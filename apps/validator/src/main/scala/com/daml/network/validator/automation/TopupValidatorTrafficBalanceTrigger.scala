@@ -11,7 +11,8 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorTrafficBalance
-import com.daml.network.util.{Contract, DomainFeesConstants}
+import com.daml.network.util.Contract
+import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.treasury.TreasuryService
@@ -25,6 +26,7 @@ import scala.concurrent.duration.*
 
 class TopupValidatorTrafficBalanceTrigger(
     override protected val context: TriggerContext,
+    buyExtraTrafficConfig: BuyExtraTrafficConfig,
     clock: Clock,
     walletManager: UserWalletManager,
     store: ValidatorStore,
@@ -36,7 +38,7 @@ class TopupValidatorTrafficBalanceTrigger(
 ) extends PollingTrigger {
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    // TODO(#4324) - Clean up the code in this trigger to be more readable.
+    // TODO(#4721) - Clean up the code in this trigger to be more readable.
     //  Also add a check to see if the user has sufficient balance to do a topup.
     // TODO(#3816) - Clean up noisy logs
     logger.debug("Executing top-up validator traffic balance trigger")
@@ -47,8 +49,8 @@ class TopupValidatorTrafficBalanceTrigger(
         .getCoinRules()
         .map(_.payload.configSchedule.currentValue.domainFeesConfig)
       (topupAmount, topupInterval) = computeTopupAmountAndInterval(
-        DomainFeesConstants.targetThroughput.value,
-        DomainFeesConstants.minTopupInterval.asFiniteApproximation,
+        buyExtraTrafficConfig.targetThroughput,
+        buyExtraTrafficConfig.minTopupInterval.asFiniteApproximation,
         domainFeesConfig,
       )
       currentTrafficBalance <- scanConnection.getValidatorTrafficBalance(

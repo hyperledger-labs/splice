@@ -4,7 +4,7 @@ import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{DomainFeesConstants, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
@@ -63,10 +63,11 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
           clue("Advance time to trigger top-up loop a few times") {
             val domainFeesConfig =
               scan.getCoinRules().payload.configSchedule.currentValue.domainFeesConfig
+            val buyExtraTrafficConfig = aliceValidator.config.domains.global.buyExtraTraffic
             val topupIntervalSecs = Math.max(
-              DomainFeesConstants.minTopupInterval.duration.toSeconds.toDouble,
+              buyExtraTrafficConfig.minTopupInterval.duration.toSeconds.toDouble,
               domainFeesConfig.minTopupAmount.doubleValue() /
-                (DomainFeesConstants.targetThroughput.value - domainFeesConfig.baseRateTrafficLimits.rate
+                (buyExtraTrafficConfig.targetThroughput - domainFeesConfig.baseRateTrafficLimits.rate
                   .doubleValue()),
             )
             val topupInterval = java.time.Duration.ofSeconds(Math.ceil(topupIntervalSecs).toLong)

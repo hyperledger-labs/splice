@@ -256,6 +256,7 @@ class ValidatorApp(
         )
       automation = new ValidatorAutomationService(
         config.automation,
+        config.domains.global.buyExtraTraffic,
         clock,
         walletManager,
         store,

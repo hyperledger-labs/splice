@@ -458,6 +458,12 @@ object CNNodeConfig {
       deriveReader[ValidatorOnboardingConfig]
     implicit val treasuryConfigReader: ConfigReader[TreasuryConfig] =
       deriveReader[TreasuryConfig]
+    implicit val buyExtraTrafficConfigReader: ConfigReader[BuyExtraTrafficConfig] =
+      deriveReader[BuyExtraTrafficConfig]
+    implicit val validatorGlobalDomainConfigReader: ConfigReader[ValidatorGlobalDomainConfig] =
+      deriveReader[ValidatorGlobalDomainConfig]
+    implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =
+      deriveReader[ValidatorDomainConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
       deriveReader[ValidatorAppBackendConfig]
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
@@ -579,10 +585,17 @@ object CNNodeConfig {
       deriveWriter[SharedCNNodeAppParameters]
     implicit val domainConfigWriter: ConfigWriter[DomainConfig] =
       deriveWriter[DomainConfig]
-    implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
-      deriveWriter[ValidatorDomainConfig]
+    implicit val globalOnlyDomainConfigWriter: ConfigWriter[GlobalOnlyDomainConfig] =
+      deriveWriter[GlobalOnlyDomainConfig]
+
     implicit val validatorOnboardingConfigWriter: ConfigWriter[ValidatorOnboardingConfig] =
       confidentialWriter[ValidatorOnboardingConfig](ValidatorOnboardingConfig.hideConfidential)
+    implicit val buyExtraTrafficWriter: ConfigWriter[BuyExtraTrafficConfig] =
+      deriveWriter[BuyExtraTrafficConfig]
+    implicit val validatorGlobalDomainConfigWriter: ConfigWriter[ValidatorGlobalDomainConfig] =
+      deriveWriter[ValidatorGlobalDomainConfig]
+    implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
+      deriveWriter[ValidatorDomainConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
       deriveWriter[ValidatorAppBackendConfig]
     implicit val validatorClientConfigWriter: ConfigWriter[ValidatorAppClientConfig] =

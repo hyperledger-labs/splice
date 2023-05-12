@@ -5,6 +5,7 @@ import com.daml.network.config.*
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.wallet.config.TreasuryConfig
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 
 import java.nio.file.Path
@@ -30,6 +31,34 @@ object ValidatorOnboardingConfig {
     config.copy(secret = hidden)
   }
 }
+
+final case class BuyExtraTrafficConfig(
+    /** target throughput in bytes per second
+      *
+      * The top-up trigger uses this to determine how much extra traffic to purchase each time.
+      * Values smaller than the SVC-determined base rate imply that no extra traffic will be
+      * purchased automatically and the throughput will be limited to the base rate.
+      */
+    targetThroughput: Double = 0, // in bytes per second
+
+    /** minimum interval between extra traffic purchases in seconds
+      *
+      * This allows validator operators to control the frequency at which the top-up trigger
+      * will charge them domain fees making spends more predictable. This should be greater than the
+      * polling interval of the top-up trigger.
+      *
+      * Note that the actual interval between topups might be larger due to the SVC requiring
+      * a minimal topup amount larger than `targetThroughput * minTopupInterval`.
+      */
+    minTopupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
+)
+
+case class ValidatorGlobalDomainConfig(
+    alias: DomainAlias,
+    buyExtraTraffic: BuyExtraTrafficConfig = BuyExtraTrafficConfig(),
+)
+
+case class ValidatorDomainConfig(global: ValidatorGlobalDomainConfig)
 
 case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),

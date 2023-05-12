@@ -5,6 +5,7 @@ import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
@@ -17,6 +18,7 @@ import scala.concurrent.ExecutionContextExecutor
 
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
+    buyExtraTrafficConfig: BuyExtraTrafficConfig,
     clock: Clock,
     walletManager: UserWalletManager,
     store: ValidatorStore,
@@ -42,6 +44,7 @@ class ValidatorAutomationService(
     registerTrigger(
       new TopupValidatorTrafficBalanceTrigger(
         triggerContext,
+        buyExtraTrafficConfig,
         clock,
         walletManager,
         store,
