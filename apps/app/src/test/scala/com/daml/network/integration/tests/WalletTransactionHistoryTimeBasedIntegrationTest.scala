@@ -12,7 +12,7 @@ import org.scalatest.OptionValues
 import java.time.Duration
 
 class WalletTransactionHistoryTimeBasedIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob", "sv1")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice", "sv1")
     with WalletTestUtil
     with WalletTxLogTestUtil
     with WalletFrontendTestUtil

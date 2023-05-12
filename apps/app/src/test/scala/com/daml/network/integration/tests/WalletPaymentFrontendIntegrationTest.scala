@@ -11,7 +11,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
 class WalletPaymentFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil {
