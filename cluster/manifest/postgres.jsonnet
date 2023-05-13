@@ -112,11 +112,8 @@ local database(name, config, namespace=null) = {
       kind: "Service",
       metadata: {
         name: name,
-        clusterName: config.clusterName,
         [if namespace != null then "namespace"]: namespace,
-        labels: {
-          clusterName: config.clusterName,
-        },
+        labels: c.standardLabels(config),
       },
       spec: {
         selector: {

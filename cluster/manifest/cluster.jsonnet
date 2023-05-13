@@ -335,11 +335,8 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
         kind: "Service",
         metadata: {
           name: name,
-          clusterName: config.clusterName,
           [if namespace != null then "namespace"]: namespace,
-          labels: {
-            clusterName: config.clusterName,
-          },
+          labels: standardLabels(config),
         },
         spec: {
           selector: {

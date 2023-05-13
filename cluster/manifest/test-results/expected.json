@@ -87,9 +87,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "docs",
             "namespace": "docs"
@@ -183,9 +183,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "gcs-proxy",
             "namespace": "docs"
@@ -341,9 +341,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres",
             "namespace": "svc"
@@ -463,9 +463,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "global-domain",
             "namespace": "svc"
@@ -634,9 +634,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "participant",
             "namespace": "svc"
@@ -775,9 +775,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "directory-app",
             "namespace": "svc"
@@ -906,9 +906,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "svc-app",
             "namespace": "svc"
@@ -1068,9 +1068,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-app",
             "namespace": "sv-1"
@@ -1207,9 +1207,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "validator-app",
             "namespace": "sv-1"
@@ -1326,9 +1326,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-web-ui",
             "namespace": "sv-1"
@@ -1445,9 +1445,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "wallet-web-ui",
             "namespace": "sv-1"
@@ -1623,9 +1623,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-app",
             "namespace": "sv-2"
@@ -1762,9 +1762,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "validator-app",
             "namespace": "sv-2"
@@ -1881,9 +1881,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-web-ui",
             "namespace": "sv-2"
@@ -2000,9 +2000,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "wallet-web-ui",
             "namespace": "sv-2"
@@ -2147,9 +2147,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres",
             "namespace": "sv-2"
@@ -2278,9 +2278,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "participant",
             "namespace": "sv-2"
@@ -2466,9 +2466,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-app",
             "namespace": "sv-3"
@@ -2605,9 +2605,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "validator-app",
             "namespace": "sv-3"
@@ -2724,9 +2724,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-web-ui",
             "namespace": "sv-3"
@@ -2843,9 +2843,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "wallet-web-ui",
             "namespace": "sv-3"
@@ -2990,9 +2990,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres",
             "namespace": "sv-3"
@@ -3121,9 +3121,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "participant",
             "namespace": "sv-3"
@@ -3309,9 +3309,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-app",
             "namespace": "sv-4"
@@ -3448,9 +3448,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "validator-app",
             "namespace": "sv-4"
@@ -3567,9 +3567,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "sv-web-ui",
             "namespace": "sv-4"
@@ -3686,9 +3686,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "wallet-web-ui",
             "namespace": "sv-4"
@@ -3833,9 +3833,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres",
             "namespace": "sv-4"
@@ -3964,9 +3964,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "participant",
             "namespace": "sv-4"
@@ -4105,9 +4105,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "scan-app",
             "namespace": "svc"
@@ -4196,9 +4196,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "scan-web-ui",
             "namespace": "svc"
@@ -4354,9 +4354,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres",
             "namespace": "validator1"
@@ -4535,9 +4535,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "participant",
             "namespace": "validator1"
@@ -4698,9 +4698,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "validator-app",
             "namespace": "validator1"
@@ -4817,9 +4817,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "wallet-web-ui",
             "namespace": "validator1"
@@ -4932,9 +4932,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "directory-web-ui",
             "namespace": "validator1"
@@ -5047,9 +5047,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "splitwell-web-ui",
             "namespace": "validator1"
@@ -5205,9 +5205,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "postgres",
             "namespace": "splitwell"
@@ -5327,9 +5327,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "domain",
             "namespace": "splitwell"
@@ -5528,9 +5528,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "participant",
             "namespace": "splitwell"
@@ -5697,9 +5697,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "validator-app",
             "namespace": "splitwell"
@@ -5816,9 +5816,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "wallet-web-ui",
             "namespace": "splitwell"
@@ -5980,9 +5980,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "splitwell-app",
             "namespace": "splitwell"
@@ -6226,9 +6226,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "external-proxy",
             "namespace": "cluster-ingress"
@@ -6395,10 +6395,9 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "clusterName": "cluster",
-            "cnjClusterName": "cluster",
             "labels": {
-               "clusterName": "cluster"
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
             },
             "name": "external",
             "namespace": "cluster-ingress"

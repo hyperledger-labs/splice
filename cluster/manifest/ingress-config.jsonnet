@@ -9,11 +9,7 @@ local externalService(config, ports) = {
       metadata: {
         name: "external",
         namespace: "cluster-ingress",
-        clusterName: config.clusterName,
-        cnjClusterName: config.clusterName,
-        labels: {
-          clusterName: config.clusterName,
-        },
+        labels: c.standardLabels(config),
       },
       spec: {
         type: "LoadBalancer",
