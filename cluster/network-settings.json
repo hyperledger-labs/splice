@@ -24,7 +24,7 @@
   "participantMemoryMib": 32768,
   "postgresCpu": 2,
   "postgresMemoryMib": 8192,
-  "ledgerDatabaseGib": 20,
+  "ledgerDatabaseGib": 40,
   "numberOfSvNodes": 4,
   "jvmHeapMemoryFactor": 0.75,
   "externalIPRanges": [

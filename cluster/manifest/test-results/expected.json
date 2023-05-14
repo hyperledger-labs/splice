@@ -328,7 +328,7 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "20Gi"
+                           "storage": "40Gi"
                         }
                      },
                      "storageClassName": "standard-rwo"
@@ -2134,7 +2134,7 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "20Gi"
+                           "storage": "40Gi"
                         }
                      },
                      "storageClassName": "standard-rwo"
@@ -2977,7 +2977,7 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "20Gi"
+                           "storage": "40Gi"
                         }
                      },
                      "storageClassName": "standard-rwo"
@@ -3820,7 +3820,7 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "20Gi"
+                           "storage": "40Gi"
                         }
                      },
                      "storageClassName": "standard-rwo"
@@ -4341,7 +4341,7 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "20Gi"
+                           "storage": "40Gi"
                         }
                      },
                      "storageClassName": "standard-rwo"
@@ -5192,7 +5192,7 @@
                      ],
                      "resources": {
                         "requests": {
-                           "storage": "20Gi"
+                           "storage": "40Gi"
                         }
                      },
                      "storageClassName": "standard-rwo"
