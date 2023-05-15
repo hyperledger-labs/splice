@@ -863,8 +863,6 @@ jobs:
           cmd: "damlTest"
           timeout: "10m"
           extra_env_vars: DAML_DEBUG=1
-          # TODO(#4150) Remove retry once bug has been fixed in damlc
-          cmd_retry_count: 3
       - cleanup_sbt_test_job
 
   # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
