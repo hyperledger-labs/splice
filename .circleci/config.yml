@@ -19,7 +19,7 @@ parameters:
     default: "16"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, auth0-user-cleanup]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   mark-for-testnet:
     type: boolean
@@ -473,7 +473,7 @@ commands:
               done
 
               if [ $n -gt $MAX_RETRY ]; then
-                echo "retrying command << parameters.cmd_name >> exceeded max retries" >&2
+                echo "Exceeded maximum retries, no more attempts << parameters.cmd_name >>" >&2
                 exit 1
               fi
             EOF
@@ -586,8 +586,7 @@ commands:
             sudo apt-get install -y expect charon-cmd
       - run:
           name: Dump public IP
-          command: |
-            curl checkip.amazonaws.com
+          command: curl checkip.amazonaws.com
       - run:
           name: Start VPN connection
           # the charon-cmd process must remain running throughout the whole job,
@@ -836,6 +835,7 @@ commands:
             fi
             echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
             echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-network-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
+
 jobs:
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
@@ -1116,6 +1116,42 @@ jobs:
           additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET"
       - save_sbt_cache
       - save_compiled_classes
+
+  cluster_lock_reaper:
+    circleci_ip_ranges: true
+    parameters:
+      cluster:
+        type: enum
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Reap locks older than 12 hours
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep SLACK_ACCESS_TOKEN"
+          gce_authenticate: true
+          cmd: |
+            set -eou pipefail
+            export KUBECONFIG=$PWD/.kubecfg
+
+            cncluster activate
+            if cncluster assert_fresh_lock; then
+              echo "Lock fresh and nothing to do."
+            else
+              lockholder=$(cncluster lockholder)
+
+              curl -s -f -X POST --url "https://slack.com/api/chat.postMessage" \
+                 -H "Content-type: application/json" \
+                 -H "Authorization: Bearer $SLACK_ACCESS_TOKEN" \
+                 --data '{ "text": "*The cluster lock on '<< parameters.cluster >>' held by '${lockholder}' is too old. Unlocking and resetting cluster.* :reaper::reaper::reaper:.", "channel": "C03J6NCPSE4" }'
+
+              cncluster ci_reset_unlock
+            fi
 
   update_pipeline_schedule:
     docker:
@@ -1789,3 +1825,32 @@ workflows:
       equal: [ auth0-user-cleanup, << pipeline.parameters.run-job >> ]
     jobs:
       - auth0_user_cleanup
+
+  cluster_lock_reaper:
+    when:
+      equal: [ cluster-lock-reaper, << pipeline.parameters.run-job >> ]
+    jobs:
+       - cluster_lock_reaper:
+            <<: *main-branch-only
+            cluster: "scratchneta"
+            context:
+              - canton-network-vpn
+              - slack-context
+       - cluster_lock_reaper:
+            <<: *main-branch-only
+            cluster: "scratchnetb"
+            context:
+              - canton-network-vpn
+              - slack-context
+       - cluster_lock_reaper:
+            <<: *main-branch-only
+            cluster: "scratchnetc"
+            context:
+              - canton-network-vpn
+              - slack-context
+       - cluster_lock_reaper:
+            <<: *main-branch-only
+            cluster: "scratchnetd"
+            context:
+              - canton-network-vpn
+              - slack-context

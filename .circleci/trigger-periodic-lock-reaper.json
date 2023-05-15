@@ -1,0 +1,25 @@
+{
+    "name" : "Scratch cluster lock reaper",
+    "description" : "Periodically check for cluster locks held for too long",
+    "attribution-actor": "system",
+    "parameters" : {
+      "branch" : "main",
+      "run-job": "cluster-lock-reaper"
+    },
+    "timetable" : {
+      "per-hour" : 1,
+      "hours-of-day": [
+        0,
+        3,
+        6,
+        9,
+        12,
+        15,
+        18,
+        21
+      ],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}

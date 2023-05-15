@@ -170,8 +170,13 @@ function _current_lockholder() {
 function _current_lock_age() {
     lock_timestamp=$(kubectl get secret cluster-lock -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null | xargs -0 -I X date -d X +%s)
     current_timestamp=$(date +%s)
-    diff="$((current_timestamp-lock_timestamp))"
-    echo "$((diff / 86400)) days(s), $(((diff % 86400) / 3600)) hour(s), $(((diff % 3600) / 60)) minute(s)"
+    echo "$((current_timestamp-lock_timestamp))"
+}
+
+
+function _current_lock_age_formatted() {
+    age_secs="$(_current_lock_age)"
+    echo "$((age_secs / 86400)) days(s), $(((age_secs % 86400) / 3600)) hour(s), $(((age_secs % 3600) / 60)) minute(s)"
 }
 
 function _assert_lock() {
@@ -658,6 +663,29 @@ function subcmd_ci_apply() {
 
     _cluster_reset
     _cluster_apply "${SOURCE_IMAGE_TAG}"
+}
+
+###
+
+subcommand_whitelist[assert_fresh_lock]='Run only by CircleCI'
+
+function subcmd_assert_fresh_lock() {
+    if [ -z "${SHARED_CLUSTER:-}" ]; then
+        _info "Cluster not marked as shared. No lock to check."
+        exit 0
+    fi
+
+    if lockholder=$(_current_lockholder); then
+        age_secs="$(_current_lock_age)"
+
+        if (( age_secs > 43200 )); then
+            _error "Cluster lock old (and probably stale)."
+        else
+            _info "Cluster lock fresh."
+        fi
+    else
+        _info "Cluster sharable but not locked. No lock to check."
+    fi
 }
 
 ###
@@ -1233,14 +1261,22 @@ subcommand_whitelist[lock]="Attempt to claim the lock on a cluster."
 function subcmd_lock() {
     if lockholder=$(_current_lockholder); then
         if [ "${lockholder}" = "$(whoami)" ]; then
-            _info "Cluster is already locked to you."
+            _info "Cluster is already locked to you. Lock age: $(_current_lock_age_formatted)."
         else
-            _error "Cluster already locked by: ${lockholder}. Lock age: $(_current_lock_age)."
+            _error "Cluster already locked by: ${lockholder}. Lock age: $(_current_lock_age_formatted)."
         fi
     else
         kubectl create secret generic cluster-lock --from-literal=lockholder="$(whoami)" > /dev/null
         _info "Cluster lock claimed successfully."
     fi
+}
+
+###
+
+subcommand_whitelist[lockholder]="Print the current lockholder, if any, for the cluster."
+
+function subcmd_lockholder() {
+    _current_lockholder
 }
 
 ###
