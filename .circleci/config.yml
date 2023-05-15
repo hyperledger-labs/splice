@@ -782,7 +782,7 @@ commands:
             for app in "${apps[@]}"
             do
               echo "Use the following command to download logs for $app '$query':"
-              echo "cncluster gcloud_logs $app \"$query\""
+              echo "cncluster gcloud_logs $app '$query'"
             done
 
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
