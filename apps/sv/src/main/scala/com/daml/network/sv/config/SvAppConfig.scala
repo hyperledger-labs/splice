@@ -77,6 +77,7 @@ case class SvAppBackendConfig(
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     onboarding: SvOnboardingConfig = SvOnboardingConfig.JoinViaSvcApp(),
     enableCoinRulesUpgrade: Boolean = false,
+    cometBftConfig: Option[CometBftConfig] = None,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 
@@ -88,3 +89,7 @@ case class SvAppClientConfig(
 ) extends HttpCNNodeClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
+case class CometBftConfig(
+    enabled: Boolean = false,
+    connectionUri: String = "",
+)

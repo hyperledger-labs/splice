@@ -7,8 +7,7 @@ trait CometBftContainerAround extends BeforeAndAfterAll {
 
   private val container = new CometBftContainer
   lazy val connectionConfig: CometBftConnectionConfig = CometBftConnectionConfig(
-    container.getIp,
-    container.getPort,
+    s"http://${container.getIp}:${container.getPort}"
   )
 
   override protected def beforeAll(): Unit = {

@@ -49,6 +49,27 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListValidatorLicensesResponse"
+  /admin/domain/cometbft/status:
+    get:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "getCometBftNodeStatus"
+      responses:
+        "200":
+          description: "Response returned by the CometBFT node, or the error if the call failed"
+          content:
+            application/json:
+              schema:
+                # Either `response` or `error` will be populated. To be improved once oneOf is supported
+                "$ref": "#/components/schemas/CometBftStatusOrError"
+        "404":
+          description: "CometBFT is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -264,6 +285,32 @@ components:
         secret:
           type: string
 
+    CometBftStatusOrError:
+      type: object
+      # TODO(tech-debt): Either `response` or `error` will be populated. To be improved once oneOf is supported
+      properties:
+        error:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+        response:
+          $ref: "#/components/schemas/CometBftNodeStatusResponse"
+
+    CometBftNodeStatusResponse:
+      type: object
+      required:
+        - id
+        - catching_up
+        - voting_power
+      properties:
+        id:
+          type: string
+          description: "The node-id of the CometBFT node"
+        catching_up:
+          type: boolean
+          description: "Is the node still catching up to the other nodes in the network"
+        voting_power:
+          type: number
+          description: "The voting power assigned to the CometBFT node"
+
     ApproveSvIdentityRequest:
       type: object
       required:
@@ -367,4 +414,3 @@ components:
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
-

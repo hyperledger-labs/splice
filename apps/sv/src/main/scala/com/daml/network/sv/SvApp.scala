@@ -1,5 +1,7 @@
 package com.daml.network.sv
 
+import java.security.interfaces.ECPrivateKey
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
@@ -24,6 +26,11 @@ import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.auth.SvAuthExtractor
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.cometbft.{
+  CometBftClient,
+  CometBftConnectionConfig,
+  CometBftHttpRpcClient,
+}
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
@@ -50,7 +57,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -147,11 +153,24 @@ class SvApp(
         loggerFactory,
       )
 
+      cometBftStatusClient = config.cometBftConfig
+        .filter(_.enabled)
+        .map(connectionConfig =>
+          new CometBftClient(
+            new CometBftHttpRpcClient(
+              CometBftConnectionConfig(connectionConfig.connectionUri),
+              loggerFactory,
+            ),
+            loggerFactory,
+          )
+        )
+
       adminHandler = new HttpSvAdminHandler(
         ledgerClient,
         globalDomain,
         svStore,
         svcStore,
+        cometBftStatusClient,
         clock,
         loggerFactory,
       )

@@ -2,4 +2,4 @@
 
 package com.daml.network.sv.cometbft
 
-case class CometBftConnectionConfig(cometbftNodeHost: String, cometbftNodePort: Int)
+case class CometBftConnectionConfig(uri: String)

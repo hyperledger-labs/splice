@@ -2,7 +2,7 @@
 
 package com.daml.network.sv.cometbft
 
-import com.daml.network.sv.cometbft.CometBftGovernanceClientIntegrationTest.{
+import com.daml.network.sv.cometbft.CometBftClientIntegrationTest.{
   InitialVotingPower,
   PubKey2,
   SvNode2,
@@ -25,16 +25,14 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.ExecutionContext
 
-class CometBftGovernanceClientIntegrationTest
+class CometBftClientIntegrationTest
     extends AsyncWordSpec
     with BaseTest
     with CometBftContainerAround {
 
   override implicit def executionContext: ExecutionContext = ExecutionContext.global
-
-  private lazy val cometBftClient = new CometBftGovernanceClient(
-    new CometBftClient(connectionConfig, NamedLoggerFactory.root)
-  )
+  lazy val client = new CometBftHttpRpcClient(connectionConfig, NamedLoggerFactory.root)
+  private lazy val cometBftClient = new CometBftClient(client, loggerFactory)
 
   "CometBFT Canton Network ABCI app" should {
     "get the initial network config state" in {
@@ -72,7 +70,7 @@ class CometBftGovernanceClientIntegrationTest
       } yield {
         eventually() {
           cometBftClient
-            .readNetworkConfig()(ExecutionContext.global)
+            .readNetworkConfig()
             .map { networkConfig =>
               val newState = networkConfig.svNodeConfigStates.get(SvNode2).value
               newState.currentConfigRevision shouldBe 1
@@ -90,9 +88,23 @@ class CometBftGovernanceClientIntegrationTest
     }
   }
 
+  "CometBFT status call" should {
+
+    "read status" in {
+      cometBftClient
+        .nodeStatus()
+        .map { status =>
+          status.validatorInfo.votingPower.toDouble should be > 0d
+          status.syncInfo.catchingUp shouldBe false
+        }
+        .valueOrFail("Reading status")
+    }
+
+  }
+
 }
 
-object CometBftGovernanceClientIntegrationTest {
+object CometBftClientIntegrationTest {
   private val InitialVotingPower = 10L
 
   private val PubKey2 = "pubKey2"

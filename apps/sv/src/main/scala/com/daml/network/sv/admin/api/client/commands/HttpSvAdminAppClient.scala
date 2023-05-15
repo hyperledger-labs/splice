@@ -7,6 +7,8 @@ import cats.implicits.{toBifunctorOps, toTraverseOps}
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
+import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
+import com.daml.network.http.v0.svAdmin.GetCometBftNodeStatusResponse
 import com.daml.network.http.v0.{definitions, svAdmin as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.tracing.TraceContext
@@ -155,6 +157,30 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.IsAuthorizedResponse.OK =>
       Right(())
+    }
+  }
+
+  case class GetCometBftNodeStatus()
+      extends BaseCommand[
+        http.GetCometBftNodeStatusResponse,
+        definitions.CometBftNodeStatusResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCometBftNodeStatusResponse] =
+      client.getCometBftNodeStatus(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      GetCometBftNodeStatusResponse,
+      Either[String, CometBftNodeStatusResponse],
+    ] = { case http.GetCometBftNodeStatusResponse.OK(response) =>
+      response.response.toRight(response.error.map(_.error).getOrElse("No response found"))
     }
   }
 

@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
@@ -62,6 +63,7 @@ abstract class SvAppReference(
     consoleEnvironment.run {
       httpCommand(HttpSvAppClient.OnboardSvPartyMigrationAuthorize(participantId))
     }
+
 }
 
 class SvAppClientReference(
@@ -137,6 +139,12 @@ class SvAppBackendReference(
       )
     }
   }
+
+  @Help.Summary("Get the CometBFT node status")
+  def cometBftNodeStatus(): CometBftNodeStatusResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.GetCometBftNodeStatus())
+    }
 
   /** Remote participant this sv app is configured to interact with. */
   lazy val participantClient =

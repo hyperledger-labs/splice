@@ -428,7 +428,7 @@ object CNNodeConfigTransforms {
     * These are 128 character random strings (not JWTs), generated independently for each local participant node at canton startup.
     * Attaching an admin token to a ledger API request allows you to bypass auth, i.e., to act as any party and perform all admin operations.
     * There is (intentionally) no way of getting the admin tokens from an external canton process,
-    * so we export them to a file in our canton bootstrap script (see `bootstrap-canton.canton`).
+    * so we export them to a file in our canton bootstrap script (see `bootstrap-canton.sc`).
     */
   private def readTokenDataFile(clockConfig: ClockConfig): Map[Int, String] = {
     val tokens: mutable.Map[Int, String] = mutable.Map.empty

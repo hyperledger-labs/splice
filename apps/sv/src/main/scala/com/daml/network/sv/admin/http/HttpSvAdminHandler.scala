@@ -1,9 +1,17 @@
 package com.daml.network.sv.admin.http
 
+import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.environment.CNLedgerClient
+import com.daml.network.http.v0.definitions.{
+  CometBftNodeStatusResponse,
+  CometBftStatusOrError,
+  ErrorResponse,
+}
+import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.http.v0.{definitions, svAdmin as v0}
 import com.daml.network.sv.SvApp
+import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.Codec
@@ -21,6 +29,7 @@ class HttpSvAdminHandler(
     globalDomain: DomainId,
     svStore: SvSvStore,
     svcStore: SvSvcStore,
+    cometBftClient: Option[CometBftClient],
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -153,4 +162,37 @@ class HttpSvAdminHandler(
     withNewTrace(workflowId) { _ => _ =>
       Future.successful(v0.SvAdminResource.IsAuthorizedResponseOK)
     }
+
+  override def getCometBftNodeStatus(
+      respond: SvAdminResource.GetCometBftNodeStatusResponse.type
+  )()(extracted: String): Future[
+    SvAdminResource.GetCometBftNodeStatusResponse
+  ] = withNewTrace(workflowId) { implicit tc => _ =>
+    cometBftClient
+      .fold {
+        SvAdminResource
+          .GetCometBftNodeStatusResponse(
+            SvAdminResource.GetCometBftNodeStatusResponseNotFound(
+              ErrorResponse("CometBFT is not configured.")
+            )
+          )
+          .pure[Future]
+      } {
+        _.nodeStatus()
+          .fold(
+            error =>
+              CometBftStatusOrError(
+                error = ErrorResponse(error.message).some
+              ),
+            status =>
+              CometBftStatusOrError(
+                response = CometBftNodeStatusResponse(
+                  status.nodeInfo.id,
+                  status.syncInfo.catchingUp,
+                  BigDecimal(status.validatorInfo.votingPower),
+                ).some
+              ),
+          )
+      }
+  }
 }

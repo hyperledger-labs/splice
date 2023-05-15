@@ -455,6 +455,7 @@ object CNNodeConfig {
       deriveReader[ExpectedOnboardingConfig]
     implicit val approvedSvIdentityConfigReader: ConfigReader[ApprovedSvIdentityConfig] =
       deriveReader[ApprovedSvIdentityConfig]
+    implicit val cometBftConfigReader: ConfigReader[CometBftConfig] = deriveReader
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig]
 
@@ -587,6 +588,7 @@ object CNNodeConfig {
       confidentialWriter[ExpectedOnboardingConfig](ExpectedOnboardingConfig.hideConfidential)
     implicit val approvedSvIdentityConfigWriter: ConfigWriter[ApprovedSvIdentityConfig] =
       deriveWriter[ApprovedSvIdentityConfig]
+    implicit val cometBftConfigWriter: ConfigWriter[CometBftConfig] = deriveWriter
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

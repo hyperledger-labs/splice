@@ -959,7 +959,7 @@ lazy val `apps-app` =
       `apps-directory`,
       `apps-validator`,
       `apps-svc`,
-      `apps-sv`,
+      `apps-sv` % "compile->compile;test->test",
       `apps-scan`,
       `apps-wallet`,
       `canton-coin-api-daml`,
