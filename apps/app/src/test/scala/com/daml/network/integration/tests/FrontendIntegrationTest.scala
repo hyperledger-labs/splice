@@ -161,7 +161,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       logger.debug(s"FirefoxDriver started, attempting to get BiDi connection... ($name)")
       val bidi = Try(driver.getBiDi()).toEither.valueOr { e =>
         logger.info(s"Failed to get BiDi connection to FirefoxDriver ($name). The error was $e")
-        driver.quit()
+        Try(driver.quit()).leftSide.foreach(e => logger.debug("Driver failed to quit properly.", e))
         fail()
       }
 
