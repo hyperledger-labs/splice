@@ -140,7 +140,7 @@ class SvFrontendIntegrationTest
             loginOnCurrentPage(port, sv1.config.ledgerApiUser)
           },
         )(
-          "We see a median coin price, desired coin price of SV1 and other SVs",
+          "We see a median coin price, desired coin price of SV1 and other SVs, open mining rounds",
           _ => {
             inside(find(id("median-coin-price-usd"))) { case Some(e) =>
               e.text shouldBe "1 USD"
@@ -153,6 +153,12 @@ class SvFrontendIntegrationTest
             svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "Not Set")
             svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "Not Set")
             svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "Not Set")
+
+            val roundRows = findAll(className("open-mining-round-row")).toSeq
+            roundRows should have size 3
+            forEvery(roundRows) {
+              _.childElement(className("coin-price")).text shouldBe "1 USD"
+            }
           },
         )
 

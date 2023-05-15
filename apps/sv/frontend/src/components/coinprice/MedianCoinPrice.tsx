@@ -46,7 +46,7 @@ const MedianCoinPrice: React.FC = () => {
   }
 
   return (
-    <Stack mt={4} spacing={4} direction="column" justifyContent="center">
+    <Stack mt={4} direction="column" justifyContent="center">
       <Typography variant="h4">Coin Price for Next Open Mining Round</Typography>
       <Typography id="median-coin-price-usd" variant="h2">
         {medianCoinPrice && <AmountDisplay amount={medianCoinPrice} currency="USD" />}

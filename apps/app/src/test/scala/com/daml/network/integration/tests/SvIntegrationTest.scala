@@ -97,6 +97,11 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("The founding SV app (sv1) is the first leader") {
       getSvcRules().data.leader should equal(sv1.getSvcInfo().svParty.toProtoPrimitive)
     }
+    clue("initial open mining rounds are created") {
+      eventually() {
+        sv1.listOpenMiningRounds() should have size 3
+      }
+    }
   }
 
   "SV parties can't act as the SVC party and can read as both themselves and the SVC party" in {
@@ -851,6 +856,13 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         )
       },
     )
+  }
+
+  "SV can see the current active open mining rounds" in { implicit env =>
+    initSvc()
+    eventually() {
+      sv1.listOpenMiningRounds() should have size 3
+    }
   }
 
   private def getCoinPriceVoteMap()(implicit env: CNNodeTestConsoleEnvironment) =

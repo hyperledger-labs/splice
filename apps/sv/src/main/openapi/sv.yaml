@@ -98,6 +98,18 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListCoinPriceVotesResponse"
+  /admin/sv/open-mining-rounds:
+    get:
+      tags: [ sv ]
+      x-jvm-package: svAdmin
+      operationId: "ListOpenMiningRounds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListOpenMiningRoundsResponse"
   /admin/sv/coin-price/vote:
     put:
       tags: [sv]
@@ -328,6 +340,16 @@ components:
         - coin_price_votes
       properties:
         coin_price_votes:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    ListOpenMiningRoundsResponse:
+      type: object
+      required:
+        - open_mining_rounds
+      properties:
+        open_mining_rounds:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"

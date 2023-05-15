@@ -6,6 +6,7 @@ import {
   createConfiguration,
   ListCoinPriceVotesResponse,
   ListOngoingValidatorOnboardingsResponse,
+  ListOpenMiningRoundsResponse,
   ListValidatorLicensesResponse,
   Middleware,
   PrepareValidatorOnboardingRequest,
@@ -29,6 +30,7 @@ export interface SvAdminClient {
   listValidatorLicenses: () => Promise<ListValidatorLicensesResponse>;
   listCoinPriceVotes: () => Promise<ListCoinPriceVotesResponse>;
   updateDesiredCoinPrice: (coinPrice: BigNumber) => Promise<void>;
+  listOpenMiningRounds: () => Promise<ListOpenMiningRoundsResponse>;
 }
 
 class ApiMiddleware
@@ -71,6 +73,9 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       updateDesiredCoinPrice: async (coinPrice: BigNumber): Promise<void> => {
         const request: UpdateCoinPriceVoteRequest = { coinPrice: coinPrice.toString() };
         return await svAdminClient.updateCoinPriceVote(request);
+      },
+      listOpenMiningRounds: async (): Promise<ListOpenMiningRoundsResponse> => {
+        return await svAdminClient.listOpenMiningRounds();
       },
     };
   }, [url, userAccessToken]);

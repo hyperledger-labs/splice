@@ -5,6 +5,7 @@ import akka.stream.Materializer
 import cats.data.EitherT
 import cats.implicits.{toBifunctorOps, toTraverseOps}
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
@@ -133,6 +134,28 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.UpdateCoinPriceVoteResponse.OK =>
       Right(())
+    }
+  }
+
+  case object ListOpenMiningRounds
+      extends BaseCommand[http.ListOpenMiningRoundsResponse, Seq[
+        Contract[OpenMiningRound.ContractId, OpenMiningRound]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListOpenMiningRoundsResponse] =
+      client.listOpenMiningRounds(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListOpenMiningRoundsResponse.OK(response) =>
+      response.openMiningRounds
+        .traverse(req => Contract.fromJson(OpenMiningRound.COMPANION)(req))
+        .leftMap(_.toString)
     }
   }
 

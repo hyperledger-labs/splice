@@ -3,6 +3,7 @@ package com.daml.network.console
 import akka.util.ByteString
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
+import com.daml.network.codegen.java.cc.round as cr
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -132,10 +133,20 @@ class SvAppBackendReference(
       )
     }
 
+  @Help.Summary("List cc price vote (via admin API)")
   def listCoinPriceVotes(): Seq[Contract[cp.CoinPriceVote.ContractId, cp.CoinPriceVote]] = {
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.ListCoinPriceVotes
+      )
+    }
+  }
+
+  @Help.Summary("List open mining rounds (via admin API)")
+  def listOpenMiningRounds(): Seq[Contract[cr.OpenMiningRound.ContractId, cr.OpenMiningRound]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.ListOpenMiningRounds
       )
     }
   }

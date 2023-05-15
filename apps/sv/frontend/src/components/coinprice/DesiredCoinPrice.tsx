@@ -68,7 +68,7 @@ const DesiredCoinPrice: React.FC = () => {
 
   const isInvalidPrice = curPrice.lte(0.0);
   return (
-    <Stack mt={4} spacing={4} direction="column" justifyContent="center">
+    <>
       <Typography mt={6} variant="h4">
         {'Your Desired Canton Coin Price'}
       </Typography>
@@ -105,7 +105,7 @@ const DesiredCoinPrice: React.FC = () => {
           </Stack>
         )
       ) : (
-        <Typography id="cur-sv-coin-price-usd" mt={6} variant="h6">
+        <Typography id="cur-sv-coin-price-usd" variant="h6">
           {curSvCoinPriceVote?.coinPrice ? (
             <AmountDisplay amount={maybeBigNumber(curSvCoinPriceVote.coinPrice)!} currency="USD" />
           ) : (
@@ -156,7 +156,7 @@ const DesiredCoinPrice: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-    </Stack>
+    </>
   );
 };
 

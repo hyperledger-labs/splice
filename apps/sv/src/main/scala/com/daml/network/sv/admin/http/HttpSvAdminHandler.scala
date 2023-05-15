@@ -133,6 +133,23 @@ class HttpSvAdminHandler(
     }
   }
 
+  def listOpenMiningRounds(respond: v0.SvAdminResource.ListOpenMiningRoundsResponse.type)()(
+      adminUser: String
+  ): Future[v0.SvAdminResource.ListOpenMiningRoundsResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        openMiningRoundTriple <- svcStore.lookupOpenMiningRoundTriple()
+      } yield {
+        definitions.ListOpenMiningRoundsResponse(
+          (openMiningRoundTriple match {
+            case Some(triple) => triple.toSeq
+            case _ => Seq.empty
+          }).map(_.toJson).toVector
+        )
+      }
+    }
+  }
+
   def updateCoinPriceVote(
       respond: v0.SvAdminResource.UpdateCoinPriceVoteResponse.type
   )(
