@@ -81,6 +81,7 @@ setupValidator' app name = do
   userId <- validateUserId name
   -- TODO(#2957): remove read-as SVC.
   createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.svc]
+  recordValidatorOf app validatorParty validatorParty
   tap app (CCUser userId validatorParty) 1.0
   let validatorUser = CCUser with
         primaryParty = validatorParty
@@ -104,23 +105,23 @@ setupUser app name validator = do
   tap app u 1.0
   return u
 
-setupSelfHostedUser: CCApp -> Text -> Script (CCUser, Party)
+setupSelfHostedUser: CCApp -> Text -> Script (CCUser, CCUser)
 setupSelfHostedUser app name = do
-  validator <- setupValidator app (name <> "_validator")
-  user <- setupUser app name validator
+  validator <- setupValidator' app (name <> "_validator")
+  user <- setupUser app name validator.primaryParty
   return (user, validator)
 
 data DefaultAppWithUsers = DefaultAppWithUsers with
     app: CCApp
     alice: CCUser
-    aliceValidator : Party
+    aliceValidator : CCUser
     bob: CCUser
     charlie: CCUser
-    bobValidator: Party
+    bobValidator: CCUser
     provider1: CCUser
-    provider1Validator: Party
+    provider1Validator: CCUser
     provider2: CCUser
-    provider2Validator: Party
+    provider2Validator: CCUser
   deriving (Show, Eq, Ord)
 
 setupDefaultAppWithUsers: Script DefaultAppWithUsers
@@ -128,7 +129,7 @@ setupDefaultAppWithUsers = do
   app <- setupApp
   (alice, aliceValidator) <- setupSelfHostedUser app "alice"
   (bob, bobValidator) <- setupSelfHostedUser app "bob"
-  charlie <- setupUser app "charlie" bobValidator
+  charlie <- setupUser app "charlie" bobValidator.primaryParty
   (provider1, provider1Validator) <- setupSelfHostedUser app "provider1"
   (provider2, provider2Validator) <- setupSelfHostedUser app "provider2"
   return DefaultAppWithUsers with ..
