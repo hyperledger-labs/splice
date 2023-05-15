@@ -193,7 +193,8 @@ following content.
     scanPort: "5012"
     scanAddress: "https://TARGET_CLUSTER.network.canton.global"
     # Replace SV_WALLET_USER_ID with the user id in your IAM that you want to use to log into
-    # the wallet as the SV party:
+    # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
+    # not only the suffix ``43b68e1e4978b000cefba352``:
     validatorWalletUser: "SV_WALLET_USER_ID"
     clusterUrl: "TARGET_CLUSTER.network.canton.global"
     auth:
