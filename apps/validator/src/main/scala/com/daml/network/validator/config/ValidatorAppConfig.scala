@@ -7,6 +7,7 @@ import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 
 import java.nio.file.Path
 
@@ -39,7 +40,8 @@ final case class BuyExtraTrafficConfig(
       * Values smaller than the SVC-determined base rate imply that no extra traffic will be
       * purchased automatically and the throughput will be limited to the base rate.
       */
-    targetThroughput: Double = 0, // in bytes per second
+    targetThroughput: NonNegativeNumeric[BigDecimal] =
+      NonNegativeNumeric.tryCreate(BigDecimal(0)), // in bytes per second
 
     /** minimum interval between extra traffic purchases in seconds
       *
@@ -47,8 +49,8 @@ final case class BuyExtraTrafficConfig(
       * will charge them domain fees making spends more predictable. This should be greater than the
       * polling interval of the top-up trigger.
       *
-      * Note that the actual interval between topups might be larger due to the SVC requiring
-      * a minimal topup amount larger than `targetThroughput * minTopupInterval`.
+      * Note that the actual interval between top-ups might be larger due to the SVC requiring
+      * a minimal top-up amount larger than `(targetThroughput - freeBaseThroughput) * minTopupInterval`.
       */
     minTopupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
 )

@@ -11,6 +11,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
@@ -304,6 +305,23 @@ trait TimeTestUtil extends CNNodeTestCommon {
   ) = advanceTime(
     appRef.config.automation.pollingInterval.asJava
   )
+
+  /** This function advances time sufficiently to trigger an extra traffic top-up
+    * for the provided validator.
+    *
+    * Note that it does not guarantee that a top-up will occur because the validator
+    * may still have enough traffic balance remaining to not warrant another top-up.
+    */
+  def advanceTimeByMinTopupInterval(validatorAppRef: ValidatorAppBackendReference)(implicit
+      env: CNNodeTestConsoleEnvironment
+  ) = {
+    val validatorTopupParameters = ExtraTrafficTopupParameters(
+      scan.getCoinRules().payload.configSchedule.currentValue.domainFeesConfig,
+      validatorAppRef.config.domains.global.buyExtraTraffic,
+      validatorAppRef.config.automation.pollingInterval,
+    )
+    advanceTime(validatorTopupParameters.minTopupInterval.asJava)
+  }
 
   def getSortedOpenMiningRounds(
       participantClient: CNParticipantClientReference,

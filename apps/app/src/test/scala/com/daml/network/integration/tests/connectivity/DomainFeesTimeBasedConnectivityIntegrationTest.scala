@@ -61,19 +61,9 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
             aliceValidatorWallet.tap(1000)
           }
           clue("Advance time to trigger top-up loop a few times") {
-            val domainFeesConfig =
-              scan.getCoinRules().payload.configSchedule.currentValue.domainFeesConfig
-            val buyExtraTrafficConfig = aliceValidator.config.domains.global.buyExtraTraffic
-            val topupIntervalSecs = Math.max(
-              buyExtraTrafficConfig.minTopupInterval.duration.toSeconds.toDouble,
-              domainFeesConfig.minTopupAmount.doubleValue() /
-                (buyExtraTrafficConfig.targetThroughput - domainFeesConfig.baseRateTrafficLimits.rate
-                  .doubleValue()),
-            )
-            val topupInterval = java.time.Duration.ofSeconds(Math.ceil(topupIntervalSecs).toLong)
-            advanceTime(topupInterval)
-            advanceTime(topupInterval)
-            advanceTime(topupInterval)
+            advanceTimeByMinTopupInterval(aliceValidator)
+            advanceTimeByMinTopupInterval(aliceValidator)
+            advanceTimeByMinTopupInterval(aliceValidator)
           }
         },
         entries => {

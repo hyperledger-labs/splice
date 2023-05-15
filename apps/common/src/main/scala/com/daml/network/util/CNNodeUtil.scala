@@ -147,15 +147,13 @@ object CNNodeUtil {
 
   val defaultLockHolderFee = new cc.fees.FixedFee(BigDecimal(0.005).bigDecimal)
 
-  val baseRateTrafficLimits = new BaseRateTrafficLimits(
-    damlDecimal(333.0), // base rate
-    new RelTime(10 * 60 * 1_000_000), // burst window
-  )
-  val defaultDomainFeesConfig = new DomainFeesConfig(
-    baseRateTrafficLimits,
-    damlDecimal(1.0), // extraTrafficPrice (in $/MB)
-    damlDecimal(0.02), // readScalingFactor
-    1_000_000, // minTopupAmount (in bytes)
+  val defaultExtraTrafficPrice = damlDecimal(1.0) // extraTrafficPrice (in $/MB)
+  val defaultReadScalingFactor = damlDecimal(0.02) // charge 2% of write cost for every read
+  val defaultDomainFeesConfig = domainFeesConfig(
+    // 10 txs of 20kB each in a window of 10 mins
+    damlDecimal(333.0),
+    NonNegativeFiniteDuration.ofMinutes(10),
+    1_000_000, // minTopupAmount = 1MB
   )
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
@@ -220,6 +218,28 @@ object CNNodeUtil {
     50,
     // 2.5 min default duration
   )
+
+  def baseRateLimits(baseRate: BigDecimal, baseRateBurstWindow: NonNegativeFiniteDuration) = {
+    new BaseRateTrafficLimits(
+      baseRate.bigDecimal,
+      new RelTime(TimeUnit.NANOSECONDS.toMicros(baseRateBurstWindow.duration.toNanos)),
+    )
+  }
+
+  def domainFeesConfig(
+      baseRate: BigDecimal,
+      baseRateBurstWindow: NonNegativeFiniteDuration,
+      minTopupAmount: Long,
+      extraTrafficPrice: BigDecimal = defaultExtraTrafficPrice,
+      readScalingFactor: BigDecimal = defaultReadScalingFactor,
+  ) = {
+    new DomainFeesConfig(
+      baseRateLimits(baseRate, baseRateBurstWindow),
+      extraTrafficPrice.bigDecimal,
+      readScalingFactor.bigDecimal,
+      minTopupAmount,
+    )
+  }
 
   def defaultEnabledChoices: cc.api.v1.coin.EnabledChoices =
     new cc.api.v1.coin.EnabledChoices(

@@ -28,6 +28,7 @@ import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImp
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.domain.config.{CommunityDomainConfig, RemoteDomainConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{
@@ -380,6 +381,9 @@ object CNNodeConfig {
     import DeprecatedConfigUtils.*
     import CantonDeprecationImplicits.*
 
+    implicit val nonNegativeBigDecimalReader: ConfigReader[NonNegativeNumeric[BigDecimal]] =
+      NonNegativeNumeric.nonNegativeNumericReader[BigDecimal]
+
     implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
 
     implicit val hs256UnsafeConfig: ConfigReader[AuthConfig.Hs256Unsafe] =
@@ -504,6 +508,9 @@ object CNNodeConfig {
     import writers.*
     import DeprecatedConfigUtils.*
     import CantonDeprecationImplicits.*
+
+    implicit val nonNegativeBigDecimalWriter: ConfigWriter[NonNegativeNumeric[BigDecimal]] =
+      ConfigWriter.toString(x => x.unwrap.toString)
 
     // Use a `confidentialWriter` if a config can contain confidential values!
     // Also consider revisiting if the "leaked secrets check" in

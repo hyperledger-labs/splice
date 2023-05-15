@@ -2,7 +2,7 @@ package com.daml.network.validator.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.cc.domainfees.{DomainFeesConfig, ValidatorTraffic}
+import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyExtraTraffic
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_BuyExtraTraffic,
@@ -14,15 +14,16 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.Validat
 import com.daml.network.util.Contract
 import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.treasury.TreasuryService
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.*
 
 class TopupValidatorTrafficBalanceTrigger(
     override protected val context: TriggerContext,
@@ -48,16 +49,21 @@ class TopupValidatorTrafficBalanceTrigger(
       domainFeesConfig <- scanConnection
         .getCoinRules()
         .map(_.payload.configSchedule.currentValue.domainFeesConfig)
-      (topupAmount, topupInterval) = computeTopupAmountAndInterval(
-        buyExtraTrafficConfig.targetThroughput,
-        buyExtraTrafficConfig.minTopupInterval.asFiniteApproximation,
+      topupParameters = ExtraTrafficTopupParameters(
         domainFeesConfig,
+        buyExtraTrafficConfig,
+        context.config.pollingInterval,
       )
       currentTrafficBalance <- scanConnection.getValidatorTrafficBalance(
         store.key.validatorParty
       )
       result <-
-        if (toppingUpTooSoon(validatorTraffic.payload.lastPurchasedAt, topupInterval)) {
+        if (
+          toppingUpTooSoon(
+            validatorTraffic.payload.lastPurchasedAt,
+            topupParameters.minTopupInterval,
+          )
+        ) {
           logger.debug(
             s"Trying to topup too soon after previous topup at ${validatorTraffic.payload.lastPurchasedAt}"
           )
@@ -69,14 +75,13 @@ class TopupValidatorTrafficBalanceTrigger(
               s"Latest purchased traffic ingested from ledger: ${validatorTraffic.payload.totalPurchased}"
           )
           Future.successful(false)
-        } else if (currentTrafficBalance.remainingBalance >= topupAmount) {
+        } else if (currentTrafficBalance.remainingBalance >= topupParameters.topupAmount) {
           Future.successful(false)
         } else {
           topUpValidatorTraffic(
             validatorTreasury,
             validatorTraffic.contractId,
-            topupInterval,
-            topupAmount,
+            topupParameters,
           )
         }
     } yield result
@@ -110,9 +115,9 @@ class TopupValidatorTrafficBalanceTrigger(
 
   private def toppingUpTooSoon(
       lastPurchasedAt: java.time.Instant,
-      topupInterval: FiniteDuration,
+      topupInterval: NonNegativeFiniteDuration,
   ): Boolean = {
-    lastPurchasedAt.toEpochMilli + topupInterval.toMillis > clock.nowInMicrosecondsSinceEpoch / 1000
+    lastPurchasedAt.toEpochMilli + topupInterval.duration.toMillis > clock.nowInMicrosecondsSinceEpoch / 1000
   }
 
   private def isTrafficBalanceStale(
@@ -121,52 +126,16 @@ class TopupValidatorTrafficBalanceTrigger(
   ) =
     trafficBalance.totalPurchased < ingestedTrafficContract.payload.totalPurchased
 
-  private def computeTopupAmountAndInterval(
-      targetRateBytesPerSecond: Double,
-      minTopupInterval: FiniteDuration,
-      domainFeesConfig: DomainFeesConfig,
-  ): (Long, FiniteDuration) = {
-    val baseRateBytesPerSecond = domainFeesConfig.baseRateTrafficLimits.rate.doubleValue()
-    if (targetRateBytesPerSecond <= baseRateBytesPerSecond) {
-      (0, 1.second) // the second return value does not matter in this case
-    } else {
-      val minTopupAmountBytes = domainFeesConfig.minTopupAmount
-      val pollingIntervalSecs = context.config.pollingInterval.duration.toSeconds
-      // ensure minTopupInterval is at least equal to the polling interval
-      val minTopupIntervalSecs = Math.max(minTopupInterval.toSeconds, pollingIntervalSecs)
-      // round minTopupInterval up to the nearest multiple of the polling interval to determine when the
-      // next topup is expected to occur.
-      val multiple = (minTopupIntervalSecs + pollingIntervalSecs - 1) / pollingIntervalSecs
-      val nextTopupAfterSecs = multiple * pollingIntervalSecs
-      // calculate expectedTopupAmount as the amount of traffic needed to deliver target rate till next topup
-      val expectedTopupAmountBytes =
-        ((targetRateBytesPerSecond - baseRateBytesPerSecond) * nextTopupAfterSecs).toLong
-      if (expectedTopupAmountBytes > minTopupAmountBytes) {
-        (expectedTopupAmountBytes, nextTopupAfterSecs.seconds)
-      } else {
-        // if the minTopupAmount is higher than expectedTopupAmount, adjust the topup interval to
-        // provide target traffic rate.
-        // Note that the target rate is greater than the base rate at this point implying that the
-        // denominator in this calculation is positive.
-        (
-          minTopupAmountBytes,
-          (minTopupAmountBytes.toDouble / (targetRateBytesPerSecond - baseRateBytesPerSecond)).seconds,
-        )
-      }
-    }
-  }
-
   private def topUpValidatorTraffic(
       validatorTreasury: TreasuryService,
       validatorTrafficCid: ValidatorTraffic.ContractId,
-      topupInterval: FiniteDuration,
-      extraTrafficBytes: Long,
+      topupParameters: ExtraTrafficTopupParameters,
   )(implicit traceContext: TraceContext): Future[Boolean] = {
-    logger.info(s"Topping up traffic balance by ${extraTrafficBytes / 1e6} MB")
+    logger.info(s"Topping up traffic balance by ${topupParameters.topupAmount / 1e6} MB")
     val coBuyExtraTraffic = new CO_BuyExtraTraffic(
-      extraTrafficBytes,
+      topupParameters.topupAmount,
       validatorTrafficCid,
-      new RelTime(topupInterval.toMillis * 1000),
+      new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
     )
     validatorTreasury
       .enqueueCoinOperation(coBuyExtraTraffic)
