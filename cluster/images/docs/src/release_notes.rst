@@ -8,6 +8,12 @@ Release Notes
 
 * Make the Kubernetes namespace for the SV node configurable in the Helm charts (now defaulting to `sv` in the runbook), see :ref:`deployment using Helm <helm-sv-wallet-ui>`.
 
+* Features introduced to the SV UI:
+
+  * Set your desired coin price (price per round determined using median of all coin price votes by SVs)
+ 
+  * View currently open mining rounds, along with their coin prices
+
 
 2023-05-14
 ----------
