@@ -1,8 +1,11 @@
 import { clusterBasename } from "./config";
+import { configureIstio } from "./istio";
 import { configureNetwork } from "./network";
 import { dnsServiceAccountKey } from "./secrets";
 
 const network = configureNetwork(clusterBasename);
+
+configureIstio(network.ingressNs);
 
 export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.metadata.name;

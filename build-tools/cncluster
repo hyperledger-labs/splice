@@ -556,6 +556,11 @@ function subcmd_create() {
     _log "Authenticating to newly created cluster."
     subcmd_activate
 
+    #### Open port 15017 in GKE firewall, see https://istio.io/latest/docs/setup/platform-setup/gke/
+    _log "Opening port 15017 in GKE firewall"
+    FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-master" --format=json | jq -r '.[].name')
+    gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
+
     _log "Activating infrastructure Pulumi stack"
     subcmd_infra_pulumi up --yes
 
