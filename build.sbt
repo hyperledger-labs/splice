@@ -1002,15 +1002,19 @@ lazy val `apps-app` =
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
 // also used by Canton team
 lazy val printTests = taskKey[Unit](
-  "write full class names of `apps-app` tests to `test-full-class-names.log`; used for CI test splitting"
+  "write full class names of `apps-app` tests to separted files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend; used for CI test splitting"
 )
 printTests := {
   import java.io._
-  println("Appending full class names of tests to the file `test-full-class-names.log`.")
+  println("Appending full class names of tests.")
   val pw = new PrintWriter(new FileWriter(s"test-full-class-names.log", true))
   val pwSimTime = new PrintWriter(new FileWriter(s"test-full-class-names-sim-time.log", true))
+  val pwFrontEnd = new PrintWriter(new FileWriter(s"test-full-class-names-frontend.log", true))
+  val pwFrontEndSimTime =
+    new PrintWriter(new FileWriter(s"test-full-class-names-frontend-sim-time.log", true))
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
+  def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
   def printTestNames(
       testSet: String,
@@ -1031,19 +1035,33 @@ printTests := {
       .flatten
       .map(_.name)
 
-  printTestNames(
-    "tests with wall clock time",
-    allTestNames,
-    pw,
-    t => !isTimeBasedTest(t) && !isPreflightIntegrationTest(t),
-  )
-  printTestNames(
-    "tests with simulated time",
-    allTestNames,
-    pwSimTime,
-    t => isTimeBasedTest(t) && !isPreflightIntegrationTest(t),
-  )
+  Seq(
+    (
+      "tests with wall clock time",
+      pw,
+      (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(t),
+    ),
+    (
+      "tests with simulated time",
+      pwSimTime,
+      (t: String) => isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(t),
+    ),
+    (
+      "Frontend tests with wall clock time",
+      pwFrontEnd,
+      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(t),
+    ),
+    (
+      "Frontend tests with simulated time",
+      pwFrontEndSimTime,
+      (t: String) => isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(t),
+    ),
+  ).foreach { case (testSet, pw, predicate) =>
+    printTestNames(testSet, allTestNames, pw, predicate)
+  }
 
   pw.close()
   pwSimTime.close()
+  pwFrontEnd.close()
+  pwFrontEndSimTime.close()
 }

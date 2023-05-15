@@ -558,13 +558,19 @@ commands:
     parameters:
       start_canton_options:
         type: string
+      extra_pre_sbt_cmd:
+        type: string
+        default: ""
+      extra_post_sbt_cmd:
+        type: string
+        default: ""
     steps:
       - execute_sbt_command:
           # run all tests except the live cluster ones
-          pre_sbt_cmd: ./start-canton.sh << parameters.start_canton_options >> && ./start-frontends.sh -d && $(top -b -o %MEM -c -w 256 > log/memory &)
+          pre_sbt_cmd: ./start-canton.sh << parameters.start_canton_options >> << parameters.extra_pre_sbt_cmd >> && $(top -b -o %MEM -c -w 256 > log/memory &)
           extra_env_vars: POSTGRES_DB=postgres
           cmd: "\"$RUN_SPLITTED_TESTS_CMD -- -l LiveDevNetTest\""
-          post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
+          post_sbt_cmd: ./stop-canton.sh external << parameters.extra_post_sbt_cmd >>
           additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
           extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
           # it is in our best interest for our tests to be faster than this,
@@ -881,6 +887,12 @@ jobs:
         type: string
       start_canton_options:
         type: string
+      extra_pre_sbt_cmd:
+        type: string
+        default: ""
+      extra_post_sbt_cmd:
+        type: string
+        default: ""
       parallelism:
         type: integer
     resource_class: 2xlarge+
@@ -906,6 +918,8 @@ jobs:
       - run_splitted_scala_tests:
           # run in detached mode, with external postgres and only start either wall clock or sim time instance
           start_canton_options: << parameters.start_canton_options >>
+          extra_pre_sbt_cmd: << parameters.extra_pre_sbt_cmd >>
+          extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
       - cleanup_sbt_test_job
       - collect_failing_test_data_and_send_to_datadog
 
@@ -1339,6 +1353,30 @@ workflows:
         test_names_file: "test-full-class-names-sim-time.log"
         start_canton_options: "-d -p external -s"
         parallelism: 4
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test frontend wall clock time"
+        test_names_file: "test-full-class-names-frontend.log"
+        start_canton_options: "-d -p external -w"
+        extra_pre_sbt_cmd: "&& ./start-frontends.sh -d"
+        extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        parallelism: 4
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test frontend sim time"
+        test_names_file: "test-full-class-names-frontend-sim-time.log"
+        start_canton_options: "-d -p external -s"
+        extra_pre_sbt_cmd: "&& ./start-frontends.sh -d"
+        extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        parallelism: 1
     - bundle:
         <<: *notify-fail
         context:

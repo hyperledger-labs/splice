@@ -11,7 +11,7 @@ import org.scalatest.Assertion
 
 import scala.collection.parallel.immutable.ParVector
 
-class WalletTransactionHistoryIntegrationTest
+class WalletTransactionHistoryFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with WalletTxLogTestUtil
