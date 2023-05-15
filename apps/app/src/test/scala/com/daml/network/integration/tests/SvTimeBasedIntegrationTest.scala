@@ -1006,37 +1006,34 @@ class SvTimeBasedIntegrationTest
       val effectiveTimeout = automationConfig.effectiveLeaderInactiveTimeout.asJava
       val bufferDuration = java.time.Duration.ofSeconds(5)
 
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        {
-          advanceTime(tickDurationWithBuffer)
-        },
-        entries => {
-          forExactly(3, entries) { line =>
-            line.message should include(
-              "Starting check for leader inactivity"
-            )
-          }
-        },
-      )
+      clue("Waiting for leader inactivity checks to start") {
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+          {
+            advanceTime(tickDurationWithBuffer)
+          },
+          entries => {
+            forExactly(3, entries) { line =>
+              line.message should include(
+                "Starting check for leader inactivity"
+              )
+            }
+          },
+        )
+      }
 
-      actAndCheck(
-        "Wait for leader inactivity to be detected",
-        advanceTime(effectiveTimeout.plus(bufferDuration)),
-      )(
-        "The inactivity is detected and logged",
-        _ => {
-          loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-            {},
-            entries => {
-              forExactly(3, entries) { line =>
-                line.message should include(
-                  "The leader is inactive"
-                )
-              }
+      clue("Waiting for leader inactivity to be detected") {
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+          {
+            advanceTime(effectiveTimeout.plus(bufferDuration))
+          },
+          entries =>
+            forExactly(3, entries) { line =>
+              line.message should include(
+                "The leader is inactive"
+              )
             },
-          )
-        },
-      )
+        )
+      }
 
       val currentLeader = getSvcRules().data.leader
       val currentEpoch = getSvcRules().data.epoch
