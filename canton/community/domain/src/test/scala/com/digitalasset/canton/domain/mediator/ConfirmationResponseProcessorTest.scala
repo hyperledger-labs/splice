@@ -604,10 +604,10 @@ class ConfirmationResponseProcessorTest
           List(Set[Member](participant) -> correctViewType, Set[Member](otherParticipant) -> wrongViewType),
 
         (batchWithRootHashMessageWithTooManyRecipients ->
-          show"Root hash messages with wrong recipients tree: RecipientsTree(recipient group = Seq($mediatorId, $participant, $otherParticipant))") ->
+          show"Root hash messages with wrong recipients tree: RecipientsTree(recipient group = Seq(${MemberRecipient(mediatorId)}, ${MemberRecipient(participant)}, ${MemberRecipient(otherParticipant)}))") ->
           List(Set[Member](participant, otherParticipant) -> correctViewType),
 
-        (batchWithRootHashMessageWithTooFewRecipients -> show"Root hash messages with wrong recipients tree: RecipientsTree(recipient group = $mediatorId)") -> List.empty,
+        (batchWithRootHashMessageWithTooFewRecipients -> show"Root hash messages with wrong recipients tree: RecipientsTree(recipient group = ${MemberRecipient(mediatorId)})") -> List.empty,
 
         (batchWithRepeatedRootHashMessage             -> show"Several root hash messages for members: $participant") ->
           List(Set[Member](participant) -> correctViewType),

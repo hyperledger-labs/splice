@@ -68,6 +68,8 @@ case class CNNodeConfig(
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
     remoteDomains: Map[InstanceName, RemoteDomainConfig] = Map.empty,
     remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
+    participantsX: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
+    remoteParticipantsX: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(),
     features: CantonFeatures = CantonFeatures(),

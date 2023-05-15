@@ -34,7 +34,12 @@ import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Positive
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.{DomainId, KeyOwner, TopologyManagerError}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, MonadUtil, SimpleExecutionQueue}
+import com.digitalasset.canton.util.{
+  ErrorUtil,
+  FutureUtil,
+  MonadUtil,
+  SimpleExecutionQueueWithShutdown,
+}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.timestamp.Timestamp as ProtoTimestamp
@@ -49,12 +54,13 @@ final case class EffectiveTime(value: CantonTimestamp) {
 
   def toProtoPrimitive: ProtoTimestamp = value.toProtoPrimitive
 
+  def max(that: EffectiveTime): EffectiveTime =
+    EffectiveTime(value.max(that.value))
+
 }
 object EffectiveTime {
   val MinValue: EffectiveTime = EffectiveTime(CantonTimestamp.MinValue)
   val MaxValue: EffectiveTime = EffectiveTime(CantonTimestamp.MaxValue)
-  def max(ts: EffectiveTime, other: EffectiveTime*): EffectiveTime =
-    EffectiveTime(CantonTimestamp.max(ts.value, other.map(_.value): _*))
   implicit val orderingEffectiveTime: Ordering[EffectiveTime] =
     Ordering.by[EffectiveTime, CantonTimestamp](_.value)
   def fromProtoPrimitive(ts: ProtoTimestamp): ParsingResult[EffectiveTime] =
@@ -120,7 +126,12 @@ class TopologyTransactionProcessor(
   private val listeners = ListBuffer[TopologyTransactionProcessingSubscriber]()
   private val timeAdjuster =
     new TopologyTimestampPlusEpsilonTracker(timeouts, loggerFactory, futureSupervisor)
-  private val serializer = new SimpleExecutionQueue()
+  private val serializer = new SimpleExecutionQueueWithShutdown(
+    "topology-transaction-processor-queue",
+    futureSupervisor,
+    timeouts,
+    loggerFactory,
+  )
   private val initialised = new AtomicBoolean(false)
 
   private def listenersUpdateHead(
@@ -345,7 +356,7 @@ class TopologyTransactionProcessor(
   }
 
   /** assumption: subscribers don't do heavy lifting */
-  def subscribe(listener: TopologyTransactionProcessingSubscriber): Unit = {
+  override def subscribe(listener: TopologyTransactionProcessingSubscriber): Unit = {
     listeners += listener
   }
 
@@ -575,8 +586,8 @@ class TopologyTransactionProcessor(
       effectiveTime <- computeEffectiveTime(updates)
     } yield {
       // the rest, we'll run asynchronously, but sequential
-      val scheduledF = FutureUnlessShutdown(
-        serializer.execute(
+      val scheduledF =
+        serializer.executeUS(
           {
             if (updates.nonEmpty) {
               // TODO(i4933) check signature of domain idm and don't accept any transaction other than domain uid tx until we are bootstrapped
@@ -587,10 +598,9 @@ class TopologyTransactionProcessor(
             } else {
               tickleListeners(sequencedTime, effectiveTime)
             }
-          }.unwrap,
+          },
           "processing identity",
         )
-      )
       AsyncResult(scheduledF)
     }
   }
@@ -643,7 +653,13 @@ class TopologyTransactionProcessor(
         TopologyTransactionProcessor.this.subscriptionStartsAt(start, domainTimeTracker)
     }
 
-  override def onClosed(): Unit = Lifecycle.close(timeAdjuster, store)(logger)
+  override def onClosed(): Unit = {
+    Lifecycle.close(
+      timeAdjuster,
+      store,
+      serializer,
+    )(logger)
+  }
 
 }
 

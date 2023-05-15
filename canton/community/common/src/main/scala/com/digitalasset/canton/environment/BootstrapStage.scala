@@ -41,10 +41,20 @@ sealed trait BootstrapStageOrLeaf[T <: CantonNode]
 
 }
 
-abstract class FinalStage[T <: CantonNode](
-    val description: String,
+class RunningNode[T <: CantonNode](
     val bootstrap: BootstrapStage.Callback,
-) extends BootstrapStageOrLeaf[T] {}
+    val node: T,
+)(implicit ec: ExecutionContext)
+    extends BootstrapStageOrLeaf[T] {
+
+  def description: String = "Node up and running"
+  override def getNode: Option[T] = Some(node)
+
+  override def start()(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, String, Unit] = EitherT.rightT[FutureUnlessShutdown, String](())
+
+}
 
 abstract class BootstrapStage[T <: CantonNode, StageResult <: BootstrapStageOrLeaf[T]](
     val description: String,
@@ -230,22 +240,44 @@ abstract class BootstrapStageWithStorage[
   protected def completeWithExternal(
       storeAndPassResult: => EitherT[Future, String, M]
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
-    bootstrap.queue.executeEUS(
-      if (stageResult.get().nonEmpty) {
-        EitherT.leftT(s"Already initialised ${description}")
-      } else {
-        performUnlessClosingEitherU(s"complete-grab-result-$description")(storeAndPassResult)
-          .flatMap { item =>
-            val stage = buildNextStage(item)
-            stageResult.set(Some(stage))
-            stage.start().leftMap { err =>
-              logger.error(s"Failed to startup at $description with $err")
-              err
-            }
-          }
-      },
-      s"complete-with-external-$description",
-    )
+    bootstrap.queue
+      .executeEUS(
+        if (stageResult.get().nonEmpty) {
+          EitherT.leftT[FutureUnlessShutdown, StageResult](s"Already initialised ${description}")
+        } else
+          {
+            for {
+              current <- performUnlessClosingEitherU(s"check-already-init-$description")(
+                EitherT.right[String](stageCompleted)
+              )
+              _ <- EitherT.cond[FutureUnlessShutdown](
+                current.isEmpty,
+                (),
+                s"Node is already initialised with ${current}",
+              )
+              _ <- EitherT.cond[FutureUnlessShutdown](storage.isActive, (), "Node is passive")
+              item <- performUnlessClosingEitherU(s"complete-grab-result-$description")(
+                storeAndPassResult
+              ): EitherT[FutureUnlessShutdown, String, M]
+              stage <- EitherT.right(
+                FutureUnlessShutdown.lift(performUnlessClosing(s"store-stage-$description") {
+                  val stage = buildNextStage(item)
+                  stageResult.set(Some(stage))
+                  stage
+                })
+              )
+            } yield stage
+          }: EitherT[FutureUnlessShutdown, String, StageResult],
+        s"complete-with-external-$description",
+      )
+      .flatMap { stage =>
+        // run start outside here to avoid blocking on the sequential queue. note that
+        // shutdown / sequential processing is handled within the start
+        stage.start().leftMap { err =>
+          logger.error(s"Failed to startup at $description with $err")
+          err
+        }
+      }
 
   final override def attempt()(implicit
       traceContext: TraceContext
@@ -260,12 +292,24 @@ abstract class BootstrapStageWithStorage[
             // if stage is not completed, but we can auto-init this stage, proceed
             val isActive = storage.isActive
             if (autoInit && isActive) {
-              EitherT(autoCompleteStage().value.recover { case _: PassiveInstanceException =>
-                logger.info(s"Stage ${description} failed as node became passive")
-                // if we became passive during auto-complete stage, we complete the
-                // start procedure and move the waiting to the back
-                Right(None)
-              }).map(_.map(buildNextStage))
+              EitherT(
+                autoCompleteStage()
+                  .map { res =>
+                    if (res.isEmpty) {
+                      logger.info(
+                        s"Waiting for external action on $description to complete startup"
+                      )
+                    }
+                    res
+                  }
+                  .value
+                  .recover { case _: PassiveInstanceException =>
+                    logger.info(s"Stage ${description} failed as node became passive")
+                    // if we became passive during auto-complete stage, we complete the
+                    // start procedure and move the waiting to the back
+                    Right(None)
+                  }
+              ).map(_.map(buildNextStage))
             } else {
               // otherwise, finish the startup here and wait for an external trigger
               EitherT.rightT[Future, String](None)

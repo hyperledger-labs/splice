@@ -7,6 +7,8 @@ import cats.data.EitherT
 import cats.syntax.parallel.*
 import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.daml.lf.data.Ref.PackageId
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.{Crypto, Fingerprint}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -17,10 +19,10 @@ import com.digitalasset.canton.participant.topology.ParticipantTopologyManager.P
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerError.IdentityManagerParentError
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.TopologyManagerError.ParticipantErrorGroup
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.DomainTopologyClient
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.topology.{DomainId, *}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -29,6 +31,29 @@ import io.functionmeta.functionFullName
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future, blocking}
+
+trait ParticipantTopologyManagerOps {
+
+  def attachPartyNotifier(partyNotifier: LedgerServerPartyNotifier): Unit
+
+  def vetPackages(packages: Seq[PackageId], synchronize: Boolean)(implicit
+      traceContext: TraceContext
+  ): EitherT[
+    FutureUnlessShutdown,
+    ParticipantTopologyManagerError,
+    Unit,
+  ]
+
+  def allocateParty(
+      validatedSubmissionId: String255,
+      partyId: PartyId,
+      participantId: ParticipantId,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit]
+
+}
 
 trait ParticipantTopologyManagerObserver {
   def addedNewTransactions(
@@ -50,6 +75,7 @@ class ParticipantTopologyManager(
     override protected val timeouts: ProcessingTimeout,
     protocolVersion: ProtocolVersion,
     loggerFactory: NamedLoggerFactory,
+    futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext)
     extends TopologyManager[ParticipantTopologyManagerError](
       clock,
@@ -58,7 +84,9 @@ class ParticipantTopologyManager(
       timeouts,
       protocolVersion,
       loggerFactory,
-    )(ec) {
+      futureSupervisor,
+    )(ec)
+    with ParticipantTopologyManagerOps {
 
   private val observers = mutable.ListBuffer[ParticipantTopologyManagerObserver]()
   def addObserver(observer: ParticipantTopologyManagerObserver): Unit = blocking(synchronized {
@@ -87,7 +115,7 @@ class ParticipantTopologyManager(
   // function to support sequential reading from identity store
   def sequentialStoreRead(run: => Future[Unit], description: String)(implicit
       traceContext: TraceContext
-  ): Future[Unit] = {
+  ): FutureUnlessShutdown[Unit] = {
     sequentialQueue.execute(run, description)
   }
 
@@ -267,7 +295,7 @@ class ParticipantTopologyManager(
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Either[ParticipantTopologyManagerError, Unit]] = {
+  ): EitherT[FutureUnlessShutdown, String, Unit] = {
 
     def alreadyTrusted: EitherT[Future, ParticipantTopologyManagerError, Boolean] =
       EitherT.right(
@@ -288,7 +316,7 @@ class ParticipantTopologyManager(
           })
       )
 
-    def trustDomain: EitherT[Future, ParticipantTopologyManagerError, Unit] = {
+    def trustDomain: EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
       val transaction = ParticipantState(
         RequestSide.To,
         domainId,
@@ -307,12 +335,13 @@ class ParticipantTopologyManager(
     }
 
     // check if cert already exists
-    performUnlessClosingF(functionFullName) {
-      (for {
-        have <- alreadyTrusted
-        _ <- if (have) EitherT.rightT[Future, ParticipantTopologyManagerError](()) else trustDomain
-      } yield ()).value
-    }
+    val ret = for {
+      have <- performUnlessClosingEitherU(functionFullName)(alreadyTrusted)
+      _ <-
+        if (have) EitherT.rightT[FutureUnlessShutdown, ParticipantTopologyManagerError](())
+        else trustDomain
+    } yield ()
+    ret.leftMap(_.cause)
   }
 
   private def unvettedPackages(pid: ParticipantId, packages: Set[PackageId])(implicit
@@ -339,12 +368,12 @@ class ParticipantTopologyManager(
 
   def vetPackages(packages: Seq[PackageId], syncVetting: Boolean)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, ParticipantTopologyManagerError, Unit] = {
+  ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
     val packageSet = packages.toSet
 
     def authorizeVetting(
         pid: ParticipantId
-    ): EitherT[Future, ParticipantTopologyManagerError, SignedTopologyTransaction[
+    ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, SignedTopologyTransaction[
       TopologyChangeOp
     ]] = {
       authorize(
@@ -376,7 +405,7 @@ class ParticipantTopologyManager(
 
     for {
       // get package service (stored in an atomic reference)
-      participantId <- EitherT.fromEither[Future](
+      participantId <- EitherT.fromEither[FutureUnlessShutdown](
         participantIdO
           .get()
           .toRight(
@@ -384,18 +413,19 @@ class ParticipantTopologyManager(
               .Reject("Participant id is not yet set")
           )
       )
-      callbacks <- packageAndSyncService
-      isVetted <- EitherT.right(unvettedPackages(participantId, packageSet).map(_.isEmpty))
+      callbacks <- packageAndSyncService.mapK(FutureUnlessShutdown.outcomeK)
+      isVetted <- EitherT
+        .right(unvettedPackages(participantId, packageSet).map(_.isEmpty))
+        .mapK(FutureUnlessShutdown.outcomeK)
       _ <-
         if (isVetted) {
           logger.debug(show"The following packages are already vetted: ${packages}")
-          EitherT.rightT[Future, ParticipantTopologyManagerError](())
+          EitherT.rightT[FutureUnlessShutdown, ParticipantTopologyManagerError](())
         } else {
           authorizeVetting(participantId).map(_ => ())
         }
       // register our handle to wait for the packages being vetted
       appeared <- waitForPackagesBeingVetted(participantId, () => callbacks.clients())
-        .onShutdown(Right(false))
     } yield {
       if (appeared) {
         logger.debug("Packages appeared on all connected domains.")
@@ -403,6 +433,37 @@ class ParticipantTopologyManager(
     }
   }
 
+  override def attachPartyNotifier(partyNotifier: LedgerServerPartyNotifier): Unit =
+    this.addObserver(partyNotifier.attachToIdentityManager())
+
+  override def allocateParty(
+      validatedSubmissionId: String255,
+      partyId: PartyId,
+      participantId: ParticipantId,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
+    val update = TopologyStateUpdate(
+      TopologyChangeOp.Add,
+      TopologyStateUpdateElement(
+        TopologyElementId.adopt(validatedSubmissionId),
+        PartyToParticipant(
+          RequestSide.Both,
+          partyId,
+          participantId,
+          ParticipantPermission.Submission,
+        ),
+      ),
+      protocolVersion,
+    )
+    authorize(
+      update,
+      None,
+      protocolVersion,
+      force = false,
+    ).map(_ => ())
+  }
 }
 
 object ParticipantTopologyManager {

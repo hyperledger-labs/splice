@@ -16,15 +16,16 @@ import com.digitalasset.canton.participant.protocol.submission.{
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.TransferProcessorError
 import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
+import com.digitalasset.canton.protocol.TargetDomainId
 import com.digitalasset.canton.protocol.messages.TransferInResult
 import com.digitalasset.canton.sequencing.client.SequencerClient
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.version.Transfer.TargetProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
 class TransferInProcessor(
-    domainId: DomainId,
+    domainId: TargetDomainId,
     override val participantId: ParticipantId,
     damle: DAMLe,
     transferCoordination: TransferCoordination,
@@ -33,11 +34,11 @@ class TransferInProcessor(
     domainCrypto: DomainSyncCryptoClient,
     seedGenerator: SeedGenerator,
     sequencerClient: SequencerClient,
-    causalityTracking: Boolean,
     override protected val timeouts: ProcessingTimeout,
     targetProtocolVersion: TargetProtocolVersion,
     loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
+    skipRecipientsCheck: Boolean,
 )(implicit ec: ExecutionContext)
     extends ProtocolProcessor[
       TransferInProcessingSteps.SubmissionParam,
@@ -52,7 +53,6 @@ class TransferInProcessor(
         damle,
         transferCoordination,
         seedGenerator,
-        causalityTracking,
         targetProtocolVersion,
         loggerFactory,
       ),
@@ -60,6 +60,9 @@ class TransferInProcessor(
       ephemeral,
       domainCrypto,
       sequencerClient,
+      domainId.unwrap,
+      targetProtocolVersion.v,
       loggerFactory,
       futureSupervisor,
+      skipRecipientsCheck = skipRecipientsCheck,
     )

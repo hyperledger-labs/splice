@@ -457,7 +457,7 @@ file along with your dar changes.
 
 ### Bumping Our Canton fork
 
-Current Canton commit: `1b2f3bec3fb649a5bc2a5d0b7ec9149c0ec126c5`
+Current Canton commit: `a8fbec0487b34bd052157f13abbe2ad5a3ed6be4`
 
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
@@ -503,7 +503,6 @@ Current Canton commit: `1b2f3bec3fb649a5bc2a5d0b7ec9149c0ec126c5`
    - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.
    - We have some files that we added ourselves to the `canton/` directory, and the above steps happen to delete these.
      See #2467 for a recent list, and copy them from another checkout of the Canton Coin repo.
-     TODO(#2467): change our tooling to avoid this step
    - If you encounter issues with daml2ts, you might need to [rebase our TS fork](nix/vendored/README.md).
 7. If there are any, remove all `*.rej` files.
 

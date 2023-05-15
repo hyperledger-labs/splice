@@ -8,6 +8,7 @@ import cats.syntax.either.*
 import com.daml.ledger.client.binding.Primitive.Party as ClientParty
 import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.canton.config.CantonRequireTypes.{String255, String3, String300}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.RandomOps
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
@@ -155,10 +156,8 @@ object Member {
         )
     }
 
-  implicit val memberOrdering: Ordering[Member] =
-    Ordering.by(x => (x.code.threeLetterId.unwrap, x.uid.namespace.unwrap, x.uid.id.unwrap))
-
-  implicit val memberOrder: Order[Member] = Order.fromOrdering
+  // Use the same ordering as for what we use in the database
+  implicit val memberOrdering: Ordering[Member] = Ordering.by(_.toLengthLimitedString.unwrap)
 
   /** Instances for slick to set and get members.
     * Not exposed by default as other types derived from [[Member]] have their own persistence schemes ([[ParticipantId]]).
@@ -242,7 +241,7 @@ object DomainId {
   ): ParsingResult[DomainId] =
     UniqueIdentifier.fromProtoPrimitive(proto, fieldName).map(DomainId(_))
 
-  def tryFromString(str: String) = DomainId(UniqueIdentifier.tryFromProtoPrimitive(str))
+  def tryFromString(str: String): DomainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive(str))
 
   def fromString(str: String): Either[String, DomainId] =
     UniqueIdentifier.fromProtoPrimitive_(str).map(DomainId(_))
@@ -371,6 +370,13 @@ object DomainMember {
   def listAll(id: DomainId): Set[DomainMember] = list(id, includeSequencer = true)
 }
 
+final case class MediatorGroup(
+    index: NonNegativeInt,
+    active: Seq[MediatorId],
+    passive: Seq[MediatorId],
+    threshold: PositiveInt,
+)
+
 final case class MediatorId(uid: UniqueIdentifier) extends DomainMember with NodeIdentity {
   override def code: AuthenticatedMemberCode = MediatorId.Code
 
@@ -443,4 +449,17 @@ object SequencerId {
     SequencerId(UniqueIdentifier(identifier, namespace))
 
   def apply(domainId: DomainId): SequencerId = SequencerId(domainId.unwrap)
+
+  def fromProtoPrimitive(
+      proto: String,
+      fieldName: String,
+  ): ParsingResult[SequencerId] =
+    KeyOwner.fromProtoPrimitive(proto, fieldName).flatMap {
+      case x: SequencerId => Right(x)
+      case y =>
+        Left(
+          ProtoDeserializationError
+            .ValueDeserializationError(fieldName, s"Value $y is not of type `SequencerId`")
+        )
+    }
 }

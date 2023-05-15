@@ -80,7 +80,7 @@ class DomainTopologyManagerEventHandler(
           logger.debug(
             s"New register topology transaction request from participant ${request.participant} with requestId = ${request.requestId}, size=${request.transactions.size}"
           )
-          AsyncResult.async(handleTopologyRequest(request))
+          AsyncResult(handleTopologyRequest(request))
         // if the response has been recorded before, it means we're now replaying events
         case Some(Response(response, isCompleted)) =>
           logger.debug(
@@ -88,7 +88,7 @@ class DomainTopologyManagerEventHandler(
           )
           // if this response recorded before had not been sent yet, then let's send it. otherwise we're done.
           if (!isCompleted)
-            AsyncResult.async(sendResponse(response))
+            AsyncResult(sendResponse(response))
           else AsyncResult.immediate
       }
     } yield result
@@ -96,7 +96,7 @@ class DomainTopologyManagerEventHandler(
 
   private def handleTopologyRequest(
       request: RegisterTopologyTransactionRequest
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     for {
       // TODO(i4933) we need to add a signature to the request
       //   - signature must match participant
@@ -115,18 +115,18 @@ class DomainTopologyManagerEventHandler(
       )
       pendingResponse <- pendingResponseE.fold(
         { case e @ RegisterTopologyTransactionResponse.ResultVersionsMixture =>
-          Future.failed(new IllegalStateException(e.message))
+          FutureUnlessShutdown.failed(new IllegalStateException(e.message))
         },
-        Future.successful,
+        FutureUnlessShutdown.pure,
       )
-      _ <- store.savePendingResponse(pendingResponse)
+      _ <- FutureUnlessShutdown.outcomeF(store.savePendingResponse(pendingResponse))
       result <- sendResponse(pendingResponse)
     } yield result
   }
 
   private def sendResponse(
       response: RegisterTopologyTransactionResponse.Result
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val batch = OpenEnvelope(response, Recipients.cc(response.requestedBy))(protocolVersion)
     SequencerClient
       .sendWithRetries(
@@ -140,12 +140,14 @@ class DomainTopologyManagerEventHandler(
         flagCloseable = this,
       )
       .flatMap { _ =>
-        store.completeResponse(response.requestId)
+        performUnlessClosingF("sendResponse")(store.completeResponse(response.requestId))
       }
       .recover { case NonFatal(e) =>
-        logger.error(
-          s"After many attempts, failed to send register topology transaction response for participant ${response.participant} with requestId = ${response.requestId}",
-          e,
+        performUnlessClosing("recover")(
+          logger.error(
+            s"After many attempts, failed to send register topology transaction response for participant ${response.participant} with requestId = ${response.requestId}",
+            e,
+          )
         )
       }
   }

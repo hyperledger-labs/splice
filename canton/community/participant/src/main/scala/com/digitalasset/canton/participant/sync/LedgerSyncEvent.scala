@@ -22,10 +22,12 @@ import com.digitalasset.canton.protocol.{
   LfHash,
   LfNodeCreate,
   LfNodeId,
+  LfTemplateId,
   LfVersionedTransaction,
+  SourceDomainId,
+  TargetDomainId,
   TransferId,
 }
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{
   LedgerConfiguration,
   LedgerParticipantId,
@@ -281,7 +283,8 @@ object LedgerSyncEvent {
     * @param optCompletionInfo     Must be provided for the participant that submitted the transfer-out.
     * @param submitter             The partyId of the transfer submitter.
     * @param recordTime            The ledger-provided timestamp at which the contract was transferred away.
-    * @param contractId            The contract-id that's being transfer-out.
+    * @param contractId            The contract-id that's being transferred-out.
+    * @param templateId            The template-id of the contract that's being transferred-out.
     * @param sourceDomainId        The source domain of the transfer.
     * @param targetDomainId        The target domain of the transfer.
     * @param transferInExclusivity The timestamp of the timeout before which only the submitter can initiate the
@@ -294,9 +297,10 @@ object LedgerSyncEvent {
       submitter: LfPartyId,
       recordTime: LfTimestamp,
       contractId: LfContractId,
+      templateId: Option[LfTemplateId], // TODO(#9014): make this field not optional anymore
       contractStakeholders: Set[LfPartyId],
-      sourceDomainId: DomainId,
-      targetDomainId: DomainId,
+      sourceDomainId: SourceDomainId,
+      targetDomainId: TargetDomainId,
       transferInExclusivity: Option[LfTimestamp],
       workflowId: Option[LfWorkflowId],
   ) extends LedgerSyncEvent
@@ -311,6 +315,7 @@ object LedgerSyncEvent {
       param("submitter", _.submitter),
       param("recordTime", _.recordTime),
       param("contractId", _.contractId),
+      paramIfDefined("templateId", _.templateId),
       param("source", _.sourceDomainId),
       param("target", _.targetDomainId),
       paramIfDefined("transferInExclusivity", _.transferInExclusivity),
@@ -323,7 +328,7 @@ object LedgerSyncEvent {
   /**  Signal the transfer-in of a contract from the source domain to the target domain.
     *
     * @param updateId                  Uniquely identifies the update.
-    * @param optCompletionInfo         Must be provided for the participant that submitted the transferIn.
+    * @param optCompletionInfo         Must be provided for the participant that submitted the transfer-in.
     * @param submitter                 The partyId of the transfer submitter.
     * @param recordTime                The ledger-provided timestamp at which the contract was transferred in.
     * @param ledgerCreateTime          The ledger time of the transaction '''creating''' the contract
@@ -346,12 +351,12 @@ object LedgerSyncEvent {
       creatingTransactionId: LedgerTransactionId,
       contractMetadata: Bytes,
       transferOutId: TransferId,
-      targetDomain: DomainId,
+      targetDomain: TargetDomainId,
       createTransactionAccepted: Boolean,
       workflowId: Option[LfWorkflowId],
   ) extends LedgerSyncEvent
       with PrettyPrinting {
-    def sourceDomain: DomainId = transferOutId.sourceDomain
+    def sourceDomain: SourceDomainId = transferOutId.sourceDomain
 
     override def description: String =
       s"transferred-in ${createNode.coid} from $targetDomain to ${sourceDomain}"
@@ -369,7 +374,7 @@ object LedgerSyncEvent {
       paramIfDefined("workflowId", _.workflowId),
     )
 
-    lazy val transactionMeta = TransactionMeta(
+    private lazy val transactionMeta: TransactionMeta = TransactionMeta(
       ledgerEffectiveTime = ledgerCreateTime,
       workflowId = workflowId,
       submissionTime = recordTime, // TODO(M41): Upstream mismatch, replace with enter/leave view

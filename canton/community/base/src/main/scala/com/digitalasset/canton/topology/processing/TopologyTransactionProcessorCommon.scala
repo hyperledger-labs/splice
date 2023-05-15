@@ -18,6 +18,8 @@ import com.digitalasset.canton.time.DomainTimeTracker
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 
+import scala.concurrent.ExecutionContext
+
 /** Main incoming topology transaction validation and processing
   *
   * The topology transaction processor is subscribed to the event stream and processes
@@ -33,6 +35,8 @@ abstract class TopologyTransactionProcessorCommon(
     val loggerFactory: NamedLoggerFactory,
 ) extends NamedLogging
     with FlagCloseable {
+
+  def subscribe(listener: TopologyTransactionProcessingSubscriber): Unit
 
   /** Inform the topology manager where the subscription starts when using [[processEnvelopes]] rather than [[createHandler]] */
   def subscriptionStartsAt(start: SubscriptionStart, domainTimeTracker: DomainTimeTracker)(implicit
@@ -51,4 +55,14 @@ abstract class TopologyTransactionProcessorCommon(
       ts: CantonTimestamp,
       envelopes: Traced[List[DefaultOpenEnvelope]],
   ): HandlerResult
+}
+
+object TopologyTransactionProcessorCommon {
+
+  abstract class Factory {
+    def create(
+        acsCommitmentScheduleEffectiveTime: Traced[CantonTimestamp] => Unit
+    )(implicit executionContext: ExecutionContext): TopologyTransactionProcessorCommon
+  }
+
 }

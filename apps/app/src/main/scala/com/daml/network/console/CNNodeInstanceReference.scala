@@ -54,14 +54,13 @@ trait CNNodeAppReference extends InstanceReference {
       this,
       consoleEnvironment,
       SimpleStatus.fromProtoV0,
-      topology_,
     )
 
   @Help.Summary(
     "Yields the globally unique id of this participant. " +
       "Throws an exception, if the id has not yet been allocated (e.g., the participant has not yet been started)."
   )
-  override def id: NodeIdentity = topology.idHelper(name, ParticipantId(_))
+  override def id: NodeIdentity = topology.idHelper(ParticipantId(_))
 
   private lazy val topology_ =
     new TopologyAdministrationGroup(

@@ -65,6 +65,7 @@ class TransactionProcessor(
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
+    skipRecipientsCheck: Boolean,
 )(implicit val ec: ExecutionContext)
     extends ProtocolProcessor[
       TransactionProcessingSteps.SubmissionParam,
@@ -102,8 +103,11 @@ class TransactionProcessor(
       ephemeral,
       crypto,
       sequencerClient,
+      domainId,
+      staticDomainParameters.protocolVersion,
       loggerFactory,
       futureSupervisor,
+      skipRecipientsCheck = skipRecipientsCheck,
     ) {
 
   def submit(

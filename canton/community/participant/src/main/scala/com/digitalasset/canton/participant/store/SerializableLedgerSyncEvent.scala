@@ -26,6 +26,8 @@ import com.digitalasset.canton.protocol.{
   LfCommittedTransaction,
   LfNodeId,
   SerializableDeduplicationPeriod,
+  SourceDomainId,
+  TargetDomainId,
   TransferId,
 }
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -913,6 +915,7 @@ private[store] final case class SerializableTransferredOut(
       submitter,
       recordTime,
       contractId,
+      templateId,
       contractStakeholders,
       source,
       target,
@@ -925,6 +928,7 @@ private[store] final case class SerializableTransferredOut(
       submitter = submitter,
       recordTime = Some(SerializableLfTimestamp(recordTime).toProtoV0),
       contractId = contractId.toProtoPrimitive,
+      templateId = templateId.map(_.toString).getOrElse(""),
       contractStakeholders = contractStakeholders.toSeq,
       sourceDomain = source.toProtoPrimitive,
       targetDomain = target.toProtoPrimitive,
@@ -949,6 +953,7 @@ private[store] object SerializableTransferredOut {
       targetDomainIdP,
       transferInExclusivityP,
       workflowIdP,
+      templateIdP,
     ) = transferOutP
 
     for {
@@ -960,21 +965,24 @@ private[store] object SerializableTransferredOut {
       )
       contractId <- ProtoConverter.parseLfContractId(contractIdP)
       contractStakeholders <- contractStakeholdersP.traverse(ProtoConverter.parseLfPartyId)
-      sourceDomainId <- DomainId.fromProtoPrimitive(sourceDomainIdP, "source_domain")
-      targetDomainId <- DomainId.fromProtoPrimitive(targetDomainIdP, "target_domain")
-      transferInExclusivity <- transferInExclusivityP
-        .traverse(SerializableLfTimestamp.fromProtoPrimitive)
-      workflowId <- ProtoConverter.parseLFWorkflowIdO(workflowIdP)
+      rawSourceDomainId <- DomainId.fromProtoPrimitive(sourceDomainIdP, "source_domain")
+      rawTargetDomainId <- DomainId.fromProtoPrimitive(targetDomainIdP, "target_domain")
 
+      transferInExclusivity <- transferInExclusivityP.traverse(
+        SerializableLfTimestamp.fromProtoPrimitive
+      )
+      workflowId <- ProtoConverter.parseLFWorkflowIdO(workflowIdP)
+      templateId <- ProtoConverter.parseTemplateIdO(templateIdP)
     } yield LedgerSyncEvent.TransferredOut(
       updateId = updateId,
       optCompletionInfo = optCompletionInfo,
       submitter = submitter,
       recordTime = recordTime,
       contractId = contractId,
+      templateId = templateId,
       contractStakeholders = contractStakeholders.toSet,
-      sourceDomainId = sourceDomainId,
-      targetDomainId = targetDomainId,
+      sourceDomainId = SourceDomainId(rawSourceDomainId),
+      targetDomainId = TargetDomainId(rawTargetDomainId),
       transferInExclusivity = transferInExclusivity,
       workflowId = workflowId,
     )
@@ -1065,7 +1073,7 @@ private[store] object SerializableTransferredIn {
         createNodeP,
       )
       creatingTransactionId <- ProtoConverter.parseLedgerTransactionId(creatingTransactionIdP)
-      targetDomainId <- DomainId.fromProtoPrimitive(targetDomainIdP, "target_domain")
+      rawTargetDomainId <- DomainId.fromProtoPrimitive(targetDomainIdP, "target_domain")
       workflowId <- ProtoConverter.parseLFWorkflowIdO(workflowIdP)
     } yield LedgerSyncEvent.TransferredIn(
       updateId = updateId,
@@ -1077,7 +1085,7 @@ private[store] object SerializableTransferredIn {
       creatingTransactionId = creatingTransactionId,
       contractMetadata = contractMetadata,
       transferOutId = transferOutId,
-      targetDomain = targetDomainId,
+      targetDomain = TargetDomainId(rawTargetDomainId),
       createTransactionAccepted = createTransactionAcceptedP,
       workflowId = workflowId,
     )

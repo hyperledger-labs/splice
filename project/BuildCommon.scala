@@ -824,7 +824,7 @@ object BuildCommon {
             ),
             (
               (Compile / baseDirectory).value,
-              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.6.0.dar",
+              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.7.0.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),

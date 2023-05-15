@@ -17,8 +17,8 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
   TestingConfigInternal,
 }
-import com.digitalasset.canton.crypto.HashPurpose
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
+import com.digitalasset.canton.crypto.{CryptoPureApi, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{
@@ -720,7 +720,7 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
   }
 
   private case class Env(
-      client: SequencerClient,
+      client: SequencerClientImpl,
       transport: MockTransport,
       sequencerCounterTrackerStore: SequencerCounterTrackerStore,
       sequencedEventStore: SequencedEventStore,
@@ -846,9 +846,13 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
         request: SubscriptionRequest,
         handler: SerializedEventHandler[E],
     )(implicit traceContext: TraceContext): SequencerSubscription[E] = ???
+
+    override def downloadTopologyStateForInit(request: TopologyStateForInitRequest)(implicit
+        traceContext: TraceContext
+    ): EitherT[Future, String, TopologyStateForInitResponse] = ???
   }
 
-  private implicit class RichSequencerClient(client: SequencerClient) {
+  private implicit class RichSequencerClient(client: SequencerClientImpl) {
     // flush needs to be called twice in order to finish asynchronous processing
     // (see comment around shutdown in SequencerClient). So we have this small
     // helper for the tests.
@@ -861,7 +865,7 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
   private object Env {
     val eventAlwaysValid: SequencedEventValidator = SequencedEventValidator.noValidation(
       DefaultTestIdentities.domainId,
-      DefaultTestIdentities.sequencer,
+      DefaultTestIdentities.sequencerId,
       timeouts,
       warn = false,
     )
@@ -932,7 +936,7 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
           loggerFactory,
         )
 
-      val client = new SequencerClient(
+      val client = new SequencerClientImpl(
         DefaultTestIdentities.domainId,
         participant1,
         transport,
@@ -964,6 +968,7 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
         CommonMockMetrics.sequencerClient,
         None,
         false,
+        mock[CryptoPureApi],
         LoggingConfig(),
         loggerFactory,
       )(executionContext, tracer)

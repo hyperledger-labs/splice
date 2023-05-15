@@ -224,12 +224,12 @@ object SequencerWriterSource {
         )
       )
       // Merge watermark updating in case we are running slow here
-      .conflate[Traced[BatchWritten]] { case (lftT, rghtT) =>
-        lftT.withTraceContext { traceContext => lft =>
-          rghtT.map(rght =>
+      .conflate[Traced[BatchWritten]] { case (tracedLeft, tracedRight) =>
+        tracedLeft.withTraceContext { _ => left =>
+          tracedRight.map(right =>
             BatchWritten(
-              lft.notifies.union(rght.notifies),
-              CantonTimestamp.max(lft.latestTimestamp, rght.latestTimestamp),
+              left.notifies.union(right.notifies),
+              left.latestTimestamp.max(right.latestTimestamp),
             )
           )
         }
@@ -268,7 +268,8 @@ class SendEventGenerator(
 
     def validateRecipients: Future[Validated[NonEmpty[Seq[Member]], Set[SequencerMemberId]]] =
       for {
-        validatedSeq <- submission.batch.allRecipients.toSeq
+        // TODO(#12363) Support group addresses in the DB Sequencer
+        validatedSeq <- submission.batch.allMembers.toSeq
           .parTraverse(validateRecipient)
         validated = validatedSeq.traverse(_.leftMap(NonEmpty(Seq, _)))
       } yield validated.map(_.toSet)

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.domain.sequencing
 
 import akka.actor.ActorSystem
+import cats.data.EitherT
 import cats.syntax.option.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.PositiveDouble
@@ -26,12 +27,13 @@ import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor
-import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.store.TopologyStateForInitializationService
+import com.digitalasset.canton.topology.{DomainId, DomainMember, Member, SequencerId}
+import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.ScheduledExecutorService
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 trait SequencerParameters {
   def maxBurstFactor: PositiveDouble
@@ -43,8 +45,8 @@ trait CantonNodeWithSequencerParameters extends CantonNodeParameters with Sequen
 trait SequencerRuntimeFactory {
   def create(
       domainId: DomainId,
+      sequencerId: SequencerId,
       crypto: Crypto,
-      sequencedTopologyStore: TopologyStore[TopologyStoreId.DomainStore],
       topologyClientMember: Member,
       topologyClient: DomainTopologyClientWithInit,
       topologyProcessor: TopologyTransactionProcessor,
@@ -60,6 +62,7 @@ trait SequencerRuntimeFactory {
       metrics: SequencerMetrics,
       indexedStringStore: IndexedStringStore,
       futureSupervisor: FutureSupervisor,
+      topologyStateForInitializationService: Option[TopologyStateForInitializationService],
       loggerFactory: NamedLoggerFactory,
       logger: TracedLogger,
   )(implicit
@@ -67,7 +70,8 @@ trait SequencerRuntimeFactory {
       scheduler: ScheduledExecutorService,
       tracer: Tracer,
       system: ActorSystem,
-  ): SequencerRuntime
+      traceContext: TraceContext,
+  ): EitherT[Future, String, SequencerRuntime]
 }
 
 object SequencerRuntimeFactory {
@@ -75,8 +79,8 @@ object SequencerRuntimeFactory {
       extends SequencerRuntimeFactory {
     override def create(
         domainId: DomainId,
+        sequencerId: SequencerId,
         crypto: Crypto,
-        sequencedTopologyStore: TopologyStore[TopologyStoreId.DomainStore],
         topologyClientMember: Member,
         topologyClient: DomainTopologyClientWithInit,
         topologyProcessor: TopologyTransactionProcessor,
@@ -92,6 +96,7 @@ object SequencerRuntimeFactory {
         metrics: SequencerMetrics,
         indexedStringStore: IndexedStringStore,
         futureSupervisor: FutureSupervisor,
+        topologyStateForInitializationService: Option[TopologyStateForInitializationService],
         loggerFactory: NamedLoggerFactory,
         logger: TracedLogger,
     )(implicit
@@ -99,8 +104,9 @@ object SequencerRuntimeFactory {
         scheduler: ScheduledExecutorService,
         tracer: Tracer,
         system: ActorSystem,
-    ): SequencerRuntime =
-      new SequencerRuntime(
+        traceContext: TraceContext,
+    ): EitherT[Future, String, SequencerRuntime] = {
+      val ret = new SequencerRuntime(
         new CommunityDatabaseSequencerFactory(
           sequencerConfig,
           metrics,
@@ -110,18 +116,15 @@ object SequencerRuntimeFactory {
           localParameters,
           loggerFactory,
         ),
+        sequencerId,
         staticDomainParameters,
         localParameters,
         domainConfig.publicApi,
-        domainConfig.timeTracker,
-        testingConfig,
         metrics,
         domainId,
         crypto,
-        sequencedTopologyStore,
         topologyClient,
         topologyProcessor,
-        sharedTopologyProcessor = true,
         storage,
         clock,
         auditLogger,
@@ -134,12 +137,15 @@ object SequencerRuntimeFactory {
           StaticGrpcServices
             .notSupportedByCommunity(EnterpriseSequencerAdministrationServiceGrpc.SERVICE, logger)
             .some,
-        registerSequencerMember =
-          false, // the community sequencer is always an embedded single sequencer
-        indexedStringStore,
+        DomainMember
+          .list(domainId, includeSequencer = false)
+          .toList, // the community sequencer is always an embedded single sequencer
         futureSupervisor,
         agreementManager,
+        topologyStateForInitializationService,
         loggerFactory,
       )
+      ret.initialize().map(_ => ret)
+    }
   }
 }

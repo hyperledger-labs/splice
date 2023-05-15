@@ -9,6 +9,8 @@ import com.digitalasset.canton.topology.{Member, ParticipantId}
 import org.scalatest.wordspec.AnyWordSpec
 
 class RecipientsTreeTest extends AnyWordSpec with BaseTest {
+  def rec(member: Member): Recipient = MemberRecipient(member)
+
   lazy val p1: Member = ParticipantId("participant1")
   lazy val p2: Member = ParticipantId("participant2")
   lazy val p3: Member = ParticipantId("participant3")
@@ -18,16 +20,17 @@ class RecipientsTreeTest extends AnyWordSpec with BaseTest {
 
   lazy val t1 = RecipientsTree.leaf(NonEmpty(Set, p1, p5))
   lazy val t2 = RecipientsTree.leaf(NonEmpty(Set, p3))
-  lazy val t3 = RecipientsTree(NonEmpty(Set, p4, p2), Seq(t1, t2))
 
-  lazy val t4 = RecipientsTree.leaf(NonEmpty(Set, p2, p6))
+  lazy val t3 = RecipientsTree(NonEmpty(Set, rec(p4), rec(p2)), Seq(t1, t2))
 
-  lazy val t5 = RecipientsTree(NonEmpty(Set, p1), Seq(t3, t4))
+  lazy val t4 = RecipientsTree.recipientsLeaf(NonEmpty(Set, rec(p2), rec(p6)))
+
+  lazy val t5 = RecipientsTree(NonEmpty(Set, rec(p1)), Seq(t3, t4))
 
   "RecipientsTree" when {
     "allRecipients" should {
       "give all recipients" in {
-        t5.allRecipients shouldBe Set(p1, p2, p3, p4, p5, p6)
+        t5.allRecipients shouldBe Set(p1, p2, p3, p4, p5, p6).map(rec)
       }
     }
 
@@ -47,7 +50,7 @@ class RecipientsTreeTest extends AnyWordSpec with BaseTest {
     "preserve the same thing" in {
 
       val serialized = t5.toProtoV0
-      val deserialized = RecipientsTree.fromProtoV0(serialized)
+      val deserialized = RecipientsTree.fromProtoV0(serialized, supportGroupAddressing = false)
 
       deserialized shouldBe Right(t5)
     }

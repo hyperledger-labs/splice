@@ -174,6 +174,7 @@ sealed trait AcsCommitmentProcessorBaseTest
         any[Option[CantonTimestamp]],
         any[CantonTimestamp],
         any[MessageId],
+        any[Option[AggregationRule]],
         any[SendCallback],
       )(anyTraceContext)
     )
@@ -204,6 +205,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       testedProtocolVersion,
       DefaultProcessingTimeouts.testing
         .copy(storageMaxRetryInterval = NonNegativeDuration.tryFromDuration(1.millisecond)),
+      futureSupervisor,
       loggerFactory,
     )
 
@@ -527,6 +529,7 @@ class AcsCommitmentProcessorTest
           any[Option[CantonTimestamp]],
           any[CantonTimestamp],
           any[MessageId],
+          any[Option[AggregationRule]],
           any[SendCallback],
         )(anyTraceContext)
         assert(computed.size === 2)

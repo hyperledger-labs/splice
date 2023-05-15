@@ -15,6 +15,7 @@ import com.daml.ledger.api.refinements.ApiTypes as A
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.lf.data.Ref.PackageId
 import com.daml.lf.language.Ast
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.HashOps
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.AdminWorkflowServicesErrorGroup
@@ -23,6 +24,7 @@ import com.digitalasset.canton.ledger.client.configuration.CommandClientConfigur
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
+import com.digitalasset.canton.participant.admin.AdminWorkflowServices.AbortedDueToShutdownException
 import com.digitalasset.canton.participant.config.LocalParticipantConfig
 import com.digitalasset.canton.participant.ledger.api.CantonAdminToken
 import com.digitalasset.canton.participant.ledger.api.client.{LedgerConnection, LedgerSubscription}
@@ -57,6 +59,7 @@ class AdminWorkflowServices(
     adminPartyId: PartyId,
     hashOps: HashOps,
     adminToken: CantonAdminToken,
+    futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
     protected val clock: Clock,
     tracerProvider: TracerProvider,
@@ -93,6 +96,7 @@ class AdminWorkflowServices(
       syncService.maxDeduplicationDuration, // Set the deduplication duration for Ping command to the maximum allowed.
       syncService.isActive(),
       Some(syncService),
+      futureSupervisor,
       loggerFactory,
       clock,
     )
@@ -134,24 +138,29 @@ class AdminWorkflowServices(
     } yield pkgRes.forall(pkgResponse => pkgResponse.packageStatus.isRegistered)
 
   private def handleDamlErrorDuringPackageLoading(
-      res: EitherT[Future, DamlError, Unit]
-  ): EitherT[Future, IllegalStateException, Unit] =
-    EitherTUtil.leftSubflatMap(res) {
-      case CantonPackageServiceError.IdentityManagerParentError(
-            ParticipantTopologyManagerError.IdentityManagerParentError(
-              NoAppropriateSigningKeyInStore.Failure(_)
-            )
-          ) =>
-        // Log error by creating error object, but continue processing.
-        AdminWorkflowServices.CanNotAutomaticallyVetAdminWorkflowPackage.Error().discard
-        Right(())
-      case err =>
-        Left(new IllegalStateException(CantonError.stringFromContext(err)))
-    }
+      res: EitherT[FutureUnlessShutdown, DamlError, Unit]
+  ): EitherT[Future, IllegalStateException, Unit] = EitherT {
+    EitherTUtil
+      .leftSubflatMap(res) {
+        case CantonPackageServiceError.IdentityManagerParentError(
+              ParticipantTopologyManagerError.IdentityManagerParentError(
+                NoAppropriateSigningKeyInStore.Failure(_)
+              )
+            ) =>
+          // Log error by creating error object, but continue processing.
+          AdminWorkflowServices.CanNotAutomaticallyVetAdminWorkflowPackage.Error().discard
+          Right(())
+        case err =>
+          Left(new IllegalStateException(CantonError.stringFromContext(err)))
+      }
+      .value
+      .failOnShutdownTo(new AbortedDueToShutdownException())
+  }
 
   /** Parses dar and checks if all contained packages are already loaded and recorded in the indexer. If not,
     * loads the dar.
     * @throws java.lang.IllegalStateException if the daml archive cannot be found on the classpath
+    * @throws AbortedDueToShutdownException if the node is shutting down
     */
   private def loadDamlArchiveUnlessRegistered()(implicit traceContext: TraceContext): Unit =
     withResource({
@@ -184,6 +193,7 @@ class AdminWorkflowServices(
     * or can be loaded as a resource.
     * @return Future that contains an IllegalStateException or a Unit
     * @throws RuntimeException if the daml archive cannot be found on the classpath
+    * @throws AbortedDueToShutdownException if the node is shutting down
     */
   private def loadDamlArchiveResource()(implicit
       traceContext: TraceContext
@@ -270,7 +280,10 @@ class AdminWorkflowServices(
 }
 
 object AdminWorkflowServices extends AdminWorkflowServicesErrorGroup {
-  private val AdminWorkflowDarResourceName: String = "AdminWorkflowsWithVacuuming-2.6.0.dar"
+  class AbortedDueToShutdownException
+      extends RuntimeException("The request was aborted due to the node shutting down.")
+
+  private val AdminWorkflowDarResourceName: String = "AdminWorkflowsWithVacuuming.dar"
   private def adminWorkflowDarInputStream(): InputStream = getDarInputStream(
     AdminWorkflowDarResourceName
   )

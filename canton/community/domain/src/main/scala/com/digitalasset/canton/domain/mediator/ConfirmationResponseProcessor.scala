@@ -19,7 +19,7 @@ import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, H
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
 import com.digitalasset.canton.protocol.messages.*
-import com.digitalasset.canton.protocol.{RequestId, RootHash, v0}
+import com.digitalasset.canton.protocol.{RequestId, RootHash, SourceDomainId, TargetDomainId, v0}
 import com.digitalasset.canton.sequencing.HandlerResult
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.time.DomainTimeTracker
@@ -308,11 +308,21 @@ private[mediator] class ConfirmationResponseProcessor(
     val (wrongRecipients, oneMemberRecipients) = rootHashMessages.flatMap { rhm =>
       rhm.recipients.trees.toList.map {
         case tree @ RecipientsTree(group, Seq()) =>
-          Either.cond(group.size == 2 && group.contains(mediatorId), group, tree)
+          Either.cond(
+            group.size == 2 && group.contains(MemberRecipient(mediatorId)),
+            group,
+            tree,
+          )
         case badTree => Left(badTree)
       }
     }.separate
-    val members = oneMemberRecipients.mapFilter(recipients => (recipients - mediatorId).headOption)
+    // TODO(#12569): support mediator groups
+    val members = oneMemberRecipients
+      .mapFilter(recipients =>
+        (recipients.collect { case MemberRecipient(member) =>
+          member
+        } - mediatorId).headOption
+      )
 
     def repeatedMembers(members: Seq[Member]): Seq[Member] = {
       val repeatedMembersB = Seq.newBuilder[Member]
@@ -505,7 +515,12 @@ private[mediator] class ConfirmationResponseProcessor(
     // This can happen without a malicious submitter, e.g., if the topology has changed.
     val recipientsByViewType =
       rootHashMessages.groupBy(_.protocolMessage.viewType).mapFilter { rhms =>
-        val recipients = rhms.flatMap(_.recipients.allRecipients).toSet
+        // todo(#12360): how to handle ParticipantsOfParty here?
+        val recipients = rhms
+          .flatMap(_.recipients.allRecipients.collect { case MemberRecipient(member) =>
+            member
+          })
+          .toSet
         val participantRecipients = recipients.collect[Member] { case p: ParticipantId => p }
         NonEmpty.from(participantRecipients.toSeq)
       }
@@ -543,7 +558,7 @@ private[mediator] class ConfirmationResponseProcessor(
                 TransferInResult.create(
                   requestId,
                   Set.empty,
-                  TransferInDomainId(domainId),
+                  TargetDomainId(domainId),
                   rejectionReason,
                   protocolVersion,
                 )
@@ -551,7 +566,7 @@ private[mediator] class ConfirmationResponseProcessor(
                 TransferOutResult.create(
                   requestId,
                   Set.empty,
-                  TransferOutDomainId(domainId),
+                  SourceDomainId(domainId),
                   rejectionReason,
                   protocolVersion,
                 )

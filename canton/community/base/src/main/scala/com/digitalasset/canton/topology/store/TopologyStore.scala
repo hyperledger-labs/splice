@@ -6,6 +6,7 @@ package com.digitalasset.canton.topology.store
 import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.LengthLimitedString.DisplayName
 import com.digitalasset.canton.config.CantonRequireTypes.{
   LengthLimitedString,
@@ -38,7 +39,6 @@ import com.digitalasset.canton.topology.store.memory.{
 }
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
@@ -84,6 +84,18 @@ trait PartyMetadataStore extends AutoCloseable {
   def metadataForParty(partyId: PartyId)(implicit
       traceContext: TraceContext
   ): Future[Option[PartyMetadata]]
+
+  final def insertOrUpdatePartyMetadata(metadata: PartyMetadata)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    insertOrUpdatePartyMetadata(
+      partyId = metadata.partyId,
+      participantId = metadata.participantId,
+      displayName = metadata.displayName,
+      effectiveTimestamp = metadata.effectiveTimestamp,
+      submissionId = metadata.submissionId,
+    )
+  }
 
   def insertOrUpdatePartyMetadata(
       partyId: PartyId,
@@ -242,7 +254,8 @@ object TimeQuery {
 
 }
 
-trait BaseTopologyStore[+StoreID <: TopologyStoreId, ValidTx] extends AutoCloseable {
+trait TopologyStoreCommon[+StoreID <: TopologyStoreId, ValidTx, StoredTx, SignedTx]
+    extends AutoCloseable {
 
   this: NamedLogging =>
 
@@ -254,12 +267,59 @@ trait BaseTopologyStore[+StoreID <: TopologyStoreId, ValidTx] extends AutoClosea
     monotonicityCheck.getAndSet(Some(ts))
 
   def storeId: StoreID
+
+  /** fetch the effective time updates greater than or equal to a certain timestamp
+    *
+    * this function is used to recover the future effective timestamp such that we can reschedule "pokes" of the
+    * topology client and updates of the acs commitment processor on startup
+    */
+  def findUpcomingEffectiveChanges(asOfInclusive: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TopologyStore.Change]]
+
+  def maxTimestamp()(implicit
+      traceContext: TraceContext
+  ): Future[Option[(SequencedTime, EffectiveTime)]]
+
+  /** returns the current dispatching watermark
+    *
+    * for topology transaction dispatching, we keep track up to which point in time
+    * we have mirrored the authorized store to the remote store
+    *
+    * the timestamp always refers to the timestamp of the authorized store!
+    */
+  def currentDispatchingWatermark(implicit
+      traceContext: TraceContext
+  ): Future[Option[CantonTimestamp]]
+
+  /** update the dispatching watermark for this target store */
+  def updateDispatchingWatermark(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Future[Unit]
+
+  protected def signedTxFromStoredTx(storedTx: StoredTx): SignedTx
+
+  final def exists(transaction: SignedTx)(implicit
+      traceContext: TraceContext
+  ): Future[Boolean] = findStored(transaction).map(_.exists(signedTxFromStoredTx(_) == transaction))
+
+  def findStored(transaction: SignedTx)(implicit
+      traceContext: TraceContext
+  ): Future[Option[StoredTx]]
+}
+
+object TopologyStoreCommon {
+
+  type DomainStoreCommon = TopologyStoreCommon[DomainStore, _, _, _]
+
 }
 
 abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
     ec: ExecutionContext
 ) extends AutoCloseable
-    with BaseTopologyStore[StoreID, ValidatedTopologyTransaction] {
+    with TopologyStoreCommon[StoreID, ValidatedTopologyTransaction, StoredTopologyTransaction[
+      TopologyChangeOp
+    ], SignedTopologyTransaction[TopologyChangeOp]] {
   this: NamedLogging =>
 
   /** add validated topology transaction as is to the topology transaction table */
@@ -285,22 +345,6 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       transactions: Seq[ValidatedTopologyTransaction],
   )(implicit traceContext: TraceContext): Future[Unit]
 
-  /** returns the current dispatching watermark
-    *
-    * for topology transaction dispatching, we keep track up to which point in time
-    * we have mirrored the authorized store to the remote store
-    *
-    * the timestamp always refers to the timestamp of the authorized store!
-    */
-  def currentDispatchingWatermark(implicit
-      traceContext: TraceContext
-  ): Future[Option[CantonTimestamp]]
-
-  /** update the dispatching watermark for this target store */
-  def updateDispatchingWatermark(timestamp: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): Future[Unit]
-
   /** returns transactions that should be dispatched to the domain */
   def findDispatchingTransactionsAfter(
       timestampExclusive: CantonTimestamp,
@@ -310,7 +354,7 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
   /** returns initial set of onboarding transactions that should be dispatched to the domain */
   def findParticipantOnboardingTransactions(participantId: ParticipantId, domainId: DomainId)(
       implicit traceContext: TraceContext
-  ): Future[Seq[SignedTopologyTransaction[TopologyChangeOp]]]
+  ): FutureUnlessShutdown[Seq[SignedTopologyTransaction[TopologyChangeOp]]]
 
   /** returns an descending ordered list of timestamps of when participant state changes occurred before a certain point in time */
   def findTsOfParticipantStateChangesBefore(
@@ -327,6 +371,10 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
   def timestamp(useStateStore: Boolean = false)(implicit
       traceContext: TraceContext
   ): Future[Option[(SequencedTime, EffectiveTime)]]
+
+  override def maxTimestamp()(implicit
+      traceContext: TraceContext
+  ): Future[Option[(SequencedTime, EffectiveTime)]] = timestamp(useStateStore = true)
 
   /** set of topology transactions which are active */
   def headTransactions(implicit
@@ -348,14 +396,6 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
   def allTransactions(implicit
       traceContext: TraceContext
   ): Future[StoredTopologyTransactions[TopologyChangeOp]]
-
-  final def exists(transaction: SignedTopologyTransaction[TopologyChangeOp])(implicit
-      traceContext: TraceContext
-  ): Future[Boolean] = findStored(transaction).map(_.exists(_.transaction == transaction))
-
-  def findStored(transaction: SignedTopologyTransaction[TopologyChangeOp])(implicit
-      traceContext: TraceContext
-  ): Future[Option[StoredTopologyTransaction[TopologyChangeOp]]]
 
   def findStoredNoSignature(transaction: TopologyTransaction[TopologyChangeOp])(implicit
       traceContext: TraceContext
@@ -473,34 +513,30 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit
       filterNamespace: Option[Seq[Namespace]],
   )(implicit traceContext: TraceContext): Future[PositiveStoredTopologyTransactions]
 
-  /** fetch the effective time updates greater than or equal to a certain timestamp
-    *
-    * this function is used to recover the future effective timestamp such that we can reschedule "pokes" of the
-    * topology client and updates of the acs commitment processor on startup
-    */
-  def findUpcomingEffectiveChanges(asOfInclusive: CantonTimestamp)(implicit
-      traceContext: TraceContext
-  ): Future[Seq[TopologyStore.Change]]
+  override protected def signedTxFromStoredTx(
+      storedTx: StoredTopologyTransaction[TopologyChangeOp]
+  ): SignedTopologyTransaction[TopologyChangeOp] = storedTx.transaction
 
 }
 
 object TopologyStore {
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def apply[StoreID <: TopologyStoreId](
-      storeId: TopologyStoreId,
+      storeId: StoreID,
       storage: Storage,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
+      futureSupervisor: FutureSupervisor,
   )(implicit
       ec: ExecutionContext
   ): TopologyStore[StoreID] =
     storage match {
       case _: MemoryStorage =>
-        (new InMemoryTopologyStore(storeId, loggerFactory)).asInstanceOf[TopologyStore[StoreID]]
+        (new InMemoryTopologyStore(storeId, loggerFactory, timeouts, futureSupervisor))
+
       case jdbc: DbStorage =>
-        new DbTopologyStore(jdbc, storeId, timeouts, loggerFactory)
-          .asInstanceOf[TopologyStore[StoreID]]
+        new DbTopologyStore(jdbc, storeId, timeouts, loggerFactory, futureSupervisor)
+
     }
 
   sealed trait Change extends Product with Serializable {
@@ -704,10 +740,12 @@ object TopologyStore {
       store: TopologyStore[TopologyStoreId],
       loggerFactory: NamedLoggerFactory,
       transactions: StoredTopologyTransactions[TopologyChangeOp],
+      timeouts: ProcessingTimeout,
+      futureSupervisor: FutureSupervisor,
   )(implicit
       traceContext: TraceContext,
       executionContext: ExecutionContext,
-  ): Future[Seq[SignedTopologyTransaction[TopologyChangeOp]]] = {
+  ): FutureUnlessShutdown[Seq[SignedTopologyTransaction[TopologyChangeOp]]] = {
     val logger = loggerFactory.getLogger(getClass)
     def includeState(mapping: TopologyStateUpdateMapping): Boolean = mapping match {
       case NamespaceDelegation(_, _, _) | IdentifierDelegation(_, _) =>
@@ -729,7 +767,13 @@ object TopologyStore {
       case _ => false
     }
     val validator =
-      new SnapshotAuthorizationValidator(CantonTimestamp.MaxValue, store, loggerFactory)
+      new SnapshotAuthorizationValidator(
+        CantonTimestamp.MaxValue,
+        store,
+        timeouts,
+        loggerFactory,
+        futureSupervisor,
+      )
     val filtered = transactions.result.filter(tx =>
       tx.transaction.transaction.element.mapping.restrictedToDomain
         .forall(_ == domainId) && include(tx.transaction.transaction.element.mapping)

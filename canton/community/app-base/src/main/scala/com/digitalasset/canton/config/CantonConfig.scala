@@ -326,6 +326,18 @@ trait CantonConfig {
     n.unwrap -> c
   }
 
+  /** all participants that this Canton process can operate or connect to
+    *
+    * participants are grouped by their local name
+    */
+  def participantsX: Map[InstanceName, ParticipantConfigType]
+
+  /** Use `participantsX` instead!
+    */
+  def participantsByStringX: Map[String, ParticipantConfigType] = participantsX.map { case (n, c) =>
+    n.unwrap -> c
+  }
+
   /** all remotely running domains to which the console can connect and operate on */
   def remoteDomains: Map[InstanceName, RemoteDomainConfig]
 
@@ -338,9 +350,19 @@ trait CantonConfig {
   /** all remotely running participants to which the console can connect and operate on */
   def remoteParticipants: Map[InstanceName, RemoteParticipantConfig]
 
+  /** all remotely running participants to which the console can connect and operate on */
+  def remoteParticipantsX: Map[InstanceName, RemoteParticipantConfig]
+
   /** Use `remoteParticipants` instead!
     */
   def remoteParticipantsByString: Map[String, RemoteParticipantConfig] = remoteParticipants.map {
+    case (n, c) =>
+      n.unwrap -> c
+  }
+
+  /** Use `remoteParticipantsX` instead!
+    */
+  def remoteParticipantsByStringX: Map[String, RemoteParticipantConfig] = remoteParticipantsX.map {
     case (n, c) =>
       n.unwrap -> c
   }
@@ -381,7 +403,7 @@ trait CantonConfig {
     domainNodeParameters(InstanceName.tryCreate(name))
 
   private lazy val participantNodeParameters_ : Map[InstanceName, ParticipantNodeParameters] =
-    participants.fmap { participantConfig =>
+    (participants ++ participantsX).fmap { participantConfig =>
       val participantParameters = participantConfig.parameters
       ParticipantNodeParameters(
         general = CantonNodeParameterConverter.general(this, participantConfig),
@@ -397,7 +419,6 @@ trait CantonConfig {
           initialProtocolVersion = participantParameters.initialProtocolVersion.unwrap,
         ),
         participantConfig.init.parameters.uniqueContractKeys,
-        participantConfig.init.parameters.unsafeEnableCausalityTracking,
         participantParameters.ledgerApiServerParameters,
         maxDbConnections = participantConfig.storage.maxConnectionsCanton(true, false, false).value,
         participantParameters.excludeInfrastructureTransactions,

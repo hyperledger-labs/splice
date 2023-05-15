@@ -432,13 +432,7 @@ class SvApp(
   private def getParticipantId(
       participantAdminConnection: ParticipantAdminConnection
   ): Future[ParticipantId] = {
-    participantAdminConnection.getParticipantId().map { participantIdOpt =>
-      participantIdOpt.getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription(s"Cannot participant Id")
-        )
-      )
-    }
+    participantAdminConnection.getParticipantId()
   }
 
   private def newSvStore(key: SvStore.Key) = SvSvStore(

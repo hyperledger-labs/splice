@@ -19,7 +19,7 @@ import com.digitalasset.canton.topology.Member
   * the top-level subtree A.
   */
 final case class RecipientsTree(
-    recipientGroup: NonEmpty[Set[Member]],
+    recipientGroup: NonEmpty[Set[Recipient]],
     children: Seq[RecipientsTree],
 ) extends PrettyPrinting {
 
@@ -29,12 +29,12 @@ final case class RecipientsTree(
       paramIfNonEmpty("children", _.children),
     )
 
-  lazy val allRecipients: NonEmpty[Set[Member]] = {
-    val tail: Set[Member] = children.flatMap(t => t.allRecipients).toSet
+  lazy val allRecipients: NonEmpty[Set[Recipient]] = {
+    val tail: Set[Recipient] = children.flatMap(t => t.allRecipients).toSet
     recipientGroup ++ tail
   }
 
-  def allPaths: NonEmpty[Seq[NonEmpty[Seq[NonEmpty[Set[Member]]]]]] =
+  def allPaths: NonEmpty[Seq[NonEmpty[Seq[NonEmpty[Set[Recipient]]]]]] =
     NonEmpty.from(children) match {
       case Some(childrenNE) =>
         childrenNE.flatMap { child =>
@@ -44,20 +44,28 @@ final case class RecipientsTree(
     }
 
   def forMember(member: Member): Seq[RecipientsTree] = {
-    if (recipientGroup.contains(member)) {
+    // TODO(#12360): The projection for a member should include all the group addresses that include this member,
+    //  using the appropriate topology snapshot for resolving the group addresses to members.
+    if (
+      recipientGroup
+        .collect { case MemberRecipient(member) =>
+          member
+        }
+        .contains(member)
+    ) {
       Seq(this)
     } else {
       children.flatMap(c => c.forMember(member))
     }
   }
 
-  lazy val leafMembers: NonEmpty[Set[Member]] = children match {
-    case NonEmpty(cs) => cs.toNEF.reduceLeftTo(_.leafMembers)(_ ++ _.leafMembers)
-    case _ => recipientGroup
+  lazy val leafRecipients: NonEmpty[Set[Recipient]] = children match {
+    case NonEmpty(cs) => cs.toNEF.reduceLeftTo(_.leafRecipients)(_ ++ _.leafRecipients)
+    case _ => recipientGroup.map(m => m: Recipient)
   }
 
   def toProtoV0: v0.RecipientsTree = {
-    val recipientsP = recipientGroup.toSeq.map(member => member.toProtoPrimitive).sorted
+    val recipientsP = recipientGroup.toSeq.map(_.toProtoPrimitive).sorted
     val childrenP = children.map(_.toProtoV0)
     new v0.RecipientsTree(recipientsP, childrenP)
   }
@@ -65,16 +73,28 @@ final case class RecipientsTree(
 
 object RecipientsTree {
 
-  def leaf(group: NonEmpty[Set[Member]]): RecipientsTree = RecipientsTree(group, Seq.empty)
+  def ofMembers(
+      recipientGroup: NonEmpty[Set[Member]],
+      children: Seq[RecipientsTree],
+  ) = RecipientsTree(recipientGroup.map(MemberRecipient), children)
+
+  def leaf(group: NonEmpty[Set[Member]]): RecipientsTree =
+    RecipientsTree(group.map(MemberRecipient), Seq.empty)
+
+  def recipientsLeaf(group: NonEmpty[Set[Recipient]]): RecipientsTree =
+    RecipientsTree(group, Seq.empty)
 
   def fromProtoV0(
-      treeProto: v0.RecipientsTree
+      treeProto: v0.RecipientsTree,
+      supportGroupAddressing: Boolean,
   ): ParsingResult[RecipientsTree] = {
     for {
       members <- treeProto.recipients.traverse(str =>
-        Member.fromProtoPrimitive(str, "RecipientsTreeProto.recipients")
+        if (supportGroupAddressing)
+          Recipient.fromProtoPrimitive(str, "RecipientsTreeProto.recipients")
+        else Member.fromProtoPrimitive(str, "RecipientsTreeProto.recipients").map(MemberRecipient)
       )
-      membersNonEmpty <- NonEmpty
+      recipientsNonEmpty <- NonEmpty
         .from(members)
         .toRight(
           ProtoDeserializationError.ValueConversionError(
@@ -83,8 +103,11 @@ object RecipientsTree {
           )
         )
       children = treeProto.children
-      childTrees <- children.toList.traverse(fromProtoV0)
-    } yield RecipientsTree(membersNonEmpty.toSet, childTrees)
+      childTrees <- children.toList.traverse(fromProtoV0(_, supportGroupAddressing))
+    } yield RecipientsTree(
+      recipientsNonEmpty.toSet,
+      childTrees,
+    )
   }
 
 }

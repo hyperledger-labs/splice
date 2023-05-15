@@ -143,9 +143,9 @@ class ParticipantAdminConnection(
     )
   }
 
-  def getParticipantId()(implicit traceContext: TraceContext): Future[Option[ParticipantId]] = {
+  def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] = {
     runCmd(
       TopologyAdminCommands.Init.GetId()
-    ).map(_.map(ParticipantId(_)))
+    ).map(ParticipantId(_))
   }
 }

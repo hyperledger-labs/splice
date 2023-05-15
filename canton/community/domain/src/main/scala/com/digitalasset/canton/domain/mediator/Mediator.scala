@@ -64,6 +64,7 @@ private[mediator] class Mediator(
     val topologyClient: DomainTopologyClientWithInit,
     private[canton] val syncCrypto: DomainSyncCryptoClient,
     topologyTransactionProcessor: TopologyTransactionProcessorCommon,
+    topologyRequestProcessor: Option[UnsignedProtocolEventHandler],
     timeTrackerConfig: DomainTimeTrackerConfig,
     state: MediatorState,
     private[canton] val sequencerCounterTrackerStore: SequencerCounterTrackerStore,
@@ -90,7 +91,14 @@ private[mediator] class Mediator(
       metrics.sequencerClient.delay,
     )
 
-  val timeTracker = DomainTimeTracker(timeTrackerConfig, clock, sequencerClient, loggerFactory)
+  val timeTracker = DomainTimeTracker(
+    timeTrackerConfig,
+    clock,
+    sequencerClient,
+    protocolVersion,
+    timeouts,
+    loggerFactory,
+  )
 
   private val verdictSender =
     VerdictSender(sequencerClient, syncCrypto, protocolVersion, loggerFactory)
@@ -119,6 +127,7 @@ private[mediator] class Mediator(
     state,
     syncCrypto,
     topologyTransactionProcessor.createHandler(domain),
+    topologyRequestProcessor,
     processor,
     deduplicator,
     protocolVersion,
@@ -369,8 +378,7 @@ private[mediator] object Mediator {
       cleanTs: CantonTimestamp,
   ): PruningSafetyCheck = {
     lazy val timeout = domainParameters.parameters.participantResponseTimeout
-    lazy val cappedSafePruningTs =
-      CantonTimestamp.max(cleanTs - timeout, domainParameters.validFrom)
+    lazy val cappedSafePruningTs = domainParameters.validFrom.max(cleanTs - timeout)
 
     if (cleanTs <= domainParameters.validFrom) // If these parameters apply only to the future
       Safe

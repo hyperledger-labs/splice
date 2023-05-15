@@ -564,7 +564,10 @@ class TransactionProcessingSteps(
       def extractRandomnessFromView(
           transactionViewEnvelope: OpenEnvelope[TransactionViewMessage]
       ): Unit = {
-        if (transactionViewEnvelope.recipients.leafMembers.contains(participantId)) {
+        if (
+          // TODO(#12382): support group addressing for informees
+          transactionViewEnvelope.recipients.leafRecipients.contains(MemberRecipient(participantId))
+        ) {
           val message = transactionViewEnvelope.protocolMessage
           val randomnessF = EncryptedViewMessage
             .decryptRandomness(
@@ -768,13 +771,16 @@ class TransactionProcessingSteps(
       pendingDataAndResponseArgs: PendingDataAndResponseArgs,
       transferLookup: TransferLookup,
       contractLookup: ContractLookup,
-      tracker: SingleDomainCausalTracker,
-      activenessResultFuture: Future[ActivenessResult],
+      activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       pendingCursor: Future[Unit],
       mediatorId: MediatorId,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransactionProcessorError, StorePendingDataAndSendResponseAndCreateTimeout] = {
+  ): EitherT[
+    FutureUnlessShutdown,
+    TransactionProcessorError,
+    StorePendingDataAndSendResponseAndCreateTimeout,
+  ] = {
     import cats.Order.*
 
     val PendingDataAndResponseArgs(
@@ -853,7 +859,7 @@ class TransactionProcessingSteps(
       )
     }
 
-    def awaitActivenessResult: Future[ActivenessResult] = activenessResultFuture.map {
+    def awaitActivenessResult: FutureUnlessShutdown[ActivenessResult] = activenessResultFuture.map {
       activenessResult =>
         val contractResult = activenessResult.contracts
 
@@ -973,7 +979,7 @@ class TransactionProcessingSteps(
 
     val result =
       for {
-        parallelChecksResult <- doParallelChecks(enrichedTransaction)
+        parallelChecksResult <- FutureUnlessShutdown.outcomeF(doParallelChecks(enrichedTransaction))
         activenessResult <- awaitActivenessResult
         _ = crashOnUnknownKeys(activenessResult)
         transactionValidationResult = computeValidationResult(
@@ -981,11 +987,13 @@ class TransactionProcessingSteps(
           parallelChecksResult,
           activenessResult,
         )
-        responses <- confirmationResponseFactory.createConfirmationResponses(
-          requestId,
-          malformedPayloads,
-          transactionValidationResult,
-          ipsSnapshot,
+        responses <- FutureUnlessShutdown.outcomeF(
+          confirmationResponseFactory.createConfirmationResponses(
+            requestId,
+            malformedPayloads,
+            transactionValidationResult,
+            ipsSnapshot,
+          )
         )
       } yield {
 
@@ -994,7 +1002,6 @@ class TransactionProcessingSteps(
         StorePendingDataAndSendResponseAndCreateTimeout(
           pendingTransaction,
           responses.map(_ -> mediatorRecipient),
-          Seq.empty,
           RejectionArgs(
             pendingTransaction,
             LocalReject.TimeRejects.LocalTimeout.Reject(protocolVersion),
@@ -1278,15 +1285,6 @@ class TransactionProcessingSteps(
       Some(commitSetF),
       contractsToBeStored,
       Some(timestampedEvent),
-      Some(
-        TransactionUpdate(
-          pendingRequestData.transactionValidationResult.hostedInformeeStakeholders,
-          pendingRequestData.requestTime,
-          domainId,
-          pendingRequestData.requestCounter,
-          protocolVersion,
-        )
-      ),
     )
   }
 
@@ -1298,7 +1296,6 @@ class TransactionProcessingSteps(
       resultE: Either[MalformedMediatorRequestResult, TransactionResultMessage],
       pendingRequestData: RequestType#PendingRequestData,
       pendingSubmissionMap: PendingSubmissions,
-      tracker: SingleDomainCausalTracker,
       hashOps: HashOps,
   )(implicit
       traceContext: TraceContext
@@ -1313,7 +1310,7 @@ class TransactionProcessingSteps(
         event <- EitherT.fromEither[Future](
           createRejectionEvent(RejectionArgs(pendingRequestData, error))
         )
-      } yield CommitAndStoreContractsAndPublishEvent(None, Set(), event, None)
+      } yield CommitAndStoreContractsAndPublishEvent(None, Set(), event)
     }
 
     def getCommitSetAndContractsToBeStoredAndEvent()
@@ -1331,7 +1328,10 @@ class TransactionProcessingSteps(
           )
 
         case (_: Verdict.Approve, Left(modelConformanceError))
-            if !ModelConformanceChecker.isSubviewsCheckDisabled && modelConformanceError.aSubviewIsValid =>
+            if ModelConformanceChecker
+              .isSubviewsCheckEnabled(
+                loggerFactory.name
+              ) && modelConformanceError.aSubviewIsValid =>
           ErrorUtil.invalidState(
             s"The Mediator approved a request where a root view fails the model conformance check while a subview passes it"
           )

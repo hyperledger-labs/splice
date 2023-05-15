@@ -3,11 +3,19 @@
 
 package com.digitalasset.canton.topology.store
 
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.topology.store.TopologyStoreId.DomainStore
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransactionX.GenericValidatedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.{
+  SignedTopologyTransaction,
+  SignedTopologyTransactionX,
+  TopologyChangeOp,
+  TopologyChangeOpX,
+  TopologyMappingX,
+}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, blocking}
@@ -17,10 +25,16 @@ import scala.concurrent.{ExecutionContext, blocking}
   * domain stores need the domain-id, but we only know it after init.
   * therefore, we need some data structure to manage the store
   */
-abstract class DomainTopologyStoreBase[ValidTx, T <: BaseTopologyStore[DomainStore, ValidTx]](
+abstract class DomainTopologyStoreBase[
+    ValidTx,
+    StoredTx,
+    SignedTx,
+    T <: TopologyStoreCommon[DomainStore, ValidTx, StoredTx, SignedTx],
+](
     storage: Storage,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
+    futureSupervisor: FutureSupervisor,
 ) extends AutoCloseable {
   private val store = new AtomicReference[Option[T]](None)
   def initOrGet(
@@ -59,15 +73,21 @@ class DomainTopologyStore(
     storage: Storage,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
-) extends DomainTopologyStoreBase[ValidatedTopologyTransaction, TopologyStore[DomainStore]](
+    futureSupervisor: FutureSupervisor,
+) extends DomainTopologyStoreBase[ValidatedTopologyTransaction, StoredTopologyTransaction[
+      TopologyChangeOp
+    ], SignedTopologyTransaction[
+      TopologyChangeOp
+    ], TopologyStore[DomainStore]](
       storage,
       timeouts,
       loggerFactory,
+      futureSupervisor,
     ) {
   override protected def createTopologyStore(
       storeId: DomainStore
   )(implicit ec: ExecutionContext): TopologyStore[DomainStore] =
-    TopologyStore(storeId, storage, timeouts, loggerFactory)
+    TopologyStore(storeId, storage, timeouts, loggerFactory, futureSupervisor)
 
 }
 
@@ -75,12 +95,19 @@ class DomainTopologyStoreX(
     storage: Storage,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
-) extends DomainTopologyStoreBase[GenericValidatedTopologyTransactionX, TopologyStoreX[
-      DomainStore
-    ]](
+    futureSupervisor: FutureSupervisor,
+) extends DomainTopologyStoreBase[
+      GenericValidatedTopologyTransactionX,
+      StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX],
+      SignedTopologyTransactionX[TopologyChangeOpX, TopologyMappingX],
+      TopologyStoreX[
+        DomainStore
+      ],
+    ](
       storage,
       timeouts,
       loggerFactory,
+      futureSupervisor,
     ) {
   override protected def createTopologyStore(
       storeId: DomainStore

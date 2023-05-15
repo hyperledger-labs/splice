@@ -26,7 +26,7 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.domain.DomainNodeBootstrap
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.ParticipantNodeBootstrap
+import com.digitalasset.canton.participant.{ParticipantNodeBootstrap, ParticipantNodeBootstrapX}
 import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
 
 trait CNNodeEnvironment extends Environment {
@@ -288,8 +288,12 @@ class CNNodeEnvironmentImpl(
   }
 
   override protected val participantNodeFactory
-      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType] =
+      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap] =
     ParticipantNodeBootstrap.CommunityParticipantFactory
+
+  override protected def participantNodeFactoryX
+      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrapX] =
+    ParticipantNodeBootstrapX.CommunityParticipantFactory
 
   override protected val domainFactory: DomainNodeBootstrap.Factory[Config#DomainConfigType] =
     DomainNodeBootstrap.CommunityDomainFactory

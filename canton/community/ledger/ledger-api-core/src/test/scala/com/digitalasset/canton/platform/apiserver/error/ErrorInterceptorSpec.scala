@@ -17,7 +17,7 @@ import com.daml.platform.hello.HelloServiceGrpc.HelloService
 import com.daml.platform.hello.{HelloRequest, HelloResponse, HelloServiceGrpc}
 import com.daml.platform.testing.StreamConsumer
 import com.digitalasset.canton.platform.server.api.services.grpc.StreamingServiceLifecycleManagement
-import com.digitalasset.canton.testing.TestingLogCollector.{ThrowableCause, ThrowableEntry}
+import com.digitalasset.canton.testing.TestingLogCollector.ThrowableEntry
 import com.digitalasset.canton.testing.{LoggingAssertions, TestingLogCollector}
 import io.grpc.*
 import io.grpc.stub.StreamObserver
@@ -52,7 +52,7 @@ final class ErrorInterceptorSpec
 
   classOf[ErrorInterceptor].getSimpleName - {
 
-    assert(FooMissingErrorCode.category.grpcCode.get != Status.Code.INTERNAL)
+    assert(FooMissingErrorCode.category.grpcCode.value != Status.Code.INTERNAL)
 
     "for a server unary future endpoint" - {
       "when signalling with a non-self-service error should SANITIZE the server response when arising " - {
@@ -139,13 +139,8 @@ final class ErrorInterceptorSpec
           ).map { t: StatusRuntimeException =>
             assertSecuritySanitizedError(t)
             assertLogEntries[this.type, ErrorInterceptor] { loggedEntries =>
-              loggedEntries should have size 1
-              loggedEntries.head.throwableEntryO.flatMap(_.causeO).value shouldBe
-                ThrowableCause(
-                  className = "java.lang.IllegalArgumentException",
-                  message =
-                    "Failing the stream by passing a non error-code based error directly to observer.onError",
-                )
+              // not logging the transformed error
+              loggedEntries should have size 0
             }
           }
         }
@@ -266,7 +261,7 @@ final class ErrorInterceptorSpec
   ): Assertion = {
     assertError(
       actual,
-      expectedStatusCode = FooMissingErrorCode.category.grpcCode.get,
+      expectedStatusCode = FooMissingErrorCode.category.grpcCode.value,
       expectedMessage = s"FOO_MISSING_ERROR_CODE(11,0): Foo is missing: $expectedMsg",
       expectedDetails =
         Seq(ErrorDetails.ErrorInfoDetail("FOO_MISSING_ERROR_CODE", Map("category" -> "11"))),

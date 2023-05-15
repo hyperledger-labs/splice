@@ -18,11 +18,11 @@ import com.digitalasset.canton.topology.Member
   */
 final case class Recipients(trees: NonEmpty[Seq[RecipientsTree]]) extends PrettyPrinting {
 
-  lazy val allRecipients: Set[Member] = {
-    trees.flatMap(t => t.allRecipients).toSet
-  }
+  lazy val allRecipients: NonEmpty[Set[Recipient]] = trees
+    .flatMap(t => t.allRecipients)
+    .toSet
 
-  def allPaths: NonEmpty[Seq[NonEmpty[Seq[NonEmpty[Set[Member]]]]]] = trees.flatMap(_.allPaths)
+  def allPaths: NonEmpty[Seq[NonEmpty[Seq[NonEmpty[Set[Recipient]]]]]] = trees.flatMap(_.allPaths)
 
   def forMember(member: Member): Option[Recipients] = {
     val ts = trees.forgetNE.flatMap(t => t.forMember(member))
@@ -40,24 +40,31 @@ final case class Recipients(trees: NonEmpty[Seq[RecipientsTree]]) extends Pretty
 
   def asSingleGroup: Option[NonEmpty[Set[Member]]] = {
     trees match {
-      case Seq(RecipientsTree(group, Seq())) => Some(group)
+      case Seq(RecipientsTree(group, Seq())) =>
+        NonEmpty.from(group.collect { case MemberRecipient(member) =>
+          member
+        })
       case _ => None
     }
   }
 
-  /** Members that appear at the leaf of the BCC tree. For example, the informees of a view are leaf members of the
+  /** Recipients that appear at the leaf of the BCC tree. For example, the informees of a view are leaf members of the
     * view message.
     */
-  lazy val leafMembers: NonEmpty[Set[Member]] =
-    trees.toNEF.reduceLeftTo(_.leafMembers)(_ ++ _.leafMembers)
-
+  lazy val leafRecipients: NonEmpty[Set[Recipient]] =
+    trees.toNEF.reduceLeftTo(_.leafRecipients)(_ ++ _.leafRecipients)
 }
 
 object Recipients {
 
-  def fromProtoV0(proto: v0.Recipients): ParsingResult[Recipients] = {
+  def fromProtoV0(
+      proto: v0.Recipients,
+      supportGroupAddressing: Boolean,
+  ): ParsingResult[Recipients] = {
     for {
-      trees <- proto.recipientsTree.traverse(t => RecipientsTree.fromProtoV0(t))
+      trees <- proto.recipientsTree.traverse(t =>
+        RecipientsTree.fromProtoV0(t, supportGroupAddressing)
+      )
       recipients <- NonEmpty
         .from(trees)
         .toRight(
