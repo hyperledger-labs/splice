@@ -582,8 +582,19 @@ commands:
       - run:
           name: Install VPN client
           command: |
-            sudo apt-get update
-            sudo apt-get install -y expect charon-cmd
+            # Retry because we've seen Ubuntu be down sometimes.
+            n=0
+            until [ $n -gt 50 ]; do
+              sudo apt-get update && break
+              n=$((n+1))
+              sleep 10
+            done
+            n=0
+            until [ $n -gt 50 ]; do
+              sudo apt-get install -y expect charon-cmd && break
+              n=$((n+1))
+              sleep 10
+            done
       - run:
           name: Dump public IP
           command: curl checkip.amazonaws.com
