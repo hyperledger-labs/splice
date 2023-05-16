@@ -106,6 +106,9 @@ class SvApp(
       svPartyId: PartyId,
   ): Future[SvApp.State] = {
     for {
+      // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
+      // reconnect all domains at the beginning of SV initialization just in case.
+      _ <- participantAdminConnection.reconnectAllDomains()
       // TODO(#3856): find a better way to get the SVC party ID
       svcPartyId <- retryProvider.retryForAutomation("get SVC party ID", getSvcPartyId, logger)
       ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)

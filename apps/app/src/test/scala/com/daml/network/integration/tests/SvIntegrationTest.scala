@@ -60,6 +60,29 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     sv1.startSync()
   }
 
+  "connect to all domains during initialization" in { implicit env =>
+    initSvc()
+    sv4.stop()
+
+    val globalDomainId = inside(sv4.participantClient.domains.list_connected()) {
+      case Seq(domain) =>
+        domain.domainId
+    }
+
+    clue("simulate the domain was left disconnected when error occur during party migration.") {
+      sv4.participantClient.domains.disconnect_all()
+      sv4.participantClient.domains.list_connected() shouldBe empty
+    }
+
+    clue("sv will connect to all domains during initialization.") {
+      sv4.startSync()
+      inside(sv4.participantClient.domains.list_connected()) {
+        case Seq(listConnectedDomainsResult) =>
+          listConnectedDomainsResult.domainId shouldBe globalDomainId
+      }
+    }
+  }
+
   // A test to make debugging bootstrap problems easier
   "SV apps can start one by one" in { implicit env =>
     clue("Starting SVC app and SV1 app") {
