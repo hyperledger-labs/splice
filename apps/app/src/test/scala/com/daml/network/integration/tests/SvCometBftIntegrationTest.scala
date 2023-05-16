@@ -46,4 +46,10 @@ class SvCometBftIntegrationTest
     }
   }
 
+  "get the debug dump for cometBft" in { implicit env =>
+    initSvcWithSv1Only()
+    eventually() {
+      sv1.cometBftNodeDump().abciInfo.isObject shouldBe true
+    }
+  }
 }

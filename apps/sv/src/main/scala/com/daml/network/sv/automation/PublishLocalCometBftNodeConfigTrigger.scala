@@ -55,7 +55,7 @@ class PublishLocalCometBftNodeConfigTrigger(
 
   private def getLocalSvNodeConfig(): OptionT[Future, proto.cometbft.SvNodeConfig] = {
     throw new NotImplementedError(
-      "TODO(#4630): implement this by querying the local RPC, if available"
+      "TODO(#4628): implement this by querying the local RPC, if available"
     )
   }
 

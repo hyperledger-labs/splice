@@ -70,6 +70,26 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+  /admin/domain/cometbft/debug:
+    get:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "getCometBftNodeDebugDump"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CometBftNodeDumpOrErrorResponse"
+        "404":
+          description: "CometBFT is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -297,9 +317,9 @@ components:
         secret:
           type: string
 
+    # TODO(#2755) make prettier with support of oneOf
     CometBftStatusOrError:
       type: object
-      # TODO(tech-debt): Either `response` or `error` will be populated. To be improved once oneOf is supported
       properties:
         error:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
@@ -322,6 +342,32 @@ components:
         voting_power:
           type: number
           description: "The voting power assigned to the CometBFT node"
+
+    # TODO(#2755) make prettier with support of oneOf
+    CometBftNodeDumpOrErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+        response:
+          $ref: "#/components/schemas/CometBftNodeDumpResponse"
+
+    CometBftNodeDumpResponse:
+      type: object
+      required:
+        - status
+        - network_info
+        - abci_info
+        - validators
+      properties:
+        status:
+          type: object
+        network_info:
+          type: object
+        abci_info:
+          type: object
+        validators:
+          type: object
 
     ApproveSvIdentityRequest:
       type: object

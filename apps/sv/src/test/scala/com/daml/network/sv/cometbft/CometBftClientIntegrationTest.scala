@@ -100,6 +100,19 @@ class CometBftClientIntegrationTest
         .valueOrFail("Reading status")
     }
 
+    "create dump" in {
+      cometBftClient
+        .nodeDebugDump()
+        .map { dump =>
+          // Validate some basic data from each result as per RPC doc: https://docs.cometbft.com/v0.37/rpc/#/Info/status
+          dump.abciInfo.findAllByKey("app_version") should not be empty
+          dump.validators.findAllByKey("address") should not be empty
+          dump.networkInfo.findAllByKey("n_peers") should not be empty
+          dump.status.findAllByKey("latest_block_height") should not be empty
+        }
+        .valueOrFail("Cannot create dump")
+    }
+
   }
 
 }

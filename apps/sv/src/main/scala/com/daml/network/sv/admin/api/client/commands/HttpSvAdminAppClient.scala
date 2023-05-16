@@ -8,8 +8,11 @@ import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpComman
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
-import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
-import com.daml.network.http.v0.svAdmin.GetCometBftNodeStatusResponse
+import com.daml.network.http.v0.definitions.{CometBftNodeDumpResponse, CometBftNodeStatusResponse}
+import com.daml.network.http.v0.svAdmin.{
+  GetCometBftNodeDebugDumpResponse,
+  GetCometBftNodeStatusResponse,
+}
 import com.daml.network.http.v0.{definitions, svAdmin as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.tracing.TraceContext
@@ -203,6 +206,30 @@ object HttpSvAdminAppClient {
       GetCometBftNodeStatusResponse,
       Either[String, CometBftNodeStatusResponse],
     ] = { case http.GetCometBftNodeStatusResponse.OK(response) =>
+      response.response.toRight(response.error.map(_.error).getOrElse("No response found"))
+    }
+  }
+
+  case class GetCometBftNodeDump()
+      extends BaseCommand[
+        http.GetCometBftNodeDebugDumpResponse,
+        definitions.CometBftNodeDumpResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCometBftNodeDebugDumpResponse] =
+      client.getCometBftNodeDebugDump(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      GetCometBftNodeDebugDumpResponse,
+      Either[String, CometBftNodeDumpResponse],
+    ] = { case http.GetCometBftNodeDebugDumpResponse.OK(response) =>
       response.response.toRight(response.error.map(_.error).getOrElse("No response found"))
     }
   }

@@ -4,6 +4,7 @@ import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.environment.CNLedgerClient
 import com.daml.network.http.v0.definitions.{
+  CometBftNodeDumpResponse,
   CometBftNodeStatusResponse,
   CometBftStatusOrError,
   ErrorResponse,
@@ -185,31 +186,55 @@ class HttpSvAdminHandler(
   )()(extracted: String): Future[
     SvAdminResource.GetCometBftNodeStatusResponse
   ] = withNewTrace(workflowId) { implicit tc => _ =>
-    cometBftClient
-      .fold {
-        SvAdminResource
-          .GetCometBftNodeStatusResponse(
-            SvAdminResource.GetCometBftNodeStatusResponseNotFound(
-              ErrorResponse("CometBFT is not configured.")
-            )
-          )
-          .pure[Future]
-      } {
-        _.nodeStatus()
-          .fold(
-            error =>
-              CometBftStatusOrError(
-                error = ErrorResponse(error.message).some
-              ),
-            status =>
-              CometBftStatusOrError(
-                response = CometBftNodeStatusResponse(
-                  status.nodeInfo.id,
-                  status.syncInfo.catchingUp,
-                  BigDecimal(status.validatorInfo.votingPower),
-                ).some
-              ),
-          )
-      }
+    withClientOrNotFound(respond.NotFound) {
+      _.nodeStatus()
+        .fold(
+          error =>
+            CometBftStatusOrError(
+              error = ErrorResponse(error.message).some
+            ),
+          status =>
+            CometBftStatusOrError(
+              response = CometBftNodeStatusResponse(
+                status.nodeInfo.id,
+                status.syncInfo.catchingUp,
+                BigDecimal(status.validatorInfo.votingPower),
+              ).some
+            ),
+        )
+    }
   }
+  override def getCometBftNodeDebugDump(
+      respond: SvAdminResource.GetCometBftNodeDebugDumpResponse.type
+  )()(extracted: String): Future[
+    SvAdminResource.GetCometBftNodeDebugDumpResponse
+  ] = withNewTrace(workflowId) { implicit tc => _ =>
+    withClientOrNotFound(respond.NotFound) { client =>
+      client
+        .nodeDebugDump()
+        .fold(
+          err =>
+            definitions.CometBftNodeDumpOrErrorResponse(
+              error = ErrorResponse(err.message).some
+            ),
+          response =>
+            definitions.CometBftNodeDumpOrErrorResponse(
+              response = CometBftNodeDumpResponse(
+                status = response.status,
+                networkInfo = response.networkInfo,
+                abciInfo = response.abciInfo,
+                validators = response.validators,
+              ).some
+            ),
+        )
+    }
+  }
+
+  private def withClientOrNotFound[T](
+      notFound: ErrorResponse => T
+  )(call: CometBftClient => Future[T]) = cometBftClient
+    .fold {
+      notFound(ErrorResponse("CometBFT is not configured."))
+        .pure[Future]
+    } { call }
 }

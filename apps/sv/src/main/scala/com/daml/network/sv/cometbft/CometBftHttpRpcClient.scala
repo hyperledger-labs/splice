@@ -3,8 +3,8 @@
 package com.daml.network.sv.cometbft
 
 import java.net.http.HttpClient
-import java.util.{Base64, UUID}
 import java.util.concurrent.Executor
+import java.util.{Base64, UUID}
 
 import cats.data.EitherT
 import cats.syntax.either.*
@@ -18,9 +18,10 @@ import com.daml.network.sv.cometbft.CometBftHttpRpcClient.NodeStatus.{
   ValidatorInfo,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import io.circe.Decoder
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser.*
+import io.circe.syntax.EncoderOps
+import io.circe.{Decoder, Json}
 
 import scala.annotation.nowarn
 import scala.compat.java8.FutureConverters.CompletionStageOps
@@ -48,11 +49,18 @@ class CometBftHttpRpcClient(
       }
     }
 
-  def nodeStatus(): EitherT[Future, QueryError, NodeStatus] = {
-    callCometBftJsonHttp[NodeStatus]("status", "[]").map(_.result)
+  def rawCall(
+      path: String,
+      params: Map[String, Json] = Map.empty,
+  ): EitherT[Future, QueryError, Json] = {
+    callCometBftJsonHttp[Json](path, params).map(_.result)
   }
 
-  def query(queryParams: String): EitherT[Future, QueryError, QueryResponse] = {
+  def nodeStatus(): EitherT[Future, QueryError, NodeStatus] = {
+    callCometBftJsonHttp[NodeStatus]("status", Map.empty).map(_.result)
+  }
+
+  def query(queryParams: Map[String, Json]): EitherT[Future, QueryError, QueryResponse] = {
     callCometBftJsonHttp[CometBftQueryResult](AbciQueryMethod, queryParams).map(response =>
       QueryResponse(response.result.response.value)
     )
@@ -65,13 +73,13 @@ class CometBftHttpRpcClient(
       Base64.getEncoder.encodeToString(message)
     callCometBftJsonHttp[CometBftBroadcastResult](
       "broadcast_tx_async",
-      s"""{"tx" : "$encodedRequest"}""",
+      Map("tx" -> encodedRequest.asJson),
     ).map(_ => {})
   }
 
   private def callCometBftJsonHttp[T: Decoder](
       method: String,
-      param: String,
+      param: Map[String, Json],
   ): EitherT[Future, QueryError, CometBftCallResponse[T]] = EitherT {
     // id is set to a unique id for correlating requests with responses
     // without an id the requests is treated fully async
@@ -79,7 +87,7 @@ class CometBftHttpRpcClient(
       s"""{
          |  "jsonrpc": "2.0",
          |  "method": "$method",
-         |  "params": $param,
+         |  "params": ${param.asJson.noSpaces},
          |  "id": "${UUID.randomUUID()}"
          |}""".stripMargin
     httpClientBuilder

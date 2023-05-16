@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.round as cr
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
-import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
+import com.daml.network.http.v0.definitions.{CometBftNodeDumpResponse, CometBftNodeStatusResponse}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
@@ -155,6 +155,12 @@ class SvAppBackendReference(
   def cometBftNodeStatus(): CometBftNodeStatusResponse =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetCometBftNodeStatus())
+    }
+
+  @Help.Summary("Get the CometBFT node debug dump")
+  def cometBftNodeDump(): CometBftNodeDumpResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.GetCometBftNodeDump())
     }
 
   /** Remote participant this sv app is configured to interact with. */
