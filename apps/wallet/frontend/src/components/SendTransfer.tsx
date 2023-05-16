@@ -29,7 +29,7 @@ const SendTransfer: React.FC = () => {
 
   const [receiver, setReceiver] = useState<string>('');
   const [usd, setUsdAmount] = useState<BigNumber | undefined>(undefined);
-  const [ccAmount, setCCAmount] = useState<BigNumber>(BigNumber(1));
+  const [ccAmountText, setCCAmountText] = useState<string>('1');
   const [expDays, setExpDays] = useState('1');
   const [description, setDescription] = useState<string>('');
 
@@ -40,6 +40,8 @@ const SendTransfer: React.FC = () => {
     { name: '60 days', value: 60 },
     { name: '90 days', value: 90 },
   ];
+
+  const ccAmount = useMemo(() => new BigNumber(ccAmountText), [ccAmountText]);
 
   // Only set idempotencyKey once. In the success case, it doesn't matter because of `isSending` & the `navigate`.
   // But: if the transfer is accepted by the BE, but the response fails to reach the FE (e.g., timeout),
@@ -73,7 +75,7 @@ const SendTransfer: React.FC = () => {
   }, [ccAmount, coinPriceQuery.data]);
 
   const onCCAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCCAmount(BigNumber(e.target.value));
+    setCCAmountText(e.target.value);
   };
 
   return (
@@ -98,15 +100,14 @@ const SendTransfer: React.FC = () => {
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
                 <OutlinedInput
                   id="create-offer-cc-amount"
-                  type="number"
-                  value={ccAmount}
+                  type="text"
+                  value={ccAmountText}
                   onChange={onCCAmountChange}
                   endAdornment={<InputAdornment position="end">CC</InputAdornment>}
                   aria-describedby="outlined-amount-cc-helper-text"
-                  error={BigNumber(ccAmount).lte(0.0)}
+                  error={BigNumber(ccAmountText).lte(0.0)}
                   inputProps={{
                     'aria-label': 'amount',
-                    min: 0,
                   }}
                 />
               </FormControl>
