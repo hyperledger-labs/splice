@@ -4,7 +4,7 @@ import { ValidatorLicense } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
-export const useValidatorLicenses: () => UseQueryResult<Contract<ValidatorLicense>[]> = () => {
+export const useValidatorLicenses = (): UseQueryResult<Contract<ValidatorLicense>[]> => {
   const { listValidatorLicenses } = useSvAdminClient();
   return useQuery({
     queryKey: ['listValidatorLicenses'],

@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { useScanClient } from 'common-frontend';
 
-export const useCoinPrice: () => UseQueryResult<BigNumber> = () => {
+export const useCoinPrice = (): UseQueryResult<BigNumber> => {
   const { getCoinPrice } = useScanClient();
   return useQuery({
     queryKey: ['coinPrice'],

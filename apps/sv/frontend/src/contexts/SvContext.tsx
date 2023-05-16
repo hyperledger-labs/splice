@@ -16,7 +16,7 @@ type SvUiState =
     }
   | undefined;
 
-export const useSvcInfos: () => UseQueryResult<SvUiState> = () => {
+export const useSvcInfos = (): UseQueryResult<SvUiState> => {
   const { getSvcInfo } = useSvClient();
   return useQuery({
     queryKey: ['getSvcInfo', SvcRules],

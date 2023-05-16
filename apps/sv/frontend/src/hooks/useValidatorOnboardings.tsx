@@ -4,9 +4,7 @@ import { ValidatorOnboarding } from 'common-frontend/daml.js/validator-lifecycle
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
-export const useValidatorOnboardings: () => UseQueryResult<
-  Contract<ValidatorOnboarding>[]
-> = () => {
+export const useValidatorOnboardings = (): UseQueryResult<Contract<ValidatorOnboarding>[]> => {
   const { listOngoingValidatorOnboardings } = useSvAdminClient();
   return useQuery({
     queryKey: ['listOngoingValidatorOnboardings'],

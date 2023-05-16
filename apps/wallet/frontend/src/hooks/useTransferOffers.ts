@@ -5,9 +5,9 @@ import { TransferOffer } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Walle
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
-export const useTransferOffers: (
-  coinPrice: BigNumber | undefined
-) => UseQueryResult<Contract<TransferOffer>[]> = (coinPrice: BigNumber | undefined) => {
+export const useTransferOffers = (
+  coinPrice?: BigNumber
+): UseQueryResult<Contract<TransferOffer>[]> => {
   const { listTransferOffers } = useWalletClient();
   return useQuery({
     queryKey: ['listTransferOffers'],

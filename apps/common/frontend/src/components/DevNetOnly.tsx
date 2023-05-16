@@ -5,7 +5,7 @@ import { CoinRules } from '../../daml.js/canton-coin-0.1.0/lib/CC/Coin';
 import { useScanClient } from '../contexts';
 import { Contract } from '../utils';
 
-const useGetCoinRules: () => UseQueryResult<Contract<CoinRules>> = () => {
+const useGetCoinRules = (): UseQueryResult<Contract<CoinRules>> => {
   const { getCoinRules } = useScanClient();
 
   return useQuery({
