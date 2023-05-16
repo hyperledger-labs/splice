@@ -122,7 +122,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   val options: FirefoxOptions =
     new FirefoxOptions()
       .setLogLevel(FirefoxDriverLogLevel.DEBUG)
-      .addArguments("-headless", "--log-no-truncate")
+      .addArguments("-headless")
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty

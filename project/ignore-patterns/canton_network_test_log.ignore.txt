@@ -46,4 +46,8 @@ LOCAL_VERDICT_INACTIVE_CONTRACTS.+Rejected transaction is referring to inactive 
 # Testcontainers tries to read the configuration file but it's not available on CI
 Attempted to read Testcontainers configuration file at file:
 
+# Output of the oidc-client-ts frontend library. Interaction with Auth0 appears to be unreliable, so
+# we ignore all errors and rely on retry loops.
+\[oidc-client-ts\]
+
 # Make sure to have a trailing newline
