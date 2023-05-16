@@ -832,16 +832,16 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   "SVs can update their CoinPriceVote contracts" in { implicit env =>
     initSvc()
     val svParties = Seq(("sv1", sv1), ("sv2", sv2), ("sv3", sv3), ("sv4", sv4)).map {
-      case (svName, sv) => svName -> sv.getSvcInfo().svParty.toProtoPrimitive
+      case (svName, sv) => svName -> sv.getSvcInfo().svParty
     }.toMap
 
     clue("initially only sv1 has set the CoinPriceVote") {
       eventually() {
         getCoinPriceVoteMap() shouldBe Map(
-          svParties("sv1") -> Some(BigDecimal(1.0)),
-          svParties("sv2") -> None,
-          svParties("sv3") -> None,
-          svParties("sv4") -> None,
+          svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
+          svParties("sv2") -> Seq(None),
+          svParties("sv3") -> Seq(None),
+          svParties("sv4") -> Seq(None),
         )
       }
     }
@@ -856,10 +856,10 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       "CoinPriceVote contract for sv2, sv3 anc sv4 are updated",
       _ => {
         getCoinPriceVoteMap() shouldBe Map(
-          svParties("sv1") -> Some(BigDecimal(1.0)),
-          svParties("sv2") -> Some(BigDecimal(4.0)),
-          svParties("sv3") -> Some(BigDecimal(3.0)),
-          svParties("sv4") -> Some(BigDecimal(2.0)),
+          svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
+          svParties("sv2") -> Seq(Some(BigDecimal(4.0))),
+          svParties("sv3") -> Seq(Some(BigDecimal(3.0))),
+          svParties("sv4") -> Seq(Some(BigDecimal(2.0))),
         )
       },
     )
@@ -872,28 +872,79 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       "CoinPriceVote contract for sv1 are updated",
       _ => {
         getCoinPriceVoteMap() shouldBe Map(
-          svParties("sv1") -> Some(BigDecimal(5.0)),
-          svParties("sv2") -> Some(BigDecimal(4.0)),
-          svParties("sv3") -> Some(BigDecimal(3.0)),
-          svParties("sv4") -> Some(BigDecimal(2.0)),
+          svParties("sv1") -> Seq(Some(BigDecimal(5.0))),
+          svParties("sv2") -> Seq(Some(BigDecimal(4.0))),
+          svParties("sv3") -> Seq(Some(BigDecimal(3.0))),
+          svParties("sv4") -> Seq(Some(BigDecimal(2.0))),
         )
       },
     )
   }
 
-  "SV can see the current active open mining rounds" in { implicit env =>
+  "archive duplicated and non-member CoinPriceVote contracts" in { implicit env =>
     initSvc()
-    eventually() {
-      sv1.listOpenMiningRounds() should have size 3
-    }
+    val svParties = Seq(("sv1", sv1), ("sv2", sv2), ("sv3", sv3), ("sv4", sv4)).map {
+      case (svName, sv) => svName -> sv.getSvcInfo().svParty
+    }.toMap
+
+    getCoinPriceVoteMap() shouldBe Map(
+      svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
+      svParties("sv2") -> Seq(None),
+      svParties("sv3") -> Seq(None),
+      svParties("sv4") -> Seq(None),
+    )
+
+    actAndCheck(
+      "create duplicated vote for sv4", {
+        createCoinPriceVote(svParties("sv4"), Some(BigDecimal(3.0)))
+        createCoinPriceVote(svParties("sv4"), Some(BigDecimal(4.0)))
+      },
+    )(
+      "observed duplicated coin price of sv4",
+      _ =>
+        getCoinPriceVoteMap() shouldBe Map(
+          svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
+          svParties("sv2") -> Seq(None),
+          svParties("sv3") -> Seq(None),
+          svParties("sv4") -> Seq(None, Some(BigDecimal(3.0)), Some(BigDecimal(4.0))),
+        ),
+    )
+
+    actAndCheck(
+      "execute an action to remove sv3 on svcRules contract to trigger `GarbageCollectCoinPriceVotesTrigger` to remove duplicated and non member votes", {
+        svc.participantClient.ledger_api_extensions.commands.submitWithResult(
+          svc.config.ledgerApiUser,
+          actAs = Seq(svcParty),
+          readAs = Seq.empty,
+          update = getSvcRules().id.exerciseSvcRules_RemoveMember(
+            svParties("sv3").toProtoPrimitive
+          ),
+        )
+      },
+    )(
+      "vote of sv3 is removed and the all votes of sv4 are removed except the latest vote",
+      _ =>
+        getCoinPriceVoteMap() shouldBe Map(
+          svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
+          svParties("sv2") -> Seq(None),
+          svParties("sv4") -> Seq(Some(BigDecimal(4.0))),
+        ),
+    )
   }
 
   private def getCoinPriceVoteMap()(implicit env: CNNodeTestConsoleEnvironment) =
     sv1
       .listCoinPriceVotes()
       .groupBy(_.payload.sv)
-      .map { case (sv, contracts) =>
-        sv -> contracts.head.payload.coinPrice.toScala.map(BigDecimal(_))
+      .flatMap { case (sv, contracts) =>
+        PartyId
+          .fromProtoPrimitive(sv)
+          .map(p =>
+            p -> contracts.map(
+              _.payload.coinPrice.toScala.map(BigDecimal(_))
+            )
+          )
+          .toOption
       }
 
   private def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(
@@ -928,6 +979,22 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       .filterJava(cc.coin.Coin.COMPANION)(party, predicate)
       .sortBy(_.data.amount.initialAmount)
   }
+
+  private def createCoinPriceVote(
+      svParty: PartyId,
+      coinPrice: Option[BigDecimal],
+  )(implicit env: CNNodeTestConsoleEnvironment) =
+    svc.participantClient.ledger_api_extensions.commands.submitWithResult(
+      svc.config.ledgerApiUser,
+      actAs = Seq(svcParty),
+      readAs = Seq.empty,
+      update = new cn.svc.coinprice.CoinPriceVote(
+        svcParty.toProtoPrimitive,
+        svParty.toProtoPrimitive,
+        coinPrice.map(_.bigDecimal).toJava,
+        Instant.now(),
+      ).create,
+    )
 
   private def createSvOnboardingConfirmation(
       svcRules: SvcRules.Contract,

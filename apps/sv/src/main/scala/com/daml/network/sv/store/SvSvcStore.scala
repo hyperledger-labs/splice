@@ -468,6 +468,18 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       _.expiresAt
     )
 
+  /** List all the current coin price votes. */
+  def listAllCoinPriceVotes()(implicit tc: TraceContext): Future[
+    Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
+  ] =
+    for {
+      domain <- defaultAcsDomainIdF
+      votes <- multiDomainAcsStore.listContractsOnDomain(
+        cn.svc.coinprice.CoinPriceVote.COMPANION,
+        domain,
+      )
+    } yield votes
+
   /** List the current coin price votes by the SVC members. */
   def listMemberCoinPriceVotes()(implicit
       tc: TraceContext
@@ -475,12 +487,8 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
   ] =
     for {
-      domain <- defaultAcsDomainIdF
       svcRules <- getSvcRules()
-      votes <- multiDomainAcsStore.listContractsOnDomain(
-        cn.svc.coinprice.CoinPriceVote.COMPANION,
-        domain,
-      )
+      votes <- listAllCoinPriceVotes()
     } yield {
       // Only use votes cast by current members, and thereof pick only one
       val eligibleVotes = votes.iterator.collect {
