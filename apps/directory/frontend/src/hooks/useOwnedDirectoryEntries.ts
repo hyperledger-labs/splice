@@ -5,10 +5,10 @@ import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 import { useLedgerApiClient } from '../contexts/LedgerApiContext';
 
-const useOwnedDirectoryEntries: (
+const useOwnedDirectoryEntries = (
   user?: string,
   provider?: string
-) => UseQueryResult<Contract<DirectoryEntry>[]> = (user, provider) => {
+): UseQueryResult<Contract<DirectoryEntry>[]> => {
   const operationName = 'queryDirectoryEntries';
   const ledgerApi = useLedgerApiClient();
 

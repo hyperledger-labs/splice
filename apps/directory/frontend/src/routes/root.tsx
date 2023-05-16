@@ -3,11 +3,11 @@ import { Outlet } from 'react-router-dom';
 
 import { Box, Button, Toolbar, Typography } from '@mui/material';
 
-import { usePrimaryParty } from '../contexts/DirectoryContext';
+import { usePrimaryParty } from '../hooks';
 
 const Root: React.FC = () => {
   const { logout } = useUserState();
-  const primaryPartyId = usePrimaryParty();
+  const { data: primaryPartyId } = usePrimaryParty(); // TODO(#4139) -- consider handling query loading/error states
 
   return (
     <ErrorBoundary>
