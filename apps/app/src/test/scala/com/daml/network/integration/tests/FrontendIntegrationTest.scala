@@ -166,6 +166,9 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       }
 
       logger.debug(s"FirefoxDriver started and BiDi connection acquired ($name)")
+      logger.debug(
+        s"windowHandle='${driver.getWindowHandle}', currentUrl='${driver.getCurrentUrl}', sessionId='${driver.getSessionId.toString}' ($name)"
+      )
       (driver, bidi)
     }
     webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
