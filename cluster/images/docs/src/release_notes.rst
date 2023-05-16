@@ -11,8 +11,13 @@ Release Notes
 * Features introduced to the SV UI:
 
   * Set your desired coin price (price per round determined using median of all coin price votes by SVs)
- 
+
   * View currently open mining rounds, along with their coin prices
+
+* Bugfixes
+
+  * Fix an issue where the validator and SV app were unable to pass
+    the well known response from IAMs other than Auth0.
 
 
 2023-05-14

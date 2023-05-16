@@ -22,22 +22,20 @@ object OAuthApi {
 
   final case class TokenResponse(access_token: String)
 
+  // We want to be compatible with a wide range of IAMs so we
+  // only include the required fields based on the standard
+  // https://openid.net/specs/openid-connect-discovery-1_0.html
   final case class WellKnownResponse(
       issuer: String,
       authorization_endpoint: String,
       token_endpoint: String,
-      device_authorization_endpoint: String,
-      userinfo_endpoint: String,
-      mfa_challenge_endpoint: String,
       jwks_uri: String,
-      registration_endpoint: String,
-      revocation_endpoint: String,
   )
 }
 
 trait OAuthApiJson extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val clientCredentialRequestFormat = jsonFormat4(OAuthApi.ClientCredentialRequest)
-  implicit val wellKnownResponseFormat = jsonFormat9(OAuthApi.WellKnownResponse)
+  implicit val wellKnownResponseFormat = jsonFormat4(OAuthApi.WellKnownResponse)
   implicit val tokenResponseFormat = jsonFormat1(OAuthApi.TokenResponse)
 }
 
