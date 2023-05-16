@@ -968,8 +968,8 @@ lazy val `apps-app` =
       `canton-community-integration-testing` % "test",
     )
     .settings(
-      libraryDependencies += "org.scalatestplus" %% "selenium-4-7" % "3.2.15.0" % "test",
-      libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.8.0" % "test",
+      libraryDependencies += "org.scalatestplus" %% "selenium-4-9" % "3.2.16.0" % "test",
+      libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.9.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
       // Force SBT to use the right version of opentelemetry libs.
