@@ -1153,7 +1153,7 @@ jobs:
             export KUBECONFIG=$PWD/.kubecfg
 
             cncluster activate
-            if cncluster assert_fresh_lock; then
+            if cncluster ci_assert_fresh_lock; then
               echo "Lock fresh and nothing to do."
             else
               lockholder=$(cncluster lockholder)
