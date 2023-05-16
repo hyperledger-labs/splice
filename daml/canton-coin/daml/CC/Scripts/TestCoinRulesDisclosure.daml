@@ -8,29 +8,16 @@ import CC.Scripts.Util
 
 test : Script ()
 test = do
-  -- bootstrap app
-  app <- setupApp
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   -- -- start issuing so the SVC has some coins to invite users
   runNextIssuance app
   runCoinDepositBots app
 
-  -- -- -- -- bootstrap validators
-  validator1 <- setupValidator app "validator1"
-  validator2 <- setupValidator app "validator2"
-
-  -- -- -- -- bootstrap users
-  user1 <- setupUser app "user1" validator1
-  recordValidatorOf app user1.primaryParty validator1
-
-  user2 <- setupUser app "user2" validator2
-  recordValidatorOf app user2.primaryParty validator2
-
-  -- user1 transfers 0.01 coins to user2
   mapA_ (\_ -> do
     runNextIssuance app
     runCoinDepositBots app
-    pay app user1 user2.primaryParty 0.01
+    pay app alice bob.primaryParty 0.01
     ) [1,2,3,4,5]
 
 

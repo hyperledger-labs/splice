@@ -21,7 +21,8 @@ import qualified CC.API.V1.Round as API
 
 test : Script ()
 test = script do
-  app <- setupApp
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
   currentTime <- getTime
   let coinPrice = 2.5
       config = scaleCoinConfig coinPrice defaultCoinConfig
@@ -44,7 +45,6 @@ test = script do
       openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
       openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
 
-  alice <- setupUser app "alice" app.svc
   -- Lock expires at T00:12:30
   let lockExpiresAt12_30 = API.TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30
   -- Lock expires at T00:15:00
@@ -84,7 +84,7 @@ test = script do
 -- in estimateOpenRoundCreatedAt when the coin amount is too large
 testLargeCoinExpiry : Script ()
 testLargeCoinExpiry = script do
-  app <- setupApp
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   now <- getTime
 
   let coinPrice = 2.5
@@ -110,10 +110,7 @@ testLargeCoinExpiry = script do
 
 testExpireLockedCoin : Script ()
 testExpireLockedCoin = do
-  app <- setupApp
-
-  alice <- setupUser app "alice" app.svc
-  bob <- setupUser app "bob" app.svc
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   passTime (minutes 6)
 
   -- Locking the coin with with initialAmount 0.000005 and created at round 2 but with a
@@ -155,8 +152,7 @@ testExpireLockedCoin = do
 
 testExpireCoin : Script ()
 testExpireCoin = do
-  app <- setupApp
-  alice <- setupUser app "alice" app.svc
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   -- alice own a coin with initial amount of 1.0
   [(_, onlyCoin)] <- query @Coin alice.primaryParty

@@ -10,18 +10,14 @@ import CC.Scripts.Util
 
 testCoinRules : Script ()
 testCoinRules = do
-  app <- setupApp
-
-  validator <- setupValidator app "validator1"
-  provider <- setupUser app "provider" validator
-  alice <- setupUser app "alice" app.svc
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   (round, _) <- getLatestOpenRound app
   testChoice app [alice.primaryParty] [app.svc] $ \coinRules ->
     exerciseCmd (fromInterfaceContractId @CoinRules coinRules) (CoinRules_DevNet_Tap alice.primaryParty 5.0 round)
 
-  testChoice app [provider.primaryParty, app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd (fromInterfaceContractId @CoinRules coinRules) (CoinRules_DevNet_FeatureApp provider.primaryParty)
+  testChoice app [provider1.primaryParty, app.svc] [app.svc] $ \coinRules ->
+    exerciseCmd (fromInterfaceContractId @CoinRules coinRules) (CoinRules_DevNet_FeatureApp provider1.primaryParty)
 
   pure ()
 

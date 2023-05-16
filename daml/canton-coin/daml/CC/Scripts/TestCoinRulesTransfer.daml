@@ -12,7 +12,6 @@ import CC.Fees
 import CC.Scripts.Parameters
 import CC.Scripts.Util
 
-
 testUsageFees: Script ()
 testUsageFees = do
   app <- setupApp

@@ -13,10 +13,9 @@ import CC.Scripts.Util
 
 testSetConfigSchedule: Script ()
 testSetConfigSchedule = do
-  app <- setupApp
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   now <- getTime
-  validator <- setupValidator app "validator"
-  alice <- setupUser app "alice" validator
+  
   runNextIssuance app
   context <- getPaymentTransferContext app alice
 
