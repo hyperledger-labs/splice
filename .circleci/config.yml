@@ -895,7 +895,9 @@ jobs:
         default: ""
       parallelism:
         type: integer
-    resource_class: 2xlarge+
+      resource_class:
+        type: string
+    resource_class: << parameters.resource_class >>
     environment:
       <<: *env
       POSTGRES_HOST: localhost
@@ -1378,6 +1380,7 @@ workflows:
         name: "scala_test wall clock time"
         test_names_file: "test-full-class-names.log"
         start_canton_options: "-d -p external -w"
+        resource_class: "xlarge"
         parallelism: 8
     - scala_test:
         <<: *notify-fail
@@ -1388,6 +1391,7 @@ workflows:
         name: "scala_test sim time"
         test_names_file: "test-full-class-names-sim-time.log"
         start_canton_options: "-d -p external -s"
+        resource_class: "xlarge"
         parallelism: 4
     - scala_test:
         <<: *notify-fail
@@ -1400,6 +1404,7 @@ workflows:
         start_canton_options: "-d -p external -w"
         extra_pre_sbt_cmd: "&& ./start-frontends.sh -d"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        resource_class: "2xlarge+"
         parallelism: 4
     - scala_test:
         <<: *notify-fail
@@ -1412,6 +1417,7 @@ workflows:
         start_canton_options: "-d -p external -s"
         extra_pre_sbt_cmd: "&& ./start-frontends.sh -d"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        resource_class: "2xlarge+"
         parallelism: 1
     - bundle:
         <<: *notify-fail
