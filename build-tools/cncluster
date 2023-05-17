@@ -1096,7 +1096,7 @@ function subcmd_pulumi() {
     pulumi_project="${1-}"
     pulumi_cmd="${2-}"
     if [ -z "${pulumi_cmd}" ] || [ -z "${pulumi_project}" ]; then
-        _info "Usage: $SCRIPTNAME pulumi <pulumi-cmd> <pulumi-project> [options...]"
+        _info "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
         exit 1
     fi
 
