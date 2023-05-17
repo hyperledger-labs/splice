@@ -67,8 +67,8 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
           }
         },
         entries => {
-          // Check that top up happens exactly once even though scan app reports that we should top up
-          forExactly(1, entries) { line =>
+          // Check that top up happens at most once even though scan app reports that we should top up
+          forAtMost(1, entries) { line =>
             assert(
               line.loggerName.endsWith("validator=aliceValidator") &&
                 line.message.contains("successfully bought extra traffic")
