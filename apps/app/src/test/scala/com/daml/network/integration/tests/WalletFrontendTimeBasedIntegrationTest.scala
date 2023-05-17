@@ -10,6 +10,7 @@ import com.daml.network.util.{
   WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import org.openqa.selenium.StaleElementReferenceException
 
 import java.time.Duration
 
@@ -37,12 +38,18 @@ class WalletFrontendTimeBasedIntegrationTest
         login(3000, newRandomUser)
 
         // After a short delay, the UI should realize that the user is not onboarded,
-        // and switch to the onbaording page.
+        // and switch to the onboarding page.
         click on "onboard-button"
         // The onboard button should immediately be disabled, to prevent further clicking.
-        find(id("onboard-button")) match {
-          case Some(e) => e.isEnabled shouldBe false
-          case _ => // The page went back to the default view before we could check the button
+        try {
+          find(id("onboard-button")) match {
+            case Some(e) => e.isEnabled shouldBe false
+            case _ => // The page went back to the default view before we could check the button
+          }
+        } catch {
+          case _: StaleElementReferenceException =>
+          // The reference to the button became stale due to a page redraw that happened shortly after the `find`;
+          // this can be because the page went back to the default view before we could check the button
         }
 
         userIsLoggedIn()
