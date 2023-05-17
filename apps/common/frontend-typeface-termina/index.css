@@ -1,0 +1,7 @@
+@font-face {
+  font-family: "Termina";
+  src: url("./fonts/Termina-Bold.woff") format("woff");
+
+  font-weight: 700;
+  font-style: bold;
+}

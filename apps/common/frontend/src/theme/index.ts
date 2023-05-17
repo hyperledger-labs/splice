@@ -1,3 +1,5 @@
+import 'common-typeface-termina';
+
 import { createTheme, TypographyStyle } from '@mui/material';
 
 import { generateHslPalette, generateRemValue } from './utils';
@@ -94,7 +96,7 @@ theme = createTheme(theme, {
       fontWeight: 400,
     },
     monospace: {
-      fontFamily: '"Source Code Pro", monospace',
+      fontFamily: '"Termina", monospace',
       fontWeight: 500,
     },
   },
