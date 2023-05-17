@@ -312,7 +312,10 @@ trait TimeTestUtil extends CNNodeTestCommon {
     * Note that it does not guarantee that a top-up will occur because the validator
     * may still have enough traffic balance remaining to not warrant another top-up.
     */
-  def advanceTimeByMinTopupInterval(validatorAppRef: ValidatorAppBackendReference)(implicit
+  def advanceTimeByMinTopupInterval(
+      validatorAppRef: ValidatorAppBackendReference,
+      multiple: Double = 1.0,
+  )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
     val validatorTopupParameters = ExtraTrafficTopupParameters(
@@ -320,7 +323,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       validatorAppRef.config.domains.global.buyExtraTraffic,
       validatorAppRef.config.automation.pollingInterval,
     )
-    advanceTime(validatorTopupParameters.minTopupInterval.asJava)
+    advanceTime((validatorTopupParameters.minTopupInterval * multiple).asJava)
   }
 
   def getSortedOpenMiningRounds(

@@ -17,7 +17,6 @@ import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.treasury.TreasuryService
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
@@ -39,13 +38,14 @@ class TopupValidatorTrafficBalanceTrigger(
 ) extends PollingTrigger {
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    // TODO(#4721) - Clean up the code in this trigger to be more readable.
-    //  Also add a check to see if the user has sufficient balance to do a topup.
     // TODO(#3816) - Clean up noisy logs
     logger.debug("Executing top-up validator traffic balance trigger")
     for {
       validatorTreasury <- getValidatorTreasury
-      validatorTraffic <- store.getValidatorTraffic()
+      currentValidatorTraffic <- store.getValidatorTraffic()
+      currentTrafficBalance <- scanConnection.getValidatorTrafficBalance(
+        store.key.validatorParty
+      )
       domainFeesConfig <- scanConnection
         .getCoinRules()
         .map(_.payload.configSchedule.currentValue.domainFeesConfig)
@@ -54,36 +54,14 @@ class TopupValidatorTrafficBalanceTrigger(
         buyExtraTrafficConfig,
         context.config.pollingInterval,
       )
-      currentTrafficBalance <- scanConnection.getValidatorTrafficBalance(
-        store.key.validatorParty
-      )
       result <-
-        if (
-          toppingUpTooSoon(
-            validatorTraffic.payload.lastPurchasedAt,
-            topupParameters.minTopupInterval,
-          )
-        ) {
-          logger.debug(
-            s"Trying to topup too soon after previous topup at ${validatorTraffic.payload.lastPurchasedAt}"
-          )
-          Future.successful(false)
-        } else if (isTrafficBalanceStale(currentTrafficBalance, validatorTraffic)) {
-          logger.debug(
-            s"Traffic balance from scan is stale. Retry in some time. " +
-              s"Total purchased traffic from scan: ${currentTrafficBalance.totalPurchased}, " +
-              s"Latest purchased traffic ingested from ledger: ${validatorTraffic.payload.totalPurchased}"
-          )
-          Future.successful(false)
-        } else if (currentTrafficBalance.remainingBalance >= topupParameters.topupAmount) {
-          Future.successful(false)
-        } else {
+        if (shouldTopup(currentTrafficBalance, currentValidatorTraffic, topupParameters))
           topUpValidatorTraffic(
             validatorTreasury,
-            validatorTraffic.contractId,
+            currentValidatorTraffic.contractId,
             topupParameters,
           )
-        }
+        else Future.successful(false)
     } yield result
   }
 
@@ -113,18 +91,36 @@ class TopupValidatorTrafficBalanceTrigger(
     } yield validatorWallet.treasury
   }
 
-  private def toppingUpTooSoon(
-      lastPurchasedAt: java.time.Instant,
-      topupInterval: NonNegativeFiniteDuration,
-  ): Boolean = {
-    lastPurchasedAt.toEpochMilli + topupInterval.duration.toMillis > clock.nowInMicrosecondsSinceEpoch / 1000
+  private def shouldTopup(
+      currentTrafficBalance: ValidatorTrafficBalance,
+      validatorTraffic: Contract[ValidatorTraffic.ContractId, ValidatorTraffic],
+      topupParameters: ExtraTrafficTopupParameters,
+  )(implicit traceContext: TraceContext): Boolean = {
+    if (
+      (validatorTraffic.payload.lastPurchasedAt.toEpochMilli + topupParameters.minTopupInterval.duration.toMillis) >
+        clock.now.toEpochMilli
+    ) {
+      logger.debug(
+        s"Trying to top-up too soon after previous top-up at ${validatorTraffic.payload.lastPurchasedAt}"
+      )
+      false
+    } else if (currentTrafficBalance.totalPurchased < validatorTraffic.payload.totalPurchased) {
+      logger.info(s"There is another top-up already in progress. Retry in some time.")
+      logger.debug(
+        s"Total purchased traffic from scan: ${currentTrafficBalance.totalPurchased}, " +
+          s"Total purchased traffic ingested from ledger: ${validatorTraffic.payload.totalPurchased}"
+      )
+      false
+    } else if (currentTrafficBalance.remainingBalance >= topupParameters.topupAmount) {
+      logger.debug(
+        s"Skipping top-up because sufficient traffic balance remains. " +
+          s"Current traffic balance: ${currentTrafficBalance.remainingBalance / 1e6} MB"
+      )
+      false
+    } else {
+      true
+    }
   }
-
-  private def isTrafficBalanceStale(
-      trafficBalance: ValidatorTrafficBalance,
-      ingestedTrafficContract: Contract[ValidatorTraffic.ContractId, ValidatorTraffic],
-  ) =
-    trafficBalance.totalPurchased < ingestedTrafficContract.payload.totalPurchased
 
   private def topUpValidatorTraffic(
       validatorTreasury: TreasuryService,

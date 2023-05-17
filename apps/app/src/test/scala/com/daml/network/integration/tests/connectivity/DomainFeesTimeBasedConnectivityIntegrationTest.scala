@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests.connectivity
 
+import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
@@ -55,28 +56,30 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
           .totalPurchased shouldBe 0
       )
 
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-        {
-          clue("Give the validator sufficient coins") {
-            aliceValidatorWallet.tap(1000)
-          }
-          clue("Advance time to trigger top-up loop a few times") {
-            advanceTimeByMinTopupInterval(aliceValidator)
-            advanceTimeByMinTopupInterval(aliceValidator)
-            advanceTimeByMinTopupInterval(aliceValidator)
-          }
-        },
-        entries => {
-          // Check that top up happens at most once even though scan app reports that we should top up
-          forAtMost(1, entries) { line =>
-            assert(
-              line.loggerName.endsWith("validator=aliceValidator") &&
-                line.message.contains("successfully bought extra traffic")
-            )
-          }
-        },
+      clue("Give the validator sufficient coins")(
+        aliceValidatorWallet.tap(1000)
       )
 
+      actAndCheck(
+        "Advance time to trigger top-up loop a few times", {
+          advanceTimeByMinTopupInterval(aliceValidator)
+          advanceTimeByMinTopupInterval(aliceValidator)
+          advanceTimeByMinTopupInterval(aliceValidator)
+        },
+      )(
+        // Note that it's possible that top-up may not happen because cutting Scan from the ledger may also
+        // cause it to provide stale open mining round information for the top-up. This is a known issue
+        // (https://github.com/DACH-NY/the-real-canton-coin/issues/4810) and is only temporary while
+        // Scan is also used to mock the validator traffic related endpoints for the Domain Fees PoC
+        "Top-up happens at most once even though scan app reports that we should top-up",
+        _ => {
+          val validatorTraffic =
+            aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
+              .filterJava(ValidatorTraffic.COMPANION)(aliceValidator.getValidatorPartyId())
+              .head
+          validatorTraffic.data.numPurchases.longValue() should be <= 1L
+        },
+      )
     }
   }
 }

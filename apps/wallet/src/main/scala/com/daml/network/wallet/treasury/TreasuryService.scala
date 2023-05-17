@@ -501,7 +501,7 @@ class TreasuryService(
       if (!tapsApproved) {
         throw new StatusRuntimeException(
           Status.ABORTED.withDescription(
-            show"Aborted operation - insufficient validator credit to create coins"
+            show"Aborted operation - insufficient validator traffic balance to create coins"
           )
         )
       }
