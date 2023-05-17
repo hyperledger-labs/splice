@@ -141,7 +141,7 @@ Hosting the SV Wallet UI
 To view the coin balance of your SV, you can host the wallet UI and
 then login as ``sv_wallet_user``.  To do so, first edit the wallet UI
 config file ``web-uis/wallet/config.js`` and replace
-``TARGET_CLUSTER`` with |cn_cluster| as described in the :ref:`runbook
+``TARGET_CLUSTER`` with |cn_cluster_literal| as described in the :ref:`runbook
 for self-hosted validators <configuring-wallet-ui>`.
 
 Next run the following command: ::

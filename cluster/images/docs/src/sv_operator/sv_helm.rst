@@ -362,10 +362,10 @@ reaches a stable state prior to moving on to the next step.
 .. code-block:: bash
 
     helm repo update
-    helm install postgres canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION}
-    helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f participant-values.yaml
-    helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f validator-values.yaml
-    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f sv-values.yaml
+    helm install postgres canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} --wait
+    helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f participant-values.yaml --wait
+    helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f validator-values.yaml --wait
+    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f sv-values.yaml --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in each of the three new
@@ -428,8 +428,8 @@ definition:
     apiVersion: cert-manager.io/v1
     kind: Certificate
     metadata:
-    name: cn-certificate
-    namespace: cluster-ingress
+       name: cn-certificate
+       namespace: cluster-ingress
     spec:
         dnsNames:
         - '*.sv.svc.YOUR_DOMAIN.com'
@@ -464,7 +464,8 @@ Install the Ingress Helm Chart:
 
     helm install cluster-ingress canton-network-helm/cn-cluster-ingress \
         -n cluster-ingress \
-        -f ingress-values.yaml
+        -f ingress-values.yaml \
+        --wait
 
 .. _helm-sv-wallet-ui:
 

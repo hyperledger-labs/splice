@@ -61,7 +61,7 @@ Glossary
       * provides UI for managing peer-to-peer transfers
         between two users
 
-    Directory Service
+    Canton Name Service (sometimes also called directory service)
 
       * allows parties to buy a globally unique, human readable name for a time period mapped to their party (similar to DNS)
       * allows each party to declare one of their entries as the primary
@@ -69,3 +69,8 @@ Glossary
         (similar to reverse DNS)
       * provides APIs for resolution in both directions that can be used by
         other apps (e.g., the wallet) to display and accept directory names instead of party ids
+
+
+    Splitwell
+
+      * Example application that allows users to split payments and then settle their debts to each other.

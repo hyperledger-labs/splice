@@ -168,7 +168,7 @@ The Wallet UI is distributed as static files that connect to the
 validator backend that we started in the previous section.
 
 Before we can deploy the Wallet UI, we need to configure the URL of the directory service so the wallet can resolve party IDs as well as the URL of CC Scan.
-For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster| for both directory and scan:
+For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| for both directory and scan:
 
 .. literalinclude:: ../../../../../apps/wallet/frontend/public/config.js
     :start-after: BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
@@ -187,7 +187,7 @@ First - you will need to upload the directory's dar file to your validator's par
 
 Before you can use the Directory UI, you need to configure the URL of the directory backend similar to
 how you configured the Wallet UI earlier. For that,
-open ``web-uis/directory/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster|:
+open ``web-uis/directory/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal|:
 
 .. literalinclude:: ../../../../../apps/directory/frontend/public/config.js
     :start-after: BEGIN_DIRECTORY_CONFIG
@@ -212,14 +212,16 @@ Configuring the Splitwell UI
 To use splitwell, you first need to connect your participant to the
 splitwell domain and upload the DAR.  Go to the terminal in which you
 are running the validator (the one using "validator.conf"), and type:
-Note, that if you are not connecting to the splitwell instance
-operated by Digital Asset, the Domain URL here will be different. Ask
-the operator for the correct URL.
 
 .. parsed-literal::
 
    @ validatorApp.participantClient.domains.connect("splitwell", "http://|cn_cluster|.network.canton.global:5108")
    @ validatorApp.participantClient.dars.upload("dars/splitwell-0.1.0.dar")
+
+.. note::
+   Note, that if you are not connecting to the splitwell instance
+   operated by Digital Asset, the Domain URL here will be different. Ask
+   the operator for the correct URL.
 
 The splitwell UI connects to the ledger API of your participant
 through `Envoy
@@ -230,7 +232,7 @@ Once you completed the installation, open a new terminal and start it ::
 
   envoy -c examples/validator/envoy.yaml
 
-As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster| like you did earlier for the directory and wallet UIs:
+As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| like you did earlier for the directory and wallet UIs:
 
 .. literalinclude:: ../../../../../apps/splitwell/frontend/public/config.js
     :start-after: BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG

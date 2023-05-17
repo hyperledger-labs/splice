@@ -107,6 +107,7 @@ rst_prolog = """
    :format: html
 
 .. |cn_cluster| replace:: :raw-html:`<span class="cn-cluster">unknown_cluster</span>`
+.. |cn_cluster_literal| replace:: :raw-html:`<code class="literal"><span class="cn-cluster">unknown_cluster</span></code>`
 
 .. |version_literal| replace:: ``{version}``
 .. |chart_version_literal| replace:: ``{chart_version}``
