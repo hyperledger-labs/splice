@@ -256,17 +256,17 @@ particualrly if all helm charts are deployed at the same time. The
 
 
 Configuring the Cluster Ingress
-===============================
+-------------------------------
 
 Internet ingress configuration is often specific to the network configuration and scenario of the cluster being configured. To illustrate the basic requirements of a Canton Network ingress, we have provided a Helm chart that configures the above cluster for external network access.
 
 Requirements:
--------------
++++++++++++++
 
 cert-manager must be available in the cluster (See `cert-manager documentation <https://cert-manager.io/docs/installation/helm/>`_)
 
 Installation Instructions:
---------------------------
+++++++++++++++++++++++++++
 
 Create a cluster-ingress namespace with image pull permissions from the Artifactory docker repository:
 
@@ -348,6 +348,7 @@ Once logged in one should see the transactions page.
   :width: 600
   :alt: After logged in into the wallet UI
 
+.. _local-sv-web-ui:
 
 Logging into the SV UI
 ----------------------

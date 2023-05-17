@@ -36,6 +36,7 @@ Helm Chart Version: |chart_version_literal|
 
    sv_operator/onboarding.rst
    sv_operator/sv_helm.rst
+   sv_operator/sv_operations.rst
 
 
 .. toctree::
