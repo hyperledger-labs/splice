@@ -1063,10 +1063,26 @@ function subcmd_help() {
 
     for ii in "${sorted[@]}";
     do
-        if [[ "$ii" != ci_* ]]; then
+        if [[ "$ii" != ci_* && "$ii" != _* ]]; then
             printf '%s\t%s\n' "${ii}" "${subcommand_whitelist[${ii}]}"
         fi
     done | column -ts $'\t'
+}
+
+###
+
+subcommand_whitelist[_autocomplete]='Utility for autocomplete.'
+
+function subcmd__autocomplete() {
+    readarray -t sorted < <(printf '%s\n' "${!subcommand_whitelist[@]}" | sort)
+
+    for ii in "${sorted[@]}";
+    do
+        if [[ "$ii" != ci_* && "$ii" != _* ]]; then
+            echo "${ii}"
+        fi
+    done
+
 }
 
 

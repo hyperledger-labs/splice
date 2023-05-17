@@ -282,6 +282,8 @@ variables. As stated above, these are usually populated via `.envrc`.
 | `GCP_CLUSTER_BASENAME`        | Base of the cluster within the cloud project.  Used to compute the cluster's full name and DNS name.                   |
 | `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
+`cncluster` also has basic autocompletion for bash. To install that, add a line: `source <this script>` to your ~/.bashrc
+
 ### DevNet and TestNet
 
 The DevNet cluster is updated every day with the latest code from
