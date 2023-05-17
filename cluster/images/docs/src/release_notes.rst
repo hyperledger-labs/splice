@@ -14,6 +14,11 @@ Release Notes
 
   * View currently open mining rounds, along with their coin prices
 
+* Documentation improvements
+
+  * Extend and improve documentation for :ref:`setting up authentication for SV nodes <helm-sv-auth>`
+  * Add documentation for :ref:`validator onboarding through SV UI <generate_onboarding_secret>`
+
 * Bugfixes
 
   * Fix an issue where the validator and SV app were unable to pass

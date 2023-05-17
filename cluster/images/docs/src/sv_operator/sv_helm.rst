@@ -28,7 +28,7 @@ Requirements
 See instructions in the :ref:`Generating an SV identity section <sv-identity>`.
 
 5) You should have completed the self hosted validator setup,
-   including Auth 0 setup. Dedicated instructions can be found in the :ref:`Self-Hosted Validator section <self_hosted_validator>`
+   including Auth0 setup. Dedicated instructions can be found in the :ref:`Self-Hosted Validator section <self_hosted_validator>`
 
 6) Your cluster either needs to be connected to the GCP DA Canton
    DevNet VPN or you need a static egress IP. In the latter case,
@@ -39,14 +39,14 @@ See instructions in the :ref:`Generating an SV identity section <sv-identity>`.
 Preparing a Cluster for Installation
 ------------------------------------
 
-In the following, you will need your artifactory credentials from
+In the following, you will need your Artifactory credentials from
 https://digitalasset.jfrog.io/ui/user_profile. Based on that, set the following environment variables.
 
 ====================== ==========================================================================================
 Name                   Value
 ---------------------- ------------------------------------------------------------------------------------------
-ARTIFACTORY_USER       Your artifactory user name shown at the top right.
-ARTIFACTORY_PASSWORD   Your artifactory API key. If you don't have one you can generate one on your profile page.
+ARTIFACTORY_USER       Your Artifactory user name shown at the top right.
+ARTIFACTORY_PASSWORD   Your Artifactory API key. If you don't have one you can generate one on your profile page.
 ====================== ==========================================================================================
 
 Ensure that your local helm installation has access to the Digital Asset Helm chart repository:
@@ -73,35 +73,167 @@ Create the application namespace within Kubernetes and ensure is has image pull 
     kubectl patch serviceaccount default -n sv \
         -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
+.. _helm-sv-auth:
 
-.. _helm-sv-auth0:
+Configuring Authentication
+--------------------------
 
-Configuring an Auth0 Tenant
----------------------------
+For security, the various components that comprise your SV node need to be able to authenticate themselves to each other,
+as well as be able to authenticate external UI and API users.
+We use JWT access tokens for authentication and expect these tokens to be issued by an (external) `OpenID Connect <https://openid.net/connect/>`_ (OIDC) provider.
+You must:
 
-An SV node currently requires the following to exist in your Auth0 tenant:
+1. Set up an OIDC provider in such a way that both backends and web UI users are able to obtain JWTs in a supported form.
 
-- An API with audience `https://canton.network.global`  (this is currently the only audience supported. In the future, this will be made customizable.)
-- Two machine-to-machine applications, for the validator and for the sv-app. Both should be authorized for the API defined above.
-- One single-page-application for the wallet web UI, with allowed callback, logout URLs, web origins, and CORS origins configured to the wallet UI URL for your SV's validator. If you're using the ingress configuration of this runbook, that would be `https://wallet.sv.svc.YOUR_CLUSTER_URL`.
-- One single-page-application for the SV web UI, with allowed callback, logout URLs, web origins, and CORS origins configured to the wallet UI URL for your SV's validator. If you're using the ingress configuration of this runbook, that would be `https://sv.sv.svc.YOUR_CLUSTER_URL`.
+2. Configure your backends to use that OIDC provider.
 
-We will use the environment variables listed in the table to refer to aspects of your Auth0 configuration:
+.. _helm-sv-auth-requirements:
+
+OIDC Provider Requirements
+++++++++++++++++++++++++++
+
+This section provides pointers for setting up an OIDC provider for use with your SV node.
+Feel free to skip directly to :ref:`helm-sv-auth0` if you plan to use `Auth0 <https://auth0.com>`_ for your SV node's authentication needs.
+That said, we encourage you to move to an OIDC provider different from Auth0 for the long-term production deployment of your SV,
+to avoid security risks resulting from a majority of SVs depending on the same authentication provider
+(which could expose the whole network to potential security problems at this provider).
+
+Your OIDC provider must be reachable [#reach]_ at a well known (HTTPS) URL.
+In the following, we will refer to this URL as ``OIDC_AUTHORITY_URL``.
+Both your SV node and any users that wish to authenticate to a web UI connected to your SV node must be able to reach the ``OIDC_AUTHORITY_URL``.
+We require your OIDC provider to provide a `discovery document <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ at ``OIDC_AUTHORITY_URL/.well-known/openid-configuration``.
+We furthermore require that your OIDC provider exposes a `JWK Set <https://datatracker.ietf.org/doc/html/rfc7517>`_ document.
+In this documentation, we assume that this document is available at ``OIDC_AUTHORITY_URL/.well-known/jwks.json``.
+
+For machine-to-machine (SV node component to SV node component) authentication,
+your OIDC provider must support the `OAuth 2.0 Client Credentials Grant <https://tools.ietf.org/html/rfc6749#section-4.4>`_ flow.
+This means that you must be able to configure (`CLIENT_ID`, `CLIENT_SECRET`) pairs for all SV node components that need to authenticate to others.
+Currently, these are the validator app backend and the SV app backend - both need to authenticate to the SV node's Canton participant.
+The `sub` field of JWTs issued through this flow must match the user ID configured as `ledger-api-user` in :ref:`helm-sv-auth-secrets-config`.
+In this documentation, we assume that the `sub` field of these JWTs is formed as ``CLIENT_ID@clients``.
+If this is not true for your OIDC provider, pay extra attention when configuring ``ledger-api-user`` values below.
+
+For user-facing authentication - allowing users to access the various web UIs hosted on your SV node,
+your OIDC provider must support the `OAuth 2.0 Authorization Code Grant <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1>`_ flow
+and allow you to obtain client identifiers for the web UIs your SV node will be hosting.
+Currently, these are the SV web UI and the Wallet web UI.
+You might be required to whitelist a range of URLs on your OIDC provider, such as "Allowed Callback URLs", "Allowed Logout URLs", "Allowed Web Origins", and "Allowed Origins (CORS)".
+If you are using the ingress configuration of this runbook, the correct URLs to configure here are
+``https://sv.sv.svc.YOUR_CLUSTER_URL`` (for the SV web UI) and
+``https://wallet.sv.svc.YOUR_CLUSTER_URL`` (for the Wallet web UI).
+An identifier that is unique to the user must be set via the `sub` field of the issued JWT.
+On some occasions, this identifier will be used as a user name for that user on your SV node's Canton participant.
+In :ref:`helm-sv-install`, you will be required to configure a user identifier as the ``validatorWalletUser`` -
+make sure that whatever you configure there matches the contents of the `sub` field of JWTs issued for that user.
+
+*All* JWTs issued for use with your SV node:
+
+- must be signed using the RS256 signing algorithm
+- must set the audience (`aud`) field to exactly ``https://canton.network.global`` [#aud]_
+
+In the future, your OIDC provider might additionally be required to issue JWTs with a ``scope`` explicitly set to ``daml_ledger_api``
+(when requested to do so as part of the OAuth 2.0 authorization code flow).
+
+Summing up, your OIDC provider setup must provide you with the following configuration values:
 
 ======================= ===========================================================================
 Name                    Value
 ----------------------- ---------------------------------------------------------------------------
+OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
 VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
-SV_CLIENT_ID            The client id of the Auth0 app for the sv app backend
-SV_CLIENT_SECRET        The client id of the Auth0 app for the sv app backend
-AUTH0_TENANT            The name of your auth0 tenant, shown at the top left of your Auth0 project.
+SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
+SV_CLIENT_SECRET        The client id of the Auth0 app for the SV app backend
 WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
 SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
 ======================= ===========================================================================
 
+We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
 
-The following two secrets will instruct the participant to create service users for your validator and sv apps:
+In case you are facing trouble with setting up your (non-Auth0) OIDC provider,
+it can be beneficial to skim the instructions in :ref:`helm-sv-auth0` as well, to check for functionality or configuration details that your OIDC provider setup might be missing.
+
+.. [#reach] The URL must be reachable from the Canton participant, validator app and SV app running in your cluster, as well as from all web browsers that should be able to interact with the SV and wallet UIs.
+
+.. [#aud] This is currently the only audience supported. In the future, the audience will be made customizable.
+
+    .. TODO(#2052) use a unique audience for each app
+
+.. _helm-sv-auth0:
+
+Configuring an Auth0 Tenant
++++++++++++++++++++++++++++
+
+To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform the following:
+
+1. Create an Auth0 tenant for your SV
+2. Create an Auth0 API that controls access to the ledger API:
+
+    a. Navigate to Applications > APIs and click "Create API". Set name to ``Daml Ledger API``, set identifier to ``https://canton.network.global`` [#aud]_.
+    b. Under the Permissions tab in the new API, add a permission with scope ``daml_ledger_api``, and a description of your choice.
+    c. On the Settings tab, scroll down to "Access Settings" and enable "Allow Offline Access", for automatic token refreshing.
+
+3. Create an Auth0 Application for the validator backend:
+
+    a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button.
+    b. Name it ``Validator app backend``, choose "Machine to Machine Applications", and click Create.
+    c. Choose the ``Daml Ledger API`` API you created in step 2 in the "Authorize Machine to Machine Application" dialog and click Authorize.
+
+4. Create an Auth0 Application for the SV backend.
+   Repeat all steps described in step 3, using ``SV app backend`` as the name of your application.
+
+5. Create an Auth0 Application for the SV web UI:
+
+    a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button.
+    b. Choose "Single Page Web Applications", call it ``SV web UI``, and click Create.
+    c. Determine the URL for your validator's SV UI.
+       If you're using the ingress configuration of this runbook, that would be ``https://sv.sv.svc.YOUR_CLUSTER_URL``.
+    d. In the Auth0 application settings, add the SV URL to the following:
+
+       - "Allowed Callback URLs"
+       - "Allowed Logout URLs"
+       - "Allowed Web Origins"
+       - "Allowed Origins (CORS)"
+    e. Save your application settings.
+
+6. Create an Auth0 Application for the wallet web UI.
+   Repeat all steps described in step 5, with following modifications:
+
+   - In step b, use ``Wallet web UI`` as the name of your application.
+   - In steps c and d, use the URL for your SV's *wallet* UI.
+     If you're using the ingress configuration of this runbook, that would be ``https://wallet.sv.svc.YOUR_CLUSTER_URL``.
+
+Please refer to Auth0's `own documentation on user management <https://auth0.com/docs/manage-users>`_ for pointers on how to set up end-user accounts for the two web UI applications you created.
+Note that you will need to create at least one such user account for completing the steps in :ref:`helm-sv-install` - for being able to log in as your SV node's administrator.
+You will be asked to obtain the user identifier for this user account.
+It can be found in the Auth0 interface under User Management -> Users -> your user's name -> user_id (a field right under the user's name at the top).
+
+We will use the environment variables listed in the table below to refer to aspects of your Auth0 configuration:
+
+======================= ===========================================================================
+Name                    Value
+----------------------- ---------------------------------------------------------------------------
+OIDC_AUTHORITY_URL      ``https://AUTH0_TENANT_NAME.us.auth0.com``
+VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
+VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
+SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
+SV_CLIENT_SECRET        The client id of the Auth0 app for the SV app backend
+WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
+SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
+======================= ===========================================================================
+
+The ``AUTH0_TENANT_NAME`` is the name of your Auth0 tenant as shown at the top left of your Auth0 project.
+You can obtain the client ID and secret of each Auth0 app from the settings pages of that app.
+
+.. _helm-sv-auth-secrets-config:
+
+Configuring Authentication on your SV Node
+++++++++++++++++++++++++++++++++++++++++++
+
+We are now going to configure your SV node software based on the OIDC provider configuration values your exported to environment variables at the end of either :ref:`helm-sv-auth-requirements` or :ref:`helm-sv-auth0`.
+(Note that some authentication-related configuration steps are also included in :ref:`helm-sv-install`.)
+
+The following two kubernetes secrets will instruct the participant to create service users for your validator and SV apps:
 
 .. code-block:: bash
 
@@ -126,7 +258,7 @@ The SV app app is configured with a secret as follows:
 
     kubectl create --namespace sv secret generic cn-app-sv-ledger-api-auth \
         "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients" \
-        "--from-literal=url=https://${AUTH0_TENANT}.us.auth0.com/.well-known/openid-configuration" \
+        "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
         "--from-literal=client-secret=${SV_CLIENT_SECRET}"
 
@@ -137,23 +269,26 @@ The validator app backend requires the following secret.
 
     kubectl create --namespace sv secret generic cn-app-validator-ledger-api-auth \
         "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
-        "--from-literal=url=https://${AUTH_TENANT}.us.auth0.com/.well-known/openid-configuration" \
+        "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
 
 To setup the wallet and SV UI, create the following two secrets.
 
+.. code-block:: bash
+
     kubectl create --namespace sv secret generic cn-app-wallet-ui-auth \
-        "--from-literal=url=https://${AUTH0_TENANT}.us.auth0.com" \
+        "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${WALLET_UI_CLIENT_ID}"
 
     kubectl create --namespace sv secret generic cn-app-sv-ui-auth \
-        "--from-literal=url=https://${AUTH0_TENANT}.us.auth0.com" \
+        "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${SV_UI_CLIENT_ID}"
 
+.. _helm-sv-install:
 
 Installing the Software
--------------------------
+-----------------------
 
 Install the Helm charts needed to start an SV node connected to the cluster.
 To make these commands work, you will need to meet a few
@@ -178,7 +313,7 @@ to match your configuration.
       alias: global
       url: http://TARGET_CLUSTER.network.canton.global:5008
     auth:
-      jwksEndpoint: "https://YOUR_AUTH0_TENANT.us.auth0.com/.well-known/jwks.json"
+      jwksEndpoint: "${OIDC_AUTHORITY_URL}/.well-known/jwks.json"
       targetAudience: "https://canton.network.global"
 
 An SV node includes a validator app so you also need to configure
@@ -250,7 +385,7 @@ namespaces. A typical query might look as follows:
 
 
 Note also that ``Pod`` restarts may happen during bringup,
-particualrly if all helm charts are deployed at the same time. The
+particularly if all helm charts are deployed at the same time. The
 ``cn-sv-node`` cannot start until ``participant`` is running and
 ``participant`` cannot start until ``postgres`` is running.
 
