@@ -4,6 +4,7 @@ package com.daml.network.sv.cometbft
 
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.images.ImagePullPolicy
 import org.testcontainers.utility.DockerImageName
 
 class CometBftContainer {
@@ -13,15 +14,22 @@ class CometBftContainer {
   class CometBftTestContainer
       extends GenericContainer[CometBftTestContainer](
         DockerImageName.parse(
-          "digitalasset-canton-enterprise-docker.jfrog.io/cometbft-canton-network:53d33e114a70b311f7b048f016243449635ca3ad"
+          sys.env("COMETBFT_DOCKER_IMAGE")
         )
       )
 
-  private val container = new CometBftTestContainer().withCreateContainerCmdModifier {
-    createContainerCmd =>
+  case object NeverPullOnCIImagePolicy extends ImagePullPolicy {
+    override def shouldPull(imageName: DockerImageName): Boolean =
+      !sys.env.contains("CI")
+  }
+
+  private val container = new CometBftTestContainer()
+    .withCreateContainerCmdModifier { createContainerCmd =>
       createContainerCmd.withEntrypoint("testing-entrypoint.sh")
       ()
-  }
+    }
+    // Always expect that images are pulled on CI before running tests
+    .withImagePullPolicy(NeverPullOnCIImagePolicy)
 
   def initialize(): Unit = {
     container.addExposedPort(defaultCometBftHttpPort)

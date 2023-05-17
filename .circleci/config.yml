@@ -846,6 +846,16 @@ commands:
             fi
             echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
             echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-network-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
+  docker_pull_test_images:
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: "Pull docker images used for integration tests"
+          additional_nix_args: "--keep DOCKER_CERT_PATH \
+                              --keep DOCKER_HOST \
+                              --keep DOCKER_MACHINE_NAME \
+                              --keep DOCKER_TLS_VERIFY \
+                              --keep NO_PROXY"
+          cmd: docker pull ${COMETBFT_DOCKER_IMAGE}
 
 jobs:
 
@@ -917,12 +927,13 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout
+      - setup_sbt_test_job
       # Used to pull docker images for cometbft
       - docker_login_artifactory
       # Used to start cometbft docker containers
       - setup_remote_docker:
           version: 20.10.14
-      - setup_sbt_test_job
+      - docker_pull_test_images
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
