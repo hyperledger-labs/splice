@@ -295,10 +295,11 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
       logger.info(
         s"Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
       )
-    case Failure(err) => {
-      logger.error(s"Initialization of $name failed", err)
+    case Failure(err) =>
+      val msg = s"Initialization of $name failed"
+      logger.error(msg, err)
+      System.err.println(s"$msg, so exiting; check the application logs for details")
       sys.exit(1)
-    }
   }
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
