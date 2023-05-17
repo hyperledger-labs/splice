@@ -174,7 +174,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
     registerWebDriver(name, webDriver)
 
-    // TODO(#4620): This works around an incompatibility between Selenium and Firefox.
+    // TODO(#4828): This works around an incompatibility between Selenium and Firefox.
     //  Remove this hack once the incompatibility is fixed in Selenium.
     val originalLogEvent = Log.entryAdded()
     val fixedLogEvent = new Event[LogEntry](
