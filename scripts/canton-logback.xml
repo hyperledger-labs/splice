@@ -32,7 +32,7 @@
             </matcher>
             <matcher>
               <Name>requestlogger_message</Name>
-              <regex>(UpdateService/GetLedgerEnd|TransactionService/GetLedgerEnd|StateSnapshotService/GetConnectedDomains)</regex>
+              <regex>(UpdateService/GetLedgerEnd|TransactionService/GetLedgerEnd|StateService/GetConnectedDomains)</regex>
             </matcher>
             <expression>
               hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
@@ -127,7 +127,7 @@
                     </matcher>
                     <matcher>
                       <Name>requestlogger_message</Name>
-                      <regex>(UpdateService/GetLedgerEnd|TransactionService/GetLedgerEnd|StateSnapshotService/GetConnectedDomains)</regex>
+                      <regex>(StateService/GetLedgerEnd|TransactionService/GetLedgerEnd|StateService/GetConnectedDomains)</regex>
                     </matcher>
                     <expression>
                       hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||

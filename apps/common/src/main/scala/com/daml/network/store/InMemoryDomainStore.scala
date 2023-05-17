@@ -124,7 +124,9 @@ class InMemoryDomainStore(
       updateState(
         _.setDomains(domains)
       ).map { case (summary, stateChanged, aliasSignals) =>
-        logger.debug(show"Ingested domain update $summary")
+        if (summary.nonEmpty) {
+          logger.debug(show"Ingested domain update $summary")
+        }
         stateChanged.success(())
         aliasSignals.foreach { case (domainId, promise) =>
           promise.success(domainId)
@@ -196,6 +198,8 @@ object InMemoryDomainStore {
       removedDomains: Map[DomainAlias, DomainId],
       newNumConnectedDomains: Int,
   ) extends PrettyPrinting {
+    def nonEmpty: Boolean =
+      addedDomains.nonEmpty || removedDomains.nonEmpty
     override def pretty: Pretty[this.type] = {
       prettyNode(
         "", // intentionally left empty, as that worked better in the log messages above
