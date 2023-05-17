@@ -108,7 +108,6 @@ function usage() {
 daemon=0
 enable_test_auth="true"
 use_preflight_frontends=0
-PREFLIGHT_JSON_LEDGER_API_PORT=6001
 
 while getopts "hdap" arg; do
   case ${arg} in
@@ -189,7 +188,6 @@ function start_preflight_frontends() {
   # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
   start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
   start_frontend   directory 3004 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
-  start_json_api ${PREFLIGHT_JSON_LEDGER_API_PORT} "--allow-insecure-tokens"
 }
 
 if [ $use_preflight_frontends -eq 0 ]; then
@@ -198,7 +196,6 @@ else
   if [ "$enable_test_auth" == "true" ]; then
     start_preflight_frontends
     echo "$NETWORK_APPS_ADDRESS" > start-frontends-network-address
-    echo "$PREFLIGHT_JSON_LEDGER_API_PORT" > start-frontends-http-ledger-api-port
   else
     echo "enable_test_auth was set to false, -p is incompatible with -a"
     exit 1

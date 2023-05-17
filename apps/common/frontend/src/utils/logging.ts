@@ -16,7 +16,7 @@ export function callWithLogging<T extends Arr, R>(
   console.debug(`${callerName} calling ${callName}`);
   return call(...args)
     .catch(reason => {
-      console.debug(`${callerName} call ${callName} rejected with `, reason);
+      console.debug(`${callerName} call ${callName} rejected with ${JSON.stringify(reason)}`);
       throw reason;
     })
     .then(value => {

@@ -9,11 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{
-  CantonProcessTestUtil,
-  CommonCNNodeAppInstanceReferences,
-  SplitwellTestUtil,
-}
+import com.daml.network.util.{ProcessTestUtil, CommonCNNodeAppInstanceReferences, SplitwellTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
@@ -26,7 +22,7 @@ import scala.util.Using
 class SelfHostedSplitwellPreflightIntegrationTest
     extends CNNodeIntegrationTest
     with HasConsoleScriptRunner
-    with CantonProcessTestUtil
+    with ProcessTestUtil
     with PreflightIntegrationTestUtil
     with SplitwellTestUtil
     with CommonCNNodeAppInstanceReferences {

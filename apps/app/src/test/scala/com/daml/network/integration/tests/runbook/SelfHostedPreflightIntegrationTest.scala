@@ -8,7 +8,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTest
 import com.daml.network.util.{
-  CantonProcessTestUtil,
+  ProcessTestUtil,
   DirectoryFrontendTestUtil,
   FrontendLoginUtil,
   WalletFrontendTestUtil,
@@ -24,7 +24,7 @@ import scala.util.Using
 class SelfHostedPreflightIntegrationTest
     extends FrontendIntegrationTest("alice-selfhosted")
     with HasConsoleScriptRunner
-    with CantonProcessTestUtil
+    with ProcessTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
     with PreflightIntegrationTestUtil
@@ -74,33 +74,37 @@ class SelfHostedPreflightIntegrationTest
       "--bootstrap",
       (validatorPath / "validator-participant.sc").toString,
     )
-    checkFrontendsJsonLedgerApiPort("6001")
     checkFrontendsNetworkAppsAddress(sys.env("NETWORK_APPS_ADDRESS"))
 
     Using.resource(startCanton(cantonArgs, "self-hosted-validator")) { _ =>
       runScript(validatorPath / "validator.sc")(env.environment)
-      runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
+      // We start the JSON API after the participant because the
+      // reconnection logic in the JSON API doesn't seem to work well and we otherwise
+      // sometimes fail requests for quite some time.
+      Using.resource(startJsonApi(6001, File("log/json-api-self-hosted.log").toJava)) { _ =>
+        runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
 
-      v("validatorApp").participantClient.dars
-        .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
+        v("validatorApp").participantClient.dars
+          .upload("./daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 
-      val walletUiPort = 3000
-      val directoryUiPort = 3004
+        val walletUiPort = 3000
+        val directoryUiPort = 3004
 
-      // Generate new random CNS names to avoid conflicts between multiple preflight check runs
-      val id = (new scala.util.Random).nextInt().toHexString
-      val cnsName = s"alice+${id}.cns"
+        // Generate new random CNS names to avoid conflicts between multiple preflight check runs
+        val id = (new scala.util.Random).nextInt().toHexString
+        val cnsName = s"alice+${id}.cns"
 
-      startWebDriver("alice-selfhosted")
+        startWebDriver("alice-selfhosted")
 
-      withFrontEnd("alice-selfhosted") { implicit webDriver =>
-        login(walletUiPort, "alice")
-        tapCoins(100)
-        reserveDirectoryNameFor(() => login(directoryUiPort, "alice"), cnsName)
-        // "Close" frontend before Canton is shut down to avoid failures in ACS queries.
-        go to "about:blank"
-        eventually() {
-          pageTitle shouldBe ""
+        withFrontEnd("alice-selfhosted") { implicit webDriver =>
+          login(walletUiPort, "alice")
+          tapCoins(100)
+          reserveDirectoryNameFor(() => login(directoryUiPort, "alice"), cnsName)
+          // "Close" frontend before Canton is shut down to avoid failures in ACS queries.
+          go to "about:blank"
+          eventually() {
+            pageTitle shouldBe ""
+          }
         }
       }
 
@@ -113,16 +117,6 @@ class SelfHostedPreflightIntegrationTest
     clue(s"Checking frontends match given network apps address: ${networkAppsAddress}") {
       eventually() {
         "start-frontends-network-address".toFile.lines.headOption shouldBe Some(networkAppsAddress)
-      }
-    }
-  }
-
-  private def checkFrontendsJsonLedgerApiPort(jsonLedgerApiPort: String): Unit = {
-    clue(s"Checking frontends match given json ledger api port: ${jsonLedgerApiPort}") {
-      eventually() {
-        "start-frontends-http-ledger-api-port".toFile.lines.headOption shouldBe Some(
-          jsonLedgerApiPort
-        )
       }
     }
   }

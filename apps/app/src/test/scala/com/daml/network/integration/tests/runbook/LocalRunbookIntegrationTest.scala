@@ -10,7 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.sv.config.ExpectedOnboardingConfig
-import com.daml.network.util.CantonProcessTestUtil
+import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
@@ -19,8 +19,8 @@ import monocle.macros.syntax.lens.*
 class LocalRunbookIntegrationTest
     extends CNNodeIntegrationTest
     with HasConsoleScriptRunner
-    with CantonProcessTestUtil {
-  import CantonProcessTestUtil.CantonProcess
+    with ProcessTestUtil {
+  import ProcessTestUtil.Process
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val validatorPath: File = examplesPath / "validator"
@@ -38,7 +38,7 @@ class LocalRunbookIntegrationTest
     ("ParticipantAdminApi", 7002),
   )
 
-  var cantonProcess: Option[CantonProcess] = None
+  var cantonProcess: Option[Process] = None
 
   // We usually set this through an env var but you cannot easily set env vars in Java so instead we opt for a system property.
   // Note that system properties can only be used in tests at this point.

@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{CantonProcessTestUtil, WalletTestUtil}
+import com.daml.network.util.{ProcessTestUtil, WalletTestUtil}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.console.CommandFailure
@@ -18,7 +18,7 @@ import scala.concurrent.duration.*
 
 class WalletSurviveCantonRestartIntegrationTest
     extends CNNodeIntegrationTest
-    with CantonProcessTestUtil
+    with ProcessTestUtil
     with WalletTestUtil {
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"

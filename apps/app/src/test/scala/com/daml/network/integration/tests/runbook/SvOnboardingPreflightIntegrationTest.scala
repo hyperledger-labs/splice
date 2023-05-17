@@ -10,7 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
 }
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
-import com.daml.network.util.CantonProcessTestUtil
+import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
@@ -22,7 +22,7 @@ import scala.util.Using
 class SvOnboardingPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasConsoleScriptRunner
-    with CantonProcessTestUtil
+    with ProcessTestUtil
     with PreflightIntegrationTestUtil {
 
   private val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
