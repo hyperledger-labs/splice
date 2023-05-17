@@ -22,7 +22,7 @@ However, if you still have the participant and validator running from the previo
 SV nodes must be connected to a Canton participant node that is configured to use persistent storage via a PostgreSQL database:
 
 .. literalinclude:: ../../../../../apps/app/src/pack/examples/sv/sv-participant.conf
-    :start-after: participants
+    :start-after: participants {
     :end-before: supply
 
 At this moment, this documentation does not cover setting up a Canton participant with persistent storage via PostgreSQL.
