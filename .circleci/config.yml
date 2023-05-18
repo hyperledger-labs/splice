@@ -838,14 +838,26 @@ commands:
   docker_login_artifactory:
     steps:
       - run:
-          name: Login to artifactory
+          name: Pre-login checks
           command: |
             if [[ -z "${ARTIFACTORY_USER}" || -z "${ARTIFACTORY_PASSWORD}" ]]; then
                 echo "artifactory user:key is empty: ${ARTIFACTORY_USER} / pw. maybe add context:artifactory?"
                 exit 1
             fi
-            echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
-            echo "${ARTIFACTORY_PASSWORD}" | docker login digitalasset-canton-network-docker.jfrog.io -u "${ARTIFACTORY_USER}" --password-stdin
+      - run_bash_command_in_nix:
+         cmd_name: Log in to Artifactory
+         additional_nix_args: "--keep DOCKER_CERT_PATH \
+                              --keep DOCKER_HOST \
+                              --keep DOCKER_MACHINE_NAME \
+                              --keep DOCKER_TLS_VERIFY \
+                              --keep ARTIFACTORY_USER \
+                              --keep ARTIFACTORY_PASSWORD \
+                              --keep NO_PROXY"
+         # Retrying as sometimes the login fails
+         cmd_retry_count: 5
+         cmd: |
+           echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
+           echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-network-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
   docker_pull_test_images:
     steps:
       - run_bash_command_in_nix:
