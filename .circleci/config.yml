@@ -1257,8 +1257,9 @@ jobs:
     environment:
       <<: *env
     steps:
-      - docker_login_artifactory
       - checkout
+      - setup_nix
+      - docker_login_artifactory
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Promote images to Artifactory
