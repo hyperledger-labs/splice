@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { AmountDisplay, Loading, PartyId, SvClientProvider } from 'common-frontend';
 import DateDisplay from 'common-frontend/lib/components/DateDisplay';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 
 import EditIcon from '@mui/icons-material/Edit';
 import {
@@ -46,6 +46,14 @@ const DesiredCoinPrice: React.FC = () => {
   };
 
   const svcInfosQuery = useSvcInfos();
+  const getMemberName = useCallback(
+    (partyId: string) => {
+      const member = svcInfosQuery.data?.svcRules.payload.members.get(partyId);
+      return member ? member.name : '';
+    },
+    [svcInfosQuery.data]
+  );
+
   if (coinPriceVotesQuery.isLoading || svcInfosQuery.isLoading) {
     return <Loading />;
   }
@@ -138,6 +146,7 @@ const DesiredCoinPrice: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Super Validator</TableCell>
+              <TableCell>Super Validator Party ID</TableCell>
               <TableCell>Desired Coin Price</TableCell>
               <TableCell>Last Updated At</TableCell>
             </TableRow>
@@ -148,6 +157,7 @@ const DesiredCoinPrice: React.FC = () => {
                 <OtherCoinPricesRow
                   key={coinPriceVote.sv}
                   sv={coinPriceVote.sv}
+                  svName={getMemberName(coinPriceVote.sv)}
                   coinPrice={maybeBigNumber(coinPriceVote.coinPrice)!}
                   lastUpdatedAt={coinPriceVote.lastUpdatedAt}
                 />
@@ -161,18 +171,21 @@ const DesiredCoinPrice: React.FC = () => {
 };
 
 interface OtherCoinPricesRowProps {
+  svName: string;
   sv: Party;
   coinPrice: BigNumber | undefined;
   lastUpdatedAt: Date;
 }
 
 const OtherCoinPricesRow: React.FC<OtherCoinPricesRowProps> = ({
+  svName,
   sv,
   coinPrice,
   lastUpdatedAt,
 }) => {
   return (
     <TableRow className="coin-price-table-row">
+      <TableCell>{svName}</TableCell>
       <TableCell>
         <PartyId partyId={sv} className="sv-party" />
       </TableCell>

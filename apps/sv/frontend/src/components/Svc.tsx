@@ -1,4 +1,4 @@
-import { Loading, SvClientProvider } from 'common-frontend';
+import { Loading, PartyId, SvClientProvider } from 'common-frontend';
 import TitledTable from 'common-frontend/lib/components/TitledTable';
 import React from 'react';
 
@@ -10,11 +10,11 @@ import TableRow from '@mui/material/TableRow';
 import { useSvcInfos } from '../contexts/SvContext';
 import { config } from '../utils';
 
-function createRow(key: string, value: string) {
-  return { key, value };
+function createRow(key: string, value: string, isParty: boolean = false) {
+  return { key, value, isParty };
 }
 
-function getInfoTable(title: string, rows: { key: string; value: string }[]) {
+function getInfoTable(title: string, rows: { key: string; value: string; isParty: boolean }[]) {
   return (
     <TitledTable
       title={title}
@@ -26,8 +26,12 @@ function getInfoTable(title: string, rows: { key: string; value: string }[]) {
             <TableCell align="left" className="key-name">
               {row.key}
             </TableCell>
-            <TableCell align="left" className="value-name" style={{ wordBreak: 'break-all' }}>
-              {row.value}
+            <TableCell
+              align="left"
+              className="value-name"
+              style={{ wordBreak: row.isParty ? 'normal' : 'break-all' }}
+            >
+              {row.isParty ? <PartyId partyId={row.value} /> : row.value}
             </TableCell>
           </TableRow>
         ))}
@@ -42,14 +46,17 @@ const SvcView: React.FC = () => {
     const data = resp.data!;
     var cs: { key: string; value: string }[] = [];
     data.svcRules.payload.members.forEach((value, key) => cs.push(createRow(key, value.name)));
-    const svInfos = [createRow('svUser', data.svUser), createRow('svPartyId', data.svPartyId)];
-    const membersInfos: { key: string; value: string }[] = [];
+    const svInfos = [
+      createRow('svUser', data.svUser),
+      createRow('svPartyId', data.svPartyId, true),
+    ];
+    const membersInfos: { key: string; value: string; isParty: boolean }[] = [];
     for (var member of cs) {
-      membersInfos.push(createRow(member.value, member.key));
+      membersInfos.push(createRow(member.value, member.key, true));
     }
     const svcInfos = [
-      createRow('svcLeaderPartyId', data.svcRules.payload.leader.toString()),
-      createRow('svcPartyId', data.svcPartyId),
+      createRow('svcLeaderPartyId', data.svcRules.payload.leader.toString(), true),
+      createRow('svcPartyId', data.svcPartyId, true),
       createRow('coinRulesContractId', data.coinRulesContractId),
       createRow('svcRulesContractId', data.svcRules.contractId),
       createRow('isDevNet', data.svcRules.payload.isDevNet ? 'True' : 'False'),

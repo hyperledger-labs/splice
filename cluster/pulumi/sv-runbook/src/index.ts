@@ -44,7 +44,7 @@ console.log(`Installing SV node in namespace: ${SV_NAMESPACE}`);
 
 // Copied from ${REPO_ROOT}/apps/app/src/pack/examples/sv/sv-onboarding.conf
 // TODO(#4443): make sure it's OK to reuse these once automated
-const SV_NAME = "svTest";
+const SV_NAME = "DA-Test-Node";
 const SV_PUBLIC_KEY =
   "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA==";
 const SV_PRIVATE_KEY =

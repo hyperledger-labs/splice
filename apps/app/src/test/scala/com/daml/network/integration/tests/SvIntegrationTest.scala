@@ -338,7 +338,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
         sv1.getSvcInfo().svParty
       ) should have length 3
-    val svXName = "svX"
+    val svXName = "Canton-Foundation-X"
     val svXKey =
       "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj6n2u5RWQdkq2cWvStGbIBe2JmoFs+vZGOVfd6oIm/FqfK2qV2fiHX9DieJ1c6BarDdsAD7IRnksD9BGisU3ZQ=="
     sv1.approveSvIdentity(svXName, svXKey)
@@ -388,15 +388,18 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           // if this check fails:
           // make sure that the values (especially the key) are in sync with sv1's config file
           approvedSvIds should have size 3
-          val maybeSv2ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv2")
+          val maybeSv2ApprovedSvId =
+            approvedSvIds.find(_.data.candidateName == "Canton-Foundation-2")
           inside(maybeSv2ApprovedSvId) { case Some(sv2ApprovedSvId) =>
             sv2ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVdt8tLAfv+6H6s6EGpYMbthSdtEbykUO2Fau0k2wipf/6C0A/+xzKtqKJlBkybcBiICG/ZonGkuKgWBAC1jVAg=="
           }
-          val maybeSv3ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv3")
+          val maybeSv3ApprovedSvId =
+            approvedSvIds.find(_.data.candidateName == "Canton-Foundation-3")
           inside(maybeSv3ApprovedSvId) { case Some(sv2ApprovedSvId) =>
             sv2ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7sHQDYkVisVznuFqvjWWxH3u8S+f07f1HCZ+mx+yj28ysRJjbatPNnsVAbiFDu2XOqyITx+os/Gd39piOfyw2w=="
           }
-          val maybeSv4ApprovedSvId = approvedSvIds.find(_.data.candidateName == "sv4")
+          val maybeSv4ApprovedSvId =
+            approvedSvIds.find(_.data.candidateName == "Canton-Foundation-4")
           inside(maybeSv4ApprovedSvId) { case Some(sv4ApprovedSvId) =>
             sv4ApprovedSvId.data.candidateKey shouldBe "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
           }
@@ -438,7 +441,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         sv3.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
             sv3.getSvcInfo().svParty,
-            c => c.data.candidateName == "sv4",
+            c => c.data.candidateName == "Canton-Foundation-4",
           )
       ) {
         case Seq(approvedSvId) => {
@@ -479,7 +482,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
               .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty)
           ) {
             case Seq(svOnboarding) => {
-              svOnboarding.data.candidateName shouldBe "sv4"
+              svOnboarding.data.candidateName shouldBe "Canton-Foundation-4"
               svOnboarding.data.candidateParty shouldBe sv4Party.toProtoPrimitive
               svOnboarding.data.sponsor shouldBe sv1Party.toProtoPrimitive
               svOnboarding.data.svc shouldBe svcParty.toProtoPrimitive
@@ -488,7 +491,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
               SvOnboardingToken
                 .verifyAndDecode(svOnboarding.data.token)
                 .value shouldBe SvOnboardingToken(
-                "sv4",
+                "Canton-Foundation-4",
                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA==",
                 sv4Party,
                 svcParty,
@@ -519,7 +522,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             case a: ARC_SvcRules =>
               a.svcAction match {
                 case confirm: SRARC_ConfirmSvOnboarding =>
-                  confirm.svcRules_ConfirmSvOnboardingValue.newMemberName == "sv4"
+                  confirm.svcRules_ConfirmSvOnboardingValue.newMemberName == "Canton-Foundation-4"
                 case _ => false
               }
             case _ => false
@@ -530,11 +533,13 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("SV4's onboarding status is reported correctly.") {
       eventually()(inside(sv1.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Requested => {
-          status.name shouldBe "sv4"
+          status.name shouldBe "Canton-Foundation-4"
           status.svOnboardingRequestCid shouldBe svOnboardingRequestCid
-          status.confirmedBy.sorted shouldBe Vector("sv1")
+          status.confirmedBy.sorted shouldBe Vector("Canton-Foundation-1")
           status.requiredNumConfirmations shouldBe 2
-          sv1.getSvOnboardingStatus("sv4") shouldBe sv1.getSvOnboardingStatus(sv4Party)
+          sv1.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1.getSvOnboardingStatus(
+            sv4Party
+          )
         }
       })
     }
@@ -549,9 +554,11 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("SV4's onboarding status is reported as completed.") {
       eventually()(inside(sv1.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Completed => {
-          status.name shouldBe "sv4"
+          status.name shouldBe "Canton-Foundation-4"
           status.svcRulesCid shouldBe getSvcRules().id
-          sv1.getSvOnboardingStatus("sv4") shouldBe sv1.getSvOnboardingStatus(sv4Party)
+          sv1.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1.getSvOnboardingStatus(
+            sv4Party
+          )
         }
       })
     }
@@ -580,7 +587,9 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
       clue("Unknown parties have unknown SV onboarding status") {
         inside(sv1.getSvOnboardingStatus(sv2Party)) { case SvOnboardingStatus.Unknown() =>
-          sv1.getSvOnboardingStatus("sv2") shouldBe sv1.getSvOnboardingStatus(sv2Party)
+          sv1.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1.getSvOnboardingStatus(
+            sv2Party
+          )
         }
       }
       actAndCheck(
@@ -593,7 +602,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             update = getSvcRules().id
               .exerciseSvcRules_ConfirmSvOnboarding(
                 sv2Party.toProtoPrimitive,
-                "sv2",
+                "Canton-Foundation-2",
                 "no reason",
               ),
           )
@@ -603,9 +612,11 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         svOnboardingConfirmedCid =>
           inside(sv1.getSvOnboardingStatus(sv2Party)) {
             case status: SvOnboardingStatus.Confirmed => {
-              status.name shouldBe "sv2"
+              status.name shouldBe "Canton-Foundation-2"
               status.svOnboardingConfirmedCid shouldBe svOnboardingConfirmedCid
-              sv1.getSvOnboardingStatus("sv2") shouldBe sv1.getSvOnboardingStatus(sv2Party)
+              sv1.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1.getSvOnboardingStatus(
+                sv2Party
+              )
             }
           },
       )
@@ -650,7 +661,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             readAs = Seq.empty,
             update = getSvcRules().id.exerciseSvcRules_AddMember(
               fakeSv4Party.toProtoPrimitive,
-              "sv4",
+              "Canton-Foundation-4",
             ),
           )
         },
@@ -659,7 +670,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         _ =>
           inside(getSvcRules().data.members.asScala.get(fakeSv4Party.toProtoPrimitive)) {
             case Some(memberInfo) =>
-              memberInfo.name shouldBe "sv4"
+              memberInfo.name shouldBe "Canton-Foundation-4"
           },
       )
 
@@ -674,7 +685,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           inside(
             getSvcRules().data.members.asScala.get(sv4.getSvcInfo().svParty.toProtoPrimitive)
           ) { case Some(memberInfo) =>
-            memberInfo.name shouldBe "sv4"
+            memberInfo.name shouldBe "Canton-Foundation-4"
           }
         },
       )
@@ -706,7 +717,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     actAndCheck(
       "SV1 to SV4 create confirmation to Confirm SVX", {
         val svcRules = getSvcRules()
-        val newMemberName = "svX"
+        val newMemberName = "Canton-Foundation-X"
         val newMemberPartyId = allocateRandomSvParty(newMemberName)
         createSvOnboardingConfirmation(svcRules, sv1, newMemberPartyId, newMemberName)
         createSvOnboardingConfirmation(svcRules, sv2, newMemberPartyId, newMemberName)
@@ -720,7 +731,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           svc.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty)
         ) { case Seq(svOnboardingConfirmed) =>
-          svOnboardingConfirmed.data.svName shouldBe "svX"
+          svOnboardingConfirmed.data.svName shouldBe "Canton-Foundation-X"
         },
     )
   }

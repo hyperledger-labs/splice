@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Loading, PartyId, SvClientProvider } from 'common-frontend';
+import { Loading, SvClientProvider } from 'common-frontend';
 import CopyableTypography from 'common-frontend/lib/components/CopyableTypography';
 import DateDisplay from 'common-frontend/lib/components/DateDisplay';
 import React from 'react';
@@ -8,8 +8,6 @@ import { Button, Stack, Table, TableContainer, TableHead, Typography } from '@mu
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
-
-import { Party } from '@daml/types';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 import { useValidatorOnboardings } from '../hooks/useValidatorOnboardings';
@@ -58,7 +56,6 @@ const ValidatorOnboardingSecrets: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Expires At</TableCell>
-              <TableCell>Sponsor</TableCell>
               <TableCell>Onboarding Secret</TableCell>
             </TableRow>
           </TableHead>
@@ -68,7 +65,6 @@ const ValidatorOnboardingSecrets: React.FC = () => {
                 <OnboardingRow
                   key={onboarding.payload.candidateSecret}
                   expiresAt={onboarding.payload.expiresAt}
-                  sponsor={onboarding.payload.sv}
                   secret={onboarding.payload.candidateSecret}
                 />
               );
@@ -82,18 +78,14 @@ const ValidatorOnboardingSecrets: React.FC = () => {
 
 interface OnboardingRowProps {
   expiresAt: string;
-  sponsor: Party;
   secret: string;
 }
 
-const OnboardingRow: React.FC<OnboardingRowProps> = ({ expiresAt, sponsor, secret }) => {
+const OnboardingRow: React.FC<OnboardingRowProps> = ({ expiresAt, secret }) => {
   return (
     <TableRow className="onboarding-secret-table-row">
       <TableCell>
         <DateDisplay datetime={expiresAt} />
-      </TableCell>
-      <TableCell className="onboarding-secret-table-sponsor">
-        {<PartyId partyId={sponsor} />}
       </TableCell>
       <TableCell>
         <CopyableTypography text={secret} className="onboarding-secret-table-secret" />

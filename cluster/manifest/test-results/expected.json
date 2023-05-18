@@ -593,7 +593,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv1\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"Canton-Foundation-1\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -1027,7 +1027,7 @@
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_NAME",
-                              "value": "sv1"
+                              "value": "Canton-Foundation-1"
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
@@ -1566,7 +1566,7 @@
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_NAME",
-                              "value": "sv2"
+                              "value": "Canton-Foundation-2"
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
@@ -2237,7 +2237,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv2\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"Canton-Foundation-2\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -2409,7 +2409,7 @@
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_NAME",
-                              "value": "sv3"
+                              "value": "Canton-Foundation-3"
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
@@ -3080,7 +3080,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv3\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"Canton-Foundation-3\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -3252,7 +3252,7 @@
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_NAME",
-                              "value": "sv4"
+                              "value": "Canton-Foundation-4"
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_TYPE",
@@ -3923,7 +3923,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"sv4\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"Canton-Foundation-4\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",

@@ -27,6 +27,10 @@ const OpenMiningRounds: React.FC = () => {
     return <p>Error, something went wrong.</p>;
   }
 
+  const sortedRounds = openMiningRoundsQuery.data.sort(
+    (a, b) => parseInt(b.payload.round.number) - parseInt(a.payload.round.number)
+  );
+
   return (
     <>
       <Typography mt={6} variant="h4">
@@ -43,7 +47,7 @@ const OpenMiningRounds: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {openMiningRoundsQuery.data.map(round => {
+            {sortedRounds.map(round => {
               return (
                 <OpenMiningRoundRow
                   key={round.payload.round.number}

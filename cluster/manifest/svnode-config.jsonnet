@@ -5,7 +5,7 @@ local c = import "./cluster.jsonnet";
 local deployments(num, svConfig, config) =
   local namespace = std.format("sv-%d", num);
   local adminApi = std.format("sv%d-api", num);
-  local svName = std.format("sv%d", num);
+  local svName = std.format("Canton-Foundation-%d", num);
   local port = 5014 + 100 * (num - 1);
 
   local participantAdminApi = std.format("sv%d-adm-api", num);

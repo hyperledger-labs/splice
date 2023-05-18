@@ -57,7 +57,7 @@ class SvOnboardingPreflightIntegrationTest
   "run through sv onboarding runbook" taggedAs LiveDevNetTest in { implicit env =>
     // TODO(M3-53) Consider running this test more than once per deployment once we can offboard SVs
     // and/or remove the SVC party from their participants.
-    sv1Client.getSvOnboardingStatus("svTest") match {
+    sv1Client.getSvOnboardingStatus("DA-Test-Node") match {
       case _: SvOnboardingStatus.Completed =>
         println(
           "Ignoring SV onboarding preflight check as we already ran it once in this cluster."
