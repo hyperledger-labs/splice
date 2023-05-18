@@ -138,7 +138,7 @@ const DesiredCoinPrice: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Super Validator</TableCell>
-              <TableCell>Desired CC Price</TableCell>
+              <TableCell>Desired Coin Price</TableCell>
               <TableCell>Last Updated At</TableCell>
             </TableRow>
           </TableHead>

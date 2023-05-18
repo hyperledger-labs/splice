@@ -28,7 +28,7 @@ class SvFrontendIntegrationTest
           },
         )(
           "logged in in the sv ui",
-          _ => find(id("app-title")).value.text should matchText("SV OPERATIONS"),
+          _ => find(id("app-title")).value.text should matchText("SUPER VALIDATOR OPERATIONS"),
         )
       }
     }

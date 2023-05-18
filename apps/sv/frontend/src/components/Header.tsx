@@ -10,7 +10,7 @@ const Header: React.FC = () => {
   const navLinks = [
     { name: 'Information', path: 'svc' },
     { name: 'Validator Onboarding', path: 'validator-onboarding' },
-    { name: 'CC Price', path: 'cc-price' },
+    { name: 'Canton Coin Price', path: 'cc-price' },
   ];
 
   const applyNavStyle = (isActive: boolean) => {
@@ -39,7 +39,7 @@ const Header: React.FC = () => {
         fontWeight={theme => theme.fonts.monospace.fontWeight}
         id="app-title"
       >
-        Sv Operations
+        Super Validator Operations
       </Typography>
       <Stack direction="row" spacing={4} alignItems="center">
         {navLinks.map((navLink, index) => (

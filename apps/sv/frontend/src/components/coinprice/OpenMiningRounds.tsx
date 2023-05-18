@@ -37,7 +37,7 @@ const OpenMiningRounds: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Round</TableCell>
-              <TableCell>CC Price</TableCell>
+              <TableCell>Canton Coin Price</TableCell>
               <TableCell>Opens At</TableCell>
               <TableCell>Target Closes At</TableCell>
             </TableRow>

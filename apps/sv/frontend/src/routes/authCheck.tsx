@@ -43,7 +43,7 @@ const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => 
     return (
       <Login
         loginFailed={!isAuthorized && userId !== undefined}
-        title="SV Operations"
+        title="Super Validator Operations"
         authConfig={authConfig}
         testAuthConfig={testAuthConfig}
       />

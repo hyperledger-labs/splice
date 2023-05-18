@@ -45,13 +45,10 @@ const SvcView: React.FC = () => {
     const svInfos = [createRow('svUser', data.svUser), createRow('svPartyId', data.svPartyId)];
     const membersInfos: { key: string; value: string }[] = [];
     for (var member of cs) {
-      membersInfos.push(createRow(`${member.value} PartyId`, member.key));
+      membersInfos.push(createRow(member.value, member.key));
     }
     const svcInfos = [
-      createRow(
-        `${data.svcRules.payload.members.get(data.svcRules.payload.leader)!.name} svcLeaderPartyId`,
-        data.svcRules.payload.leader.toString()
-      ),
+      createRow('svcLeaderPartyId', data.svcRules.payload.leader.toString()),
       createRow('svcPartyId', data.svcPartyId),
       createRow('coinRulesContractId', data.coinRulesContractId),
       createRow('svcRulesContractId', data.svcRules.contractId),
@@ -77,10 +74,10 @@ const SvcView: React.FC = () => {
     ];
     return (
       <Box>
-        {getInfoTable('Sv Information', svInfos)}
-        {getInfoTable('Svc Members', membersInfos)}
-        {getInfoTable('Svc Information', svcInfos)}
-        {getInfoTable('Svc Configuration', configInfos)}
+        {getInfoTable('Super Validator Information', svInfos)}
+        {getInfoTable('Super Validator Collective Members', membersInfos)}
+        {getInfoTable('Super Validator Collective Information', svcInfos)}
+        {getInfoTable('Super Validator Collective Configuration', configInfos)}
       </Box>
     );
   } else {
