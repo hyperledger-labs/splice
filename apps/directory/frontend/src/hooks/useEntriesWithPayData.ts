@@ -83,24 +83,21 @@ const useEntriesWithSubscriptionContext = (): EntryWithSubscriptionContext[] => 
   const { data: directoryEntries = [] } = useDirectoryEntries();
   const { data: directoryEntriesContexts = [] } = useDirectoryEntryContexts();
 
-  return useMemo(() => {
-    return directoryEntries.map(entry => {
-      const context = directoryEntriesContexts.find(ec => ec.payload.name === entry.payload.name);
-
-      if (context === undefined) {
-        throw new Error(
-          "[useEntriesWithSubscriptionContext]: expected a DirectoryEntryContext for the given DirectoryEntry, but couldn't find one."
-        );
-      }
-
+  return directoryEntries.reduce((acc, entry) => {
+    const context = directoryEntriesContexts.find(dec => dec.payload.name === entry.payload.name);
+    if (context === undefined) {
+      // in case there's a race in which the DirectoryEntry shows up before its DirectoryEntryContext,
+      // do nothing. Once the DEC arrives, this hook will re-render and add it to the result.
+      return acc;
+    } else {
       const subscriptionCtxCid = DirectoryEntryContext.toInterface(
         SubscriptionContext,
         context.contractId
       );
 
-      return { entry, subscriptionCtxCid };
-    });
-  }, [directoryEntries, directoryEntriesContexts]);
+      return [...acc, { entry, subscriptionCtxCid }];
+    }
+  }, [] as EntryWithSubscriptionContext[]);
 };
 
 /**
