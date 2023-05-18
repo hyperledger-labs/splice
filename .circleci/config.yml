@@ -1258,9 +1258,8 @@ jobs:
       <<: *env
     steps:
       - checkout
-      - setup_nix
-      - docker_login_artifactory
       - setup_sbt_test_job
+      - docker_login_artifactory
       - run_bash_command_in_nix:
          cmd_name: Promote images to Artifactory
          additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
