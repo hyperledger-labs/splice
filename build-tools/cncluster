@@ -996,7 +996,6 @@ function subcmd_update_secrets() {
   )
 
   for i in \
-    "cn-app-wallet-ledger-api-auth wallet validator1" \
     "cn-app-validator-ledger-api-auth validator validator1" \
     "cn-app-svc-ledger-api-auth svc svc" \
     "cn-app-sv-ledger-api-auth sv1 sv-1" \
@@ -1010,8 +1009,7 @@ function subcmd_update_secrets() {
     "cn-app-scan-ledger-api-auth scan svc" \
     "cn-app-directory-ledger-api-auth directory svc" \
     "cn-app-splitwell-ledger-api-auth splitwell splitwell" \
-    "cn-app-validator-ledger-api-auth splitwell_validator splitwell" \
-    "cn-app-wallet-ledger-api-auth splitwell_wallet splitwell"
+    "cn-app-validator-ledger-api-auth splitwell_validator splitwell"
   do
     # shellcheck disable=SC2086
     set -- $i
