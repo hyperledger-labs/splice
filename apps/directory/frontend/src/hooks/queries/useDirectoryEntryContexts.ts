@@ -3,24 +3,24 @@ import { Contract } from 'common-frontend';
 
 import { DirectoryEntryContext } from '@daml.js/directory/lib/CN/Directory';
 
-import { useLedgerApiClient } from '../contexts/LedgerApiContext';
+import { useProviderParty, usePrimaryParty } from '..';
+import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
 
-const useDirectoryEntryContexts = (
-  user?: string,
-  provider?: string
-): UseQueryResult<Contract<DirectoryEntryContext>[]> => {
+const useDirectoryEntryContexts = (): UseQueryResult<Contract<DirectoryEntryContext>[]> => {
   const operationName = 'querySubscriptions';
   const ledgerApi = useLedgerApiClient();
+  const { data: primaryPartyId } = usePrimaryParty();
+  const { data: providerPartyId } = useProviderParty();
 
   return useQuery({
     queryKey: [operationName, ledgerApi, DirectoryEntryContext],
     queryFn: async () => {
       const response = await ledgerApi!.query(operationName, DirectoryEntryContext);
       return response
-        .filter(s => s.payload.user === user && s.payload.provider === provider)
+        .filter(s => s.payload.user === primaryPartyId && s.payload.provider === providerPartyId)
         .map(ledgerApi!.toContract);
     },
-    enabled: !!ledgerApi && !!user && !!provider, // wait for dependencies to be defined
+    enabled: !!ledgerApi && !!primaryPartyId && !!providerPartyId, // wait for dependencies to be defined
   });
 };
 

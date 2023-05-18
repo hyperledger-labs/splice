@@ -1,76 +1,30 @@
-import { Loading, useDirectoryClient } from 'common-frontend';
-import React, { useEffect, useState } from 'react';
+import { Loading } from 'common-frontend';
+import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { CloseRounded, DoneRounded } from '@mui/icons-material';
 import { Button, Stack, Typography } from '@mui/material';
 
-import { useDirectoryUiState } from '../contexts/DirectoryContext';
+import { useLookupEntryByName } from '../hooks';
+import { LookupEntryByNameError } from '../hooks/queries/useLookupEntryByName';
 
-type DirectoryStatus =
-  | { type: 'loading' }
-  | { type: 'ready' }
-  | { type: 'error'; error: DirectoryStatusError };
-type DirectoryStatusError =
-  | { type: 'assigned_to_other' }
-  | { type: 'unknown'; errorMessage: string };
 export const PostPayment: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const entryName = searchParams.get('entryName');
+  const entryName = searchParams.get('entryName') || undefined;
 
-  const { lookupEntryByName } = useDirectoryClient();
-  const { primaryPartyId } = useDirectoryUiState();
-  const [directoryStatus, setDirectoryStatus] = useState<DirectoryStatus>({ type: 'loading' });
-  useEffect(() => {
-    let effectCancelled = false;
-    const tryLookup: (retriesDone: number) => void = retriesLeft => {
-      if (entryName && directoryStatus.type === 'loading') {
-        lookupEntryByName(entryName).then(
-          response => {
-            if (effectCancelled) {
-              return;
-            }
-            if (response.payload.user === primaryPartyId) {
-              setDirectoryStatus({ type: 'ready' });
-            } else {
-              setDirectoryStatus({ type: 'error', error: { type: 'assigned_to_other' } });
-            }
-          },
-          err => {
-            if (effectCancelled) {
-              return;
-            }
-            if (retriesLeft === 0) {
-              setDirectoryStatus({
-                type: 'error',
-                error: { type: 'unknown', errorMessage: JSON.stringify(err) },
-              });
-            } else {
-              setTimeout(() => tryLookup(retriesLeft - 1), 1000);
-            }
-          }
-        );
-      }
-    };
-
-    const maxRetries = 10;
-    tryLookup(maxRetries);
-    return () => {
-      effectCancelled = true;
-    };
-  }, [entryName, lookupEntryByName, directoryStatus, primaryPartyId]);
+  const directoryStatus = useLookupEntryByName(entryName);
 
   if (!entryName) {
     console.error('PostPayment rendered without entryName.');
     return <></>;
   }
 
-  switch (directoryStatus.type) {
+  switch (directoryStatus.status) {
     case 'loading':
       return <DirectoryLoading entryName={entryName} />;
     case 'error':
       return <DirectoryFailed entryName={entryName} error={directoryStatus.error} />;
-    case 'ready':
+    case 'success':
       return <DirectoryReady entryName={entryName} />;
   }
 };
@@ -98,7 +52,7 @@ const DirectoryLoading: React.FC<DirectoryProps> = ({ entryName }) => {
   );
 };
 
-const DirectoryFailed: React.FC<DirectoryProps & { error: DirectoryStatusError }> = ({
+const DirectoryFailed: React.FC<DirectoryProps & { error: LookupEntryByNameError }> = ({
   entryName,
   error,
 }) => {
@@ -121,7 +75,7 @@ const DirectoryFailed: React.FC<DirectoryProps & { error: DirectoryStatusError }
             <br />
             Please try again, or search for a different name.
           </Typography>
-          <Typography variant="body2">{error.errorMessage}</Typography>
+          <Typography variant="body2">{error.message}</Typography>
         </Stack>
       );
       break;

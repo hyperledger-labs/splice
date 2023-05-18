@@ -4,12 +4,12 @@ import React, { useState } from 'react';
 import { Stack, Typography } from '@mui/material';
 
 import Searchbar from '../components/Searchbar';
-import { useDirectoryUiState } from '../contexts/DirectoryContext';
+import { useRequestEntry } from '../hooks';
 import { config } from '../utils';
 
 const RequestDirectoryEntry: React.FC = () => {
   const [entryName, setEntryName] = useState<string>('');
-  const { requestEntry } = useDirectoryUiState();
+  const { mutateAsync: requestEntry } = useRequestEntry();
 
   return (
     <Stack justifyContent="center" mt={2} spacing={2}>

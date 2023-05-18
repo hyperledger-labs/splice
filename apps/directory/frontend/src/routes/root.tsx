@@ -1,13 +1,42 @@
 import { ErrorBoundary, PartyId, useUserState } from 'common-frontend';
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 
 import { Box, Button, Toolbar, Typography } from '@mui/material';
 
-import { usePrimaryParty } from '../hooks';
+import { useLedgerApiClient } from '../contexts/LedgerApiContext';
+import {
+  useDirectoryInstall,
+  usePrimaryParty,
+  useProviderParty,
+  useRequestDirectoryInstall,
+} from '../hooks';
 
 const Root: React.FC = () => {
   const { logout } = useUserState();
   const { data: primaryPartyId } = usePrimaryParty(); // TODO(#4139) -- consider handling query loading/error states
+  const { data: directoryInstallContract } = useDirectoryInstall();
+  const { data: providerPartyId } = useProviderParty();
+
+  const ledgerApiClient = useLedgerApiClient();
+  const requestDirectoryInstall = useRequestDirectoryInstall();
+
+  useEffect(() => {
+    if (requestDirectoryInstall.isIdle && primaryPartyId && providerPartyId && ledgerApiClient) {
+      if (directoryInstallContract) {
+        console.debug('DirectoryInstall found');
+      } else {
+        console.debug('DirectoryInstall not found, creating DirectoryInstallRequest');
+        requestDirectoryInstall.mutate({ primaryPartyId, providerPartyId, ledgerApiClient });
+      }
+    }
+  }, [
+    directoryInstallContract,
+    ledgerApiClient,
+    primaryPartyId,
+    providerPartyId,
+    requestDirectoryInstall,
+  ]);
 
   return (
     <ErrorBoundary>

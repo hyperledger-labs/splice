@@ -3,14 +3,14 @@ import { Contract } from 'common-frontend';
 
 import { DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 
-import { useLedgerApiClient } from '../contexts/LedgerApiContext';
+import { useProviderParty, usePrimaryParty } from '..';
+import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
 
-const useDirectoryInstall = (
-  user?: string,
-  provider?: string
-): UseQueryResult<Contract<DirectoryInstall>> => {
+const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall>> => {
   const operationName = 'queryDirectoryInstall';
   const ledgerApi = useLedgerApiClient();
+  const { data: primaryPartyId } = usePrimaryParty();
+  const { data: providerPartyId } = useProviderParty();
 
   return useQuery({
     queryKey: [operationName, ledgerApi, DirectoryInstall],
@@ -18,7 +18,7 @@ const useDirectoryInstall = (
       const result = await ledgerApi!.query(operationName, DirectoryInstall);
       const directoryInstall = result
         .map(ev => ledgerApi!.toContract(ev))
-        .find(c => c.payload.user === user && c.payload.provider === provider);
+        .find(c => c.payload.user === primaryPartyId && c.payload.provider === providerPartyId);
 
       if (directoryInstall) {
         return directoryInstall;
@@ -27,7 +27,7 @@ const useDirectoryInstall = (
         throw new Error('Directory install contract not found');
       }
     },
-    enabled: !!ledgerApi && !!user && !!provider, // wait for dependencies to be defined
+    enabled: !!ledgerApi && !!primaryPartyId && !!providerPartyId, // wait for dependencies to be defined
   });
 };
 

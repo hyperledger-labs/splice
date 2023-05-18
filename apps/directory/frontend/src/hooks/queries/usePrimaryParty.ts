@@ -1,6 +1,6 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
 
-import { useLedgerApiClient } from '../contexts/LedgerApiContext';
+import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
 
 const usePrimaryParty = (): UseQueryResult<string> => {
   const ledgerApi = useLedgerApiClient();

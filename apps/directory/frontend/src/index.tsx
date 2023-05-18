@@ -12,7 +12,6 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
-import { DirectoryUiStateProvider } from './contexts/DirectoryContext';
 import { LedgerApiClientProvider } from './contexts/LedgerApiContext';
 import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
@@ -36,7 +35,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
           <LedgerApiClientProvider jsonApiUrl={config.services.jsonApi.url}>
             <DirectoryClientProvider url={config.services.directory.url}>
-              <DirectoryUiStateProvider>{children}</DirectoryUiStateProvider>
+              {children}
             </DirectoryClientProvider>
           </LedgerApiClientProvider>
         </UserProvider>
