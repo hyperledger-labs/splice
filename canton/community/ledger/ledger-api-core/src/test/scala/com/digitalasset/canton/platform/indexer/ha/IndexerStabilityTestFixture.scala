@@ -13,7 +13,7 @@ import com.daml.metrics.api.dropwizard.DropwizardMetricsFactory
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.ledger.api.health.ReportsHealth
 import com.digitalasset.canton.platform.LedgerApiServer
-import com.digitalasset.canton.platform.configuration.IndexServiceConfig
+import com.digitalasset.canton.platform.configuration.{CommandConfiguration, IndexServiceConfig}
 import com.digitalasset.canton.platform.indexer.{
   IndexerConfig,
   IndexerServiceOwner,
@@ -67,7 +67,7 @@ object IndexerStabilityTestFixture {
       lockIdSeed: Int,
   )(implicit resourceContext: ResourceContext, materializer: Materializer): Resource[Indexers] = {
     val indexerConfig = IndexerConfig(
-      startupMode = IndexerStartupMode.MigrateAndStart(),
+      startupMode = IndexerStartupMode.MigrateAndStart,
       highAvailability = HaConfig(
         indexerLockId = lockIdSeed,
         indexerWorkerLockId = lockIdSeed + 1,
@@ -103,6 +103,7 @@ object IndexerStabilityTestFixture {
           LedgerApiServer
             .createInMemoryStateAndUpdater(
               IndexServiceConfig(),
+              CommandConfiguration.DefaultMaxCommandsInFlight,
               metrics,
               executionContext,
             )

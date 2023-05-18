@@ -103,7 +103,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
     .withReversedTopology(
       Map(submitterParticipant -> Map(party1 -> ParticipantPermission.Submission))
     )
-    .withParticipants(participant) // required such that `participant` gets a signing key
+    .withSimpleParticipants(participant) // required such that `participant` gets a signing key
     .build(loggerFactory)
 
   private val cryptoSnapshot =
@@ -215,6 +215,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
           timestamp = CantonTimestamp.Epoch,
           targetDomain = targetDomain,
         ),
+        TransferCounter.Genesis,
       )
       val uuid = new UUID(1L, 2L)
       val seed = seedGenerator.generateSaltSeed()
@@ -228,12 +229,15 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
           )
         TransferData(
           SourceProtocolVersion(testedProtocolVersion),
-          transferId.requestTimestamp,
+          transferId.transferOutTimestamp,
           RequestCounter(0),
           fullTransferOutTree,
           CantonTimestamp.ofEpochSecond(10),
           contract,
+          TransferCounter.Genesis, // TODO(#12286) test different values.
           transactionId1,
+          None,
+          None,
           None,
         )
       }
@@ -386,6 +390,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
         party1,
         Set(party1),
         contract,
+        TransferCounter.Genesis,
         transactionId1,
         targetDomain,
         targetMediator,
@@ -441,6 +446,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
         party1,
         Set(party1),
         contract,
+        TransferCounter.Genesis,
         transactionId1,
         TargetDomainId(anotherDomain),
         anotherMediator,
@@ -518,6 +524,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
           party1,
           stakeholders = Set(party1, party2),
           contract,
+          TransferCounter.Genesis,
           transactionId1,
           targetDomain,
           targetMediator,
@@ -566,6 +573,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
           party1,
           Set(party1),
           contract,
+          TransferCounter.Genesis,
           transactionId1,
           targetDomain,
           targetMediator,
@@ -679,6 +687,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
       submitter: LfPartyId,
       stakeholders: Set[LfPartyId],
       contract: SerializableContract,
+      transferCounter: TransferCounter,
       creatingTransactionId: TransactionId,
       targetDomain: TargetDomainId,
       targetMediator: MediatorId,
@@ -692,6 +701,7 @@ class TransferInProcessingStepsTest extends AsyncWordSpec with BaseTest {
       submitterInfo(submitter),
       stakeholders,
       contract,
+      transferCounter,
       creatingTransactionId,
       targetDomain,
       targetMediator,

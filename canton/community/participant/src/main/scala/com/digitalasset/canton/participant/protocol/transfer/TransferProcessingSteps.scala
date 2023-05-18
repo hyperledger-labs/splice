@@ -173,7 +173,7 @@ trait TransferProcessingSteps[
       requestId: RequestId,
       malformedPayloads: Seq[MalformedPayload],
   )(implicit traceContext: TraceContext): Seq[MediatorResponse] =
-    // TODO(M40) This will crash the SyncDomain
+    // TODO(i12926) This will crash the SyncDomain
     ErrorUtil.internalError(
       new UnsupportedOperationException(
         s"Received a transfer out/in request with id $requestId with all payloads being malformed. Crashing..."
@@ -432,15 +432,6 @@ object TransferProcessingSteps {
     }
   }
 
-  final case class SubmittingPartyMustBeStakeholderOut(
-      contractId: LfContractId,
-      submittingParty: LfPartyId,
-      stakeholders: Set[LfPartyId],
-  ) extends TransferProcessorError {
-    override def message: String =
-      s"Cannot transfer-out contract `$contractId`: submitter `$submittingParty` is not a stakeholder"
-  }
-
   final case class SubmittingPartyMustBeStakeholderIn(
       transferId: TransferId,
       submittingParty: LfPartyId,
@@ -482,11 +473,6 @@ object TransferProcessingSteps {
   final case class FailedToCreateResponse(transferId: TransferId, error: InvalidMediatorResponse)
       extends TransferProcessorError {
     override def message: String = s"Cannot transfer `$transferId`: failed to create response"
-  }
-
-  final case class CausalityInformationMissing(transferId: TransferId, missingFor: Set[LfPartyId])
-      extends TransferProcessorError {
-    override def message: String = s"Cannot transfer `$transferId`: causility information missing"
   }
 
   final case class IncompatibleProtocolVersions(

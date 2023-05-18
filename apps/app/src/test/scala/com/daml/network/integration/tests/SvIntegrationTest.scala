@@ -27,7 +27,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
 import com.daml.network.sv.util.SvOnboardingToken
-import com.daml.network.util.SvTestUtil
+import com.daml.network.util.{Codec, SvTestUtil}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
@@ -937,8 +937,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       .listCoinPriceVotes()
       .groupBy(_.payload.sv)
       .flatMap { case (sv, contracts) =>
-        PartyId
-          .fromProtoPrimitive(sv)
+        Codec
+          .decode(Codec.Party)(sv)
           .map(p =>
             p -> contracts.map(
               _.payload.coinPrice.toScala.map(BigDecimal(_))

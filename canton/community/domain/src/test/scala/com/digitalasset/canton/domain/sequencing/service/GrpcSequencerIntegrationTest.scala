@@ -90,7 +90,10 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
   private val domainId = DefaultTestIdentities.domainId
   private val sequencerId = DefaultTestIdentities.sequencerId
   private val cryptoApi =
-    TestingTopology().withParticipants(participant).build().forOwnerAndDomain(participant, domainId)
+    TestingTopology()
+      .withSimpleParticipants(participant)
+      .build()
+      .forOwnerAndDomain(participant, domainId)
   private val clock = new SimClock(loggerFactory = loggerFactory)
   private val sequencerSubscriptionFactory = mock[DirectSequencerSubscriptionFactory]
   def timeouts = DefaultProcessingTimeouts.testing
@@ -164,10 +167,12 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
       params,
       None,
       BaseTest.testedProtocolVersion,
+      enableMediatorUnauthenticatedMessages = false,
     )
   private val connectService = new GrpcSequencerConnectService(
     domainId = domainId,
     sequencerId = sequencerId,
+    mediatorsProcessParticipantTopologyRequests = false,
     staticDomainParameters = BaseTest.defaultStaticDomainParameters,
     cryptoApi = cryptoApi,
     agreementManager = None,

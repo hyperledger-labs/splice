@@ -94,7 +94,7 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
         .submitTransferAndWaitNoDedup(
           alice,
           TransferCommand.In(
-            transferOutId = toApiTransferId(outId.requestTimestamp.toLf),
+            transferOutId = toApiTransferId(outId.transferOutTimestamp.toLf),
             source = globalDomainId,
             target = splitwellDomainId,
           ),
@@ -105,7 +105,7 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
         .submitTransferAndWaitNoDedup(
           alice,
           TransferCommand.In(
-            transferOutId = toApiTransferId(outId.requestTimestamp.toLf),
+            transferOutId = toApiTransferId(outId.transferOutTimestamp.toLf),
             source = globalDomainId,
             target = splitwellDomainId,
           ),

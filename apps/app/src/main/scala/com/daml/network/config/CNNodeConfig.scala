@@ -100,6 +100,7 @@ case class CNNodeConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
+        dbMigrateAndStart = false,
       )
     }
 
@@ -147,6 +148,7 @@ case class CNNodeConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
+        dbMigrateAndStart = false,
       )
     }
 
@@ -185,6 +187,7 @@ case class CNNodeConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
+        dbMigrateAndStart = false,
       )
     }
 
@@ -229,6 +232,7 @@ case class CNNodeConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
+        dbMigrateAndStart = false,
       )
     }
 
@@ -273,6 +277,7 @@ case class CNNodeConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
+        dbMigrateAndStart = false,
       )
     }
 
@@ -317,6 +322,7 @@ case class CNNodeConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
+        dbMigrateAndStart = false,
       )
     }
 

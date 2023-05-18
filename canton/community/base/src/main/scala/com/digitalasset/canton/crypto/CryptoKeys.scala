@@ -70,8 +70,10 @@ object Fingerprint {
       .flatMap(String68.fromProtoPrimitive(_, "Fingerprint"))
       .map(Fingerprint(_))
 
-  private[crypto] def create(bytes: ByteString, hashAlgorithm: HashAlgorithm): Fingerprint = {
-    val hash = Hash.digest(HashPurpose.PublicKeyFingerprint, bytes, hashAlgorithm)
+  private[crypto] def create(
+      bytes: ByteString
+  ): Fingerprint = {
+    val hash = Hash.digest(HashPurpose.PublicKeyFingerprint, bytes, HashAlgorithm.Sha256)
     new Fingerprint(hash.toLengthLimitedHexString)
   }
 

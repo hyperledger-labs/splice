@@ -195,8 +195,8 @@ object HttpSvAppClient {
             )
           ) =>
         for {
-          svPartyId <- PartyId.fromProtoPrimitive(svPartyId)
-          svcPartyId <- PartyId.fromProtoPrimitive(svcPartyId)
+          svPartyId <- Codec.decode(Codec.Party)(svPartyId)
+          svcPartyId <- Codec.decode(Codec.Party)(svcPartyId)
           svcRules <- Contract.fromJson(SvcRules.COMPANION)(svcRules).left.map(_.toString)
         } yield SvcInfo(
           svUser,

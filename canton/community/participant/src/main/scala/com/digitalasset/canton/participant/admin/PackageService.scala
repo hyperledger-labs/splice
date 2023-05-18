@@ -8,17 +8,19 @@ import cats.syntax.either.*
 import cats.syntax.functorFilter.*
 import cats.syntax.parallel.*
 import com.daml.daml_lf_dev.DamlLf
-import com.daml.error.definitions.{DamlError, PackageServiceError}
+import com.daml.error.DamlError
 import com.daml.lf.archive
 import com.daml.lf.archive.{DarParser, Decode, Error as LfArchiveError}
 import com.daml.lf.data.Ref.PackageId
 import com.daml.lf.engine.Engine
 import com.daml.lf.language.Ast.Package
+import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.LedgerSubmissionId
 import com.digitalasset.canton.config.CantonRequireTypes.LengthLimitedString.DarName
 import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.{Hash, HashOps, HashPurpose}
+import com.digitalasset.canton.ledger.error.PackageServiceError
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.CantonPackageServiceError.PackageRemovalErrorCode
@@ -29,17 +31,18 @@ import com.digitalasset.canton.participant.admin.CantonPackageServiceError.Packa
   PackageRemovalError,
 }
 import com.digitalasset.canton.participant.admin.PackageService.*
+import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.participant.store.DamlPackageStore
 import com.digitalasset.canton.participant.store.DamlPackageStore.readPackageId
 import com.digitalasset.canton.participant.sync.{LedgerSyncEvent, ParticipantEventPublisher}
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManagerOps
+import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
 import com.digitalasset.canton.protocol.{PackageDescription, PackageInfoService}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.PathUtils
 import com.github.blemale.scaffeine.Scaffeine
 import com.google.protobuf.ByteString
-import io.functionmeta.functionFullName
 import slick.jdbc.GetResult
 
 import java.io.*
@@ -70,6 +73,7 @@ class PackageService(
     hashOps: HashOps,
     vettingHandle: ParticipantTopologyManagerOps,
     inspectionOps: PackageInspectionOps,
+    metrics: ParticipantMetrics,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -77,6 +81,8 @@ class PackageService(
     with PackageInfoService
     with NamedLogging
     with FlagCloseable {
+
+  private val packageLoader = new DeduplicatingPackageLoader()
 
   def getLfArchive(packageId: PackageId)(implicit
       traceContext: TraceContext
@@ -96,7 +102,11 @@ class PackageService(
   def getPackage(packageId: PackageId)(implicit
       traceContext: TraceContext
   ): Future[Option[Package]] =
-    getLfArchive(packageId).map(_.map(Decode.assertDecodeArchive(_)._2))
+    packageLoader.loadPackage(
+      packageId,
+      getLfArchive,
+      metrics.ledgerApiServer.daml.execution.getLfPackage,
+    )
 
   private def neededForAdminWorkflow(
       packageId: PackageId

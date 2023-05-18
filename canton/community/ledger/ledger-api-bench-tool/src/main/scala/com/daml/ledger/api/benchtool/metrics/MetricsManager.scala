@@ -3,12 +3,13 @@
 
 package com.daml.ledger.api.benchtool.metrics
 
-import akka.actor.{Cancellable, CoordinatedShutdown}
 import akka.actor.typed.scaladsl.AskPattern.*
 import akka.actor.typed.{ActorRef, ActorSystem, Props, SpawnProtocol}
+import akka.actor.{Cancellable, CoordinatedShutdown}
 import akka.util.Timeout
 import com.daml.ledger.api.benchtool.metrics.MetricsCollector.Response
 import com.daml.ledger.api.benchtool.util.ReportFormatter
+import com.digitalasset.canton.DiscardOps
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.*
@@ -31,7 +32,7 @@ final case class MetricsManagerImpl[T](
 
   def result(): Future[BenchmarkResult] = {
     logger.debug(s"Requesting result of stream: $observedMetric")
-    periodicRequest.cancel()
+    periodicRequest.cancel().discard
     implicit val timeout: Timeout = Timeout(3.seconds)
     collector
       .ask(MetricsCollector.Message.FinalReportRequest)
@@ -71,6 +72,7 @@ final case class MetricsManagerImpl[T](
               )
             )
         }(system.executionContext)
+        .discard
       ()
     })(system.executionContext)
 

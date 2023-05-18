@@ -21,7 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable
 import com.digitalasset.canton.util.retry.Success
-import com.digitalasset.canton.util.{EitherTUtil, SimpleExecutionQueueWithShutdown, retry}
+import com.digitalasset.canton.util.{EitherTUtil, SimpleExecutionQueue, retry}
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.duration.DurationInt
@@ -84,28 +84,30 @@ abstract class BootstrapStage[T <: CantonNode, StageResult <: BootstrapStageOrLe
     */
   protected def attemptAndStore()(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Option[StageResult]] = bootstrap.queue.executeEUS(
-    stageResult.get() match {
-      case Some(previous) => EitherT.rightT(Some(previous))
-      case None =>
-        EitherT(
-          performUnlessClosingUSF(description)(
-            (for {
-              result <- attempt()
-                .leftMap { err =>
-                  logger.error(s"Startup of ${description} failed with $err")
-                  bootstrap.abortThisNodeOnStartupFailure()
-                  err
-                }
-            } yield {
-              stageResult.set(result)
-              result
-            }).value
+  ): EitherT[FutureUnlessShutdown, String, Option[StageResult]] = {
+    bootstrap.queue.executeEUS(
+      stageResult.get() match {
+        case Some(previous) => EitherT.rightT(Some(previous))
+        case None =>
+          EitherT(
+            performUnlessClosingUSF(description)(
+              (for {
+                result <- attempt()
+                  .leftMap { err =>
+                    logger.error(s"Startup of ${description} failed with $err")
+                    bootstrap.abortThisNodeOnStartupFailure()
+                    err
+                  }
+              } yield {
+                stageResult.set(result)
+                result
+              }).value
+            )
           )
-        )
-    },
-    description,
-  )
+      },
+      description,
+    )
+  }
 
   /** iterative start handler which will attempt to start the stages until
     * we are either up and running or awaiting some init action by the user
@@ -234,11 +236,16 @@ abstract class BootstrapStageWithStorage[
     * if this stage does not support auto-init, you must return None
     * the method may throw "PassiveInstanceException" if it becomes passive
     */
-  protected def autoCompleteStage(): EitherT[Future, String, Option[M]]
+  protected def autoCompleteStage(): EitherT[FutureUnlessShutdown, String, Option[M]]
 
   /** if external input is necessary */
   protected def completeWithExternal(
       storeAndPassResult: => EitherT[Future, String, M]
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
+    completeWithExternalUS(storeAndPassResult.mapK(FutureUnlessShutdown.outcomeK))
+
+  protected def completeWithExternalUS(
+      storeAndPassResult: => EitherT[FutureUnlessShutdown, String, M]
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] =
     bootstrap.queue
       .executeEUS(
@@ -256,7 +263,7 @@ abstract class BootstrapStageWithStorage[
                 s"Node is already initialised with ${current}",
               )
               _ <- EitherT.cond[FutureUnlessShutdown](storage.isActive, (), "Node is passive")
-              item <- performUnlessClosingEitherU(s"complete-grab-result-$description")(
+              item <- performUnlessClosingEitherUSF(s"complete-grab-result-$description")(
                 storeAndPassResult
               ): EitherT[FutureUnlessShutdown, String, M]
               stage <- EitherT.right(
@@ -282,12 +289,12 @@ abstract class BootstrapStageWithStorage[
   final override def attempt()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Option[StageResult]] =
-    performUnlessClosingEitherU(description) {
+    performUnlessClosingEitherUSF(description) {
       for {
-        result <- EitherT.right(stageCompleted)
+        result <- EitherT.right(stageCompleted).mapK(FutureUnlessShutdown.outcomeK)
         stageO <- result match {
           case Some(result) =>
-            EitherT.rightT[Future, String](Some(buildNextStage(result)))
+            EitherT.rightT[FutureUnlessShutdown, String](Some(buildNextStage(result)))
           case None =>
             // if stage is not completed, but we can auto-init this stage, proceed
             val isActive = storage.isActive
@@ -307,12 +314,12 @@ abstract class BootstrapStageWithStorage[
                     logger.info(s"Stage ${description} failed as node became passive")
                     // if we became passive during auto-complete stage, we complete the
                     // start procedure and move the waiting to the back
-                    Right(None)
+                    UnlessShutdown.Outcome(Right(None))
                   }
               ).map(_.map(buildNextStage))
             } else {
               // otherwise, finish the startup here and wait for an external trigger
-              EitherT.rightT[Future, String](None)
+              EitherT.rightT[FutureUnlessShutdown, String](None)
             }
         }
       } yield stageO
@@ -336,7 +343,7 @@ object BootstrapStage {
     def loggerFactory: NamedLoggerFactory
     def timeouts: ProcessingTimeout
     def abortThisNodeOnStartupFailure(): Unit
-    def queue: SimpleExecutionQueueWithShutdown
+    def queue: SimpleExecutionQueue
     def ec: ExecutionContext
   }
 

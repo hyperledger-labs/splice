@@ -6,16 +6,12 @@ package com.digitalasset.canton.topology
 import cats.data.EitherT
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  FutureUnlessShutdown,
-  SyncCloseable,
-}
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
@@ -46,13 +42,20 @@ class TopologyManagerX(
     val store: TopologyStoreX[AuthorizedStore],
     val timeouts: ProcessingTimeout,
     protocolVersion: ProtocolVersion,
+    futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging
-    with FlagCloseableAsync {
+    with FlagCloseable {
 
   // sequential queue to run all the processing that does operate on the state
-  protected val sequentialQueue = new SimpleExecutionQueue()
+  protected val sequentialQueue = new SimpleExecutionQueue(
+    "topology-manager-x-queue",
+    futureSupervisor,
+    timeouts,
+    loggerFactory,
+  )
+
   private val processor = new TopologyStateProcessorX(store, loggerFactory)
 
   def queueSize: Int = sequentialQueue.queueSize
@@ -81,11 +84,12 @@ class TopologyManagerX(
       force: Boolean = false,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TopologyManagerError, GenericSignedTopologyTransactionX] = {
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, GenericSignedTopologyTransactionX] = {
     logger.debug(show"Attempting to build, sign, and ${op} ${mapping}")
     for {
-      tx <- build(op, mapping, serial = serial, protocolVersion)
+      tx <- build(op, mapping, serial, protocolVersion).mapK(FutureUnlessShutdown.outcomeK)
       signedTx <- signTransaction(tx, signingKeys, isProposal = !expectFullAuthorization)
+        .mapK(FutureUnlessShutdown.outcomeK)
       _ <- add(Seq(signedTx), force = force, expectFullAuthorization)
     } yield signedTx
   }
@@ -108,19 +112,23 @@ class TopologyManagerX(
       expectFullAuthorization: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TopologyManagerError, GenericSignedTopologyTransactionX] = {
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, GenericSignedTopologyTransactionX] = {
     // TODO(#11255): check that there is an existing topology transaction with the hash of the unique key
     for {
-      proposals <- EitherT.right[TopologyManagerError](
-        store.findProposalsByTxHash(EffectiveTime(clock.now), Seq(transactionHash))
-      )
+      proposals <- EitherT
+        .right[TopologyManagerError](
+          store.findProposalsByTxHash(EffectiveTime(clock.now), NonEmpty(Set, transactionHash))
+        )
+        .mapK(FutureUnlessShutdown.outcomeK)
       existingTransaction =
         (proposals match {
           case Seq() => ??? // TODO(#11255) proper error
           case Seq(tx) => tx
           case _otherwise => ??? // TODO(#11255) proper error
         })
-      extendedTransaction <- extendSignature(existingTransaction, signingKeys)
+      extendedTransaction <- extendSignature(existingTransaction, signingKeys).mapK(
+        FutureUnlessShutdown.outcomeK
+      )
       _ <- add(
         Seq(extendedTransaction),
         force = force,
@@ -136,16 +144,55 @@ class TopologyManagerX(
       mapping: M,
       serial: Option[PositiveInt],
       protocolVersion: ProtocolVersion,
+  )(implicit
+      traceContext: TraceContext
   ): EitherT[Future, TopologyManagerError, TopologyTransactionX[Op, M]] = {
     for {
-      // find serial number
-      theSerial <- (serial match {
-        case Some(value) =>
-          // TODO(#11255) check for the latest topology transaction for the uniqueness key: serial = previousSerial + 1
-          EitherT.rightT(value)
-        case None =>
-          // TODO(#11255) get next serial for mapping
-          EitherT.rightT(PositiveInt.one)
+      existingTransactions <- EitherT.right(
+        store.findTransactionsForMapping(EffectiveTime(clock.now), NonEmpty(Set, mapping.uniqueKey))
+      )
+      _ = if (existingTransactions.size > 1)
+        logger.warn(
+          s"found more than one valid mapping for unique key ${mapping.uniqueKey} of type ${mapping.code}"
+        )
+      existingMapping = existingTransactions
+        .sortBy(_.transaction.serial)
+        .lastOption
+        .map(t => (t.transaction.mapping, t.transaction.serial))
+
+      theSerial <- ((existingMapping, serial) match {
+        case (None, proposedO) =>
+          // didn't find an existing transaction, therefore the proposed serial must be 1
+          EitherT.cond[Future][TopologyManagerError, PositiveInt](
+            proposedO.forall(_ == PositiveInt.one),
+            PositiveInt.one,
+            TopologyManagerError.InternalError.Other(
+              "TODO(#11255) use proper error code: the first mapping must have serial 1"
+            ),
+          )
+
+        case (Some((`mapping`, existingSerial)), proposedO) =>
+          // TODO(#11255) existing mapping and the proposed mapping are the same. does this only add a (superfluous) signature?
+          //              maybe we should reject this proposal, but for now we need this to pass through successfully, because we don't
+          //              support proper topology transaction validation yet, especially not for multi-sig transactions.
+          EitherT.cond[Future](
+            proposedO.forall(existingSerial == _),
+            existingSerial,
+            TopologyManagerError.InternalError.Other(
+              s"TODO(#11255) use proper error code: proposed serial $proposedO should match the identical existing serial $existingSerial for adding (superfluous) signatures"
+            ),
+          )
+
+        case (Some((_, existingSerial)), proposedO) =>
+          // check that the proposed serial matches existing+1 or auto-select existing+1
+          val next = existingSerial + PositiveInt.one
+          EitherT.cond[Future](
+            proposedO.forall(_ == next),
+            next,
+            TopologyManagerError.InternalError.Other(
+              s"TODO(#11255) use proper error code: proposed serial $proposedO doesn't immediately follow the existing serial $existingSerial"
+            ),
+          )
       }): EitherT[Future, TopologyManagerError, PositiveInt]
     } yield TopologyTransactionX(op, theSerial, mapping, protocolVersion)
   }
@@ -165,7 +212,11 @@ class TopologyManagerX(
           EitherT.pure(NonEmpty.mk(Set, first, rest: _*))
         case _empty =>
           // TODO(#11255) get signing keys for transaction.
-          EitherT.leftT(TopologyManagerError.InternalError.ImplementMe())
+          EitherT.leftT(
+            TopologyManagerError.InternalError.ImplementMe(
+              "Automatic signing key lookup not yet implemented. Please specify a signing explicitly."
+            )
+          )
       }): EitherT[Future, TopologyManagerError, NonEmpty[Set[Fingerprint]]]
       // create signed transaction
       signed <- SignedTopologyTransactionX
@@ -200,12 +251,18 @@ class TopologyManagerX(
           EitherT.rightT(keys.toSet)
         case _ =>
           // TODO(#11255) fetch signing keys that are relevant for the required authorization for this transaction
-          EitherT.leftT(TopologyManagerError.InternalError.ImplementMe())
+          EitherT.leftT(
+            TopologyManagerError.InternalError.ImplementMe(
+              "Automatic signing key lookup not yet implemented. Please specify a signing explicitly."
+            )
+          )
       }): EitherT[Future, TopologyManagerError, Set[Fingerprint]]
       signatures <- keys.toSeq.parTraverse(
         crypto.privateCrypto
           .sign(transaction.transaction.hash.hash, _)
-          .leftMap(err => TopologyManagerError.InternalError.ImplementMe(): TopologyManagerError)
+          .leftMap(err =>
+            TopologyManagerError.InternalError.TopologySigningError(err): TopologyManagerError
+          )
       )
     } yield transaction.addSignatures(signatures)
   }
@@ -219,7 +276,9 @@ class TopologyManagerX(
       force: Boolean,
       expectFullAuthorization: Boolean,
       abortOnError: Boolean = true,
-  )(implicit traceContext: TraceContext): EitherT[Future, TopologyManagerError, Unit] =
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TopologyManagerError, Unit] =
     sequentialQueue.executeE(
       {
         val ts = clock.uniqueTime()
@@ -257,15 +316,6 @@ class TopologyManagerX(
     )
     .map(_ => ())
 
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-    import TraceContext.Implicits.Empty.*
-    Seq(
-      SyncCloseable("topology-manager-store", store.close()),
-      sequentialQueue.asCloseable(
-        "topology-manager-sequential-queue",
-        timeouts.shutdownProcessing.unwrap,
-      ),
-    )
-  }
+  override protected def onClosed(): Unit = Lifecycle.close(store, sequentialQueue)(logger)
 
 }

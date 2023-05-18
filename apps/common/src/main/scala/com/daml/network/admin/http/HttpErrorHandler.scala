@@ -17,7 +17,7 @@ import akka.http.scaladsl.server.Directives.{
   withRequestTimeoutResponse,
 }
 import akka.util.ByteString
-import com.daml.error.definitions.groups.CommandExecution.Interpreter
+import com.digitalasset.canton.ledger.error.groups.CommandExecution.Interpreter
 import com.daml.network.http.v0.definitions as d0
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}

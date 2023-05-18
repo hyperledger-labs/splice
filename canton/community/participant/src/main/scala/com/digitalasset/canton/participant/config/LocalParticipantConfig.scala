@@ -215,7 +215,6 @@ final case class RemoteParticipantConfig(
   * @param maxContractKeyStateCacheSize    maximum caffeine cache size of mutable state cache of contract keys
   * @param maxInboundMessageSize maximum inbound message size on the ledger api
   * @param databaseConnectionTimeout database connection timeout
-  * @param enableInMemoryFanOutForLedgerApi enable the "in-memory fan-out" performance optimization (default false; not tested for production yet)
   * @param maxTransactionsInMemoryFanOutBufferSize maximum number of transactions to hold in the "in-memory fanout" (if enabled)
   * @param additionalMigrationPaths Optional extra paths for the database migrations
   * @param inMemoryStateUpdaterParallelism The processing parallelism of the Ledger API server in-memory state updater
@@ -259,7 +258,6 @@ final case class LedgerApiServerConfig(
       LedgerApiServerConfig.DefaultApiStreamShutdownTimeout,
     maxTransactionsInMemoryFanOutBufferSize: Int =
       LedgerApiServerConfig.DefaultMaxTransactionsInMemoryFanOutBufferSize,
-    enableInMemoryFanOutForLedgerApi: Boolean = false, // Not tested for production yet
     additionalMigrationPaths: Seq[String] = Seq.empty,
     inMemoryStateUpdaterParallelism: Int =
       LedgerApiServerConfig.DefaultInMemoryStateUpdaterParallelism,
@@ -635,24 +633,21 @@ final case class TreeTransactionStreamsConfig(
 
 /** Ledger api command service specific configurations
   *
-  * @param trackerRetentionPeriod maximum command tracking duration
-  * @param inputBufferSize        maximum number of commands queued for submission for each distinct set of parties
-  * @param maxCommandsInFlight    maximum number of submitted commands waiting to be completed for each distinct set of parties
+  * @param maxTrackingTimeout maximum command tracking duration
+  * @param maxCommandsInFlight    maximum number of submitted commands waiting to be completed
   */
 final case class CommandServiceConfig(
-    trackerRetentionPeriod: NonNegativeFiniteDuration = NonNegativeFiniteDuration(
-      CommandConfiguration.Default.trackerRetentionPeriod
+    maxTrackingTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration(
+      CommandConfiguration.Default.maxTrackingTimeout
     ),
-    inputBufferSize: Int = CommandConfiguration.Default.inputBufferSize,
     maxCommandsInFlight: Int = CommandConfiguration.Default.maxCommandsInFlight,
 ) {
   // This helps us detect if any CommandService configuration are added in the daml repo.
   private def _completenessCheck(config: CommandConfiguration): CommandServiceConfig =
     config match {
-      case CommandConfiguration(inputBufferSize, maxCommandsInFlight, trackerRetentionPeriod) =>
+      case CommandConfiguration(maxTrackingTimeout, maxCommandsInFlight) =>
         CommandServiceConfig(
-          trackerRetentionPeriod = NonNegativeFiniteDuration(trackerRetentionPeriod),
-          inputBufferSize = inputBufferSize,
+          maxTrackingTimeout = NonNegativeFiniteDuration(maxTrackingTimeout),
           maxCommandsInFlight = maxCommandsInFlight,
         )
     }
@@ -668,8 +663,8 @@ object CommandServiceConfig {
       .into[CommandServiceConfig]
       .disableDefaultValues
       .withFieldComputed(
-        _.trackerRetentionPeriod,
-        c => NonNegativeFiniteDuration(c.trackerRetentionPeriod),
+        _.maxTrackingTimeout,
+        c => NonNegativeFiniteDuration(c.maxTrackingTimeout),
       )
       .transform
   }
@@ -812,7 +807,7 @@ final case class IndexerConfig(
   ): DamlIndexerConfig = this
     .into[DamlIndexerConfig]
     .disableDefaultValues
-    .withFieldConst(_.startupMode, IndexerStartupMode.MigrateAndStart(false))
+    .withFieldConst(_.startupMode, IndexerStartupMode.MigrateAndStart)
     .withFieldConst(
       _.highAvailability,
       indexerLockIds.fold(HaConfig()) { case IndexerLockIds(mainLockId, workerLockId) =>
@@ -854,7 +849,7 @@ object IndexerConfig {
 
     val (schemaMigrationAttempts, schemaMigrationAttemptBackoff) = (startupMode match {
       case IndexerStartupMode.ValidateAndStart => None
-      case IndexerStartupMode.MigrateAndStart(_) => None
+      case IndexerStartupMode.MigrateAndStart => None
       case IndexerStartupMode.ValidateAndWaitOnly(
             schemaMigrationAttempts,
             schemaMigrationAttemptBackoff,

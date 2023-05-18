@@ -6,8 +6,6 @@ package com.digitalasset.canton.platform.index
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.daml_lf_dev.DamlLf
-import com.daml.error.DamlContextualizedErrorLogger
-import com.daml.error.definitions.{CommonErrors, LedgerApiErrors}
 import com.daml.ledger.api.v1.active_contracts_service.GetActiveContractsResponse
 import com.daml.ledger.api.v1.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v1.event_query_service.{
@@ -42,6 +40,11 @@ import com.digitalasset.canton.ledger.api.domain.{
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.api.{TraceIdentifiers, domain}
 import com.digitalasset.canton.ledger.configuration.Configuration
+import com.digitalasset.canton.ledger.error.{
+  CommonErrors,
+  DamlContextualizedErrorLogger,
+  LedgerApiErrors,
+}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.index.v2
 import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.ReportData
@@ -369,6 +372,8 @@ private[index] class IndexServiceImpl(
     * to subscribe to further configuration changes.
     * The offset is internal and not exposed over Ledger API.
     */
+  // TODO(#13019) Replace parasitic with DirectExecutionContext
+  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   override def lookupConfiguration()(implicit
       loggingContext: LoggingContext
   ): Future[Option[(LedgerOffset.Absolute, Configuration)]] =
@@ -515,6 +520,8 @@ private[index] class IndexServiceImpl(
   ): Future[MaximumLedgerTime] =
     maximumLedgerTimeService.lookupMaximumLedgerTimeAfterInterpretation(ids)
 
+  // TODO(#13019) Replace parasitic with DirectExecutionContext
+  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   override def latestPrunedOffsets()(implicit
       loggingContext: LoggingContext
   ): Future[(LedgerOffset.Absolute, LedgerOffset.Absolute)] =

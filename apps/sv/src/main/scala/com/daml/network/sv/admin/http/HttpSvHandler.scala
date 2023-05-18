@@ -60,7 +60,7 @@ class HttpSvHandler(
       body: definitions.OnboardValidatorRequest
   )(fake: Unit): Future[v0.SvResource.OnboardValidatorResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      PartyId.fromProtoPrimitive(body.partyId) match {
+      Codec.decode(Codec.Party)(body.partyId) match {
         case Right(partyId) =>
           svStore.lookupValidatorOnboardingBySecret(body.secret).flatMap {
             case None =>
@@ -126,7 +126,7 @@ class HttpSvHandler(
       respond: v0.SvResource.GetSvOnboardingStatusResponse.type
   )(svPartyOrName: String)(fake: Unit): Future[SvResource.GetSvOnboardingStatusResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      PartyId.fromProtoPrimitive(svPartyOrName) match {
+      Codec.decode(Codec.Party)(svPartyOrName) match {
         case Left(error) =>
           for {
             svcRules <- svcStore.getSvcRules()

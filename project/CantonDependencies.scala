@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.7.0-snapshot.20230424.11710.0.2f27f987"
+  val version: String = "2.7.0-snapshot.20230515.11783.0.36293a4e"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
@@ -100,6 +100,7 @@ object CantonDependencies {
   lazy val daml_script_runner = "com.daml" %% "daml-script-runner" % daml_libraries_version
   lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
+  lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
   lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
   lazy val daml_jwt = "com.daml" %% "jwt" % daml_libraries_version
   lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
@@ -108,6 +109,10 @@ object CantonDependencies {
   lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
   lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
   lazy val daml_rs_grpc_akka = "com.daml" %% "rs-grpc-akka" % daml_libraries_version
+  lazy val daml_rs_grpc_testing_utils =
+    "com.daml" %% "rs-grpc-testing-utils" % daml_libraries_version
+  lazy val daml_test_common = "com.daml" %% "test-common-1.15" % daml_libraries_version
+  lazy val daml_testing_utils = "com.daml" %% "testing-utils" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =
     "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
@@ -281,4 +286,9 @@ object CantonDependencies {
   lazy val scalaz_scalacheck =
     "org.scalaz" %% "scalaz-scalacheck-binding" % "7.2.33-scalacheck-1.15"
   lazy val scalapb_json4s = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
+
+  lazy val google_common_protos =
+    "com.google.api.grpc" % "proto-google-common-protos" % "2.0.1"
+  lazy val google_protobuf_java = "com.google.protobuf" % "protobuf-java" % "3.19.6"
+  lazy val google_protobuf_java_util = "com.google.protobuf" % "protobuf-java-util" % "3.19.6"
 }

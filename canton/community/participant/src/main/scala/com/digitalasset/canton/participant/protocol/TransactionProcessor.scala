@@ -4,7 +4,6 @@
 package com.digitalasset.canton.participant.protocol
 
 import cats.data.{EitherT, NonEmptyChain}
-import com.daml.error.definitions.LedgerApiErrors
 import com.daml.error.{ContextualizedErrorLogger, ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -14,6 +13,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.SubmissionErrorGroup
 import com.digitalasset.canton.error.*
+import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.ledger.participant.state.v2.{
   ChangeId,
   SubmitterInfo,
@@ -34,6 +34,7 @@ import com.digitalasset.canton.participant.protocol.submission.{
 }
 import com.digitalasset.canton.participant.protocol.validation.{
   ConfirmationResponseFactory,
+  InternalConsistencyChecker,
   ModelConformanceChecker,
 }
 import com.digitalasset.canton.participant.store.{DuplicateContract, SyncDomainEphemeralState}
@@ -96,6 +97,11 @@ class TransactionProcessor(
         new SerializableContractAuthenticatorImpl(new UnicumGenerator(crypto.pureCrypto)),
         new AuthenticationValidator(),
         new AuthorizationValidator(participantId),
+        new InternalConsistencyChecker(
+          staticDomainParameters.uniqueContractKeys,
+          staticDomainParameters.protocolVersion,
+          loggerFactory,
+        ),
         loggerFactory,
         futureSupervisor,
       ),

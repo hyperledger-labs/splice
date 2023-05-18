@@ -5,7 +5,7 @@ import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.validator as http
-import com.daml.network.util.TemplateJsonDecoder
+import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -45,7 +45,7 @@ object HttpValidatorAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.GetValidatorUserInfoResponse.OK(response) =>
-      PartyId.fromProtoPrimitive(response.partyId).map(pid => UserInfo(pid, response.userName))
+      Codec.decode(Codec.Party)(response.partyId).map(pid => UserInfo(pid, response.userName))
     }
   }
   case object Register extends BaseCommand[http.RegisterResponse, PartyId] {
@@ -59,7 +59,7 @@ object HttpValidatorAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.RegisterResponse.OK(response) =>
-      PartyId.fromProtoPrimitive(response.partyId)
+      Codec.decode(Codec.Party)(response.partyId)
     }
   }
 }

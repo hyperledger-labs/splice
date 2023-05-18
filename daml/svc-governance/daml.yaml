@@ -1,4 +1,4 @@
-sdk-version: 2.7.0-snapshot.20230424.11710.0.2f27f987
+sdk-version: 2.7.0-snapshot.20230515.11783.0.36293a4e
 name: svc-governance
 source: daml
 version: 0.1.0

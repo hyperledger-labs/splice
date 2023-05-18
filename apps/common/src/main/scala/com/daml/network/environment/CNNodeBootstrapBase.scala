@@ -24,7 +24,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.NodeId
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
-import io.functionmeta.functionFullName
+import com.daml.nameof.NameOf.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 

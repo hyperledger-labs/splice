@@ -15,7 +15,7 @@ import com.daml.ledger.api.v1.commands.{Command, Commands}
 import com.daml.ledger.client
 import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
-import com.daml.metrics.api.MetricHandle.{MetricsFactory, Timer}
+import com.daml.metrics.api.MetricHandle.{LabeledMetricsFactory, Timer}
 import com.daml.metrics.api.MetricName
 import io.grpc.Status
 import org.slf4j.LoggerFactory
@@ -31,7 +31,7 @@ final case class CommandSubmitter(
     benchtoolUserServices: LedgerApiServices,
     adminServices: LedgerApiServices,
     partyAllocating: PartyAllocating,
-    metricsFactory: MetricsFactory,
+    metricsFactory: LabeledMetricsFactory,
     metricsManager: MetricsManager[LatencyNanos],
     waitForSubmission: Boolean,
     commandGenerationParallelism: Int = 8,

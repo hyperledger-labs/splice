@@ -506,6 +506,7 @@ private[config] object CantonNodeParameterConverter {
       node.sequencerClient,
       node.caching,
       parent.parameters.nonStandardConfig,
+      node.storage.parameters.migrateAndStart,
     )
   }
 

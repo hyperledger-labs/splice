@@ -13,11 +13,7 @@ import com.digitalasset.canton.data.MerkleTree.RevealIfNeedBe
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod.DeduplicationDuration
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.{Recipients, RecipientsTree}
-import com.digitalasset.canton.topology.transaction.{
-  ParticipantAttributes,
-  ParticipantPermission,
-  TrustLevel,
-}
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, TestingIdentityFactory}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{
@@ -508,7 +504,8 @@ class GenTransactionTreeTest
     import GenTransactionTreeTest.*
 
     "correctly compute recipients from witnesses" in {
-      def mkWitnesses(setup: Seq[Set[Int]]): Witnesses = Witnesses(setup.map(_.map(informee)))
+      def mkWitnesses(setup: NonEmpty[Seq[Set[Int]]]): Witnesses =
+        Witnesses(setup.map(_.map(informee)))
 
       // Maps parties to participants; parties have IDs that start at 1, participants have IDs that start at 11
       def topology =
@@ -523,24 +520,13 @@ class GenTransactionTreeTest
             6 -> Set(16),
           ).map { case (partyId, participantIds) =>
             party(partyId) -> participantIds
-              .map(id =>
-                participant(id) -> ParticipantAttributes(
-                  ParticipantPermission.Submission,
-                  TrustLevel.Ordinary,
-                )
-              )
+              .map(id => participant(id) -> ParticipantPermission.Submission)
               .toMap
           },
         ).topologySnapshot()
 
       val witnesses = mkWitnesses(
-        Seq(
-          Set(1, 2),
-          Set(1, 3),
-          Set(2, 4),
-          Set(1, 2, 5),
-          Set(6),
-        )
+        NonEmpty(Seq, Set(1, 2), Set(1, 3), Set(2, 4), Set(1, 2, 5), Set(6))
       )
 
       witnesses

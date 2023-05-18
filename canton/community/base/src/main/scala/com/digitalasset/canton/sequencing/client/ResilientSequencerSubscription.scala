@@ -3,9 +3,11 @@
 
 package com.digitalasset.canton.sequencing.client
 
+import akka.stream.AbruptStageTerminationException
 import cats.data.EitherT
 import cats.syntax.functor.*
 import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
+import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerSubscriptionErrorGroup
@@ -33,7 +35,6 @@ import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.{DelayUtil, FutureUtil, LoggerUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{DiscardOps, SequencerCounter}
-import io.functionmeta.functionFullName
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.*
@@ -131,6 +132,9 @@ class ResilientSequencerSubscription[HandlerError](
               giveUp(error)
             }
 
+          case Failure(_: AbruptStageTerminationException) if isClosing =>
+            giveUp(Success(SubscriptionCloseReason.Shutdown))
+
           case Failure(exn) =>
             val canRetry = retryPolicy.retryOnException(exn, logger)
 
@@ -227,6 +231,8 @@ class ResilientSequencerSubscription[HandlerError](
     reason match {
       case Success(SubscriptionCloseReason.Closed) =>
         logger.trace("Sequencer subscription is being closed")
+      case Success(SubscriptionCloseReason.Shutdown) =>
+        logger.info("Sequencer subscription is being closed due to an ongoing shutdown")
       case Success(SubscriptionCloseReason.HandlerError(_: ApplicationHandlerShutdown.type)) =>
         logger.info("Sequencer subscription is being closed due to handler shutdown")
       case Success(SubscriptionCloseReason.HandlerError(ApplicationHandlerPassive(reason))) =>
@@ -375,6 +381,27 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
           cause = s"Lost subscription to domain ${domain}. Will try to recover automatically."
         )
   }
+
+  @Explanation(
+    """This error is logged when a sequencer client determined a ledger fork, where a sequencer node
+      |responded with different events for the same timestamp / counter.
+      |
+      |Whenever a client reconnects to a domain, it will start with the last message received and compare
+      |whether that last message matches the one it received previously. If not, it will report with this error.
+      |
+      |A ledger fork should not happen in normal operation. It can happen if the backups have been taken
+      |in a wrong order and e.g. the participant was more advanced than the sequencer.
+      |"""
+  )
+  @Resolution(
+    """You can recover by restoring the system with a correctly ordered backup. Please consult the
+      |respective sections in the manual."""
+  )
+  object ForkHappened
+      extends ErrorCode(
+        "SEQUENCER_FORK_DETECTED",
+        ErrorCategory.SystemInternalAssumptionViolated,
+      )
 
 }
 

@@ -9,9 +9,11 @@ import cats.data.EitherT
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.lf.data.Ref.PackageId
 import com.daml.lf.engine.Engine
+import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.LfPackageId
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.CantonRequireTypes
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi, SyncCryptoApiProvider}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.environment.*
@@ -27,7 +29,7 @@ import com.digitalasset.canton.participant.admin.{
   PackageService,
   ResourceManagementService,
 }
-import com.digitalasset.canton.participant.config.LocalParticipantConfig
+import com.digitalasset.canton.participant.config.{LocalParticipantConfig, PartyNotificationConfig}
 import com.digitalasset.canton.participant.domain.DomainAliasResolution
 import com.digitalasset.canton.participant.ledger.api.*
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
@@ -35,6 +37,7 @@ import com.digitalasset.canton.participant.scheduler.ParticipantSchedulersParame
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.{
   CantonSyncService,
+  ParticipantEventPublisher,
   SyncDomainPersistentStateManager,
   SyncDomainPersistentStateManagerX,
 }
@@ -47,11 +50,11 @@ import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.IdentityProvidingServiceClient
-import com.digitalasset.canton.topology.store.PartyMetadataStore
+import com.digitalasset.canton.topology.store.{PartyMetadataStore, TopologyStoreId, TopologyStoreX}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.SingleUseCell
 import com.digitalasset.canton.version.ProtocolVersion
-import io.functionmeta.functionFullName
 import io.grpc.ServerServiceDefinition
 
 import java.util.concurrent.ScheduledExecutorService
@@ -89,6 +92,16 @@ class ParticipantNodeBootstrapX(
       ParticipantMetrics,
     ](arguments)
     with ParticipantNodeBootstrapCommon {
+
+  // TODO(#12946) clean up to remove SingleUseCell
+  private val cantonSyncService = new SingleUseCell[CantonSyncService]
+
+  override protected def sequencedTopologyStores: Seq[TopologyStoreX[TopologyStoreId]] =
+    cantonSyncService.get.toList.flatMap(
+      _.syncDomainPersistentStateManager.getAll.values.map(_.topologyStore).collect {
+        case s: TopologyStoreX[TopologyStoreId] => s
+      }
+    )
   override protected def customNodeStages(
       storage: Storage,
       crypto: Crypto,
@@ -167,16 +180,11 @@ class ParticipantNodeBootstrapX(
     }
 
     private val participantOps = new ParticipantTopologyManagerOps {
-      override def attachPartyNotifier(partyNotifier: LedgerServerPartyNotifier): Unit = {
-        // TODO(#11255) attach properly to topology manager (requires us to rewrite partyNotifier.attachToIdentityManager()
-        //     and make it agnostic)
-        //     right now, we won't observe parties on the ledger-api server
-      }
       override def vetPackages(packages: Seq[PackageId], synchronize: Boolean)(implicit
           traceContext: TraceContext
       ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
         // TODO(#11255) this vetting extension might fail on concurrent uploads of dars
-        val currentF = performUnlessClosingF(functionFullName)(
+        val currentMappingF = performUnlessClosingF(functionFullName)(
           topologyManager.store
             .findPositiveTransactions(
               asOf = CantonTimestamp.MaxValue,
@@ -191,20 +199,24 @@ class ParticipantNodeBootstrapX(
                 .collectOfMapping[VettedPackagesX]
                 .result
                 .lastOption
-                .map(_.transaction.transaction.mapping.packageIds)
-                .getOrElse(Seq.empty)
             }
         )
         for {
-          current <- EitherT.right(currentF)
-          _ <- performUnlessClosingEitherU(functionFullName)(
+          currentMapping <- EitherT.right(currentMappingF)
+          currentPackages = currentMapping
+            .map(_.transaction.transaction.mapping.packageIds)
+            .getOrElse(Seq.empty)
+          nextSerial = currentMapping.map(_.transaction.transaction.serial + PositiveInt.one)
+          _ <- performUnlessClosingEitherUSF(functionFullName)(
             topologyManager
               .proposeAndAuthorize(
                 TopologyChangeOpX.Replace,
-                VettedPackagesX(participantId = participantId.uid, domainId = None)(
-                  (current ++ packages).distinct
+                VettedPackagesX(
+                  participantId = participantId,
+                  domainId = None,
+                  (currentPackages ++ packages).distinct,
                 ),
-                serial = None,
+                serial = nextSerial,
                 // TODO(#11255) auto-determine signing keys
                 signingKeys = Seq(participantId.uid.namespace.fingerprint),
                 parameters.initialProtocolVersion,
@@ -226,17 +238,16 @@ class ParticipantNodeBootstrapX(
       ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
         // TODO(#11255) make this "extend" / not replace
         //    this will also be potentially racy!
-        performUnlessClosingEitherU(functionFullName)(
+        performUnlessClosingEitherUSF(functionFullName)(
           topologyManager
             .proposeAndAuthorize(
               TopologyChangeOpX.Replace,
               PartyToParticipantX(
-                partyId.uid,
+                partyId,
                 None,
-              )(
                 threshold = 1,
                 participants =
-                  Seq(HostingParticipant(participantId.uid, ParticipantPermissionX.Submission)),
+                  Seq(HostingParticipant(participantId, ParticipantPermissionX.Submission)),
                 groupAddressing = false,
               ),
               serial = None,
@@ -267,6 +278,25 @@ class ParticipantNodeBootstrapX(
         PartyMetadataStore(storage, parameterConfig.processingTimeouts, loggerFactory)
       addCloseable(partyMetadataStore)
       val adminToken = CantonAdminToken.create(crypto.pureCrypto)
+      // upstream party information update generator
+
+      val partyNotifierFactory = (eventPublisher: ParticipantEventPublisher) => {
+        val partyNotifier = new LedgerServerPartyNotifier(
+          participantId,
+          eventPublisher,
+          partyMetadataStore,
+          clock,
+          arguments.futureSupervisor,
+          parameterConfig.processingTimeouts,
+          loggerFactory,
+        )
+        // Notify at participant level if eager notification is configured, else rely on notification via domain.
+        if (parameterConfig.partyChangeNotification == PartyNotificationConfig.Eager) {
+          topologyManager.addObserver(partyNotifier.attachToIdentityManagerX())
+        }
+        partyNotifier
+      }
+
       createParticipantServices(
         participantId,
         crypto,
@@ -280,7 +310,7 @@ class ParticipantNodeBootstrapX(
         resourceManagementServiceFactory,
         replicationServiceFactory,
         createSchedulers,
-        partyMetadataStore,
+        partyNotifierFactory,
         adminToken,
         participantOps,
         componentFactory,
@@ -295,6 +325,9 @@ class ParticipantNodeBootstrapX(
               schedulers,
               topologyDispatcher,
             ) =>
+          if (cantonSyncService.putIfAbsent(sync).nonEmpty) {
+            sys.error("should not happen")
+          }
           addCloseable(partyNotifier)
           addCloseable(ephemeralState.participantEventPublisher)
           addCloseable(topologyDispatcher)

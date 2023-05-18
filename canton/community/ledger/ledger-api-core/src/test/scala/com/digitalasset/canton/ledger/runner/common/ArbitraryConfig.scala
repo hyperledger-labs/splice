@@ -249,13 +249,11 @@ object ArbitraryConfig {
   )
 
   val commandConfiguration = for {
-    inputBufferSize <- Gen.chooseNum(Int.MinValue, Int.MaxValue)
     maxCommandsInFlight <- Gen.chooseNum(Int.MinValue, Int.MaxValue)
-    trackerRetentionPeriod <- duration
+    maxTrackingTimeout <- duration
   } yield CommandConfiguration(
-    inputBufferSize,
+    maxTrackingTimeout,
     maxCommandsInFlight,
-    trackerRetentionPeriod,
   )
 
   val timeProviderType = Gen.oneOf(TimeProviderType.Static, TimeProviderType.WallClock)
@@ -332,7 +330,6 @@ object ArbitraryConfig {
   )
 
   val indexerStartupMode: Gen[IndexerStartupMode] = for {
-    allowExistingSchema <- Gen.oneOf(true, false)
     schemaMigrationAttempts <- Gen.chooseNum(0, Int.MaxValue)
     schemaMigrationAttemptBackoff <- Gen.finiteDuration
     value <- Gen.oneOf[IndexerStartupMode](
@@ -340,7 +337,7 @@ object ArbitraryConfig {
       IndexerStartupMode
         .ValidateAndWaitOnly(schemaMigrationAttempts, schemaMigrationAttemptBackoff),
       IndexerStartupMode.MigrateOnEmptySchemaAndStart,
-      IndexerStartupMode.MigrateAndStart(allowExistingSchema),
+      IndexerStartupMode.MigrateAndStart,
     )
   } yield value
 

@@ -3,14 +3,14 @@
 
 package com.daml.ledger.api.benchtool.metrics.metrics
 
-import java.time.{Clock, Duration, Instant}
-
-import com.daml.ledger.api.benchtool.metrics.{Metric, MetricValue, ServiceLevelObjective}
 import com.daml.ledger.api.benchtool.metrics.metrics.TotalRuntimeMetric.{
   MaxDurationObjective,
   Value,
 }
+import com.daml.ledger.api.benchtool.metrics.{Metric, MetricValue, ServiceLevelObjective}
 import com.daml.ledger.api.benchtool.util.TimeUtil
+
+import java.time.{Clock, Duration, Instant}
 
 object TotalRuntimeMetric {
 

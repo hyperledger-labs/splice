@@ -6,15 +6,16 @@ package com.digitalasset.canton.participant.admin
 import better.files.*
 import com.daml.daml_lf_dev.DamlLf
 import com.daml.daml_lf_dev.DamlLf.Archive
-import com.daml.error.definitions.PackageServiceError
 import com.daml.lf.archive.DarParser
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
+import com.digitalasset.canton.ledger.error.PackageServiceError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.admin.PackageService.{Dar, DarDescriptor}
 import com.digitalasset.canton.participant.admin.PackageServiceTest.readCantonExamples
+import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
 import com.digitalasset.canton.participant.store.DamlPackageStore
 import com.digitalasset.canton.participant.store.memory.InMemoryDamlPackageStore
 import com.digitalasset.canton.participant.sync.{LedgerSyncEvent, ParticipantEventPublisher}
@@ -71,6 +72,7 @@ class PackageServiceTest extends AsyncWordSpec with BaseTest {
         new SymbolicPureCrypto(),
         vettingOps,
         new PackageInspectionOpsForTesting(participantId, loggerFactory),
+        ParticipantTestMetrics,
         ProcessingTimeout(),
         loggerFactory,
       )

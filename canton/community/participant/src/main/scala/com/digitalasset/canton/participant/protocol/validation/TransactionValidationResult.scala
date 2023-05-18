@@ -8,13 +8,13 @@ import com.digitalasset.canton.data.SubmitterMetadata
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet
 import com.digitalasset.canton.participant.protocol.validation.ContractConsistencyChecker.ReferenceToFutureContractError
+import com.digitalasset.canton.participant.protocol.validation.InternalConsistencyChecker.ErrorWithInternalConsistencyCheck
 import com.digitalasset.canton.participant.protocol.validation.TimeValidator.TimeCheckFailure
 import com.digitalasset.canton.participant.store.ContractKeyJournal
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.{LfPartyId, WorkflowId}
 
-// TODO(M40): Push model conformance down to individual views, not just for the transaction as a whole
 final case class TransactionValidationResult(
     transactionId: TransactionId,
     confirmationPolicy: ConfirmationPolicy,
@@ -27,6 +27,7 @@ final case class TransactionValidationResult(
       ModelConformanceChecker.ErrorWithSubviewsCheck,
       ModelConformanceChecker.Result,
     ],
+    internalConsistencyResultE: Either[ErrorWithInternalConsistencyCheck, Unit],
     consumedInputsOfHostedParties: Map[LfContractId, WithContractHash[Set[LfPartyId]]],
     witnessedAndDivulged: Map[LfContractId, SerializableContract],
     createdContracts: Map[LfContractId, SerializableContract],
@@ -53,7 +54,7 @@ final case class TransactionValidationResult(
       SyncServiceAlarm
         .Warn(s"Request $requestId with failed activeness check is approved.")
         .report()
-      // TODO(M40) Handle this case gracefully
+      // TODO(i12904) Handle this case gracefully
       throw new RuntimeException(s"Request $requestId with failed activeness check is approved.")
     }
   }

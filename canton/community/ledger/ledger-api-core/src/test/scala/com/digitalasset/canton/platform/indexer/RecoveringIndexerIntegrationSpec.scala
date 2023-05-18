@@ -29,7 +29,11 @@ import com.digitalasset.canton.ledger.participant.state.v2.{
   WritePartyService,
 }
 import com.digitalasset.canton.platform.LedgerApiServer
-import com.digitalasset.canton.platform.configuration.{IndexServiceConfig, ServerRole}
+import com.digitalasset.canton.platform.configuration.{
+  CommandConfiguration,
+  IndexServiceConfig,
+  ServerRole,
+}
 import com.digitalasset.canton.platform.indexer.RecoveringIndexerIntegrationSpec.*
 import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.DbSupport.{
@@ -203,6 +207,8 @@ class RecoveringIndexerIntegrationSpec
     }
   }
 
+  // TODO(#13019) Avoid the global execution context
+  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   private def participantServer(
       newParticipantState: ParticipantStateFactory,
       restartDelay: FiniteDuration = 100.millis,
@@ -224,6 +230,7 @@ class RecoveringIndexerIntegrationSpec
         LedgerApiServer
           .createInMemoryStateAndUpdater(
             IndexServiceConfig(),
+            CommandConfiguration.DefaultMaxCommandsInFlight,
             metrics,
             ExecutionContext.global,
           )
@@ -231,7 +238,7 @@ class RecoveringIndexerIntegrationSpec
         readService = participantState._1,
         participantId = participantId,
         config = IndexerConfig(
-          startupMode = IndexerStartupMode.MigrateAndStart(),
+          startupMode = IndexerStartupMode.MigrateAndStart,
           restartDelay = restartDelay,
         ),
         metrics = metrics,

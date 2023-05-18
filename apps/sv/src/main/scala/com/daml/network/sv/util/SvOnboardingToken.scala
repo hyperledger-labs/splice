@@ -3,6 +3,7 @@ package com.daml.network.sv.util
 import com.auth0.jwt.{JWT, JWTVerifier}
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
+import com.daml.network.util.Codec
 import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.topology.PartyId
 import spray.json.*
@@ -22,8 +23,8 @@ private object JsonProtocol extends DefaultJsonProtocol {
       value.asJsObject.getFields("name", "key", "party", "svc") match {
         case Seq(JsString(name), JsString(key), JsString(partyS), JsString(svcS)) =>
           (for {
-            party <- PartyId.fromProtoPrimitive(partyS)
-            svc <- PartyId.fromProtoPrimitive(svcS)
+            party <- Codec.decode(Codec.Party)(partyS)
+            svc <- Codec.decode(Codec.Party)(svcS)
           } yield new SvOnboardingToken(name, key, party, svc))
             .getOrElse(throw new DeserializationException("Could not parse party IDs"))
         case _ => throw new DeserializationException("Wrong fields in JSON object")

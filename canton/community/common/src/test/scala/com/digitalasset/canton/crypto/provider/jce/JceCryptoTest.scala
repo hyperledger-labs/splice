@@ -17,6 +17,7 @@ class JceCryptoTest
     extends AsyncWordSpec
     with SigningTest
     with EncryptionTest
+    with PrivateKeySerializationTest
     with HkdfTest
     with RandomTest
     with JavaKeyConverterTest {
@@ -42,36 +43,43 @@ class JceCryptoTest
       Jce.symmetric.supported,
       jceCrypto(),
     )
+    behave like privateKeySerializerProvider(
+      Jce.signing.supported,
+      Jce.encryption.supported,
+      jceCrypto(),
+    )
 
-    // Deterministic hybrid encryption is only enabled for EciesP256HmacSha256Aes128Cbc
-    s"Deterministic hybrid encrypt with ${EncryptionKeyScheme.EciesP256HmacSha256Aes128Cbc}" should {
+    forAll(Jce.encryption.supported.filter(_.supportDeterministicEncryption)) { keyScheme =>
+      s"Deterministic hybrid encrypt " +
+        s"with $keyScheme" should {
 
-      val newCrypto = jceCrypto()
+          val newCrypto = jceCrypto()
 
-      behave like hybridEncrypt(
-        EncryptionKeyScheme.EciesP256HmacSha256Aes128Cbc,
-        (message, publicKey, version) =>
-          newCrypto.map(crypto =>
-            crypto.pureCrypto.encryptDeterministicWith(message, publicKey, version)
-          ),
-        newCrypto,
-      )
+          behave like hybridEncrypt(
+            keyScheme,
+            (message, publicKey, version) =>
+              newCrypto.map(crypto =>
+                crypto.pureCrypto.encryptDeterministicWith(message, publicKey, version)
+              ),
+            newCrypto,
+          )
 
-      "yield the same ciphertext for the same encryption" in {
-        val message = Message(ByteString.copyFromUtf8("foobar"))
-        for {
-          crypto <- jceCrypto()
-          publicKey <- newPublicKey(crypto, EncryptionKeyScheme.EciesP256HmacSha256Aes128Cbc)
-          encrypted1 = crypto.pureCrypto
-            .encryptDeterministicWith(message, publicKey, testedProtocolVersion)
-            .valueOrFail("encrypt")
-          _ = assert(message.bytes != encrypted1.ciphertext)
-          encrypted2 = crypto.pureCrypto
-            .encryptDeterministicWith(message, publicKey, testedProtocolVersion)
-            .valueOrFail("encrypt")
-          _ = assert(message.bytes != encrypted2.ciphertext)
-        } yield encrypted1.ciphertext shouldEqual encrypted2.ciphertext
-      }
+          "yield the same ciphertext for the same encryption" in {
+            val message = Message(ByteString.copyFromUtf8("foobar"))
+            for {
+              crypto <- jceCrypto()
+              publicKey <- newPublicKey(crypto, keyScheme)
+              encrypted1 = crypto.pureCrypto
+                .encryptDeterministicWith(message, publicKey, testedProtocolVersion)
+                .valueOrFail("encrypt")
+              _ = assert(message.bytes != encrypted1.ciphertext)
+              encrypted2 = crypto.pureCrypto
+                .encryptDeterministicWith(message, publicKey, testedProtocolVersion)
+                .valueOrFail("encrypt")
+              _ = assert(message.bytes != encrypted2.ciphertext)
+            } yield encrypted1.ciphertext shouldEqual encrypted2.ciphertext
+          }
+        }
     }
 
     behave like hkdfProvider(jceCrypto().map(_.pureCrypto))
@@ -81,6 +89,6 @@ class JceCryptoTest
       Jce.encryption.supported,
       jceCrypto(),
     )
-  }
 
+  }
 }

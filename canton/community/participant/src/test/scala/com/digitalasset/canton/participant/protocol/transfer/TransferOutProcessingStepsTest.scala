@@ -27,13 +27,10 @@ import com.digitalasset.canton.participant.protocol.submission.{
   SeedGenerator,
 }
 import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessingSteps.PendingTransferOut
-import com.digitalasset.canton.participant.protocol.transfer.TransferOutRequestValidation.{
-  PermissionErrors,
-  TargetDomainIsSourceDomain,
-}
+import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessorError.*
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.{
   NoSubmissionPermissionOut,
-  SubmittingPartyMustBeStakeholderOut,
+  TransferProcessorError,
 }
 import com.digitalasset.canton.participant.store.memory.*
 import com.digitalasset.canton.participant.store.{MultiDomainEventLog, SyncDomainEphemeralState}
@@ -61,6 +58,7 @@ import com.digitalasset.canton.{
   LfPartyId,
   RequestCounter,
   SequencerCounter,
+  TransferCounter,
 }
 import com.google.protobuf.ByteString
 import org.scalatest.Assertion
@@ -68,7 +66,6 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 import java.util.UUID
 import scala.annotation.nowarn
-import scala.collection.immutable.Set
 import scala.concurrent.{ExecutionContext, Future}
 
 @nowarn("msg=match may not be exhaustive")
@@ -195,7 +192,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       loggerFactory,
     )(executorService)
 
-  val participants @ Seq(
+  val Seq(
     (participant1, admin1),
     (participant2, admin2),
     (participant3, admin3),
@@ -205,7 +202,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       val participant =
         ParticipantId(UniqueIdentifier.tryFromProtoPrimitive(s"participant$i::participant"))
       val admin = participant.adminParty.toLf
-      (participant -> admin)
+      participant -> admin
     }
 
   private val timeEvent =
@@ -229,9 +226,9 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         stakeholders: Set[LfPartyId],
         sourceIps: TopologySnapshot,
         targetIps: TopologySnapshot,
-    ) = {
-      TransferOutProcessingSteps
-        .createTransferOutRequest(
+    ): Either[TransferProcessorError, TransferOutRequestValidated] =
+      TransferOutRequest
+        .validated(
           submittingParticipant,
           timeEvent,
           contractId,
@@ -245,17 +242,17 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
           TargetProtocolVersion(testedProtocolVersion),
           sourceIps,
           targetIps,
+          TransferCounter.Genesis,
           logger,
         )
         .value
+        .failOnShutdown
         .futureValue
-    }
 
     "fail if submitter is not a stakeholder" in {
       val stakeholders = Set(party1, party2)
       val result = mkTxOutRes(stakeholders, ips1, ips1)
-      result should matchPattern { case Left(SubmittingPartyMustBeStakeholderOut(_, _, _)) =>
-      }
+      result.left.value shouldBe a[SubmittingPartyMustBeStakeholderOut]
     }
 
     "fail if submitting participant does not have submission permission" in {
@@ -263,7 +260,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         generateIps(Map(submittingParticipant -> Map(submitter -> Confirmation)))
 
       val result = mkTxOutRes(Set(submitter), ipsNoSubmissionPermission, ips1)
-      result should matchPattern { case Left(NoSubmissionPermissionOut(_, _, _)) => }
+      result.left.value shouldBe a[NoSubmissionPermissionOut]
     }
 
     "fail if a stakeholder cannot submit on target domain" in {
@@ -276,8 +273,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
 
       val stakeholders = Set(submitter, party1)
       val result = mkTxOutRes(stakeholders, ips1, ipsNoSubmissionOnTarget)
-      result should matchPattern { case Left(PermissionErrors(_)) =>
-      }
+      result.left.value shouldBe a[PermissionErrors]
     }
 
     "fail if a stakeholder cannot confirm on target domain" in {
@@ -297,8 +293,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
 
       val stakeholders = Set(submitter, party1)
       val result = mkTxOutRes(stakeholders, ipsConfirmationOnSource, ipsNoConfirmationOnTarget)
-      result should matchPattern { case Left(PermissionErrors(_)) =>
-      }
+      result.left.value shouldBe a[PermissionErrors]
     }
 
     "fail if a stakeholder is not hosted on the same participant on both domains" in {
@@ -312,8 +307,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
 
       val stakeholders = Set(submitter, party1)
       val result = mkTxOutRes(stakeholders, ips1, ipsDifferentParticipant)
-      result should matchPattern { case Left(PermissionErrors(_)) =>
-      }
+      result.left.value shouldBe a[PermissionErrors]
     }
 
     "fail if participant cannot confirm for admin party" in {
@@ -327,8 +321,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         loggerFactory.suppressWarningsAndErrors(
           mkTxOutRes(Set(submitter, party1), ipsAdminNoConfirmation, ips1)
         )
-      result should matchPattern { case Left(PermissionErrors(_)) =>
-      }
+      result.left.value shouldBe a[PermissionErrors]
     }
 
     "pick the active confirming admin party" in {
@@ -343,8 +336,24 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         loggerFactory.suppressWarningsAndErrors(
           mkTxOutRes(Set(submitter, party1), ipsAdminNoConfirmation, ips1)
         )
-      result should matchPattern { case Right(x) =>
-      }
+      result.value shouldEqual
+        TransferOutRequestValidated(
+          TransferOutRequest(
+            submitterMetadata = submitterMetadata(submitter),
+            stakeholders = Set(submitter, party1),
+            adminParties = Set(adminSubmitter, admin1),
+            contractId = contractId,
+            templateId = templateId,
+            sourceDomain = sourceDomain,
+            sourceProtocolVersion = SourceProtocolVersion(testedProtocolVersion),
+            sourceMediator = sourceMediator,
+            targetDomain = targetDomain,
+            targetProtocolVersion = TargetProtocolVersion(testedProtocolVersion),
+            targetTimeProof = timeEvent,
+            transferCounter = TransferCounter.Genesis,
+          ),
+          Set(submittingParticipant, participant1, participant2),
+        )
     }
 
     "work if topology constraints are satisfied" in {
@@ -367,49 +376,45 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       )
       val stakeholders = Set(submitter, party1)
       val result = mkTxOutRes(stakeholders, ipsSource, ipsTarget)
-      assert(
-        result == Right(
-          (
-            TransferOutRequest(
-              submitterMetadata = submitterMetadata(submitter),
-              stakeholders = stakeholders,
-              adminParties = Set(adminSubmitter, admin3, admin4),
-              contractId = contractId,
-              templateId = templateId,
-              sourceDomain = sourceDomain,
-              sourceProtocolVersion = SourceProtocolVersion(testedProtocolVersion),
-              sourceMediator = sourceMediator,
-              targetDomain = targetDomain,
-              targetProtocolVersion = TargetProtocolVersion(testedProtocolVersion),
-              targetTimeProof = timeEvent,
-            ),
-            Set(submittingParticipant, participant1, participant2, participant3, participant4),
-          )
+      result.value shouldEqual
+        TransferOutRequestValidated(
+          TransferOutRequest(
+            submitterMetadata = submitterMetadata(submitter),
+            stakeholders = stakeholders,
+            adminParties = Set(adminSubmitter, admin3, admin4),
+            contractId = contractId,
+            templateId = templateId,
+            sourceDomain = sourceDomain,
+            sourceProtocolVersion = SourceProtocolVersion(testedProtocolVersion),
+            sourceMediator = sourceMediator,
+            targetDomain = targetDomain,
+            targetProtocolVersion = TargetProtocolVersion(testedProtocolVersion),
+            targetTimeProof = timeEvent,
+            transferCounter = TransferCounter.Genesis,
+          ),
+          Set(submittingParticipant, participant1, participant2, participant3, participant4),
         )
-      )
     }
 
     "allow admin parties as stakeholders" in {
       val stakeholders = Set(submitter, adminSubmitter, admin1)
-      val result = mkTxOutRes(stakeholders, ips1, ips1)
-      assert(
-        result == Right(
-          (
-            TransferOutRequest(
-              submitterMetadata = submitterMetadata(submitter),
-              stakeholders = stakeholders,
-              adminParties = Set(adminSubmitter, admin1),
-              contractId = contractId,
-              templateId = templateId,
-              sourceDomain = sourceDomain,
-              sourceProtocolVersion = SourceProtocolVersion(testedProtocolVersion),
-              sourceMediator = sourceMediator,
-              targetDomain = targetDomain,
-              targetProtocolVersion = TargetProtocolVersion(testedProtocolVersion),
-              targetTimeProof = timeEvent,
-            ),
-            Set(submittingParticipant, participant1),
-          )
+      mkTxOutRes(stakeholders, ips1, ips1) shouldBe Right(
+        TransferOutRequestValidated(
+          TransferOutRequest(
+            submitterMetadata = submitterMetadata(submitter),
+            stakeholders = stakeholders,
+            adminParties = Set(adminSubmitter, admin1),
+            contractId = contractId,
+            templateId = templateId,
+            sourceDomain = sourceDomain,
+            sourceProtocolVersion = SourceProtocolVersion(testedProtocolVersion),
+            sourceMediator = sourceMediator,
+            targetDomain = targetDomain,
+            targetProtocolVersion = TargetProtocolVersion(testedProtocolVersion),
+            targetTimeProof = timeEvent,
+            transferCounter = TransferCounter.Genesis,
+          ),
+          Set(submittingParticipant, participant1),
         )
       )
     }
@@ -442,7 +447,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
           RequestCounter(1),
           Seq(WithTransactionId(contract, transactionId)),
         )
-        _submissionResult <-
+        _ <-
           outProcessingSteps
             .prepareSubmission(
               submissionParam,
@@ -503,6 +508,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       targetDomain,
       TargetProtocolVersion(testedProtocolVersion),
       timeEvent,
+      transferCounter = TransferCounter.Genesis,
     )
     val outTree = makeFullTransferOutTree(outRequest)
     val encryptedOutRequestF = for {
@@ -516,7 +522,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         case outProcessingSteps.CheckActivenessAndWritePendingContracts(
               activenessSet,
               pendingContracts,
-              _pendingDataAndResponseArgs,
+              _,
             ) =>
           activenessSet shouldBe mkActivenessSet(deact = Set(contractId))
           pendingContracts shouldBe Seq.empty
@@ -575,6 +581,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         targetDomain,
         TargetProtocolVersion(testedProtocolVersion),
         timeEvent,
+        transferCounter = TransferCounter.Genesis,
       )
 
       val fullTransferOutTree = makeFullTransferOutTree(outRequest)
@@ -591,7 +598,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
           RequestCounter(1),
           Seq(WithTransactionId(contract, transactionId)),
         )
-        _result <- valueOrFail(
+        _ <- valueOrFail(
           outProcessingSteps
             .constructPendingDataAndResponse(
               dataAndResponseArgs,

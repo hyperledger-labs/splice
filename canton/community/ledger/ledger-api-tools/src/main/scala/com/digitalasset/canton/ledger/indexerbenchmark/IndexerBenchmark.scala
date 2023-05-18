@@ -67,6 +67,7 @@ class IndexerBenchmark() {
           LedgerApiServer
             .createInMemoryStateAndUpdater(
               config.indexServiceConfig,
+              256,
               metrics,
               indexerExecutionContext,
             )
@@ -195,6 +196,8 @@ object IndexerBenchmark {
   private val logger = LoggerFactory.getLogger(getClass)
   val LedgerId = "IndexerBenchmarkLedger"
 
+  // TODO(#13019) Avoid the global execution context
+  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   def runAndExit(
       config: Config,
       updates: () => Future[Source[(Offset, Update), NotUsed]],

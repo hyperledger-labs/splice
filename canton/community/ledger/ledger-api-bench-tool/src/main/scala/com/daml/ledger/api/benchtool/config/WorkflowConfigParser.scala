@@ -4,11 +4,6 @@
 package com.daml.ledger.api.benchtool.config
 
 import cats.syntax.functor.*
-import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
-import io.circe.yaml.parser
-import io.circe.{Decoder, HCursor}
-import java.io.Reader
-
 import com.daml.ledger.api.benchtool.config.WorkflowConfig.FooSubmissionConfig.{
   ConsumingExercises,
   NonconsumingExercises,
@@ -17,7 +12,11 @@ import com.daml.ledger.api.benchtool.config.WorkflowConfig.StreamConfig.{
   PartyFilter,
   PartyNamePrefixFilter,
 }
+import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
+import io.circe.yaml.parser
+import io.circe.{Decoder, HCursor}
 
+import java.io.Reader
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
@@ -188,15 +187,6 @@ object WorkflowConfigParser {
           timeoutO = timeout,
         )
       }
-    Decoder.forProduct7(
-      "name",
-      "filters",
-      "party_prefix_filters",
-      "objectives",
-      "subscription_delay",
-      "max_item_count",
-      "timeout",
-    )(StreamConfig.ActiveContractsStreamConfig.apply)
 
     implicit val completionsStreamDecoder: Decoder[StreamConfig.CompletionsStreamConfig] =
       (c: HCursor) => {

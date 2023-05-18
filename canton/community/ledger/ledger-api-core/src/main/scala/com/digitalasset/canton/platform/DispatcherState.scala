@@ -3,11 +3,10 @@
 
 package com.digitalasset.canton.platform
 
-import com.daml.error.DamlContextualizedErrorLogger
-import com.daml.error.definitions.CommonErrors
 import com.daml.ledger.resources.ResourceOwner
 import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.timer.Timeout.*
+import com.digitalasset.canton.ledger.error.{CommonErrors, DamlContextualizedErrorLogger}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.platform.DispatcherState.{
   DispatcherNotRunning,
@@ -61,6 +60,8 @@ class DispatcherState(dispatcherShutdownTimeout: Duration)(implicit
     }
   })
 
+  // TODO(#13019) Replace parasitic with DirectExecutionContext
+  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   def stopDispatcher(): Future[Unit] = blocking(synchronized {
     logger.info(s"Stopping active $ServiceName.")
     dispatcherStateRef match {
@@ -82,6 +83,8 @@ class DispatcherState(dispatcherShutdownTimeout: Duration)(implicit
     }
   })
 
+  // TODO(#13019) Replace parasitic with DirectExecutionContext
+  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   private[platform] def shutdown(): Future[Unit] = blocking(synchronized {
     logger.info(s"Shutting down $ServiceName state.")
 

@@ -20,11 +20,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
-import com.digitalasset.canton.data.TransactionViewDecomposition.{
-  NewView,
-  SameView,
-  createWithConfirmationPolicy,
-}
+import com.digitalasset.canton.data.TransactionViewDecomposition.{NewView, SameView}
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod.DeduplicationDuration
@@ -337,14 +333,15 @@ object ExampleTransactionFactory {
   def defaultTestingIdentityFactory: TestingIdentityFactory =
     TestingTopology(
       topology = Map(
-        submitter -> Map(submitterParticipant -> ParticipantAttributes(Submission, TrustLevel.Vip)),
+        submitter -> Map(submitterParticipant -> Submission),
         signatory -> Map(
-          signatoryParticipant -> ParticipantAttributes(Confirmation, TrustLevel.Ordinary)
+          signatoryParticipant -> Confirmation
         ),
         observer -> Map(
-          signatoryParticipant -> ParticipantAttributes(Observation, TrustLevel.Ordinary)
+          signatoryParticipant -> Observation
         ),
-      )
+      ),
+      participants = Map(submitterParticipant -> ParticipantAttributes(Submission, TrustLevel.Vip)),
     )
       .build()
 
@@ -392,6 +389,35 @@ class ExampleTransactionFactory(
 
   private def saltConditionally(salt: Salt): Option[Salt] =
     Option.when(protocolVersion >= ProtocolVersion.v4)(salt)
+
+  private def createWithConfirmationPolicy(
+      confirmationPolicy: ConfirmationPolicy,
+      topologySnapshot: TopologySnapshot,
+      rootNode: LfActionNode,
+      rootSeed: Option[LfHash],
+      rootNodeId: LfNodeId,
+      tailNodes: Seq[TransactionViewDecomposition],
+  )(implicit ec: ExecutionContext): Future[NewView] = {
+
+    val rootRbContext = RollbackContext.empty
+
+    confirmationPolicy.informeesAndThreshold(rootNode, topologySnapshot).flatMap {
+      case (viewInformees, viewThreshold) =>
+        val result = NewView(
+          rootNode,
+          viewInformees,
+          viewThreshold,
+          rootSeed,
+          rootNodeId,
+          tailNodes,
+          rootRbContext,
+        )
+        result
+          .compliesWith(confirmationPolicy, topologySnapshot)
+          .map(_ => result)
+          .valueOr(err => throw new IllegalArgumentException(err))
+    }
+  }
 
   private def awaitCreateWithConfirmationPolicy(
       confirmationPolicy: ConfirmationPolicy,
@@ -843,7 +869,7 @@ class ExampleTransactionFactory(
         (
           rootTransactionViewTree(view0),
           (transaction(Seq(0), reinterpretedNode), metadata, keyResolver),
-          Witnesses(List(view0.viewCommonData.tryUnwrap.informees)),
+          Witnesses(NonEmpty(List, view0.viewCommonData.tryUnwrap.informees)),
         )
       )
   }
@@ -1119,7 +1145,7 @@ class ExampleTransactionFactory(
         (
           rootTransactionViewTree(rootViewsWithOneViewUnblinded: _*),
           (transactionFrom(Seq(i), i, example.reinterpretedNode), example.metadata, Map.empty),
-          Witnesses(List(example.view0.viewCommonData.tryUnwrap.informees)),
+          Witnesses(NonEmpty(List, example.view0.viewCommonData.tryUnwrap.informees)),
         )
       }
     }
@@ -1545,7 +1571,7 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(_._1 == LfNodeId(0))),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree0.informees)),
+          Witnesses(NonEmpty(List, transactionViewTree0.informees)),
         ),
         (
           transactionViewTree1,
@@ -1569,7 +1595,7 @@ class ExampleTransactionFactory(
             ),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree1.informees)),
+          Witnesses(NonEmpty(List, transactionViewTree1.informees)),
         ),
         (
           transactionViewTree10,
@@ -1578,7 +1604,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(_._1 == LfNodeId(6))),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree10.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)
+          ),
         ),
         (
           transactionViewTree11,
@@ -1587,7 +1615,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(seed => Seq(7, 8).map(LfNodeId.apply).contains(seed._1))),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree11.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree11.informees, transactionViewTree1.informees)
+          ),
         ),
         (
           transactionViewTree110,
@@ -1597,7 +1627,8 @@ class ExampleTransactionFactory(
             Map.empty,
           ),
           Witnesses(
-            List(
+            NonEmpty(
+              List,
               transactionViewTree110.informees,
               transactionViewTree11.informees,
               transactionViewTree1.informees,
@@ -2137,7 +2168,7 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(_._1 == LfNodeId(0))),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree0.informees)),
+          Witnesses(NonEmpty(List, transactionViewTree0.informees)),
         ),
         (
           transactionViewTree1,
@@ -2158,7 +2189,7 @@ class ExampleTransactionFactory(
             ),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree1.informees)),
+          Witnesses(NonEmpty(List, transactionViewTree1.informees)),
         ),
         (
           transactionViewTree10,
@@ -2167,7 +2198,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(seed => Seq(2, 3).map(LfNodeId.apply).contains(seed._1))),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree10.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)
+          ),
         ),
         (
           transactionViewTree100,
@@ -2177,7 +2210,8 @@ class ExampleTransactionFactory(
             Map.empty,
           ),
           Witnesses(
-            List(
+            NonEmpty(
+              List,
               transactionViewTree100.informees,
               transactionViewTree10.informees,
               transactionViewTree1.informees,
@@ -2191,7 +2225,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(seed => Seq(5, 6).map(LfNodeId.apply).contains(seed._1))),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree11.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree11.informees, transactionViewTree1.informees)
+          ),
         ),
         (
           transactionViewTree110,
@@ -2201,7 +2237,8 @@ class ExampleTransactionFactory(
             Map.empty,
           ),
           Witnesses(
-            List(
+            NonEmpty(
+              List,
               transactionViewTree110.informees,
               transactionViewTree11.informees,
               transactionViewTree1.informees,
@@ -2211,7 +2248,7 @@ class ExampleTransactionFactory(
         (
           transactionViewTree2,
           (transaction(Seq(0), lfCreate2), mkMetadata(Map(LfNodeId(0) -> create2seed)), Map.empty),
-          Witnesses(List(transactionViewTree2.informees)),
+          Witnesses(NonEmpty(List, transactionViewTree2.informees)),
         ),
       )
 
@@ -2507,7 +2544,7 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(_._1 == LfNodeId(0))),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree0.informees)),
+          Witnesses(NonEmpty(List, transactionViewTree0.informees)),
         ),
         (
           transactionViewTree1,
@@ -2527,7 +2564,7 @@ class ExampleTransactionFactory(
             ),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree1.informees)),
+          Witnesses(NonEmpty(List, transactionViewTree1.informees)),
         ),
         (
           transactionViewTree10,
@@ -2536,7 +2573,9 @@ class ExampleTransactionFactory(
             mkMetadata(seeds.filter(seed => Seq(3, 4).map(LfNodeId.apply).contains(seed._1))),
             Map.empty,
           ),
-          Witnesses(List(transactionViewTree10.informees, transactionViewTree1.informees)),
+          Witnesses(
+            NonEmpty(List, transactionViewTree10.informees, transactionViewTree1.informees)
+          ),
         ),
       )
 

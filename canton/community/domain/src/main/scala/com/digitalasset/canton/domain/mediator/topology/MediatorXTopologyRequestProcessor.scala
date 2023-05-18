@@ -5,6 +5,7 @@ package com.digitalasset.canton.domain.mediator.topology
 
 import cats.data.EitherT
 import cats.syntax.functor.*
+import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
@@ -19,12 +20,15 @@ import com.digitalasset.canton.sequencing.client.{
 import com.digitalasset.canton.sequencing.protocol.{Deliver, OpenEnvelope, Recipients}
 import com.digitalasset.canton.time.DomainTimeTracker
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
-import com.digitalasset.canton.topology.transaction.OwnerToKeyMappingX
+import com.digitalasset.canton.topology.transaction.{
+  DomainTrustCertificateX,
+  MediatorDomainStateX,
+  SequencerDomainStateX,
+}
 import com.digitalasset.canton.topology.{DomainId, TopologyStateProcessorX}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
-import io.functionmeta.functionFullName
 
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
@@ -141,17 +145,32 @@ class MediatorXTopologyRequestProcessor(
       processor.store.findPositiveTransactions(
         asOf = ts,
         asOfInclusive =
-          false, // must be inclusive as we don't want to include folks that we just added
+          false, // must be exclusive as we don't want to include folks that we just added
         isProposal = false,
-        types = Seq(OwnerToKeyMappingX.code),
+        types = Seq(
+          DomainTrustCertificateX.code,
+          MediatorDomainStateX.code,
+          SequencerDomainStateX.code,
+        ),
         filterUid = None,
         filterNamespace = None,
       )
     ).flatMap { res =>
-      val members = res
-        .collectOfMapping[OwnerToKeyMappingX]
+      val participants = res
+        .collectOfMapping[DomainTrustCertificateX]
         .result
-        .map(_.transaction.transaction.mapping.member)
+        .map(_.transaction.transaction.mapping.participantId)
+      val mediators = res
+        .collectOfMapping[MediatorDomainStateX]
+        .result
+        .map(_.transaction.transaction.mapping)
+        .flatMap(mds => mds.active ++ mds.observers)
+      val sequencers = res
+        .collectOfMapping[SequencerDomainStateX]
+        .result
+        .map(_.transaction.transaction.mapping)
+        .flatMap(sds => sds.active ++ sds.observers)
+      val members = participants ++ mediators ++ sequencers
       Recipients.ofSet(members.toSet) match {
         case Some(recipients) =>
           send(OpenEnvelope(msg, recipients)(protocolVersion), "sending accepted txs to members")

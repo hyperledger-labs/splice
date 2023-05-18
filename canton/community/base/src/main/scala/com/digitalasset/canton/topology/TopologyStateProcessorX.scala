@@ -4,6 +4,7 @@
 package com.digitalasset.canton.topology
 
 import cats.data.EitherT
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransactionX.GenericValidatedTopologyTransactionX
@@ -64,7 +65,9 @@ class TopologyStateProcessorX(
       expectFullAuthorization: Boolean,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, Seq[GenericValidatedTopologyTransactionX], Unit] = {
+  ): EitherT[Future, Seq[GenericValidatedTopologyTransactionX], Seq[
+    GenericValidatedTopologyTransactionX
+  ]] = {
 
     type Lft = Seq[GenericValidatedTopologyTransactionX]
 
@@ -119,7 +122,7 @@ class TopologyStateProcessorX(
         logger.info(
           "Persisted topology transactions:\n  " + success.mkString("\n  ")
         )
-        ()
+        success
       },
     )
   }
@@ -128,16 +131,19 @@ class TopologyStateProcessorX(
       effective: EffectiveTime,
       transactions: Seq[GenericSignedTopologyTransactionX],
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val hashes = transactions
-      .map(x => x.transaction.mapping.uniqueKey)
-      .filterNot(txForMapping.contains)
-    if (hashes.nonEmpty) {
+    val hashes = NonEmpty.from(
+      transactions
+        .map(x => x.transaction.mapping.uniqueKey)
+        .filterNot(txForMapping.contains)
+        .toSet
+    )
+    hashes.fold(Future.unit) {
       store
-        .findTransactionsForMapping(effective, hashes)
+        .findTransactionsForMapping(effective, _)
         .map(_.foreach { item =>
           txForMapping.put(item.transaction.mapping.uniqueKey, MaybePending(item)).discard
         })
-    } else Future.unit
+    }
   }
 
   private def trackProposal(txHash: TxHash, mappingHash: MappingHash): Unit = {
@@ -154,10 +160,13 @@ class TopologyStateProcessorX(
       transactions: Seq[GenericSignedTopologyTransactionX],
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val hashes =
-      transactions.map(x => x.transaction.hash).filterNot(proposalsForTx.contains)
-    if (hashes.nonEmpty) {
+      NonEmpty.from(
+        transactions.map(x => x.transaction.hash).filterNot(proposalsForTx.contains).toSet
+      )
+
+    hashes.fold(Future.unit) {
       store
-        .findProposalsByTxHash(effective, hashes)
+        .findProposalsByTxHash(effective, _)
         .map(_.foreach { item =>
           val txHash = item.transaction.hash
           // store the proposal
@@ -165,7 +174,7 @@ class TopologyStateProcessorX(
           // maintain a map from mapping to txs
           trackProposal(txHash, item.transaction.mapping.uniqueKey)
         })
-    } else Future.unit
+    }
   }
 
   private def serialIsMonotonicallyIncreasing(
@@ -243,6 +252,7 @@ class TopologyStateProcessorX(
     //     - a party to participant mapping mentioning a participant who is not on the domain
     //       (no trust certificate or no owner keys)
     //     - a mediator or sequencer who doesn't have keys
+    //     - a domain parameter change (in particular changes to the topology change delay) that coudl confuse the future dating logic.
     val ret = for {
       // we check if the transaction is properly authorized given the current topology state
       // if it is a proposal, then we demand that all signatures are appropriate (but
