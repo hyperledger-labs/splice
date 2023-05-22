@@ -15,16 +15,21 @@ fetch() {
 
 pipeline_workflows_complete() {
   pipeline_id=$1
-  fetch "https://circleci.com/api/v2/pipeline/$pipeline_id/workflow" "/tmp/workflows.json"
-  RESULT=$(jq < /tmp/workflows.json '.items | map(.status) | all(. != "running")')
-  if [[ $RESULT == "true" ]]
+  if fetch "https://circleci.com/api/v2/pipeline/$pipeline_id/workflow" "/tmp/workflows.json"
   then
-      echo "Pipeline complete"
-      return 0
+    RESULT=$(jq < /tmp/workflows.json '.items | map(.status) | all(. != "running")')
+    if [[ $RESULT == "true" ]]
+    then
+        echo "Pipeline complete"
+        return 0
+    else
+        echo "Pipeline still running"
+        cat /tmp/workflows.json
+        return 1
+    fi
   else
-      echo "Pipeline still running"
-      cat /tmp/workflows.json
-      return 1
+    echo "Could not fetch pipeline status; assuming that pipeline is till running"
+    return 1
   fi
 }
 
