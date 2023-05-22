@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, Loading, RateDisplay } from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, ErrorDisplay, Loading, RateDisplay } from 'common-frontend';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -34,9 +34,8 @@ export const ConfirmPayment: React.FC = () => {
     return <Loading />;
   }
 
-  // TODO(#4139) implement error state from design
   if (coinPriceQuery.isError || appPaymentRequestQuery.isError) {
-    return <p>Error, something went wrong.</p>;
+    return <ErrorDisplay message={'Error while fetching payment requests and coin price'} />;
   }
 
   const appPayment = appPaymentRequestQuery.data;

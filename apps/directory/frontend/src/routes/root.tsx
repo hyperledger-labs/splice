@@ -1,4 +1,4 @@
-import { ErrorBoundary, PartyId, useUserState } from 'common-frontend';
+import { ErrorBoundary, Loading, PartyId, useUserState } from 'common-frontend';
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 
@@ -14,7 +14,8 @@ import {
 
 const Root: React.FC = () => {
   const { logout } = useUserState();
-  const { data: primaryPartyId } = usePrimaryParty(); // TODO(#4139) -- consider handling query loading/error states
+  const primaryPartyQuery = usePrimaryParty();
+  const primaryPartyId = primaryPartyQuery.data;
   const { data: directoryInstallContract } = useDirectoryInstall();
   const { data: providerPartyId } = useProviderParty();
 
@@ -37,6 +38,10 @@ const Root: React.FC = () => {
     providerPartyId,
     requestDirectoryInstall,
   ]);
+
+  if (primaryPartyQuery.isLoading) {
+    return <Loading />;
+  }
 
   return (
     <ErrorBoundary>

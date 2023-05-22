@@ -6,13 +6,14 @@ import {
   DirectoryEntry,
   DateDisplay,
   useUserState,
+  ErrorDisplay,
 } from 'common-frontend';
 import { TransferOffer } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
 import Loading from 'common-frontend/lib/components/Loading';
 import { useCallback, useMemo, useState } from 'react';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';
-import { Button, Card, CardContent, Chip, Stack } from '@mui/material';
+import { Box, Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 import { Currency } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
@@ -53,18 +54,18 @@ export const TransferOffers: React.FC = () => {
     [primaryPartyId]
   );
 
-  const { data: transferOfferContracts } = useTransferOffers(coinPriceQuery.data);
-  useMemo(() => {
-    if (transferOfferContracts && coinPriceQuery.data) {
-      toWalletTransferOffer(transferOfferContracts, coinPriceQuery.data).then(offers =>
-        setOffers(offers)
-      );
-    }
-  }, [coinPriceQuery.data, toWalletTransferOffer, transferOfferContracts]);
+  const transferOfferContractsQuery = useTransferOffers(coinPriceQuery.data);
+  const { data: transferOfferContracts } = transferOfferContractsQuery;
+  const coinPrice = coinPriceQuery.data;
 
-  if (coinPriceQuery.isLoading) {
-    return <Loading />;
-  }
+  useMemo(() => {
+    if (transferOfferContracts && coinPrice) {
+      toWalletTransferOffer(transferOfferContracts, coinPrice).then(setOffers);
+    }
+  }, [coinPrice, toWalletTransferOffer, transferOfferContracts]);
+
+  const isLoading = coinPriceQuery.isLoading || transferOfferContractsQuery.isLoading;
+  const isError = coinPriceQuery.isError || transferOfferContractsQuery.isError;
 
   return (
     <Stack spacing={4} direction="column" justifyContent="center" id="transfer-offers">
@@ -72,9 +73,19 @@ export const TransferOffers: React.FC = () => {
         Action Needed{' '}
         <Chip label={offers.length} color="success" className="transfer-offers-count" />
       </Typography>
-      {offers.map((offer, index) => (
-        <TransferOfferDisplay key={'offer-' + index} transferOffer={offer} />
-      ))}
+      {isLoading ? (
+        <Loading />
+      ) : isError ? (
+        <ErrorDisplay message={'Error while fetching coin price and transfer offers'} />
+      ) : offers.length === 0 ? (
+        <Box display="flex" justifyContent="center">
+          <Typography variant="h6">No transfer offers available</Typography>
+        </Box>
+      ) : (
+        offers.map((offer, index) => (
+          <TransferOfferDisplay key={'offer-' + index} transferOffer={offer} />
+        ))
+      )}
     </Stack>
   );
 };

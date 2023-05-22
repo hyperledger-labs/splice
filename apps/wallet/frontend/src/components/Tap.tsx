@@ -1,10 +1,9 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { theme } from 'common-frontend';
+import { ErrorDisplay } from 'common-frontend';
 import { useState } from 'react';
 
 import { Button, Stack, TextField } from '@mui/material';
-import Typography from '@mui/material/Typography';
 
 import { useTap } from '../hooks';
 
@@ -33,11 +32,7 @@ const Tap: React.FC = () => {
         Tap
       </Button>
 
-      {mutation.isError ? (
-        <Typography id="tap-error-message" variant="caption" color={theme.palette.error.main}>
-          Tap operation failed
-        </Typography>
-      ) : null}
+      {mutation.isError ? <ErrorDisplay message={'Tap operation failed'} /> : null}
     </Stack>
   );
 };

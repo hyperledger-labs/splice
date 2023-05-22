@@ -1,6 +1,12 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, RateDisplay, useUserState } from 'common-frontend';
+import {
+  AmountDisplay,
+  DirectoryEntry,
+  ErrorDisplay,
+  RateDisplay,
+  useUserState,
+} from 'common-frontend';
 import Loading from 'common-frontend/lib/components/Loading';
 import formatISO from 'date-fns/formatISO';
 
@@ -32,14 +38,16 @@ const TransactionHistory: React.FC = () => {
   const coinPriceQuery = useCoinPrice();
   const { primaryPartyId } = useUserState();
 
-  // TODO(#4139) Implement design for loading and error states
-  if (coinPriceQuery.isLoading || txQuery.isLoading || !primaryPartyId) {
-    return <Loading />;
-  }
+  const isLoading = coinPriceQuery.isLoading || txQuery.isLoading;
+  const isError = coinPriceQuery.isError || txQuery.isError || !primaryPartyId;
 
-  if (txQuery.isError) {
-    <p>Error fetching transactions.</p>;
-  }
+  const hasNoTransactions = (pagedTxs: Transaction[][]): boolean => {
+    return (
+      pagedTxs === undefined ||
+      pagedTxs.length === 0 ||
+      pagedTxs.every(p => p === undefined || p.length === 0)
+    );
+  };
 
   const pagedTransactions = txQuery.data ? txQuery.data.pages : [];
 
@@ -48,25 +56,34 @@ const TransactionHistory: React.FC = () => {
       <Typography mt={6} variant="h4">
         Transaction History
       </Typography>
-      <TableContainer>
-        <Table>
-          <TableBody>
-            {pagedTransactions.map(
-              transactions =>
-                transactions &&
-                transactions.map(tx => {
-                  return (
+      {isLoading ? (
+        <Loading />
+      ) : isError ? (
+        <ErrorDisplay
+          message={'Error while fetching either transactions or coin price.'}
+          // renderAs="tr"
+        />
+      ) : hasNoTransactions(pagedTransactions) ? (
+        <Typography variant="h6">No Transactions yet</Typography>
+      ) : (
+        <TableContainer>
+          <Table>
+            <TableBody>
+              {pagedTransactions.map(
+                transactions =>
+                  transactions &&
+                  transactions.map(tx => (
                     <TransactionHistoryRow
                       key={'tx-row-' + tx.id}
                       transaction={tx}
                       primaryPartyId={primaryPartyId}
                     />
-                  );
-                })
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                  ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
       <ViewMoreButton
         label={
           txQuery.isFetchingNextPage

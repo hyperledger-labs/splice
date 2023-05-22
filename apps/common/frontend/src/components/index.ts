@@ -5,6 +5,7 @@ import DateDisplay from './DateDisplay';
 import DirectoryEntry from './DirectoryEntry';
 import DirectoryField from './DirectoryField';
 import ErrorBoundary from './ErrorBoundary';
+import ErrorDisplay from './ErrorDisplay';
 import FeaturedAppRight from './FeaturedAppRight';
 import IntervalDisplay from './IntervalDisplay';
 import Loading from './Loading';
@@ -30,4 +31,5 @@ export {
   IntervalDisplay,
   Loading,
   LoginFailed,
+  ErrorDisplay,
 };

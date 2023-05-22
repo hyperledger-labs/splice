@@ -1,4 +1,4 @@
-import { useUserState } from 'common-frontend';
+import { ErrorDisplay, Loading, useUserState } from 'common-frontend';
 import React, { useEffect } from 'react';
 
 import { Box, Container } from '@mui/material';
@@ -9,7 +9,8 @@ import { useDirectoryInstall, usePrimaryParty } from '../hooks';
 
 const Home: React.FC = () => {
   const { updateStatus } = useUserState();
-  const { data: primaryPartyId } = usePrimaryParty(); // TODO(#4139) -- handle error state, especially if user not onboarded
+  const primaryPartyIdQuery = usePrimaryParty();
+  const { data: primaryPartyId } = primaryPartyIdQuery;
   const directoryInstallQuery = useDirectoryInstall();
 
   useEffect(() => {
@@ -18,19 +19,19 @@ const Home: React.FC = () => {
     }
   }, [primaryPartyId, updateStatus]);
 
-  switch (directoryInstallQuery.status) {
-    case 'error':
-      // TODO(#4139) - add error page
-      console.error(
-        'Error retrieving directory install contract in Home.tsx: ',
-        directoryInstallQuery.error
-      );
-      return null;
-    case 'loading':
-      // TODO(#4139) - improve loading page
-      return <span>Loading ...</span>;
-    case 'success':
-      return (
+  if (primaryPartyIdQuery.isError) {
+    return <ErrorDisplay message={'Error while fetching primary party'} />;
+  } else if (primaryPartyIdQuery.isLoading) {
+    return <Loading />;
+  }
+
+  return (
+    <>
+      {directoryInstallQuery.isLoading ? (
+        <Loading />
+      ) : directoryInstallQuery.isError ? (
+        <ErrorDisplay message={'Error while retrieving CNS entries'} />
+      ) : (
         <>
           <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" pb={4}>
             <Container maxWidth="md">
@@ -41,8 +42,9 @@ const Home: React.FC = () => {
             <DirectoryEntries />
           </Container>
         </>
-      );
-  }
+      )}
+    </>
+  );
 };
 
 export default Home;

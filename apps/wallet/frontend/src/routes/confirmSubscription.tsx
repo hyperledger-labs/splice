@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, IntervalDisplay } from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, ErrorDisplay, IntervalDisplay } from 'common-frontend';
 import Loading from 'common-frontend/lib/components/Loading';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -21,34 +21,41 @@ export const ConfirmSubscription: React.FC = () => {
   if (subscriptionRequestQuery.isLoading) {
     return <Loading />;
   }
-  // TODO(#4139) implement error state from design
-  if (subscriptionRequestQuery.isError) {
-    console.error(subscriptionRequestQuery.error);
-    return <p>Something went wrong</p>;
-  }
-
-  const subscriptionRequest = subscriptionRequestQuery.data;
 
   return (
     <Container maxWidth="md">
       <Stack alignItems="center" paddingTop={4} spacing={4}>
-        <Stack alignItems="center" spacing={1}>
-          <Stack alignItems="center" direction="row" spacing={1}>
-            <Typography variant="h6">Confirm Subscription to </Typography>
-            <DirectoryEntry
-              partyId={subscriptionRequest.subscriptionRequest.payload.subscriptionData.receiver}
-              variant="h5"
-            />
-          </Stack>
-          <Stack alignItems="center" direction="row" spacing={1}>
-            <Typography variant="body2">via </Typography>
-            <DirectoryEntry
-              partyId={subscriptionRequest.subscriptionRequest.payload.subscriptionData.provider}
-              variant="body2"
-            />
-          </Stack>
-        </Stack>
-        <SubscriptionContainer subscription={subscriptionRequest} />
+        {subscriptionRequestQuery.isError ? (
+          <Box display="flex" alignItems="center" justifyContent="center">
+            <ErrorDisplay message={'Error while fetching subscription request and coin price'} />
+          </Box>
+        ) : (
+          <>
+            <Stack alignItems="center" spacing={1}>
+              <Stack alignItems="center" direction="row" spacing={1}>
+                <Typography variant="h6">Confirm Subscription to </Typography>
+                <DirectoryEntry
+                  partyId={
+                    subscriptionRequestQuery.data.subscriptionRequest.payload.subscriptionData
+                      .receiver
+                  }
+                  variant="h5"
+                />
+              </Stack>
+              <Stack alignItems="center" direction="row" spacing={1}>
+                <Typography variant="body2">via </Typography>
+                <DirectoryEntry
+                  partyId={
+                    subscriptionRequestQuery.data.subscriptionRequest.payload.subscriptionData
+                      .provider
+                  }
+                  variant="body2"
+                />
+              </Stack>
+            </Stack>
+            <SubscriptionContainer subscription={subscriptionRequestQuery.data} />
+          </>
+        )}
       </Stack>
     </Container>
   );
@@ -65,9 +72,8 @@ const SubscriptionContainer: React.FC<{ subscription: SubscriptionRequestWithCon
     return <Loading />;
   }
 
-  // TODO(#4139) implement error state from design
   if (coinPriceQuery.isError) {
-    return <p>Error, something went wrong.</p>;
+    return <ErrorDisplay message={'Error while fetching coin price'} />;
   }
 
   const payData = subscription.subscriptionRequest.payload.payData;

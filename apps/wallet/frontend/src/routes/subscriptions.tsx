@@ -1,6 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, IntervalDisplay } from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, ErrorDisplay, IntervalDisplay } from 'common-frontend';
 import Loading from 'common-frontend/lib/components/Loading';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
@@ -32,53 +32,51 @@ const Subscriptions: React.FC = () => {
   const subscriptionQuery = useSubscriptions();
   const coinPriceQuery = useCoinPrice();
 
-  if (coinPriceQuery.isLoading || subscriptionQuery.isLoading) {
-    return <Loading />;
-  }
-
-  // TODO(#4139) implement error state from design
-  if (coinPriceQuery.isError || subscriptionQuery.isError) {
-    return <p>Error, something went wrong.</p>;
-  }
-
-  const subscriptionTuples = subscriptionQuery.data;
+  const isLoading = coinPriceQuery.isLoading || subscriptionQuery.isLoading;
+  const isError = coinPriceQuery.isError || subscriptionQuery.isError;
 
   return (
     <Stack marginY={10} spacing={2}>
       <Typography variant="h6" fontWeight="bold">
         Your Subscriptions
       </Typography>
-      <TableContainer>
-        <Table style={{ tableLayout: 'fixed' }}>
-          <TableHead>
-            <TableRow>
-              <TableCell>Receiver</TableCell>
-              <TableCell>Service</TableCell>
-              <TableCell align="right">Price</TableCell>
-              <TableCell>Payment Due</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {subscriptionTuples.map((subscription, index) => {
-              const onCancel = () => {
-                cancelSubscription(subscription.state.value.contractId).catch(err =>
-                  console.error('Failed to cancel subscription.', err)
-                );
-              };
+      {isLoading ? (
+        <Loading />
+      ) : isError ? (
+        <ErrorDisplay message={'Error while fetching either transactions or coin price.'} />
+      ) : (
+        <TableContainer>
+          <Table style={{ tableLayout: 'fixed' }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Receiver</TableCell>
+                <TableCell>Service</TableCell>
+                <TableCell align="right">Price</TableCell>
+                <TableCell>Payment Due</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {subscriptionQuery.data.map((subscription, index) => {
+                const onCancel = () => {
+                  cancelSubscription(subscription.state.value.contractId).catch(err =>
+                    console.error('Failed to cancel subscription.', err)
+                  );
+                };
 
-              return (
-                <SubscriptionRow
-                  key={subscription.subscription.contractId}
-                  subscription={subscription}
-                  cancelSubscription={onCancel}
-                  coinPrice={coinPriceQuery.data}
-                />
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                return (
+                  <SubscriptionRow
+                    key={subscription.subscription.contractId}
+                    subscription={subscription}
+                    cancelSubscription={onCancel}
+                    coinPrice={coinPriceQuery.data}
+                  />
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </Stack>
   );
 };
