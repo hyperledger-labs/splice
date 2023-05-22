@@ -148,8 +148,15 @@ class Validator1PreflightIntegrationTest
           val description = transaction.partyDescription.getOrElse(fail("There should be a party."))
           description should fullyMatch regex partyR
           transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
-          transaction.usdAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
-          transaction.rate should matchText(s"1 CC/USD")
+          // we can't test a specific coin price as the coin price on a live network can change
+          val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
+          inside(transaction.rate) { case rateR(rate) =>
+            BigDecimal(rate) should be > BigDecimal(0)
+            transaction.usdAmount should beWithin(
+              transaction.ccAmount / BigDecimal(rate) - smallAmount,
+              transaction.ccAmount / BigDecimal(rate) + smallAmount,
+            )
+          }
         }
       }
 
