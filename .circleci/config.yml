@@ -256,6 +256,35 @@ commands:
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
 
+  cluster_lock_reaper:
+    parameters:
+      cluster:
+        type: enum
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Reap << parameters.cluster >> if lock older than 12 hours
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
+          gce_authenticate: true
+          cmd: |
+            set -eou pipefail
+            export KUBECONFIG=$PWD/.kubecfg
+
+            cncluster activate
+            cncluster show
+            if ! cncluster ci_assert_fresh_lock; then
+              lockholder=$(cncluster lockholder)
+
+              curl -s -f -X POST --url "https://slack.com/api/chat.postMessage" \
+                 -H "Content-type: application/json" \
+                 -H "Authorization: Bearer $SLACK_ACCESS_TOKEN" \
+                 --data '{ "text": "The cluster lock on '<< parameters.cluster >>' held by '${lockholder}' is too old. \n*Unlocking and resetting cluster.* :reaper: ( <'${CIRCLE_BUILD_URL}'|CI Build> )", "channel": "C03J6NCPSE4" }'
+
+              cncluster ci_reset_unlock
+            fi
+
+
   # Largely copied from Canton's CI definition
   execute_sbt_command:
     description: |
@@ -1165,10 +1194,6 @@ jobs:
 
   cluster_lock_reaper:
     circleci_ip_ranges: true
-    parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
     docker:
     - image: cimg/base:2021.04
     environment:
@@ -1176,28 +1201,14 @@ jobs:
     steps:
       - checkout
       - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Reap locks older than 12 hours
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep SLACK_ACCESS_TOKEN"
-          gce_authenticate: true
-          cmd: |
-            set -eou pipefail
-            export KUBECONFIG=$PWD/.kubecfg
-
-            cncluster activate
-            if cncluster ci_assert_fresh_lock; then
-              echo "Lock fresh and nothing to do."
-            else
-              lockholder=$(cncluster lockholder)
-
-              curl -s -f -X POST --url "https://slack.com/api/chat.postMessage" \
-                 -H "Content-type: application/json" \
-                 -H "Authorization: Bearer $SLACK_ACCESS_TOKEN" \
-                 --data '{ "text": "*The cluster lock on '<< parameters.cluster >>' held by '${lockholder}' is too old. Unlocking and resetting cluster.* :reaper::reaper::reaper:.", "channel": "C03J6NCPSE4" }'
-
-              cncluster ci_reset_unlock
-            fi
+      - cluster_lock_reaper:
+          cluster: "scratchneta"
+      - cluster_lock_reaper:
+          cluster: "scratchnetb"
+      - cluster_lock_reaper:
+          cluster: "scratchnetc"
+      - cluster_lock_reaper:
+          cluster: "scratchnetd"
 
   update_pipeline_schedule:
     docker:
@@ -1882,25 +1893,6 @@ workflows:
     jobs:
        - cluster_lock_reaper:
             <<: *main-branch-only
-            cluster: "scratchneta"
-            context:
-              - canton-network-vpn
-              - slack-context
-       - cluster_lock_reaper:
-            <<: *main-branch-only
-            cluster: "scratchnetb"
-            context:
-              - canton-network-vpn
-              - slack-context
-       - cluster_lock_reaper:
-            <<: *main-branch-only
-            cluster: "scratchnetc"
-            context:
-              - canton-network-vpn
-              - slack-context
-       - cluster_lock_reaper:
-            <<: *main-branch-only
-            cluster: "scratchnetd"
             context:
               - canton-network-vpn
               - slack-context

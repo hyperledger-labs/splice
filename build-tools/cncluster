@@ -648,6 +648,9 @@ function _cluster_reset() {
         --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
         down -y
 
+    _info "Uninstalling Pulumi canton-network stack"
+    subcmd_pulumi canton-network down --yes
+
     _info "Cluster in reset/idle state."
 }
 
@@ -720,9 +723,9 @@ function subcmd_ci_assert_fresh_lock() {
         age_secs="$(_current_lock_age)"
 
         if (( age_secs > 43200 )); then
-            _error "Cluster lock old (and probably stale)."
+            _error "Cluster lock held by ${lockholder} is stale. Lock age: $(_current_lock_age_formatted)"
         else
-            _info "Cluster lock fresh."
+            _info "Cluster lock held by ${lockholder} is fresh. Lock age: $(_current_lock_age_formatted)"
         fi
     else
         _info "Cluster sharable but not locked. No lock to check."
@@ -874,6 +877,15 @@ function subcmd_info() {
         | sort \
         | column -t
 
+}
+
+###
+
+subcommand_whitelist[show]='Display information on current cluster configuration'
+
+function subcmd_show() {
+    _cluster_show
+    _cluster_must_exist
 }
 
 ###
