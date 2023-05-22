@@ -36,6 +36,10 @@ spec:
             - name: CN_APP_SV_ONBOARDING_TYPE
               value: {{ .Values.onboardingType }}
             {{- end }}
+            {{- if .Values.onboardingName }}
+            - name: CN_APP_SV_ONBOARDING_NAME
+              value: {{ .Values.onboardingName }}
+            {{- end }}
             {{ if ((.Values.auth).audience) }}
             - name: CN_APP_SV_AUTH_AUDIENCE
               value: {{ .Values.auth.audience | quote }}
@@ -54,7 +58,6 @@ spec:
                 _onboarding {
                   type = "join-with-key"
                   sv-client.admin-api.url = "{{ .sponsorApiUrl }}"":""{{ .sponsorApiPort }}"
-                  name = "{{ .keyName }}"
                   public-key = "{{ .publicKey }}"
                   private-key = "{{ .privateKey }}"
                 }

@@ -14,11 +14,19 @@ const appToClientId = {
   'sv-2': 'rv4bllgKWAiW9tBtdvURMdHW42MAXghz',
   'sv-3': 'SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk',
   'sv-4': 'CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN',
+  sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
+  sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
+  sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
+  sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
 } as { [key: string]: string };
 
 const namespaceToUiClientId = {
   validator1: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
   splitwell: 'eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL',
+  'sv-1': 'Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J',
+  'sv-2': 'G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6',
+  'sv-3': 'cgxHguMv32JLeew9S6wBDgNPHmPCIKaP',
+  'sv-4': 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
 } as { [key: string]: string };
 
 /// Auth0

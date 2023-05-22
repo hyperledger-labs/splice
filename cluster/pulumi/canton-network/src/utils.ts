@@ -86,7 +86,8 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
 
   const imageTagOverride = config.get('IMAGE_TAG');
 
-  return _.merge(
+  const values = _.mergeWith(
+    {},
     chartDefaultValues,
     {
       imageRepo: 'us-central1-docker.pkg.dev/da-cn-images/cn-images',
@@ -98,6 +99,7 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
         dnsName: CLUSTER_DNS_NAME,
         networkSettings,
       },
+      clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
     },
     overrideValues,
     imageTagOverride
@@ -106,8 +108,11 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
             imageTag: imageTagOverride,
           },
         }
-      : {}
+      : {},
+    (a, b) => (_.isArray(b) ? b : undefined)
   );
+
+  return values;
 }
 
 export function installCNHelmChartByNamespaceName(
@@ -161,4 +166,4 @@ export function installCNHelmChart(
 // Typically used for overriding chart values.
 // The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ChartValues = { [key: string]: any };
+export type ChartValues = { [key: string]: any };
