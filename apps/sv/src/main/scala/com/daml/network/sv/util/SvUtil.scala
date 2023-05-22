@@ -88,20 +88,16 @@ object SvUtil {
     }
   }
 
-  def requiredNumConfirmations(svcRules: Contract[SvcRules.ContractId, SvcRules]): Int = {
-    val memberNum = svcRules.payload.members.size
-    // as per `SvcRules` / `summarizeCollective`
-    val required = 2 * (memberNum - 1) / 3 + 1
-    if (svcRules.payload.isDevNet) required min 4
-    else required
-  }
-
   def requiredNumVotes(svcRules: Contract[SvcRules.ContractId, SvcRules]): Int = {
     val memberNum = svcRules.payload.members.size
     // as per `SvcRules` / `summarizeCollective`
-    val required = 2 * (memberNum - 1) / 3 + 1
-    if (svcRules.payload.isDevNet) required min 4
-    else required
+    val f = (memberNum - 1) / 3
+    val superMajoritySize = 2 * f + 1
+    val adjustedSuperMajoritySize =
+      if (svcRules.payload.isDevNet) superMajoritySize min 4
+      else superMajoritySize
+    val majoritySize = memberNum / 2 + 1
+    majoritySize.max(adjustedSuperMajoritySize)
   }
 
   def generateRandomOnboardingSecret(): String = {

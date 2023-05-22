@@ -121,7 +121,7 @@ template SvcRulesV1Test with
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
-        require "Member name is new" (not $ newMemberName `elem` (map (.name) (Map.values members)))
+        require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
         let info = MemberInfo with
               name = newMemberName
               joinedAsOfRound = nextMiningRound
@@ -245,7 +245,7 @@ template SvcRulesV1Test with
       controller leader
       do
         let s = summarizeCollectiveV1Test this
-        require "Enough confirmations" (length confirmationCids >= s.requiredNumConfirmations)
+        require "Enough confirmations" (length confirmationCids >= s.requiredNumVotes)
         confirmers <- forA confirmationCids $ \confirmationCid -> do
           confirmation <- fetch confirmationCid
           archive confirmationCid
@@ -433,7 +433,6 @@ summarizeCollectiveV1Test : SvcRulesV1Test -> CollectiveSummary
 summarizeCollectiveV1Test c = CollectiveSummary with
     leader = c.leader
     numMembers
-    requiredNumConfirmations = 2 * (numMembers - 1) / 3 + 1
     requiredNumVotes = 2 * (numMembers - 1) / 3 + 1
   where
     numMembers = Map.size c.members

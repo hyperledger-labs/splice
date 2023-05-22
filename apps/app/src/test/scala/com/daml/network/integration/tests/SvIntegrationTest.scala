@@ -700,17 +700,17 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
 
     actAndCheck(
-      "Add 6 phantom SVs to SVC", {
-        for { i <- 1 to 6 } {
+      "Add 3 phantom SVs to SVC", {
+        for { i <- 1 to 3 } {
           val name = s"phantom sv$i"
           val partyId = allocateRandomSvParty(name)
           addSvMember(partyId, name)
         }
       },
     )(
-      "There should be 10 SVC members in total now",
+      "There should be 7 SVC members in total now",
       _ => {
-        getSvcRules().data.members should have size 10
+        getSvcRules().data.members should have size 7
       },
     )
 
@@ -725,7 +725,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         createSvOnboardingConfirmation(svcRules, sv4, newMemberPartyId, newMemberName)
       },
     )(
-      "There are 10 SVC members in total but only 4 confirmations are required to confirm a SV",
+      "There are 7 SVC members in total but only 4 confirmations are required to confirm a SV",
       _ =>
         inside(
           svc.participantClientWithAdminToken.ledger_api_extensions.acs

@@ -111,8 +111,8 @@ testRequiredNumOfConfirmationInDevNet : Script ()
 testRequiredNumOfConfirmationInDevNet = do
   (_, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
 
-  -- add 9 phamton SVs
-  forA_ [5 .. 13] $ \i -> do
+  -- add 3 phamton SVs
+  forA_ [5 .. 7] $ \i -> do
     [(svcRulesCid, _)] <- query @SvcRules svc
     let svName = "sv" <> show i
     phamtonSv <- allocateParty $ svName
@@ -120,7 +120,7 @@ testRequiredNumOfConfirmationInDevNet = do
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
-  Map.size svcRules.members === 13
+  Map.size svcRules.members === 7
 
   svX <- allocateParty "svX"
 
@@ -137,7 +137,7 @@ testRequiredNumOfConfirmationInDevNet = do
   confirmations <- query @Confirmation svc
   length confirmations === 4
 
-  -- There are 13 SVC members in total, which implies f = 4 and thus 9 confirmations are required in a non-DevNet.
+  -- There are 7 SVC members in total, which implies f = 2 and thus 5 confirmations are required in a non-DevNet.
   -- However, in DevNet only 4 confirmations are required to run a confirmed action
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
     SvcRules_ExecuteConfirmedAction with

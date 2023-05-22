@@ -101,11 +101,8 @@ data MemberInfo = MemberInfo with
 data CollectiveSummary = CollectiveSummary with
     leader : Party
     numMembers : Int
-    requiredNumConfirmations : Int
-    -- | The number of confirmations required for executing an action that
-    -- is automatically determined by the state of the ledger and the wall-clocks of the SV nodes.
     requiredNumVotes : Int
-    -- | The number of votes required for considering a request for a vote or
+    -- | The number of votes required for considering a confirmation, a request for a vote, or
     -- a leader election definitive.
   deriving (Eq, Show)
 
@@ -437,7 +434,7 @@ template SvcRules with
       do
         requireUnlocked lock
         let s = summarizeCollective this
-        require "Enough confirmations" (length confirmationCids >= s.requiredNumConfirmations)
+        require "Enough confirmations" (length confirmationCids >= s.requiredNumVotes)
         confirmers <- forA confirmationCids $ \confirmationCid -> do
           confirmation <- fetch confirmationCid
           archive confirmationCid
@@ -938,13 +935,22 @@ summarizeCollective : SvcRules -> CollectiveSummary
 summarizeCollective svcRules = CollectiveSummary with
     leader = svcRules.leader
     numMembers
-    requiredNumConfirmations = adjustForDevNet (2 * f + 1)
-    -- TODO(M3-57): switch this to f + 1, as that matches the difference in confirmation-based processes and voting-based processes
-    requiredNumVotes = adjustForDevNet (2 * f + 1)
+    requiredNumVotes =  
+      -- NOTE: 
+      --   * We require at least majority of votes to ensure that every definite
+      --     vote or confirmed action can be executed at most once. Otherwise, we'd fail
+      --     to properly propagate the command-deduplication done by SV's when they submit
+      --     confirmations.
+      --     This adjustment is only relevant for the cases where `f == 0` (i.e., numMembers \in {2,3})
+      --     or when we adjust the requiredNumVotes for DevNet and `numMembers >= 8`
+      --   * We require `2 * f + 1` confirmations instead of only `f + 1` confirmations, as otherwise 
+      --     the confirmations for adding members can be abused by an `f + 1` minority to change the 
+      --     consortium composition to onboard fake SVs that boost the votes of that minority.
+      max (numMembers / 2 + 1) (adjustForDevNet (2 * f + 1))
   where
     numMembers = Map.size svcRules.members
     f = (numMembers - 1) / 3
-    -- TODO(M3-57): consider removing this adjustment, as we don't expect the DevNet SV's to be actively malicous and try to take over the network
+    -- TODO(M3-57): remove the adjustment for dev-net once the SVs have proven to be operationally stable
     adjustForDevNet = if svcRules.isDevNet then min 4 else identity
 
 -- | Execute an action which requires certain number of confirmations from SVs.

@@ -63,7 +63,7 @@ class ExecuteConfirmedActionTrigger(
         for {
           domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
           svcRules <- store.getSvcRules()
-          requiredNumConfirmations = SvUtil.requiredNumConfirmations(svcRules)
+          requiredNumConfirmations = SvUtil.requiredNumVotes(svcRules)
           confirmations <- store.listConfirmations(action)
           uniqueConfirmations = confirmations.distinctBy(_.payload.confirmer)
           taskOutcome <-

@@ -343,7 +343,7 @@ class HttpSvHandler(
       name = Some(svOnboardingRequest.payload.candidateName),
       contractId = Some(Codec.encodeContractId(svOnboardingRequest.contractId)),
       confirmedBy = Some(confirmedBy),
-      requiredNumConfirmations = Some(SvUtil.requiredNumConfirmations(svcRules)),
+      requiredNumConfirmations = Some(SvUtil.requiredNumVotes(svcRules)),
     )
   }
 
