@@ -270,179 +270,179 @@ spec:
     - destination:
         port:
           number: 80
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
   - match:
     - port: 5008
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5008
   - match:
     - port: 10313
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 10313
   - match:
     - port: 5002
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5002
   - match:
     - port: 5001
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5001
   - match:
     - port: 10013
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 10013
   - match:
     - port: 5010
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5010
   - match:
     - port: 5005
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5005
   - match:
     - port: 5014
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5014
   - match:
     - port: 5114
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5114
   - match:
     - port: 5214
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5214
   - match:
     - port: 5314
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5314
   - match:
     - port: 5012
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5012
   - match:
     - port: 5102
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5102
   - match:
     - port: 5101
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5101
   - match:
     - port: 10113
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 10113
   - match:
     - port: 6101
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 6101
   - match:
     - port: 5108
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5108
   - match:
     - port: 5109
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5109
   - match:
     - port: 10413
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 10413
   - match:
     - port: 5202
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5202
   - match:
     - port: 5201
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5201
   - match:
     - port: 10213
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 10213
   - match:
     - port: 6201
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 6201
   - match:
     - port: 5213
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5213
   - match:
     - port: 6213
     route:
     - destination:
-        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 6213

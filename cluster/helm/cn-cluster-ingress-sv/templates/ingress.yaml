@@ -125,14 +125,10 @@ spec:
     spec:
       containers:
       - name: external-proxy
-        image: "{{ .Values.imageRepo }}/external-proxy:{{ (.Values.cluster).imageTag }}"
+        image: "{{ .Values.imageRepo }}/external-proxy-sv:{{ (.Values.cluster).imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- if .Values.enableIngressModes }}
-        - name: ENABLE_INGRESS_MODES
-          value: "{{ .Values.enableIngressModes }}"
-        {{- end }}
         {{- if .Values.svNamespace }}
         - name: INGRESS_CONFIG_SV_NAMESPACE
           value: "{{ .Values.svNamespace }}"

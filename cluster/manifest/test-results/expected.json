@@ -6021,19 +6021,19 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "external-proxy",
+               "app": "external-proxy-full",
                "clusterName": "cluster",
                "cnjClusterName": "cluster",
-               "moduleName": "external-proxy"
+               "moduleName": "external-proxy-full"
             },
-            "name": "external-proxy",
+            "name": "external-proxy-full",
             "namespace": "cluster-ingress"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "external-proxy"
+                  "app": "external-proxy-full"
                }
             },
             "strategy": {
@@ -6042,10 +6042,10 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "external-proxy",
+                     "app": "external-proxy-full",
                      "clusterName": "cluster",
                      "cnjClusterName": "cluster",
-                     "moduleName": "external-proxy"
+                     "moduleName": "external-proxy-full"
                   }
                },
                "spec": {
@@ -6057,9 +6057,9 @@
                               "value": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4"
                            }
                         ],
-                        "image": "region-docker.pkg.dev/project/repo/external-proxy:tag",
+                        "image": "region-docker.pkg.dev/project/repo/external-proxy-full:tag",
                         "imagePullPolicy": "Always",
-                        "name": "external-proxy",
+                        "name": "external-proxy-full",
                         "ports": [
                            {
                               "containerPort": 80,
@@ -6194,7 +6194,7 @@
                         "volumeMounts": [
                            {
                               "mountPath": "/config",
-                              "name": "external-proxy-config-vol"
+                              "name": "external-proxy-full-config-vol"
                            }
                         ]
                      }
@@ -6204,7 +6204,7 @@
                         "configMap": {
                            "name": "cluster-manifest"
                         },
-                        "name": "external-proxy-config-vol"
+                        "name": "external-proxy-full-config-vol"
                      }
                   ]
                }
@@ -6219,7 +6219,7 @@
                "clusterName": "cluster",
                "cnjClusterName": "cluster"
             },
-            "name": "external-proxy",
+            "name": "external-proxy-full",
             "namespace": "cluster-ingress"
          },
          "spec": {
@@ -6376,7 +6376,7 @@
                }
             ],
             "selector": {
-               "app": "external-proxy"
+               "app": "external-proxy-full"
             }
          }
       }

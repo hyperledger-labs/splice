@@ -18,7 +18,8 @@ images := \
 	splitwell-web-ui \
 	\
 	docs \
-	external-proxy \
+	external-proxy-full \
+	external-proxy-sv \
 	gcs-proxy \
 	envoy-proxy \
 	json-api

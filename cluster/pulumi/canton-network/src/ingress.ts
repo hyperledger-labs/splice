@@ -15,7 +15,7 @@ export function installClusterIngress(
     'cluster-ingress',
     ingressNsName,
     'cluster-ingress',
-    'cn-cluster-ingress',
+    'cn-cluster-ingress-full',
     {},
     dependsOn
   );

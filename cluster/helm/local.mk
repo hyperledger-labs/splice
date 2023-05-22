@@ -1,5 +1,6 @@
 app_charts := \
-	cn-cluster-ingress \
+	cn-cluster-ingress-full \
+	cn-cluster-ingress-sv \
 	cn-directory-web-ui \
 	cn-docs \
 	cn-domain \

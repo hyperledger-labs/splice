@@ -3,6 +3,15 @@
 Release Notes
 =============
 
+2023-05-28
+----------
+
+* Deployment updates:
+
+  * Note that the ingress Helm chart has been renamed to `canton-network-helm/cn-cluster-ingress-sv`,
+    and similarly, the underlying image has been renamed to `external-proxy-sv`. They will soon be
+    simplified to include only the configuration essential for an SV node deployment.
+
 2023-05-21
 ----------
 

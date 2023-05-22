@@ -149,7 +149,7 @@ const ingressImagePullDeps = localCharts
 installCNHelmChartByNamespaceName(
   infraStack.getOutput("ingressNs") as pulumi.Output<string>,
   "cluster-ingress",
-  "cn-cluster-ingress",
+  "cn-cluster-ingress-sv",
   // TODO(#4384): move these values into a file and distribute it with the release
   {
     enableIngressModes: "sv-external",

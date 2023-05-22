@@ -462,7 +462,7 @@ Install the Ingress Helm Chart:
 
 .. code-block:: bash
 
-    helm install cluster-ingress canton-network-helm/cn-cluster-ingress \
+    helm install cluster-ingress canton-network-helm/cn-cluster-ingress-sv \
         -n cluster-ingress \
         -f ingress-values.yaml \
         --wait

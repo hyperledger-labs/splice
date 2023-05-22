@@ -26,7 +26,7 @@ local deployments(config, deployments) =
     clusterVersionConfigMap(config, "cluster-manifest"),
     c.deployment(
       config,
-      "external-proxy",
+      "external-proxy-full",
       externalProxyPorts,
       memoryLimitMiB=512,
       mountConfig="cluster-manifest",
