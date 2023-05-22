@@ -219,64 +219,92 @@ class HttpSvHandler(
       )
     }
 
-  // TODO(#3429) add a check here to make sure the candidate SV is already confirmed.
   def onboardSvPartyMigrationAuthorize(
       respond: v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse.type
   )(
       body: definitions.OnboardSvPartyMigrationAuthorizeRequest
   )(fake: Unit): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      ParticipantId
-        .fromProtoPrimitive(body.participantId, "")
-        .fold(
-          err =>
-            Future
-              .failed(
-                HttpErrorHandler.badRequest(err.message)
-              ),
-          participantId => {
-            logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
-            for {
-              // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
-              // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-              _ <- retryProvider.retryForClientCalls(
-                "locking SvcRules and CoinRules contracts",
-                lockSvcRulesAndCoinRules(),
-                logger,
+      (for {
+        participantId <- Codec.decode(Codec.Participant)(body.participantId)
+        candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
+      } yield {
+        for {
+          isCandidateOnboardingConfirmed <- svcStore
+            .lookupSvOnboardingConfirmedByParty(candidateParty)
+            .map(_.isDefined)
+          svcRules <- svcStore.getSvcRules()
+          isCandidateMember = SvApp.isSvcMemberParty(candidateParty, svcRules)
+          isCandidatePartyHostedInParticipant <- svcPartyHosting
+            .listActivePartyToParticipantMappings(
+              svcParty,
+              globalDomain,
+              participantId,
+            )
+            .map(_.nonEmpty)
+          res <-
+            if (!isCandidateOnboardingConfirmed && !isCandidateMember)
+              Future.failed(
+                HttpErrorHandler.unauthorized(
+                  s"Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
+                )
               )
-              _ = logger.info(
-                s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
+            else if (!isCandidatePartyHostedInParticipant)
+              Future.failed(
+                HttpErrorHandler.unauthorized(
+                  s"Candidate party $candidateParty is not authorized by participant $participantId"
+                )
               )
-
-              // this will wait until the PartyToParticipant state change completed
-              authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
-                globalDomain,
-                participantId,
-                RequestSide.From,
-              )
-              _ = logger
-                .info(s"Sponsor SV finished authorizing svc party to participant $participantId")
-              _ <- retryProvider.retryForClientCalls(
-                "unlocking SvcRules and CoinRules contracts",
-                unlockSvcRulesAndCoinRules(),
-                logger,
-              )
-
-              _ = logger.info(
-                s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
-              )
-
-              acsBytes <- participantAdminConnection.downloadAcsSnapshot(
-                Set(svcParty),
-                filterDomainId = globalDomain.toProtoPrimitive,
-                timestamp = Some(authorizedAt),
-              )
-              // TODO(M3-57) consider if a more space-efficient encoding is necessary
-              encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
-            } yield definitions.OnboardSvPartyMigrationAuthorizeResponse(encoded)
-          },
-        )
+            else authorizeParticipantForHostingSvcParty(participantId)
+        } yield res
+      }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
     }
+
+  private def authorizeParticipantForHostingSvcParty(
+      participantId: ParticipantId
+  )(implicit tc: TraceContext) = {
+    logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
+    for {
+      // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
+      // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
+      _ <- retryProvider.retryForClientCalls(
+        "locking SvcRules and CoinRules contracts",
+        lockSvcRulesAndCoinRules(),
+        logger,
+      )
+      _ = logger.info(
+        s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
+      )
+
+      // this will wait until the PartyToParticipant state change completed
+      authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
+        globalDomain,
+        participantId,
+        RequestSide.From,
+      )
+      _ = logger
+        .info(s"Sponsor SV finished authorizing svc party to participant $participantId")
+      _ <- retryProvider.retryForClientCalls(
+        "unlocking SvcRules and CoinRules contracts",
+        unlockSvcRulesAndCoinRules(),
+        logger,
+      )
+
+      _ = logger.info(
+        s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
+      )
+
+      acsBytes <- participantAdminConnection.downloadAcsSnapshot(
+        Set(svcParty),
+        filterDomainId = globalDomain.toProtoPrimitive,
+        timestamp = Some(authorizedAt),
+      )
+      // TODO(M3-57) consider if a more space-efficient encoding is necessary
+      encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
+    } yield v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
+      definitions.OnboardSvPartyMigrationAuthorizeResponse(encoded)
+    )
+  }
 
   private def isCompleted(
       svParty: PartyId,

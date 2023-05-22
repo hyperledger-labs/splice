@@ -208,7 +208,7 @@ object HttpSvAppClient {
     }
   }
 
-  case class OnboardSvPartyMigrationAuthorize(participantId: ParticipantId)
+  case class OnboardSvPartyMigrationAuthorize(participantId: ParticipantId, candidate: PartyId)
       extends BaseCommand[http.OnboardSvPartyMigrationAuthorizeResponse, ByteString] {
 
     override def submitRequest(
@@ -219,7 +219,10 @@ object HttpSvAppClient {
       HttpResponse,
     ], http.OnboardSvPartyMigrationAuthorizeResponse] =
       client.onboardSvPartyMigrationAuthorize(
-        body = definitions.OnboardSvPartyMigrationAuthorizeRequest(participantId.toProtoPrimitive),
+        body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
+          participantId.toProtoPrimitive,
+          candidate.toProtoPrimitive,
+        ),
         headers = headers,
       )
 

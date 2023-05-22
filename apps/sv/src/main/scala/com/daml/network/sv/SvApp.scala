@@ -360,6 +360,7 @@ class SvApp(
                 globalDomain,
                 participantId,
                 svcPartyHosting,
+                svStore.key.svParty,
               )
               _ <- ledgerConnection.grantUserRights(
                 config.ledgerApiUser,
@@ -428,9 +429,10 @@ class SvApp(
       domainId: DomainId,
       participantId: ParticipantId,
       svcPartyHosting: SvcPartyHosting,
+      svParty: PartyId,
   ): Future[Unit] = {
     svcPartyHosting
-      .start(domainId, participantId)
+      .start(domainId, participantId, svParty)
       .map(
         _.getOrElse(
           sys.error(s"Failed to host svc party on participant $participantId")
@@ -809,7 +811,7 @@ class SvApp(
       privateKey: ECPrivateKey,
   ): Future[Unit] = {
     SvOnboardingToken(name, publicKey, partyId, svcPartyId).signAndEncode(privateKey) match {
-      case Right(token) => {
+      case Right(token) =>
         logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
         retryProvider.retryForAutomation(
           "request onboarding",
@@ -825,7 +827,6 @@ class SvApp(
           },
           logger,
         )
-      }
       case Left(error) =>
         Future.failed(
           Status.INTERNAL

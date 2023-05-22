@@ -751,6 +751,30 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       val svcParticipant = svc.participantClient
       val sv4Participant = sv4.participantClient
 
+      clue(
+        "svc party hosting authorization request with party which is not confirmed will be rejected by sponsor SV"
+      ) {
+        val randomParty = allocateRandomSvParty("random")
+        assertThrowsAndLogsCommandFailures(
+          sv1.onboardSvPartyMigrationAuthorize(sv4.participantClient.id, randomParty),
+          _.errorMessage should include(
+            "Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
+          ),
+        )
+      }
+
+      clue(
+        "svc party hosting authorization request with party which is not hosted on the target participant"
+      ) {
+        val sv1Party = sv1.getSvcInfo().svParty
+        assertThrowsAndLogsCommandFailures(
+          sv1.onboardSvPartyMigrationAuthorize(sv4.participantClient.id, sv1Party),
+          _.errorMessage should include(
+            s"Candidate party $sv1Party is not authorized by participant"
+          ),
+        )
+      }
+
       createCoinOwnBySvc(svcParticipant, 1.0)
 
       clue("start onboarding new SV and SVC party setup on new SV's dedicated participant") {

@@ -51,13 +51,17 @@ final class SvConnection private (
 
   /** Ask the sponsoring SV to authorize hosting the SVC party at the candidate participant and to prepare the ACS snapshot.
     */
-  def authorizeSvcPartyHosting(candidateParticipantId: ParticipantId)(implicit
+  def authorizeSvcPartyHosting(candidateParticipantId: ParticipantId, candidateParty: PartyId)(
+      implicit
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[ByteString] =
-    runHttpCmd(config.url, HttpSvAppClient.OnboardSvPartyMigrationAuthorize(candidateParticipantId))
+    runHttpCmd(
+      config.url,
+      HttpSvAppClient.OnboardSvPartyMigrationAuthorize(candidateParticipantId, candidateParty),
+    )
 }
 
 object SvConnection {

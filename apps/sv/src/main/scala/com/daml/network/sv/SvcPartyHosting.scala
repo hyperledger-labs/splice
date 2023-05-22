@@ -50,7 +50,7 @@ class SvcPartyHosting(
     ) && mappings.exists(_.item.side == RequestSide.From))
   }
 
-  def start(domainId: DomainId, participantId: ParticipantId)(implicit
+  def start(domainId: DomainId, participantId: ParticipantId, svParty: PartyId)(implicit
       traceContext: TraceContext
   ): Future[Either[String, Unit]] = {
     getSponsorSvConfig(onboardingConfig) match {
@@ -64,7 +64,7 @@ class SvcPartyHosting(
           )
           _ <- participantAdminConnection.disconnectFromAllDomains()
           _ = logger.info("candidate SV participant disconnected from global domain")
-          acsBytes <- getAuthorizationAndAcsFromSponsor(sponsorSvConfig, participantId)
+          acsBytes <- getAuthorizationAndAcsFromSponsor(sponsorSvConfig, participantId, svParty)
           _ <- participantAdminConnection.uploadAcsSnapshot(acsBytes)
           _ = logger.info(
             "Imported Acs snapshot from sponsor SV participant to candidate participant"
@@ -91,6 +91,7 @@ class SvcPartyHosting(
   private def getAuthorizationAndAcsFromSponsor(
       sponsorSvConfig: SvAppClientConfig,
       candidateParticipantId: ParticipantId,
+      svParty: PartyId,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
     logger.info(
       s"Requesting to authorize SVC party hosting via SV at: ${sponsorSvConfig.adminApi.url}"
@@ -104,7 +105,7 @@ class SvcPartyHosting(
         loggerFactory,
       ).flatMap { svConnection =>
         svConnection
-          .authorizeSvcPartyHosting(candidateParticipantId)
+          .authorizeSvcPartyHosting(candidateParticipantId, svParty)
           .map(bs => ByteString.copyFrom(bs.asByteBuffer))
           .andThen(_ => svConnection.close())
       },
@@ -117,11 +118,19 @@ class SvcPartyHosting(
       participantId: ParticipantId,
       side: Option[RequestSide],
   )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResult]] =
+    listActivePartyToParticipantMappings(svcParty, domain, participantId, side)
+
+  def listActivePartyToParticipantMappings(
+      party: PartyId,
+      domain: DomainId,
+      participantId: ParticipantId,
+      side: Option[RequestSide] = None,
+  )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResult]] =
     participantAdminConnection
       .listPartyToParticipantMappings(
         filterStore = domain.toProtoPrimitive,
         operation = Some(TopologyChangeOp.Add),
-        filterParty = svcParty.toProtoPrimitive,
+        filterParty = party.toProtoPrimitive,
         filterParticipant = participantId.uid.toProtoPrimitive,
         filterRequestSide = side,
       )

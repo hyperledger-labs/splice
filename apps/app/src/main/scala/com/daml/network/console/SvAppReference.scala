@@ -60,11 +60,13 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.GetSvcInfo)
     }
 
-  def onboardSvPartyMigrationAuthorize(participantId: ParticipantId): ByteString =
+  def onboardSvPartyMigrationAuthorize(
+      participantId: ParticipantId,
+      candidateParty: PartyId,
+  ): ByteString =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.OnboardSvPartyMigrationAuthorize(participantId))
+      httpCommand(HttpSvAppClient.OnboardSvPartyMigrationAuthorize(participantId, candidateParty))
     }
-
 }
 
 class SvAppClientReference(
