@@ -82,7 +82,6 @@ object CantonDependencies {
   lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
-  lazy val daml_lf_interpreter = "com.daml" %% "daml-lf-interpreter" % daml_libraries_version
   lazy val daml_lf_value_java_proto =
     "com.daml" % "daml-lf-value-java-proto" % daml_libraries_version
   lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
@@ -90,14 +89,11 @@ object CantonDependencies {
     "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
 
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
-  lazy val daml_caching = "com.daml" %% "caching" % daml_libraries_version
   lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
   lazy val daml_contextualized_logging =
     "com.daml" %% "contextualized-logging" % daml_libraries_version
-  lazy val daml_resources_akka = "com.daml" %% "resources-akka" % daml_libraries_version
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
-  lazy val daml_script_runner = "com.daml" %% "daml-script-runner" % daml_libraries_version
   lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
@@ -119,8 +115,6 @@ object CantonDependencies {
   lazy val bouncycastle_bcpkix_jdk15on =
     "org.bouncycastle" % "bcpkix-jdk15on" % bouncy_castle_version
 
-  lazy val javax_annotations = "javax.annotation" % "javax.annotation-api" % "1.3.2"
-
   lazy val grpc_api = "io.grpc" % "grpc-api" % grpc_version
   lazy val grpc_protobuf = "io.grpc" % "grpc-protobuf" % grpc_version
   lazy val grpc_netty = "io.grpc" % "grpc-netty" % grpc_version
@@ -128,7 +122,6 @@ object CantonDependencies {
   // required for ALPN (which is required for TLS+HTTP/2) when running on Java 8. JSSE will be used on Java 9+.
   lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.46.Final"
   lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
-  lazy val grpc_stub = "io.grpc" % "grpc-stub" % grpc_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
 
   lazy val scopt = "com.github.scopt" %% "scopt" % "4.0.0"
@@ -179,7 +172,6 @@ object CantonDependencies {
   lazy val circe_core = "io.circe" %% "circe-core" % circe_version
   lazy val circe_generic = "io.circe" %% "circe-generic" % circe_version
   lazy val circe_generic_extras = "io.circe" %% "circe-generic-extras" % circe_version
-  lazy val circe_parser = "io.circe" %% "circe-parser" % circe_version
 
   lazy val guava = "com.google.guava" % "guava" % "31.1-jre"
   lazy val tink = "com.google.crypto.tink" % "tink" % "1.3.0" excludeAll (
@@ -237,43 +229,10 @@ object CantonDependencies {
   lazy val sttp = "com.softwaremill.sttp.client3" %% "core" % sttp_version
   lazy val sttp_okhttp = "com.softwaremill.sttp.client3" %% "okhttp-backend" % sttp_version
   lazy val sttp_circe = "com.softwaremill.sttp.client3" %% "circe" % sttp_version
-  lazy val sttp_slf4j = "com.softwaremill.sttp.client3" %% "slf4j-backend" % sttp_version
-
-  // demo dependencies (you also need to update demo.sc)
-  lazy val scalafx = "org.scalafx" %% "scalafx" % "17.0.1-R26"
-  // TODO(#8460) Don't upgrade until https://github.com/sbt/sbt/issues/6564 is fixed
-  lazy val javafx_all =
-    Seq("controls", "base", "fxml", "media", "web", "graphics").map { x =>
-      "org.openjfx" % s"javafx-$x" % "17-ea+8"
-    }
 
   lazy val toxiproxy_java = "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4"
 
-  lazy val fabric_sdk = "org.hyperledger.fabric-sdk-java" % "fabric-sdk-java" % "2.2.13"
-
   lazy val web3j = "org.web3j" % "core" % "4.8.9"
-
-  // From digitalasset.jfrog.io
-  lazy val vmbc_protos =
-    "com.digitalasset.daml.driver.vmbc" % "vmbc-grpc" % vmbc_driver_libraries_version
-
-  // From digitalasset.jfrog.io
-  lazy val vmbc_interceptors =
-    "com.digitalasset.daml.driver.vmbc" % "vmbc-grpc-interceptors" % vmbc_driver_libraries_version
-
-  // From digitalasset.jfrog.io
-  lazy val vmbc_sequencer_protos =
-    "com.daml.ledger.canton.driver.vmbc" % "canton-sequencer-grpc" % vmbc_driver_libraries_version
-
-  // From digitalasset.jfrog.io
-  lazy val vmbc_sequencer_core_reference =
-    "com.daml.ledger.canton.driver.vmbc" % "canton-sequencer-core-reference" % vmbc_driver_libraries_version % Test classifier "all"
-  lazy val vmbc_sequencer_core_reference_artifact_file_name: String = {
-    val artifact = vmbc_sequencer_core_reference.explicitArtifacts.head
-    s"${artifact.name}-${vmbc_sequencer_core_reference.revision}-${artifact.classifier.get}.${artifact.extension}"
-  }
-  lazy val vmbc_sequencer_core_reference_artifact_file_sha256 = // Compute with "sha256sum <file> | cut -d " " -f1 | sed 's/[a-z]/\U&/g'"`"
-    "BEE54719959F22328AB5F68A364FA5A51DDD8906FA2D5A68891A4E3CA011CBA7"
 
   lazy val concurrency_limits =
     "com.netflix.concurrency-limits" % "concurrency-limits-grpc" % "0.3.6"
@@ -281,14 +240,7 @@ object CantonDependencies {
   lazy val wartremover_dep =
     "org.wartremover" % "wartremover" % wartremover.Wart.PluginVersion cross CrossVersion.full
 
-  lazy val scala_csv = "com.github.tototoshi" %% "scala-csv" % "1.3.10"
-
   lazy val scalaz_scalacheck =
     "org.scalaz" %% "scalaz-scalacheck-binding" % "7.2.33-scalacheck-1.15"
   lazy val scalapb_json4s = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
-
-  lazy val google_common_protos =
-    "com.google.api.grpc" % "proto-google-common-protos" % "2.0.1"
-  lazy val google_protobuf_java = "com.google.protobuf" % "protobuf-java" % "3.19.6"
-  lazy val google_protobuf_java_util = "com.google.protobuf" % "protobuf-java-util" % "3.19.6"
 }
