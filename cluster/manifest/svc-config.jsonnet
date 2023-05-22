@@ -76,62 +76,90 @@ local deployments(config) = [
       { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "postgres" },
     ]
   ),
-  c.deployment(config, "participant", [
-    {
-      name: "grpc-svcp-adm",
-      port: 5002,
+  c.deployment(
+    config,
+    "participant",
+    [
+      {
+        name: "grpc-svcp-adm",
+        port: 5002,
+      },
+      {
+        name: "grpc-svcp-lg",
+        port: 5001,
+      },
+      {
+        name: "svcp-metrics",
+        port: 10013,
+        externalPort: 10013,
+      },
+    ],
+    image="canton-participant",
+    namespace="svc",
+    cpuRequest=config.participantCpu,
+    memoryLimitMiB=config.participantMemoryMib,
+    livenessProbeConfig={
+      grpc: {
+        port: 5061,
+        service: "liveness",
+      },
+      initialDelaySeconds: 60,
+      periodSeconds: 60,
+      failureThreshold: 5,
+      timeoutSeconds: 10,
     },
-    {
-      name: "grpc-svcp-lg",
-      port: 5001,
+    readinessProbeConfig={
+      grpc: {
+        port: 5061,
+      },
+      initialDelaySeconds: 20,
+      periodSeconds: 10,
+      failureThreshold: 3,
+      timeoutSeconds: 10,
     },
-    {
-      name: "svcp-metrics",
-      port: 10013,
-      externalPort: 10013,
-    },
-  ], image="canton-participant", namespace="svc", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=
-               c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBinding("sv1-validator", "validator") + c.appUserNameEnvBindings(["svc", "scan", "directory"]) + [
-    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
-    { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
-    { name: "CANTON_PARTICIPANT_USERS", json: [
-      {
-        name: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { allocate: "svc_party" },
-        actAs: [{ fromUser: "self" }],
-        readAs: [],
-        admin: true,
-      },
-      {
-        name: { env: "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
-        actAs: [],
-        readAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-        admin: false,
-      },
-      {
-        name: { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
-        actAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-        readAs: [],
-        admin: true,
-      },
-      {
-        name: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { allocate: "Canton-Foundation-1" },
-        actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-        readAs: [],
-        admin: true,
-      },
-      {
-        name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { fromUser: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" } },
-        actAs: [{ fromUser: "self" }],
-        readAs: [],
-        admin: true,
-      },
-    ] },
-  ]),
+    extraEnvVars=
+    c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBinding("sv1-validator", "validator") + c.appUserNameEnvBindings(["svc", "scan", "directory"]) + [
+      { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
+      { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
+      { name: "CANTON_PARTICIPANT_USERS", json: [
+        {
+          name: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" },
+          primaryParty: { allocate: "svc_party" },
+          actAs: [{ fromUser: "self" }],
+          readAs: [],
+          admin: true,
+        },
+        {
+          name: { env: "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME" },
+          primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
+          actAs: [],
+          readAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+          admin: false,
+        },
+        {
+          name: { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME" },
+          primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
+          actAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+          readAs: [],
+          admin: true,
+        },
+        {
+          name: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
+          primaryParty: { allocate: "Canton-Foundation-1" },
+          actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
+          readAs: [],
+          admin: true,
+        },
+        {
+          name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
+          primaryParty: { fromUser: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" } },
+          actAs: [{ fromUser: "self" }],
+          readAs: [],
+          admin: true,
+        },
+      ] },
+    ]
+  ),
 
   c.deployment(config, "directory-app", [
     {

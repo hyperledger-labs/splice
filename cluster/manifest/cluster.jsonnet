@@ -234,7 +234,7 @@ local jsonApiConfig(config) =
 
 
 // `image` defaults to `name`
-local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, jsonApi=null, proxyToGrpcWeb=null, mountConfig=null, extraEnvVars=[], image=null, namespace=null) =
+local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, jsonApi=null, proxyToGrpcWeb=null, mountConfig=null, extraEnvVars=[], image=null, namespace=null, livenessProbeConfig=null, readinessProbeConfig=null) =
 
   local proxyPorts =
     if proxyToGrpcWeb == null then []
@@ -282,6 +282,8 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                   image: imageName(config, if image == null then name else image),
                   imagePullPolicy: "Always",
                   ports: [toContainerPortDefn(p) for p in ports],
+                  livenessProbe: if livenessProbeConfig != null then livenessProbeConfig else null,
+                  readinessProbe: if readinessProbeConfig != null then readinessProbeConfig else null,
                   env: [
                     {
                       name: "JAVA_TOOL_OPTIONS",

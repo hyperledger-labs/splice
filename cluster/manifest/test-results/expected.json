@@ -55,6 +55,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/docs:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "docs",
                         "ports": [
                            {
@@ -66,6 +67,7 @@
                               "name": "https"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -155,6 +157,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/gcs-proxy:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "gcs-proxy",
                         "ports": [
                            {
@@ -162,6 +165,7 @@
                               "name": "http"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "512Mi"
@@ -598,6 +602,16 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "grpc": {
+                              "port": 5061,
+                              "service": "liveness"
+                           },
+                           "initialDelaySeconds": 60,
+                           "periodSeconds": 60,
+                           "timeoutSeconds": 10
+                        },
                         "name": "participant",
                         "ports": [
                            {
@@ -613,6 +627,15 @@
                               "name": "svcp-metrics"
                            }
                         ],
+                        "readinessProbe": {
+                           "failureThreshold": 3,
+                           "grpc": {
+                              "port": 5061
+                           },
+                           "initialDelaySeconds": 20,
+                           "periodSeconds": 10,
+                           "timeoutSeconds": 10
+                        },
                         "resources": {
                            "limits": {
                               "memory": "32768Mi"
@@ -747,6 +770,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/directory-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "directory-app",
                         "ports": [
                            {
@@ -754,6 +778,7 @@
                               "name": "dir-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -878,6 +903,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/svc-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "svc-app",
                         "ports": [
                            {
@@ -885,6 +911,7 @@
                               "name": "grpc-svc-adm"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -1040,6 +1067,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "sv-app",
                         "ports": [
                            {
@@ -1047,6 +1075,7 @@
                               "name": "sv1-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -1179,6 +1208,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "validator-app",
                         "ports": [
                            {
@@ -1186,6 +1216,7 @@
                               "name": "sv1-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -1298,6 +1329,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "sv-web-ui",
                         "ports": [
                            {
@@ -1305,6 +1337,7 @@
                               "name": "val1-sv-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -1417,6 +1450,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "wallet-web-ui",
                         "ports": [
                            {
@@ -1424,6 +1458,7 @@
                               "name": "val1-wal-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -1595,6 +1630,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "sv-app",
                         "ports": [
                            {
@@ -1602,6 +1638,7 @@
                               "name": "sv2-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -1734,6 +1771,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "validator-app",
                         "ports": [
                            {
@@ -1741,6 +1779,7 @@
                               "name": "sv2-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -1853,6 +1892,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "sv-web-ui",
                         "ports": [
                            {
@@ -1860,6 +1900,7 @@
                               "name": "val1-sv-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -1972,6 +2013,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "wallet-web-ui",
                         "ports": [
                            {
@@ -1979,6 +2021,7 @@
                               "name": "val1-wal-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -2242,6 +2285,16 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "grpc": {
+                              "port": 5061,
+                              "service": "liveness"
+                           },
+                           "initialDelaySeconds": 60,
+                           "periodSeconds": 60,
+                           "timeoutSeconds": 10
+                        },
                         "name": "participant",
                         "ports": [
                            {
@@ -2257,6 +2310,15 @@
                               "name": "sv2-metrics"
                            }
                         ],
+                        "readinessProbe": {
+                           "failureThreshold": 3,
+                           "grpc": {
+                              "port": 5061
+                           },
+                           "initialDelaySeconds": 20,
+                           "periodSeconds": 10,
+                           "timeoutSeconds": 10
+                        },
                         "resources": {
                            "limits": {
                               "memory": "32768Mi"
@@ -2438,6 +2500,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "sv-app",
                         "ports": [
                            {
@@ -2445,6 +2508,7 @@
                               "name": "sv3-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -2577,6 +2641,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "validator-app",
                         "ports": [
                            {
@@ -2584,6 +2649,7 @@
                               "name": "sv3-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -2696,6 +2762,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "sv-web-ui",
                         "ports": [
                            {
@@ -2703,6 +2770,7 @@
                               "name": "val1-sv-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -2815,6 +2883,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "wallet-web-ui",
                         "ports": [
                            {
@@ -2822,6 +2891,7 @@
                               "name": "val1-wal-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -3085,6 +3155,16 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "grpc": {
+                              "port": 5061,
+                              "service": "liveness"
+                           },
+                           "initialDelaySeconds": 60,
+                           "periodSeconds": 60,
+                           "timeoutSeconds": 10
+                        },
                         "name": "participant",
                         "ports": [
                            {
@@ -3100,6 +3180,15 @@
                               "name": "sv3-metrics"
                            }
                         ],
+                        "readinessProbe": {
+                           "failureThreshold": 3,
+                           "grpc": {
+                              "port": 5061
+                           },
+                           "initialDelaySeconds": 20,
+                           "periodSeconds": 10,
+                           "timeoutSeconds": 10
+                        },
                         "resources": {
                            "limits": {
                               "memory": "32768Mi"
@@ -3281,6 +3370,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "sv-app",
                         "ports": [
                            {
@@ -3288,6 +3378,7 @@
                               "name": "sv4-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -3420,6 +3511,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "validator-app",
                         "ports": [
                            {
@@ -3427,6 +3519,7 @@
                               "name": "sv4-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -3539,6 +3632,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "sv-web-ui",
                         "ports": [
                            {
@@ -3546,6 +3640,7 @@
                               "name": "val1-sv-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -3658,6 +3753,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "wallet-web-ui",
                         "ports": [
                            {
@@ -3665,6 +3761,7 @@
                               "name": "val1-wal-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -3928,6 +4025,16 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "grpc": {
+                              "port": 5061,
+                              "service": "liveness"
+                           },
+                           "initialDelaySeconds": 60,
+                           "periodSeconds": 60,
+                           "timeoutSeconds": 10
+                        },
                         "name": "participant",
                         "ports": [
                            {
@@ -3943,6 +4050,15 @@
                               "name": "sv4-metrics"
                            }
                         ],
+                        "readinessProbe": {
+                           "failureThreshold": 3,
+                           "grpc": {
+                              "port": 5061
+                           },
+                           "initialDelaySeconds": 20,
+                           "periodSeconds": 10,
+                           "timeoutSeconds": 10
+                        },
                         "resources": {
                            "limits": {
                               "memory": "32768Mi"
@@ -4077,6 +4193,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/scan-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "scan-app",
                         "ports": [
                            {
@@ -4084,6 +4201,7 @@
                               "name": "scan-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -4168,6 +4286,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/scan-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "scan-web-ui",
                         "ports": [
                            {
@@ -4175,6 +4294,7 @@
                               "name": "scan-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -4443,6 +4563,16 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "grpc": {
+                              "port": 5061,
+                              "service": "liveness"
+                           },
+                           "initialDelaySeconds": 60,
+                           "periodSeconds": 60,
+                           "timeoutSeconds": 10
+                        },
                         "name": "participant",
                         "ports": [
                            {
@@ -4462,6 +4592,15 @@
                               "name": "json-api"
                            }
                         ],
+                        "readinessProbe": {
+                           "failureThreshold": 3,
+                           "grpc": {
+                              "port": 5061
+                           },
+                           "initialDelaySeconds": 20,
+                           "periodSeconds": 10,
+                           "timeoutSeconds": 10
+                        },
                         "resources": {
                            "limits": {
                               "memory": "32768Mi"
@@ -4670,6 +4809,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "validator-app",
                         "ports": [
                            {
@@ -4677,6 +4817,7 @@
                               "name": "val1-val"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "4096Mi"
@@ -4789,6 +4930,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "wallet-web-ui",
                         "ports": [
                            {
@@ -4796,6 +4938,7 @@
                               "name": "val1-wal-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -4904,6 +5047,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/directory-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "directory-web-ui",
                         "ports": [
                            {
@@ -4911,6 +5055,7 @@
                               "name": "val1-dir-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -5019,6 +5164,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwell-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "splitwell-web-ui",
                         "ports": [
                            {
@@ -5026,6 +5172,7 @@
                               "name": "val1-sw-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -5426,6 +5573,16 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "grpc": {
+                              "port": 5061,
+                              "service": "liveness"
+                           },
+                           "initialDelaySeconds": 60,
+                           "periodSeconds": 60,
+                           "timeoutSeconds": 10
+                        },
                         "name": "participant",
                         "ports": [
                            {
@@ -5441,6 +5598,15 @@
                               "name": "sw-metrics"
                            }
                         ],
+                        "readinessProbe": {
+                           "failureThreshold": 3,
+                           "grpc": {
+                              "port": 5061
+                           },
+                           "initialDelaySeconds": 20,
+                           "periodSeconds": 10,
+                           "timeoutSeconds": 10
+                        },
                         "resources": {
                            "limits": {
                               "memory": "32768Mi"
@@ -5669,6 +5835,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "validator-app",
                         "ports": [
                            {
@@ -5676,6 +5843,7 @@
                               "name": "sw-val"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -5788,6 +5956,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "wallet-web-ui",
                         "ports": [
                            {
@@ -5795,6 +5964,7 @@
                               "name": "sw-wal-ui"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -5919,6 +6089,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwell-app:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "splitwell-app",
                         "ports": [
                            {
@@ -5926,6 +6097,7 @@
                               "name": "grpc-sw-api"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "1536Mi"
@@ -6059,6 +6231,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/external-proxy-full:tag",
                         "imagePullPolicy": "Always",
+                        "livenessProbe": null,
                         "name": "external-proxy-full",
                         "ports": [
                            {
@@ -6182,6 +6355,7 @@
                               "name": "sw-api-gw"
                            }
                         ],
+                        "readinessProbe": null,
                         "resources": {
                            "limits": {
                               "memory": "512Mi"

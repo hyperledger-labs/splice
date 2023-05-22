@@ -55,6 +55,21 @@ spec:
         - containerPort: 10013
           name: metrics-api
           protocol: TCP
+        livenessProbe:
+          grpc:
+            port: 5061
+            service: liveness
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          failureThreshold: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          grpc:
+            port: 5061
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          failureThreshold: 3
+          timeoutSeconds: 10          
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}

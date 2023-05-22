@@ -56,42 +56,71 @@ local deployments(config) = [
       { name: "CANTON_DOMAIN_POSTGRES_SERVER", value: "postgres" },
     ]
   ),
-  c.deployment(config, "participant", [
-    {
-      name: "grpc-sw-adm",
-      port: 5002,
-      externalPort: 5202,
-    },
-    {
-      name: "grpc-sw-lg",
-      port: 5001,
-      externalPort: 5201,
-    },
-    {
-      name: "sw-metrics",
-      port: 10013,
-      externalPort: 10213,
-    },
-  ], image="canton-participant", namespace="splitwell", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb=["grpc-sw-lg", "grpc-sw-adm"], extraEnvVars=
-               c.appUserNameEnvBinding("validator", "splitwell_validator") + [
-    { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
-    { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwell_participant" },
-    { name: "CANTON_PARTICIPANT_USERS", json: [
+  c.deployment(
+    config,
+    "participant",
+    [
       {
-        name: { env: "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-        primaryParty: { allocate: "splitwell_validator_service_user" },
-        actAs: [{ fromUser: "self" }],
-        readAs: [],
-        admin: true,
+        name: "grpc-sw-adm",
+        port: 5002,
+        externalPort: 5202,
       },
-    ] },
-    { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
       {
-        alias: "splitwell",
-        url: "http://domain:5008",
+        name: "grpc-sw-lg",
+        port: 5001,
+        externalPort: 5201,
       },
-    ] },
-  ]),
+      {
+        name: "sw-metrics",
+        port: 10013,
+        externalPort: 10213,
+      },
+    ],
+    image="canton-participant",
+    namespace="splitwell",
+    cpuRequest=config.participantCpu,
+    memoryLimitMiB=config.participantMemoryMib,
+    livenessProbeConfig={
+      grpc: {
+        port: 5061,
+        service: "liveness",
+      },
+      initialDelaySeconds: 60,
+      periodSeconds: 60,
+      failureThreshold: 5,
+      timeoutSeconds: 10,
+    },
+    proxyToGrpcWeb=["grpc-sw-lg", "grpc-sw-adm"],
+    readinessProbeConfig={
+      grpc: {
+        port: 5061,
+      },
+      initialDelaySeconds: 20,
+      periodSeconds: 10,
+      failureThreshold: 3,
+      timeoutSeconds: 10,
+    },
+    extraEnvVars=
+    c.appUserNameEnvBinding("validator", "splitwell_validator") + [
+      { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
+      { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwell_participant" },
+      { name: "CANTON_PARTICIPANT_USERS", json: [
+        {
+          name: { env: "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
+          primaryParty: { allocate: "splitwell_validator_service_user" },
+          actAs: [{ fromUser: "self" }],
+          readAs: [],
+          admin: true,
+        },
+      ] },
+      { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
+        {
+          alias: "splitwell",
+          url: "http://domain:5008",
+        },
+      ] },
+    ]
+  ),
 
   c.deployment(config + validatorConfigOverrides,
                "validator-app",

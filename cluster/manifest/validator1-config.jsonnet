@@ -7,55 +7,76 @@ local validatorConfigOverrides = import "../overrides/validator-app.json";
 local deployments(config) = [
   c.namespace("validator1", config),
   postgres.database("postgres", config, namespace="validator1"),
-  c.deployment(config,
-               "participant",
-               [
-                 {
-                   name: "grpc-val1-adm",
-                   port: 5002,
-                   externalPort: 5102,
-                 },
-                 {
-                   name: "grpc-val1-lg",
-                   port: 5001,
-                   externalPort: 5101,
-                 },
-                 {
-                   name: "val1-metrics",
-                   port: 10013,
-                   externalPort: 10113,
-                 },
-                 {
-                   name: "json-api",
-                   port: 7575,
-                   externalPort: 7575,
-                 },
-               ],
-               image="canton-participant",
-               namespace="validator1",
-               cpuRequest=config.participantCpu,
-               memoryLimitMiB=config.participantMemoryMib,
-               jsonApi=c.jsonApiConfig(config),
-               proxyToGrpcWeb=["grpc-val1-lg"],
-               extraEnvVars=c.appUserNameEnvBinding("validator") + [
-                 { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
-                 { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
-                 { name: "CANTON_PARTICIPANT_USERS", json: [
-                   {
-                     name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-                     primaryParty: { allocate: "validator1_validator_service_user" },
-                     actAs: [{ fromUser: "self" }],
-                     readAs: [],
-                     admin: true,
-                   },
-                 ] },
-                 { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
-                   {
-                     alias: "splitwell",
-                     url: "http://domain.splitwell:5008",
-                   },
-                 ] },
-               ]),
+  c.deployment(
+    config,
+    "participant",
+    [
+      {
+        name: "grpc-val1-adm",
+        port: 5002,
+        externalPort: 5102,
+      },
+      {
+        name: "grpc-val1-lg",
+        port: 5001,
+        externalPort: 5101,
+      },
+      {
+        name: "val1-metrics",
+        port: 10013,
+        externalPort: 10113,
+      },
+      {
+        name: "json-api",
+        port: 7575,
+        externalPort: 7575,
+      },
+    ],
+    image="canton-participant",
+    namespace="validator1",
+    cpuRequest=config.participantCpu,
+    memoryLimitMiB=config.participantMemoryMib,
+    livenessProbeConfig={
+      grpc: {
+        port: 5061,
+        service: "liveness",
+      },
+      initialDelaySeconds: 60,
+      periodSeconds: 60,
+      failureThreshold: 5,
+      timeoutSeconds: 10,
+    },
+    readinessProbeConfig={
+      grpc: {
+        port: 5061,
+      },
+      initialDelaySeconds: 20,
+      periodSeconds: 10,
+      failureThreshold: 3,
+      timeoutSeconds: 10,
+    },
+    jsonApi=c.jsonApiConfig(config),
+    proxyToGrpcWeb=["grpc-val1-lg"],
+    extraEnvVars=c.appUserNameEnvBinding("validator") + [
+      { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
+      { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },
+      { name: "CANTON_PARTICIPANT_USERS", json: [
+        {
+          name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
+          primaryParty: { allocate: "validator1_validator_service_user" },
+          actAs: [{ fromUser: "self" }],
+          readAs: [],
+          admin: true,
+        },
+      ] },
+      { name: "CANTON_PARTICIPANT_EXTRA_DOMAINS", json: [
+        {
+          alias: "splitwell",
+          url: "http://domain.splitwell:5008",
+        },
+      ] },
+    ]
+  ),
 
   c.deployment(config + validatorConfigOverrides,
                "validator-app",

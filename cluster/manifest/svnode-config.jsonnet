@@ -121,43 +121,71 @@ local deployments(num, svConfig, config) =
     // No participant is created for sv1 app as it uses the svc participant in svc namespace
     if num != 1 then [
       postgres.database("postgres", config, namespace=namespace),
-      c.deployment(config, "participant", [
-        {
-          name: participantAdminApi,
-          port: 5002,
-          internalOnly: true,
-        },
-        {
-          name: participantLedgerApi,
-          port: 5001,
-          internalOnly: true,
-        },
-        {
-          name: participantMetricsApi,
-          port: 10013,
-          internalOnly: true,
-        },
-      ], image="canton-participant", namespace=namespace, cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, extraEnvVars=
-                   c.appUserNameEnvBindings(["sv"]) + c.appUserNameEnvBindings(["validator"]) + [
-        { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
-        { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: participantPostgresSchema },
-        { name: "CANTON_PARTICIPANT_USERS", json: [
+      c.deployment(
+        config,
+        "participant",
+        [
           {
-            name: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
-            primaryParty: { allocate: svName },
-            actAs: [{ fromUser: "self" }],
-            readAs: [],
-            admin: true,
+            name: participantAdminApi,
+            port: 5002,
+            internalOnly: true,
           },
           {
-            name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-            primaryParty: { fromUser: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" } },
-            actAs: [{ fromUser: "self" }],
-            readAs: [],
-            admin: true,
+            name: participantLedgerApi,
+            port: 5001,
+            internalOnly: true,
           },
-        ] },
-      ]),
+          {
+            name: participantMetricsApi,
+            port: 10013,
+            internalOnly: true,
+          },
+        ],
+        image="canton-participant",
+        namespace=namespace,
+        cpuRequest=config.participantCpu,
+        memoryLimitMiB=config.participantMemoryMib,
+        livenessProbeConfig={
+          grpc: {
+            port: 5061,
+            service: "liveness",
+          },
+          initialDelaySeconds: 60,
+          periodSeconds: 60,
+          failureThreshold: 5,
+          timeoutSeconds: 10,
+        },
+        readinessProbeConfig={
+          grpc: {
+            port: 5061,
+          },
+          initialDelaySeconds: 20,
+          periodSeconds: 10,
+          failureThreshold: 3,
+          timeoutSeconds: 10,
+        },
+        extraEnvVars=
+        c.appUserNameEnvBindings(["sv"]) + c.appUserNameEnvBindings(["validator"]) + [
+          { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
+          { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: participantPostgresSchema },
+          { name: "CANTON_PARTICIPANT_USERS", json: [
+            {
+              name: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
+              primaryParty: { allocate: svName },
+              actAs: [{ fromUser: "self" }],
+              readAs: [],
+              admin: true,
+            },
+            {
+              name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
+              primaryParty: { fromUser: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" } },
+              actAs: [{ fromUser: "self" }],
+              readAs: [],
+              admin: true,
+            },
+          ] },
+        ]
+      ),
     ] else []
   );
 
