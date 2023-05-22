@@ -32,7 +32,7 @@ local externalPort(port) =
   if std.objectHas(port, "externalPort") then port.externalPort else port.port;
 
 local toGrpcWebPort(port) = {
-  name: validPortName(port.name + "-gw"),
+  name: validPortName(std.strReplace(port.name, "grpc-", "") + "-gw"),
   port: port.port + 1000,
   externalPort: externalPort(port) + 1000,
   proxyToGrpc: port.port,
@@ -234,7 +234,7 @@ local jsonApiConfig(config) =
 
 
 // `image` defaults to `name`
-local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, jsonApi=null, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[], image=null, namespace=null) =
+local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={}, jsonApi=null, proxyToGrpcWeb=null, mountConfig=null, extraEnvVars=[], image=null, namespace=null) =
 
   local proxyPorts =
     if proxyToGrpcWeb == null then []
@@ -302,12 +302,7 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                                      mountPath: "/config",
                                      name: name + "-config-vol",
                                    },
-                                 ]) + (if tlsCertSecret == null then [] else [
-                                         {
-                                           mountPath: "/tmp",
-                                           name: name + "-tls-cert-vol",
-                                         },
-                                       ]),
+                                 ]),
                 } + ext,
               ] + [envoyConfig(config, port) for port in proxyPorts] + (if jsonApi != null then [jsonApi] else []),
               volumes: (if mountConfig == null then [] else [
@@ -317,15 +312,7 @@ local deployment(config, name, ports, cpuRequest=1, memoryLimitMiB=1536, ext={},
                               name: mountConfig,
                             },
                           },
-                        ]) + (if tlsCertSecret == null then [] else [
-                                {
-                                  name: name + "-tls-cert-vol",
-                                  secret: {
-                                    secretName: tlsCertSecret,
-                                    optional: false,
-                                  },
-                                },
-                              ]),
+                        ]),
             },
           },
         },

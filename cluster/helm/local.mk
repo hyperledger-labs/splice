@@ -9,7 +9,8 @@ app_charts := \
 	cn-splitwell-web-ui \
 	cn-sv-node \
 	cn-svc \
-	cn-validator
+	cn-validator \
+	cn-istio-fwd
 
 all_charts := $(app_charts) cn-util-lib
 

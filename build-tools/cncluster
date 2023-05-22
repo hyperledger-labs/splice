@@ -88,6 +88,22 @@ function _cluster_apply() {
         TICK_DURATION_ARG="tickDuration=\"${CNCLUSTER_TICK_DURATION}\""
     fi
 
+    # TODO(#4560): Use an empty passphrase until we manage secrets
+    local -x PULUMI_CONFIG_PASSPHRASE=''
+
+    _info "Creating a pulumi stack if it does not yet exist"
+
+    _uses_pulumi_stack canton-network-gateway
+
+    _info "Installing canton-network-gateway stack"
+
+    # Spin up the canton-network-gateway pulumi stack
+    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
+           --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
+           up -y
+
+    _info "Applying jsonnet manifest"
+
     # Apply base cluster config
     jsonnet --tla-str gcpRegion="${CLOUDSDK_COMPUTE_REGION}" \
             --tla-str gcpRepoName="${GCP_REPO_NAME}" \
@@ -159,6 +175,20 @@ function _pulumi() {
 
     pulumi "$@"
 }
+
+# Create a pulumi stack for a given project (for the current cluster) if one does not yet exist
+# Use cases:
+# - unfortunately `pulumi up -y` still asks for confirmation of stack creation despite the `-y` flag
+# - to bring a stack down if it exists - call this before calling refresh&down
+function _uses_pulumi_stack() {
+
+    pulumi_project=$1
+
+    _pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+           --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
+            stack init 2> /dev/null || true
+}
+
 
 ### Cluster manageent
 
@@ -606,6 +636,17 @@ function _cluster_reset() {
 
     _info "Deleting all persistent volume claims..."
     kubectl delete PersistentVolumeClaim --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
+
+    _info "Uninstalling the istio gateway and virtual services"
+    # TODO(#4560): Use an empty passphrase until we manage secrets
+    local -x PULUMI_CONFIG_PASSPHRASE=''
+    _uses_pulumi_stack canton-network-gateway
+    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
+        --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
+        refresh -y
+    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
+        --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
+        down -y
 
     _info "Cluster in reset/idle state."
 }
@@ -1100,7 +1141,7 @@ function subcmd_pulumi() {
 
     shift 2
 
-    # Use an empty passphrase until we manage secrets
+    # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
 
     _pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
@@ -1256,7 +1297,7 @@ function subcmd_pdown_sv(){
 subcommand_whitelist[infra_pulumi]="Run pulumi for the infrastructure project"
 
 function subcmd_infra_pulumi() {
-  # Use an empty passphrase until we manage secrets
+  # TODO(#4560): Use an empty passphrase until we manage secrets
   local -x PULUMI_CONFIG_PASSPHRASE=''
   local -a args=( --cwd "${REPO_ROOT}/cluster/pulumi/infrastructure" )
 

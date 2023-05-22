@@ -12,12 +12,12 @@ local deployments(config) = [
     "domain",
     [
       {
-        name: "swd-pub-api",
+        name: "grpc-swd-pub",
         port: 5008,
         externalPort: 5108,
       },
       {
-        name: "swd-adm-api",
+        name: "grpc-swd-adm",
         port: 5009,
         externalPort: 5109,
       },
@@ -32,19 +32,19 @@ local deployments(config) = [
     ext={
       readinessProbe: {
         tcpSocket: {
-          port: "swd-pub-api",
+          port: "grpc-swd-pub",
         },
       },
       livenessProbe: {
         tcpSocket: {
-          port: "swd-pub-api",
+          port: "grpc-swd-pub",
         },
         failureThreshold: 5,
         periodSeconds: 10,
       },
       startupProbe: {
         tcpSocket: {
-          port: "swd-pub-api",
+          port: "grpc-swd-pub",
         },
         failureThreshold: 20,
         periodSeconds: 10,
@@ -58,12 +58,12 @@ local deployments(config) = [
   ),
   c.deployment(config, "participant", [
     {
-      name: "sw-adm-api",
+      name: "grpc-sw-adm",
       port: 5002,
       externalPort: 5202,
     },
     {
-      name: "sw-lg-api",
+      name: "grpc-sw-lg",
       port: 5001,
       externalPort: 5201,
     },
@@ -72,7 +72,7 @@ local deployments(config) = [
       port: 10013,
       externalPort: 10213,
     },
-  ], image="canton-participant", namespace="splitwell", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb=["sw-lg-api", "sw-adm-api"], extraEnvVars=
+  ], image="canton-participant", namespace="splitwell", cpuRequest=config.participantCpu, memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb=["grpc-sw-lg", "grpc-sw-adm"], extraEnvVars=
                c.appUserNameEnvBinding("validator", "splitwell_validator") + [
     { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
     { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "splitwell_participant" },
@@ -131,10 +131,10 @@ local deployments(config) = [
 
   c.deployment(config, "splitwell-app", [
     {
-      name: "sw-api",
+      name: "grpc-sw-api",
       port: 5213,
     },
-  ], namespace="splitwell", proxyToGrpcWeb=["sw-api"], extraEnvVars=c.appAuthEnvBinding(config, "splitwell")),
+  ], namespace="splitwell", proxyToGrpcWeb=["grpc-sw-api"], extraEnvVars=c.appAuthEnvBinding(config, "splitwell")),
 ];
 
 

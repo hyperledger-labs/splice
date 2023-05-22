@@ -447,9 +447,13 @@ commands:
               if [[ << parameters.gce_authenticate >> == true ]]; then
                 if [[ << parameters.cluster >> =~ (dev|test)net ]]; then
                   echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
+                  # GOOGLE_CREDENTIALS variable is used by pulumi
+                  export GOOGLE_CREDENTIALS=${GCP_DA_CN_DEVNET_KEY}
                 fi
                 if [[ << parameters.cluster >> =~ ^(staging|scratchnet.*)$ ]]; then
                   echo $GCP_DA_CN_SCRATCHNET_KEY | gcloud auth activate-service-account --key-file=-
+                  # GOOGLE_CREDENTIALS variable is used by pulumi
+                  export GOOGLE_CREDENTIALS=${GCP_DA_CN_SCRATCHNET_KEY}
                 fi
               fi
 
@@ -1020,6 +1024,12 @@ jobs:
     steps:
       - checkout
       - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm&Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            set -eou pipefail
+            make cluster/build
       - run_bash_command_in_nix:
           cmd_name: Apply Kubernetes manifest to cluster
           cluster: << parameters.cluster >>

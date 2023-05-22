@@ -11,12 +11,12 @@ local deployments(config) = [
                "participant",
                [
                  {
-                   name: "val1-adm-api",
+                   name: "grpc-val1-adm",
                    port: 5002,
                    externalPort: 5102,
                  },
                  {
-                   name: "val1-lg-api",
+                   name: "grpc-val1-lg",
                    port: 5001,
                    externalPort: 5101,
                  },
@@ -36,7 +36,7 @@ local deployments(config) = [
                cpuRequest=config.participantCpu,
                memoryLimitMiB=config.participantMemoryMib,
                jsonApi=c.jsonApiConfig(config),
-               proxyToGrpcWeb=["val1-lg-api"],
+               proxyToGrpcWeb=["grpc-val1-lg"],
                extraEnvVars=c.appUserNameEnvBinding("validator") + [
                  { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
                  { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "val1_participant" },

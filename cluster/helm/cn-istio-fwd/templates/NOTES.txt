@@ -1,0 +1,1 @@
+A temporary helm chart that forwards all traffic from istio to nginx

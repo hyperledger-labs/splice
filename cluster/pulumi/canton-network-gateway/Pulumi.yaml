@@ -1,0 +1,3 @@
+name: canton-network-gateway
+runtime: nodejs
+description: An istio gateway for canton-network

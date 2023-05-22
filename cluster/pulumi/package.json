@@ -33,6 +33,7 @@
     },
     "workspaces": [
         "canton-network",
+        "canton-network-gateway",
         "infrastructure",
         "sv-runbook"
     ]

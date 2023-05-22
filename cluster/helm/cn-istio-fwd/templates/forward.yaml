@@ -1,0 +1,448 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: forward-all-gateway
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: istio-ingress
+    istio: ingress
+  servers:
+  - hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+    port:
+      name: http
+      number: 80
+      protocol: HTTP
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5008
+      name: grpc-cd-pub-api
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5009
+      name: grpc-cd-adm-api
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 10313
+      name: cd-metrics
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5002
+      name: grpc-svcp-adm
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5001
+      name: grpc-svcp-lg
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 10013
+      name: svcp-metrics
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5010
+      name: dir-api
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5005
+      name: grpc-svc-adm
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5014
+      name: sv1-api
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5114
+      name: sv2-api
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5214
+      name: sv3-api
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5314
+      name: sv4-api
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5012
+      name: scan-api
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5102
+      name: grpc-val1-adm
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5101
+      name: grpc-val1-lg
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 10113
+      name: val1-metrics
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 6101
+      name: val1-lg-gw
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5108
+      name: grpc-swd-pub
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5109
+      name: grpc-swd-adm
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 10413
+      name: swd-metrics
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5202
+      name: grpc-sw-adm
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5201
+      name: grpc-sw-lg
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 10213
+      name: sw-metrics
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 6201
+      name: sw-lg-gw
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5213
+      name: grpc-sw-api
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 6213
+      name: sw-api-gw
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: forward-all
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  gateways:
+  - forward-all-gateway
+  http:
+  - match:
+    - port: 443
+    route:
+    - destination:
+        port:
+          number: 80
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+  - match:
+    - port: 5008
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5008
+  - match:
+    - port: 10313
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10313
+  - match:
+    - port: 5002
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5002
+  - match:
+    - port: 5001
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5001
+  - match:
+    - port: 10013
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10013
+  - match:
+    - port: 5010
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5010
+  - match:
+    - port: 5005
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5005
+  - match:
+    - port: 5014
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5014
+  - match:
+    - port: 5114
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5114
+  - match:
+    - port: 5214
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5214
+  - match:
+    - port: 5314
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5314
+  - match:
+    - port: 5012
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5012
+  - match:
+    - port: 5102
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5102
+  - match:
+    - port: 5101
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5101
+  - match:
+    - port: 10113
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10113
+  - match:
+    - port: 6101
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 6101
+  - match:
+    - port: 5108
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5108
+  - match:
+    - port: 5109
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5109
+  - match:
+    - port: 10413
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10413
+  - match:
+    - port: 5202
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5202
+  - match:
+    - port: 5201
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5201
+  - match:
+    - port: 10213
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10213
+  - match:
+    - port: 6201
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 6201
+  - match:
+    - port: 5213
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5213
+  - match:
+    - port: 6213
+    route:
+    - destination:
+        host: external-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 6213

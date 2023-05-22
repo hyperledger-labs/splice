@@ -412,18 +412,18 @@
                            "failureThreshold": 5,
                            "periodSeconds": 10,
                            "tcpSocket": {
-                              "port": "cd-pub-api"
+                              "port": "grpc-cd-pub-api"
                            }
                         },
                         "name": "global-domain",
                         "ports": [
                            {
                               "containerPort": 5008,
-                              "name": "cd-pub-api"
+                              "name": "grpc-cd-pub-api"
                            },
                            {
                               "containerPort": 5009,
-                              "name": "cd-adm-api"
+                              "name": "grpc-cd-adm-api"
                            },
                            {
                               "containerPort": 10013,
@@ -432,7 +432,7 @@
                         ],
                         "readinessProbe": {
                            "tcpSocket": {
-                              "port": "cd-pub-api"
+                              "port": "grpc-cd-pub-api"
                            }
                         },
                         "resources": {
@@ -448,7 +448,7 @@
                            "failureThreshold": 20,
                            "periodSeconds": 10,
                            "tcpSocket": {
-                              "port": "cd-pub-api"
+                              "port": "grpc-cd-pub-api"
                            }
                         },
                         "volumeMounts": [ ]
@@ -473,12 +473,12 @@
          "spec": {
             "ports": [
                {
-                  "name": "cd-pub-api",
+                  "name": "grpc-cd-pub-api",
                   "port": 5008,
                   "protocol": "TCP"
                },
                {
-                  "name": "cd-adm-api",
+                  "name": "grpc-cd-adm-api",
                   "port": 5009,
                   "protocol": "TCP"
                },
@@ -602,11 +602,11 @@
                         "ports": [
                            {
                               "containerPort": 5002,
-                              "name": "svcp-adm-api"
+                              "name": "grpc-svcp-adm"
                            },
                            {
                               "containerPort": 5001,
-                              "name": "svcp-lg-api"
+                              "name": "grpc-svcp-lg"
                            },
                            {
                               "containerPort": 10013,
@@ -644,12 +644,12 @@
          "spec": {
             "ports": [
                {
-                  "name": "svcp-adm-api",
+                  "name": "grpc-svcp-adm",
                   "port": 5002,
                   "protocol": "TCP"
                },
                {
-                  "name": "svcp-lg-api",
+                  "name": "grpc-svcp-lg",
                   "port": 5001,
                   "protocol": "TCP"
                },
@@ -882,7 +882,7 @@
                         "ports": [
                            {
                               "containerPort": 5005,
-                              "name": "svc-app-adm-api"
+                              "name": "grpc-svc-adm"
                            }
                         ],
                         "resources": {
@@ -916,7 +916,7 @@
          "spec": {
             "ports": [
                {
-                  "name": "svc-app-adm-api",
+                  "name": "grpc-svc-adm",
                   "port": 5005,
                   "protocol": "TCP"
                }
@@ -4447,11 +4447,11 @@
                         "ports": [
                            {
                               "containerPort": 5002,
-                              "name": "val1-adm-api"
+                              "name": "grpc-val1-adm"
                            },
                            {
                               "containerPort": 5001,
-                              "name": "val1-lg-api"
+                              "name": "grpc-val1-lg"
                            },
                            {
                               "containerPort": 10013,
@@ -4490,11 +4490,11 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
                         "imagePullPolicy": "Always",
-                        "name": "envoy-proxy-val1-lg-api",
+                        "name": "envoy-proxy-grpc-val1-lg",
                         "ports": [
                            {
                               "containerPort": 6001,
-                              "name": "val1-lg-api-gw"
+                              "name": "val1-lg-gw"
                            }
                         ],
                         "resources": {
@@ -4545,12 +4545,12 @@
          "spec": {
             "ports": [
                {
-                  "name": "val1-adm-api",
+                  "name": "grpc-val1-adm",
                   "port": 5002,
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-lg-api",
+                  "name": "grpc-val1-lg",
                   "port": 5001,
                   "protocol": "TCP"
                },
@@ -4565,7 +4565,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-lg-api-gw",
+                  "name": "val1-lg-gw",
                   "port": 6001,
                   "protocol": "TCP"
                }
@@ -5276,18 +5276,18 @@
                            "failureThreshold": 5,
                            "periodSeconds": 10,
                            "tcpSocket": {
-                              "port": "swd-pub-api"
+                              "port": "grpc-swd-pub"
                            }
                         },
                         "name": "domain",
                         "ports": [
                            {
                               "containerPort": 5008,
-                              "name": "swd-pub-api"
+                              "name": "grpc-swd-pub"
                            },
                            {
                               "containerPort": 5009,
-                              "name": "swd-adm-api"
+                              "name": "grpc-swd-adm"
                            },
                            {
                               "containerPort": 10013,
@@ -5296,7 +5296,7 @@
                         ],
                         "readinessProbe": {
                            "tcpSocket": {
-                              "port": "swd-pub-api"
+                              "port": "grpc-swd-pub"
                            }
                         },
                         "resources": {
@@ -5312,7 +5312,7 @@
                            "failureThreshold": 20,
                            "periodSeconds": 10,
                            "tcpSocket": {
-                              "port": "swd-pub-api"
+                              "port": "grpc-swd-pub"
                            }
                         },
                         "volumeMounts": [ ]
@@ -5337,12 +5337,12 @@
          "spec": {
             "ports": [
                {
-                  "name": "swd-pub-api",
+                  "name": "grpc-swd-pub",
                   "port": 5008,
                   "protocol": "TCP"
                },
                {
-                  "name": "swd-adm-api",
+                  "name": "grpc-swd-adm",
                   "port": 5009,
                   "protocol": "TCP"
                },
@@ -5430,11 +5430,11 @@
                         "ports": [
                            {
                               "containerPort": 5002,
-                              "name": "sw-adm-api"
+                              "name": "grpc-sw-adm"
                            },
                            {
                               "containerPort": 5001,
-                              "name": "sw-lg-api"
+                              "name": "grpc-sw-lg"
                            },
                            {
                               "containerPort": 10013,
@@ -5469,11 +5469,11 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
                         "imagePullPolicy": "Always",
-                        "name": "envoy-proxy-sw-lg-api",
+                        "name": "envoy-proxy-grpc-sw-lg",
                         "ports": [
                            {
                               "containerPort": 6001,
-                              "name": "sw-lg-api-gw"
+                              "name": "sw-lg-gw"
                            }
                         ],
                         "resources": {
@@ -5502,11 +5502,11 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
                         "imagePullPolicy": "Always",
-                        "name": "envoy-proxy-sw-adm-api",
+                        "name": "envoy-proxy-grpc-sw-adm",
                         "ports": [
                            {
                               "containerPort": 6002,
-                              "name": "sw-adm-api-gw"
+                              "name": "sw-adm-gw"
                            }
                         ],
                         "resources": {
@@ -5538,12 +5538,12 @@
          "spec": {
             "ports": [
                {
-                  "name": "sw-adm-api",
+                  "name": "grpc-sw-adm",
                   "port": 5002,
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-lg-api",
+                  "name": "grpc-sw-lg",
                   "port": 5001,
                   "protocol": "TCP"
                },
@@ -5553,12 +5553,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-lg-api-gw",
+                  "name": "sw-lg-gw",
                   "port": 6001,
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-adm-api-gw",
+                  "name": "sw-adm-gw",
                   "port": 6002,
                   "protocol": "TCP"
                }
@@ -5923,7 +5923,7 @@
                         "ports": [
                            {
                               "containerPort": 5213,
-                              "name": "sw-api"
+                              "name": "grpc-sw-api"
                            }
                         ],
                         "resources": {
@@ -5954,7 +5954,7 @@
                         ],
                         "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
                         "imagePullPolicy": "Always",
-                        "name": "envoy-proxy-sw-api",
+                        "name": "envoy-proxy-grpc-sw-api",
                         "ports": [
                            {
                               "containerPort": 6213,
@@ -5990,7 +5990,7 @@
          "spec": {
             "ports": [
                {
-                  "name": "sw-api",
+                  "name": "grpc-sw-api",
                   "port": 5213,
                   "protocol": "TCP"
                },
@@ -6071,11 +6071,11 @@
                            },
                            {
                               "containerPort": 5008,
-                              "name": "cd-pub-api"
+                              "name": "grpc-cd-pub-api"
                            },
                            {
                               "containerPort": 5009,
-                              "name": "cd-adm-api"
+                              "name": "grpc-cd-adm-api"
                            },
                            {
                               "containerPort": 10313,
@@ -6083,11 +6083,11 @@
                            },
                            {
                               "containerPort": 5002,
-                              "name": "svcp-adm-api"
+                              "name": "grpc-svcp-adm"
                            },
                            {
                               "containerPort": 5001,
-                              "name": "svcp-lg-api"
+                              "name": "grpc-svcp-lg"
                            },
                            {
                               "containerPort": 10013,
@@ -6099,7 +6099,7 @@
                            },
                            {
                               "containerPort": 5005,
-                              "name": "svc-app-adm-api"
+                              "name": "grpc-svc-adm"
                            },
                            {
                               "containerPort": 5014,
@@ -6123,11 +6123,11 @@
                            },
                            {
                               "containerPort": 5102,
-                              "name": "val1-adm-api"
+                              "name": "grpc-val1-adm"
                            },
                            {
                               "containerPort": 5101,
-                              "name": "val1-lg-api"
+                              "name": "grpc-val1-lg"
                            },
                            {
                               "containerPort": 10113,
@@ -6139,15 +6139,15 @@
                            },
                            {
                               "containerPort": 6101,
-                              "name": "val1-lg-api-gw"
+                              "name": "val1-lg-gw"
                            },
                            {
                               "containerPort": 5108,
-                              "name": "swd-pub-api"
+                              "name": "grpc-swd-pub"
                            },
                            {
                               "containerPort": 5109,
-                              "name": "swd-adm-api"
+                              "name": "grpc-swd-adm"
                            },
                            {
                               "containerPort": 10413,
@@ -6155,11 +6155,11 @@
                            },
                            {
                               "containerPort": 5202,
-                              "name": "sw-adm-api"
+                              "name": "grpc-sw-adm"
                            },
                            {
                               "containerPort": 5201,
-                              "name": "sw-lg-api"
+                              "name": "grpc-sw-lg"
                            },
                            {
                               "containerPort": 10213,
@@ -6167,15 +6167,15 @@
                            },
                            {
                               "containerPort": 6201,
-                              "name": "sw-lg-api-gw"
+                              "name": "sw-lg-gw"
                            },
                            {
                               "containerPort": 6202,
-                              "name": "sw-adm-api-gw"
+                              "name": "sw-adm-gw"
                            },
                            {
                               "containerPort": 5213,
-                              "name": "sw-api"
+                              "name": "grpc-sw-api"
                            },
                            {
                               "containerPort": 6213,
@@ -6195,10 +6195,6 @@
                            {
                               "mountPath": "/config",
                               "name": "external-proxy-config-vol"
-                           },
-                           {
-                              "mountPath": "/tmp",
-                              "name": "external-proxy-tls-cert-vol"
                            }
                         ]
                      }
@@ -6209,13 +6205,6 @@
                            "name": "cluster-manifest"
                         },
                         "name": "external-proxy-config-vol"
-                     },
-                     {
-                        "name": "external-proxy-tls-cert-vol",
-                        "secret": {
-                           "optional": false,
-                           "secretName": "cluster-tls"
-                        }
                      }
                   ]
                }
@@ -6246,12 +6235,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "cd-pub-api",
+                  "name": "grpc-cd-pub-api",
                   "port": 5008,
                   "protocol": "TCP"
                },
                {
-                  "name": "cd-adm-api",
+                  "name": "grpc-cd-adm-api",
                   "port": 5009,
                   "protocol": "TCP"
                },
@@ -6261,12 +6250,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "svcp-adm-api",
+                  "name": "grpc-svcp-adm",
                   "port": 5002,
                   "protocol": "TCP"
                },
                {
-                  "name": "svcp-lg-api",
+                  "name": "grpc-svcp-lg",
                   "port": 5001,
                   "protocol": "TCP"
                },
@@ -6281,7 +6270,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "svc-app-adm-api",
+                  "name": "grpc-svc-adm",
                   "port": 5005,
                   "protocol": "TCP"
                },
@@ -6311,12 +6300,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-adm-api",
+                  "name": "grpc-val1-adm",
                   "port": 5102,
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-lg-api",
+                  "name": "grpc-val1-lg",
                   "port": 5101,
                   "protocol": "TCP"
                },
@@ -6331,17 +6320,17 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-lg-api-gw",
+                  "name": "val1-lg-gw",
                   "port": 6101,
                   "protocol": "TCP"
                },
                {
-                  "name": "swd-pub-api",
+                  "name": "grpc-swd-pub",
                   "port": 5108,
                   "protocol": "TCP"
                },
                {
-                  "name": "swd-adm-api",
+                  "name": "grpc-swd-adm",
                   "port": 5109,
                   "protocol": "TCP"
                },
@@ -6351,12 +6340,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-adm-api",
+                  "name": "grpc-sw-adm",
                   "port": 5202,
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-lg-api",
+                  "name": "grpc-sw-lg",
                   "port": 5201,
                   "protocol": "TCP"
                },
@@ -6366,17 +6355,17 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-lg-api-gw",
+                  "name": "sw-lg-gw",
                   "port": 6201,
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-adm-api-gw",
+                  "name": "sw-adm-gw",
                   "port": 6202,
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-api",
+                  "name": "grpc-sw-api",
                   "port": 5213,
                   "protocol": "TCP"
                },
@@ -6389,199 +6378,6 @@
             "selector": {
                "app": "external-proxy"
             }
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "labels": {
-               "clusterName": "cluster",
-               "cnjClusterName": "cluster"
-            },
-            "name": "external",
-            "namespace": "cluster-ingress"
-         },
-         "spec": {
-            "loadBalancerIP": "ipaddr",
-            "loadBalancerSourceRanges": [
-               "35.194.81.56/32",
-               "35.198.147.95/32",
-               "35.189.40.124/32",
-               "34.132.91.75/32",
-               "18.210.210.130/32",
-               "35.188.147.4/32",
-               "34.70.206.199/32",
-               "35.224.88.220/32",
-               "104.198.152.233/32",
-               "34.69.77.22/32",
-               "104.154.35.222/32",
-               "35.239.94.218/32",
-               "35.232.124.246/32",
-               "20.250.62.34/32",
-               "3.248.162.60/32",
-               "34.254.73.185/32",
-               "54.228.250.8/32",
-               "52.50.252.242/32",
-               "52.210.114.82/32",
-               "34.27.240.103/32"
-            ],
-            "ports": [
-               {
-                  "name": "http",
-                  "port": 80,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "https",
-                  "port": 443,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "cd-pub-api",
-                  "port": 5008,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "cd-adm-api",
-                  "port": 5009,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "cd-metrics",
-                  "port": 10313,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "svcp-adm-api",
-                  "port": 5002,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "svcp-lg-api",
-                  "port": 5001,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "svcp-metrics",
-                  "port": 10013,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "dir-api",
-                  "port": 5010,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "svc-app-adm-api",
-                  "port": 5005,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv1-api",
-                  "port": 5014,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv2-api",
-                  "port": 5114,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv3-api",
-                  "port": 5214,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv4-api",
-                  "port": 5314,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "scan-api",
-                  "port": 5012,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-adm-api",
-                  "port": 5102,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-lg-api",
-                  "port": 5101,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-metrics",
-                  "port": 10113,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "json-api",
-                  "port": 7575,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-lg-api-gw",
-                  "port": 6101,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-pub-api",
-                  "port": 5108,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-adm-api",
-                  "port": 5109,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "swd-metrics",
-                  "port": 10413,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sw-adm-api",
-                  "port": 5202,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sw-lg-api",
-                  "port": 5201,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sw-metrics",
-                  "port": 10213,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sw-lg-api-gw",
-                  "port": 6201,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sw-adm-api-gw",
-                  "port": 6202,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sw-api",
-                  "port": 5213,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sw-api-gw",
-                  "port": 6213,
-                  "protocol": "TCP"
-               }
-            ],
-            "selector": {
-               "app": "external-proxy"
-            },
-            "type": "LoadBalancer"
          }
       }
    ],

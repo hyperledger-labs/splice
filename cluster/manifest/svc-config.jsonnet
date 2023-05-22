@@ -34,11 +34,11 @@ local deployments(config) = [
     "global-domain",
     [
       {
-        name: "cd-pub-api",
+        name: "grpc-cd-pub-api",
         port: 5008,
       },
       {
-        name: "cd-adm-api",
+        name: "grpc-cd-adm-api",
         port: 5009,
       },
       {
@@ -52,19 +52,19 @@ local deployments(config) = [
     ext={
       readinessProbe: {
         tcpSocket: {
-          port: "cd-pub-api",
+          port: "grpc-cd-pub-api",
         },
       },
       livenessProbe: {
         tcpSocket: {
-          port: "cd-pub-api",
+          port: "grpc-cd-pub-api",
         },
         failureThreshold: 5,
         periodSeconds: 10,
       },
       startupProbe: {
         tcpSocket: {
-          port: "cd-pub-api",
+          port: "grpc-cd-pub-api",
         },
         failureThreshold: 20,
         periodSeconds: 10,
@@ -78,11 +78,11 @@ local deployments(config) = [
   ),
   c.deployment(config, "participant", [
     {
-      name: "svcp-adm-api",
+      name: "grpc-svcp-adm",
       port: 5002,
     },
     {
-      name: "svcp-lg-api",
+      name: "grpc-svcp-lg",
       port: 5001,
     },
     {
@@ -142,7 +142,7 @@ local deployments(config) = [
 
   c.deployment(config, "svc-app", [
     {
-      name: "svc-app-adm-api",
+      name: "grpc-svc-adm",
       port: 5005,
     },
   ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "svc")),
