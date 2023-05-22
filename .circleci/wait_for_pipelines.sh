@@ -28,7 +28,7 @@ pipeline_workflows_complete() {
         return 1
     fi
   else
-    echo "Could not fetch pipeline status; assuming that pipeline is till running"
+    echo "Could not fetch pipeline status; assuming that pipeline is still running"
     return 1
   fi
 }
