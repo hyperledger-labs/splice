@@ -4,52 +4,74 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
+  CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.cometbft.CometBftContainerAround
+import com.daml.network.sv.cometbft.SvCometBftNetwork
 import com.daml.network.sv.config.CometBftConfig
 import com.daml.network.util.SvTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 
 class SvCometBftIntegrationTest
-    extends CNNodeIntegrationTest
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with SvTestUtil
-    with CometBftContainerAround {
+    with SvCometBftNetwork {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransform(CNNodeConfigTransforms.onlySv1)
       .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppConfigs_(config =>
+        CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
           config
             .focus(_.cometBftConfig)
             .replace(
               Some(
                 CometBftConfig(
                   enabled = true,
-                  connectionUri = connectionConfig.uri,
+                  connectionUri = startNewCometBftContainer(name).uri,
                 )
               )
             )
-        )(config)
+        }(config)
       )
-      .withManualStart
 
   "report cometBft status" in { implicit env =>
-    initSvcWithSv1Only()
-    eventually() {
-      sv1.cometBftNodeStatus().catchingUp shouldBe false
+    forAll(env.svs.local) { sv =>
+      eventually() {
+        sv.cometBftNodeStatus().catchingUp shouldBe false
+      }
     }
   }
 
   "get the debug dump for cometBft" in { implicit env =>
-    initSvcWithSv1Only()
-    eventually() {
-      sv1.cometBftNodeDump().abciInfo.isObject shouldBe true
+    forAll(env.svs.local) { sv =>
+      eventually() {
+        sv.cometBftNodeDump().abciInfo.isObject shouldBe true
+      }
     }
   }
+
+  "only the SV1 CometBFT node is a validator" in { implicit env =>
+    eventually() {
+      env.svs.local.foreach { sv =>
+        withClue(s"sv ${sv.name} must know all the other BFT nodes as peers") {
+          sv.cometBftNodeDump()
+            .networkInfo
+            .findAllByKey("n_peers")
+            .loneElement
+            .as[Integer]
+            .value shouldBe 3
+        }
+      }
+      // SV1 always starts first, and it's set as a validator in the genesis
+      sv1.cometBftNodeStatus().votingPower.doubleValue shouldBe 10
+      // Validate all other nodes are not validators
+      forAll(env.svs.local.filterNot(_.name == sv1.name)) { sv =>
+        sv.cometBftNodeStatus().votingPower.doubleValue shouldBe 0
+      }
+    }
+  }
+
 }
