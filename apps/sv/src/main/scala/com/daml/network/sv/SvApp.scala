@@ -778,6 +778,7 @@ class SvApp(
               ),
               defaultEnabledChoices,
               config.isDevNet,
+              false,
             ).create(),
             commandId = CNLedgerConnection.CommandId(
               "com.daml.network.svc.initiateCoinRulesUpgrade",

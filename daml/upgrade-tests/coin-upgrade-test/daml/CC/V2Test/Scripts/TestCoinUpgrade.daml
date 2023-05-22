@@ -24,6 +24,7 @@ setupForCoinUpgradeTest = do
       enabledChoices = API.enableAllChoices
       isDevNet = True
       svc = app.svc
+      lock = False
 
   validator <- setupValidator app "oldValidator"
 

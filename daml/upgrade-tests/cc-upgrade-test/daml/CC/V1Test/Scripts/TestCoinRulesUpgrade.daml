@@ -25,6 +25,7 @@ setupForCoinRulesUpgradeTest = do
       enabledChoices = API.enableAllChoices
       isDevNet = True
       svc = app.svc
+      lock = False
 
   -- Setup two validators - users on one will keep using the "old" CoinRules,
   -- while users on the other will use CoinRulesV1Test (to simulate their validator software being upgraded)

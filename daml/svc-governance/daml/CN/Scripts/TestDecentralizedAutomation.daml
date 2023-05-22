@@ -1,5 +1,6 @@
 module CN.Scripts.TestDecentralizedAutomation where
 
+import DA.Action
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.List
@@ -13,8 +14,12 @@ import CC.Coin
 import CN.SvcRules
 import CN.Util.Assert
 
+import CC.Scripts.Parameters
 import CC.Scripts.Util
 import CN.Scripts.SvcTestUtils
+
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
 
 
 -- Automation leader election
@@ -183,8 +188,8 @@ testConfirmationExpiry = do
 -- Testing the SVC activity lock
 --------------------------------
 
-testLockAndUnlockSvcRulesCoinRules: Script ()
-testLockAndUnlockSvcRulesCoinRules = do
+testActivityLockingOnSvcRulesCoinRulesChoices: Script ()
+testActivityLockingOnSvcRulesCoinRulesChoices = do
   (app, svc, (_, sv2, _, _)) <- initDevNetCollective
   [(svcRulesCid, _)] <- query @SvcRules svc
   [(coinRulesCid, _)] <- query @CoinRules svc
@@ -216,3 +221,77 @@ testLockAndUnlockSvcRulesCoinRules = do
   submitMulti [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
 
   pure ()
+
+testActivityLockOnLockedCoinChoices: Script ()
+testActivityLockOnLockedCoinChoices = do
+  (app, _, (_, _, _, _)) <- initDevNetCollective
+
+  alice <- setupUser app "alice" app.svc
+  bob <- setupUser app "bob" app.svc
+
+  cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
+  roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
+  ensureHonorsActivityLock app [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock coinRules roundCid)
+
+  cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
+  passTime (minutes 6)
+  roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
+  ensureHonorsActivityLock app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_OwnerExpireLock coinRules roundCid)
+
+  cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 1)
+  replicateA_ 4 $ runNextIssuance app
+  (round, _) <- getLatestOpenRound app
+  ensureHonorsActivityLock app [app.svc] [app.svc] $ \coinRules ->
+    exerciseCmd cid (LockedCoin_ExpireCoin round coinRules)
+  pure ()
+
+testActivityLockOnCoinChoices : Script ()
+testActivityLockOnCoinChoices = do
+  (app, _, (_, _, _, _)) <- initDevNetCollective
+  alice <- setupUser app "alice" app.svc
+
+  cid <- tap app alice defaultTransferConfig.holdingFee.rate
+  replicateA_ 3 $ runNextIssuance app
+  (round, _) <- getLatestOpenRound app
+  ensureHonorsActivityLock app [app.svc] [app.svc] $ \coinRules ->
+    exerciseCmd cid (Coin_Expire round coinRules)
+  pure ()
+
+ensureHonorsActivityLock : CCApp -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script ()
+ensureHonorsActivityLock app actAs readAs buildCommand = do
+  lockSvcRules app
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMultiMustFail actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+
+  unlockSvcRules app
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMulti actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+  pure ()
+
+lockSvcRules : CCApp -> Script ()
+lockSvcRules app = do
+  [(svcRulesCid, _)] <- query @SvcRules app.svc
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  submitMulti [app.svc] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
+    sponsor = app.svc
+    coinRulesCid
+  pure ()
+
+unlockSvcRules : CCApp -> Script ()
+unlockSvcRules app = do
+  [(svcRulesCid, _)] <- query @SvcRules app.svc
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  submitMulti [app.svc] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
+    sponsor = app.svc
+    coinRulesCid
+  pure ()
+
+getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)
+getLockedCoin app owner lockHolder amount lockDuration =  do
+-- tap amount + 1 to account for fees
+  _ <- tap app owner (amount + 1.0)
+  lockTo1 app owner lockHolder amount lockDuration
+  [(cid, _)] <- query @LockedCoin lockHolder
+  pure cid

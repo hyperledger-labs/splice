@@ -51,6 +51,8 @@ template Coin
       -- For simplicity and to communicate this as the standard-case, we only allow the SVC to expire coins (see #1789 for full context)
       controller svc
       do coinRules <- view <$> fetch coinRulesCid
+         -- This is not necessary as there is already a checking in SvcRules but still add it here to be consistent with other choices.
+         requireUnlocked coinRules.lock
          requireChoiceIsEnabled "Coin_Expire" (\c -> c.enable_Coin_Expire) coinRules
          requireCoinExpiredForAllOpenRounds roundCid this
          return owner
@@ -70,6 +72,7 @@ template LockedCoin
 
       lockedCoin_OwnerExpireLock coinRulesCid openRoundCid = do
         coinRules <- view <$> fetch coinRulesCid
+        requireUnlocked coinRules.lock
         openMiningRound <- exercise openRoundCid (API.OpenMiningRound_Fetch coin.owner)
         requireChoiceIsEnabled "LockedCoin_OwnerExpireLock" (\c -> c.enable_LockedCoin_OwnerExpireLock) coinRules
         t <- getTime
@@ -81,6 +84,7 @@ template LockedCoin
 
       lockedCoin_Unlock coinRulesCid openRoundCid = do
         coinRules <- view <$> fetch coinRulesCid
+        requireUnlocked coinRules.lock
         openMiningRound <- exercise openRoundCid (API.OpenMiningRound_Fetch coin.owner)
         requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_Unlock) coinRules
         coinCid <- toInterfaceContractId <$> create coin
@@ -95,6 +99,8 @@ template LockedCoin
       -- For simplicity and to communicate this as the standard-case, we only allow the SVC to expire coins (see #1789 for full context)
       controller coin.svc
       do coinRules <- view <$> fetch coinRulesCid
+         -- This is not necessary as there is already a checking in SvcRules but still add it here to be consistent with other choices.
+         requireUnlocked coinRules.lock
          requireChoiceIsEnabled "LockedCoin_ExpireCoin" (\c -> c.enable_LockedCoin_ExpireCoin) coinRules
          requireChoiceIsEnabled "Coin_Expire" (\c -> c.enable_Coin_Expire) coinRules
          t <- getTime

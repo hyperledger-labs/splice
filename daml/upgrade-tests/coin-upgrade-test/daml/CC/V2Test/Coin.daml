@@ -105,6 +105,7 @@ template CoinRulesV2Test
     configSchedule : Schedule Time (CoinConfig USD)
     enabledChoices : API.EnabledChoices
     isDevNet : Bool
+    lock: Bool
   where
     ensure validSchedule configSchedule validCoinConfig
 
