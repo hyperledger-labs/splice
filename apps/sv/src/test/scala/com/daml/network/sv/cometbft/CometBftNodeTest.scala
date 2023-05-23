@@ -4,7 +4,14 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.drivers as proto
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cc.api.v1.round.Round
-import com.daml.network.codegen.java.cn.cometbft.SvNodeConfig
+import com.daml.network.codegen.java.cn.cometbft.{
+  CometBftConfig,
+  CometBftNodeConfig,
+  GovernanceKeyConfig,
+  SequencingKeyConfig,
+}
+import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
+import com.daml.network.sv.util.SvUtil
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters.*
@@ -86,16 +93,20 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
           new daml.svcrules.MemberInfo(
             mkSvNodeId(svNodeNr),
             new Round(0L),
-            new SvNodeConfig(
-              Map(
-                mkCometBftNodeName(svNodeNr) -> new daml.cometbft.CometBftNodeConfig(
-                  validatorKey,
-                  1L,
+            Map(
+              long2Long(SvUtil.defaultSvcDomainNumber) -> new DomainNodeConfig(
+                new CometBftConfig(
+                  Map(
+                    mkCometBftNodeName(svNodeNr) -> new CometBftNodeConfig(
+                      validatorKey,
+                      1L,
+                    )
+                  ).asJava,
+                  Seq[GovernanceKeyConfig]().asJava,
+                  Seq[SequencingKeyConfig]().asJava,
                 )
-              ).asJava,
-              Seq[daml.cometbft.GovernanceKeyConfig]().asJava,
-              Seq[daml.cometbft.SequencingKeyConfig]().asJava,
-            ),
+              )
+            ).asJava,
           ),
         )
       }

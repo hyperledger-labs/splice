@@ -6,12 +6,14 @@ import com.auth0.exception.Auth0Exception
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.{
-  LedgerApiExtensions,
   DirectoryAppClientReference,
+  LedgerApiExtensions,
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
+import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.sv.config.SvOnboardingConfig.FoundCollective
@@ -30,9 +32,11 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.integration.plugins.WaitForPorts
+import com.digitalasset.canton.topology.DomainId
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.AppendedClues
 
+import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 
 /** Analogue to Canton's CommunityTests */
@@ -193,16 +197,24 @@ object CNNodeTests {
     def tickDurationWithBuffer(implicit env: CNNodeTestConsoleEnvironment) =
       defaultTickDuration.asJava.plus(java.time.Duration.ofSeconds(10))
 
-    protected def mkCoinConfig(
+    /** Helper function to create CoinConfig's in tests for coin config changes. Uses the `currentSchedule` as a reference
+      * to fill in the id of the activeDomain. Not meant to be a general utility. Please adjust if you need it to do more
+      */
+    protected def mkUpdatedCoinConfig(
+        currentSchedule: Schedule[Instant, CoinConfig[USD]],
         tickDuration: NonNegativeFiniteDuration,
         maxNumInputs: Int = 100,
         holdingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
-    ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] =
+    ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
+      val activeDomainId =
+        currentSchedule.currentValue.globalDomain.activeDomain // TODO(#4510): adjust by 'now' to fetch the proper value
       defaultCoinConfig(
         tickDuration,
         maxNumInputs,
+        DomainId.tryFromString(activeDomainId),
         holdingFee,
       )
+    }
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
       value should (be >= range._1 and be <= range._2)

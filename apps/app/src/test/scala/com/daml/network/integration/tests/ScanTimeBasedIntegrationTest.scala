@@ -82,12 +82,18 @@ class ScanTimeBasedIntegrationTest
 
     val newHoldingFee = 0.1
     clue("schedule a config change, and advance time for it to take effect") {
+      val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
       val configSchedule =
         createConfigSchedule(
+          currentConfigSchedule,
           (
             defaultTickDuration.asJava,
-            mkCoinConfig(tickDuration = defaultTickDuration, holdingFee = newHoldingFee),
-          )
+            mkUpdatedCoinConfig(
+              currentConfigSchedule,
+              tickDuration = defaultTickDuration,
+              holdingFee = newHoldingFee,
+            ),
+          ),
         )
       svcClient.setConfigSchedule(configSchedule)
       advanceRoundsByOneTick

@@ -1,0 +1,85 @@
+-- | Data structures and contracts related to the SVC's management of the global domain.
+module CN.SVC.GlobalDomain where
+
+import qualified DA.Map as Map
+
+import CN.CometBft
+
+-- Collective-level configuration
+-- ==============================
+
+-- | The global domain consists of a series of actual domains.
+-- New domains are created by the collective for the rare case of needing to roll-out
+-- a BFT protocol upgrade that cannot be rolled out in a backwards compatible fashion.
+--
+-- Note that domains themselves are formed by a cluster of nodes run by the collective members.
+-- As can be seen form `DomainNodeConfig` each member runs multiple different kinds of
+-- physical nodes.
+data GlobalDomainConfig = GlobalDomainConfig with
+    domains : Map.Map Int DomainConfig
+    -- ^ The actual domains, numbered sequentially.
+    lastDomainNumber : Int
+    -- ^ The last allocated domain number.
+    activeDomain : Int
+    -- ^ The domain to be used for managing all SVC and CC workflows.
+  deriving (Eq, Show)
+
+-- | The collective-level configuration of a domain. This contains the shared parameters
+-- of the domain.
+data DomainConfig = DomainConfig with
+    state : DomainState
+    -- ^ The state of this domain as seen from the perspective of the collective.
+    cometBftGenesisJson : Text
+    -- ^ The CometBftGenesis json value required for new members to bring up
+    -- their CometBft nodes for this domain.
+  deriving (Eq, Show)
+
+-- | The state of a domain.
+data DomainState
+  = DS_Bootstrapping
+    -- ^ The collective is bootstrapping this domain, and members are required to
+    -- provision their nodes for it.
+  | DS_Operational
+    -- ^ The collective considers this domain operational, and thus can use it as
+    -- the active domain.
+  | DS_Decomissioned
+    -- ^ The domain has been decommissioned and members are now allowed to shutdown
+    -- their nodes for that domain. We track this state explicitly instead of just
+    -- deleting the domain config, as decomissioning likely takes a while, and we
+    -- want to avoid confusion among SV operators when they see errors raised from
+    -- some of their domain nodes.
+  deriving (Eq, Show)
+
+
+-- Member-level configuration
+-- ==========================
+
+-- | A map from domain-numbers to the configuration of a member's node for this domain.
+type DomainNodeConfigMap = Map.Map Int DomainNodeConfig
+
+-- | The configuration of a member's node for a particular domain.
+data DomainNodeConfig = DomainNodeConfig with
+
+    -- TODO(M3-47): extend this record with the configuration of Canton sequencers and mediators.
+
+    cometBft : CometBftConfig
+    -- ^ The configuration of this member's CometBFT nodes and keys.
+  deriving (Eq, Show)
+
+noDomainNodes : DomainNodeConfigMap
+noDomainNodes = Map.empty
+
+data DomainNodeConfigLimits = DomainNodeConfigLimits with
+    cometBft : CometBftConfigLimits
+  deriving (Eq, Show)
+
+
+-- helper functions
+-------------------
+
+validDomainNodeConfig : DomainNodeConfigLimits -> DomainNodeConfig -> Bool
+validDomainNodeConfig limits config =
+  validCometBftConfig limits.cometBft config.cometBft
+
+defaultDomainNodeConfigLimits : DomainNodeConfigLimits
+defaultDomainNodeConfigLimits = DomainNodeConfigLimits with cometBft = defaultCometBftConfigLimits

@@ -72,8 +72,9 @@ const SvcView: React.FC = () => {
       ),
       createRow(
         'maxNumCometBftNodes',
-        data.svcRules.payload.config.cometBftConfigLimits.maxNumCometBftNodes
+        data.svcRules.payload.config.domainNodeConfigLimits.cometBft.maxNumCometBftNodes
       ),
+      // TODO(#4902): display all fields of the config, in particular the ones related to the global domain configuration
       createRow(
         'numUnclaimedRewardsThreshold',
         data.svcRules.payload.config.numUnclaimedRewardsThreshold

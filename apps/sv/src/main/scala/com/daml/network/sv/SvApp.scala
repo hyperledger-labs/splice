@@ -1,7 +1,6 @@
 package com.daml.network.sv
 
 import java.security.interfaces.ECPrivateKey
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
@@ -35,7 +34,11 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.svc.admin.api.client.SvcConnection
-import com.daml.network.util.CNNodeUtil.{defaultCoinConfigSchedule, defaultEnabledChoices}
+import com.daml.network.util.CNNodeUtil.{
+  defaultCoinConfig,
+  defaultCoinConfigSchedule,
+  defaultEnabledChoices,
+}
 import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -694,9 +697,11 @@ class SvApp(
                     svcParty.toProtoPrimitive,
                     svParty.toProtoPrimitive,
                     foundingConfig.name,
-                    defaultCoinConfigSchedule(
+                    SvUtil.noFounderDomainNodes,
+                    defaultCoinConfig(
                       foundingConfig.initialTickDuration,
                       foundingConfig.initialMaxNumInputs,
+                      domainId,
                     ),
                     foundingConfig.initialCoinPrice.bigDecimal,
                     SvUtil.defaultSvcRulesConfig(),
@@ -775,6 +780,7 @@ class SvApp(
               defaultCoinConfigSchedule(
                 foundingConfig.initialTickDuration,
                 foundingConfig.initialMaxNumInputs,
+                domainId,
               ),
               defaultEnabledChoices,
               config.isDevNet,

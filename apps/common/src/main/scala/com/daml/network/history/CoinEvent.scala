@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, DamlOptional, ExercisedEvent,
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}

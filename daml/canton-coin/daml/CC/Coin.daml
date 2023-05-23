@@ -20,7 +20,7 @@ import CC.Expiry
 import CC.Fees
 import CC.Issuance
 import CC.Round
-import CC.DomainFees
+import CC.GlobalDomain
 import CC.Util
 
 import qualified CC.API.V1.Coin as API
@@ -267,28 +267,29 @@ template CoinRules
         requireChoiceIsEnabled "CoinRules_Transfer" (\c -> c.enable_CoinRules_Transfer) (view $ toInterface @API.CoinRules this)
         executeTransfer coinRulesCid context svc transfer
 
-    -- TODO(#3742): Also declare this method in the CoinRules interface
+    -- Global domain usage
+    ----------------------
+
+    -- TODO(#3742): consider also declaring this method in the CoinRules interface
     nonconsuming choice CoinRules_BuyExtraTraffic
       : (ContractId ValidatorTraffic, Optional (ContractId API.Coin))
       with
         inputs : [API.TransferInput]
         context : API.PaymentTransferContext
         validator : Party
-        trafficCid: ContractId ValidatorTraffic
+        domainIdOrTrafficCid: Either Text (ContractId ValidatorTraffic)
         extraTraffic : Int
       controller validator
       do
         requireUnlocked lock
-        traffic <- fetch trafficCid
+        -- validate choice parameters
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
-        let minTopupAmount = configUsd.domainFeesConfig.minTopupAmount
-        require "validator party and ValidatorTraffic match" (validator == traffic.validator)
-        require "CoinRules svc and ValidatorTraffic svc match" (svc == traffic.svc)
+        let minTopupAmount = configUsd.globalDomain.fees.minTopupAmount
         require "extraTraffic is at least as much as the configured minTopupAmount" (extraTraffic >= minTopupAmount)
-
+        -- compute price in CC
         contextMiningRound <- exercise context.context.openMiningRound (API.OpenMiningRound_Fetch validator)
-        let extraTrafficPrice = configUsd.domainFeesConfig.extraTrafficPrice
+        let extraTrafficPrice = configUsd.globalDomain.fees.extraTrafficPrice
         let usdSpent = intToDecimal extraTraffic / 1e6 * extraTrafficPrice
         let ccSpent = usdSpent / contextMiningRound.coinPrice
         let transfer = API.Transfer with
@@ -306,8 +307,18 @@ template CoinRules
         let [API.TransferResultCoin coin] = result.createdCoins
         -- burn the coin created for the SVC
         _ <- archive coin
-        -- .. and add new traffic to the validator's balance
-        archive trafficCid
+        -- fetch, archive, and validate traffic contract
+        traffic <- case domainIdOrTrafficCid of
+          Left domainId -> do
+            require "Known domain-id" (domainId `Set.member` configUsd.globalDomain.requiredDomains)
+            pure $ initialValidatorTraffic svc validator domainId
+          Right trafficCid -> do
+            traffic <- fetch trafficCid
+            archive trafficCid
+            require "validator party and ValidatorTraffic match" (validator == traffic.validator)
+            require "CoinRules svc and ValidatorTraffic svc match" (svc == traffic.svc)
+            pure traffic
+        -- add new traffic to the validator's balance
         newTraffic <- create ValidatorTraffic with
               svc = traffic.svc
               validator = traffic.validator
@@ -316,8 +327,35 @@ template CoinRules
               ccSpent = traffic.ccSpent + ccSpent
               usdSpent = traffic.usdSpent + usdSpent
               lastPurchasedAt = now
+              domainId = traffic.domainId
         return (newTraffic, result.senderChangeCoin)
 
+    -- Disincentivize the creation of duplicate traffic contracts by giving
+    -- the SVC the right to retire the duplicates with a lower amount of purchased extra traffic.
+    nonconsuming choice CoinRules_ArchiveDuplicateValidatorTrafficContracts : ()
+      with
+        trafficCid : ContractId ValidatorTraffic
+        duplicateCids : [ContractId ValidatorTraffic]
+      controller svc
+      do
+        requireUnlocked lock
+        -- fetch and validate traffic contract to be kept
+        traffic <- fetch trafficCid
+        require "SVC matches" (traffic.svc == svc)
+        -- fetch and archive traffic contracts
+        forA_ duplicateCids $ \duplicateCid -> do
+          duplicate <- fetch duplicateCid
+          archive duplicateCid
+          require "Duplicate is different from reference" (duplicateCid /= trafficCid)
+          require "SVC matches reference" (duplicate.svc == traffic.svc)
+          require "Validator matches reference" (duplicate.validator == traffic.validator)
+          require "Domain-id matches reference" (duplicate.domainId == traffic.domainId)
+          require "Purchased amount of duplicate is smaller or equal to reference"
+            (duplicate.totalPurchased <= traffic.totalPurchased)
+
+
+    -- Coin usage
+    -------------
 
     -- A choice for the SVC to mint coin for the cases where the
     -- collective rules allow for that; e.g., when redeeming SVC rewards.
@@ -659,7 +697,7 @@ transferControllers t =
 scaleCoinConfig : Decimal -> CoinConfig USD -> CoinConfig CC
 scaleCoinConfig coinPrice config = CoinConfig with
   transferConfig = scaleFees (1.0 / coinPrice) config.transferConfig
-  domainFeesConfig = config.domainFeesConfig
+  globalDomain = config.globalDomain
   issuanceCurve = config.issuanceCurve
   tickDuration = config.tickDuration
 
@@ -847,7 +885,7 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
-        
+
     summarizeAndConsumeInput _round s (API.InputValidatorRewardCoupon couponCid) = do
       -- fetch and archive
       (couponCid, coupon) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" couponCid
@@ -926,9 +964,9 @@ summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
       senderChangeFee
       senderChangeAmount
       coinPrice = openRound.coinPrice
-      changeToInitialAmountAsOfRoundZero = totalOutputAmount 
+      changeToInitialAmountAsOfRoundZero = totalOutputAmount
         + senderChangeAmount
-        + intToDecimal openRound.round.number *  numOutputs * transferConfigCC.holdingFee.rate 
+        + intToDecimal openRound.round.number *  numOutputs * transferConfigCC.holdingFee.rate
         - inp.amountArchivedAsOfRoundZero
       changeToHoldingFeesRate = numOutputs * transferConfigCC.holdingFee.rate - inp.totalHoldingFees
 

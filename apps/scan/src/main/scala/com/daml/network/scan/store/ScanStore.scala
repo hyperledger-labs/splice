@@ -2,7 +2,7 @@ package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
@@ -90,9 +90,9 @@ trait ScanStore
 
   def getBaseRateTrafficLimits()(implicit
       tc: TraceContext
-  ): Future[cc.domainfees.BaseRateTrafficLimits] =
+  ): Future[cc.globaldomain.BaseRateTrafficLimits] =
     lookupCoinRules().map(
-      _.map(_.payload.configSchedule.currentValue.domainFeesConfig.baseRateTrafficLimits)
+      _.map(_.payload.configSchedule.currentValue.globalDomain.fees.baseRateTrafficLimits)
         .getOrElse(
           throw Status.NOT_FOUND.withDescription("No active SvcRules contract").asRuntimeException()
         )
@@ -143,7 +143,7 @@ object ScanStore {
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
-        mkFilter(cc.domainfees.ValidatorTraffic.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.globaldomain.ValidatorTraffic.COMPANION)(co => co.payload.svc == svc),
       ) ++
         (if (scanConfig.enableCoinRulesUpgrade)
            Map(mkFilter(ccV1Test.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))

@@ -120,11 +120,16 @@ class SvTimeBasedIntegrationTest
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
     initSvc()
+    val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
 
     val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
     svcClient.setConfigSchedule(
       createConfigSchedule(
-        (defaultTickDuration.asJava, mkCoinConfig(doubledTickDuration))
+        currentConfigSchedule,
+        (
+          defaultTickDuration.asJava,
+          mkUpdatedCoinConfig(currentConfigSchedule, doubledTickDuration),
+        ),
       )
     )
     advanceRoundsByOneTick
@@ -215,11 +220,17 @@ class SvTimeBasedIntegrationTest
 
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
     initSvc()
+    val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
 
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
+    scan.getCoinRules().payload.configSchedule.currentValue.globalDomain.activeDomain
     svcClient.setConfigSchedule(
       createConfigSchedule(
-        (defaultTickDuration.asJava, mkCoinConfig(reducedTickDuration))
+        currentConfigSchedule,
+        (
+          defaultTickDuration.asJava,
+          mkUpdatedCoinConfig(currentConfigSchedule, reducedTickDuration),
+        ),
       )
     )
     advanceRoundsByOneTick
@@ -383,12 +394,14 @@ class SvTimeBasedIntegrationTest
 
   "round management with very tightly scheduled config" in { implicit env =>
     initSvc()
+    val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
 
-    val config101 = mkCoinConfig(defaultTickDuration, 101)
-    val config102 = mkCoinConfig(defaultTickDuration, 102)
+    val config101 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 101)
+    val config102 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 102)
 
     svcClient.setConfigSchedule(
       createConfigSchedule(
+        currentConfigSchedule,
         (Duration.ofSeconds(150), config101),
         (Duration.ofSeconds(151), config102),
       )
@@ -405,14 +418,14 @@ class SvTimeBasedIntegrationTest
       rounds.latestOpen.data.transferConfigUsd.maxNumInputs shouldBe config102.transferConfig.maxNumInputs
     })
 
-    val config201 = mkCoinConfig(defaultTickDuration, 201)
-    val config202 = mkCoinConfig(defaultTickDuration, 202)
+    val config201 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 201)
+    val config202 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 202)
 
     {
       val now = svc.participantClientWithAdminToken.ledger_api.time.get()
       val configSchedule = {
         new cc.schedule.Schedule(
-          mkCoinConfig(defaultTickDuration),
+          mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration),
           List(
             new Tuple2(
               now.add(tickDurationWithBuffer).toInstant,

@@ -1,6 +1,13 @@
 package com.daml.network.sv.util
 
-import com.daml.network.codegen.java.cn.cometbft.NetworkConfigLimits
+import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
+import com.daml.network.codegen.java.cn.svc
+import com.daml.network.codegen.java.cn.svc.globaldomain.{
+  DomainConfig,
+  DomainNodeConfig,
+  DomainNodeConfigLimits,
+  GlobalDomainConfig,
+}
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.util.Contract
@@ -10,10 +17,11 @@ import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.util.Base64
 import java.util.concurrent.TimeUnit
+import scala.jdk.CollectionConverters.*
 
 object SvUtil {
 
-  def defaultCometBftNetworkLimits: NetworkConfigLimits = new NetworkConfigLimits(
+  private def defaultCometBftNetworkLimits: CometBftConfigLimits = new CometBftConfigLimits(
     2, // maxNumCometBftNodes
     2, // maxNumGovernanceKeys
     2, // maxNumSequencingKeys
@@ -21,14 +29,40 @@ object SvUtil {
     256, // maxPubKeyLength
   )
 
+  private def defaultDomainNodeConfigLimits: DomainNodeConfigLimits = new DomainNodeConfigLimits(
+    defaultCometBftNetworkLimits // cometBft
+  )
+
+  val defaultSvcDomainNumber = 0L;
+
+  private def defaultSvcGlobalDomainConfig = new GlobalDomainConfig(
+    // domains
+    Map(
+      long2Long(defaultSvcDomainNumber) -> new DomainConfig(
+        svc.globaldomain.DomainState.DS_OPERATIONAL,
+        "TODO(#4900): share CometBFT genesis.json of founding SV node via SvcRules config.",
+        // TODO(M3-47): also share the Canton DomainId of the decentralized domain here
+      )
+    ).asJava,
+    defaultSvcDomainNumber, // lastDomainNumber
+    defaultSvcDomainNumber, // activeDomain
+
+  )
+
+  def noFounderDomainNodes: java.util.Map[java.lang.Long, DomainNodeConfig] = {
+    // NOTE: we leave this empty by default, as it will be populated via a reconciliation trigger
+    Map[java.lang.Long, DomainNodeConfig]().asJava
+  }
+
   def defaultSvcRulesConfig(): SvcRulesConfig = new SvcRulesConfig(
     10, // numUnclaimedRewardsThreshold
     new RelTime(TimeUnit.MINUTES.toMicros(5)), // actionConfirmationTimeout
     new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingTimeout
     new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingConfirmedTimeout
     new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout
-    defaultCometBftNetworkLimits,
+    defaultDomainNodeConfigLimits,
     1024, // maxTextLength
+    defaultSvcGlobalDomainConfig, // globalDomainConfig
   )
 
   def keyPairMatches(

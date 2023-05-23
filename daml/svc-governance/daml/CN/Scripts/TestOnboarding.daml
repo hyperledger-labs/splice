@@ -9,8 +9,9 @@ import DA.Time
 
 import CC.ValidatorLicense
 
-import qualified CN.CometBft as CometBft
+import CN.CometBft
 import CN.SvcRules
+import CN.SVC.GlobalDomain
 import CN.SvOnboarding
 
 import CN.Scripts.SvcTestUtils
@@ -28,7 +29,7 @@ testOnboardValidator = do
   onboardValidator app sv2 v1
 
   -- v1 received a validator license
-  [(_, validatorLicense)] <- query @ValidatorLicense svc
+  [(_, validatorLicense)] <- queryFilter @ValidatorLicense svc (\license -> license.validator == v1)
   validatorLicense === ValidatorLicense with
     validator = v1
     sponsor = sv2
@@ -96,28 +97,35 @@ testSvOnboarding = do
 
   -- now that svX is a member it can set its CometBFT config to become a CometBFT  validator
   -- TODO(M3-59): add negative tests for limits enforced on config values (manual testing showed they work)
-  let cometBftConfig = CometBft.SvNodeConfig with
-        cometBftNodes = Map.fromList
+  let cometBftConfig = CometBftConfig with
+        nodes = Map.fromList
           [ ( "svX-node-id-1"
-            , CometBft.CometBftNodeConfig with
+            , CometBftNodeConfig with
                 validatorPubKey = "==base-64-validator-pub-key-1"
                 votingPower = 0
             )
           , ( "svX-node-id-2"
-            , CometBft.CometBftNodeConfig with
+            , CometBftNodeConfig with
                 validatorPubKey = "==base-64-validator-pub-key-1"
                 votingPower = 1
             )
           ]
-        governanceKeys = [CometBft.GovernanceKeyConfig with pubKey = "==base-64-pubKey-1"]
+        governanceKeys = [GovernanceKeyConfig with pubKey = "==base-64-pubKey-1"]
         sequencingKeys = []
-  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetCometBftConfig with
+  let newNodeConfig = DomainNodeConfig with
+        cometBft = cometBftConfig
+  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
     sv = svX
-    cometBftConfig
+    domainNumber = svcRules.config.globalDomain.lastDomainNumber
+    newNodeConfig
 
   -- check that the config was actually set
   [(_, svcRules)] <- query @SvcRules svc
-  fmap (.cometBftConfig) (Map.lookup svX svcRules.members) === Some cometBftConfig
+  let actualConfig = do
+        info <- Map.lookup svX svcRules.members
+        config <- Map.lookup svcRules.config.globalDomain.lastDomainNumber info.domainNodes
+        pure config
+  actualConfig === Some newNodeConfig
 
   pure ()
 

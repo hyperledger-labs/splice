@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
@@ -17,9 +17,8 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -71,26 +70,17 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupValidatorTraffic()(implicit tc: TraceContext): Future[
-    Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
+  /** Lookup the validator-traffic contract for the given domain. */
+  def lookupValidatorTrafficWithOffset(domainId: DomainId)(implicit tc: TraceContext): Future[
+    QueryResult[Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]]
   ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomain(ValidatorTraffic.COMPANION)(_, _ => true)
-    )
-
-  def getValidatorTraffic()(implicit
-      tc: TraceContext
-  ): Future[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]] = {
-    lookupValidatorTraffic().map(
-      _.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(
-            s"No validator traffic contract for validator ${key.validatorParty}"
-          )
-          .asRuntimeException()
+    defaultAcsDomainIdF.flatMap(defaultDomainId =>
+      // TODO(#4913): read from all domains in the global domain
+      multiDomainAcsStore.findContractOnDomainWithOffset(ValidatorTraffic.COMPANION)(
+        defaultDomainId,
+        traffic => traffic.payload.domainId == domainId.toProtoPrimitive,
       )
     )
-  }
 
   def listUsers()(implicit tc: TraceContext): Future[Seq[String]] = {
     for {

@@ -12,7 +12,7 @@ General approach for CometBFT integration:
     - governance keys <= 2
     - sequencing keys <= 2
 
-- every SV can freely update their CometBft SvNodeConfig provided it is
+- every SV can freely update their CometBft CometBftConfig provided it is
     - valid
     - for mainnet, total voting power <= 1
 
@@ -57,15 +57,15 @@ data SequencingKeyConfig = SequencingKeyConfig with
   deriving (Eq, Show)
 
 -- | Config for all CometBFT nodes and keys under the control of a single SV node operator.
-data SvNodeConfig = SvNodeConfig with
-    cometBftNodes : Map.Map Text CometBftNodeConfig
+data CometBftConfig = CometBftConfig with
+    nodes : Map.Map Text CometBftNodeConfig
     -- ^ A map from CometBft node-ids to their configuration.
     governanceKeys : [GovernanceKeyConfig]
     sequencingKeys : [SequencingKeyConfig]
   deriving (Eq, Show)
 
 -- | Limits on the configurations that SV node operators can choose for their CometBFT nodes and keys.
-data NetworkConfigLimits = NetworkConfigLimits with
+data CometBftConfigLimits = CometBftConfigLimits with
     maxNumCometBftNodes : Int
     maxNumGovernanceKeys : Int
     maxNumSequencingKeys : Int
@@ -77,11 +77,11 @@ data NetworkConfigLimits = NetworkConfigLimits with
 -- default values
 -----------------
 
-emptySvNodeConfig : SvNodeConfig
-emptySvNodeConfig = SvNodeConfig Map.empty [] []
+emptyCometBftConfig : CometBftConfig
+emptyCometBftConfig = CometBftConfig Map.empty [] []
 
-defaultNetworkConfigLimits : NetworkConfigLimits
-defaultNetworkConfigLimits = NetworkConfigLimits with
+defaultCometBftConfigLimits : CometBftConfigLimits
+defaultCometBftConfigLimits = CometBftConfigLimits with
     maxNumCometBftNodes = 2
     maxNumGovernanceKeys = 2
     maxNumSequencingKeys = 2
@@ -92,21 +92,20 @@ defaultNetworkConfigLimits = NetworkConfigLimits with
 -- validity checks
 ------------------
 
-
-validSvNodeConfig : NetworkConfigLimits -> SvNodeConfig -> Bool
-validSvNodeConfig limits config =
-    all (validCometBftNodeConfig limits) (Map.toList config.cometBftNodes) &&
-    (Map.size config.cometBftNodes <= limits.maxNumCometBftNodes) &&
+validCometBftConfig : CometBftConfigLimits -> CometBftConfig -> Bool
+validCometBftConfig limits config =
+    all (validCometBftNodeConfig limits) (Map.toList config.nodes) &&
+    (Map.size config.nodes <= limits.maxNumCometBftNodes) &&
     length config.governanceKeys <= limits.maxNumGovernanceKeys &&
     length config.sequencingKeys <= limits.maxNumSequencingKeys &&
     all (\k -> T.length k.pubKey <= limits.maxPubKeyLength) config.governanceKeys &&
     all (\k -> T.length k.pubKey <= limits.maxPubKeyLength) config.sequencingKeys
 
-validCometBftNodeConfig : NetworkConfigLimits -> (Text, CometBftNodeConfig) -> Bool
+validCometBftNodeConfig : CometBftConfigLimits -> (Text, CometBftNodeConfig) -> Bool
 validCometBftNodeConfig limits (nodeId, config) =
   T.length nodeId <= limits.maxNodeIdLength &&
   config.votingPower >= 0 &&
   T.length config.validatorPubKey <= limits.maxPubKeyLength
 
-totalVotingPower : SvNodeConfig -> Int
-totalVotingPower config = sum $ map votingPower $ Map.values $ config.cometBftNodes
+totalVotingPower : CometBftConfig -> Int
+totalVotingPower config = sum $ map votingPower $ Map.values $ config.nodes

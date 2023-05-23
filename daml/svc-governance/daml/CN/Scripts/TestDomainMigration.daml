@@ -1,0 +1,116 @@
+module CN.Scripts.TestDomainMigration where
+
+import DA.Foldable (forA_)
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import Daml.Script
+import DA.Time
+
+import CC.Coin
+import CC.CoinConfig
+import CC.Schedule
+import CC.Scripts.Util
+
+import CN.CometBft
+import CN.SvcRules
+import CN.SVC.GlobalDomain
+
+import CN.Scripts.SvcTestUtils
+
+testDomainMigration : Script ()
+testDomainMigration = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  let svs = [sv1, sv2, sv3, sv4]
+
+  -- SVC decides off-ledger to setup a second domain
+  --
+  -- Every member generates their new validator keys and assemble these off-ledger into a valid[sv1, sv2, sv3, sv4]
+  -- genesis.json for bootstrapping the CometBft network, likely via the https://github.com/canton-network/foundation repo
+  let newDomainNumber = 1
+  executeSvcRulesConfigChange app $ \config ->
+    let globalDomainConfig = config.globalDomain
+        newDomainConfig = DomainConfig with state = DS_Bootstrapping; cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
+        newGlobalDomainConfig = globalDomainConfig with
+          domains = Map.insert newDomainNumber newDomainConfig globalDomainConfig.domains
+          lastDomainNumber = newDomainNumber
+    in  config with
+          globalDomain = newGlobalDomainConfig
+
+  -- SV's onboard their nodes and make them known
+  forA_ svs $ \sv -> do
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
+      sv
+      domainNumber = newDomainNumber
+      newNodeConfig = DomainNodeConfig with
+        cometBft = CometBftConfig with
+          nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
+          sequencingKeys = []
+          governanceKeys = []
+
+  -- The SVC marks the domain as operational
+  executeSvcRulesConfigChange app $ \config ->
+    let globalDomainConfig = config.globalDomain
+        newDomainConfig = DomainConfig with state = DS_Operational; cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
+        newGlobalDomainConfig = globalDomainConfig with
+          domains = Map.insert newDomainNumber newDomainConfig globalDomainConfig.domains
+          lastDomainNumber = newDomainNumber
+    in  config with
+          globalDomain = newGlobalDomainConfig
+
+  -- once the SVC is confident about the working of the new domain it announces it to its users
+  -- choosing a 30 day headroom until the active domain switches.
+  now <- getTime
+  executeCoinConfigChange app $ \configSchedule ->
+    let config = configSchedule.currentValue
+        globalDomainConfig = config.globalDomain
+        newDomainId = "global-domain-id-1"
+        newGlobalDomainConfigAnnounce = globalDomainConfig with
+          requiredDomains = Set.insert newDomainId globalDomainConfig.requiredDomains
+        newGlobalDomainConfigSwitched = newGlobalDomainConfigAnnounce with
+          activeDomain = newDomainId
+    in  Schedule with
+          currentValue = config with globalDomain = newGlobalDomainConfigAnnounce
+          futureValues = [
+            (addRelTime now (days 30), config with globalDomain = newGlobalDomainConfigSwitched
+            )]
+
+  -- At this point we expect the validator apps to start connecting to the newly announced domain,
+  -- and create domain connectivity proof contracts
+  -- TODO(#4894): create domain connectivity proof contracts
+
+
+  -- Once the SV's are confident enough that the switch is not leaving too many users behind they 
+  -- can change the switching date.
+
+
+
+  passTime (days 30)
+
+  -- The new domain becomes active, which implies that:
+  -- 1. The SV apps change the domain topology information to allow transferring all of its contracts.
+  --    (once Canton actually supports transfer permissions)
+  -- 2. The stakeholders of CC and SVC contracts transfer them to the new active domain as described in
+  --    the design document: https://docs.google.com/document/d/1vjcq9iGBnqWl0Q-3sIBvXEV61U2TflolxDpuES97Kh4/edit#bookmark=id.9lc9od4yaflf
+  pure ()
+
+executeSvcRulesConfigChange : CCApp -> (SvcRulesConfig -> SvcRulesConfig) -> Script ()
+executeSvcRulesConfigChange app updateConfig = do
+  [(_, svcRules)] <- query @SvcRules app.svc
+  let newConfig = updateConfig svcRules.config
+  initateAndAcceptVote app (Map.keys svcRules.members) $
+    ARC_SvcRules with
+      svcAction = SRARC_SetConfig SvcRules_SetConfig with newConfig
+
+
+executeCoinConfigChange
+  : CCApp -> (Schedule Time (CoinConfig USD) -> Schedule Time (CoinConfig USD)) -> Script ()
+executeCoinConfigChange app updateConfig = do
+  [(_, svcRules)] <- query @SvcRules app.svc
+  [(coinRulesCid, coinRules)] <- query @CoinRules app.svc
+  let newConfigSchedule = updateConfig coinRules.configSchedule
+  initateAndAcceptVote app (Map.keys svcRules.members) $
+    ARC_CoinRules with
+      coinRulesCid
+      coinRulesAction = CRARC_SetConfigSchedule CoinRules_SetConfigSchedule with
+        newConfigSchedule

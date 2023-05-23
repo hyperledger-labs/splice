@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests.connectivity
 
-import com.daml.network.codegen.java.cc.domainfees.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy

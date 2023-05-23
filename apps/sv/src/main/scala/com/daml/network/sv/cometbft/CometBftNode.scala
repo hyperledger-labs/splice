@@ -2,6 +2,7 @@ package com.daml.network.sv.cometbft
 
 import com.digitalasset.canton.drivers as proto
 import com.daml.network.codegen.java.cn as daml
+import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyUtil}
 import com.digitalasset.canton.tracing.TraceContext
@@ -175,9 +176,9 @@ object CometBftNode {
       votingPower = config.votingPower,
     )
 
-  def svNodeConfigToProto(config: daml.cometbft.SvNodeConfig): proto.cometbft.SvNodeConfig =
+  def svNodeConfigToProto(config: daml.cometbft.CometBftConfig): proto.cometbft.SvNodeConfig =
     proto.cometbft.SvNodeConfig(cometbftNodes =
-      config.cometBftNodes.asScala
+      config.nodes.asScala
         .map({ case (nodeId, nodeConfig) =>
           (nodeId, cometBftNodeConfigToProto(nodeConfig))
         })
@@ -188,6 +189,14 @@ object CometBftNode {
       memberInfos: java.util.Map[String, daml.svcrules.MemberInfo]
   ): immutable.Map[String, proto.cometbft.SvNodeConfig] =
     memberInfos.asScala.values
-      .map(info => (info.name, svNodeConfigToProto(info.cometBftConfig)))
+      .map(info => (info.name, svNodeConfigToProto(extractDefaultDomainNodeConfig(info).cometBft)))
       .toMap
+
+  def extractDefaultDomainNodeConfig(
+      info: daml.svcrules.MemberInfo
+  ): daml.svc.globaldomain.DomainNodeConfig =
+    info.domainNodes.asScala.getOrElse(
+      SvUtil.defaultSvcDomainNumber,
+      throw new NotImplementedError("TODO(#4901): reconcile all configured CometBFT networks"),
+    )
 }

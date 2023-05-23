@@ -1,7 +1,7 @@
 module CC.CoinConfig where
 
 import CC.Fees
-import CC.DomainFees
+import CC.GlobalDomain
 import CC.Issuance
 import CC.Schedule
 import DA.Time
@@ -15,7 +15,8 @@ data USD = USD deriving (Show, Eq)
 data CoinConfig currency = CoinConfig with
     transferConfig : TransferConfig currency -- ^ Configuration determining the fees and limits for CC transfers
     issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
-    domainFeesConfig : DomainFeesConfig -- ^ Configuration determining fees and limits for domain fees
+    globalDomain : GlobalDomainConfig -- ^ Configuration for the global domain and its fees.
+    -- TODO(M4-85): the values in here are likely quite large (several URls and long domainIds) and not required for executing transfers. Split this part of the config out into a separate contract as a performance optimization.
     tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
   deriving (Eq, Show)
 
@@ -33,8 +34,9 @@ data TransferConfig currency = TransferConfig with
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
   deriving (Eq, Show)
 
--- Check constraints on config params on which the implementation of the choices relies
+-- Check constraints on config params on which the implementation of the choices rely.
 validCoinConfig : CoinConfig currency -> Bool
 validCoinConfig CoinConfig{..} =
     tickDuration > days 0
   && validIssuanceCurve issuanceCurve
+  && validGlobalDomainConfig globalDomain

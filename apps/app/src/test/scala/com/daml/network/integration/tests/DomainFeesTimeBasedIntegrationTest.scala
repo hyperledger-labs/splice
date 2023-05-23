@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cc.domainfees.{BaseRateTrafficLimits, ValidatorTraffic}
+import com.daml.network.codegen.java.cc.globaldomain.{BaseRateTrafficLimits, ValidatorTraffic}
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs
 import com.daml.network.console.{ValidatorAppBackendReference, WalletAppClientReference}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -79,12 +79,9 @@ class DomainFeesTimeBasedIntegrationTest
         )(
           "No top-up happens",
           _ => {
-            val validatorTraffic = getCurrentValidatorTraffic(bobValidator)
-            validatorTraffic.data.validator shouldBe bobValidator
-              .getValidatorPartyId()
-              .toProtoPrimitive
-            validatorTraffic.data.numPurchases shouldBe 0
-            validatorTraffic.data.totalPurchased shouldBe 0L
+            // NOTE: this check is not very strong, as it is already true at the beginning of the test.
+            // We'll recheck that no traffic contract has been created at the end of the test to be more sure.
+            lookupCurrentValidatorTraffic(bobValidator) should have length 0
           },
         )
 
@@ -126,6 +123,9 @@ class DomainFeesTimeBasedIntegrationTest
           _ => tryTapAndReturnOneOnSuccess(bobWallet, 100) shouldBe 1,
         )
 
+        clue("Recheck that no traffic contract has been created")(
+          lookupCurrentValidatorTraffic(bobValidator) should have length 0
+        )
       }
     }
 
@@ -143,12 +143,13 @@ class DomainFeesTimeBasedIntegrationTest
         )(
           "The validator is able to successfully top up their extra traffic",
           _ => {
-            val validatorTraffic = getCurrentValidatorTraffic(aliceValidator)
-            validatorTraffic.data.validator shouldBe aliceValidator
-              .getValidatorPartyId()
-              .toProtoPrimitive
-            validatorTraffic.data.numPurchases shouldBe 1
-            validatorTraffic.data.totalPurchased shouldBe topupParameters.topupAmount
+            inside(lookupCurrentValidatorTraffic(aliceValidator)) { case Seq(validatorTraffic) =>
+              validatorTraffic.data.validator shouldBe aliceValidator
+                .getValidatorPartyId()
+                .toProtoPrimitive
+              validatorTraffic.data.numPurchases shouldBe 1
+              validatorTraffic.data.totalPurchased shouldBe topupParameters.topupAmount
+            }
           },
         )
 
@@ -196,12 +197,13 @@ class DomainFeesTimeBasedIntegrationTest
         )(
           "Top-up should be successful",
           _ => {
-            val validatorTraffic = getCurrentValidatorTraffic(aliceValidator)
-            validatorTraffic.data.validator shouldBe aliceValidator
-              .getValidatorPartyId()
-              .toProtoPrimitive
-            validatorTraffic.data.numPurchases shouldBe 2
-            validatorTraffic.data.totalPurchased shouldBe 2 * topupParameters.topupAmount
+            inside(lookupCurrentValidatorTraffic(aliceValidator)) { case Seq(validatorTraffic) =>
+              validatorTraffic.data.validator shouldBe aliceValidator
+                .getValidatorPartyId()
+                .toProtoPrimitive
+              validatorTraffic.data.numPurchases shouldBe 2
+              validatorTraffic.data.totalPurchased shouldBe 2 * topupParameters.topupAmount
+            }
           },
         )
 
@@ -232,12 +234,13 @@ class DomainFeesTimeBasedIntegrationTest
           // purchased on each top-up.
           "Top-up is not skipped since the balance is below the top-up threshold",
           _ => {
-            val validatorTraffic = getCurrentValidatorTraffic(aliceValidator)
-            validatorTraffic.data.validator shouldBe aliceValidator
-              .getValidatorPartyId()
-              .toProtoPrimitive
-            validatorTraffic.data.numPurchases shouldBe 3
-            validatorTraffic.data.totalPurchased shouldBe 3 * topupParameters.topupAmount
+            inside(lookupCurrentValidatorTraffic(aliceValidator)) { case Seq(validatorTraffic) =>
+              validatorTraffic.data.validator shouldBe aliceValidator
+                .getValidatorPartyId()
+                .toProtoPrimitive
+              validatorTraffic.data.numPurchases shouldBe 3
+              validatorTraffic.data.totalPurchased shouldBe 3 * topupParameters.topupAmount
+            }
           },
         )
 
@@ -260,14 +263,12 @@ class DomainFeesTimeBasedIntegrationTest
     }
   }
 
-  private def getCurrentValidatorTraffic(validatorApp: ValidatorAppBackendReference) = {
+  private def lookupCurrentValidatorTraffic(validatorApp: ValidatorAppBackendReference) =
     validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(ValidatorTraffic.COMPANION)(validatorApp.getValidatorPartyId())
-      .head
-  }
 
   private def baseRateLimits(implicit env: CNNodeTestConsoleEnvironment): BaseRateTrafficLimits =
-    scan.getCoinRules().payload.configSchedule.currentValue.domainFeesConfig.baseRateTrafficLimits
+    scan.getCoinRules().payload.configSchedule.currentValue.globalDomain.fees.baseRateTrafficLimits
 
   private def baseRateTrafficBalance(implicit env: CNNodeTestConsoleEnvironment): BigDecimal = {
     BigDecimal(baseRateLimits.burstWindow.microseconds) / 1e6 * baseRateLimits.rate
@@ -277,7 +278,7 @@ class DomainFeesTimeBasedIntegrationTest
       validatorApp: ValidatorAppBackendReference
   )(implicit env: CNNodeTestConsoleEnvironment): ExtraTrafficTopupParameters = {
     ExtraTrafficTopupParameters(
-      scan.getCoinRules().payload.configSchedule.currentValue.domainFeesConfig,
+      scan.getCoinRules().payload.configSchedule.currentValue.globalDomain.fees,
       validatorApp.config.domains.global.buyExtraTraffic,
       validatorApp.config.automation.pollingInterval,
     )

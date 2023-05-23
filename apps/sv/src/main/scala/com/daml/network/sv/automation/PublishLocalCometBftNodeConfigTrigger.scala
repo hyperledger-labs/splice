@@ -11,7 +11,9 @@ import com.daml.network.codegen.java.cn as daml
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.automation.PublishLocalCometBftNodeConfigTrigger.*
 import com.daml.network.sv.cometbft.CometBftNode
+import com.daml.network.sv.cometbft.CometBftNode.extractDefaultDomainNodeConfig
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.drivers as proto
@@ -45,12 +47,14 @@ class PublishLocalCometBftNodeConfigTrigger(
       svcRules <- OptionT(store.lookupSvcRules())
       members = svcRules.payload.members.asScala
       // require our svParty to be registered as a member
-      damlSvNodeConfig <- OptionT(
+      info <- OptionT(
         Future.successful(members.get(store.key.svParty.toProtoPrimitive))
       )
       // create a task if the local config is different than the one we have published to the SVC
       localSvNodeConfig <- getLocalSvNodeConfig()
-      if (CometBftNode.svNodeConfigToProto(damlSvNodeConfig.cometBftConfig) != localSvNodeConfig)
+      if (CometBftNode.svNodeConfigToProto(
+        extractDefaultDomainNodeConfig(info).cometBft
+      ) != localSvNodeConfig)
     } yield PublishLocalConfigTask(svcRules, localSvNodeConfig)).value.map(_.toList)
 
   private def getLocalSvNodeConfig(): OptionT[Future, proto.cometbft.SvNodeConfig] = {
@@ -64,8 +68,9 @@ class PublishLocalCometBftNodeConfigTrigger(
   ): Future[TaskOutcome] =
     for {
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      cmd = task.svcRules.contractId.exerciseSvcRules_SetCometBftConfig(
+      cmd = task.svcRules.contractId.exerciseSvcRules_SetDomainNodeConfig(
         store.key.svParty.toProtoPrimitive,
+        SvUtil.defaultSvcDomainNumber, // TODO(#4901): do not use default, but reconcile all configured CometBFT networks
         task.damlSvNodeConfig,
       )
       (offset, _) <- connection.submitWithResultAndOffsetNoDedup(
@@ -113,20 +118,21 @@ object PublishLocalCometBftNodeConfigTrigger {
       param("localSvNodeConfig", _.localSvNodeConfig),
     )
 
-    val damlSvNodeConfig: daml.cometbft.SvNodeConfig =
-      new daml.cometbft.SvNodeConfig(
-        localSvNodeConfig.cometbftNodes.map { case (nodeId, config) =>
-          (
-            nodeId,
-            new daml.cometbft.CometBftNodeConfig(
-              config.validatorPubKey,
-              config.votingPower,
-            ),
-          )
-        }.asJava,
-        Seq[daml.cometbft.GovernanceKeyConfig]().asJava,
-        Seq[daml.cometbft.SequencingKeyConfig]().asJava,
+    val damlSvNodeConfig: daml.svc.globaldomain.DomainNodeConfig =
+      new daml.svc.globaldomain.DomainNodeConfig(
+        new daml.cometbft.CometBftConfig(
+          localSvNodeConfig.cometbftNodes.map { case (nodeId, config) =>
+            (
+              nodeId,
+              new daml.cometbft.CometBftNodeConfig(
+                config.validatorPubKey,
+                config.votingPower,
+              ),
+            )
+          }.asJava,
+          Seq[daml.cometbft.GovernanceKeyConfig]().asJava,
+          Seq[daml.cometbft.SequencingKeyConfig]().asJava,
+        )
       )
-
   }
 }

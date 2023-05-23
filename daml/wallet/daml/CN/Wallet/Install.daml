@@ -7,7 +7,7 @@ import qualified CC.API.V1.Coin as API
 
 import CC.Round (OpenMiningRound)
 import CC.Coin (Coin, CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..), CoinRules_BuyExtraTraffic(..))
-import CC.DomainFees
+import CC.GlobalDomain
 
 import CN.Util.ExpiringContract
 import CN.Wallet.Payment
@@ -78,11 +78,16 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]
     handleLeft errorMsg = executeCoinOperationRec endUserP validatorP context inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
 
-    handleBuyExtraTraffic extraTraffic trafficCid minTopupInterval = do
-      traffic <- fetch trafficCid
-      now <- getTime
-      require "enough time has elapsed since the last topup" (addRelTime traffic.lastPurchasedAt minTopupInterval <= now)
-      exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_BuyExtraTraffic inputs context validatorP trafficCid extraTraffic)
+    handleBuyExtraTraffic extraTraffic domainIdOrTrafficCid minTopupInterval = do
+      -- protect against successive topups being too close together
+      case domainIdOrTrafficCid of
+        Left _ -> pure ()  -- nothing has to be done if a traffic contract is created freshly for a domain
+        Right trafficCid -> do
+          traffic <- fetch trafficCid
+          now <- getTime
+          require "enough time has elapsed since the last topup" (addRelTime traffic.lastPurchasedAt minTopupInterval <= now)
+      exercise (fromInterfaceContractId @CoinRules context.coinRules)
+        (CoinRules_BuyExtraTraffic inputs context validatorP domainIdOrTrafficCid extraTraffic)
 
 executeCoinOperationRec _endUserP _validatorP _context _inputs prevResults [] = do
   return prevResults
@@ -108,7 +113,7 @@ data CoinOperation
   | CO_MergeTransferInputs
   | CO_BuyExtraTraffic with
       extraTrafficAmount: Int
-      validatorTraffic : ContractId ValidatorTraffic
+      domainIdOrTrafficCid : Either Text (ContractId ValidatorTraffic)
       minTopupInterval: RelTime
   | CO_Tap with
       tapAmount: Decimal

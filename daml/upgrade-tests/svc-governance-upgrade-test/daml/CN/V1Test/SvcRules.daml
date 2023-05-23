@@ -11,14 +11,12 @@ import CN.Util.Assert
 import CC.Coin
 import CC.Round
 import CC.API.V1.Round (Round(..))
-import CC.DomainFees
 
 import CC.ValidatorLicense
 import CN.SvOnboarding
 
 import CC.V1Test.Coin
 import CN.SvcRules
-import qualified CN.CometBft as CometBft
 
 
 -- A version of SvcRules intended for testing upgrades. For now, we focus on an upgrade of the underlying CoinRules,
@@ -125,7 +123,7 @@ template SvcRulesV1Test with
         let info = MemberInfo with
               name = newMemberName
               joinedAsOfRound = nextMiningRound
-              cometBftConfig = CometBft.emptySvNodeConfig
+              domainNodes = Map.empty
         create SvcRulesV1Test with
           svc
           epoch
@@ -269,9 +267,7 @@ template SvcRulesV1Test with
       controller sponsor
       do
         require "Sponsor is a collective member" (sponsor `Map.member` members)
-        license <- create ValidatorLicense with ..
-        _ <- create (initialValidatorTraffic svc validator)
-        return license
+        create ValidatorLicense with ..
 
 
     -- SV onboarding

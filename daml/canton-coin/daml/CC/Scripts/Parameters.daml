@@ -1,10 +1,11 @@
 module CC.Scripts.Parameters where
 
+import qualified DA.Set as Set
 import DA.Time
 
 import CC.CoinConfig
 import CC.Fees
-import CC.DomainFees
+import CC.GlobalDomain
 import CC.Issuance
 import CC.Schedule
 
@@ -44,19 +45,27 @@ defaultTransferConfig = TransferConfig with
     -- Chosen conservatively, but high enough to invite thinking about what's possible.
     maxNumLockHolders = 10
 
+-- | Global domain config to use for testing.
+defaultGlobalDomainConfig : GlobalDomainConfig
+defaultGlobalDomainConfig = GlobalDomainConfig with
+  requiredDomains = Set.fromList ["global-domain-id-0"]
+  activeDomain = "global-domain-id-0"
+  fees = defaultDomainFeesConfig
+
+
 -- | Default proposal for issuance curve and tickDuration
 defaultCoinConfig : CoinConfig USD
 defaultCoinConfig = CoinConfig with
-    transferConfig = defaultTransferConfig
+  transferConfig = defaultTransferConfig
 
-    -- Using issuance curve defined in the CC whitepaper
-    issuanceCurve = defaultIssuanceCurve
+  -- Using issuance curve defined in the CC whitepaper
+  issuanceCurve = defaultIssuanceCurve
 
-    domainFeesConfig = defaultDomainFeesConfig
+  globalDomain = defaultGlobalDomainConfig
 
-    -- Duration of one tick, which is half the target duration of one round
-    -- default: 2.5 minutes
-    tickDuration = seconds 150
+  -- Duration of one tick, which is half the target duration of one round
+  -- default: 2.5 minutes
+  tickDuration = seconds 150
 
 -- | Default configuration schedule with single current coin config
 defaultCoinConfigSchedule : Schedule Time (CoinConfig USD)

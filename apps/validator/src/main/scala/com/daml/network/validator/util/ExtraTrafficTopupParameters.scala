@@ -1,6 +1,6 @@
 package com.daml.network.validator.util
 
-import com.daml.network.codegen.java.cc.domainfees.DomainFeesConfig
+import com.daml.network.codegen.java.cc.globaldomain.DomainFeesConfig
 import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 

@@ -3,16 +3,21 @@ package com.daml.network.util
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.client.binding
-import com.daml.ledger.javaapi.data.Command
+import com.daml.ledger.javaapi.data.{Command, Unit as DamlUnit}
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.Coin
-import com.daml.network.codegen.java.cc.domainfees.{BaseRateTrafficLimits, DomainFeesConfig}
+import com.daml.network.codegen.java.cc.globaldomain.{
+  BaseRateTrafficLimits,
+  DomainFeesConfig,
+  GlobalDomainConfig,
+}
 import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
+import com.daml.network.codegen.java.da.set.types.{Set as DamlSet}
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -161,16 +166,18 @@ object CNNodeUtil {
   def defaultCoinConfigSchedule(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
+      initialDomainId: DomainId,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
   ) = new cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]](
-    defaultCoinConfig(initialTickDuration, initialMaxNumInputs, holdingFee),
+    defaultCoinConfig(initialTickDuration, initialMaxNumInputs, initialDomainId, holdingFee),
     List.empty[Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]].asJava,
   )
 
   def defaultCoinConfig(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
-      holdingFee: BigDecimal,
+      initialDomainId: DomainId,
+      holdingFee: BigDecimal = defaultHoldingFee.rate,
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = new cc.coinconfig.CoinConfig(
     // transferConfig
     defaultTransferConfig(initialMaxNumInputs, holdingFee),
@@ -179,11 +186,23 @@ object CNNodeUtil {
     defaultIssuanceCurve,
 
     // domainFeesConfig
-    defaultDomainFeesConfig,
+    defaultGlobalDomainConfig(initialDomainId),
 
     // tick duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
   )
+
+  private def defaultGlobalDomainConfig(initialDomainId: DomainId): GlobalDomainConfig = {
+    val domainId = initialDomainId.toProtoPrimitive
+    new GlobalDomainConfig(
+      // requiredDomains
+      new DamlSet(Map(domainId -> DamlUnit.getInstance).asJava),
+      // activeDomain
+      domainId,
+      // fees
+      defaultDomainFeesConfig,
+    )
+  }
 
   def defaultTransferConfig(
       initialMaxNumInputs: Int,

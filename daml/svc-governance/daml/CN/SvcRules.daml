@@ -14,13 +14,12 @@ import CC.Round
 import CC.Util
 import CC.API.V1.Coin (CoinCreateSummary(..))
 import CC.API.V1.Round (Round(..))
-import CC.DomainFees
-
 import CC.ValidatorLicense
 
 import qualified CN.CometBft as CometBft
 import CN.SvOnboarding
 import CN.SVC.CoinPrice
+import CN.SVC.GlobalDomain
 import CN.Util.Assert
 import CN.Util.ExpiringContract
 
@@ -91,7 +90,7 @@ data SvcRules_ActionRequiringConfirmation
 data MemberInfo = MemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
     joinedAsOfRound : Round
-    cometBftConfig : CometBft.SvNodeConfig
+    domainNodes : DomainNodeConfigMap
     -- ^ This is the config for the CometBFT nodes under control of this member.
     -- We expect the SvApp to run a reconciliation loop that applies all changes to this
     -- config to the actual CometBFT network config using the service defined here:
@@ -222,8 +221,9 @@ data SvcRulesConfig = SvcRulesConfig with
     svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
     svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing a SV confirmation
     voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote`s.
-    cometBftConfigLimits : CometBft.NetworkConfigLimits  -- ^ Limits to enforce on the members' CometBft.SvNodeConfig's
+    domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the members' `DomainNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
+    globalDomain : GlobalDomainConfig
   deriving (Eq, Show)
 
 -- | Rules governing the collective.
@@ -264,7 +264,7 @@ template SvcRules with
         let info = MemberInfo with
               name = newMemberName
               joinedAsOfRound = nextMiningRound
-              cometBftConfig = CometBft.emptySvNodeConfig
+              domainNodes = noDomainNodes
         let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
         now <- getTime
         create CoinPriceVote with
@@ -328,32 +328,33 @@ template SvcRules with
           newMemberName = svOnboardingConfirmed.svName
 
 
-    -- CometBFT config management
-    -----------------------------
+    -- Global domain config management
+    -----------------------------------
 
-    -- Every SV can change their own config within the configured limits.
-    choice SvcRules_SetCometBftConfig : ContractId SvcRules
+    -- Every SV can change their own domain node's config within the configured limits.
+    choice SvcRules_SetDomainNodeConfig : ContractId SvcRules
       with
         sv : Party
-        cometBftConfig : CometBft.SvNodeConfig
+        domainNumber : Int
+        newNodeConfig : DomainNodeConfig
       controller sv
       do
         requireUnlocked lock
+        require "Domain with this number is configured" (domainNumber `Map.member` config.globalDomain.domains)
         case Map.lookup sv members of
           None -> error "SV is no member"
           Some info -> do
             -- check validity of config and constraint on voting power
-            require "Valid configuration" (CometBft.validSvNodeConfig config.cometBftConfigLimits cometBftConfig)
+            require "Valid configuration" (validDomainNodeConfig config.domainNodeConfigLimits newNodeConfig)
             unless isDevNet $
-              require "At most one vote" (CometBft.totalVotingPower cometBftConfig <= 1)
+              require "CometBft voting power <= 1" (CometBft.totalVotingPower newNodeConfig.cometBft <= 1)
             -- update member info
-            let newInfo = info with cometBftConfig
+            let newInfo = info with domainNodes = Map.insert domainNumber newNodeConfig info.domainNodes
             create this with members = Map.insert sv newInfo this.members
 
 
     -- Automation leader election
     ------------------------------
-
     nonconsuming choice SvcRules_RequestElection : ContractId ElectionRequest
       with
         requester : Party
@@ -687,9 +688,9 @@ template SvcRules with
       do
         requireUnlocked lock
         require "Sponsor is a collective member" (sponsor `Map.member` members)
-        license <- create ValidatorLicense with ..
-        _ <- create (initialValidatorTraffic svc validator)
-        return license
+        -- create license that records in particular which SV sponsored the onboarding of the validator
+        create ValidatorLicense with ..
+
 
 
     -- SV onboarding

@@ -15,15 +15,15 @@ import CC.Coin
 import CC.Issuance
 import CC.API.V1.Round (Round(..))
 import CC.Round
-import CC.Schedule
 
 import CC.Scripts.Util
 import CC.Scripts.Parameters
 
-import qualified CN.CometBft as CometBft
+import CN.CometBft
 import CN.SvcRules
 import CN.SvcBootstrap
 import CN.SVC.CoinPrice
+import CN.SVC.GlobalDomain
 import CN.Util.ExpiringContract
 
 
@@ -42,19 +42,48 @@ initCollective isDevNet = do
   -- TODO(M3-46): make this a real collective party
   svc <- allocateParty "svc"
 
+  -- We expect the founding node to create a proper single-node domain that can then be used
+  -- for driving all Daml workflows
+  let initialDomainConfig = DomainConfig with
+        state = DS_Operational
+        cometBftGenesisJson = "<genesis-json-injected-by-founding-member>"
+  let initialGlobalDomainConfig =  GlobalDomainConfig with
+        domains = Map.fromList [(0, initialDomainConfig)]
+        lastDomainNumber = 0
+        activeDomain = 0
+
   let config = SvcRulesConfig with
         numUnclaimedRewardsThreshold = 5
         actionConfirmationTimeout = minutes 5
         svOnboardingRequestTimeout = hours 24
         svOnboardingConfirmedTimeout = hours 24
         voteRequestTimeout = days 7
-        cometBftConfigLimits = CometBft.defaultNetworkConfigLimits
+        domainNodeConfigLimits = defaultDomainNodeConfigLimits
         maxTextLength = 1024
-  let coinConfigSchedule = Schedule with currentValue = defaultCoinConfig ; futureValues = []
+        globalDomain = initialGlobalDomainConfig
+  let coinConfig = defaultCoinConfig
 
   -- have mallory bootstrap the collective
   submit svc $ createAndExerciseCmd
-    (SvcBootstrap with svc, founderParty = sv1, founderName = "sv1", coinConfigSchedule, coinPrice = 1.0, config, enabledChoices = API.enableAllChoices, isDevNet)
+    SvcBootstrap with
+      svc
+      founderParty = sv1
+      founderName = "sv1"
+      founderDomainNodes = Map.fromList
+        -- NOTE: the Canton domain and CometBft keys and config need to be allocated before bootstrapping the SvcRules
+        -- as we need a working domain to create and exercise Daml contracts.
+        [(0,  DomainNodeConfig with
+                cometBft = CometBftConfig with
+                  nodes = Map.fromList
+                    [("node-id-1", CometBftNodeConfig "validatorPubKey" 1)]
+                  sequencingKeys = map SequencingKeyConfig ["initial-sequencer-key"]
+                  governanceKeys = map GovernanceKeyConfig ["initial-governance-key"]
+        )]
+      coinConfig
+      coinPrice = 1.0
+      config
+      enabledChoices = API.enableAllChoices
+      isDevNet
     SvcBootstrap_Bootstrap
 
   svcUserId <- validateUserId "svc-user"
@@ -68,6 +97,9 @@ initCollective isDevNet = do
   -- TODO(#2241) consider replicating the proper SV onboarding flow here
   forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
     [(svcRulesCid, _)] <- query @SvcRules svc
+    submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid $ SvcRules_OnboardValidator with
+      sponsor = sv1
+      validator = svParty
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
       newMemberParty = svParty
       newMemberName = svName

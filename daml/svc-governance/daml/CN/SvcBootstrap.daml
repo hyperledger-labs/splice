@@ -8,8 +8,8 @@ import CC.Schedule
 import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round
 
-import qualified CN.CometBft as CometBft
 import CN.SVC.CoinPrice
+import CN.SVC.GlobalDomain
 import CN.SvcRules
 
 -- | A template for bootstrapping the collective and CoinRules.
@@ -17,7 +17,8 @@ template SvcBootstrap with
     svc : Party
     founderParty : Party -- ^ the founding SV
     founderName : Text -- ^ human-readable name of the founding SV
-    coinConfigSchedule : Schedule Time (CoinConfig USD)
+    founderDomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
+    coinConfig : CoinConfig USD
     coinPrice : Decimal
     config : SvcRulesConfig
     enabledChoices : API.EnabledChoices
@@ -29,10 +30,11 @@ template SvcBootstrap with
     choice SvcBootstrap_Bootstrap : ()
       controller svc
       do
+        -- create the SVC rules with the founding member as the sole member
         let founderInfo = MemberInfo with
               name = founderName
               joinedAsOfRound = Round 0
-              cometBftConfig = CometBft.emptySvNodeConfig
+              domainNodes = founderDomainNodes
         _ <- create SvcRules with
           svc
           epoch = 0
@@ -42,18 +44,22 @@ template SvcBootstrap with
           config
           isDevNet
           lock = False
+
+        -- create coin-rules and the initial price vote of the founding member
         coinRulesCid <- create CoinRules with
           svc
-          configSchedule = coinConfigSchedule
+          configSchedule = Schedule with
+            currentValue = coinConfig
+            futureValues = []
           enabledChoices
           isDevNet
           lock = False
+        exercise coinRulesCid CoinRules_Bootstrap_Rounds with
+          coinPrice
         now <- getTime
         _ <- create CoinPriceVote with
           svc
           sv = founderParty
           coinPrice = Some coinPrice
           lastUpdatedAt = now
-        exercise coinRulesCid CoinRules_Bootstrap_Rounds with
-          coinPrice
         pure ()

@@ -10,7 +10,7 @@ import CC.API.V1.Round (Round(..))
 import CC.Coin
 import CC.CoinConfig hiding (CC, USD)
 import CC.Schedule
-import CC.DomainFees
+import CC.GlobalDomain
 import CN.Wallet.Install
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -549,52 +549,71 @@ testBuyExtraTraffic = script do
   runNextIssuance app
   runCoinDepositBots app
   validator <- setupValidator' app "validator1"
-  coin <- tap app validator 42.0
-  install <- submit validator.primaryParty $ createCmd $ WalletAppInstall with
+
+  -- set the validator up with some coin and its own wallet install contract
+  tap app validator 42.0
+  submit validator.primaryParty $ createCmd $ WalletAppInstall with
     endUserParty = validator.primaryParty
     endUserName = "wallet_service_participant_user"
     svcParty = app.svc
     validatorParty = validator.primaryParty
-  let initialTraffic = initialValidatorTraffic app.svc validator.primaryParty
-  traffic <- submit app.svc $ createCmd initialTraffic
-  context <- getPaymentTransferContext app validator
+
   -- retreive the domain fees configuration
-  Some (_, CoinRules{configSchedule = Schedule{currentValue = CoinConfig {domainFeesConfig = domainFeesConfig}} }) <- queryCoinRulesByKey app.svc
+  now <- getTime
+  [(_, coinRules)] <- query @CoinRules app.svc
+  let globalDomainConfig = (CC.Schedule.getValueAsOf now coinRules.configSchedule).globalDomain
 
   -- test that buying less extra traffic than the configured min topup amount fails
-  let minTopupAmount = domainFeesConfig.minTopupAmount
-  result1 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
-    operations = [(CO_BuyExtraTraffic (minTopupAmount-1) traffic (minutes 1))]
-    context
-  result1.outcomes === [COO_Error (ITR_Other ("The requirement 'extraTraffic is at least as much as the configured minTopupAmount' was not met.") )]
+  let minTopupAmount = globalDomainConfig.fees.minTopupAmount
+  outcome <- executeCoinOperation app validator $
+    CO_BuyExtraTraffic (minTopupAmount-1) (Left globalDomainConfig.activeDomain) (minutes 1)
+  outcome === COO_Error (ITR_Other ("The requirement 'extraTraffic is at least as much as the configured minTopupAmount' was not met.") )
 
-  -- test that buying extra traffic works
+  -- test that creating the initial traffic contract works when buying it initially
+  COO_BuyExtraTraffic trafficCid1 <- executeCoinOperation app validator $
+    CO_BuyExtraTraffic (minTopupAmount) (Left globalDomainConfig.activeDomain) (minutes 1)
+
+  -- buying a second time w/o referring to the previous contract results in a second contract
+  COO_BuyExtraTraffic trafficCid2 <- executeCoinOperation app validator $
+    CO_BuyExtraTraffic (minTopupAmount + 1) (Left globalDomainConfig.activeDomain) (minutes 1)
+
+  -- however the SVC can merge the two contracts, and drop the one with the lower total (the first one)
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  submit app.svc $ exerciseCmd coinRulesCid CoinRules_ArchiveDuplicateValidatorTrafficContracts with
+    trafficCid = trafficCid2
+    duplicateCids = [trafficCid1]
+  traffics <- query @ValidatorTraffic app.svc
+  map fst traffics === [trafficCid2]
+
+  -- the SVC cannot use a contract as its own duplicate
+  submitMustFail app.svc $ exerciseCmd coinRulesCid CoinRules_ArchiveDuplicateValidatorTrafficContracts with
+    trafficCid = trafficCid2
+    duplicateCids = [trafficCid2]
+
+  -- topping up too soon fails
+  outcome <- executeCoinOperation app validator $
+    CO_BuyExtraTraffic minTopupAmount (Right trafficCid2) (minutes 1)
+  outcome === COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met."))
+
+  -- once a minute has passed, the same topup succeeds
+  passTime (minutes 1)
   let topupAmount = 2 * minTopupAmount
-  result2 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
-    operations = [(CO_BuyExtraTraffic topupAmount traffic (minutes 1))]
-    context
-  let [COO_BuyExtraTraffic updatedTrafficCid] = result2.outcomes
+  COO_BuyExtraTraffic updatedTrafficCid <- executeCoinOperation app validator $
+    (CO_BuyExtraTraffic topupAmount (Right trafficCid2) (minutes 1))
+
+  -- validate state of validator traffic contract
   (_, round) <- getLatestOpenRound app
-  let extraTrafficPrice = domainFeesConfig.extraTrafficPrice
+  let extraTrafficPrice = globalDomainConfig.fees.extraTrafficPrice
   now <- getTime
   [(updatedTraffic2Cid, updatedTraffic)] <- query @ValidatorTraffic validator.primaryParty
   updatedTrafficCid === updatedTraffic2Cid
-  let usdSpent = intToDecimal topupAmount / 1e6 * extraTrafficPrice
+  let totalPurchased = topupAmount + minTopupAmount + 1
+  let usdSpent = intToDecimal totalPurchased / 1e6 * extraTrafficPrice
   let ccSpent = usdSpent / round.coinPrice
-  updatedTraffic.totalPurchased === topupAmount
+  updatedTraffic.totalPurchased === totalPurchased
   updatedTraffic.ccSpent === ccSpent
   updatedTraffic.usdSpent === usdSpent
   updatedTraffic.lastPurchasedAt === now
-
-  -- test that buying extra traffic too soon after previous topup fails
-  coin2 <- tap app validator 42.0
-  result3 <- submitUser validator.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin2]
-    operations = [(CO_BuyExtraTraffic topupAmount updatedTrafficCid (minutes 1))]
-    context
-  result3.outcomes === [COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met.") )]
 
   pure ()
 
@@ -677,7 +696,22 @@ testInsufficientFundsBatchSubscriptions = script do
     _ -> abort $ "Expected subscription payment to succeed but got " <> show outcomes
   pure ()
 
+-- Utilities
+------------
+
 withError : CanAbort m => [CoinOperationOutcome] -> (InvalidTransferReason -> m a) -> m a
 withError outcomes f = case outcomes of
   [COO_Error e] -> f e
   _ -> abort $ "Expected COO_Error but got " <> show outcomes
+
+executeCoinOperation : CCApp -> CCUser -> CoinOperation -> Script CoinOperationOutcome
+executeCoinOperation app user op = do
+  [(installCid, _)] <- query @WalletAppInstall user.primaryParty
+  context <- getPaymentTransferContext app user
+  coins <- queryFilter @Coin user.primaryParty (\coin -> coin.owner == user.primaryParty)
+  result <- submitUser user.userId $ exerciseCmd installCid WalletAppInstall_ExecuteBatch with
+    inputs = [API.InputCoin $ toInterfaceContractId coin._1 | coin <- coins]
+    operations = [op]
+    context
+  let [outcome] = result.outcomes
+  pure outcome
