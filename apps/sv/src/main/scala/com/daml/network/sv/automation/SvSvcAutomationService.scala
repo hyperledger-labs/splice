@@ -33,16 +33,8 @@ class SvSvcAutomationService(
       retryProvider,
     ) {
 
-  registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new ExpiredCoinTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, connection))
-  registerTrigger(new SvcRewardTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
   if (config.automation.enableUnclaimedRewardExpiration) {
@@ -50,9 +42,18 @@ class SvSvcAutomationService(
   }
   registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svcStore, connection))
   registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new GarbageCollectCoinPriceVotesTrigger(triggerContext, svcStore, connection))
   // TODO(#4628): register PublishLocalCometBftNodeConfigTrigger
   // TODO(#4628): register ReconcileCometBftNetworkConfigWithSvcRulesTrigger
+
+  registerTrigger(
+    new RestartLeaderBasedAutomationTrigger(
+      triggerContext,
+      svcStore,
+      connection,
+      clock,
+      config,
+      retryProvider,
+    )
+  )
 }

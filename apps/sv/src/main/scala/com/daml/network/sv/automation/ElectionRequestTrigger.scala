@@ -62,11 +62,12 @@ class ElectionRequestTrigger(
               domainId,
             )
             .flatMap(_ => store.getSvcRules())
-            .map(svcRules =>
+            .map(svcRules => {
+
               TaskSuccess(
                 show"Successfully completed a leader election to replace the leader $currentLeader with ${svcRules.payload.leader}"
               )
-            )
+            })
         } else
           Future.successful(
             TaskSuccess(

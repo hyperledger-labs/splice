@@ -2,9 +2,7 @@ package com.daml.network.sv.automation
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn
-import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -15,8 +13,7 @@ import scala.jdk.CollectionConverters.*
 
 class ExpiredSvOnboardingConfirmedTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
-    connection: CNLedgerConnection,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
     tracer: Tracer,
@@ -24,8 +21,8 @@ class ExpiredSvOnboardingConfirmedTrigger(
       cn.svonboarding.SvOnboardingConfirmed.ContractId,
       cn.svonboarding.SvOnboardingConfirmed,
     ](
-      store.multiDomainAcsStore,
-      store.listExpiredSvOnboardingConfirmed,
+      svTaskContext.svcStore.multiDomainAcsStore,
+      svTaskContext.svcStore.listExpiredSvOnboardingConfirmed,
       cn.svonboarding.SvOnboardingConfirmed.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
@@ -39,13 +36,15 @@ class ExpiredSvOnboardingConfirmedTrigger(
     ]
   ]
 
+  private val store = svTaskContext.svcStore
+
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       svcRules <- store.getSvcRules()
       cmd = svcRules.contractId.exerciseSvcRules_ExpireSvOnboardingConfirmed(
         co.work.contract.contractId
       )
-      _ <- connection.submitCommandsNoDedup(
+      _ <- svTaskContext.connection.submitCommandsNoDedup(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
         commands = cmd.commands.asScala.toSeq,
@@ -61,5 +60,4 @@ class ExpiredSvOnboardingConfirmedTrigger(
     )
   }
 
-  override def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()
 }

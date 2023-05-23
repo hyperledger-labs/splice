@@ -7,11 +7,8 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svcrules.{Confirmation, SvcRules}
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.codegen.java.cn.svcrules.Confirmation
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -20,8 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class ExpireStaleConfirmationsTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
-    connection: CNLedgerConnection,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -29,56 +25,46 @@ class ExpireStaleConfirmationsTrigger(
       Confirmation.ContractId,
       Confirmation,
     ](
-      store.multiDomainAcsStore,
-      store.listStaleConfirmations,
+      svTaskContext.svcStore.multiDomainAcsStore,
+      svTaskContext.svcStore.listStaleConfirmations,
       Confirmation.COMPANION,
-    ) {
+    )
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
+      Confirmation.ContractId,
+      Confirmation,
+    ]]] {
 
-  private def performWorkAsLeader(
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
-      task: ScheduledTaskTrigger.ReadyTask[
-        ReadyContract[Confirmation.ContractId, Confirmation]
-      ],
+  type Task = ScheduledTaskTrigger.ReadyTask[ReadyContract[
+    Confirmation.ContractId,
+    Confirmation,
+  ]]
+
+  private val store = svTaskContext.svcStore
+
+  override def completeTaskAsLeader(
+      task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
+      svcRules <- store.getSvcRules()
       domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
       cmd = svcRules.contractId.exerciseSvcRules_ExpireStaleConfirmation(
         task.work.contract.contractId
       )
-      _ <- connection
+      _ <- svTaskContext.connection
         .submitWithResultNoDedup(Seq(store.key.svParty), Seq(store.key.svcParty), cmd, domainId)
     } yield TaskSuccess(
       s"successfully expired the confirmation with cid ${task.work.contract.contractId}"
     )
   }
 
-  override protected def completeTask(
-      task: ScheduledTaskTrigger.ReadyTask[
-        ReadyContract[Confirmation.ContractId, Confirmation]
-      ]
+  override def completeTaskAsFollower(
+      task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    store
-      .lookupSvcRules()
-      .flatMap({
-        case None =>
-          logger.debug("SvcRules contract not found")
-          Future.successful(
-            TaskSuccess(
-              s"ignoring confirmation ${PrettyContractId(task.work.contract)}, SvcRules contract not found"
-            )
-          )
-        case Some(svcRules) =>
-          store
-            .svIsLeader()
-            .flatMap(if (_) {
-              performWorkAsLeader(svcRules, task)
-            } else {
-              Future.successful(
-                TaskSuccess(
-                  s"ignoring confirmation ${PrettyContractId(task.work.contract)}, as we're not the leader"
-                )
-              )
-            })
-      })
+    Future.successful(
+      TaskSuccess(
+        s"ignoring confirmation ${PrettyContractId(task.work.contract)}, as we're not the leader"
+      )
+    )
   }
+
 }

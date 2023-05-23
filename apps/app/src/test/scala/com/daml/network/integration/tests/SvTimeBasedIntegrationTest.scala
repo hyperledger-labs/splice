@@ -961,7 +961,7 @@ class SvTimeBasedIntegrationTest
   }
 
   "detect an inactive leader" in { implicit env =>
-    clue("Initialize SVC with 4 SVs") {
+    val svcRulesBeforeElection = clue("Initialize SVC with 4 SVs") {
       Seq(
         svc: CNNodeAppBackendReference,
         scan: CNNodeAppBackendReference,
@@ -990,7 +990,9 @@ class SvTimeBasedIntegrationTest
       ).foreach(
         _.waitForInitialization()
       )
-      getSvcRules().data.members should have size 4
+      val svcRulesBeforeElection = getSvcRules()
+      svcRulesBeforeElection.data.members should have size 4
+      svcRulesBeforeElection
     }
 
     var rounds: Seq[OpenMiningRound.Contract] = Seq.empty[OpenMiningRound.Contract]
@@ -1008,82 +1010,47 @@ class SvTimeBasedIntegrationTest
       "Stop the leader so we can detect its inactivity later"
     ) {
       sv1.stop()
-      getSvcRules().data.members should have size 4
     }
 
     clue(
-      "Advance time such that a new round should be opened. The leader's inactivity is detected and logged"
+      "Advance time such that a new round should be opened. SVs should start their checks of the leader's inactivity"
+    ) {
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        {
+          advanceTime(tickDurationWithBuffer)
+        },
+        entries => {
+          forExactly(3, entries) { line =>
+            line.message should include(
+              "Starting check for leader inactivity"
+            )
+          }
+        },
+      )
+    }
+
+    clue(
+      "A new leader is elected and leader-based triggers resume operating normally"
     ) {
       // It doesn't really matter which sv we pick
       val automationConfig = sv2.config.automation
       val effectiveTimeout = automationConfig.effectiveLeaderInactiveTimeout.asJava
       val bufferDuration = java.time.Duration.ofSeconds(5)
 
-      clue("Waiting for leader inactivity checks to start") {
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-          {
-            advanceTime(tickDurationWithBuffer)
-          },
-          entries => {
-            forExactly(3, entries) { line =>
-              line.message should include(
-                "Starting check for leader inactivity"
-              )
-            }
-          },
-        )
-      }
-
-      clue("Waiting for leader inactivity to be detected") {
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-          {
-            advanceTime(effectiveTimeout.plus(bufferDuration))
-          },
-          entries =>
-            forExactly(3, entries) { line =>
-              line.message should include(
-                "The leader is inactive"
-              )
-            },
-        )
-      }
-
-      val currentLeader = getSvcRules().data.leader
-      val currentEpoch = getSvcRules().data.epoch
-
-      var newLeader: String = ""
-
+      advanceTime(effectiveTimeout.plus(bufferDuration))
       eventually() {
-        val electionRequests = svc.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.ElectionRequest.COMPANION)(svcParty)
-        electionRequests should have length 0
-        newLeader = getSvcRules().data.leader
-        val newEpoch = getSvcRules().data.epoch
-        newEpoch should not be currentEpoch
-        newLeader should not be currentLeader
+        val svcRulesAfterElection = getSvcRules()
+        svcRulesAfterElection.data.epoch shouldBe svcRulesBeforeElection.data.epoch + 1
+        svcRulesAfterElection.data.leader should not be svcRulesBeforeElection.data.leader
       }
 
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        {
-          advanceTime(tickDurationWithBuffer)
-        },
-        entries => {
-          forExactly(1, entries) { line =>
-            line.message should include(
-              s"Starting work as leader ${newLeader}"
-            )
-          }
-        },
-      )
-
-      advanceTimeByPollingInterval(sv2)
       eventually() {
         val newRounds = svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(OpenMiningRound.COMPANION)(
             svcParty,
             c => !rounds.contains(c),
           )
-        newRounds should have length 1
+        newRounds.length should be >= 1
       }
     }
   }

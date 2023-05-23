@@ -19,10 +19,8 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
 }
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
-import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.SvApp.{isDevNet, isSvcMemberName, isSvcMemberParty}
-import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
@@ -36,17 +34,18 @@ import scala.jdk.CollectionConverters.*
 
 class ExecuteConfirmedActionTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
-    connection: CNLedgerConnection,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
 ) extends OnReadyContractTrigger.Template[Confirmation.ContractId, Confirmation](
-      store,
+      svTaskContext.svcStore,
       Confirmation.COMPANION,
     )
     with SvTaskBasedTrigger[ReadyContract[Confirmation.ContractId, Confirmation]] {
+
+  private val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(
       confirmationContract: ReadyContract[Confirmation.ContractId, Confirmation]
@@ -74,7 +73,7 @@ class ExecuteConfirmedActionTrigger(
                   .map(_.contractId)
                   .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
               )
-              connection
+              svTaskContext.connection
                 .submitWithResultNoDedup(
                   Seq(store.key.svParty),
                   Seq(store.key.svcParty),
@@ -173,5 +172,4 @@ class ExecuteConfirmedActionTrigger(
     }
   }
 
-  override protected def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()
 }

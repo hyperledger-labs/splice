@@ -1,10 +1,8 @@
 package com.daml.network.sv.automation
 
 import cats.data.OptionT
-import cats.instances.future.*
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.codegen.java.cc
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.UnlessShutdown
@@ -15,17 +13,17 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-import scala.util.Random
 
 class AdvanceOpenMiningRoundTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
-    connection: CNLedgerConnection,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[AdvanceOpenMiningRoundTrigger.Task]
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]] {
+
+  private val store = svTaskContext.svcStore
 
   /** Retrieve a batch of tasks that are ready for execution now. */
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
@@ -60,7 +58,7 @@ class AdvanceOpenMiningRoundTrigger(
         rounds.newest.contractId,
         coinPriceVotes.map(_.contractId).asJava,
       )
-      (offset, _) <- connection.submitWithResultAndOffsetNoDedup(
+      (offset, _) <- svTaskContext.connection.submitWithResultAndOffsetNoDedup(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
         cmd,
@@ -80,45 +78,50 @@ class AdvanceOpenMiningRoundTrigger(
     logger.debug(show"Starting check for leader inactivity for ${task.work}")
     store
       .getSvcRules()
-      .map(rules => (rules.payload.epoch, rules.payload.leader))
-      .flatMap({ case (monitoredEpoch, monitoredLeader) =>
-        val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
-          context.clock
-            .scheduleAfter(
-              _ => {
-                val isLeaderInactive = for {
-                  sameEpoch <- store
-                    .getSvcRules()
-                    .map(_.payload.epoch == monitoredEpoch)
-                  taskStale <- isStaleTask(task)
-                } yield sameEpoch && !taskStale
+      .flatMap(rules => {
+        val (monitoredEpoch, monitoredLeader) = (rules.payload.epoch, rules.payload.leader)
+        context.retryProvider
+          .waitUnlessShutdown(
+            context.clock
+              .scheduleAfter(
+                _ => {
+                  // No work done here, as we are only interested in the scheduling notification
+                  ()
+                },
+                context.config.effectiveLeaderInactiveTimeout.asJava,
+              )
+          )
+          .unwrap
+          .flatMap {
+            case UnlessShutdown.AbortedDueToShutdown =>
+              Future.successful(
+                TaskSuccess(
+                  show"Shutting down leader inactivity check for ${task.work}"
+                )
+              )
+            case UnlessShutdown.Outcome(()) => {
+              val isLeaderInactive = for {
+                sameEpoch <- store
+                  .getSvcRules()
+                  .map(_.payload.epoch == monitoredEpoch)
+                taskStale <- isStaleTask(task)
+              } yield sameEpoch && !taskStale
 
-                isLeaderInactive.foreach(isInactive => {
-                  if (isInactive) {
-                    handleLeaderFailure(
-                      monitoredLeader,
-                      show"The leader is inactive for ${task.work}",
+              isLeaderInactive.flatMap(isInactive => {
+                if (isInactive) {
+                  voteForNewLeader(
+                    monitoredLeader
+                  )
+                } else {
+                  Future.successful(
+                    TaskSuccess(
+                      show"Leader inactivity check completed for ${task.work}"
                     )
-                  }
-                })
-              },
-              context.config.effectiveLeaderInactiveTimeout.asJava,
-            )
-        )
-        continueOrShutdownSignal.unwrap.flatMap {
-          case UnlessShutdown.AbortedDueToShutdown =>
-            Future.successful(
-              TaskSuccess(
-                show"Shutting down leader inactivity check for ${task.work}"
-              )
-            )
-          case UnlessShutdown.Outcome(()) =>
-            Future.successful(
-              TaskSuccess(
-                show"Leader inactivity check completed for ${task.work}"
-              )
-            )
-        }
+                  )
+                }
+              })
+            }
+          }
 
       })
   }
@@ -126,7 +129,6 @@ class AdvanceOpenMiningRoundTrigger(
   override protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[Boolean] = {
-    import cats.data.OptionT
     import cats.instances.future.*
     import cats.syntax.traverse.*
 
@@ -144,53 +146,6 @@ class AdvanceOpenMiningRoundTrigger(
       )
     } yield ()).isEmpty
   }
-
-  /** Handle leader failure by voting for a new leader
-    */
-  @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
-  def handleLeaderFailure(currentLeader: String, msg: String)(implicit
-      tc: TraceContext
-  ): Future[TaskOutcome] = {
-    logger.warn(msg)
-
-    for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      svcRules <- store.getSvcRules()
-      currentRequesters <- store.listElectionRequests(svcRules).map(_.map(_.payload.requester))
-      self = store.key.svParty.toProtoPrimitive
-      otherParties = Set.empty ++ svcRules.payload.members.keySet.asScala - currentLeader - self
-      ranking = self :: Random.shuffle(otherParties.toList) ++ List(currentLeader)
-      cmd = svcRules.contractId.exerciseSvcRules_RequestElection(
-        self,
-        new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
-          com.daml.ledger.javaapi.data.Unit.getInstance()
-        ),
-        ranking.asJava,
-      )
-      retVal <-
-        if (!currentRequesters.contains(self)) {
-          connection.submitWithResultAndOffsetNoDedup(
-            Seq(store.key.svParty),
-            Seq(store.key.svcParty),
-            cmd,
-            domainId = domainId,
-          ): Unit
-          Future.successful(
-            TaskSuccess(
-              s"Successfully requested an election to replace inactive leader ${currentLeader}"
-            )
-          )
-        } else {
-          Future.successful(
-            TaskSuccess(
-              s"Successfully requested an election to replace inactive leader ${currentLeader}"
-            )
-          )
-        }
-    } yield retVal
-  }
-
-  override protected def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()
 }
 
 object AdvanceOpenMiningRoundTrigger {

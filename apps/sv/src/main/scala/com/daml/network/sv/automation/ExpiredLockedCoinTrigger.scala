@@ -2,9 +2,7 @@ package com.daml.network.sv.automation
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -15,8 +13,7 @@ import scala.jdk.CollectionConverters.*
 
 class ExpiredLockedCoinTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
-    connection: CNLedgerConnection,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -24,8 +21,8 @@ class ExpiredLockedCoinTrigger(
       cc.coin.LockedCoin.ContractId,
       cc.coin.LockedCoin,
     ](
-      store.multiDomainAcsStore,
-      store.listLockedExpiredCoins,
+      svTaskContext.svcStore.multiDomainAcsStore,
+      svTaskContext.svcStore.listLockedExpiredCoins,
       cc.coin.LockedCoin.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
@@ -34,6 +31,8 @@ class ExpiredLockedCoinTrigger(
     ]]] {
   type Task =
     ScheduledTaskTrigger.ReadyTask[ReadyContract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]
+
+  private val store = svTaskContext.svcStore
 
   override protected def completeTaskAsLeader(
       co: Task
@@ -49,7 +48,7 @@ class ExpiredLockedCoinTrigger(
           coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
         ),
       )
-    _ <- connection
+    _ <- svTaskContext.connection
       .submitCommandsNoDedup(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
@@ -64,5 +63,4 @@ class ExpiredLockedCoinTrigger(
     )
   }
 
-  override def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()
 }

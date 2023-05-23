@@ -8,9 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -20,8 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class SvcRewardTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
-    connection: CNLedgerConnection,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -30,7 +27,7 @@ class SvcRewardTrigger(
       cc.coin.SvcReward.ContractId,
       cc.coin.SvcReward,
     ](
-      store,
+      svTaskContext.svcStore,
       cc.coin.SvcReward.COMPANION,
     )
     with SvTaskBasedTrigger[ReadyContract[
@@ -42,6 +39,8 @@ class SvcRewardTrigger(
     cc.coin.SvcReward,
   ]
 
+  private val store = svTaskContext.svcStore
+
   override def completeTaskAsLeader(
       svcReward: SvcRewardContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
@@ -52,7 +51,7 @@ class SvcRewardTrigger(
           svcReward.contract.contractId
         )
       _ <-
-        connection.submitWithResultNoDedup(
+        svTaskContext.connection.submitWithResultNoDedup(
           Seq(store.key.svParty),
           Seq(store.key.svcParty),
           cmd,
@@ -71,5 +70,4 @@ class SvcRewardTrigger(
     )
   }
 
-  override protected def isLeader()(implicit tc: TraceContext): Future[Boolean] = store.svIsLeader()
 }

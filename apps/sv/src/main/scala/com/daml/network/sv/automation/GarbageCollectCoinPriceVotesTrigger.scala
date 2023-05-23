@@ -8,9 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -21,8 +19,7 @@ import scala.jdk.CollectionConverters.*
 
 class GarbageCollectCoinPriceVotesTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
-    connection: CNLedgerConnection,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -31,7 +28,7 @@ class GarbageCollectCoinPriceVotesTrigger(
       SvcRules.ContractId,
       SvcRules,
     ](
-      svcStore,
+      svTaskContext.svcStore,
       SvcRules.COMPANION,
     )
     with SvTaskBasedTrigger[ReadyContract[
@@ -43,11 +40,13 @@ class GarbageCollectCoinPriceVotesTrigger(
     SvcRules,
   ]
 
+  val store = svTaskContext.svcStore
+
   override def completeTaskAsLeader(
       svcRules: SvcRulesContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      coinPriceVotes <- svcStore.listAllCoinPriceVotes()
+      coinPriceVotes <- store.listAllCoinPriceVotes()
       (memberVotes, nonMemberVotes) = coinPriceVotes.partition(v =>
         svcRules.contract.payload.members.asScala.contains(v.payload.sv)
       )
@@ -66,9 +65,9 @@ class GarbageCollectCoinPriceVotesTrigger(
               nonMemberVoteCids.asJava,
               memberDuplicatedVoteCids.asJava,
             )
-          connection.submitCommandsNoDedup(
-            Seq(svcStore.key.svParty),
-            Seq(svcStore.key.svcParty),
+          svTaskContext.connection.submitCommandsNoDedup(
+            Seq(store.key.svParty),
+            Seq(store.key.svcParty),
             commands = cmd.commands.asScala.toSeq,
             domainId = svcRules.domain,
           )
@@ -85,7 +84,4 @@ class GarbageCollectCoinPriceVotesTrigger(
       TaskSuccess(show"ignoring ${PrettyContractId(svcRules.contract)}, as we're not the leader")
     )
   }
-
-  override protected def isLeader()(implicit tc: TraceContext): Future[Boolean] =
-    svcStore.svIsLeader()
 }
