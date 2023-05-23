@@ -10,6 +10,11 @@ and `DevNet` which is upgraded nightly with a nightly dev release. Please use `T
 have a specific reason not to, as `DevNet` may be unstable, and will also introduce breaking changes on
 a daily basis.
 
+Note that there is not yet data retention from release to release in
+either `DevNet` or `TestNet`. This will change as the models and API's
+stabilize, but for now, each release should be a full release from
+scratch. No data should be retained when an environment is updated.
+
 Requirements
 ------------
 
@@ -295,6 +300,12 @@ To make these commands work, you will need to meet a few
 preconditions. The first is that there needs to be an environment
 variable defined to refer to the version of the Helm charts necessary
 to connect to this environment:
+
+Note that because of the lack data retention from release to release
+in either `DevNet` or `TestNet`, every release should be installed
+from scratch into a completely clean environment. Data should not be
+retained, and there is no current support for helm chart upgrades or
+similar.
 
 |chart_version_set|
 

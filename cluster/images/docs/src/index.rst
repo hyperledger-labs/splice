@@ -1,8 +1,13 @@
 Canton Network Documentation
 ============================
 
-Version: |version_literal|
-Helm Chart Version: |chart_version_literal|
+.. list-table:: Current Version Information
+   :header-rows: 0
+
+   * - Docker Image Tag:
+     - |version_literal|
+   * - Helm Chart Version:
+     - |chart_version_literal|
 
 .. toctree::
    :maxdepth: 2
