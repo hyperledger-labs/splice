@@ -38,6 +38,8 @@ inThisBuild(
   )
 )
 
+val allDarsFilter = ScopeFilter(inAnyProject, inConfigurations(Compile), inTasks(damlBuild))
+
 /*
  * Root project
  */
@@ -89,24 +91,14 @@ lazy val root = (project in file("."))
     // Needed to be able to resolve scalafmt snapshot versions
     resolvers += Resolver.sonatypeRepo("snapshots"),
     damlDarsLockCheckerFileArg := {
-      // Sadly there dos not seem to be a way to get all values from all projects :/
-      val darFiles: Seq[File] = Seq(
-        (`cn-util-daml` / Compile / damlBuild).value,
-        (`canton-coin-api-daml` / Compile / damlBuild).value,
-        (`canton-coin-daml` / Compile / damlBuild).value,
-        (`canton-coin-v1test-daml` / Compile / damlBuild).value,
-        (`canton-coin-v2test-daml` / Compile / damlBuild).value,
-        (`wallet-payments-daml` / Compile / damlBuild).value,
-        (`wallet-daml` / Compile / damlBuild).value,
-        (`wallet-v1test-daml` / Compile / damlBuild).value,
-        (`directory-daml` / Compile / damlBuild).value,
-        (`splitwell-daml` / Compile / damlBuild).value,
-        (`svc-governance-daml` / Compile / damlBuild).value,
-        (`svc-governance-v1test-daml` / Compile / damlBuild).value,
-        (`validator-lifecycle-daml` / Compile / damlBuild).value,
-      ).flatten
-      val baseDir = baseDirectory.value.getPath + java.io.File.separator
-      val darPaths = darFiles.map(file => file.getPath.stripPrefix(baseDir))
+      val darFiles: Seq[File] = damlBuild.all(allDarsFilter).value.flatten
+      val basePath = baseDirectory.value.toPath
+      val cantonPath = basePath.resolve("canton")
+      val darPaths = for {
+        file <- darFiles
+        path = file.toPath
+        if !path.startsWith(cantonPath)
+      } yield basePath.relativize(path)
       val outputFile = "daml/dars.lock"
       " " + (Seq(outputFile) ++ darPaths).mkString(" ")
     },
