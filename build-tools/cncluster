@@ -649,6 +649,7 @@ function _cluster_reset() {
         down -y
 
     _info "Uninstalling Pulumi canton-network stack"
+    _uses_pulumi_stack canton-network
     _pulumi --stack "canton-network.${GCP_CLUSTER_BASENAME}" \
         --cwd "${REPO_ROOT}/cluster/pulumi/canton-network" \
         down --yes
