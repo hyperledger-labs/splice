@@ -1,5 +1,5 @@
 apiVersion: v2
-name: cn-cluster-ingress
+name: cn-cluster-ingress-sv
 type: application
 description: Canton Network Cluster Ingress
 
