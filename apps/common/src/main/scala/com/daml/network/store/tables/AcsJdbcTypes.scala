@@ -1,11 +1,11 @@
 package com.daml.network.store.tables
 
-import com.daml.lf.data.Ref
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Ref.*
 import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.value.Value.ContractId
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import slick.ast.FieldSymbol
 import slick.jdbc.JdbcType
@@ -20,34 +20,41 @@ trait AcsJdbcTypes {
   protected implicit lazy val timestampJdbcType: JdbcType[Timestamp] =
     MappedColumnType.base[Timestamp, Long](_.micros, Timestamp.assertFromLong)
 
-  protected implicit lazy val contractIdJdbcType: JdbcType[ContractId] =
-    MappedColumnType.base[ContractId, String](_.coid, ContractId.assertFromString)
+  protected implicit def contractIdJdbcType[T]: JdbcType[ContractId[T]] =
+    MappedColumnType.base[ContractId[T], String](_.contractId, new ContractId[T](_))
 
   protected implicit lazy val offsetJdbcType: JdbcType[Offset] =
     MappedColumnType.base[Offset, String](
       _.toHexString,
-      s => Offset.fromHexString(Ref.HexString.assertFromString(s)),
+      s => Offset.fromHexString(HexString.assertFromString(s)),
     )
 
   protected implicit lazy val templateIdJdbcType: JdbcType[TemplateId] =
     MappedColumnType.base[TemplateId, String](
       { case TemplateId(packageId, moduleName, entityName) =>
-        s"$packageId:$moduleName:$entityName"
+        Identifier(
+          PackageId.assertFromString(packageId),
+          QualifiedName(
+            ModuleName.assertFromString(moduleName),
+            DottedName.assertFromString(entityName),
+          ),
+        ).toString()
       },
       s => {
-        s.split(":") match {
-          case Array(packageId, moduleName, entityName) =>
-            TemplateId(packageId, moduleName, entityName)
-          case _ =>
-            throw new IllegalStateException(
-              s"TemplateId column didn't contain a valid template: $s"
-            )
-        }
+        val identifier = Identifier.assertFromString(s)
+        TemplateId(
+          identifier.packageId,
+          identifier.qualifiedName.module.dottedName,
+          identifier.qualifiedName.name.dottedName,
+        )
       },
     )
 
   protected implicit lazy val domainIdJdbcType: JdbcType[DomainId] =
     MappedColumnType.base[DomainId, String](_.toProtoPrimitive, DomainId.tryFromString)
+
+  protected implicit lazy val partyIdJdbcType: JdbcType[PartyId] =
+    MappedColumnType.base[PartyId, String](_.toProtoPrimitive, PartyId.tryFromProtoPrimitive)
 
   protected implicit lazy val jsonJdbcType: JdbcType[Json] = new profile.DriverJdbcType[Json]() {
     override def sqlType: Int = java.sql.Types.OTHER

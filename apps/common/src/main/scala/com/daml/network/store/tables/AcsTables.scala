@@ -1,8 +1,12 @@
 package com.daml.network.store.tables
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time.Timestamp
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.DomainId
 import io.circe.Json
+import shapeless.HNil
 import slick.jdbc.PostgresProfile
 
 trait AcsTables extends AcsJdbcTypes {
@@ -50,4 +54,42 @@ trait AcsTables extends AcsJdbcTypes {
   }
 
   lazy val StoreIngestionStates = new TableQuery(tag => new StoreIngestionStates(tag))
+
+  abstract class AcsStoreTemplate[Row](_tableTag: Tag, tableName: String)
+      extends profile.api.Table[Row](_tableTag, tableName) {
+
+    val storeId: Rep[Int] = column[Int]("store_id")
+
+    val eventNumber: Rep[Long] = column[Long]("event_number", O.AutoInc, O.PrimaryKey)
+
+    val contractId: Rep[ContractId[Any]] = column[ContractId[Any]]("contract_id")
+
+    val templateId: Rep[TemplateId] = column[TemplateId]("template_id")
+
+    val createArguments: Rep[Json] = column[Json]("create_arguments")
+
+    val contractMetadataCreatedAt: Rep[Timestamp] =
+      column[Timestamp]("contract_metadata_created_at")
+
+    val contractMetadataContractKeyHash: Rep[Option[String]] =
+      column[Option[String]]("contract_metadata_contract_key_hash", O.Default(None))
+
+    val contractMetadataDriverInternal: Rep[Array[Byte]] =
+      column[Array[Byte]]("contract_metadata_driver_internal")
+
+    val contractExpiresAt: Rep[Option[Timestamp]] =
+      column[Option[Timestamp]]("contract_expires_at", O.Default(None))
+
+    protected def templateColumns =
+      storeId ::
+        eventNumber ::
+        contractId ::
+        templateId ::
+        createArguments ::
+        contractMetadataCreatedAt ::
+        contractMetadataContractKeyHash ::
+        contractMetadataDriverInternal ::
+        contractExpiresAt :: HNil
+
+  }
 }
