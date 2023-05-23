@@ -126,10 +126,10 @@ const sv = installCNHelmChart(
       sponsorApiPort: 5014,
       sponsorApiUrl: `https://${TARGET_CLUSTER}.network.canton.global`,
       svcApiAddress: `${TARGET_CLUSTER}.network.canton.global`,
-      keyName: SV_NAME,
       publicKey: SV_PUBLIC_KEY,
       privateKey: SV_PRIVATE_KEY,
     },
+    onboardingName: SV_NAME,
     auth: {
       // TODO(#4552): support arbitrary audience
       audience: "https://canton.network.global",
