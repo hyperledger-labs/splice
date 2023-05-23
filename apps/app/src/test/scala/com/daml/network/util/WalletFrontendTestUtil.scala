@@ -11,7 +11,8 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
     val transactionsBefore = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
 
     click on "tap-amount-field"
-    numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString)
+    numberField("tap-amount-field").underlying.clear()
+    numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString())
     click on "tap-button"
 
     // Make sure the tap has been processed

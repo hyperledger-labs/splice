@@ -8,25 +8,25 @@ import { Button, Stack, TextField } from '@mui/material';
 import { useTap } from '../hooks';
 
 const Tap: React.FC = () => {
-  const [tapValue, setTapValue] = useState<BigNumber>(new BigNumber(0));
+  const [tapValueText, setTapValueText] = useState<string>('0');
 
   const mutation = useTap();
 
-  const isInvalidAmount = tapValue.lte(0.0);
+  const isInvalidAmount = BigNumber(tapValueText).lte(0.0);
   return (
     <Stack direction="row" spacing={2} alignItems="center">
       <TextField
         error={isInvalidAmount}
         label="Amount"
-        onChange={event => setTapValue(new BigNumber(event.target.value))}
-        value={tapValue}
-        type="number"
+        onChange={event => setTapValueText(event.target.value)}
+        value={tapValueText}
+        type="text"
         id="tap-amount-field"
       />
       <Button
         variant="contained"
         disabled={isInvalidAmount}
-        onClick={() => mutation.mutate(tapValue)}
+        onClick={() => mutation.mutate(BigNumber(tapValueText))}
         id="tap-button"
       >
         Tap

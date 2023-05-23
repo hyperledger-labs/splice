@@ -50,28 +50,46 @@ class WalletFrontendIntegrationTest
             },
           )
 
-          actAndCheck(
-            "User taps balance in the wallet", {
-              tapCoins(2)
-            },
-          )(
-            "User sees the updated balance",
-            _ => {
-              val ccText = find(id("wallet-balance-cc")).value.text.trim
-              val usdText = find(id("wallet-balance-usd")).value.text.trim
+          val testTap = (amount: BigDecimal, feeUpperBound: BigDecimal) => {
 
-              ccText should not be "..."
-              usdText should not be "..."
-              val cc = BigDecimal(ccText.split(" ").head)
-              val usd = BigDecimal(usdText.split(" ").head)
+            val (ccTextBefore, usdTextBefore) = eventually() {
+              val ccTextBefore = find(id("wallet-balance-cc")).value.text.trim
+              val usdTextBefore = find(id("wallet-balance-usd")).value.text.trim
+              ccTextBefore should not be "..."
+              usdTextBefore should not be "..."
+              (ccTextBefore, usdTextBefore)
+            }
+            val ccBefore = BigDecimal(ccTextBefore.split(" ").head)
+            val usdBefore = BigDecimal(usdTextBefore.split(" ").head)
 
-              assertInRange(cc, (BigDecimal(2) - smallAmount, BigDecimal(2)))
-              assertInRange(
-                usd,
-                ((BigDecimal(2) - smallAmount) * coinPrice, BigDecimal(2) * coinPrice),
-              )
-            },
-          )
+            actAndCheck(
+              s"User taps $amount in the wallet", {
+                tapCoins(amount)
+              },
+            )(
+              "User sees the updated balance",
+              _ => {
+                val ccText = find(id("wallet-balance-cc")).value.text.trim
+                val usdText = find(id("wallet-balance-usd")).value.text.trim
+
+                ccText should not be "..."
+                usdText should not be "..."
+                val cc = BigDecimal(ccText.split(" ").head)
+                val usd = BigDecimal(usdText.split(" ").head)
+
+                assertInRange(cc - ccBefore, (amount - feeUpperBound, amount))
+                assertInRange(
+                  usd - usdBefore,
+                  ((amount - feeUpperBound) * coinPrice, amount * coinPrice),
+                )
+              },
+            )
+
+          }
+
+          testTap(2, smallAmount)
+          testTap(3.14159, 0.05)
+
         }
       }
 
