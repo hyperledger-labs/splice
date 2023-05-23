@@ -96,5 +96,14 @@ find_secrets |
   # Output unmasked secrets, failing if there are some
   output_problems "unmasked secrets" "$LOGFILE"
 
+find_deprecated_configs() {
+  set +o pipefail # rg returns 1 if there were not matches
+  rg -v -f - <<< "$IGNORE_PATTERNS" "$LOGFILE" |
+    rg -e 'Config field at (\S+) is deprecated' || true
+}
+
+find_deprecated_configs |
+  output_problems "deprecated config paths" "$LOGFILE"
+
 # Give the next command some space
 echo ""
