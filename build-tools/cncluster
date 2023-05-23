@@ -73,6 +73,22 @@ function _needs_auth0_management_api_creds() {
     fi
 }
 
+function _cluster_install_network_gateway() {
+    # TODO(#4560): Use an empty passphrase until we manage secrets
+    local -x PULUMI_CONFIG_PASSPHRASE=''
+
+    _info "Creating a pulumi stack if it does not yet exist"
+
+    _uses_pulumi_stack canton-network-gateway
+
+    _info "Installing canton-network-gateway stack"
+
+    # Spin up the canton-network-gateway pulumi stack
+    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
+           --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
+           up -y
+}
+
 function _cluster_apply() {
     IMAGE_TAG=$1
 
@@ -88,19 +104,7 @@ function _cluster_apply() {
         TICK_DURATION_ARG="tickDuration=\"${CNCLUSTER_TICK_DURATION}\""
     fi
 
-    # TODO(#4560): Use an empty passphrase until we manage secrets
-    local -x PULUMI_CONFIG_PASSPHRASE=''
-
-    _info "Creating a pulumi stack if it does not yet exist"
-
-    _uses_pulumi_stack canton-network-gateway
-
-    _info "Installing canton-network-gateway stack"
-
-    # Spin up the canton-network-gateway pulumi stack
-    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
-           --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
-           up -y
+    _cluster_install_network_gateway
 
     _info "Applying jsonnet manifest"
 
@@ -188,7 +192,6 @@ function _uses_pulumi_stack() {
            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
             stack init 2> /dev/null || true
 }
-
 
 ### Cluster manageent
 
@@ -1204,6 +1207,8 @@ function subcmd_papply() {
     else
         args+=(-c "FIXED_TOKENS=0")
     fi
+
+    _cluster_install_network_gateway
 
     subcmd_pulumi canton-network up --yes --show-sames "${args[@]}"
 }
