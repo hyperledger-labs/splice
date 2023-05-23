@@ -34,6 +34,10 @@ function configureIstiod(
         global: {
           istioNamespace: "cluster-ingress",
         },
+        meshConfig: {
+          // Turns on envoy logging
+          accessLogFile: "/dev/stdout",
+        },
       },
     },
     {
