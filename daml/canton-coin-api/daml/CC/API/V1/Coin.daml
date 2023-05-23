@@ -170,6 +170,11 @@ data TransferSummary = TransferSummary with
     -- ^ The final amount of coin returned to the sender after paying for all outputs and fees.
     -- If it is zero, then no coin is created for the sender.
     coinPrice : Decimal -- ^ The coin price at the round this transfer was executed.
+    changeToInitialAmountAsOfRoundZero : Decimal
+    -- The change to the total balance introduced by this transfer, normalized to round zero, i.e., 
+    -- a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
+    changeToHoldingFeesRate : Decimal
+    -- ^ The change of total holding fees introduced by this transfer.
   deriving (Eq, Show)
 
 -- | Result of an operation that created a new coin, e.g.,

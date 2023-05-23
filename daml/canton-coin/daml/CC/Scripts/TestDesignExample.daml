@@ -126,24 +126,29 @@ test = do
   prevCoinCids <- map fst <$> query @Coin app.svc
   prevLockedCoinCids <- map fst <$> query @LockedCoin app.svc
 
+  normalizedBalanceBeforeTransfer <- getNormalizedBalance app.svc
+
   transferContext <- getAppTransferContext app arbiter
   result <- submitUser alice.userId $ exerciseCmd escrow Refresh with
     lockedCoin
     paymentCoin
     transferContext
 
+  normalizedBalanceAfterTransfer <- getNormalizedBalance app.svc
+
   let lockedCoinFee = coinConfig.createFee.fee + coinConfig.lockHolderFee.fee
       transferredCoinFee =
         coinConfig.createFee.fee
         + chargeSteppedRate coinConfig.transferFee arbiterPaymentAmount
-      holdingFees =
+      inputCoinHoldingFees =
         (chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c1.round)
         + chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c0.round)) -- holding fees
+      outputCoinHoldingFees = coinConfig.holdingFee.rate * 3.0  -- there are 2 output coins + 1 coin for the change
       outputFees = [lockedCoinFee, transferredCoinFee]
       senderChangeAmount =
         refreshCoinAmount
         - arbiterPaymentAmount
-        - holdingFees
+        - inputCoinHoldingFees
         - lockedCoinFee
         - coinConfig.createFee.fee -- fee for returning change
         -- no subtraction of transferredCoinFee as that fee is paid by the receiver
@@ -152,11 +157,13 @@ test = do
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
     inputCoinAmount = refreshCoinAmount + lockedCoinAmount
-    holdingFees
+    holdingFees = inputCoinHoldingFees
     outputFees
     senderChangeAmount
     senderChangeFee = coinConfig.createFee.fee
     coinPrice = 1.0
+    changeToInitialAmountAsOfRoundZero = normalizedBalanceAfterTransfer - normalizedBalanceBeforeTransfer
+    changeToHoldingFeesRate = outputCoinHoldingFees - inputCoinHoldingFees
 
   allCoins <- query @Coin app.svc
   allLockedCoins <- query @LockedCoin app.svc

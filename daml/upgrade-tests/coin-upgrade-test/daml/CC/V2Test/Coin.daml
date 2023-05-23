@@ -453,6 +453,7 @@ summarizeAndConsumeInputsV2Test coinRulesCid csum svc sender inps = do
       totalAppRewardAmount = 0.0
       totalValidatorRewardAmount = 0.0
       totalHoldingFees = 0.0
+      amountArchivedAsOfRoundZero = 0.0
 
     summarizeAndConsumeInput round s (API.InputCoin coinCid) = do
       -- fetch and archive
@@ -469,6 +470,7 @@ summarizeAndConsumeInputsV2Test coinRulesCid csum svc sender inps = do
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees + holdingFee
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
 
     summarizeAndConsumeInput _round s (API.InputAppRewardCoupon couponCid) = do
       -- fetch and archive
@@ -487,6 +489,7 @@ summarizeAndConsumeInputsV2Test coinRulesCid csum svc sender inps = do
         totalAppRewardAmount = s.totalAppRewardAmount + coupon.amount * issuancePerCoupon
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
 
     summarizeAndConsumeInput _round s (API.InputValidatorRewardCoupon couponCid) = do
       -- fetch and archive
@@ -507,3 +510,4 @@ summarizeAndConsumeInputsV2Test coinRulesCid csum svc sender inps = do
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
         totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero

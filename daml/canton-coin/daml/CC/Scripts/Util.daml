@@ -516,6 +516,17 @@ featureApp app provider = do
   submitExerciseCoinRulesByKey' app provider CoinRules_DevNet_FeatureApp with
     provider = provider.primaryParty
 
+getNormalizedBalance: Party -> Script Decimal
+getNormalizedBalance party = do
+  coins <- query @Coin party
+  let normalizedCoinBalance = sum $ map(\(_, c) -> c.amount.initialAmount + intToDecimal c.amount.createdAt.number * c.amount.ratePerRound.rate) coins
+
+  lockedCoins <- query @LockedCoin party
+  let normalizedLockedCoinBalance = sum $ map(\(_, lc) -> lc.coin.amount.initialAmount + intToDecimal lc.coin.amount.createdAt.number * lc.coin.amount.ratePerRound.rate) lockedCoins
+
+  let sum = normalizedCoinBalance + normalizedLockedCoinBalance
+  return sum
+
 assertError : (CanAbort m, ActionCatch m) => (() -> a) -> m ()
 assertError f = do
   isThrown <-

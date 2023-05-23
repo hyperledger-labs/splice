@@ -735,6 +735,7 @@ data TransferInputsSummary = TransferInputsSummary with
     totalAppRewardAmount : Decimal
     totalValidatorRewardAmount : Decimal
     totalHoldingFees : Decimal
+    amountArchivedAsOfRoundZero : Decimal
   deriving (Eq, Show)
 
 type TransferOutputsSummary = [PreprocessedTransferOutput]
@@ -808,6 +809,7 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
       totalAppRewardAmount = 0.0
       totalValidatorRewardAmount = 0.0
       totalHoldingFees = 0.0
+      amountArchivedAsOfRoundZero = 0.0
 
     summarizeAndConsumeInput round s (API.InputCoin coinCid) = do
       -- fetch and archive
@@ -824,6 +826,8 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees + holdingFee
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+          + coin.amount.initialAmount + coin.amount.ratePerRound.rate * intToDecimal coin.amount.createdAt.number
 
     summarizeAndConsumeInput _round s (API.InputAppRewardCoupon couponCid) = do
       -- fetch and archive
@@ -842,7 +846,8 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalAppRewardAmount = s.totalAppRewardAmount + coupon.amount * issuancePerCoupon
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees
-
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        
     summarizeAndConsumeInput _round s (API.InputValidatorRewardCoupon couponCid) = do
       -- fetch and archive
       (couponCid, coupon) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" couponCid
@@ -862,6 +867,7 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
         totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
 
 preprocessOutputs : TransferConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
 preprocessOutputs transferConfigCC sender outs =
@@ -908,6 +914,8 @@ summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
       inp.totalCoinAmount + inp.totalAppRewardAmount + inp.totalValidatorRewardAmount
       - inp.totalHoldingFees - totalOutputAmount - sum outputFees
     senderChangeFee = min transferConfigCC.createFee.fee leftOverAmount
+    senderChangeAmount = leftOverAmount - senderChangeFee
+    numOutputs = intToDecimal (length preprocessedOutputs + (if senderChangeAmount > 0.0 then 1 else 0))
 
     summary = API.TransferSummary with
       inputCoinAmount = inp.totalCoinAmount
@@ -916,8 +924,13 @@ summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
       holdingFees = inp.totalHoldingFees
       outputFees
       senderChangeFee
-      senderChangeAmount = leftOverAmount - senderChangeFee
+      senderChangeAmount
       coinPrice = openRound.coinPrice
+      changeToInitialAmountAsOfRoundZero = totalOutputAmount 
+        + senderChangeAmount
+        + intToDecimal openRound.round.number *  numOutputs * transferConfigCC.holdingFee.rate 
+        - inp.amountArchivedAsOfRoundZero
+      changeToHoldingFeesRate = numOutputs * transferConfigCC.holdingFee.rate - inp.totalHoldingFees
 
 
 issueRewards : TransferContextSummary -> Party -> Party -> API.TransferSummary -> Update ()
