@@ -135,14 +135,15 @@ class LocalRunbookIntegrationTest
         scanAppPath / "app.conf",
       )
       .clearConfigTransforms()
-      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      // In the runbook, the participant of the self-hosted validator uses ports 5xxx.
-      // This test starts the participant on ports 7xxx instead, so we need to adjust all remote participant
-      // configs of apps started on the self-hosted validator node.
-      .addConfigTransforms((_, conf) =>
-        CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
+      .addConfigTransforms(
+        (_, conf) => conf.focus(_.parameters.manualStart).replace(true),
+        // In the runbook, the participant of the self-hosted validator uses ports 5xxx.
+        // This test starts the participant on ports 7xxx instead, so we need to adjust all remote participant
+        // configs of apps started on the self-hosted validator node.
+        (_, conf) => CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf),
+        (_, conf) => expectValidatorOnboarding(conf, "validatorsecret"),
+        (_, conf) => localValidatorSvSponsorUrl(conf),
       )
-      .addConfigTransforms((_, conf) => expectValidatorOnboarding(conf, "validatorsecret"))
       .withThisSetup(env => {
         setupAndStartCanton()
         env.fullSvcApps.local.foreach(_.start())
@@ -176,5 +177,14 @@ class LocalRunbookIntegrationTest
       val oc = vc.onboarding.value
       vc.focus(_.onboarding).replace(Some(oc.copy(secret = secret)))
     })(conf_)
+  }
+
+  private def localValidatorSvSponsorUrl(conf: CNNodeConfig): CNNodeConfig = {
+    CNNodeConfigTransforms.updateAllValidatorConfigs_(vc =>
+      vc.focus(_.onboarding)
+        .modify(onboarding =>
+          onboarding.map(_.focus(_.svClient.adminApi.url).replace("http://localhost:5014"))
+        )
+    )(conf)
   }
 }

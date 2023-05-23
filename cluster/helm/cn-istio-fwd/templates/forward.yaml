@@ -93,46 +93,6 @@ spec:
     - "{{ (.Values.cluster).basename }}.network.canton.global"
     - "*.{{ (.Values.cluster).basename }}.network.canton.global"
   - port:
-      number: 5014
-      name: sv1-api
-      protocol: HTTPS
-    tls:
-      mode: SIMPLE
-      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
-    hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-  - port:
-      number: 5114
-      name: sv2-api
-      protocol: HTTPS
-    tls:
-      mode: SIMPLE
-      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
-    hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-  - port:
-      number: 5214
-      name: sv3-api
-      protocol: HTTPS
-    tls:
-      mode: SIMPLE
-      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
-    hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-  - port:
-      number: 5314
-      name: sv4-api
-      protocol: HTTPS
-    tls:
-      mode: SIMPLE
-      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
-    hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-  - port:
       number: 5012
       name: scan-api
       protocol: HTTPS
@@ -320,34 +280,6 @@ spec:
         host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 5005
-  - match:
-    - port: 5014
-    route:
-    - destination:
-        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
-        port:
-          number: 5014
-  - match:
-    - port: 5114
-    route:
-    - destination:
-        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
-        port:
-          number: 5114
-  - match:
-    - port: 5214
-    route:
-    - destination:
-        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
-        port:
-          number: 5214
-  - match:
-    - port: 5314
-    route:
-    - destination:
-        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
-        port:
-          number: 5314
   - match:
     - port: 5012
     route:

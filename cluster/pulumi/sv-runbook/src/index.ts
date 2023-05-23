@@ -99,8 +99,7 @@ const validator = installCNHelmChart(
   // TODO(#4384): move these values into a file and distribute it with the release
   {
     participantAddress: "participant",
-    svSponsorPort: "5014",
-    svSponsorAddress: `https://${TARGET_CLUSTER}.network.canton.global`,
+    svSponsorAddress: `https://sv.sv-1.svc.${TARGET_CLUSTER}.network.canton.global/api/v0/sv`,
     scanPort: "5012",
     scanAddress: `https://${TARGET_CLUSTER}.network.canton.global`,
     validatorWalletUser: SV_WALLET_USER_ID,
@@ -123,8 +122,7 @@ const sv = installCNHelmChart(
   // TODO(#4384): move these values into a file and distribute it with the release
   {
     joinWithKeyOnboarding: {
-      sponsorApiPort: 5014,
-      sponsorApiUrl: `https://${TARGET_CLUSTER}.network.canton.global`,
+      sponsorApiUrl: `https://sv.sv-1.svc.${TARGET_CLUSTER}.network.canton.global/api/v0/sv`,
       svcApiAddress: `${TARGET_CLUSTER}.network.canton.global`,
       publicKey: SV_PUBLIC_KEY,
       privateKey: SV_PRIVATE_KEY,

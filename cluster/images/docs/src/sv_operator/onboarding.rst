@@ -58,7 +58,7 @@ An SV node includes a validator node, so just like when
 
 .. parsed-literal::
 
-   curl -X POST https://|cn_cluster|.network.canton.global:5014/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/sv/validator-onboarding-nosecret.conf > validator-onboarding.conf
+   curl -X POST https://sv.sv-1.svc.|cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/sv/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 .. _sv-identity:
 

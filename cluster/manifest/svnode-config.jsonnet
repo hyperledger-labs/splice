@@ -6,7 +6,6 @@ local deployments(num, svConfig, config) =
   local namespace = std.format("sv-%d", num);
   local adminApi = std.format("sv%d-api", num);
   local svName = std.format("Canton-Foundation-%d", num);
-  local port = 5014 + 100 * (num - 1);
 
   local participantAdminApi = std.format("sv%d-adm-api", num);
   local participantLedgerApi = std.format("sv%d-lg-api", num);
@@ -21,12 +20,12 @@ local deployments(num, svConfig, config) =
       [
         {
           name: adminApi,
-          port: port,
+          port: 5014,
+          internalOnly: true,
         },
       ],
       image="sv-app",
       extraEnvVars=c.appAuthEnvBinding(config, "sv") + [
-        { name: "CN_APP_SV_ADMIN_API_PORT", value: std.toString(port) },
         { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
         { name: "CN_APP_SV_ONBOARDING_NAME", value: svName },
       ] + (
@@ -47,12 +46,8 @@ local deployments(num, svConfig, config) =
             value: "join-with-key",
           },
           {
-            name: "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT",
-            value: "5014",
-          },
-          {
             name: "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS",
-            value: "http://sv-app.sv-1",
+            value: "http://sv-app.sv-1:5014",
           },
           {
             name: "CN_APP_SV_ONBOARDING_PUBLIC_KEY",
@@ -68,7 +63,7 @@ local deployments(num, svConfig, config) =
             value: |||
               _onboarding {
                 type = "join-with-key"
-                sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}":"${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}
+                sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}
                 public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}
                 private-key = "%s"
               }

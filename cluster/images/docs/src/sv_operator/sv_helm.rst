@@ -323,8 +323,7 @@ following content.
 .. code-block:: yaml
 
     participantAddress: "participant"
-    svSponsorPort: "5014"
-    svSponsorAddress: "https://TARGET_CLUSTER.network.canton.global"
+    svSponsorAddress: "https://sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
     scanPort: "5012"
     scanAddress: "https://TARGET_CLUSTER.network.canton.global"
     # Replace SV_WALLET_USER_ID with the user id in your IAM that you want to use to log into
@@ -344,8 +343,7 @@ the :ref:`Generating an SV Identity<sv-identity>` section to obtain and register
 .. code-block:: yaml
 
     joinWithKeyOnboarding:
-      sponsorApiPort: 5014
-      sponsorApiUrl: "https://TARGET_CLUSTER.network.canton.global"
+      sponsorApiUrl: "https://sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
       svcApiAddress: "TARGET_CLUSTER.network.canton.global"
       publicKey: ... public key goes here ...
       privateKey: ... private key goes here ...

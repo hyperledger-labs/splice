@@ -1045,10 +1045,6 @@
                               }
                            },
                            {
-                              "name": "CN_APP_SV_ADMIN_API_PORT",
-                              "value": "5014"
-                           },
-                           {
                               "name": "CN_APP_SV_IS_DEV_NET",
                               "value": "true"
                            },
@@ -1592,10 +1588,6 @@
                               }
                            },
                            {
-                              "name": "CN_APP_SV_ADMIN_API_PORT",
-                              "value": "5114"
-                           },
-                           {
                               "name": "CN_APP_SV_IS_DEV_NET",
                               "value": "true"
                            },
@@ -1608,12 +1600,8 @@
                               "value": "join-with-key"
                            },
                            {
-                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT",
-                              "value": "5014"
-                           },
-                           {
                               "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS",
-                              "value": "http://sv-app.sv-1"
+                              "value": "http://sv-app.sv-1:5014"
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_PUBLIC_KEY",
@@ -1625,7 +1613,7 @@
                            },
                            {
                               "name": "ADDITIONAL_CONFIG_SV_ONBOARDING",
-                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\":\"${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA\"\n}\n"
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -1634,7 +1622,7 @@
                         "name": "sv-app",
                         "ports": [
                            {
-                              "containerPort": 5114,
+                              "containerPort": 5014,
                               "name": "sv2-api"
                            }
                         ],
@@ -1671,7 +1659,7 @@
             "ports": [
                {
                   "name": "sv2-api",
-                  "port": 5114,
+                  "port": 5014,
                   "protocol": "TCP"
                }
             ],
@@ -2462,10 +2450,6 @@
                               }
                            },
                            {
-                              "name": "CN_APP_SV_ADMIN_API_PORT",
-                              "value": "5214"
-                           },
-                           {
                               "name": "CN_APP_SV_IS_DEV_NET",
                               "value": "true"
                            },
@@ -2478,12 +2462,8 @@
                               "value": "join-with-key"
                            },
                            {
-                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT",
-                              "value": "5014"
-                           },
-                           {
                               "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS",
-                              "value": "http://sv-app.sv-1"
+                              "value": "http://sv-app.sv-1:5014"
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_PUBLIC_KEY",
@@ -2495,7 +2475,7 @@
                            },
                            {
                               "name": "ADDITIONAL_CONFIG_SV_ONBOARDING",
-                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\":\"${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI\"\n}\n"
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -2504,7 +2484,7 @@
                         "name": "sv-app",
                         "ports": [
                            {
-                              "containerPort": 5214,
+                              "containerPort": 5014,
                               "name": "sv3-api"
                            }
                         ],
@@ -2541,7 +2521,7 @@
             "ports": [
                {
                   "name": "sv3-api",
-                  "port": 5214,
+                  "port": 5014,
                   "protocol": "TCP"
                }
             ],
@@ -3332,10 +3312,6 @@
                               }
                            },
                            {
-                              "name": "CN_APP_SV_ADMIN_API_PORT",
-                              "value": "5314"
-                           },
-                           {
                               "name": "CN_APP_SV_IS_DEV_NET",
                               "value": "true"
                            },
@@ -3348,12 +3324,8 @@
                               "value": "join-with-key"
                            },
                            {
-                              "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT",
-                              "value": "5014"
-                           },
-                           {
                               "name": "CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS",
-                              "value": "http://sv-app.sv-1"
+                              "value": "http://sv-app.sv-1:5014"
                            },
                            {
                               "name": "CN_APP_SV_ONBOARDING_PUBLIC_KEY",
@@ -3365,7 +3337,7 @@
                            },
                            {
                               "name": "ADDITIONAL_CONFIG_SV_ONBOARDING",
-                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\":\"${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_PORT}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ\"\n}\n"
+                              "value": "_onboarding {\n  type = \"join-with-key\"\n  sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}\n  public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}\n  private-key = \"MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ\"\n}\n"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/sv-app:tag",
@@ -3374,7 +3346,7 @@
                         "name": "sv-app",
                         "ports": [
                            {
-                              "containerPort": 5314,
+                              "containerPort": 5014,
                               "name": "sv4-api"
                            }
                         ],
@@ -3411,7 +3383,7 @@
             "ports": [
                {
                   "name": "sv4-api",
-                  "port": 5314,
+                  "port": 5014,
                   "protocol": "TCP"
                }
             ],
@@ -6275,22 +6247,6 @@
                               "name": "grpc-svc-adm"
                            },
                            {
-                              "containerPort": 5014,
-                              "name": "sv1-api"
-                           },
-                           {
-                              "containerPort": 5114,
-                              "name": "sv2-api"
-                           },
-                           {
-                              "containerPort": 5214,
-                              "name": "sv3-api"
-                           },
-                           {
-                              "containerPort": 5314,
-                              "name": "sv4-api"
-                           },
-                           {
                               "containerPort": 5012,
                               "name": "scan-api"
                            },
@@ -6446,26 +6402,6 @@
                {
                   "name": "grpc-svc-adm",
                   "port": 5005,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv1-api",
-                  "port": 5014,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv2-api",
-                  "port": 5114,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv3-api",
-                  "port": 5214,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "sv4-api",
-                  "port": 5314,
                   "protocol": "TCP"
                },
                {

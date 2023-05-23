@@ -26,8 +26,6 @@ spec:
             - name: JAVA_TOOL_OPTIONS
               value: {{ .Values.defaultJvmOptions }}
             {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "sv" "fixedTokens" .Values.cluster.fixedTokens) | indent 12}}
-            - name: CN_APP_SV_ADMIN_API_PORT
-              value: "5014"
             - name: CN_APP_SV_IS_DEV_NET
               value: "true"
             - name: CN_APP_SV_PARTICIPANT_ADDRESS
@@ -57,7 +55,7 @@ spec:
                 }
                 _onboarding {
                   type = "join-with-key"
-                  sv-client.admin-api.url = "{{ .sponsorApiUrl }}"":""{{ .sponsorApiPort }}"
+                  sv-client.admin-api.url = "{{ .sponsorApiUrl }}"
                   public-key = "{{ .publicKey }}"
                   private-key = "{{ .privateKey }}"
                 }

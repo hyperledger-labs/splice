@@ -44,10 +44,6 @@ spec:
         - name: ADDITIONAL_CONFIG_OTHER
           value: {{- .Values.additionalConfig | toYaml | indent 12 }}
         {{ end }}
-        {{ if .Values.svSponsorPort -}}
-        - name: CN_APP_VALIDATOR_SV_SPONSOR_PORT
-          value: {{ .Values.svSponsorPort | quote }}
-        {{ end }}
         {{ if .Values.svSponsorAddress -}}
         - name: CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS
           value: {{ .Values.svSponsorAddress | quote }}
