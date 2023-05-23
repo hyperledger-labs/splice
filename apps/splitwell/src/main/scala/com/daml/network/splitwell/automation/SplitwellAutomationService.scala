@@ -35,7 +35,7 @@ class SplitwellAutomationService(
 ) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
-      Map(store.providerParty -> store),
+      store,
       ledgerClient,
       retryProvider,
     ) {

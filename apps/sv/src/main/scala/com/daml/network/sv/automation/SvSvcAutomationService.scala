@@ -28,7 +28,7 @@ class SvSvcAutomationService(
 ) extends CNNodeAppAutomationService(
       config.automation,
       clock,
-      Map(svcStore.key.svcParty -> svcStore),
+      svcStore,
       ledgerClient,
       retryProvider,
     ) {

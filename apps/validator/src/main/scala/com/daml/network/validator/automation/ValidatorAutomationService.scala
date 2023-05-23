@@ -34,7 +34,7 @@ class ValidatorAutomationService(
 ) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
-      Map(store.key.validatorParty -> store),
+      store,
       ledgerClient,
       retryProvider,
     ) {

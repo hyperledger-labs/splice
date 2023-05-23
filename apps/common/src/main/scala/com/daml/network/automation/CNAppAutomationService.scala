@@ -6,15 +6,18 @@ import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.store.CNNodeAppStore
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.{Clock, WallClock}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.DomainId
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
 
+/** A class that wires up a single store with an ingestion service, and provides a suitable
+  * context for registering triggers against that store.
+  */
 abstract class CNNodeAppAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
-    stores: Map[PartyId, CNNodeAppStore[?, ?]],
+    store: CNNodeAppStore[?, ?],
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
     enableOffsetIngestionService: Boolean = true,
@@ -44,40 +47,40 @@ abstract class CNNodeAppAutomationService(
       perDomainTriggerContext.timeouts,
     )
 
-  stores.values.foreach(store => {
-    registerTrigger(
-      new DomainIngestionService(
-        store.domains.ingestionSink,
-        connection,
-        triggerContext,
-      )
-    )
-    // We allow disabling this because the offsets are shared across users and the polling can get pretty expensive
-    // so we want to make a reasonable effort at avoiding unnecessary polling.
-    if (enableOffsetIngestionService) {
-      registerTrigger(
-        new OffsetIngestionService(
-          store.offset.ingestionSink,
-          connection,
-          // We want to always poll periodically and quickly even in simtime mode so we overwrite
-          // the polling interval and the clock.
-          triggerContext.copy(
-            config = triggerContext.config.copy(
-              pollingInterval = NonNegativeFiniteDuration.ofMillis(100)
-            ),
-            clock = new WallClock(
-              triggerContext.timeouts,
-              triggerContext.loggerFactory,
-            ),
-          ),
-        )
-      )
-    }
-    val domainAcsOrchestrator = DomainOrchestrator(
+  registerTrigger(
+    new DomainIngestionService(
+      store.domains.ingestionSink,
+      connection,
       triggerContext,
-      store.domains,
-      (da, triggerContext) => newUpdateIngestionService(store, da.domainId, triggerContext),
     )
-    registerTrigger(domainAcsOrchestrator)
-  })
+  )
+
+  // We allow disabling this because the offsets are shared across users and the polling can get pretty expensive
+  // so we want to make a reasonable effort at avoiding unnecessary polling.
+  if (enableOffsetIngestionService) {
+    registerTrigger(
+      new OffsetIngestionService(
+        store.offset.ingestionSink,
+        connection,
+        // We want to always poll periodically and quickly even in simtime mode so we overwrite
+        // the polling interval and the clock.
+        triggerContext.copy(
+          config = triggerContext.config.copy(
+            pollingInterval = NonNegativeFiniteDuration.ofMillis(100)
+          ),
+          clock = new WallClock(
+            triggerContext.timeouts,
+            triggerContext.loggerFactory,
+          ),
+        ),
+      )
+    )
+  }
+  val domainAcsOrchestrator = DomainOrchestrator(
+    triggerContext,
+    store.domains,
+    (da, triggerContext) => newUpdateIngestionService(store, da.domainId, triggerContext),
+  )
+  registerTrigger(domainAcsOrchestrator)
+
 }

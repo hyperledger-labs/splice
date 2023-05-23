@@ -36,7 +36,7 @@ class UserWalletAutomationService(
 ) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
-      Map(store.key.endUserParty -> store),
+      store,
       ledgerClient,
       retryProvider,
       enableOffsetIngestionService = false,

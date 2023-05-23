@@ -27,7 +27,7 @@ class SvSvAutomationService(
 ) extends CNNodeAppAutomationService(
       config.automation,
       clock,
-      Map(svStore.key.svParty -> svStore),
+      svStore,
       ledgerClient,
       retryProvider,
     ) {}

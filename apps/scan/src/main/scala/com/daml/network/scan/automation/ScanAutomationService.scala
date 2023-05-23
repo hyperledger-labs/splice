@@ -28,7 +28,7 @@ class ScanAutomationService(
 ) extends CNNodeAppAutomationService(
       automationConfig,
       clock,
-      Map(store.svcParty -> store),
+      store,
       ledgerClient,
       retryProvider,
     ) {}
