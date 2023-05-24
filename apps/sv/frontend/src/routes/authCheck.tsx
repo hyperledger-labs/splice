@@ -1,7 +1,7 @@
 import * as React from 'react';
-import { Login, useInterval, useUserState } from 'common-frontend';
+import { Loading, Login, useUserState } from 'common-frontend';
 import { AuthConfig, TestAuthConfig } from 'common-frontend/lib/config/schema';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
@@ -12,37 +12,49 @@ interface AuthCheckProps {
 }
 
 const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => {
-  const { isAuthenticated, userId, userAccessToken, primaryPartyId, updateStatus } = useUserState();
-  const updateStatusWhenAuthenticated = useCallback(() => {
-    if (isAuthenticated) {
-      updateStatus({ userOnboarded: true, userWalletInstalled: false, partyId: primaryPartyId! });
-    }
-  }, [isAuthenticated, primaryPartyId, updateStatus]);
-
-  useInterval(updateStatusWhenAuthenticated);
-
+  const { userAccessToken, isAuthenticated } = useUserState();
   const svClient = useSvAdminClient();
-  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
+  type AuthorizationState = 'isLoading' | 'ok' | 'unauthorized' | 'failed' | 'unset';
+  const [isAuthorized, setIsAuthorized] = useState<AuthorizationState>('unset');
 
   useEffect(() => {
     svClient
       .isAuthorized()
-      .then(r => setIsAuthorized(true))
+      .then(r => setIsAuthorized('ok'))
       .catch(error => {
-        setIsAuthorized(false);
+        if (error.code === 403) {
+          setIsAuthorized('unauthorized');
+        } else {
+          setIsAuthorized('failed');
+        }
       });
-  }, [svClient, userAccessToken, isAuthenticated]);
+  }, [svClient, userAccessToken]);
 
-  if (!isAuthorized) {
-    console.debug('undefined isAuthorized');
+  useEffect(() => {
+    if (isAuthenticated && isAuthorized === 'unset') setIsAuthorized('isLoading');
+  }, [isAuthenticated, isAuthorized]);
+
+  if (isAuthorized !== 'ok') {
+    console.info(isAuthorized);
   }
 
-  if (isAuthenticated && isAuthorized) {
+  if (isAuthorized === 'ok') {
     return <Outlet />;
+  } else if (isAuthorized === 'isLoading') {
+    return <Loading />;
+  } else if (isAuthorized === 'unauthorized') {
+    return (
+      <Login
+        loginFailed={isAuthorized === 'unauthorized'}
+        failureMessage={'User unauthorized to act as the SV Party.'}
+        title="Super Validator Operations"
+        authConfig={authConfig}
+        testAuthConfig={testAuthConfig}
+      />
+    );
   } else {
     return (
       <Login
-        loginFailed={!isAuthorized && userId !== undefined}
         title="Super Validator Operations"
         authConfig={authConfig}
         testAuthConfig={testAuthConfig}

@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import React from 'react';
 
 interface IProps {
+  message?: string;
   children?: ReactNode;
 }
 
@@ -18,7 +19,7 @@ class LoginFailed extends React.Component<IProps> {
           }}
         >
           <div>
-            <span id="loginFailed">User unauthorized to act as the SV Party.</span>
+            <span id="loginFailed">{this.props.message}</span>
           </div>
         </div>
         {this.props.children}

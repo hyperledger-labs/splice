@@ -16,9 +16,16 @@ interface LoginProps {
   authConfig: AuthConfig;
   testAuthConfig?: TestAuthConfig;
   loginFailed?: boolean;
+  failureMessage?: string;
 }
 
-const Login: React.FC<LoginProps> = ({ title, authConfig, testAuthConfig, loginFailed }) => {
+const Login: React.FC<LoginProps> = ({
+  title,
+  authConfig,
+  testAuthConfig,
+  loginFailed,
+  failureMessage,
+}) => {
   // We have some integration tests that do Auth0 login tests and others that do self-signed token login tests,
   // but because we start the UIs outside sbt they have one static config.
   // So for tests the UI must support both algorithms at the same time;
@@ -46,7 +53,7 @@ const Login: React.FC<LoginProps> = ({ title, authConfig, testAuthConfig, loginF
 
   return (
     <Container maxWidth="xs">
-      {loginFailed && <LoginFailed />}
+      {loginFailed && <LoginFailed message={failureMessage} />}
       <Stack alignItems="center" paddingTop={16} spacing={4}>
         <Typography
           variant="h5"
