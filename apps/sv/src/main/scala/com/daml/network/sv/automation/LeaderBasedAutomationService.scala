@@ -36,6 +36,7 @@ class LeaderBasedAutomationService(
   registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
   registerTrigger(new SvcRewardTrigger(triggerContext, svTaskContext))
+  registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svTaskContext))
   registerTrigger(new GarbageCollectCoinPriceVotesTrigger(triggerContext, svTaskContext))
 }
