@@ -902,7 +902,9 @@ commands:
                               --keep NO_PROXY"
           # Retrying as network stuff can be flaky
           cmd_retry_count: 5
-          cmd: docker pull ${COMETBFT_DOCKER_IMAGE}
+          cmd: |
+            docker pull ${COMETBFT_DOCKER_IMAGE}
+            docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
 
 jobs:
 
