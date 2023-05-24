@@ -900,6 +900,8 @@ commands:
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
                               --keep NO_PROXY"
+          # Retrying as network stuff can be flaky
+          cmd_retry_count: 5
           cmd: docker pull ${COMETBFT_DOCKER_IMAGE}
 
 jobs:
