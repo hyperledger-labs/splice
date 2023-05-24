@@ -260,7 +260,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Reap << parameters.cluster >> if lock older than 12 hours
@@ -426,7 +426,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "none"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet", "none"]
         default: "none"
       additional_nix_args:
         type: string
@@ -696,7 +696,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
@@ -732,7 +732,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - run:
           name: Checkout cluster version
@@ -795,7 +795,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - run_bash_command_in_nix:
           when: always
@@ -839,7 +839,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
       channel_notify:
         # This parameter allows selecting different notification channels, which can be handy when a subteam
         # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
@@ -1051,7 +1051,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - checkout
       - setup_nix
@@ -1083,7 +1083,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
     steps:
       - checkout
       - setup_nix
@@ -1107,7 +1107,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
       channel_notify:
         type: string
         # #team-canton-network-internal
@@ -1209,8 +1209,6 @@ jobs:
           cluster: "scratchnetb"
       - cluster_lock_reaper:
           cluster: "scratchnetc"
-      - cluster_lock_reaper:
-          cluster: "scratchnetd"
 
   update_pipeline_schedule:
     docker:
@@ -1366,7 +1364,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "devnet", "testnet", "scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
+        enum: ["staging", "devnet", "testnet", "scratchneta", "scratchnetb", "scratchnetc"]
     docker:
       - image: cimg/base:2021.04
     environment:
@@ -1634,51 +1632,6 @@ workflows:
             - docker_images_push
             - deploy_cluster
 
-  deploy_scratchnet_D:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: scratchnetd
-          requires:
-            - hold
-            - deployment_test
-            - docker_images_push
-      - preflight_check:
-          <<: *main-branch-never
-          cluster: scratchnetd
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - hold
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
-
   deploy_staging:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
@@ -1828,12 +1781,6 @@ workflows:
           - slack-context
     - refresh_tokens:
         cluster: "scratchnetc"
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - slack-context
-    - refresh_tokens:
-        cluster: "scratchnetd"
         <<: *main-branch-only
         context:
           - artifactory
