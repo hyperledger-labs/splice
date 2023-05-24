@@ -20,9 +20,14 @@ Release Notes
   * Kubernetes `liveness <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-grpc-liveness-probe>`_ and `readiness <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes>`_ probes are configured to probe the `GRPC Health Checking Protocol <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_ of the participant node.
 
 * Add new ``initial-coin-price-vote`` config option to SV app
+
   * for configuring an SV node to vote for a given coin price during initialization, if no coin price has been voted for by this SV node yet
   * useful for persisting coin price vote preferences across cluster (re-)deployments
 
+* Bugfixes
+
+  * DA's internal automated tests are now resilient to coin price changes allowing us to change coin price votes on DA’s SVs so votes from other SVs have an observable effect.
+    
 2023-05-21
 ----------
 
