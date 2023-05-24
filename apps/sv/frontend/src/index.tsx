@@ -18,6 +18,7 @@ import CoinPrice from './routes/coinPrice';
 import Root from './routes/root';
 import Svc from './routes/svc';
 import ValidatorOnboarding from './routes/validatorOnboarding';
+import Voting from './routes/voting';
 import { config } from './utils';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
@@ -54,6 +55,7 @@ const router = createBrowserRouter(
         <Route path="svc" element={<Svc />} />
         <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
         <Route path="cc-price" element={<CoinPrice />} />
+        <Route path="votes" element={<Voting />} />
       </Route>
     </Route>
   )

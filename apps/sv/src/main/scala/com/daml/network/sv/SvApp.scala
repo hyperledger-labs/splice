@@ -1,6 +1,5 @@
 package com.daml.network.sv
 
-import java.security.interfaces.ECPrivateKey
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
@@ -12,6 +11,13 @@ import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AuthConfig, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.codegen.java.cn.svcrules.{
+  Reason,
+  SvcRules_RemoveMember,
+  SvcRules_RequestVote,
+}
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
@@ -60,6 +66,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -1057,6 +1064,63 @@ object SvApp {
           )
         )
     }
+  }
+
+  private def parseVoteRequestAction(value: String): Either[String, ARC_SvcRules] = {
+    val jsonDic = ujson.read(value)
+    jsonDic("action").str match {
+      case "SRARC_RemoveMember" =>
+        Right(
+          new ARC_SvcRules(new SRARC_RemoveMember(new SvcRules_RemoveMember(jsonDic("member").str)))
+        )
+      case _ => Left("Action not defined")
+    }
+  }
+
+  def createVoteRequest(
+      requester: String,
+      action: String,
+      url: String,
+      description: String,
+      svcStore: SvSvcStore,
+      ledgerConnection: CNLedgerConnection,
+      globalDomain: DomainId,
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
+    parseVoteRequestAction(action) match {
+      case Left(_) =>
+        Future.successful(
+          Left(
+            s"The action could not be created."
+          )
+        )
+      case Right(action) =>
+        svcStore.lookupVoteRequestByThisSvAndAction(action).flatMap {
+          case QueryResult(_, Some(vote)) =>
+            Future.successful(
+              Left(s"This vote request has already been created ${vote.contractId}.")
+            )
+          case result @ QueryResult(_, None) =>
+            for {
+              svcRules <- svcStore.getSvcRules()
+              reason = new Reason(url, description)
+              request = new SvcRules_RequestVote(requester, action, reason)
+              cmd = svcRules.contractId.exerciseSvcRules_RequestVote(request)
+              _ <- ledgerConnection.submitCommands(
+                actAs = Seq(svcStore.key.svParty),
+                readAs = Seq(svcStore.key.svcParty),
+                commands = cmd.commands().asScala.toSeq,
+                commandId = CNLedgerConnection.CommandId(
+                  "com.daml.network.sv.requestVote",
+                  Seq(svcStore.key.svcParty, svcStore.key.svParty),
+                  action.toString,
+                ),
+                deduplicationOffset = result.deduplicationOffset,
+                domainId = globalDomain,
+              )
+            } yield Right(())
+        }
+    }
+
   }
 
   private[sv] def approveSvIdentity(

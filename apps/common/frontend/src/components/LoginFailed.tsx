@@ -18,7 +18,7 @@ class LoginFailed extends React.Component<IProps> {
           }}
         >
           <div>
-            <span id="loginFailed">User failed to login!</span>
+            <span id="loginFailed">User unauthorized to act as the SV Party.</span>
           </div>
         </div>
         {this.props.children}

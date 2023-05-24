@@ -15,6 +15,8 @@ import {
   ResponseContext,
   ServerConfiguration,
   UpdateCoinPriceVoteRequest,
+  CreateVoteRequest,
+  ListSvcRulesVoteRequestsResponse,
 } from 'sv-openapi';
 
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);
@@ -25,6 +27,13 @@ export interface SvAdminProps {
 
 export interface SvAdminClient {
   isAuthorized: () => Promise<void>;
+  createVoteRequest: (
+    requester: string,
+    action: string,
+    url: string,
+    description: string
+  ) => Promise<void>;
+  listSvcRulesVoteRequests: () => Promise<ListSvcRulesVoteRequestsResponse>;
   prepareValidatorOnboarding: (expiresIn: number) => Promise<PrepareValidatorOnboardingResponse>;
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
   listValidatorLicenses: () => Promise<ListValidatorLicensesResponse>;
@@ -53,6 +62,13 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
     return {
       isAuthorized: async (): Promise<void> => {
         return await svAdminClient.isAuthorized();
+      },
+      createVoteRequest: async (requester, action, url, description): Promise<void> => {
+        const request: CreateVoteRequest = { requester, action, url, description };
+        return await svAdminClient.createVoteRequest(request);
+      },
+      listSvcRulesVoteRequests: async (): Promise<ListSvcRulesVoteRequestsResponse> => {
+        return await svAdminClient.listSvcRulesVoteRequests();
       },
       prepareValidatorOnboarding: async (
         expiresIn: number

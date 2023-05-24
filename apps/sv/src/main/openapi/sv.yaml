@@ -106,6 +106,46 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+  /admin/sv/voterequests:
+    get:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "listSvcRulesVoteRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListSvcRulesVoteRequestsResponse"
+  /admin/sv/votes:
+    get:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "listSvcRulesVotes"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListSvcRulesVotesResponse"
+  /admin/sv/voterequest/create:
+    post:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "createVoteRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateVoteRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
   /admin/sv/coin-price/votes:
     get:
       tags: [sv]
@@ -120,7 +160,7 @@ paths:
                 "$ref": "#/components/schemas/ListCoinPriceVotesResponse"
   /admin/sv/open-mining-rounds:
     get:
-      tags: [ sv ]
+      tags: [sv]
       x-jvm-package: svAdmin
       operationId: "ListOpenMiningRounds"
       responses:
@@ -378,6 +418,44 @@ components:
           type: string
         candidateKey:
           type: string
+
+    CreateVoteRequest:
+      type: object
+      required:
+        - requester
+        - action
+        - url
+        - description
+      properties:
+        requester:
+          type: string
+        action:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+
+    ListSvcRulesVotesResponse:
+      type: object
+      required:
+        - svc_rules_votes
+      properties:
+        svc_rules_votes:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    ListSvcRulesVoteRequestsResponse:
+      type: object
+      required:
+        - svc_rules_vote_requests
+      properties:
+        svc_rules_vote_requests:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
 
     ListCoinPriceVotesResponse:
       type: object

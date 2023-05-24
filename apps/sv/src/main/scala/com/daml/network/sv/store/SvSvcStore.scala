@@ -528,6 +528,35 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.listContractsOnDomain(cn.svc.coinprice.CoinPriceVote.COMPANION, _)
     )
 
+  def listVoteRequests()(implicit tc: TraceContext): Future[
+    Seq[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.listContractsOnDomain(cn.svcrules.VoteRequest.COMPANION, _)
+    )
+
+  def listVotes()(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.listContractsOnDomain(cn.svcrules.Vote.COMPANION, _)
+    )
+
+  def lookupVoteRequestByThisSvAndAction(action: ActionRequiringConfirmation)(implicit
+      tc: TraceContext
+  ): Future[
+    QueryResult[Option[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(cn.svcrules.VoteRequest.COMPANION)(
+        _,
+        co =>
+          co.payload.requester == key.svParty.toProtoPrimitive && co.payload.action.toValue == action.toValue,
+      )
+    )
+
   def lookupCoinPriceVoteByThisSv()(implicit
       tc: TraceContext
   ): Future[Option[Contract[cp.CoinPriceVote.ContractId, cp.CoinPriceVote]]] =
@@ -645,6 +674,8 @@ object SvSvcStore {
         mkFilter(cn.svc.coinprice.CoinPriceVote.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.Confirmation.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.ElectionRequest.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.svcrules.VoteRequest.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.svcrules.Vote.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvReward.COMPANION)(co =>
           co.payload.svc == svc && co.payload.sv == sv

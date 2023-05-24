@@ -6,6 +6,8 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.{FrontendLoginUtil, SvTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
+import org.openqa.selenium.By
+import org.openqa.selenium.support.ui.Select
 
 class SvFrontendIntegrationTest
     extends FrontendIntegrationTest("sv1")
@@ -43,7 +45,10 @@ class SvFrontendIntegrationTest
               },
             )(
               "login fails",
-              _ => find(id("loginFailed")).value.text should matchText("User failed to login!"),
+              _ =>
+                find(id("loginFailed")).value.text should matchText(
+                  "User unauthorized to act as the SV Party."
+                ),
             )
           },
           _.warningMessage should include(
@@ -267,6 +272,32 @@ class SvFrontendIntegrationTest
             svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "15.55 USD")
             svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "5 USD")
             svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "9 USD")
+          },
+        )
+      }
+    }
+
+    "can create a valid vote request and see it in the list" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "sv1 operator can login and browse to the governance tab", {
+            go to s"http://localhost:$port/votes"
+            loginOnCurrentPage(port, sv1.config.ledgerApiUser)
+          },
+        )(
+          "We can see the vote request below",
+          _ => {
+
+            val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+            dropDownAction.selectByIndex(0)
+
+            val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+            dropDownMember.selectByIndex(2)
+
+            click on "create-voterequest-submit-button"
+
+            val rows = findAll(className("vote-request-row")).toSeq
+            rows should have size 1
           },
         )
       }

@@ -7,6 +7,7 @@ import com.daml.network.http.v0.definitions.{
   CometBftNodeDumpResponse,
   CometBftNodeStatusResponse,
   CometBftStatusOrError,
+  CreateVoteRequest,
   ErrorResponse,
 }
 import com.daml.network.http.v0.svAdmin.SvAdminResource
@@ -181,6 +182,52 @@ class HttpSvAdminHandler(
       Future.successful(v0.SvAdminResource.IsAuthorizedResponseOK)
     }
 
+  def createVoteRequest(respond: SvAdminResource.CreateVoteRequestResponse.type)(
+      body: CreateVoteRequest
+  )(user: String): Future[SvAdminResource.CreateVoteRequestResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      SvApp
+        .createVoteRequest(
+          body.requester,
+          body.action,
+          body.url,
+          body.description,
+          svcStore,
+          ledgerConnection,
+          globalDomain,
+        )
+        .flatMap {
+          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
+          case Right(()) => Future.successful(v0.SvAdminResource.CreateVoteRequestResponseOK)
+        }
+    }
+
+  def listSvcRulesVoteRequests(
+      respond: SvAdminResource.ListSvcRulesVoteRequestsResponse.type
+  )()(adminUser: String): Future[v0.SvAdminResource.ListSvcRulesVoteRequestsResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        svcRulesVoteRequests <- svcStore.listVoteRequests()
+      } yield {
+        definitions.ListSvcRulesVoteRequestsResponse(
+          svcRulesVoteRequests.map(_.toJson).toVector
+        )
+      }
+    }
+
+  def listSvcRulesVotes(
+      respond: SvAdminResource.ListSvcRulesVotesResponse.type
+  )()(adminUser: String): Future[v0.SvAdminResource.ListSvcRulesVotesResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        svcRulesVotes <- svcStore.listVotes()
+      } yield {
+        definitions.ListSvcRulesVotesResponse(
+          svcRulesVotes.map(_.toJson).toVector
+        )
+      }
+    }
+
   override def getCometBftNodeStatus(
       respond: SvAdminResource.GetCometBftNodeStatusResponse.type
   )()(extracted: String): Future[
@@ -237,4 +284,5 @@ class HttpSvAdminHandler(
       notFound(ErrorResponse("CometBFT is not configured."))
         .pure[Future]
     } { call }
+
 }

@@ -1,5 +1,4 @@
-import { Loading, PartyId, SvClientProvider } from 'common-frontend';
-import DateDisplay from 'common-frontend/lib/components/DateDisplay';
+import { DateDisplay, Loading, PartyId, SvClientProvider } from 'common-frontend';
 import React from 'react';
 
 import { Chip, Stack, Table, TableContainer, TableHead, Typography } from '@mui/material';
@@ -43,13 +42,13 @@ const ValidatorLicenses: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {validatorLicenses.map(lincense => {
+            {validatorLicenses.map(license => {
               return (
                 <LicenseRow
-                  key={`${lincense.payload.validator}-${lincense.payload.sponsor}`}
-                  validator={lincense.payload.validator}
-                  sponsor={lincense.payload.sponsor}
-                  createdAt={new Date(parseInt(lincense.metadata.createdAt) / 1000)}
+                  key={`${license.payload.validator}-${license.payload.sponsor}`}
+                  validator={license.payload.validator}
+                  sponsor={license.payload.sponsor}
+                  createdAt={new Date(parseInt(license.metadata.createdAt) / 1000)}
                   sv={svcInfosQuery.data!.svPartyId}
                 />
               );

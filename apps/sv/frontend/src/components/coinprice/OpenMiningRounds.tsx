@@ -1,6 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, Loading, SvClientProvider } from 'common-frontend';
-import DateDisplay from 'common-frontend/lib/components/DateDisplay';
+import { AmountDisplay, DateDisplay, Loading, SvClientProvider } from 'common-frontend';
 import React from 'react';
 
 import {
