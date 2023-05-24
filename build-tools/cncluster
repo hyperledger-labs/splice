@@ -52,8 +52,6 @@ function _production_gate() {
     if [ -n "${GCP_CLUSTER_PROD_LIKE-}" ] && [ -z "${CI-}" ]; then
         _error "Please deploy to this cluster only via CircleCI (https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#manually-deploying-via-ci)"
     fi
-
-    _error "gate done"
 }
 
 function _cluster_ip() {
