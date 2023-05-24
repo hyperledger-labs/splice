@@ -644,18 +644,13 @@ function _cluster_reset() {
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
     _uses_pulumi_stack canton-network-gateway
-    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
-        --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
-        refresh -y
-    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
-        --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
-        down -y
+    subcmd_pulumi canton-network-gateway refresh --yes
+    subcmd_pulumi canton-network-gateway down --yes
 
     _info "Uninstalling Pulumi canton-network stack"
     _uses_pulumi_stack canton-network
-    _pulumi --stack "canton-network.${GCP_CLUSTER_BASENAME}" \
-        --cwd "${REPO_ROOT}/cluster/pulumi/canton-network" \
-        down --yes
+    subcmd_pulumi canton-network refresh --yes
+    subcmd_pulumi canton-network down --yes
 
     _info "Cluster in reset/idle state."
 }
