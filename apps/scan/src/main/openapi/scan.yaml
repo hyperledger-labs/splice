@@ -210,6 +210,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetTopProvidersByAppRewardsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /api/v0/top-validators-by-validator-rewards:
@@ -237,6 +239,31 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetTopValidatorsByValidatorRewardsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+  /api/v0/top-validators-by-purchased-traffic:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByPurchasedTraffic"
+      parameters:
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByPurchasedTrafficResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /api/v0/get-validator-traffic-balance:
@@ -446,3 +473,30 @@ components:
           type: string
         rewards:
           type: string
+    GetTopValidatorsByPurchasedTrafficResponse:
+      type: object
+      required: ["validatorsByPurchasedTraffic"]
+      properties:
+        validatorsByPurchasedTraffic:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidatorPurchasedTraffic"
+    ValidatorPurchasedTraffic:
+      type: object
+      required: ["validator", "numPurchases", "totalTrafficPurchased", "totalCcSpent", "totalUsdSpent", "lastPurchasedAt"]
+      properties:
+        validator:
+          type: string
+        numPurchases:
+          type: integer
+          format: int64
+        totalTrafficPurchased:
+          type: integer
+          format: int64
+        totalCcSpent:
+          type: string
+        totalUsdSpent:
+          type: string
+        lastPurchasedAt:
+          type: string
+          format: date-time

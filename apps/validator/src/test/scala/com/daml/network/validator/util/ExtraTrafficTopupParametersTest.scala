@@ -5,15 +5,38 @@ import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.digitalasset.canton.BaseTestWordSpec
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import org.scalatest.prop.TableFor2
+
+import scala.math.BigDecimal.RoundingMode
 
 class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
+  private lazy val defaultBaseRate = BigDecimal(333)
+  private lazy val defaultBaseRateBurstWindow = NonNegativeFiniteDuration.ofMinutes(10)
+  private lazy val defaultMinTopupAmount = 1_000_000L
+  private lazy val defaultTargetRate = BigDecimal(20_000)
+  private lazy val defaultMinTopupInterval = NonNegativeFiniteDuration.ofMinutes(10)
+  private lazy val defaultTriggerPollingInterval = NonNegativeFiniteDuration.ofMinutes(2)
+
+  // check that the rounding of values works correctly with different orders of magnitude
+  // of the trigger polling interval from milliseconds to minutes.
+  private lazy val intervals: TableFor2[NonNegativeFiniteDuration, NonNegativeFiniteDuration] =
+    Table(
+      ("triggerPollingInterval", "minTopupInterval"),
+      (NonNegativeFiniteDuration.ofMillis(200), NonNegativeFiniteDuration.ofMillis(500)),
+      (NonNegativeFiniteDuration.ofMillis(200), NonNegativeFiniteDuration.ofSeconds(5)),
+      (NonNegativeFiniteDuration.ofMillis(200), NonNegativeFiniteDuration.ofMinutes(5)),
+      (NonNegativeFiniteDuration.ofSeconds(2), NonNegativeFiniteDuration.ofSeconds(5)),
+      (NonNegativeFiniteDuration.ofSeconds(2), NonNegativeFiniteDuration.ofMinutes(5)),
+      (NonNegativeFiniteDuration.ofMinutes(2), NonNegativeFiniteDuration.ofMinutes(5)),
+    )
+
   private def mkExtraTrafficTopupParameters(
-      baseRate: BigDecimal = BigDecimal(333),
-      baseRateBurstWindow: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-      minTopupAmount: Long = 1_000_000,
-      targetRate: BigDecimal = BigDecimal(20_000),
-      minTopupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-      triggerPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(2),
+      minTopupInterval: NonNegativeFiniteDuration = defaultMinTopupInterval,
+      triggerPollingInterval: NonNegativeFiniteDuration = defaultTriggerPollingInterval,
+      baseRate: BigDecimal = defaultBaseRate,
+      baseRateBurstWindow: NonNegativeFiniteDuration = defaultBaseRateBurstWindow,
+      minTopupAmount: Long = defaultMinTopupAmount,
+      targetRate: BigDecimal = defaultTargetRate,
   ) = {
     ExtraTrafficTopupParameters(
       domainFeesConfig(baseRate, baseRateBurstWindow, minTopupAmount),
@@ -22,20 +45,35 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
     )
   }
 
-  "Extra traffic top-up parameters" when {
+  private def checkTopupParameters(
+      topupParameters: ExtraTrafficTopupParameters,
+      minTopupInterval: NonNegativeFiniteDuration,
+      triggerPollingInterval: NonNegativeFiniteDuration = defaultTriggerPollingInterval,
+      baseRate: BigDecimal = defaultBaseRate,
+      targetRate: BigDecimal = defaultTargetRate,
+      minTopupAmount: Long = defaultMinTopupAmount,
+  ) = {
+    topupParameters.topupAmount should be >= minTopupAmount
+    topupParameters.topupAmount should be >= ((targetRate - baseRate) / 1e3 * topupParameters.minTopupInterval.duration.toMillis)
+      .setScale(0, RoundingMode.CEILING)
+      .toLong
+    topupParameters.minTopupInterval.duration.toMillis >= triggerPollingInterval.duration.toMillis
+    topupParameters.minTopupInterval.duration.toMillis >= minTopupInterval.duration.toMillis
+  }
 
+  "Extra traffic top-up parameters" when {
     "the min top-up interval is configured to be less than the trigger polling interval" should {
       "behave as if the min top-up interval equals the polling interval" in {
         val topupParams1 = mkExtraTrafficTopupParameters(
-          minTopupInterval = NonNegativeFiniteDuration.ofMinutes(10),
-          triggerPollingInterval = NonNegativeFiniteDuration.ofMinutes(15),
+          minTopupInterval = defaultTriggerPollingInterval * 0.5
         )
         val topupParams2 = mkExtraTrafficTopupParameters(
-          minTopupInterval = NonNegativeFiniteDuration.ofMinutes(15),
-          triggerPollingInterval = NonNegativeFiniteDuration.ofMinutes(15),
+          minTopupInterval = defaultTriggerPollingInterval
         )
-        topupParams1.topupAmount should be > 0L
-        topupParams1.minTopupInterval.duration.toNanos should be > 0L
+        checkTopupParameters(
+          topupParams1,
+          minTopupInterval = defaultTriggerPollingInterval,
+        )
         topupParams1 shouldBe topupParams2
       }
     }
@@ -88,7 +126,15 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
         // minTopupAmount <= (targetRate - baseRate) * topupInterval
         //                   = (10_000 - 1_000) * 8 * 60 = 4.32MB
         topupParams1.topupAmount shouldBe (targetRate - baseRate) * topupIntervalSecs
-        topupParams2.minTopupInterval.duration.toSeconds shouldBe topupIntervalSecs
+        topupParams1.minTopupInterval.duration.toSeconds shouldBe topupIntervalSecs
+        checkTopupParameters(
+          topupParams1,
+          baseRate = baseRate,
+          targetRate = targetRate,
+          minTopupAmount = minTopupAmount,
+          minTopupInterval = NonNegativeFiniteDuration.ofMinutes(8),
+          triggerPollingInterval = triggerPollingInterval,
+        )
         topupParams1 shouldBe topupParams2
       }
     }
@@ -99,6 +145,7 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
         val minTopupAmount = 5_000_000L
         val baseRate = BigDecimal(1_000)
         val targetRate = BigDecimal(10_000)
+        val minTopupInterval = NonNegativeFiniteDuration.ofMinutes(7)
         val triggerPollingInterval = NonNegativeFiniteDuration.ofMinutes(2)
 
         val topupParams = mkExtraTrafficTopupParameters(
@@ -106,7 +153,7 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
           baseRate = baseRate,
           targetRate = targetRate,
           triggerPollingInterval = triggerPollingInterval,
-          minTopupInterval = NonNegativeFiniteDuration.ofMinutes(7),
+          minTopupInterval = minTopupInterval,
         )
         // topupInterval in this case would be derived from the minTopupAmount as
         // minTopupAmount / (targetRate - baseRate) ~= 9.3 mins
@@ -115,6 +162,30 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
         val topupIntervalSecs = NonNegativeFiniteDuration.ofMinutes(10).duration.toSeconds
         topupParams.topupAmount shouldBe (targetRate - baseRate) * topupIntervalSecs
         topupParams.minTopupInterval.duration.toSeconds shouldBe topupIntervalSecs
+        checkTopupParameters(
+          topupParams,
+          baseRate = baseRate,
+          targetRate = targetRate,
+          minTopupAmount = minTopupAmount,
+          minTopupInterval = minTopupInterval,
+          triggerPollingInterval = triggerPollingInterval,
+        )
+      }
+    }
+
+    intervals.forEvery { case (triggerPollingInterval, minTopupInterval) =>
+      s"trigger polling interval is $triggerPollingInterval and min topup interval is $minTopupInterval" should {
+        "round times and amounts correctly" in {
+          val topupParams = mkExtraTrafficTopupParameters(
+            minTopupInterval = minTopupInterval,
+            triggerPollingInterval = triggerPollingInterval,
+          )
+          checkTopupParameters(
+            topupParams,
+            minTopupInterval = minTopupInterval,
+            triggerPollingInterval = triggerPollingInterval,
+          )
+        }
       }
     }
   }

@@ -4,6 +4,8 @@ import com.daml.network.codegen.java.cc.globaldomain.DomainFeesConfig
 import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
+import scala.math.BigDecimal.RoundingMode
+
 /** Parameters used by the top-up automation to buy extra traffic for the validator.
   *
   * These values are computed taking into account both the global domain fees configuration published by the SVC
@@ -45,15 +47,15 @@ object ExtraTrafficTopupParameters {
         // if the minTopupAmount is higher than expectedTopupAmount, adjust the topupInterval to
         // provide target traffic rate.
         // Note that the target rate is greater than the base rate at this point => the denominator is positive.
-        val topupIntervalSecs = (
+        val topupIntervalMillis = (
           BigDecimal(
             globalConfig.minTopupAmount
-          ) / (targetRateBytesPerSecond - baseRateBytesPerSecond)
-        ).toLong
+          ) / (targetRateBytesPerSecond - baseRateBytesPerSecond) * 1e3
+        ).setScale(0, RoundingMode.CEILING).toLong
         roundUpIntervalAndCalculateAmount(
           baseRateBytesPerSecond,
           targetRateBytesPerSecond,
-          NonNegativeFiniteDuration.ofSeconds(topupIntervalSecs),
+          NonNegativeFiniteDuration.ofMillis(topupIntervalMillis),
           topupTriggerPollingInterval,
         )
       }
@@ -72,18 +74,20 @@ object ExtraTrafficTopupParameters {
       topupInterval: NonNegativeFiniteDuration,
       topupTriggerPollingInterval: NonNegativeFiniteDuration,
   ) = {
-    val topupIntervalSecs = topupInterval.duration.toSeconds
-    val pollingIntervalSecs = topupTriggerPollingInterval.duration.toSeconds
+    val topupIntervalMillis = topupInterval.duration.toMillis
+    val pollingIntervalMillis = topupTriggerPollingInterval.duration.toMillis
     // round topupInterval up to the nearest multiple of the pollingInterval to determine when the
     // next top-up is expected to occur.
-    val multiple = (topupIntervalSecs + pollingIntervalSecs - 1) / pollingIntervalSecs
-    val nextTopupAfterSecs = multiple * pollingIntervalSecs
+    val multiple = (topupIntervalMillis + pollingIntervalMillis - 1) / pollingIntervalMillis
+    val nextTopupAfterMillis = multiple * pollingIntervalMillis
     // calculate topupAmount as the amount of traffic needed to deliver target rate till next top-up
     val topupAmountBytes =
-      ((targetRateBytesPerSecond - baseRateBytesPerSecond) * nextTopupAfterSecs).toLong
+      ((targetRateBytesPerSecond - baseRateBytesPerSecond) / 1e3 * nextTopupAfterMillis)
+        .setScale(0, RoundingMode.CEILING)
+        .toLong
     ExtraTrafficTopupParameters(
       topupAmountBytes,
-      NonNegativeFiniteDuration.ofSeconds(nextTopupAfterSecs),
+      NonNegativeFiniteDuration.ofMillis(nextTopupAfterMillis),
     )
   }
 }

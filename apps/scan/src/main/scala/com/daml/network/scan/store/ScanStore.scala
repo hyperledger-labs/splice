@@ -4,6 +4,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore}
@@ -73,6 +74,10 @@ trait ScanStore
   def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]]
+
+  def getTopValidatorsByPurchasedTraffic(limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[ValidatorPurchasedTraffic]]
 
   def lookupValidatorTraffic(validatorParty: PartyId)(implicit tc: TraceContext): Future[
     Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]

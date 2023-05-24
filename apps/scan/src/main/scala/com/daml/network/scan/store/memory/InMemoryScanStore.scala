@@ -3,10 +3,13 @@ package com.daml.network.scan.store.memory
 import cats.implicits.*
 import cats.kernel.Monoid
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.{InMemoryCNNodeAppStore, TxLogStore}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -219,6 +222,54 @@ class InMemoryScanStore(
         case _ => false
       }),
     )
+
+  private def listValidatorTrafficContracts()(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]] = {
+    // TODO(#4913): read from all domains in the global domain
+    defaultAcsDomainIdF.flatMap(defaultDomainId =>
+      multiDomainAcsStore
+        .listContractsOnDomain(
+          ValidatorTraffic.COMPANION,
+          defaultDomainId,
+          _ => true,
+          None,
+        )
+    )
+  }
+
+  override def getTopValidatorsByPurchasedTraffic(limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[ValidatorPurchasedTraffic]] = {
+    listValidatorTrafficContracts().map(
+      _.groupBy(_.payload.validator).toSeq
+        .map { case (validator, trafficSeq) =>
+          trafficSeq.foldLeft(
+            ValidatorPurchasedTraffic(
+              PartyId.tryFromProtoPrimitive(validator),
+              0,
+              0,
+              0,
+              0,
+              Instant.MIN,
+            )
+          )((t1, t2) =>
+            ValidatorPurchasedTraffic(
+              t1.validator,
+              t1.numPurchases + t2.payload.numPurchases,
+              t1.totalTrafficPurchased + t2.payload.totalPurchased,
+              t1.totalCcSpent + t2.payload.ccSpent,
+              t1.totalUsdSpent + t2.payload.usdSpent,
+              if (t2.payload.lastPurchasedAt.isAfter(t1.lastPurchasedAt))
+                t2.payload.lastPurchasedAt
+              else t1.lastPurchasedAt,
+            )
+          )
+        }
+        .sortWith(_.totalTrafficPurchased > _.totalTrafficPurchased)
+        .slice(0, limit)
+    )
+  }
 
   override def getTotalPaidValidatorTraffic(
       validatorParty: PartyId

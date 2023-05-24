@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cc.round.{
 }
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContract
+import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.util.{
@@ -334,6 +335,7 @@ class HttpScanHandler(
       limit: Int,
   ): Future[v0.ScanResource.GetTopProvidersByAppRewardsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
+      // TODO(#4965): Provide an upper bound for limit
       store
         .getTopProvidersByAppRewards(asOfEndOfRound, limit)
         .map(res =>
@@ -358,6 +360,7 @@ class HttpScanHandler(
       limit: Int,
   ): Future[v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
+      // TODO(#4965): Provide an upper bound for limit
       store
         .getTopValidatorsByValidatorRewards(asOfEndOfRound, limit)
         .map(res =>
@@ -374,6 +377,34 @@ class HttpScanHandler(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
         )
     }
+
+  override def getTopValidatorsByPurchasedTraffic(
+      response: ScanResource.GetTopValidatorsByPurchasedTrafficResponse.type
+  )(limit: Int): Future[ScanResource.GetTopValidatorsByPurchasedTrafficResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      // TODO(#4965): Provide an upper bound for limit
+      store
+        .getTopValidatorsByPurchasedTraffic(limit)
+        .map(validatorTraffic =>
+          v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.OK(
+            definitions.GetTopValidatorsByPurchasedTrafficResponse(
+              validatorTraffic
+                .map(t =>
+                  definitions.ValidatorPurchasedTraffic(
+                    Codec.encode(t.validator),
+                    t.numPurchases,
+                    t.totalTrafficPurchased,
+                    Codec.encode(t.totalCcSpent),
+                    Codec.encode(t.totalUsdSpent),
+                    t.lastPurchasedAt.atOffset(ZoneOffset.UTC),
+                  )
+                )
+                .toVector
+            )
+          )
+        )
+    }
+  }
 
   private def getOrCreateTrafficLimiter(
       validatorParty: PartyId
@@ -441,4 +472,5 @@ class HttpScanHandler(
         )
       }
     }
+
 }

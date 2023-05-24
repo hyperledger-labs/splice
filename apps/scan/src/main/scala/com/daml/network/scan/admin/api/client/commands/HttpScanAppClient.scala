@@ -423,6 +423,45 @@ object HttpScanAppClient {
     }
   }
 
+  final case class ValidatorPurchasedTraffic(
+      validator: PartyId,
+      numPurchases: Long,
+      totalTrafficPurchased: Long,
+      totalCcSpent: BigDecimal,
+      totalUsdSpent: BigDecimal,
+      lastPurchasedAt: Instant,
+  )
+
+  case class GetTopValidatorsByPurchasedTraffic(limit: Int)
+      extends BaseCommand[http.GetTopValidatorsByPurchasedTrafficResponse, Seq[
+        ValidatorPurchasedTraffic
+      ]] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetTopValidatorsByPurchasedTrafficResponse] =
+      client.getTopValidatorsByPurchasedTraffic(limit, headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetTopValidatorsByPurchasedTrafficResponse.OK(response) =>
+        response.validatorsByPurchasedTraffic.traverse(decodeValidatorPurchasedTraffic)
+    }
+
+    private def decodeValidatorPurchasedTraffic(traffic: definitions.ValidatorPurchasedTraffic) = {
+      for {
+        vp <- Codec.decode(Codec.Party)(traffic.validator)
+        n = traffic.numPurchases
+        tot = traffic.totalTrafficPurchased
+        cc <- Codec.decode(Codec.BigDecimal)(traffic.totalCcSpent)
+        usd <- Codec.decode(Codec.BigDecimal)(traffic.totalUsdSpent)
+        lpa = traffic.lastPurchasedAt.toInstant
+      } yield ValidatorPurchasedTraffic(vp, n, tot, cc, usd, lpa)
+    }
+  }
+
   final case class ValidatorTrafficBalance(
       remainingBalance: Double,
       totalPurchased: Double,
