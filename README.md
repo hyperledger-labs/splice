@@ -41,6 +41,7 @@
     1. [Testing Auth0 Auth Flows Locally](#testing-auth0-auth-flows-locally)
     1. [Running The Preflight Check](#running-the-preflight-check)
         1. [Configure Auth0 Environment](#configure-auth0-environment)
+        1. [Configure SV Web UI Password](#configure-sv-web-ui-password)
         1. [Setting up `lnav` to Inspect Canton logs](#setting-up-lnav-to-inspect-canton-logs)
         1. [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
     1. [Testing CircleCI Deployment Config Changes](#testing-circleci-deployment-config-changes)
@@ -772,6 +773,12 @@ Copy the Client ID and Client Secret into the following environment variables, r
 For convenience, you can `export` these from your `.envrc.private` which is ignored by git, to always be available for subsequent runs.
 
 Be aware: these tokens allow the requester to perform any administrative action against the Auth0 tenant! Use caution and keep production values secure.
+
+#### Configure SV Web UI Password
+
+For testing that we can interact with the web UIs of our own SVs (sv1-4), the preflight check needs to know about the passwords for logging in to those UIs.
+At the moment all 4 SVs share the same password, which needs to be configured via the `SV_WEB_UI_PASSWORD` environment variable.
+See [here](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#heading=h.h81kh9iplwtp) for the currently used password.
 
 #### Setting up `lnav` to Inspect Canton and CometBFT logs
 
