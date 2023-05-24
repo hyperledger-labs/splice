@@ -8,9 +8,9 @@ package com.digitalasset.canton.research.participant.multidomain;
 import "com/digitalasset/canton/research/participant/multidomain/transfer_command.proto";
 import "google/protobuf/empty.proto";
 
+option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 option java_outer_classname = "TransferSubmissionServiceOuterClass";
 option java_package = "com.digitalasset.canton.research.participant.multidomain";
-option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 
 // Allows clients to attempt advancing the ledger's state by submitting commands.
 // The final states of their submissions are disclosed by the Command Completion Service.
@@ -27,16 +27,12 @@ option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidom
 // Clients that do not receive a successful completion about their submission MUST NOT assume that it was successful.
 // Clients SHOULD subscribe to the CompletionStream before starting to submit commands to prevent race conditions.
 service TransferSubmissionService {
-
   // Submit a single composite command.
-  rpc Submit (SubmitRequest) returns (google.protobuf.Empty);
-
+  rpc Submit(SubmitRequest) returns (google.protobuf.Empty);
 }
 
 message SubmitRequest {
-
   // The transfer command to be submitted.
   // Required
   TransferCommand transfer_command = 1;
-
 }

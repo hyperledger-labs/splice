@@ -9,23 +9,23 @@ package com.digitalasset.canton.research.participant.multidomain;
  * Test service
  */
 service TestService {
-    rpc Ping(PingMessage) returns (PingMessage);
-    rpc Numbers(NumberRequest) returns (stream Num);
-    rpc SlowNumbers(NumberRequest) returns (stream Num);
-    rpc FailingNumbers(NumberRequest) returns (stream Num);
+  rpc Ping(PingMessage) returns (PingMessage);
+  rpc Numbers(NumberRequest) returns (stream Num);
+  rpc SlowNumbers(NumberRequest) returns (stream Num);
+  rpc FailingNumbers(NumberRequest) returns (stream Num);
 }
 
 message PingMessage {
-    // token to be echoed back in response
-    string token = 1;
-    // to be increased by one
-    uint64 seq_num = 2;
+  // token to be echoed back in response
+  string token = 1;
+  // to be increased by one
+  uint64 seq_num = 2;
 }
 
 message NumberRequest {
-    int64 from = 1;
+  int64 from = 1;
 }
 
 message Num {
-    int64 num = 1;
+  int64 num = 1;
 }

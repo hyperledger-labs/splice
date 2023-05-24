@@ -9,9 +9,9 @@ import "com/daml/ledger/api/v1/completion.proto";
 import "com/daml/ledger/api/v1/ledger_offset.proto";
 import "google/protobuf/timestamp.proto";
 
+option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 option java_outer_classname = "CommandCompletionServiceOuterClass";
 option java_package = "com.digitalasset.canton.research.participant.multidomain";
-option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 
 // Allows clients to observe the status of their submissions.
 // Commands may be submitted via the Command Submission Service.
@@ -28,7 +28,6 @@ option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidom
 // Clients that do not receive a successful completion about their submission MUST NOT assume that it was successful.
 // Clients SHOULD subscribe to the CompletionStream before starting to submit commands to prevent race conditions.
 service CommandCompletionService {
-
   // Subscribe to command completion events.
   // Errors:
   // - ``UNAUTHENTICATED``: if the request does not include a valid access token
@@ -37,15 +36,14 @@ service CommandCompletionService {
   // - ``FAILED_PRECONDITION``: if the ledger has been pruned after the subscription start offset
   // - ``INVALID_ARGUMENT``: if the payload is malformed or is missing required fields
   // - ``OUT_OF_RANGE``: if the absolute offset is after the end of the ledger
-  rpc CompletionStream (CompletionStreamRequest) returns (stream CompletionStreamResponse);
+  rpc CompletionStream(CompletionStreamRequest) returns (stream CompletionStreamResponse);
 
   // Returns the offset after the latest completion.
   // Errors:
   // - ``UNAUTHENTICATED``: if the request does not include a valid access token
   // - ``PERMISSION_DENIED``: if the claims in the token are insufficient to perform a given operation
   // - ``NOT_FOUND``: if the request does not include a valid ledger id
-  rpc CompletionEnd (CompletionEndRequest) returns (CompletionEndResponse);
-
+  rpc CompletionEnd(CompletionEndRequest) returns (CompletionEndResponse);
 }
 
 message CompletionStreamRequest {
@@ -78,7 +76,6 @@ message CompletionStreamRequest {
 }
 
 message CompletionStreamResponse {
-
   // This checkpoint may be used to restart consumption.  The
   // checkpoint is after any completions in this response.
   // Optional
@@ -86,7 +83,6 @@ message CompletionStreamResponse {
 
   // If set, one or more completions.
   repeated com.daml.ledger.api.v1.Completion completions = 2;
-
 }
 
 // Checkpoints may be used to:
@@ -94,7 +90,6 @@ message CompletionStreamResponse {
 // * detect time out of commands.
 // * provide an offset which can be used to restart consumption.
 message Checkpoint {
-
   // All commands with a maximum record time below this value MUST be considered lost if their completion has not arrived before this checkpoint.
   // Required
   google.protobuf.Timestamp record_time = 1;
@@ -103,7 +98,6 @@ message Checkpoint {
   // Required
   com.daml.ledger.api.v1.LedgerOffset offset = 2;
 }
-
 
 message CompletionEndRequest {
   // Must correspond to the ledger ID reported by the Ledger Identification Service.

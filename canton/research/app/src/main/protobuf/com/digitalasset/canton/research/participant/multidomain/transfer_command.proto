@@ -5,9 +5,9 @@ syntax = "proto3";
 
 package com.digitalasset.canton.research.participant.multidomain;
 
+option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 option java_outer_classname = "TransferCommandOuterClass";
 option java_package = "com.digitalasset.canton.research.participant.multidomain";
-option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 
 message TransferCommand {
   // Must correspond to the ledger ID reported by the Ledger Identification Service.

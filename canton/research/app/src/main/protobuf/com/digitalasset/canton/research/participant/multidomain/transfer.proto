@@ -8,13 +8,12 @@ package com.digitalasset.canton.research.participant.multidomain;
 import "com/daml/ledger/api/v1/event.proto";
 import "google/protobuf/timestamp.proto";
 
+option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 option java_outer_classname = "TransferOuterClass";
 option java_package = "com.digitalasset.canton.research.participant.multidomain";
-option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 
 // Complete view of an on-ledger transfer.
 message Transfer {
-
   // Assigned by the server. Useful for correlating logs.
   // Must be a valid LedgerString (as described in ``value.proto``).
   // Required
@@ -42,7 +41,6 @@ message Transfer {
 
 // Records that a contract has been transferred-out, and it becomes unusable on the source domain
 message TransferredOutEvent {
-
   // The ID of the transfer-out event. This needs to be used as an input for a transfer-in TransferCommand.
   // Must be a valid LedgerString (as described in ``value.proto``).
   // Required
@@ -88,7 +86,6 @@ message TransferredOutEvent {
 
 // Records that a contract has been transferred-in, and it becomes usable on the target domain
 message TransferredInEvent {
-
   // The ID of the source domain
   // Must be a valid domain ID
   // Required
@@ -113,4 +110,3 @@ message TransferredInEvent {
   // Required
   com.daml.ledger.api.v1.CreatedEvent created_event = 5;
 }
-
