@@ -5,6 +5,7 @@ package com.daml.network.sv.cometbft
 import com.daml.network.sv.cometbft.CometBftContainer.{ContainerType, Testing}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import org.testcontainers.containers.output.Slf4jLogConsumer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.{GenericContainer, Network}
 import org.testcontainers.utility.{DockerImageName, MountableFile}
@@ -31,6 +32,9 @@ class CometBftContainer(nodeType: ContainerType = Testing) extends NamedLogging 
   private val container = new CometBftTestContainer()
     // Always expect that images are pulled on CI before running tests
     .withImagePullPolicy(NeverPullOnCIImagePolicy)
+    .withLogConsumer(
+      new Slf4jLogConsumer(loggerFactory.getLogger(getClass)).withPrefix(s"CometBftNode[$nodeType]")
+    )
 
   def initialize(network: Option[Network] = None): Unit = {
     network.foreach(container.setNetwork)
