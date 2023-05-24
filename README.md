@@ -482,8 +482,7 @@ Current Canton commit: `022d684b73c25e754eb30919e4ac67ae9f4eaac9`
 4. Execute the following steps in your Canton Coin repo:
    1. Copy the Canton changes: `./scripts/copy-canton.sh $PATH_TO_CANTON_OSS`
    2. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit"`
-   3. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`
-      and resolve conflicts (if any).
+   3. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`.
    4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -m"Reapply our changes"`
    5. Bump the SDK/Canton versions in the following places:
       1. The current Canton commit in this `README.md`
@@ -495,20 +494,63 @@ Current Canton commit: `022d684b73c25e754eb30919e4ac67ae9f4eaac9`
          Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
       6.  Repeat the same with the sha256 of the protobufs in `daml_pbs.nix`.
    6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions"`
-5. Make a PR with your changes, so CI starts churning.
-6. Test whether things compile using `sbt Test/compile`.
+5. Test whether things compile using `sbt Test/compile`.
    In case of problems, here are some tips that help:
+   - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.
+     The previous PR that bumped our Canton fork can serve as a point of comparison here.
+     Search [here](https://github.com/DACH-NY/the-real-canton-coin/pulls?q=is%3Apr+%22bump+canton%22) to identify that PR and
+     look at the commits from the "Reapply our changes" step onwards in that PR.
    - Some of our changes might have been upstreamed: adapt `CANTON_CODE_CHANGES.md` accordingly; and resolve the path
      conflicts in favor of the upstreamed code.
+   - The file paths and hence import paths may have changed in the upstream code. Change such imports to reflect the new paths.
    - Find the related change in the **closed source Canton repo** and use the change and its commit message to adjust our code.
-   - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.
    - We have some files that we added ourselves to the `canton/` directory, and the above steps happen to delete these.
-     See #2467 for a recent list, and copy them from another checkout of the Canton Coin repo.
+     See the previous PR for a recent list, and add them back using `git restore -s main <path-to-file>`.
    - If you encounter issues with daml2ts, you might need to [rebase our TS fork](nix/vendored/README.md).
+   - In case you run into issues with missing classes, or you find that some code is using a different class to the one defined in the Canton OSS repo,
+     then:
+     - If the file defining the class exists in the OSS repo but not in our fork, copy it over manually. You should also fix `copy-canton.sh` to ensure it gets
+       copied over correctly in the future.
+     - If the file already exists in our fork, you may need to [update the build dependencies](#updating-canton-build-dependencies).
+6. Make a PR with your changes, so CI starts churning.
 7. If there are any, remove all `*.rej` files.
 
 You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
 
+
+#### Updating Canton build dependencies
+
+The relevant files defining our build are:
+- `CantonDependencies.scala` - contains named constants for the various libraries used by Canton.
+- `BuildCommon.scala` - specifies the module and library dependency graph for build targets common to most of our apps.
+This is where you should find the dependencies for all the Canton related modules and where you will most likely need to make changes.
+- `Dependencies.scala` - contains named constants for the various libraries used by the Canton Coin repo apart from those defined in `CantonDependencies.scala`.
+- `build.sbt` - tells SBT how to build the Canton Network apps making use of the definitions in the above files.
+
+Updating the build dependencies can be a non-trivial and time-consuming process, so please reach out on Slack if you face issues.
+It's recommended that you reload sbt and run `Test/compile` after each change to see if the build succeeds.
+
+The following steps should be broadly useful when updating the build dependencies:
+
+- Identify the module in the Canton Coin repo that contains the class you're looking for. If you're an IntelliJ user, module names are
+  always displayed in bold in the [Project Tool Window](https://www.jetbrains.com/help/idea/project-tool-window.html)
+  (if the directory name is the same as the module name, it just appears bolded; if it is different, the module name appears in bold next
+  to the directory name in square brackets). In our repo, the Canton modules are invariably named `canton-xxx`.
+  Here is an example of identifying the module containing the class `PackageServiceError` in IntelliJ.
+  ![Identifying module for a class in IntelliJ](readme/images/identifying-module-for-class.png)
+- Add a `dependsOn` relationship in `BuildCommon.scala` between the module where the class is being used and the one where it is defined.
+- Recompile to check if the build succeeds.
+
+Both Canton and Canton Coin also extensively use Daml SDK libraries and these can at times conflict.
+
+To identify which Daml SDK library defines a particular class:
+- search for the class in the [daml OSS repo](https://github.com/digital-asset/daml?search=1)
+- identify the module directory and locate the `BUILD.bazel` file inside it
+- search for `maven_coordinates` within the `BUILD.bazel` file to get the name of the library.
+
+To add a new library as a dependency for some module:
+- add the library name as a constant in `CantonDependencies.scala` or `Dependencies.scala` as appropriate
+- add the library to the list of `libraryDependencies` within the build definition of the required module in `BuildCommon.scala` or `build.sbt`
 
 ### Message Definitions
 
@@ -984,7 +1026,7 @@ The resulting key id matches the one you see in gcloud console.
 
 To update the secret, run this command. Afterwards, you can delete the
 old key from the gcloud console. Note that at any point in time, there
-can only be 10 keys. Otherwis you will see `precondition failed` errors.
+can only be 10 keys. Otherwise you will see `precondition failed` errors.
 
 ```
 cncluster update_dns01_secret

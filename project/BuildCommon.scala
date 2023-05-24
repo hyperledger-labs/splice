@@ -486,7 +486,7 @@ object BuildCommon {
   }
 
   lazy val `canton-community-app-base` = {
-    import CantonDependencies.*
+    import CantonDependencies._
     sbt.Project
       .apply("canton-community-app-base", file("canton/community/app-base"))
       .dependsOn(
@@ -592,7 +592,7 @@ object BuildCommon {
   }
 
   lazy val `canton-community-testing` = {
-    import CantonDependencies.*
+    import CantonDependencies._
     sbt.Project
       .apply("canton-community-testing", file("canton/community/testing"))
       .disablePlugins(WartRemover)
@@ -625,7 +625,7 @@ object BuildCommon {
   }
 
   lazy val `canton-community-integration-testing` = {
-    import CantonDependencies.*
+    import CantonDependencies._
     sbt.Project
       .apply("canton-community-integration-testing", file("canton/community/integration-testing"))
       .disablePlugins(WartRemover)
@@ -1058,7 +1058,7 @@ object BuildCommon {
   }
 
   lazy val `canton-ledger-api-core` = {
-    import CantonDependencies.*
+    import CantonDependencies._
     sbt.Project
       .apply("canton-ledger-api-core", file("canton/community/ledger/ledger-api-core"))
       .dependsOn(
@@ -1221,12 +1221,9 @@ object BuildCommon {
         openApiSpec: String,
         cacheFileDependencies: Set[File] = Set.empty[File],
     ): Def.Initialize[Task[Seq[File]]] = Def.task {
-      import better.files.*
-      import _root_.io.circe.*
-      import _root_.io.circe.parser.*
-      import _root_.io.circe.optics.JsonPath.*
-      import _root_.io.circe.optics.JsonPath.{root => jsonRoot}
-      import _root_.io.circe.syntax._
+      import better.files._
+      import _root_.io.circe._
+      import _root_.io.circe.parser._
 
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory
