@@ -57,17 +57,34 @@ local deployments(num, svConfig, config) =
             name: "CN_APP_SV_PARTICIPANT_ADDRESS",
             value: "participant",
           },
-          // TODO(#4459) Move privateKey to k8s secrets
+          {
+            name: "CN_APP_SV_PUBLIC_KEY",
+            valueFrom: {
+              secretKeyRef: {
+                name: "cn-app-sv-key",
+                key: "public",
+                optional: false,
+              },
+            },
+          },
+          {
+            name: "CN_APP_SV_PRIVATE_KEY",
+            valueFrom: {
+              secretKeyRef: {
+                name: "cn-app-sv-key",
+                key: "private",
+                optional: false,
+              },
+            },
+          },
           {
             name: "ADDITIONAL_CONFIG_SV_ONBOARDING",
             value: |||
               _onboarding {
                 type = "join-with-key"
                 sv-client.admin-api.url = ${CN_APP_SV_CLIENT_SPONSOR_SV_ADMIN_API_ADDRESS}
-                public-key = ${CN_APP_SV_ONBOARDING_PUBLIC_KEY}
-                private-key = "%s"
               }
-            ||| % (std.get(svConfig, "privateKey")),
+            |||,
           },
         ]
       ) + (

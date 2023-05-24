@@ -346,18 +346,28 @@ following content.
       audience: https://canton.network.global
       jwksUrl: https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json
 
-The authentication credentials should be defined in a file named
-``sv-values.yaml``. If you haven't done so yet, please first follow the instructions in
-the :ref:`Generating an SV Identity<sv-identity>` section to obtain and register a name and keypair for your SV.
+The private and public key for your SV are defined in a K8s secret.
+If you haven't done so yet, please first follow the instructions in
+the :ref:`Generating an SV Identity<sv-identity>` section to obtain
+and register a name and keypair for your SV. Replace
+``YOUR_PUBLIC_KEY`` and ``YOUR_PRIVATE_KEY`` with the ``public-key``
+and ``private-key`` values obtained as part of generating your SV
+idenitty.
 
+.. code-block:: bash
+
+    kubectl create secret --namespace sv generic cn-app-sv-key \
+        --from-literal=public=YOUR_PUBLIC_KEY \
+        --from-literal=private=YOUR_PRIVATE_KEY
+
+The configuration used by the SV app to onboard your SV should be defined in a file named
+``sv-values.yaml``.
 
 .. code-block:: yaml
 
     joinWithKeyOnboarding:
       sponsorApiUrl: "https://sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
       svcApiAddress: "TARGET_CLUSTER.network.canton.global"
-      publicKey: ... public key goes here ...
-      privateKey: ... private key goes here ...
     onboardingName: ... your SV name goes here ...
     auth:
       audience: https://canton.network.global

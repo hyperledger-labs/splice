@@ -130,6 +130,34 @@ function installSvParticipant(
   );
 }
 
+// btoa is only available in DOM so inline the definition here.
+const btoa = (s: string) => Buffer.from(s).toString('base64');
+
+export function installSvKeySecret(
+  xns: ExactNamespace,
+  publicKey: string,
+  privateKey: string
+): k8s.core.v1.Secret {
+  const secretName = 'cn-app-sv-key';
+  return new k8s.core.v1.Secret(
+    `cn-app-${xns.logicalName}-key`,
+    {
+      metadata: {
+        name: secretName,
+        namespace: xns.logicalName,
+      },
+      type: 'Opaque',
+      data: {
+        public: btoa(publicKey),
+        private: btoa(privateKey),
+      },
+    },
+    {
+      dependsOn: [xns.ns],
+    }
+  );
+}
+
 export function installSvNode(
   svc: k8s.helm.v3.Release,
   nodename: string,
@@ -145,7 +173,9 @@ export function installSvNode(
     installAuth0UISecret(xns, 'sv', nodename),
     installAuth0Secret(xns, 'validator', 'validator'),
     installAuth0UISecret(xns, 'wallet', 'wallet'),
-  ];
+  ].concat(
+    joinWithKey ? [installSvKeySecret(xns, joinWithKey.publicKey, joinWithKey.privateKey)] : []
+  );
 
   if (nodename !== 'sv-1') {
     installSvParticipant(xns, svc, nodename, onboardingName);

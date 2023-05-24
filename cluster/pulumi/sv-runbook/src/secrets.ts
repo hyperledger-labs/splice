@@ -200,3 +200,28 @@ export function svcUserParticipantSecret(
 ): k8s.core.v1.Secret {
   return participantSecret(ns, "svc", "dummy");
 }
+
+export function svKeySecret(
+  ns: ExactNamespace,
+  publicKey: string,
+  privateKey: string
+): k8s.core.v1.Secret {
+  const secretName = "cn-app-sv-key";
+  return new k8s.core.v1.Secret(
+    secretName,
+    {
+      metadata: {
+        name: secretName,
+        namespace: ns.logicalName,
+      },
+      type: "Opaque",
+      data: {
+        public: btoa(publicKey),
+        private: btoa(privateKey),
+      },
+    },
+    {
+      dependsOn: [ns.ns],
+    }
+  );
+}

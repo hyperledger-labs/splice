@@ -9,7 +9,6 @@ import { installValidator } from './validator';
 
 /// Toplevel Chart Installs
 
-// TODO(#4459) Move these keys to k8s secrets
 const SV2_KEY = {
   publicKey:
     'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==',

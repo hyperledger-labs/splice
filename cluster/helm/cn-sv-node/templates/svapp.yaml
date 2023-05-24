@@ -59,6 +59,18 @@ spec:
                   public-key = "{{ .publicKey }}"
                   private-key = "{{ .privateKey }}"
                 }
+            - name: CN_APP_SV_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: public
+                  name: "cn-app-sv-key"
+                  optional: false
+            - name: CN_APP_SV_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: private
+                  name: "cn-app-sv-key"
+                  optional: false
             {{- end }}
           ports:
             - name: sv-api

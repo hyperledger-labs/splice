@@ -8,6 +8,7 @@ import {
   sv1UserParticipantSecret,
   sv1UserValidatorParticipantSecret,
   svAppSecrets,
+  svKeySecret,
   svValidatorSecrets,
   svcUserParticipantSecret,
 } from "./secrets";
@@ -89,6 +90,7 @@ const participant = installCNHelmChart(
     scanUserParticipantSecret(svNamespace),
     directoryUserParticipantSecret(svNamespace),
     svcUserParticipantSecret(svNamespace),
+    svKeySecret(svNamespace, SV_PUBLIC_KEY, SV_PRIVATE_KEY),
   ])
 );
 
