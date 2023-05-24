@@ -446,7 +446,9 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       "Auth0 login: Fill out and submit login form", {
         textField(id("username")).value = username
         find(id("password")).foreach(_.underlying.sendKeys(password))
-        click on name("action")
+        inside(findAll(name("action")).filter(_.isDisplayed).toSeq) { case Seq(button) =>
+          click on button
+        }
       },
     )(
       "Auth0 login: Target page or authorization form is visible",
