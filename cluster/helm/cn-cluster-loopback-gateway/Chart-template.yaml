@@ -1,0 +1,7 @@
+apiVersion: v2
+name: cn-cluster-loopback-gateway
+type: application
+description: Canton Network gateway that loops back traffic to the same cluster without hitting the firewall
+
+version: VERSION_NUMBER
+appVersion: IMAGE_TAG

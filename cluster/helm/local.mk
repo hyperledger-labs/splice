@@ -1,6 +1,7 @@
 app_charts := \
 	cn-cluster-ingress-full \
 	cn-cluster-ingress-sv \
+	cn-cluster-loopback-gateway \
 	cn-directory-web-ui \
 	cn-docs \
 	cn-domain \

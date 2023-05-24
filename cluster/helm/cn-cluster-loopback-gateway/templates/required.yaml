@@ -1,0 +1,2 @@
+{{ $_ := required ".Release.Namespace is required." .Release.Namespace }}
+{{ $_ := required ".Values.cluster.basename is required." (.Values.cluster).basename }}

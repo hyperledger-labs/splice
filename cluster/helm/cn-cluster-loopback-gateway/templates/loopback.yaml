@@ -1,0 +1,118 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: loopback
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+  - "{{ (.Values.cluster).basename }}.network.canton.global"
+  - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  exportTo:
+  - "."
+  ports:
+  - number: 80
+    name: http-port
+    protocol: HTTP
+  - number: 443
+    name: tls
+    protocol: TLS
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: istio-egressgateway
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    istio: egressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 443
+      name: tls
+      protocol: TLS
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+    tls:
+      mode: PASSTHROUGH
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: egressgateway-for-loopback
+  namespace: {{ .Release.Namespace }}
+spec:
+  host: istio-egressgateway
+  subsets:
+  - name: loopback
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: direct-loopback-through-egress-gateway
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  gateways:
+  - istio-egressgateway
+  - mesh
+  http:
+  - match:
+    - gateways:
+      - mesh
+      port: 80
+    route:
+    - destination:
+        host: istio-egressgateway
+        subset: loopback
+        port:
+          number: 80
+      weight: 100
+  - match:
+    - gateways:
+      - istio-egressgateway
+      port: 80
+    route:
+    - destination:
+        host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"
+        port:
+          number: 80
+      weight: 100
+  tls:
+  - match:
+    - gateways:
+      - mesh
+      port: 443
+      sniHosts:
+      - "{{ (.Values.cluster).basename }}.network.canton.global"
+      - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+    route:
+    - destination:
+        host: istio-egressgateway
+        subset: loopback
+        port:
+          number: 443
+      weight: 100
+  - match:
+    - gateways:
+      - istio-egressgateway
+      port: 443
+      sniHosts:
+      - "{{ (.Values.cluster).basename }}.network.canton.global"
+      - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+    route:
+    - destination:
+        host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"
+        port:
+          number: 443
+      weight: 100
