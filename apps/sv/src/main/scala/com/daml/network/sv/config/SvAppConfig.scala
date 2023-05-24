@@ -76,6 +76,7 @@ case class SvAppBackendConfig(
     expectedOnboardings: List[ExpectedOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     onboarding: SvOnboardingConfig = SvOnboardingConfig.JoinViaSvcApp(),
+    initialCoinPriceVote: Option[BigDecimal] = None,
     enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,
 ) extends CNNodeBackendConfig {

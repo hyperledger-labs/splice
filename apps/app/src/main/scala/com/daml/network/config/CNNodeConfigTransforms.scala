@@ -165,6 +165,7 @@ object CNNodeConfigTransforms {
       Seq(
         updateSvcAppConfig(c => c.focus(_.coinPrice).replace(price)),
         updateAllSvAppFoundCollectiveConfigs_(c => c.focus(_.initialCoinPrice).replace(price)),
+        updateAllSvAppConfigs_(c => c.focus(_.initialCoinPriceVote).replace(Some(price))),
       ).foldLeft(config)((c, tf) => tf(c))
 
   def updateDirectoryAppConfig(update: DirectoryAppTransform): CNNodeConfigTransform =

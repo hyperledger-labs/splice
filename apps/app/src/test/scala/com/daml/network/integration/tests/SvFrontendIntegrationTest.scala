@@ -155,7 +155,7 @@ class SvFrontendIntegrationTest
             }
             val rows = findAll(className("coin-price-table-row")).toSeq
             rows should have size 3
-            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "1 USD")
             svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "Not Set")
             svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "Not Set")
 
@@ -180,14 +180,14 @@ class SvFrontendIntegrationTest
           "median coin price changed and desired coin price of sv1 is updated",
           _ => {
             inside(find(id("median-coin-price-usd"))) { case Some(e) =>
-              e.text shouldBe "10 USD"
+              e.text shouldBe "5.5 USD"
             }
             inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
               e.text shouldBe "10 USD"
             }
             val rows = findAll(className("coin-price-table-row")).toSeq
             rows should have size 3
-            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "1 USD")
             svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "Not Set")
             svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "Not Set")
           },

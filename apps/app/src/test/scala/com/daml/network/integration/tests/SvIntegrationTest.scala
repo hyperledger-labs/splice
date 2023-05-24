@@ -870,11 +870,12 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       case (svName, sv) => svName -> sv.getSvcInfo().svParty
     }.toMap
 
-    clue("initially only sv1 has set the CoinPriceVote") {
+    clue("initially only sv1 and sv2 have set the CoinPriceVote") {
+      // sv1 because it's the SVC founder and sv2 because we configured it to do so
       eventually() {
         getCoinPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
-          svParties("sv2") -> Seq(None),
+          svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
           svParties("sv3") -> Seq(None),
           svParties("sv4") -> Seq(None),
         )
@@ -914,6 +915,24 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         )
       },
     )
+
+    actAndCheck(
+      "restarting all SVs", {
+        svs.foreach(_.stop())
+        svs.foreach(_.start())
+        svs.foreach(_.waitForInitialization())
+      },
+    )(
+      "CoinPriceVote contracts didn't change",
+      _ => {
+        getCoinPriceVoteMap() shouldBe Map(
+          svParties("sv1") -> Seq(Some(BigDecimal(5.0))),
+          svParties("sv2") -> Seq(Some(BigDecimal(4.0))),
+          svParties("sv3") -> Seq(Some(BigDecimal(3.0))),
+          svParties("sv4") -> Seq(Some(BigDecimal(2.0))),
+        )
+      },
+    )
   }
 
   "archive duplicated and non-member CoinPriceVote contracts" in { implicit env =>
@@ -922,12 +941,14 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       case (svName, sv) => svName -> sv.getSvcInfo().svParty
     }.toMap
 
-    getCoinPriceVoteMap() shouldBe Map(
-      svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
-      svParties("sv2") -> Seq(None),
-      svParties("sv3") -> Seq(None),
-      svParties("sv4") -> Seq(None),
-    )
+    eventually() {
+      getCoinPriceVoteMap() shouldBe Map(
+        svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
+        svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
+        svParties("sv3") -> Seq(None),
+        svParties("sv4") -> Seq(None),
+      )
+    }
 
     actAndCheck(
       "create duplicated vote for sv4", {
@@ -939,7 +960,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       _ =>
         getCoinPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
-          svParties("sv2") -> Seq(None),
+          svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
           svParties("sv3") -> Seq(None),
           svParties("sv4") -> Seq(None, Some(BigDecimal(3.0)), Some(BigDecimal(4.0))),
         ),
@@ -961,7 +982,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       _ =>
         getCoinPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
-          svParties("sv2") -> Seq(None),
+          svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
           svParties("sv4") -> Seq(Some(BigDecimal(4.0))),
         ),
     )

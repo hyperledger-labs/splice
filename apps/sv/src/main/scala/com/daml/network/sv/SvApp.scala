@@ -147,6 +147,18 @@ class SvApp(
         logger,
       )
 
+      _ <- config.initialCoinPriceVote
+        .map(
+          ensureCoinPriceVoteHasCoinPrice(
+            _,
+            svcStore,
+            ledgerConnection,
+            globalDomain,
+            logger,
+          )
+        )
+        .getOrElse(Future.unit)
+
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
@@ -937,6 +949,32 @@ class SvApp(
       case Right(()) => ()
     }
   }
+
+  private def ensureCoinPriceVoteHasCoinPrice(
+      defaultCoinPriceVote: BigDecimal,
+      svcStore: SvSvcStore,
+      ledgerConnection: CNLedgerConnection,
+      globalDomain: DomainId,
+      logger: TracedLogger,
+  ): Future[Either[String, Unit]] =
+    svcStore.lookupCoinPriceVoteByThisSv().flatMap {
+      case Some(vote) if vote.payload.coinPrice.toScala.isDefined =>
+        logger.info(s"A coin price vote with a defined coin price already exists")
+        Future.successful(Right(()))
+      case _ =>
+        retryProvider.retryForAutomation(
+          "Update coin price vote to configured initial coin price vote",
+          SvApp
+            .updateCoinPriceVote(
+              defaultCoinPriceVote,
+              svcStore,
+              ledgerConnection,
+              globalDomain,
+              logger,
+            ),
+          logger,
+        )
+    }
 }
 
 object SvApp {
