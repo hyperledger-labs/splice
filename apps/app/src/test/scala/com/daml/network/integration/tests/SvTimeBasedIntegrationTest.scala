@@ -5,7 +5,6 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.round.*
-import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.CNNodeAppBackendReference
@@ -26,9 +25,8 @@ import com.digitalasset.canton.time.EnrichedDurations.*
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
-import scala.math.pow
 import java.math.RoundingMode
-import java.time.{Duration, Instant}
+import java.time.{Duration as JavaDuration, Instant}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
@@ -139,9 +137,9 @@ class SvTimeBasedIntegrationTest
       val now = svc.participantClientWithAdminToken.ledger_api.time.get()
 
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.middleOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.latestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe SvUtil.toRelTime(doubledTickDuration)
 
       rounds.latestOpen.data.opensAt shouldBe (now + doubledTickDuration.toInternal).toInstant
       rounds.latestOpen.data.targetClosesAt shouldBe (
@@ -174,9 +172,9 @@ class SvTimeBasedIntegrationTest
       )
 
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.middleOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
-      rounds.latestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe SvUtil.toRelTime(doubledTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe SvUtil.toRelTime(doubledTickDuration)
 
       val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
       expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
@@ -194,9 +192,9 @@ class SvTimeBasedIntegrationTest
 
       val rounds = getOpenMiningRounds()
       // all active open mining rounds are created with doubled tick
-      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
-      rounds.middleOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
-      rounds.latestOpen.data.tickDuration shouldBe toRelTime(doubledTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(doubledTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe SvUtil.toRelTime(doubledTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe SvUtil.toRelTime(doubledTickDuration)
 
       val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
       expectedAdvanceRoundAt shouldBe rounds.latestOpen.data.opensAt
@@ -240,9 +238,9 @@ class SvTimeBasedIntegrationTest
       val now = svc.participantClientWithAdminToken.ledger_api.time.get()
 
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.middleOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.latestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe SvUtil.toRelTime(reducedTickDuration)
 
       rounds.latestOpen.data.opensAt shouldBe (now + reducedTickDuration.toInternal).toInstant
       rounds.latestOpen.data.targetClosesAt shouldBe (
@@ -264,7 +262,7 @@ class SvTimeBasedIntegrationTest
       // latestOpen.opensAt is now before middleOpen + tickDuration
       // Instead of latestOpen.opensAt middleOpen + tickDuration becomes the time when it is ready to advance rounds
       expectedAdvanceRoundAt shouldBe (
-        rounds.middleOpen.data.opensAt plus fromRelTime(
+        rounds.middleOpen.data.opensAt plus SvUtil.fromRelTime(
           rounds.middleOpen.data.tickDuration
         )
       )
@@ -280,9 +278,9 @@ class SvTimeBasedIntegrationTest
       )
 
       val rounds = getOpenMiningRounds()
-      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(defaultTickDuration)
-      rounds.middleOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
-      rounds.latestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe SvUtil.toRelTime(reducedTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe SvUtil.toRelTime(reducedTickDuration)
 
       val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
       // As both tick durations of middleOpen and latestOpen are reduced,
@@ -304,9 +302,9 @@ class SvTimeBasedIntegrationTest
 
       val rounds = getOpenMiningRounds()
       // all active open mining rounds are created with reduced tick
-      rounds.oldestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
-      rounds.middleOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
-      rounds.latestOpen.data.tickDuration shouldBe toRelTime(reducedTickDuration)
+      rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(reducedTickDuration)
+      rounds.middleOpen.data.tickDuration shouldBe SvUtil.toRelTime(reducedTickDuration)
+      rounds.latestOpen.data.tickDuration shouldBe SvUtil.toRelTime(reducedTickDuration)
 
       val expectedAdvanceRoundAt = readyToAdvanceAt(rounds)
       // rounds.latestOpen is the time when it is ready to advance rounds
@@ -402,8 +400,8 @@ class SvTimeBasedIntegrationTest
     svcClient.setConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
-        (Duration.ofSeconds(150), config101),
-        (Duration.ofSeconds(151), config102),
+        (JavaDuration.ofSeconds(150), config101),
+        (JavaDuration.ofSeconds(151), config102),
       )
     )
 
@@ -432,7 +430,7 @@ class SvTimeBasedIntegrationTest
               config201,
             ),
             new Tuple2(
-              now.add(tickDurationWithBuffer.plus(Duration.ofSeconds(1))).toInstant,
+              now.add(tickDurationWithBuffer.plus(JavaDuration.ofSeconds(1))).toInstant,
               config202,
             ),
           ).asJava,
@@ -750,7 +748,7 @@ class SvTimeBasedIntegrationTest
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
       )
     }
-    actAndCheck("No onboarding happens for a long time", advanceTime(Duration.ofHours(25)))(
+    actAndCheck("No onboarding happens for a long time", advanceTime(JavaDuration.ofHours(25)))(
       "The `SvOnboarding` contract expires and is archived",
       _ =>
         svc.participantClientWithAdminToken.ledger_api_extensions.acs
@@ -812,7 +810,7 @@ class SvTimeBasedIntegrationTest
     )
     actAndCheck(
       "No confirmation happens within 24h",
-      advanceTime(Duration.ofHours(25)),
+      advanceTime(JavaDuration.ofHours(25)),
     )(
       "The `SvOnboardingConfirmed` contract expires and is archived",
       _ =>
@@ -922,18 +920,14 @@ class SvTimeBasedIntegrationTest
       },
     )
 
-    val bufferDurationInSeconds = 20
+    val bufferDurationInSeconds = 20L
 
     actAndCheck(
       "Wait for Confirmation TTL to elapse",
       advanceTime(
-        java.time.Duration.ofSeconds(
-          (SvUtil
-            .defaultSvcRulesConfig()
-            .actionConfirmationTimeout
-            .microseconds / pow(10, 6)).toLong
-            + bufferDurationInSeconds
-        )
+        SvUtil
+          .fromRelTime(SvUtil.defaultSvcRulesConfig().actionConfirmationTimeout)
+          .plus(JavaDuration.ofSeconds(bufferDurationInSeconds))
       ),
     )(
       "The Confirmation expires and is archived",
@@ -1034,8 +1028,11 @@ class SvTimeBasedIntegrationTest
     ) {
       // It doesn't really matter which sv we pick
       val automationConfig = sv2.config.automation
-      val effectiveTimeout = automationConfig.effectiveLeaderInactiveTimeout.asJava
-      val bufferDuration = java.time.Duration.ofSeconds(5)
+      val effectiveTimeout = SvUtil
+        .fromRelTime(SvUtil.defaultSvcRulesConfig().leaderInactiveTimeout)
+        .plus(automationConfig.pollingInterval.asJava)
+
+      val bufferDuration = JavaDuration.ofSeconds(5)
 
       advanceTime(effectiveTimeout.plus(bufferDuration))
       eventually() {
@@ -1059,16 +1056,13 @@ class SvTimeBasedIntegrationTest
     Ordering[Instant].max(
       rounds.oldestOpen.data.targetClosesAt,
       Ordering[Instant].max(
-        rounds.middleOpen.data.opensAt plus fromRelTime(
+        rounds.middleOpen.data.opensAt plus SvUtil.fromRelTime(
           rounds.middleOpen.data.tickDuration
         ),
         rounds.latestOpen.data.opensAt,
       ),
     )
   }
-
-  private def fromRelTime(duration: RelTime): Duration =
-    Duration.ofMillis(duration.microseconds / 1000)
 
   private case class OpenMiningRoundsTriplet(
       oldestOpen: OpenMiningRound.Contract,
@@ -1091,8 +1085,8 @@ class SvTimeBasedIntegrationTest
       toAdvanceAt: Instant
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
     val now = svc.participantClientWithAdminToken.ledger_api.time.get()
-    val duration = Duration.between(now.toInstant, toAdvanceAt)
-    val timeShift = Duration.ofSeconds(10)
+    val duration = JavaDuration.between(now.toInstant, toAdvanceAt)
+    val timeShift = JavaDuration.ofSeconds(10)
     val skew = timeShift
     val rounds = getOpenMiningRounds()
     actAndCheck(
@@ -1125,21 +1119,17 @@ class SvTimeBasedIntegrationTest
   }
 
   private def assertTickDurationOfIssuingRound(
-      roundNumberToTickDuration: Map[Long, Duration]
+      roundNumberToTickDuration: Map[Long, JavaDuration]
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = eventually() {
     val issuingRounds = getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty)
     issuingRounds.map(_.data.round.number) shouldBe roundNumberToTickDuration.keySet.toSeq.sorted
     issuingRounds.map { issuingRound =>
       val expectedDuration = roundNumberToTickDuration(issuingRound.data.round.number)
-      Duration
+      JavaDuration
         .between(
           issuingRound.data.opensAt,
           issuingRound.data.targetClosesAt,
         ) shouldBe (expectedDuration plus expectedDuration)
     }
   }
-
-  private def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
-    duration.toInternal.toScala.toMicros
-  )
 }

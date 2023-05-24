@@ -12,10 +12,6 @@ case class AutomationConfig(
     /** Interval at which time-based automation triggers
       */
     pollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
-    /** Duration after which leader is considered to be inactive
-      */
-    leaderInactiveTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(70),
-
     /** Only intended for testing. Disables the polling trigger that periodically collects rewards
       * and merges coins.
       */
@@ -27,14 +23,4 @@ case class AutomationConfig(
       * TODO(#3816) cleanup this flag after DomainFees PoC and replace with a per-validator spend limit
       */
     enableAutomaticValidatorTrafficBalanceTopup: Boolean = false,
-) {
-
-  /** Effective duration after which leader inactivity is detected
-    */
-  // TODO(#4440) Leader inactivity timeout configuration is SvApp-specific. Move this into a config value specific to the SvApp
-  def effectiveLeaderInactiveTimeout: NonNegativeFiniteDuration =
-    NonNegativeFiniteDuration.apply(
-      leaderInactiveTimeout.duration
-        .plus(pollingInterval.duration)
-    )
-}
+) {}

@@ -4,6 +4,8 @@ import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.util.SvUtil
+
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -88,7 +90,10 @@ class AdvanceOpenMiningRoundTrigger(
                   // No work done here, as we are only interested in the scheduling notification
                   ()
                 },
-                context.config.effectiveLeaderInactiveTimeout.asJava,
+                // NOTE: We don't restart existing inactivity checks when the leaderInactiveTimeout changes
+                SvUtil
+                  .fromRelTime(rules.payload.config.leaderInactiveTimeout)
+                  .plus(context.config.pollingInterval.asJava),
               )
           )
           .unwrap

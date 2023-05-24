@@ -58,6 +58,7 @@ initCollective isDevNet = do
         svOnboardingRequestTimeout = hours 24
         svOnboardingConfirmedTimeout = hours 24
         voteRequestTimeout = days 7
+        leaderInactiveTimeout = seconds 70
         domainNodeConfigLimits = defaultDomainNodeConfigLimits
         maxTextLength = 1024
         globalDomain = initialGlobalDomainConfig

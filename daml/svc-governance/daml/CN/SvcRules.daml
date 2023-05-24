@@ -221,6 +221,7 @@ data SvcRulesConfig = SvcRulesConfig with
     svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
     svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing a SV confirmation
     voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote`s.
+    leaderInactiveTimeout: RelTime -- ^ The amount of time given to the leader to complete an action it should take care of
     domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the members' `DomainNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     globalDomain : GlobalDomainConfig

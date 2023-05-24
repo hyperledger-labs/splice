@@ -12,9 +12,13 @@ import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.util.Contract
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.EnrichedDurations.*
+
 import java.security.{KeyFactory, SecureRandom, Signature}
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
+import java.time.Duration as JavaDuration
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters.*
@@ -60,6 +64,7 @@ object SvUtil {
     new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingTimeout
     new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingConfirmedTimeout
     new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout
+    new RelTime(TimeUnit.SECONDS.toMicros(70)), // leaderInactiveTimeout
     defaultDomainNodeConfigLimits,
     1024, // maxTextLength
     defaultSvcGlobalDomainConfig, // globalDomainConfig
@@ -141,4 +146,11 @@ object SvUtil {
     rng.nextBytes(bytes)
     Base64.getEncoder().encodeToString(bytes)
   }
+
+  def fromRelTime(duration: RelTime): JavaDuration =
+    JavaDuration.ofMillis(duration.microseconds / 1000)
+
+  def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
+    duration.toInternal.toScala.toMicros
+  )
 }
