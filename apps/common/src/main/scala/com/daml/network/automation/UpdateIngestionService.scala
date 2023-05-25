@@ -117,12 +117,7 @@ class UpdateIngestionService(
     val javaOffset = new LedgerOffset.Absolute(offset)
     for {
       // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
-      evs <- connection.activeContracts(domain, filter, Some(javaOffset))
-      tfs <- connection.getInFlightTransfers(
-        domain,
-        filter.primaryParty,
-        Some(javaOffset),
-      )
+      (evs, tfs) <- connection.activeContracts(domain, filter, javaOffset)
       _ <- ingestionSink.ingestAcsAndTransferOuts(domain, evs, tfs)
       // Note that we cannot wait for the offset here since it may be an offset from a transfer
       // which does not advance the participant offset.

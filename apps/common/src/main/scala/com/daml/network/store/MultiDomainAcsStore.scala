@@ -2,6 +2,7 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import com.daml.ledger.api.v1.{transaction_filter as scalaFilter}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   Filter,
@@ -408,6 +409,13 @@ object MultiDomainAcsStore {
       val partyString: String = primaryParty.toProtoPrimitive
       new FiltersByParty(Map[String, Filter](partyString -> NoFilter.instance).asJava)
     }
+
+    // TODO (#3956) callers should use `toTransactionFilter` instead when
+    // snapshotsvc supports real filters
+    def toTransactionFilterAllContractsScala: scalaFilter.TransactionFilter =
+      scalaFilter.TransactionFilter(
+        Map(primaryParty.toProtoPrimitive -> scalaFilter.Filters())
+      )
   }
 
   /** A query result computed as-of a specific set of per-domain ledger API offset. */

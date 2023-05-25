@@ -11,15 +11,13 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
   ExercisedEvent,
-  GetActiveContractsRequest,
   Identifier,
   LedgerOffset,
-  Template,
   Transaction,
   TransactionTree,
   User,
 }
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractId, Created, Exercised, Update}
+import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, Update}
 import com.daml.network.environment.ledger.api.{
   DedupConfig,
   DedupOffset,
@@ -29,7 +27,6 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
-import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.Threading
@@ -44,6 +41,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
+import com.digitalasset.canton.research.participant.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
@@ -334,78 +332,35 @@ class CNLedgerConnection(
     )
   }
 
-  def activeContractsWithOffset(
-      domain: DomainId,
-      filter: IngestionFilter,
-      offsetO: Option[LedgerOffset.Absolute] = None,
-  ): Future[(Seq[CreatedEvent], LedgerOffset)] = {
-    val activeContractsRequest = client.activeContracts(
-      new GetActiveContractsRequest("", filter.toTransactionFilterAllContracts, false),
-      domain,
-      offsetO,
-    )
-    for {
-      responseSequence <- activeContractsRequest runWith Sink.seq
-      offset =
-        if (responseSequence.isEmpty) LedgerOffset.LedgerBegin.getInstance()
-        else
-          new LedgerOffset.Absolute(
-            responseSequence
-              .map(_.getOffset.toScala)
-              .lastOption
-              .flatten
-              // according to spec, should always be defined in last message of stream
-              .getOrElse(
-                throw new RuntimeException(
-                  "Expected to have offset in the last message of the acs stream but didn't have one!"
-                )
-              )
-          )
-      active = responseSequence.flatMap(_.getCreatedEvents.asScala)
-    } yield (active, offset)
-  }
-
-  def activeContractsWithOffset[TCid <: ContractId[
-    T
-  ], T <: Template](
-      domain: DomainId,
-      party: PartyId,
-      companion: TemplateCompanion[TCid, T],
-  ): Future[(Seq[Contract[TCid, T]], LedgerOffset)] =
-    activeContractsWithOffset(
-      domain,
-      CNLedgerConnection.transactionFilterByParty(party, companion.TEMPLATE_ID),
-    ).map { case (events, off) =>
-      (events.map(companion.fromCreatedEvent(_)), off)
-    }
-
   def activeContracts(
       domain: DomainId,
       filter: IngestionFilter,
-      offset: Option[LedgerOffset.Absolute] = None,
-  ): Future[Seq[CreatedEvent]] =
-    activeContractsWithOffset(domain, filter, offset).map(_._1)
-
-  def activeContracts[TCid <: ContractId[T], T <: Template](
-      domain: DomainId,
-      party: PartyId,
-      companion: TemplateCompanion[TCid, T],
-  ): Future[Seq[Contract[TCid, T]]] =
-    activeContractsWithOffset(domain, party, companion).map(_._1)
-
-  def getInFlightTransfers(
-      source: DomainId,
-      party: PartyId,
-      offset: Option[LedgerOffset.Absolute],
-  ): Future[Seq[InFlightTransferOutEvent]] =
-    client
-      .getInFlightTransfers(
-        Seq(party),
-        source,
-        offset,
+      offset: LedgerOffset.Absolute,
+  ): Future[(Seq[CreatedEvent], Seq[InFlightTransferOutEvent])] = {
+    val activeContractsRequest = client.activeContracts(
+      multidomain.GetActiveContractsMergedRequest(
+        validAtOffset = offset.getOffset,
+        filter = Some(filter.toTransactionFilterAllContractsScala),
       )
-      .mapConcat(_.transferOuts)
-      .runWith(Sink.seq)
+    )
+    for {
+      responseSequence <- activeContractsRequest runWith Sink.seq
+      contractStateComponents = responseSequence
+        .flatMap(_.contractStateComponents)
+        .map(_.contractStateComponent)
+      active = contractStateComponents.collect {
+        case multidomain.ContractStateComponent.ContractStateComponent.ActiveContract(contract)
+            if contract.domainId == domain.toProtoPrimitive =>
+          val ev = contract.getCreatedEvent
+          CreatedEvent.fromProto(ev.companion.toJavaProto(ev))
+      }
+      inFlight = contractStateComponents.collect {
+        case multidomain.ContractStateComponent.ContractStateComponent.IncompleteTransferredOut(ev)
+            if ev.getTransferredOutEvent.source == domain.toProtoPrimitive =>
+          InFlightTransferOutEvent.fromProto(ev)
+      }
+    } yield (active, inFlight)
+  }
 
   def getConnectedDomains(party: PartyId): Future[Map[DomainAlias, DomainId]] =
     client.getConnectedDomains(party)

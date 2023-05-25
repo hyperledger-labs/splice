@@ -10,8 +10,6 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreateUserRequest,
   CreateUserResponse,
-  GetActiveContractsRequest,
-  GetActiveContractsResponse,
   GetLedgerEndResponse,
   GetUserRequest,
   GrantUserRightsRequest,
@@ -63,7 +61,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     elc: ErrorLoggingContext,
 ) extends Closeable {
 
-  import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest, scalapbToJava}
+  import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest}
 
   private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
     withCredentials(CommandServiceGrpc.newStub(channel), token)
@@ -121,25 +119,10 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   }
 
   def activeContracts(
-      request: GetActiveContractsRequest,
-      domainId: DomainId,
-      offsetO: Option[LedgerOffset.Absolute] = None,
-  ): Source[GetActiveContractsResponse, NotUsed] = {
-    val oldProto = active_contracts_service.GetActiveContractsRequest fromJavaProto request.toProto
-    // convert ACService req to snapshot service req
-    val proto = multidomain.GetActiveContractsRequest(
-      ledgerId = oldProto.ledgerId,
-      filter = oldProto.filter,
-      verbose = oldProto.verbose,
-      activeAtOffset = offsetO.fold(oldProto.activeAtOffset)(_.getOffset),
-      domainId = domainId.toProtoPrimitive,
-    )
+      request: multidomain.GetActiveContractsMergedRequest
+  ): Source[multidomain.GetActiveContractsMergedResponse, NotUsed] =
     ClientAdapter
-      .serverStreaming(proto, stateServiceStub.getActiveContracts)
-      .map { scalaProto =>
-        GetActiveContractsResponse fromProto scalapbToJava(scalaProto)(_.companion)
-      }
-  }
+      .serverStreaming(request, stateServiceStub.getActiveContractsMerged)
 
   def tryGetTransactionTreeById(
       parties: Seq[String],
@@ -406,22 +389,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       multidomainCompletionServiceStub.completionStream,
     ) map CompletionStreamResponse.fromProto
 
-  def getInFlightTransfers(
-      parties: Seq[PartyId],
-      source: DomainId,
-      offset: Option[LedgerOffset.Absolute],
-  ): Source[LedgerClient.GetInFlightTransfersResponse, NotUsed] = {
-    val req = multidomain.GetInFlightTransfersRequest(
-      sourceDomainId = source.toProtoPrimitive,
-      validAtOffset = offset.fold("")(_.getOffset),
-      stakeholders = parties.map(_.toProtoPrimitive),
-    )
-    ClientAdapter.serverStreaming(
-      req,
-      stateServiceStub.getInFlightTransfers,
-    ) map LedgerClient.GetInFlightTransfersResponse.fromProto
-  }
-
   def getConnectedDomains(
       party: PartyId
   ): Future[Map[DomainAlias, DomainId]] = {
@@ -459,21 +426,6 @@ object LedgerClient {
         )
       )
     }
-  }
-
-  final case class GetInFlightTransfersResponse(
-      offset: LedgerOffset.Absolute,
-      transferOuts: Seq[InFlightTransferOutEvent],
-  )
-
-  object GetInFlightTransfersResponse {
-    private[LedgerClient] def fromProto(
-        proto: multidomain.GetInFlightTransfersResponse
-    ): GetInFlightTransfersResponse =
-      GetInFlightTransfersResponse(
-        new LedgerOffset.Absolute(proto.offset),
-        proto.transferOuts.map(InFlightTransferOutEvent.fromProto(_)),
-      )
   }
 
   final case class GetUpdatesRequest(

@@ -10,7 +10,6 @@ import "com/daml/ledger/api/v1/event.proto";
 import "com/daml/ledger/api/v1/transaction_filter.proto";
 import "com/digitalasset/canton/protocol/v0/topology.proto";
 import "com/digitalasset/canton/research/participant/multidomain/transfer.proto";
-import "google/protobuf/timestamp.proto";
 
 option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
 option java_outer_classname = "UpdateServiceOuterClass";
@@ -60,86 +59,64 @@ message GetActiveContractsMergedRequest {
   // Optional
   string valid_at_offset = 1;
 
-  // Return only transfers of contracts which have at least one stakeholder included in this list.
-  // Must be a non-empty list of valid PartyIdString (as described in ``value.proto``).
+  // Templates to include in the served snapshot, per party.
+  // Note: interface filter is not supported
   // Required
-  repeated string stakeholders = 2;
+  com.daml.ledger.api.v1.TransactionFilter filter = 2;
+}
+
+message ContractStateComponent {
+  oneof contract_state_component {
+    // The contract is active in the given domain.
+    // There will be one such message for each domain the contract is active in.
+    //
+    // Note: currently contains at most one such message per contract, indicating on which domain the
+    // contract can be used (at the given offset).
+    ActiveContract active_contract = 1;
+
+    // This message is only available, if the corresponding transfer-in event cannot be found before or at the
+    // active_at_offset, and at least one of the querying parties could submit the corresponding transfer-in command.
+    // The incomplete_transferred_out.created_event.witness_parties will contain all such querying parties.
+    IncompleteTransferredOut incomplete_transferred_out = 2;
+
+    // Important: this message is not indicating that the contract is active for the target domain!
+    // This message is only available, if the corresponding transfer-out event cannot be found before or at the
+    // active_at_offset, and at least one of the querying parties could have submitted the corresponding transfer-in command.
+    // The incomplete_transferred_in.transferred_in_event.created_event.witness_parties will contain all such querying parties.
+    IncompleteTransferredIn incomplete_transferred_in = 3;
+  }
 }
 
 message GetActiveContractsMergedResponse {
-  message Contract {
-    // The created event of that contract.
-    // required
-    com.daml.ledger.api.v1.CreatedEvent event = 1;
-    // The list of incomplete transfer-out events for the given contract for which the participant
-    // is a transferring participant, i.e., it hosts the party on both source and target domain.
-    // A transfer-out is considered incomplete iff the transfer-out happened at an offset before or equal to the ACS offset
-    // and there is no transfer-in before or equal to the ACS offset.
-    // optional
-    repeated IncompleteTransferredOutEvent incomplete_transfer_out_events = 3;
-    // The list of incomplete transfer-in events for the given contract for which the participant
-    // is a transferring participant, i.e., it hosts the party on both source and target domain.
-    // A transfer-out is considered incomplete iff the transfer-out happened at an offset before or equal to the ACS offset
-    // and there is no transfer-out before or equal to the ACS offset.
-    // optional
-    repeated IncompleteTransferredInEvent incomplete_transfer_in_events = 4;
-  }
-
   // Included only in the last message.
   // The client should start consuming the transactions endpoint with this offset.
   // The format of this field is described in ``ledger_offset.proto``.
   string offset = 1;
 
-  // List of contracts that are part of the ACS, no guarantees are made as to the batch size.
-  repeated Contract contracts = 2;
+  // For each contract there could be multiple ContractStateComponent-s in the entire snapshot. These together define
+  // the state of the contract in the snapshot.
+  repeated ContractStateComponent contract_state_components = 2;
 }
 
-message IncompleteTransferredOutEvent {
-  // The ID of the transfer-out event. This needs to be used as an input for a transfer-in TransferCommand.
-  // Must be a valid LedgerString (as described in ``value.proto``).
+message ActiveContract {
   // Required
-  // TODO(#11002) currently, this is the ts.toMicros.toString of the transfer-out id
-  // re-evaluate
-  string transfer_out_id = 1;
+  com.daml.ledger.api.v1.CreatedEvent created_event = 1;
 
-  // The ID of the source domain
-  // Must be a valid domain ID
+  // A valid domain ID
   // Required
-  string source = 2;
-
-  // The ID of the target domain
-  // Must be a valid domain ID
-  // Required
-  string target = 3;
-
-  // Party on whose behalf the transfer command was executed.
-  // Must be a valid PartyIdString (as described in ``value.proto``).
-  // Required
-  string submitter = 4;
-
-  // Transfer-in exclusivity
-  // Before this time (measured on the target domain), only the submitter of the transfer-out can initiate the transfer-in
-  // Missing for everyone except on the submitting participant
-  // optional
-  google.protobuf.Timestamp transfer_in_exclusivity = 5;
+  string domain_id = 2;
 }
 
-message IncompleteTransferredInEvent {
-  // The ID of the source domain
-  // Must be a valid domain ID
+message IncompleteTransferredOut {
   // Required
-  string source = 1;
+  com.daml.ledger.api.v1.CreatedEvent created_event = 1;
 
-  // The ID of the target domain
-  // Must be a valid domain ID
   // Required
-  string target = 2;
+  TransferredOutEvent transferred_out_event = 2;
+}
 
-  // The ID of the transfer-out event
-  // For correlation capabilities
-  // Must be a valid LedgerString (as described in ``value.proto``).
-  // Required
-  string transfer_out_id = 3;
+message IncompleteTransferredIn {
+  TransferredInEvent transferred_in_event = 1;
 }
 
 message GetInFlightTransfersRequest {
