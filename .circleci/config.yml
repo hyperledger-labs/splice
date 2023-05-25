@@ -903,6 +903,7 @@ commands:
           # Retrying as network stuff can be flaky
           cmd_retry_count: 5
           cmd: |
+            set -eou pipefail
             docker pull ${COMETBFT_DOCKER_IMAGE}
             docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
 
