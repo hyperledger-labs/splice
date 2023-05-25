@@ -1,6 +1,6 @@
 package com.daml.network.wallet.store
 
-import cats.Monoid
+import cats.{Eval, Monoid}
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.*
@@ -61,10 +61,10 @@ class UserWalletTxLogParser(
     with NamedLogging {
   import UserWalletTxLogParser.*
 
-  // TODO(#2844) Make this stack safe
   private def parseTree(tree: TransactionTree, root: TreeEvent)(implicit
       tc: TraceContext
-  ): State = {
+  ): Eval[State] = {
+    import Eval.{now, defer}
     root match {
       case exercised: ExercisedEvent =>
         exercised match {
@@ -127,13 +127,13 @@ class UserWalletTxLogParser(
                 })
                 ._1
 
-            val result = outputsWithChildEvent.foldMap {
+            outputsWithChildEvent.foldMap {
               // All errors are handled by producing a notification (if applicable)
               case (op, _: COO_Error, Left(reason)) =>
                 // Only show notifications if the batch was submitted by the end user associated with this TxLog.
                 // We do not want the validator user (who is also signatory on the WalletAppInstall contract)
                 // to see the notifications of all other end-users hosted on the same participant.
-                if (node.result.value.endUserName == endUserName) {
+                now(if (node.result.value.endUserName == endUserName) {
                   val details = reason match {
                     case r: ITR_InsufficientFunds =>
                       s"ITR_InsufficientFunds: missing ${r.missingAmount} CC"
@@ -156,23 +156,21 @@ class UserWalletTxLogParser(
                         details,
                       )
                     // The errors below should not produce notifications
-                    case _: CO_AppPayment => State.empty
-                    case _: CO_SubscriptionAcceptAndMakeInitialPayment => State.empty
-                    case _: CO_MergeTransferInputs => State.empty
-                    case _: CO_BuyExtraTraffic => State.empty
-                    case _: CO_Tap => State.empty
+                    case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
+                        _: CO_MergeTransferInputs | _: CO_BuyExtraTraffic | _: CO_Tap =>
+                      State.empty
                     case _ => throw new RuntimeException(s"Invalid operation $op")
                   }
                 } else {
                   State.empty
-                }
+                })
               // Tag wallet automation (coin merging, reward collection) as such, to distinguish from
               // explicit self-transfers
               case (_, _: COO_MergeTransferInputs, Right(childEvent)) =>
-                parseTree(tree, childEvent)
-                  .setTransferSubtype(TxLogEntry.Transfer.WalletAutomation)
+                defer(parseTree(tree, childEvent))
+                  .map(_.setTransferSubtype(TxLogEntry.Transfer.WalletAutomation))
               // All other successful operations are handled by parsing their subtree
-              case (_, _, Right(childEvent)) => parseTree(tree, childEvent)
+              case (_, _, Right(childEvent)) => defer(parseTree(tree, childEvent))
               // The above cases should be exhaustive
               case (op, outcome, child) =>
                 throw new RuntimeException(
@@ -180,17 +178,17 @@ class UserWalletTxLogParser(
                 )
             }
 
-            result
-
           // ------------------------------------------------------------------
           // P2P transfers
           // ------------------------------------------------------------------
 
           case AcceptedTransferOffer_Complete(_) =>
-            parseTrees(
-              tree,
-              exercised.getChildEventIds.asScala.toList,
-            ).setTransferSubtype(TxLogEntry.Transfer.P2PPaymentCompleted)
+            defer {
+              parseTrees(
+                tree,
+                exercised.getChildEventIds.asScala.toList,
+              )
+            }.map(_.setTransferSubtype(TxLogEntry.Transfer.P2PPaymentCompleted))
 
           // ------------------------------------------------------------------
           // App payments
@@ -198,32 +196,40 @@ class UserWalletTxLogParser(
 
           // Accepting app payment = locking a coin for the provider
           case AppPaymentRequest_Accept(_) =>
-            parseTrees(
-              tree,
-              exercised.getChildEventIds.asScala.toList,
-            ).setTransferSubtype(TxLogEntry.Transfer.AppPaymentAccepted)
+            defer {
+              parseTrees(
+                tree,
+                exercised.getChildEventIds.asScala.toList,
+              )
+            }.map(_.setTransferSubtype(TxLogEntry.Transfer.AppPaymentAccepted))
 
           // Collecting app payments = unlocking a locked coin + transferring the coin to the provider
           case AcceptedAppPayment_Collect(_) =>
-            parseTrees(
-              tree,
-              exercised.getChildEventIds.asScala.toList,
-            ).mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.AppPaymentCollected)
+            defer {
+              parseTrees(
+                tree,
+                exercised.getChildEventIds.asScala.toList,
+              )
+            }.map(_.mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.AppPaymentCollected))
 
           case AcceptedAppPayment_Reject(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value,
-              TxLogEntry.BalanceChange.AppPaymentRejected,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.AppPaymentRejected,
+              )
             )
 
           case AcceptedAppPayment_Expire(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value,
-              TxLogEntry.BalanceChange.AppPaymentExpired,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.AppPaymentExpired,
+              )
             )
 
           // ------------------------------------------------------------------
@@ -232,72 +238,94 @@ class UserWalletTxLogParser(
 
           // Accepting subscription = locking a coin for the provider
           case SubscriptionRequest_AcceptAndMakePayment(_) =>
-            parseTrees(
-              tree,
-              exercised.getChildEventIds.asScala.toList,
-            ).setTransferSubtype(TxLogEntry.Transfer.SubscriptionInitialPaymentAccepted)
+            defer {
+              parseTrees(
+                tree,
+                exercised.getChildEventIds.asScala.toList,
+              )
+            }.map(_.setTransferSubtype(TxLogEntry.Transfer.SubscriptionInitialPaymentAccepted))
 
           // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
           case SubscriptionInitialPayment_Collect(_) =>
-            parseTrees(
-              tree,
-              exercised.getChildEventIds.asScala.toList,
-            ).mergeBalanceChangesIntoTransfer(
-              TxLogEntry.Transfer.SubscriptionInitialPaymentCollected
+            defer {
+              parseTrees(
+                tree,
+                exercised.getChildEventIds.asScala.toList,
+              )
+            }.map(
+              _.mergeBalanceChangesIntoTransfer(
+                TxLogEntry.Transfer.SubscriptionInitialPaymentCollected
+              )
             )
 
           case SubscriptionInitialPayment_Reject(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value,
-              TxLogEntry.BalanceChange.SubscriptionInitialPaymentRejected,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.SubscriptionInitialPaymentRejected,
+              )
             )
 
           case SubscriptionInitialPayment_Expire(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value,
-              TxLogEntry.BalanceChange.SubscriptionInitialPaymentExpired,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.SubscriptionInitialPaymentExpired,
+              )
             )
 
           case SubscriptionIdleState_MakePayment(_) =>
-            parseTrees(
-              tree,
-              exercised.getChildEventIds.asScala.toList,
-            ).setTransferSubtype(TxLogEntry.Transfer.SubscriptionPaymentAccepted)
+            defer {
+              parseTrees(
+                tree,
+                exercised.getChildEventIds.asScala.toList,
+              )
+            }.map(_.setTransferSubtype(TxLogEntry.Transfer.SubscriptionPaymentAccepted))
 
           case SubscriptionIdleState_ExpireSubscription(node) =>
             // Note: this notification is shown to both the provider and the subscriber
-            State.fromNotification(
-              tree,
-              exercised,
-              TxLogEntry.Notification.SubscriptionExpired,
-              s"Expired by ${node.argument.value.actor} because the last subscription payment was missed",
+            now(
+              State.fromNotification(
+                tree,
+                exercised,
+                TxLogEntry.Notification.SubscriptionExpired,
+                s"Expired by ${node.argument.value.actor} because the last subscription payment was missed",
+              )
             )
 
           // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
           case SubscriptionPayment_Collect(_) =>
-            parseTrees(
-              tree,
-              exercised.getChildEventIds.asScala.toList,
-            ).mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.SubscriptionPaymentCollected)
+            defer {
+              parseTrees(
+                tree,
+                exercised.getChildEventIds.asScala.toList,
+              )
+            }.map(
+              _.mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.SubscriptionPaymentCollected)
+            )
 
           case SubscriptionPayment_Reject(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value._2,
-              TxLogEntry.BalanceChange.SubscriptionPaymentRejected,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value._2,
+                TxLogEntry.BalanceChange.SubscriptionPaymentRejected,
+              )
             )
 
           case SubscriptionPayment_Expire(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value._2,
-              TxLogEntry.BalanceChange.SubscriptionPaymentExpired,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value._2,
+                TxLogEntry.BalanceChange.SubscriptionPaymentExpired,
+              )
             )
 
           // ------------------------------------------------------------------
@@ -306,29 +334,40 @@ class UserWalletTxLogParser(
 
           case Transfer(node) =>
             // Note: we do not parse the child events, as we can extract all information about the transfer from this node
-            State.fromTransfer(tree, root, node, TxLogEntry.Transfer.Transfer)
+            now(State.fromTransfer(tree, root, node, TxLogEntry.Transfer.Transfer))
 
           // ------------------------------------------------------------------
           // Minting new coins
           // ------------------------------------------------------------------
 
           case Tap(node) =>
-            State.fromCoinCreateSummary(tree, root, node.result.value, TxLogEntry.BalanceChange.Tap)
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.Tap,
+              )
+            )
 
           case SvcRules_CollectSvReward(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value,
-              TxLogEntry.BalanceChange.SvRewardCollected,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.SvRewardCollected,
+              )
             )
 
           case Mint(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value,
-              TxLogEntry.BalanceChange.Mint,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.Mint,
+              )
             )
 
           // ------------------------------------------------------------------
@@ -336,19 +375,23 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case LockedCoinUnlock(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value,
-              TxLogEntry.BalanceChange.LockedCoinUnlocked,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.LockedCoinUnlocked,
+              )
             )
 
           case LockedCoinOwnerExpireLock(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              root,
-              node.result.value,
-              TxLogEntry.BalanceChange.LockedCoinExpired,
+            now(
+              State.fromCoinCreateSummary(
+                tree,
+                root,
+                node.result.value,
+                TxLogEntry.BalanceChange.LockedCoinExpired,
+              )
             )
 
           // ------------------------------------------------------------------
@@ -356,19 +399,23 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case CoinExpire(node) =>
-            State.fromCoinExpire(
-              tree,
-              exercised,
-              node.result.value,
-              TxLogEntry.BalanceChange.CoinExpired,
+            now(
+              State.fromCoinExpire(
+                tree,
+                exercised,
+                node.result.value,
+                TxLogEntry.BalanceChange.CoinExpired,
+              )
             )
 
           case LockedCoinExpireCoin(node) =>
-            State.fromCoinExpire(
-              tree,
-              exercised,
-              node.result.value,
-              TxLogEntry.BalanceChange.LockedCoinExpired,
+            now(
+              State.fromCoinExpire(
+                tree,
+                exercised,
+                node.result.value,
+                TxLogEntry.BalanceChange.LockedCoinExpired,
+              )
             )
 
           // ------------------------------------------------------------------
@@ -376,7 +423,7 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case CoinRules_BuyExtraTraffic(_) =>
-            State.fromBuyExtraTraffic(tree, exercised)
+            now(State.fromBuyExtraTraffic(tree, exercised))
 
           // ------------------------------------------------------------------
           // Other
@@ -389,10 +436,10 @@ class UserWalletTxLogParser(
             logger.warn(
               s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
             )
-            State.empty
+            now(State.empty)
 
           case _ =>
-            parseTrees(tree, exercised.getChildEventIds.asScala.toList)
+            defer { parseTrees(tree, exercised.getChildEventIds.asScala.toList) }
         }
 
       case created: CreatedEvent =>
@@ -404,10 +451,10 @@ class UserWalletTxLogParser(
             logger.warn(
               s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
             )
-            State.empty
+            now(State.empty)
 
           case _ =>
-            State.empty
+            now(State.empty)
         }
 
       case _ =>
@@ -416,7 +463,7 @@ class UserWalletTxLogParser(
   }
   private def parseTrees(tree: TransactionTree, rootsEventIds: List[String])(implicit
       tc: TraceContext
-  ): State = {
+  ): Eval[State] = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
     roots.foldMap(parseTree(tree, _))
   }
@@ -424,7 +471,7 @@ class UserWalletTxLogParser(
   override def parse(tx: TransactionTree)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
-    parseTrees(tx, tx.getRootEventIds.asScala.toList)
+    parseTrees(tx, tx.getRootEventIds.asScala.toList).value
       .filterByParty(endUserParty)
       .entries
   }
