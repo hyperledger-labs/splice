@@ -474,7 +474,7 @@ class SvApp(
   private def getParticipantId(
       participantAdminConnection: ParticipantAdminConnection
   ): Future[ParticipantId] = {
-    participantAdminConnection.getParticipantId()
+    participantAdminConnection.getParticipantId(config.useXNodes)
   }
 
   private def newSvStore(key: SvStore.Key) = SvSvStore(
@@ -532,6 +532,7 @@ class SvApp(
     config.onboarding,
     participantAdminConnection,
     storeKey.svcParty,
+    config.useXNodes,
     coinAppParameters,
     retryProvider,
     loggerFactory,

@@ -9,15 +9,17 @@ function usage() {
   echo "  -p postgres_mode postgres mode used in scripts/postgres.sh, default 'docker'"
   echo "  -w               only start canton instance with wall clock time"
   echo "  -s               only start canton instance with simulated time"
+  echo "  -x               only start the experimental canton x instance (not started by default)"
 }
 
 # default values
 daemon=0
 wallclocktime=1
 simtime=1
+x=0
 POSTGRES_MODE=docker
 
-while getopts "hdap:ws" arg; do
+while getopts "hdap:wsx" arg; do
   case ${arg} in
     h)
       usage
@@ -37,6 +39,12 @@ while getopts "hdap:ws" arg; do
       wallclocktime=0
       echo "starting canton with simulated time only"
       ;;
+    x)
+      x=1
+      simtime=0
+      wallclocktime=0
+      echo "starting canton with x nodes only"
+      ;;
     ?)
       usage
       exit 1
@@ -52,7 +60,7 @@ if tmux has-session -t $tmux_session 2>/dev/null; then
   exit 1
 fi
 
-rm -f canton.tokens canton-simtime.tokens
+rm -f canton*.tokens
 
 # Start Postgres
 ./scripts/postgres.sh "$POSTGRES_MODE" start
@@ -84,6 +92,16 @@ if [ $simtime -eq 1 ]; then
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global_simtime"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_simtime"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade_simtime"
+fi
+
+if [ $x -eq 1 ]; then
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv1_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv2_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv3_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv4_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_sv1_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_sv1_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_x"
 fi
 
 function tmux_cmd() {
@@ -126,8 +144,19 @@ if [ $simtime -eq 1 ]; then
       --bootstrap bootstrap-canton.sc"
 fi
 
+if [ $x -eq 1 ]; then
+  # For now we reuse canton.tokens here which makes it not possible to run the wallclock canton and X node canton at the same time.
+  tmux_cmd canton-x \
+    "CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" canton \
+      -c ./apps/app/src/test/resources/simple-topology-canton-x.conf \
+      --log-level-canton=DEBUG \
+      --log-encoder json \
+      --log-file-name log/canton-x.clog \
+      --bootstrap bootstrap-canton-x.sc"
+fi
+
 # Wait for both Cantons to start
-while { [ $wallclocktime -eq 1 ] && [ ! -f canton.tokens ]; } || { [ $simtime -eq 1 ] && [ ! -f canton-simtime.tokens ]; } ; do
+while { [ $wallclocktime -eq 1 ] && [ ! -f canton.tokens ]; } || { [ $simtime -eq 1 ] && [ ! -f canton-simtime.tokens ]; } || { [ $x -eq 1 ] && [ ! -f canton.tokens ]; } ; do
     echo "Waiting for Canton instance(s) to start"
     sleep 1;
 done

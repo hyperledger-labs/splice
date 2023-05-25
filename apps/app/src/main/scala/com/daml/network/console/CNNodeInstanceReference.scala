@@ -22,6 +22,7 @@ import com.digitalasset.canton.console.{
   InstanceReference,
   LocalInstanceReference,
   RemoteParticipantReference,
+  RemoteParticipantReferenceX,
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus}
@@ -206,4 +207,10 @@ class CNParticipantClientReference(
     consoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
     override val config: RemoteParticipantConfig,
-) extends RemoteParticipantReference(consoleEnvironment, name) {}
+) extends RemoteParticipantReference(consoleEnvironment, name) {
+  val config_ = config
+  // TODO (M3-47) Remove workaround once we have fully switched to CantonX nodes
+  val participantX = new RemoteParticipantReferenceX(consoleEnvironment, name) {
+    override val config = config_
+  }
+}

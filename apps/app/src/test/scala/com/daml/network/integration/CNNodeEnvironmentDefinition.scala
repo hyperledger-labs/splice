@@ -1,8 +1,9 @@
 package com.daml.network.integration
 
+import com.digitalasset.canton.concurrent.Threading
 import better.files.{File, Resource}
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
-import com.daml.network.console.ValidatorAppBackendReference
+import com.daml.network.console.{CNParticipantClientReference, ValidatorAppBackendReference}
 import com.daml.network.environment.{
   CNNodeConsoleEnvironment,
   CNNodeEnvironmentFactory,
@@ -65,9 +66,11 @@ case class CNNodeEnvironmentDefinition(
       this.preSetup(env)
       svcOpt.foreach(svc => {
         // TODO(M3-46) At some point the svcParty should be created even when `svcOpt == None`
-        val svcParty = svc.participantClientWithAdminToken.ledger_api.parties
-          .allocate(svc.config.ledgerApiUser, svc.config.ledgerApiUser)
-          .party
+        val svcParty = CNNodeEnvironmentDefinition.allocateParty(
+          svc.participantClientWithAdminToken,
+          svc.config.ledgerApiUser,
+          svc.config.useXNodes,
+        )
         svc.participantClientWithAdminToken.ledger_api.users.create(
           id = svc.config.ledgerApiUser,
           actAs = Set(svcParty),
@@ -216,6 +219,12 @@ object CNNodeEnvironmentDefinition {
       .withAllocatedSvcAndSvUsers()
       .withInitializedNodes()
 
+  def simpleTopologyX(testName: String): CNNodeEnvironmentDefinition =
+    fromResource("simple-topology-x.conf", testName)
+      .withAllocatedValidatorUsers()
+      .withAllocatedSvcAndSvUsers()
+      .withInitializedNodes()
+
   def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
     simpleTopology(testName)
       // all of these transforms need to happen before the auth-related default transforms,
@@ -272,10 +281,24 @@ object CNNodeEnvironmentDefinition {
   def waitForNodeInitialization(env: CNNodeConsoleEnvironment): Unit =
     env.coinNodes.local.foreach(_.waitForInitialization())
 
+  def allocateParty(participant: CNParticipantClientReference, hint: String, useXNodes: Boolean) =
+    if (useXNodes) {
+      // TODO(#4968) Revert once party allocation through lapi works
+      val party = participant.participantX.parties.enable(hint)
+      // We need to sleep because otherwise following user creations fail
+      // because the ledger API has not yet learned about the party.
+      Threading.sleep(2000)
+      party
+    } else {
+      participant.ledger_api.parties.allocate(hint, hint).party
+    }
+
   def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {
-    val validatorParty = validator.participantClientWithAdminToken.ledger_api.parties
-      .allocate(validator.config.ledgerApiUser, validator.config.ledgerApiUser)
-      .party
+    val validatorParty = allocateParty(
+      validator.participantClientWithAdminToken,
+      validator.config.ledgerApiUser,
+      validator.config.useXNodes,
+    )
     validator.participantClientWithAdminToken.ledger_api.users.create(
       id = validator.config.ledgerApiUser,
       actAs = Set(validatorParty),

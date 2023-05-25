@@ -230,13 +230,12 @@ class HttpSvHandler(
             .map(_.isDefined)
           svcRules <- svcStore.getSvcRules()
           isCandidateMember = SvApp.isSvcMemberParty(candidateParty, svcRules)
-          isCandidatePartyHostedInParticipant <- svcPartyHosting
-            .listActivePartyToParticipantMappings(
+          isCandidatePartyHostedOnParticipant <- svcPartyHosting
+            .isPartyHostedOnTargetParticipant(
               svcParty,
               globalDomain,
               participantId,
             )
-            .map(_.nonEmpty)
           res <-
             if (!isCandidateOnboardingConfirmed && !isCandidateMember)
               Future.failed(
@@ -244,7 +243,7 @@ class HttpSvHandler(
                   s"Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
                 )
               )
-            else if (!isCandidatePartyHostedInParticipant)
+            else if (!isCandidatePartyHostedOnParticipant)
               Future.failed(
                 HttpErrorHandler.unauthorized(
                   s"Candidate party $candidateParty is not authorized by participant $participantId"

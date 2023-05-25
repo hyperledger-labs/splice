@@ -1003,9 +1003,11 @@ printTests := {
   val pwFrontEnd = new PrintWriter(new FileWriter(s"test-full-class-names-frontend.log", true))
   val pwFrontEndSimTime =
     new PrintWriter(new FileWriter(s"test-full-class-names-frontend-sim-time.log", true))
+  val pwXNode = new PrintWriter(new FileWriter(s"test-full-class-names-xnode.log", true))
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
+  def isXNodeTest(name: String): Boolean = name.contains("XNode")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
   def printTestNames(
       testSet: String,
@@ -1013,8 +1015,9 @@ printTests := {
       writer: PrintWriter,
       predicate: String => Boolean,
   ): Unit = {
-    println(s"There are ${testNames.length} $testSet.")
-    testNames.filter(predicate).sorted.foreach { testName =>
+    val filtered = testNames.filter(predicate)
+    println(s"There are ${filtered.length} $testSet.")
+    filtered.sorted.foreach { testName =>
       writer.println(testName)
     }
   }
@@ -1030,22 +1033,39 @@ printTests := {
     (
       "tests with wall clock time",
       pw,
-      (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(t),
+      (t: String) =>
+        !isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(t) && !isXNodeTest(
+          t
+        ),
     ),
     (
       "tests with simulated time",
       pwSimTime,
-      (t: String) => isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(t),
+      (t: String) =>
+        isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(t) && !isXNodeTest(
+          t
+        ),
     ),
     (
       "Frontend tests with wall clock time",
       pwFrontEnd,
-      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(t),
+      (t: String) =>
+        !isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(t) && !isXNodeTest(
+          t
+        ),
     ),
     (
       "Frontend tests with simulated time",
       pwFrontEndSimTime,
-      (t: String) => isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(t),
+      (t: String) =>
+        isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(t) && !isXNodeTest(
+          t
+        ),
+    ),
+    (
+      "XNode tests with wall clock time",
+      pwXNode,
+      (t: String) => isXNodeTest(t),
     ),
   ).foreach { case (testSet, pw, predicate) =>
     printTestNames(testSet, allTestNames, pw, predicate)
@@ -1055,6 +1075,7 @@ printTests := {
   pwSimTime.close()
   pwFrontEnd.close()
   pwFrontEndSimTime.close()
+  pwXNode.close()
 }
 
 Global / excludeLintKeys += `root` / wartremoverErrors

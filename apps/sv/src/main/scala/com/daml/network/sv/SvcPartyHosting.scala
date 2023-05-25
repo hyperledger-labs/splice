@@ -8,11 +8,15 @@ import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
+import com.digitalasset.canton.admin.api.client.data.topologyx.{
+  ListPartyToParticipantResult as ListPartyToParticipantResultX
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.transaction.{
   ParticipantPermission,
   RequestSide,
   TopologyChangeOp,
+  TopologyChangeOpX,
 }
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -28,6 +32,7 @@ class SvcPartyHosting(
     onboardingConfig: SvOnboardingConfig,
     participantAdminConnection: ParticipantAdminConnection,
     svcParty: PartyId,
+    useXNodes: Boolean,
     coinAppParameters: SharedCNNodeAppParameters,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -41,14 +46,24 @@ class SvcPartyHosting(
   def svcPartyIsAuthorized(
       domainId: DomainId,
       participantId: ParticipantId,
-  )(implicit traceContext: TraceContext): Future[Boolean] = for {
-    mappings <- listActiveSvcPartyMappings(domainId, participantId, None)
-  } yield {
-    logger.info("SVC party mappings to our participant: " + mappings.map(_.item))
-    mappings.exists(_.item.side == RequestSide.Both) || (mappings.exists(
-      _.item.side == RequestSide.To
-    ) && mappings.exists(_.item.side == RequestSide.From))
-  }
+  )(implicit traceContext: TraceContext): Future[Boolean] =
+    if (useXNodes) {
+      for {
+        mappings <- listActiveSvcPartyMappingsX(domainId, participantId)
+      } yield {
+        logger.info("SVC party mappings to our participant: " + mappings.map(_.item))
+        mappings.nonEmpty
+      }
+    } else {
+      for {
+        mappings <- listActiveSvcPartyMappings(domainId, participantId, None)
+      } yield {
+        logger.info("SVC party mappings to our participant: " + mappings.map(_.item))
+        mappings.exists(_.item.side == RequestSide.Both) || (mappings.exists(
+          _.item.side == RequestSide.To
+        ) && mappings.exists(_.item.side == RequestSide.From))
+      }
+    }
 
   def start(domainId: DomainId, participantId: ParticipantId, svParty: PartyId)(implicit
       traceContext: TraceContext
@@ -57,11 +72,22 @@ class SvcPartyHosting(
       case Some(sponsorSvConfig) =>
         for {
           _ <- participantAdminConnection.reconnectAllDomains()
-          _ <- authorizeSvcPartyToParticipant(
-            domainId,
-            participantId,
-            RequestSide.To,
-          )
+          _ <-
+            if (useXNodes) {
+              // At the moment, Canton accepts the transaction as soon as anyone submits it. Eventually,
+              // the transaction will have to be submitted by the target participant (as part of this flow likely)
+              // and by a consensus of SVs (probably as part of a reconciliation loop)
+              logger.info(
+                s"Not submitting party to participant transaction on target participant on X nodes"
+              )
+              Future.unit
+            } else {
+              authorizeSvcPartyToParticipant(
+                domainId,
+                participantId,
+                RequestSide.To,
+              ).map(_ => ())
+            }
           _ <- participantAdminConnection.disconnectFromAllDomains()
           _ = logger.info("candidate SV participant disconnected from global domain")
           acsBytes <- getAuthorizationAndAcsFromSponsor(sponsorSvConfig, participantId, svParty)
@@ -134,38 +160,121 @@ class SvcPartyHosting(
         filterParticipant = participantId.uid.toProtoPrimitive,
         filterRequestSide = side,
       )
-      .map(_.filter(_.item.permission.isActive))
+
+  def listActiveSvcPartyMappingsX(
+      domain: DomainId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResultX]] =
+    participantAdminConnection
+      .listPartyToParticipantMappingsX(
+        filterStore = domain.toProtoPrimitive,
+        operation = Some(TopologyChangeOpX.Replace),
+        filterParty = svcParty.toProtoPrimitive,
+        filterParticipant = participantId.toProtoPrimitive,
+      )
+
+  def listActivePartyToParticipantMappingsX(
+      party: PartyId,
+      domain: DomainId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResultX]] =
+    participantAdminConnection
+      .listPartyToParticipantMappingsX(
+        filterStore = domain.toProtoPrimitive,
+        operation = Some(TopologyChangeOpX.Replace),
+        filterParty = party.toProtoPrimitive,
+        filterParticipant = participantId.uid.toProtoPrimitive,
+      )
+
+  def isPartyHostedOnTargetParticipant(
+      party: PartyId,
+      domain: DomainId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Boolean] =
+    if (useXNodes) {
+      // For now there is no initial topology transaction from the target participant
+      // so we blindly accept here.
+      Future.successful(true)
+    } else {
+      listActivePartyToParticipantMappings(party, domain, participantId).map(_.nonEmpty)
+    }
 
   def authorizeSvcPartyToParticipant(
       domain: DomainId,
       participantId: ParticipantId,
       side: RequestSide,
   )(implicit traceContext: TraceContext): Future[Instant] =
-    // check if svc party has already been authorized to be hosted by the participant
-    listActiveSvcPartyMappings(domain, participantId, Some(side)).flatMap {
-      case Seq() =>
-        for {
-          _ <- participantAdminConnection
-            .authorizePartyToParticipant(
+    if (useXNodes) {
+      // check if svc party has already been authorized to be hosted by the participant
+      listActiveSvcPartyMappingsX(domain, participantId).flatMap {
+        case Seq() =>
+          for {
+            sourceParticipant <- participantAdminConnection.getParticipantId(useXNodes)
+            // Get the existing mapping
+            mappings <- listActiveSvcPartyMappingsX(domain, sourceParticipant)
+            mapping = mappings match {
+              case Seq(mapping) => mapping
+              case _ => throw new IllegalStateException(s"Mappings are borked: $mappings")
+            }
+            // This is run under a (SvcRules) lock so no need to worry about race conditions with concurrent onboardings.
+            _ <- participantAdminConnection.authorizePartyToParticipantX(
+              svcParty,
+              mapping.item.participants.map(_.participantId),
+              participantId,
+              sourceParticipant,
+            )
+            authorizedAt <- waitForSvcPartyToParticipantAuthorization(
+              domain,
+              participantId,
+              side,
+            )
+          } yield {
+            authorizedAt
+          }
+        case Seq(mapping) =>
+          logger.info(
+            s"Party ${svcParty.toProtoPrimitive} already authorized to participant ${participantId.toProtoPrimitive}"
+          )
+          Future.successful(mapping.context.validFrom)
+        case _ =>
+          Future.failed(
+            new IllegalStateException(
+              "More than 1 svc party to participant mapping which is not expected"
+            )
+          )
+      }
+    } else {
+      // check if svc party has already been authorized to be hosted by the participant
+      listActiveSvcPartyMappings(domain, participantId, Some(side)).flatMap {
+        case Seq() =>
+          for {
+            _ <- participantAdminConnection.authorizePartyToParticipant(
               TopologyChangeOp.Add,
               svcParty,
               participantId,
               side,
               ParticipantPermission.Observation,
             )
-          authorizedAt <- waitForSvcPartyToParticipantAuthorization(domain, participantId, side)
-        } yield authorizedAt
-      case Seq(mapping) =>
-        logger.info(
-          s"Party ${svcParty.toProtoPrimitive} already authorized to participant ${participantId.toProtoPrimitive} from side $side"
-        )
-        Future.successful(mapping.context.validFrom)
-      case _ =>
-        Future.failed(
-          new IllegalStateException(
-            "More than 1 svc party to participant mapping which is not expected"
+            authorizedAt <- waitForSvcPartyToParticipantAuthorization(
+              domain,
+              participantId,
+              side,
+            )
+          } yield {
+            authorizedAt
+          }
+        case Seq(mapping) =>
+          logger.info(
+            s"Party ${svcParty.toProtoPrimitive} already authorized to participant ${participantId.toProtoPrimitive} from side $side"
           )
-        )
+          Future.successful(mapping.context.validFrom)
+        case _ =>
+          Future.failed(
+            new IllegalStateException(
+              "More than 1 svc party to participant mapping which is not expected"
+            )
+          )
+      }
     }
 
   // Wait for party to participant authorization to be reflected from the TopologyAdminCommand.ListPartyToParticipant
@@ -177,22 +286,42 @@ class SvcPartyHosting(
       side: RequestSide,
   )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retryForClientCalls(
     "wait for svc party to participant authorization to complete", {
-      listActiveSvcPartyMappings(domain, participantId, Some(side)).map {
-        case Seq(mapping) =>
-          logger.debug(
-            s"the party to participant authorization $mapping has been observed. done waiting."
-          )
-          mapping.context.validFrom
-        case Seq() =>
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription(
-              s"Authorization to $participantId on $side is still in progress"
+      if (useXNodes) {
+        listActiveSvcPartyMappingsX(domain, participantId).map {
+          case Seq(mapping) =>
+            logger.debug(
+              s"the party to participant authorization $mapping has been observed. done waiting."
             )
-          )
-        case _ =>
-          throw new StatusRuntimeException(
-            Status.INTERNAL.withDescription("Unexpected number of mappings")
-          )
+            mapping.context.validFrom
+          case Seq() =>
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(
+                s"Authorization to $participantId on $side is still in progress"
+              )
+            )
+          case _ =>
+            throw new StatusRuntimeException(
+              Status.INTERNAL.withDescription("Unexpected number of mappings")
+            )
+        }
+      } else {
+        listActiveSvcPartyMappings(domain, participantId, Some(side)).map {
+          case Seq(mapping) =>
+            logger.debug(
+              s"the party to participant authorization $mapping has been observed. done waiting."
+            )
+            mapping.context.validFrom
+          case Seq() =>
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(
+                s"Authorization to $participantId is still in progress"
+              )
+            )
+          case _ =>
+            throw new StatusRuntimeException(
+              Status.INTERNAL.withDescription("Unexpected number of mappings")
+            )
+        }
       }
     },
     logger,

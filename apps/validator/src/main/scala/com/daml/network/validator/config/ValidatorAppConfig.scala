@@ -81,6 +81,7 @@ case class ValidatorAppBackendConfig(
     onboarding: Option[ValidatorOnboardingConfig],
     enableCoinRulesUpgrade: Boolean = false,
     treasury: TreasuryConfig = TreasuryConfig(),
+    useXNodes: Boolean = false,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

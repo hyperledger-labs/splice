@@ -50,8 +50,7 @@ temp/
 **/scalapb/**/*.ts
 cluster/images/docs/src/app_dev/api
 canton.patch
-canton.tokens
-canton-simtime.tokens
+*.tokens
 canton-classpath
 openapi-ts-client
 /cluster/manifest/test-results/actual.json

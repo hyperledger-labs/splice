@@ -18,6 +18,7 @@ case class SvcAppBackendConfig(
     // TODO(M3-07): use price from SvcRules
     // TODO(M3-46): remove entirely once mining rounds automations moves into SvApp
     coinPrice: BigDecimal = 1.0,
+    useXNodes: Boolean = false,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SVC"
 
