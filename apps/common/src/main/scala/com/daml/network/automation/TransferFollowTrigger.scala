@@ -58,8 +58,7 @@ class TransferFollowTrigger[
     val leaderCid = PrettyContractId(task.leader.contract)
     val followerCid = PrettyContractId(task.follower.contract)
     for {
-      _ <- connection.submitTransferAndAwaitIngestionNoDedup(
-        store.multiDomainAcsStore,
+      _ <- connection.submitTransferAndWaitNoDedup(
         submitter = partyId,
         command = LedgerClient.TransferCommand.Out(
           contractId = task.follower.contract.contractId,

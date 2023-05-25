@@ -66,9 +66,6 @@ class AdvanceOpenMiningRoundTrigger(
         cmd,
         domainId = domainId,
       )
-      // make sure the store ingested our update so we don't
-      // attempt to advance the same round twice
-      _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, offset)
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
     )

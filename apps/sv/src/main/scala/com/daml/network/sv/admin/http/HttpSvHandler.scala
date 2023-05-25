@@ -2,15 +2,11 @@ package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
 import com.daml.network.admin.http.HttpErrorHandler
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
-import com.daml.network.environment.{
-  CNLedgerClient,
-  CNLedgerConnection,
-  ParticipantAdminConnection,
-  RetryProvider,
-}
+import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -32,11 +28,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
-    ledgerClient: CNLedgerClient,
     globalDomain: DomainId,
     svUserName: String,
-    svStore: SvSvStore,
-    svcStore: SvSvcStore,
+    svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
+    svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     isDevNet: Boolean,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
@@ -50,7 +45,8 @@ class HttpSvHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
-  private val ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+  private val svStore = svStoreWithIngestion.store
+  private val svcStore = svcStoreWithIngestion.store
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
 
@@ -180,8 +176,7 @@ class HttpSvHandler(
           .prepareValidatorOnboarding(
             secret,
             expiresIn,
-            svStore,
-            ledgerConnection,
+            svStoreWithIngestion,
             globalDomain,
             clock,
             logger,
@@ -428,7 +423,7 @@ class HttpSvHandler(
           .asScala
       ).toSeq
       // No command-dedup required, as the CoinRules contract is archived and recreated.
-      _ <- ledgerConnection.submitCommandsNoDedup(
+      _ <- svcStoreWithIngestion.connection.submitCommandsNoDedup(
         Seq(svParty),
         Seq(svcParty),
         cmds,
@@ -470,7 +465,7 @@ class HttpSvHandler(
                     svParty.toProtoPrimitive,
                   )
               )
-              ledgerConnection
+              svcStoreWithIngestion.connection
                 .submitCommands(
                   actAs = Seq(svParty),
                   readAs = Seq(svcParty),
@@ -493,7 +488,7 @@ class HttpSvHandler(
   private def lockSvcRulesAndCoinRules()(implicit tc: TraceContext) = for {
     svcRules <- svcStore.getSvcRules()
     coinRules <- svcStore.getCoinRules()
-    res <- ledgerConnection.submitWithResultNoDedup(
+    res <- svcStoreWithIngestion.connection.submitWithResultNoDedup(
       Seq(svParty),
       Seq(svcParty),
       svcRules.contractId.exerciseSvcRules_Lock(svParty.toProtoPrimitive, coinRules.contractId),
@@ -504,7 +499,7 @@ class HttpSvHandler(
   private def unlockSvcRulesAndCoinRules()(implicit tc: TraceContext) = for {
     svcRules <- svcStore.getSvcRules()
     coinRules <- svcStore.getCoinRules()
-    res <- ledgerConnection.submitWithResultNoDedup(
+    res <- svcStoreWithIngestion.connection.submitWithResultNoDedup(
       Seq(svParty),
       Seq(svcParty),
       svcRules.contractId.exerciseSvcRules_Unlock(svParty.toProtoPrimitive, coinRules.contractId),

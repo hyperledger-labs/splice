@@ -2,7 +2,7 @@ package com.daml.network.sv.admin.http
 
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.environment.CNLedgerClient
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.http.v0.definitions.{
   CometBftNodeDumpResponse,
   CometBftNodeStatusResponse,
@@ -27,10 +27,9 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpSvAdminHandler(
-    ledgerClient: CNLedgerClient,
     globalDomain: DomainId,
-    svStore: SvSvStore,
-    svcStore: SvSvcStore,
+    svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
+    svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
@@ -41,7 +40,8 @@ class HttpSvAdminHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
-  private val ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+  private val svStore = svStoreWithIngestion.store
+  private val svcStore = svcStoreWithIngestion.store
 
   def listOngoingValidatorOnboardings(
       respond: v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse.type
@@ -83,8 +83,7 @@ class HttpSvAdminHandler(
         .prepareValidatorOnboarding(
           secret,
           expiresIn,
-          svStore,
-          ledgerConnection,
+          svStoreWithIngestion,
           globalDomain,
           clock,
           logger,
@@ -110,8 +109,7 @@ class HttpSvAdminHandler(
         .approveSvIdentity(
           body.candidateName,
           body.candidateKey,
-          svStore,
-          ledgerConnection,
+          svStoreWithIngestion,
           globalDomain,
           logger,
         )
@@ -162,8 +160,7 @@ class HttpSvAdminHandler(
       SvApp
         .updateCoinPriceVote(
           coinPrice,
-          svcStore: SvSvcStore,
-          ledgerConnection,
+          svcStoreWithIngestion,
           globalDomain: DomainId,
           logger,
         )

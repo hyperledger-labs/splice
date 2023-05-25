@@ -70,6 +70,7 @@ class ScanApp(
           config,
           loggerFactory,
           futureSupervisor,
+          // ScanStore needs its own connection for enriching the tx history on-demand
           ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
           retryProvider,
         )

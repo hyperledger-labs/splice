@@ -63,7 +63,6 @@ class SvcApp(
           retryProvider,
         )
       )
-      connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
       automation = new SvcAutomationService(
         clock,
         config,
@@ -80,9 +79,8 @@ class SvcApp(
         .addService(
           SvcServiceGrpc.bindService(
             new GrpcSvcAppService(
-              ledgerClient,
               config.ledgerApiUser,
-              store,
+              automation,
               domainId,
               loggerFactory,
             ),

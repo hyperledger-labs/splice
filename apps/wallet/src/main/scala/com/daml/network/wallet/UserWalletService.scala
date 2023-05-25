@@ -2,7 +2,7 @@ package com.daml.network.wallet
 
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.daml.network.wallet.automation.UserWalletAutomationService
@@ -43,8 +43,6 @@ class UserWalletService(
   override protected val loggerFactory: NamedLoggerFactory =
     loggerFactory0.append("user", key.endUserName)
 
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-
   val store: UserWalletStore =
     UserWalletStore(
       key,
@@ -52,13 +50,15 @@ class UserWalletService(
       globalDomain,
       loggerFactory,
       futureSupervisor,
-      connection,
+      // The store needs its own connection to expand tx-history entries
+      ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
       retryProvider,
       walletManager.store.offset,
     )
 
   val treasury: TreasuryService = new TreasuryService(
-    connection,
+    // The treasury gets its own connection, and is required to manage waiting for the store on its own.
+    ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
     globalDomain,
     treasuryConfig,
     clock,
@@ -82,6 +82,11 @@ class UserWalletService(
     timeouts,
   )
 
+  /** The connection to use when submitting commands based on reads from the WalletStore.
+    * The submission will wait for the store to ingest the effect of the command before completing the future.
+    */
+  val connection: CNLedgerConnection = automation.connection
+
   override def isHealthy: Boolean = automation.isHealthy && treasury.isHealthy
 
   override def onClosed(): Unit = {
@@ -91,7 +96,6 @@ class UserWalletService(
     treasury.close()
     automation.close()
     store.close()
-    connection.close()
     super.onClosed()
   }
 }

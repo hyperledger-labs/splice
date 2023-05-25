@@ -379,7 +379,7 @@ class TreasuryService(
           disclosedContracts,
         )
 
-      // wait for store to ingest the new coin holdings *provided* they were updated, then return all outcomes to the callers
+      // wait for store to ingest the new coin holdings, then return all outcomes to the callers
       _ <- waitForIngestion(offset, result).map(_ =>
         batch.completeBatchOperations(result)(logger, tc)
       )

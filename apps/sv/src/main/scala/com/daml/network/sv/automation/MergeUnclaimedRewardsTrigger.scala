@@ -45,16 +45,13 @@ class MergeUnclaimedRewardsTrigger(
                 )
                 val cmd = svcRules.contractId.exerciseSvcRules_MergeUnclaimedRewards(arg)
                 for {
-                  (txOffset, outcome) <- connection
-                    .submitWithResultAndOffsetNoDedup(
+                  outcome <- connection
+                    .submitWithResultNoDedup(
                       Seq(store.key.svParty),
                       Seq(store.key.svcParty),
                       cmd,
                       domainId,
                     )
-                  // make sure the store ingested our update so we don't
-                  // attempt to merge the same reward twice
-                  _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, txOffset)
                 } yield Some(outcome)
             }
           } yield {

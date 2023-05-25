@@ -73,16 +73,12 @@ class PublishLocalCometBftNodeConfigTrigger(
         SvUtil.defaultSvcDomainNumber, // TODO(#4901): do not use default, but reconcile all configured CometBFT networks
         task.damlSvNodeConfig,
       )
-      (offset, _) <- connection.submitWithResultAndOffsetNoDedup(
+      _ <- connection.submitWithResultNoDedup(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
         cmd,
         domainId = domainId,
       )
-      // make sure the store ingested our update so we don't
-      // attempt to advance the same round twice
-      _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, offset)
-
     } yield TaskSuccess(show"Updated SVC-wide CometBFT node configuration for ${store.key.svParty}")
 
   override protected def isStaleTask(

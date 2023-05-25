@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
@@ -87,8 +88,8 @@ class ArchiveClosedMiningRoundsTrigger(
           svParty.toProtoPrimitive,
           action,
         )
-      txOffset <- connection
-        .submitWithResultAndOffset(
+      _ <- connection
+        .submitWithResult(
           actAs = Seq(svParty),
           readAs = Seq(svcParty),
           update = update,
@@ -97,11 +98,9 @@ class ArchiveClosedMiningRoundsTrigger(
             Seq(svParty, svcParty),
             closedRound.contractId.contractId,
           ),
-          deduplicationOffset = task.deduplicationOffset,
+          deduplicationConfig = DedupOffset(task.deduplicationOffset),
           domainId = domainId,
         )
-        .map(_._1)
-      _ <- store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, txOffset)
     } yield {
       TaskSuccess(
         s"Successfully created a confirmation for archiving closed mining round ${closedRound.payload.round.number}"

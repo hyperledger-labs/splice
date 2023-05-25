@@ -221,7 +221,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       readAs: Seq[String],
       commands: Seq[Command],
       disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
-  )(implicit ec: ExecutionContext): Future[Unit] = {
+  )(implicit ec: ExecutionContext): Future[String] = {
     val request = submitAndWaitRequest(
       workflowId,
       applicationId,
@@ -232,7 +232,9 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       commands,
       disclosedContracts,
     )
-    wrapFuture(commandServiceStub.submitAndWait(request, _)).map(_ => ())
+    wrapFuture(commandServiceStub.submitAndWaitForTransactionId(request, _)).map(response =>
+      response.getCompletionOffset
+    )
   }
 
   def submitAndWaitForTransaction(

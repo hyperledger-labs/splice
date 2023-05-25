@@ -53,8 +53,7 @@ private[automation] class UpgradeGroupTrigger(
     val (groupId, domainId) = task
     for {
       preferredDomain <- store.domains.signalWhenConnected(store.defaultAcsDomain)
-      _ <- connection.submitTransferAndAwaitIngestionNoDedup(
-        store.multiDomainAcsStore,
+      _ <- connection.submitTransferAndWaitNoDedup(
         submitter = store.providerParty,
         command = TransferCommand.Out(
           contractId = groupId,

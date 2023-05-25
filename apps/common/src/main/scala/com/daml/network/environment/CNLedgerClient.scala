@@ -9,11 +9,12 @@ import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelCo
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class CNLedgerClient(
     config: ClientConfig,
@@ -65,6 +66,7 @@ class CNLedgerClient(
   def connection(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,
+      completionOffsetCallback: (DomainId, String) => Future[Unit] = (_, _) => Future.unit,
   ): CNLedgerConnection =
     new CNLedgerConnection(
       this.client,
@@ -73,6 +75,7 @@ class CNLedgerClient(
       timeouts,
       retryProvider,
       callbacks,
+      completionOffsetCallback,
     )
 
   override def onClosed(): Unit = {

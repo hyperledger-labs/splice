@@ -2,22 +2,23 @@ package com.daml.network.automation
 
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
-import com.daml.network.store.CNNodeAppStore
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
+import com.daml.network.store.{CNNodeAppStore, CNNodeAppStoreWithIngestion}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 /** A class that wires up a single store with an ingestion service, and provides a suitable
   * context for registering triggers against that store.
   */
-abstract class CNNodeAppAutomationService(
+abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
     automationConfig: AutomationConfig,
     clock: Clock,
-    store: CNNodeAppStore[?, ?],
+    override val store: Store,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
     enableOffsetIngestionService: Boolean = true,
@@ -25,13 +26,16 @@ abstract class CNNodeAppAutomationService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(automationConfig, clock, retryProvider) {
+) extends AutomationService(automationConfig, clock, retryProvider)
+    with CNNodeAppStoreWithIngestion[Store] {
 
-  protected val connection = registerResource(
-    ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-  )
+  override val connection: CNLedgerConnection =
+    ledgerClient.connection(this.getClass.getSimpleName, loggerFactory, completionOffsetCallback)
 
-  def newUpdateIngestionService(
+  private def completionOffsetCallback(domainId: DomainId, offset: String): Future[Unit] =
+    store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, offset)(TraceContext.empty)
+
+  private def newUpdateIngestionService(
       store: CNNodeAppStore[?, ?],
       domain: DomainId,
       perDomainTriggerContext: TriggerContext,
@@ -76,11 +80,11 @@ abstract class CNNodeAppAutomationService(
       )
     )
   }
-  val domainAcsOrchestrator = DomainOrchestrator(
-    triggerContext,
-    store.domains,
-    (da, triggerContext) => newUpdateIngestionService(store, da.domainId, triggerContext),
+  registerTrigger(
+    DomainOrchestrator(
+      triggerContext,
+      store.domains,
+      (da, triggerContext) => newUpdateIngestionService(store, da.domainId, triggerContext),
+    )
   )
-  registerTrigger(domainAcsOrchestrator)
-
 }

@@ -22,6 +22,7 @@ import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
 import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{HasHealth, UploadablePackage}
@@ -83,7 +84,7 @@ class ValidatorApp(
         logger,
       )
 
-  private def setupWallet(connection: CNLedgerConnection): Future[Unit] = {
+  private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
     for {
       _ <- connection.uploadDarFile(new UploadablePackage {
@@ -114,17 +115,16 @@ class ValidatorApp(
   }
 
   private def setupAppInstance(
-      connection: CNLedgerConnection,
       name: String,
       instance: AppInstance,
       validatorParty: PartyId,
-      store: ValidatorStore,
+      storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       domainId: DomainId,
   ): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
     for {
-      _ <- instance.dars.traverse_(dar => connection.uploadDarFile(dar))
-      party <- connection.getOrAllocateParty(
+      _ <- instance.dars.traverse_(dar => storeWithIngestion.connection.uploadDarFile(dar))
+      party <- storeWithIngestion.connection.getOrAllocateParty(
         instance.serviceUser,
         Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
       )
@@ -132,8 +132,7 @@ class ValidatorApp(
         .onboard(
           instance.walletUser.getOrElse(instance.serviceUser),
           Some(party),
-          connection,
-          store,
+          storeWithIngestion,
           validatorUserName = config.ledgerApiUser,
           domainId,
           retryProvider,
@@ -225,8 +224,7 @@ class ValidatorApp(
         loggerFactory,
       )
       svcParty <- getSvcPartyId(scanConnection)
-      connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-      _ <- setupWallet(connection)
+      _ <- setupWalletDars(ledgerClient.connection(this.getClass.getSimpleName, loggerFactory))
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         svcParty = svcParty,
@@ -270,19 +268,17 @@ class ValidatorApp(
       _ <- waitForAcsIngestion(store.multiDomainAcsStore, domainId)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(
-          connection,
           name,
           instance,
           validatorParty,
-          store,
+          automation,
           domainId,
         )
       })
       _ <- ValidatorUtil.onboard(
         endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
         knownParty = Some(validatorParty),
-        connection,
-        store,
+        automation,
         validatorUserName = config.ledgerApiUser,
         domainId,
         retryProvider,
@@ -295,8 +291,7 @@ class ValidatorApp(
       }
 
       handler = new HttpValidatorHandler(
-        ledgerClient,
-        store,
+        automation,
         validatorUserName = config.ledgerApiUser,
         domainId = domainId,
         retryProvider = retryProvider,
@@ -304,8 +299,7 @@ class ValidatorApp(
       )
 
       adminHandler = new HttpValidatorAdminHandler(
-        ledgerClient,
-        store,
+        automation,
         validatorUserName = config.ledgerApiUser,
         domainId = domainId,
         retryProvider = retryProvider,
@@ -322,7 +316,6 @@ class ValidatorApp(
 
       walletHandler = new HttpWalletHandler(
         walletManager,
-        ledgerClient,
         clock,
         scanConnection,
         loggerFactory,

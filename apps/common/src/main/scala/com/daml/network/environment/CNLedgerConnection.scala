@@ -28,7 +28,7 @@ import com.daml.network.environment.ledger.api.{
   NoDedup,
   TreeUpdate,
 }
-import com.daml.network.store.MultiDomainAcsStore
+import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.DomainAlias
@@ -38,7 +38,6 @@ import com.digitalasset.canton.error.CantonErrorResource
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
-  FlagCloseable,
   FlagCloseableAsync,
   RunOnShutdown,
   SyncCloseable,
@@ -61,30 +60,28 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 
-import MultiDomainAcsStore.IngestionFilter
-
 class CNLedgerConnection(
     client: LedgerClient,
     applicationId: String,
     protected val loggerFactory: NamedLoggerFactory,
-    override protected val timeouts: ProcessingTimeout,
+    protected val timeouts: ProcessingTimeout,
     retryProvider: RetryProvider,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
+    completionOffsetCallback: (DomainId, String) => Future[Unit],
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
-    extends FlagCloseable
-    with NamedLogging {
+    extends NamedLogging {
 
   logger.debug(s"Created connection with applicationId=$applicationId")(
     TraceContext.empty
   )
 
-  override def onClosed(): Unit = {}
-
   import CNLedgerConnection.*
 
-  private def callCallbacksOnCompletion[T](result: Future[T]): Future[T] = {
+  private def callCallbacksOnCompletion[T, U](
+      result: Future[T]
+  )(getOffsetAndResult: T => (Option[(DomainId, String)], U)): Future[U] = {
     import TraceContext.Implicits.Empty.*
-    def callCallbacksInternal(result: Try[?]): Unit =
+    def callCallbacksInternal(result: Try[T]): Unit =
       LoggerUtil.logOnThrow { // in case the callbacks throw.
         result match {
           case Success(_) => ()
@@ -102,8 +99,27 @@ class CNLedgerConnection(
       }
 
     result.onComplete(callCallbacksInternal)
-    result
+    result.flatMap(x => {
+      val (optOffset, result) = getOffsetAndResult(x)
+      optOffset match {
+        case None => Future.successful(result)
+        case Some((domainId, offset)) =>
+          // Wait for the completion offset to have been processed.
+          completionOffsetCallback(domainId, offset).map(_ => result)
+      }
+    })
   }
+
+  private def callCallbacksOnCompletionAndWaitForOffset[T, U](
+      result: Future[T]
+  )(getOffsetAndResult: T => ((DomainId, String), U)): Future[U] =
+    callCallbacksOnCompletion(result)(x => {
+      val (offset, result) = getOffsetAndResult(x)
+      (Some(offset), result)
+    })
+
+  private def callCallbacksOnCompletionNoWaitForOffset[T](result: Future[T]): Future[T] =
+    callCallbacksOnCompletion(result)(x => (None, x))
 
   // The participant ledger end as opposed to the per-domain ledger end.
   // We use this for synchronization in `UpdateIngestionService`.
@@ -124,7 +140,7 @@ class CNLedgerConnection(
       domainId: DomainId,
       disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   ): Future[Unit] = {
-    callCallbacksOnCompletion(
+    callCallbacksOnCompletionAndWaitForOffset(
       client
         .submitAndWait(
           workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
@@ -136,7 +152,7 @@ class CNLedgerConnection(
           deduplicationConfig = NoDedup,
           disclosedContracts = disclosedContracts,
         )
-    )
+    )(offset => ((domainId, offset), ()))
   }
 
   // When using submitAndWaitForTransaction with a command whose resulting transaction is
@@ -149,7 +165,7 @@ class CNLedgerConnection(
       domainId: DomainId,
       disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   ): Future[Transaction] = {
-    callCallbacksOnCompletion(
+    callCallbacksOnCompletionAndWaitForOffset(
       client
         .submitAndWaitForTransaction(
           workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
@@ -161,7 +177,7 @@ class CNLedgerConnection(
           deduplicationConfig = NoDedup,
           disclosedContracts = disclosedContracts,
         )
-    )
+    )(tx => ((domainId, tx.getOffset), tx))
   }
 
   def submitCommands(
@@ -173,7 +189,7 @@ class CNLedgerConnection(
       domainId: DomainId,
       disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   ): Future[Unit] = {
-    callCallbacksOnCompletion(
+    callCallbacksOnCompletionAndWaitForOffset(
       client
         .submitAndWait(
           workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
@@ -187,7 +203,7 @@ class CNLedgerConnection(
           commands = commands,
           disclosedContracts = disclosedContracts,
         )
-    )
+    )(offset => ((domainId, offset), ()))
   }
 
   def submitCommandsTransaction(
@@ -199,7 +215,7 @@ class CNLedgerConnection(
       domainId: DomainId,
       disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   ): Future[Transaction] = {
-    callCallbacksOnCompletion(
+    callCallbacksOnCompletionAndWaitForOffset(
       client
         .submitAndWaitForTransaction(
           workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
@@ -213,7 +229,7 @@ class CNLedgerConnection(
           commands = commands,
           disclosedContracts = disclosedContracts,
         )
-    )
+    )(tx => ((domainId, tx.getOffset), tx))
   }
 
   def submitWithResultNoDedup[T](
@@ -296,7 +312,7 @@ class CNLedgerConnection(
       disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
   ): Future[(String, T)] = {
     for {
-      tree <- callCallbacksOnCompletion(
+      tree <- callCallbacksOnCompletionAndWaitForOffset(
         client
           .submitAndWaitForTransactionTree(
             workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
@@ -308,7 +324,7 @@ class CNLedgerConnection(
             deduplicationConfig = dedup,
             disclosedContracts = disclosedContracts,
           )
-      )
+      )(tx => ((domainId, tx.getOffset), tx))
     } yield (
       tree.getOffset,
       decodeExerciseResult(
@@ -662,7 +678,9 @@ class CNLedgerConnection(
         .completions(applicationId, Seq(submitter), begin = None, listenDomain)
         .wireTap(csr => logger.trace(s"completions while awaiting transfer $commandId: $csr"))
     )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
-      callCallbacksOnCompletion(
+      // We call the callbacks for handling stale contract errors here, but wait for the offset
+      // ingestion at which the completion is reported.
+      callCallbacksOnCompletionNoWaitForOffset(
         client
           .submitTransfer(
             applicationId,
@@ -687,28 +705,16 @@ class CNLedgerConnection(
       override def run(): Unit = ks.shutdown()
     })
 
-    completion.map(_._1._1)
-  }
-
-  private[network] final def submitTransferAndAwaitIngestionNoDedup(
-      store: MultiDomainAcsStore,
-      submitter: PartyId,
-      command: LedgerClient.TransferCommand,
-  )(implicit tc: TraceContext): Future[Unit] =
-    submitTransferAndWaitNoDedup(
-      submitter,
-      command,
-    )
-      .flatMap {
-        case loa: LedgerOffset.Absolute =>
-          import LedgerClient.TransferCommand.{In, Out}
-          val awaitDomain = command match {
-            case o: Out => o.source
-            case i: In => i.target
-          }
-          store.signalWhenIngestedOrShutdown(awaitDomain, loa.getOffset)
-        case _ => Future successful (()) // LedgerBegin and LedgerEnd are nonsense, don't await
+    completion.flatMap { case ((offset, _), ()) =>
+      offset match {
+        case absolute: LedgerOffset.Absolute =>
+          completionOffsetCallback(listenDomain, absolute.getOffset).map(_ => offset)
+        case other =>
+          logger.warn(s"Encountered unexpected non-absolute ledger offset $other")
+          Future.successful(offset)
       }
+    }
+  }
 
   // simulate the completion check of command service; future only yields
   // successfully if the completion was OK

@@ -1,5 +1,6 @@
 package com.daml.network.validator.util
 
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -20,8 +21,7 @@ private[validator] object ValidatorUtil {
       endUserParty: PartyId,
       endUserName: String,
       svcParty: PartyId,
-      connection: CNLedgerConnection,
-      store: ValidatorStore,
+      storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       domainId: DomainId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -29,6 +29,7 @@ private[validator] object ValidatorUtil {
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[Unit] = {
+    val store = storeWithIngestion.store
     logger.debug(
       s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
     )
@@ -37,7 +38,7 @@ private[validator] object ValidatorUtil {
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case result @ QueryResult(_, None) =>
-            connection
+            storeWithIngestion.connection
               .submitCommands(
                 actAs = Seq(validatorServiceParty, endUserParty),
                 readAs = Seq.empty,
@@ -68,35 +69,38 @@ private[validator] object ValidatorUtil {
   def onboard(
       endUserName: String,
       knownParty: Option[PartyId],
-      connection: CNLedgerConnection,
-      store: ValidatorStore,
+      storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       domainId: DomainId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
+    val store = storeWithIngestion.store
     for {
       userPartyId <- knownParty match {
         case Some(party) =>
-          connection.createUserWithPrimaryParty(
+          storeWithIngestion.connection.createUserWithPrimaryParty(
             endUserName,
             party,
             Seq(),
           )
         case None =>
-          connection.getOrAllocateParty(
+          storeWithIngestion.connection.getOrAllocateParty(
             endUserName,
             Seq(),
           )
       }
-      _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
+      _ <- storeWithIngestion.connection.grantUserRights(
+        validatorUserName,
+        Seq(userPartyId),
+        Seq.empty,
+      )
       _ <- installWalletForUser(
         endUserParty = userPartyId,
         endUserName = endUserName,
         validatorServiceParty = store.key.validatorParty,
         svcParty = store.key.svcParty,
-        connection = connection,
-        store = store,
+        storeWithIngestion = storeWithIngestion,
         domainId = domainId,
         retryProvider = retryProvider,
         logger = logger,
@@ -106,8 +110,9 @@ private[validator] object ValidatorUtil {
         user = userPartyId,
         validator = store.key.validatorParty,
         svc = store.key.svcParty,
-        connection = connection,
-        lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
+        connection = storeWithIngestion.connection,
+        lookupValidatorRightByParty =
+          storeWithIngestion.store.lookupValidatorRightByPartyWithOffset,
         domainId = domainId,
         retryProvider = retryProvider,
         logger = logger,
@@ -117,18 +122,15 @@ private[validator] object ValidatorUtil {
 
   def offboard(
       endUserName: String,
-      connection: CNLedgerConnection,
-      store: ValidatorStore,
+      storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       domainId: DomainId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    def waitForStoreIngestion(offsetAndResult: (String, Any)): Future[Unit] =
-      store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, offsetAndResult._1)
-
+    val store = storeWithIngestion.store
     for {
-      endUserParty <- connection.getPrimaryParty(endUserName)
+      endUserParty <- storeWithIngestion.connection.getPrimaryParty(endUserName)
       _ <- retryProvider.retryForClientCalls(
         "Remove install contract",
         store
@@ -139,7 +141,7 @@ private[validator] object ValidatorUtil {
               logger.debug(s"No install contract found for user $endUserName, skipping")
               Future.unit
             case Some(c) =>
-              connection
+              storeWithIngestion.connection
                 .submitWithResultAndOffsetNoDedup(
                   actAs = Seq(
                     store.key.validatorParty,
@@ -151,7 +153,6 @@ private[validator] object ValidatorUtil {
                   ),
                   domainId = domainId,
                 )
-                .flatMap(waitForStoreIngestion) // wait for store update to avoid #4536
           },
         logger,
         // once the validator's actAs and readAs rights have been revoked,
@@ -168,7 +169,7 @@ private[validator] object ValidatorUtil {
               logger.debug(s"No validator right found for user $endUserName, skipping")
               Future.unit
             case Some(c) =>
-              connection
+              storeWithIngestion.connection
                 .submitWithResultAndOffsetNoDedup(
                   actAs = Seq(
                     store.key.validatorParty,
@@ -181,14 +182,17 @@ private[validator] object ValidatorUtil {
                     ),
                   domainId = domainId,
                 )
-                .flatMap(waitForStoreIngestion) // wait for store update to avoid #4536
           },
         logger,
         // once the validator's actAs and readAs rights have been revoked,
         // this command could fail with PERMISSION_DENIED errors (#4425).
         additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
-      _ <- connection.revokeUserRights(validatorUserName, Seq(endUserParty), Seq(endUserParty))
+      _ <- storeWithIngestion.connection.revokeUserRights(
+        validatorUserName,
+        Seq(endUserParty),
+        Seq(endUserParty),
+      )
     } yield {
       logger.debug(s"User $endUserParty offboarded")
       ()

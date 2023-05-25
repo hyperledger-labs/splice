@@ -94,9 +94,7 @@ class SplitwellApp(
       .addService(
         SplitwellServiceGrpc.bindService(
           new GrpcSplitwellService(
-            ledgerClient,
             splitwellDomains,
-            scanConnection,
             party,
             store,
             loggerFactory,

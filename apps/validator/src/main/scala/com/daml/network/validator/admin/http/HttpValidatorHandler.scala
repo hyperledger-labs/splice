@@ -1,6 +1,7 @@
 package com.daml.network.validator.admin.http
 
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.{definitions, validator as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
@@ -13,8 +14,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpValidatorHandler(
-    ledgerClient: CNLedgerClient,
-    store: ValidatorStore,
+    storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
     validatorUserName: String,
     domainId: DomainId,
     retryProvider: RetryProvider,
@@ -26,7 +26,7 @@ class HttpValidatorHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+  private val store = storeWithIngestion.store
 
   def register(
       respond: v0.ValidatorResource.RegisterResponse.type
@@ -55,8 +55,7 @@ class HttpValidatorHandler(
       .onboard(
         name,
         None,
-        connection,
-        store,
+        storeWithIngestion,
         validatorUserName,
         domainId,
         retryProvider,

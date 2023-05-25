@@ -255,12 +255,12 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   ) = for {
     _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
-    connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+    initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
       retryProvider.retryForAutomation(
         "Querying primary party of user",
-        connection.getPrimaryParty(serviceUser),
+        initConnection.getPrimaryParty(serviceUser),
         logger,
         // Note: In general, app service users are allocated by the validator app.
         // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
@@ -270,7 +270,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
       )
     _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
-    _ <- waitForPackages(connection)
+    _ <- waitForPackages(initConnection)
     _ = logger.info(s"Packages available, running app-specific init")
     state <- initialize(ledgerClient, serviceParty)
   } yield state

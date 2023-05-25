@@ -23,7 +23,7 @@ import com.daml.network.codegen.java.cn.wallet.install.{
 }
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.environment.CNLedgerConnection.CommandId
 import com.daml.network.environment.ledger.api.{DedupConfig, DedupDuration}
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
@@ -64,7 +64,6 @@ import scala.util.{Failure, Success, Try}
 
 class HttpWalletHandler(
     walletManager: UserWalletManager,
-    ledgerClient: CNLedgerClient,
     clock: Clock,
     scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
@@ -79,8 +78,6 @@ class HttpWalletHandler(
   private val workflowId = this.getClass.getSimpleName
   private val store = walletManager.store
   private val validatorParty: PartyId = store.walletKey.validatorParty
-
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
 
   override def list(respond: r0.ListResponse.type)()(
       user: String
@@ -716,15 +713,16 @@ class HttpWalletHandler(
       dedup: Option[(CommandId, DedupConfig)] = None,
       dislosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
   )(implicit tc: TraceContext): Future[Response] = {
+    val userWallet = getUserWallet(user)
+    val userStore = userWallet.store
+    val userParty = userStore.key.endUserParty
     for {
-      userStore <- getUserStore(user)
-      userParty = userStore.key.endUserParty
       install <- userStore.getInstall()
       update <- getUpdate(install.contractId, userStore)
       domainId <- store.domains.getDomainId(walletManager.globalDomain)
       result <- dedup match {
         case None =>
-          connection.submitWithResultNoDedup(
+          getUserWallet(user).connection.submitWithResultNoDedup(
             Seq(validatorParty),
             Seq(userParty),
             update,
@@ -732,7 +730,7 @@ class HttpWalletHandler(
             dislosedContracts,
           )
         case Some((commandId, dedupConfig)) =>
-          connection
+          userWallet.connection
             .submitWithResult(
               Seq(validatorParty),
               Seq(userParty),

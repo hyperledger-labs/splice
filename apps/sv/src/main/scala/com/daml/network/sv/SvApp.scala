@@ -26,6 +26,7 @@ import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.svAdmin.SvAdminResource
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
@@ -121,7 +122,6 @@ class SvApp(
       _ <- participantAdminConnection.reconnectAllDomains()
       // TODO(#3856): find a better way to get the SVC party ID
       svcPartyId <- retryProvider.retryForAutomation("get SVC party ID", getSvcPartyId, logger)
-      ledgerConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
       storeKey = SvStore.Key(svPartyId, svcPartyId)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -132,15 +132,18 @@ class SvApp(
       _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
       svcPartyHosting = newSvcPartyHosting(storeKey, participantAdminConnection)
       (svcStore, svcAutomation) <- ensureOnboarded(
-        svStore,
+        svAutomation,
         ledgerClient,
-        ledgerConnection,
         participantAdminConnection,
         svcPartyHosting,
         globalDomain,
       )
-      _ <- expectConfiguredValidatorOnboardings(svStore, ledgerConnection, globalDomain, clock)
-      _ <- approveConfiguredSvIdentities(svStore, ledgerConnection, globalDomain)
+      _ <- expectConfiguredValidatorOnboardings(
+        svAutomation,
+        globalDomain,
+        clock,
+      )
+      _ <- approveConfiguredSvIdentities(svAutomation, globalDomain)
       isDevNet <- retryProvider.retryForAutomation(
         "get CoinRules to determine if we are in a DevNet",
         svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
@@ -165,11 +168,10 @@ class SvApp(
       }
 
       handler = new HttpSvHandler(
-        ledgerClient,
         globalDomain,
         config.ledgerApiUser,
-        svStore,
-        svcStore,
+        svAutomation,
+        svcAutomation,
         isDevNet,
         clock,
         participantAdminConnection,
@@ -191,10 +193,9 @@ class SvApp(
         )
 
       adminHandler = new HttpSvAdminHandler(
-        ledgerClient,
         globalDomain,
-        svStore,
-        svcStore,
+        svAutomation,
+        svcAutomation,
         cometBftStatusClient,
         clock,
         loggerFactory,
@@ -233,7 +234,7 @@ class SvApp(
                   SvAuthExtractor(
                     verifier,
                     svPartyId,
-                    ledgerConnection,
+                    svAutomation.connection,
                     loggerFactory,
                     "canton network sv admin realm",
                   ),
@@ -288,13 +289,13 @@ class SvApp(
     }
 
   private def ensureOnboarded(
-      svStore: SvSvStore,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       ledgerClient: CNLedgerClient,
-      ledgerConnection: CNLedgerConnection,
       participantAdminConnection: ParticipantAdminConnection,
       svcPartyHosting: SvcPartyHosting,
       globalDomain: DomainId,
   ): Future[(SvSvcStore, SvSvcAutomationService)] = {
+    val svStore = svStoreWithIngestion.store
     for {
       participantId <- retryProvider.retryForAutomation(
         "get Participant ID",
@@ -309,7 +310,7 @@ class SvApp(
         if (svcPartyIsAuthorized) {
           logger.info("SVC party is authorized to our participant.")
           for {
-            _ <- ledgerConnection.grantUserRights(
+            _ <- svStoreWithIngestion.connection.grantUserRights(
               config.ledgerApiUser,
               Seq.empty,
               Seq(svStore.key.svcParty),
@@ -329,10 +330,9 @@ class SvApp(
               } else {
                 logger.info("Starting onboarding (without SVC party migration).")
                 startOnboardingWithSvcPartyHosted(
-                  svStore,
-                  svcStore,
+                  svStoreWithIngestion,
+                  svcAutomation,
                   globalDomain,
-                  ledgerConnection,
                 )
               }
           } yield (svcStore, svcAutomation)
@@ -342,11 +342,10 @@ class SvApp(
               "Starting onboarding with SVC party migration."
           )
           startOnboardingWithSvcPartyMigration(
-            svStore,
+            svStoreWithIngestion,
             participantId,
             globalDomain,
             ledgerClient,
-            ledgerConnection,
             svcPartyHosting,
           )
         }
@@ -355,19 +354,19 @@ class SvApp(
   }
 
   private def startOnboardingWithSvcPartyMigration(
-      svStore: SvSvStore,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       participantId: ParticipantId,
       globalDomain: DomainId,
       ledgerClient: CNLedgerClient,
-      ledgerConnection: CNLedgerConnection,
       svcPartyHosting: SvcPartyHosting,
   ): Future[(SvSvcStore, SvSvcAutomationService)] = {
+    val svStore = svStoreWithIngestion.store
     config.onboarding match {
       case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
             for {
-              _ <- uploadDars(ledgerConnection)
+              _ <- uploadDars(svStoreWithIngestion.connection)
               _ <- waitForValidatorLicense(svStore)
               _ <- requestOnboarding(
                 svClient.adminApi,
@@ -384,7 +383,7 @@ class SvApp(
                 svcPartyHosting,
                 svStore.key.svParty,
               )
-              _ <- ledgerConnection.grantUserRights(
+              _ <- svStoreWithIngestion.connection.grantUserRights(
                 config.ledgerApiUser,
                 Seq.empty,
                 Seq(svStore.key.svcParty),
@@ -397,10 +396,9 @@ class SvApp(
               )
               _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
               _ <- addMemberToSvc(
-                svcStore,
+                svcAutomation,
                 globalDomain,
                 svOnboardingConfirmed,
-                ledgerConnection,
               )
             } yield (svcStore, svcAutomation)
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
@@ -410,14 +408,14 @@ class SvApp(
   }
 
   private def startOnboardingWithSvcPartyHosted(
-      svStore: SvSvStore,
-      svcStore: SvSvcStore,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
-      ledgerConnection: CNLedgerConnection,
   ): Future[Unit] = {
+    val svcStore = svcStoreWithIngestion.store
     config.onboarding match {
       case foundingConfig: SvOnboardingConfig.FoundCollective =>
-        foundCollective(foundingConfig, svcStore, ledgerConnection, globalDomain)
+        foundCollective(foundingConfig, svcStoreWithIngestion, globalDomain)
       case _: SvOnboardingConfig.JoinViaSvcApp =>
         joinCollective(svcStore.key.svParty)
       case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
@@ -432,12 +430,11 @@ class SvApp(
                 svcStore.key.svcParty,
                 privateKey_,
               )
-              svOnboardingConfirmed <- waitForSvOnboardingConfirmed(svStore)
+              svOnboardingConfirmed <- waitForSvOnboardingConfirmed(svStoreWithIngestion.store)
               _ <- addMemberToSvc(
-                svcStore,
+                svcStoreWithIngestion,
                 globalDomain,
                 svOnboardingConfirmed,
-                ledgerConnection,
               )
             } yield ()
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
@@ -542,11 +539,11 @@ class SvApp(
   )
 
   private def addMemberToSvc(
-      svcStore: SvSvcStore,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       domainId: DomainId,
       svOnboardingConfirmed: Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed],
-      connection: CNLedgerConnection,
   ): Future[Unit] = {
+    val svcStore = svcStoreWithIngestion.store
     retryProvider.retryForAutomation(
       "add member to Svc",
       for {
@@ -555,7 +552,7 @@ class SvApp(
           svcStore.key.svParty.toProtoPrimitive,
           svOnboardingConfirmed.contractId,
         )
-        _ <- connection.submitCommandsNoDedup(
+        _ <- svcStoreWithIngestion.connection.submitCommandsNoDedup(
           Seq(svcStore.key.svParty),
           Seq(svcStore.key.svcParty),
           commands = cmd.commands.asScala.toSeq,
@@ -640,19 +637,19 @@ class SvApp(
 
   private def foundCollective(
       foundingConfig: SvOnboardingConfig.FoundCollective,
-      svcStore: SvSvcStore,
-      ledgerConnection: CNLedgerConnection,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
   ): Future[Unit] = {
+    val svcStore = svcStoreWithIngestion.store
     for {
-      _ <- uploadDars(ledgerConnection)
+      _ <- uploadDars(svcStoreWithIngestion.connection)
       _ <- retryProvider.retryForAutomation(
         "bootstrapping SVC",
-        bootstrapSvc(foundingConfig, svcStore, ledgerConnection, globalDomain),
+        bootstrapSvc(foundingConfig, svcStoreWithIngestion, globalDomain),
         logger,
       )
       // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
-      _ <- waiveSvcRights(svcStore.key.svcParty, ledgerConnection)
+      _ <- waiveSvcRights(svcStore.key.svcParty, svcStoreWithIngestion.connection)
     } yield ()
   }
 
@@ -691,15 +688,15 @@ class SvApp(
   // Create SvcRules and CoinRules and open the first mining round
   private def bootstrapSvc(
       foundingConfig: SvOnboardingConfig.FoundCollective,
-      store: SvSvcStore,
-      ledgerConnection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       domainId: DomainId,
   ): Future[Unit] = {
-    val svcParty = store.key.svcParty
-    val svParty = store.key.svParty
+    val svStore = svStoreWithIngestion.store
+    val svcParty = svStore.key.svcParty
+    val svParty = svStore.key.svParty
     for {
-      coinRules <- store.lookupCoinRules()
-      _ <- store.lookupSvcRulesWithOffset().flatMap {
+      coinRules <- svStore.lookupCoinRules()
+      _ <- svStore.lookupSvcRulesWithOffset().flatMap {
         case result @ QueryResult(_, None) => {
           coinRules match {
             case Some(coinRules) =>
@@ -708,7 +705,7 @@ class SvApp(
                   show"This should never happen.\nCoinRules: $coinRules"
               )
             case None =>
-              ledgerConnection
+              svStoreWithIngestion.connection
                 .submitCommands(
                   actAs = Seq(svcParty),
                   readAs = Seq.empty,
@@ -762,36 +759,35 @@ class SvApp(
               )
           }
       }
-      _ <- createUpgradedCoinRulesIfEnabled(store, ledgerConnection, foundingConfig, domainId)
+      _ <- createUpgradedCoinRulesIfEnabled(svStoreWithIngestion, foundingConfig, domainId)
     } yield ()
   }
 
   private def createUpgradedCoinRulesIfEnabled(
-      store: SvSvcStore,
-      ledgerConnection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       foundingConfig: SvOnboardingConfig.FoundCollective,
       domainId: DomainId,
   ): Future[Unit] =
     for {
       _ <-
         if (config.enableCoinRulesUpgrade) {
-          createUpgradedCoinRules(store, ledgerConnection, foundingConfig, domainId)
+          createUpgradedCoinRules(svStoreWithIngestion, foundingConfig, domainId)
         } else {
           Future.successful(())
         }
     } yield ()
 
   private def createUpgradedCoinRules(
-      store: SvSvcStore,
-      connection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       foundingConfig: SvOnboardingConfig.FoundCollective,
       domainId: DomainId,
   ): Future[Unit] = {
+    val store = svStoreWithIngestion.store
     val svcParty = store.key.svcParty
     for {
       _ <- store.lookupCoinRulesV1TestWithOffset().flatMap {
         case result @ QueryResult(_, None) =>
-          connection.submitWithResult(
+          svStoreWithIngestion.connection.submitWithResult(
             actAs = Seq(svcParty),
             readAs = Seq.empty,
             update = new ccV1Test.coin.CoinRulesV1Test(
@@ -863,8 +859,7 @@ class SvApp(
   }
 
   private def expectConfiguredValidatorOnboardings(
-      svStore: SvSvStore,
-      ledgerConnection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
       clock: Clock,
   ): Future[List[Unit]] = {
@@ -876,8 +871,7 @@ class SvApp(
         expectConfiguredValidatorOnboarding(
           c.secret,
           c.expiresIn,
-          svStore,
-          ledgerConnection,
+          svStoreWithIngestion,
           globalDomain,
           clock,
         )
@@ -888,8 +882,7 @@ class SvApp(
   private def expectConfiguredValidatorOnboarding(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
-      svStore: SvSvStore,
-      ledgerConnection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
       clock: Clock,
   ): Future[Unit] = {
@@ -898,8 +891,7 @@ class SvApp(
       .prepareValidatorOnboarding(
         secret,
         expiresIn,
-        svStore,
-        ledgerConnection,
+        svStoreWithIngestion,
         globalDomain,
         clock,
         logger,
@@ -911,8 +903,7 @@ class SvApp(
   }
 
   private def approveConfiguredSvIdentities(
-      svStore: SvSvStore,
-      ledgerConnection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
   ): Future[List[Unit]] = {
     if (
@@ -928,8 +919,7 @@ class SvApp(
         approveConfiguredSvIdentity(
           c.name,
           c.publicKey,
-          svStore,
-          ledgerConnection,
+          svStoreWithIngestion,
           globalDomain,
         )
       )
@@ -939,12 +929,11 @@ class SvApp(
   private def approveConfiguredSvIdentity(
       name: String,
       key: String,
-      svStore: SvSvStore,
-      ledgerConnection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
   ): Future[Unit] = {
     logger.info("Ensuring that a SV state contract exists for the configured name and key")
-    SvApp.approveSvIdentity(name, key, svStore, ledgerConnection, globalDomain, logger).map {
+    SvApp.approveSvIdentity(name, key, svStoreWithIngestion, globalDomain, logger).map {
       case Left(reason) => logger.info(s"Failed to approve SV identity: $reason")
       case Right(()) => ()
     }
@@ -1016,12 +1005,12 @@ object SvApp {
   def prepareValidatorOnboarding(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
-      svStore: SvSvStore,
-      ledgerConnection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
       clock: Clock,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
+    val svStore = svStoreWithIngestion.store
     val svParty = svStore.key.svParty
     val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
       svParty.toProtoPrimitive,
@@ -1044,7 +1033,7 @@ object SvApp {
               )
             }
             case QueryResult(_, None) => {
-              ledgerConnection
+              svStoreWithIngestion.connection
                 .submitCommands(
                   actAs = Seq(svParty),
                   readAs = Seq.empty,
@@ -1071,11 +1060,11 @@ object SvApp {
 
   def updateCoinPriceVote(
       desiredCoinPrice: BigDecimal,
-      svcStore: SvSvcStore,
-      ledgerConnection: CNLedgerConnection,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
+    val svcStore = svcStoreWithIngestion.store
     svcStore.lookupCoinPriceVoteByThisSv().flatMap {
       case Some(vote) if vote.payload.coinPrice.toScala.contains(desiredCoinPrice.bigDecimal) =>
         logger.info(s"Coin price vote is already set to $desiredCoinPrice")
@@ -1088,7 +1077,7 @@ object SvApp {
             vote.contractId,
             desiredCoinPrice.bigDecimal,
           )
-          _ <- ledgerConnection.submitCommandsNoDedup(
+          _ <- svcStoreWithIngestion.connection.submitCommandsNoDedup(
             actAs = Seq(svcStore.key.svParty),
             readAs = Seq(svcStore.key.svcParty),
             commands = cmd.commands().asScala.toSeq,
@@ -1164,12 +1153,11 @@ object SvApp {
   private[sv] def approveSvIdentity(
       name: String,
       key: String,
-      svStore: SvSvStore,
-      ledgerConnection: CNLedgerConnection,
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
-    val svParty = svStore.key.svParty
+    val svParty = svStoreWithIngestion.store.key.svParty
     val approvedSvIdentity = new cn.svonboarding.ApprovedSvIdentity(
       svParty.toProtoPrimitive,
       name,
@@ -1179,7 +1167,7 @@ object SvApp {
       case Left(error) => Future.successful(Left(error))
       case Right(_) =>
         for {
-          res <- svStore.lookupApprovedSvIdentityByNameWithOffset(name).flatMap {
+          res <- svStoreWithIngestion.store.lookupApprovedSvIdentityByNameWithOffset(name).flatMap {
             case QueryResult(_, Some(id)) => {
               Future.successful(
                 Left(if (id.payload.candidateKey == key) {
@@ -1192,7 +1180,7 @@ object SvApp {
             }
             case result @ QueryResult(_, None) =>
               for {
-                transaction <- ledgerConnection
+                _ <- svStoreWithIngestion.connection
                   .submitCommandsTransaction(
                     actAs = Seq(svParty),
                     readAs = Seq.empty,
@@ -1206,8 +1194,6 @@ object SvApp {
                     deduplicationOffset = result.deduplicationOffset,
                     domainId = globalDomain,
                   )
-                _ <- svStore.multiDomainAcsStore
-                  .signalWhenIngestedOrShutdown(globalDomain, transaction.getOffset)
               } yield {
                 logger.info("Created new ApprovedSvIdentity contract.")
                 Right(())

@@ -3,10 +3,11 @@ package com.daml.network.svc.admin.grpc
 import com.daml.ledger.api.v1.value.Record.toJavaProto
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection}
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
@@ -30,9 +31,8 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcSvcAppService(
-    ledgerClient: CNLedgerClient,
     svcUserName: String,
-    store: SvcStore,
+    svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvcStore],
     globalDomain: DomainId,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -42,14 +42,14 @@ class GrpcSvcAppService(
     with Spanning
     with NamedLogging {
 
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+  private val svcStore = svcStoreWithIngestion.store
 
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
       Future.successful(
         v0.GetDebugInfoResponse(
           svcUser = svcUserName,
-          svcPartyId = Codec.encode(store.svcParty),
+          svcPartyId = Codec.encode(svcStore.svcParty),
         )
       )
     }
@@ -60,16 +60,16 @@ class GrpcSvcAppService(
       request: GrantFeaturedAppRightRequest
   ): Future[GrantFeaturedAppRightResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      val svcParty = store.svcParty
+      val svcParty = svcStore.svcParty
       val providerParty = PartyId.tryFromProtoPrimitive(request.appProvider)
       for {
-        result <- store.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
+        result <- svcStore.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
           case result @ QueryResult(_, None) =>
-            connection.submitWithResult(
+            svcStoreWithIngestion.connection.submitWithResult(
               actAs = Seq(svcParty),
               readAs = Seq.empty,
               update = new FeaturedAppRight(
-                store.svcParty.toProtoPrimitive,
+                svcStore.svcParty.toProtoPrimitive,
                 request.appProvider,
               ).create(),
               commandId = CNLedgerConnection.CommandId(
@@ -95,7 +95,7 @@ class GrpcSvcAppService(
   override def withdrawFeaturedAppRight(request: WithdrawFeaturedAppRightRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        _ <- store.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
+        _ <- svcStore.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
           case QueryResult(_, None) =>
             throw new StatusRuntimeException(
               Status.NOT_FOUND.withDescription(
@@ -103,8 +103,8 @@ class GrpcSvcAppService(
               )
             )
           case QueryResult(_, Some(c)) =>
-            connection.submitWithResultNoDedup(
-              actAs = Seq(store.svcParty),
+            svcStoreWithIngestion.connection.submitWithResultNoDedup(
+              actAs = Seq(svcStore.svcParty),
               readAs = Seq.empty,
               update = c.contractId.exerciseFeaturedAppRight_Withdraw(request.reason),
               domainId = globalDomain,
@@ -118,7 +118,7 @@ class GrpcSvcAppService(
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       logger.info(s"Party ${request.svParty} wants to join the SV collective")
       for {
-        _ <- store.lookupSvcRules().flatMap {
+        _ <- svcStore.lookupSvcRules().flatMap {
           case None => {
             logger.info("SvcRules doesn't exist yet, waiting for the founding SV app to create it")
             throw new StatusRuntimeException(
@@ -133,8 +133,8 @@ class GrpcSvcAppService(
               Future.successful(())
             } else {
               logger.info("SvcRules exist; adding party as member")
-              connection.submitWithResultNoDedup(
-                actAs = Seq(store.svcParty),
+              svcStoreWithIngestion.connection.submitWithResultNoDedup(
+                actAs = Seq(svcStore.svcParty),
                 readAs = Seq.empty,
                 update = svcRules.contractId.exerciseSvcRules_AddMember(
                   request.svParty,
@@ -150,7 +150,7 @@ class GrpcSvcAppService(
   override def setConfigSchedule(request: SetConfigScheduleRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        coinRuleOpt <- store.lookupCoinRules()
+        coinRuleOpt <- svcStore.lookupCoinRules()
         _ <- (request.schedule, coinRuleOpt) match {
           case (None, _) =>
             throw new StatusRuntimeException(
@@ -168,8 +168,8 @@ class GrpcSvcAppService(
                 CoinConfig.valueDecoder(USD.valueDecoder()),
               )
               .decode(record)
-            connection.submitWithResultNoDedup(
-              actAs = Seq(store.svcParty),
+            svcStoreWithIngestion.connection.submitWithResultNoDedup(
+              actAs = Seq(svcStore.svcParty),
               readAs = Seq.empty,
               update = coinRules.contractId
                 .exerciseCoinRules_SetConfigSchedule(schedule),

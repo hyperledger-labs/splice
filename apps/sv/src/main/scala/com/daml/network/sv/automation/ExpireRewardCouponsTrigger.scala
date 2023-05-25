@@ -75,22 +75,15 @@ class ExpireRewardCouponsTrigger(
       _ <- Future.sequence(
         cmds.map(cmd =>
           connection
-            .submitWithResultAndOffsetNoDedup(
+            .submitWithResultNoDedup(
               Seq(store.key.svParty),
               Seq(store.key.svcParty),
               cmd,
               domainId,
             )
-            .flatMap {
-              // make sure the store ingested our update so we don't
-              // attempt to collect the same coupon twice
-              case (offset, _) =>
-                store.multiDomainAcsStore
-                  .signalWhenIngestedOrShutdown(domainId, offset)
-            }
         )
       )
-    } yield !cmds.isEmpty
+    } yield cmds.nonEmpty
   }
 
   private def performWorkAsLeader(svcRules: Contract[SvcRules.ContractId, SvcRules])(implicit
