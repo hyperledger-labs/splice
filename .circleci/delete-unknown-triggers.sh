@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-cci_api_all_schedules="https://circleci.com/api/v2/project/github/DACH-NY/the-real-canton-coin/schedule"
+cci_api_all_schedules="https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/schedule"
 
 cci_api_schedule="https://circleci.com/api/v2/schedule"
 

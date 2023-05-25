@@ -32,7 +32,7 @@ General approach for CometBFT integration:
 --------------
 
 -- The following types match the cometbft_node_governance_service.proto messages defined in
--- https://github.com/DACH-NY/the-real-canton-coin/pull/3896/files
+-- https://github.com/DACH-NY/canton-network-node/pull/3896/files
 --
 -- See the comments there for details on the fields defined below.
 --

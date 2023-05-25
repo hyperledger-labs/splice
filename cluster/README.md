@@ -71,7 +71,7 @@ of which are accessible only through VPN:
 | SqlScratchNet  | http://sqlscratch.network.canton.global  | Ad hoc, manual                   | CloudSQL Configuration Prototype   |
 
 The automatic deployments are configured as
-[Scheduled](https://app.circleci.com/settings/project/github/DACH-NY/the-real-canton-coin/triggers?return-to=https%3A%2F%2Fapp.circleci.com%2Fpipelines%2Fgithub%2FDACH-NY%2Fthe-real-canton-coin)
+[Scheduled](https://app.circleci.com/settings/project/github/DACH-NY/canton-network-node/triggers?return-to=https%3A%2F%2Fapp.circleci.com%2Fpipelines%2Fgithub%2FDACH-NY%2Fcanton-network-node)
 [CI/CD](/.circleci/config.yml) in CircleCI.
 
 The ScratchNet, ScratchNetB, ScratchNetC, and SqlScratchNet clusters
@@ -310,7 +310,7 @@ further, there are two caveats to be aware of:
 
 Given approval, a manual deployment of `main` can be done as follows:
 
-1. Navigate to the CircleCI dashboard for [`main`](https://app.circleci.com/pipelines/github/DACH-NY/the-real-canton-coin?branch=main).
+1. Navigate to the CircleCI dashboard for [`main`](https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node?branch=main).
 2. Click on "Trigger Pipeline"
 3. Add a parameter named `run-job`, with one of the following values:
    * `deploy-devnet` - Reset the state of `DevNet` and deploy a new code set.

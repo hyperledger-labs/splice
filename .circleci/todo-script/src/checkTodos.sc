@@ -220,7 +220,7 @@ object Milestone extends RegexCategory {
 }
 
 object GithubIssueLink extends RegexCategory {
-  override val regex: Regex = "the-real-canton-coin/issues/[0-9]+".r
+  override val regex: Regex = "canton-network-node/issues/[0-9]+".r
 
   override def getBucket(str: String): Bucket = numsToIssue(str)
 }

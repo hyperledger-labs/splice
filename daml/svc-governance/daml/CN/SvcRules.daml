@@ -96,7 +96,7 @@ data MemberInfo = MemberInfo with
     -- ^ This is the config for the CometBFT nodes under control of this member.
     -- We expect the SvApp to run a reconciliation loop that applies all changes to this
     -- config to the actual CometBFT network config using the service defined here:
-    -- https://github.com/DACH-NY/the-real-canton-coin/pull/3896/files.
+    -- https://github.com/DACH-NY/canton-network-node/pull/3896/files.
   deriving (Eq, Show)
 
 data CollectiveSummary = CollectiveSummary with
@@ -939,16 +939,16 @@ summarizeCollective : SvcRules -> CollectiveSummary
 summarizeCollective svcRules = CollectiveSummary with
     leader = svcRules.leader
     numMembers
-    requiredNumVotes =  
-      -- NOTE: 
+    requiredNumVotes =
+      -- NOTE:
       --   * We require at least majority of votes to ensure that every definite
       --     vote or confirmed action can be executed at most once. Otherwise, we'd fail
       --     to properly propagate the command-deduplication done by SV's when they submit
       --     confirmations.
       --     This adjustment is only relevant for the cases where `f == 0` (i.e., numMembers \in {2,3})
       --     or when we adjust the requiredNumVotes for DevNet and `numMembers >= 8`
-      --   * We require `2 * f + 1` confirmations instead of only `f + 1` confirmations, as otherwise 
-      --     the confirmations for adding members can be abused by an `f + 1` minority to change the 
+      --   * We require `2 * f + 1` confirmations instead of only `f + 1` confirmations, as otherwise
+      --     the confirmations for adding members can be abused by an `f + 1` minority to change the
       --     consortium composition to onboard fake SVs that boost the votes of that minority.
       max (numMembers / 2 + 1) (adjustForDevNet (2 * f + 1))
   where

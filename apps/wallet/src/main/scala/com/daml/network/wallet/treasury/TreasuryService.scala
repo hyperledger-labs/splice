@@ -72,7 +72,7 @@ import scala.util.{Failure, Success}
 /** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
   * that concurrent manipulations don't conflict.
   *
-  * For the design, please see https://github.com/DACH-NY/the-real-canton-coin/issues/913
+  * For the design, please see https://github.com/DACH-NY/canton-network-node/issues/913
   */
 class TreasuryService(
     connection: CNLedgerConnection,

@@ -96,7 +96,7 @@ local appAuthEnvBinding(config, appName, varBaseName=appName) =
   local secret = std.asciiLower(std.strReplace("CN_APP_" + appName + "_LEDGER_API_AUTH", "_", "-"));
   // In staging (where fixedTokens=true by default)
   // we use fixed tokens read from a k8s secret rather than refreshing through client credentials.
-  // See https://github.com/DACH-NY/the-real-canton-coin/issues/3053 for more details.
+  // See https://github.com/DACH-NY/canton-network-node/issues/3053 for more details.
   // We cannot override an object using a substitution so instead we set this through ADDITIONAL_CONFIG
   // which first resets it back to null to disable object merging and then switches to static token config.
   if (config.fixedTokens) then

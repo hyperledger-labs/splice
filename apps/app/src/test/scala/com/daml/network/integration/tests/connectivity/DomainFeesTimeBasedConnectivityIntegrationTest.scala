@@ -69,7 +69,7 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
       )(
         // Note that it's possible that top-up may not happen because cutting Scan from the ledger may also
         // cause it to provide stale open mining round information for the top-up. This is a known issue
-        // (https://github.com/DACH-NY/the-real-canton-coin/issues/4810) and is only temporary while
+        // (https://github.com/DACH-NY/canton-network-node/issues/4810) and is only temporary while
         // Scan is also used to mock the validator traffic related endpoints for the Domain Fees PoC
         "Top-up happens at most once even though scan app reports that we should top-up",
         _ => {

@@ -39,7 +39,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       if (duration.isNegative()) {
         fail("Cannot advance time by negative duration.");
       } else if (!duration.isZero()) {
-        // As discussed in depth on https://github.com/DACH-NY/the-real-canton-coin/issues/3091
+        // As discussed in depth on https://github.com/DACH-NY/canton-network-node/issues/3091
         // we need to wait until the system is quiescent enough to avoid warnings on the
         // sequencer due to the massive clock skew induced by bumping the time.
         //

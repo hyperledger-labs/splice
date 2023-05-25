@@ -152,12 +152,12 @@ M3 - TestNet Launch.
 ### IntelliJ Setup
 
 * Clone the repository first, if you haven't yet
-* Run `which java` and `which sbt` within `the-real-canton-coin` directory to respectively find the JRE/SDK
+* Run `which java` and `which sbt` within `canton-network-node` directory to respectively find the JRE/SDK
     and sbt versions used by nix. The outputs should roughly look as follows:
     ```
-    the-real-canton-coin$ which java
+    canton-network-node$ which java
     /nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/bin/java
-    the-real-canton-coin$ which sbt
+    canton-network-node$ which sbt
     /nix/store/9q28hwzz8yy75l317k2v2mdq485hgja0-sbt-1.6.2/bin/sbt
     ```
 * Add the Java SDK from nix per the instructions [in the Daml repo.](https://github.com/digital-asset/daml/blob/main/BAZEL.md#configuring-the-jdk-in-intellij)
@@ -274,7 +274,7 @@ Test:
 - `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
   `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
   `testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
-- `test`: Note that it is [not currently advisable](https://github.com/DACH-NY/the-real-canton-coin/issues/2098) to use this command. Use the `testOnly` commands described above to run specific tests and use the CI to run all tests.
+- `test`: Note that it is [not currently advisable](https://github.com/DACH-NY/canton-network-node/issues/2098) to use this command. Use the `testOnly` commands described above to run specific tests and use the CI to run all tests.
 - `damlTest`: run the Daml script tests included with the apps' Daml files
 
 #### `sbt` Tips&Tricks
@@ -286,7 +286,7 @@ Things sometimes go wrong with `sbt` in ways that are hard to debug. This sectio
 ## Contributing Changes
 
 ### Contributing as a New Joiner
-For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/the-real-canton-coin/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding
+For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/canton-network-node/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding
 buddy for help with getting started on the code base.
 
 ### The Flake Rotation
@@ -336,7 +336,7 @@ For engineers on flake duty, the resolution process is as follows.
 
 * When there is a Slack message indicating a test failure, investigate
   and assess if it's a new or existing failure. For new failures, create
-  a new tracking issue in the [Flaky Test](https://github.com/DACH-NY/the-real-canton-coin/milestone/19)
+  a new tracking issue in the [Flaky Test](https://github.com/DACH-NY/canton-network-node/milestone/19)
   GitHub milestone.  The issue for a given failure should be linked in the Slack
   thread for the failure itself.
 * All relevent information should be tracked to the extent possible in the
@@ -498,7 +498,7 @@ Current Canton commit: `022d684b73c25e754eb30919e4ac67ae9f4eaac9`
    In case of problems, here are some tips that help:
    - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.
      The previous PR that bumped our Canton fork can serve as a point of comparison here.
-     Search [here](https://github.com/DACH-NY/the-real-canton-coin/pulls?q=is%3Apr+%22bump+canton%22) to identify that PR and
+     Search [here](https://github.com/DACH-NY/canton-network-node/pulls?q=is%3Apr+%22bump+canton%22) to identify that PR and
      look at the commits from the "Reapply our changes" step onwards in that PR.
    - Some of our changes might have been upstreamed: adapt `CANTON_CODE_CHANGES.md` accordingly; and resolve the path
      conflicts in favor of the upstreamed code.
@@ -515,7 +515,7 @@ Current Canton commit: `022d684b73c25e754eb30919e4ac67ae9f4eaac9`
 6. Make a PR with your changes, so CI starts churning.
 7. If there are any, remove all `*.rej` files.
 
-You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
+You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 
 
 #### Updating Canton build dependencies
@@ -952,7 +952,7 @@ We also have a few username-password combinations in use in our clusters, who ar
 Our CI setup requires access to a number of secrets. This section documents how they have been created
 so they can easily be rotated if needed.
 
-All secrets are managed through https://app.circleci.com/settings/project/github/DACH-NY/the-real-canton-coin/environment-variables.
+All secrets are managed through https://app.circleci.com/settings/project/github/DACH-NY/canton-network-node/environment-variables.
 
 ### Auth0 Tokens
 
@@ -1035,7 +1035,7 @@ cncluster update_dns01_secret
 ### Github Tokens
 
 The `GITHUB_TOKEN` is used by the [TODO checker](.circleci/todo-script/src/checkTodos.sc) to access the issue and PR list
-of the https://github.com/DACH-NY/the-real-canton-coin repo.
+of the https://github.com/DACH-NY/canton-network-node repo.
 
 1. Go to https://github.com/settings/tokens, which you can reach by navigating
    the GitHub UI as follows:

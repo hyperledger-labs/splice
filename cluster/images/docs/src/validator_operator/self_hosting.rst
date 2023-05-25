@@ -31,7 +31,7 @@ Please now extract Canton:
 To obtain the Canton Network node binary (required to run the validator app),
 please download a release bundle here:
 |bundle_download_link|. (Source is available by cloning the
-`the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_
+`canton-network-node <https://github.com/DACH-NY/canton-network-node>`_
 repository from GitHub.)
 
 

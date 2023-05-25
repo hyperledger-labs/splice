@@ -50,7 +50,7 @@ function _docker_must_be_running() {
 
 function _production_gate() {
     if [ -n "${GCP_CLUSTER_PROD_LIKE-}" ] && [ -z "${CI-}" ]; then
-        _error "Please deploy to this cluster only via CircleCI (https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#manually-deploying-via-ci)"
+        _error "Please deploy to this cluster only via CircleCI (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
     fi
 }
 
@@ -63,12 +63,12 @@ function _cluster_ip() {
 
 function _needs_auth0_management_api_creds() {
     if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_ID-}" ]; then
-        _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
+        _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
       exit 1
     fi
 
     if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
-      _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
+      _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
       exit 1
     fi
 }
@@ -256,7 +256,7 @@ function _assert_lock() {
             _info "CI running with cluster lock held by: ${lockholder}"
         fi
     else
-        _error "Cluster not locked. (See: https://github.com/DACH-NY/the-real-canton-coin#deploy-a-build-to-a-cluster))"
+        _error "Cluster not locked. (See: https://github.com/DACH-NY/canton-network-node#deploy-a-build-to-a-cluster))"
     fi
 }
 

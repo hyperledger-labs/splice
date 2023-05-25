@@ -35,7 +35,7 @@ if [[ -z "$TRIGGER_NAME" ]]; then
 fi
 
 verb=POST
-endpoint="https://circleci.com/api/v2/project/github/DACH-NY/the-real-canton-coin/schedule"
+endpoint="https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node/schedule"
 
 existing_schedule=$(curl -s "$endpoint" \
     -H "Content-Type: application/json" \

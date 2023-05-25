@@ -13,7 +13,7 @@ CIRCLE_TOKEN=$(grep token "$CIRCLECI_CONFIG_FILE" | sed -e "s/^token: //")
 
 CI_VCSTYPE="github"
 CI_ORGNAME="DACH-NY"
-CI_PROJECT="the-real-canton-coin"
+CI_PROJECT="canton-network-node"
 
 if [ -z "${1:-}" ]; then
   echo "Please enter the job number. This should be a ~5 digit number."

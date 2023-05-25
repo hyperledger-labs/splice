@@ -507,7 +507,7 @@ class WalletPaymentFrontendIntegrationTest
     * the second entry is the receiver unlocking the coin and transferring to themselves
     * the part of the transfer that belongs to them.
     *
-    * @see https://github.com/DACH-NY/the-real-canton-coin/pull/3787#discussion_r1153496149
+    * @see https://github.com/DACH-NY/canton-network-node/pull/3787#discussion_r1153496149
     */
   private def matchLockAndTransfer(
       expectedLockedAmount: BigDecimal,

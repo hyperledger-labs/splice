@@ -103,7 +103,7 @@ commands:
 
   # Note: compiled_classes and sbt_cache commands are largely copied from the Canton repo
   # save compiled target directories to cache (so we don't recompile everything again and again)
-  # uses the target directories in the project (e.g. `the-real-canton-coin/target`) which sbt doesn't cache.
+  # uses the target directories in the project (e.g. `canton-network-node/target`) which sbt doesn't cache.
   # This cache is not shared among CI jobs.
   save_compiled_classes:
     steps:
@@ -132,7 +132,7 @@ commands:
           destination: classes
 
   # restore pre-compiled target directories from cache (so we don't recompile everything again and again)
-  # uses the target directories in the project (e.g. `the-real-canton-coin/target`) which sbt doesn't cache.
+  # uses the target directories in the project (e.g. `canton-network-node/target`) which sbt doesn't cache.
   # This cache is not shared among CI jobs.
   restore_precompiled_classes:
     parameters:
@@ -1353,7 +1353,7 @@ jobs:
               publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
            done
 
-           git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/the-real-canton-coin.git
+           git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
            RELEASE_TAG=$(get-snapshot-version)
            git tag "${RELEASE_TAG}"
            git push origin "${RELEASE_TAG}"
