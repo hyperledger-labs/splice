@@ -25,6 +25,10 @@ Release Notes
   * for configuring an SV node to vote for a given coin price during initialization, if no coin price has been voted for by this SV node yet
   * useful for persisting coin price vote preferences across cluster (re-)deployments
 
+* SV UI:
+
+  * Added support for proposing a vote on an action, currently only on removing an SV member.
+
 * Bugfixes
 
   * DA's internal automated tests are now resilient to coin price changes allowing us to change coin price votes on DA’s SVs so votes from other SVs have an observable effect.
