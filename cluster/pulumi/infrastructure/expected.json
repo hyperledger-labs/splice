@@ -1,0 +1,307 @@
+[
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {
+      "helmOptions": {
+        "namespace": "cert-manager"
+      },
+      "installCRDs": true
+    },
+    "name": "cert-manager",
+    "provider": "",
+    "type": "kubernetes-cert-manager:index:CertManager"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "cert-manager"
+      }
+    },
+    "name": "cert-manager",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "cert-manager.io/v1",
+      "kind": "Certificate",
+      "metadata": {
+        "name": "cn-test-stack-certificate",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "dnsNames": [
+          "test-stack.network.canton.global",
+          "*.test-stack.network.canton.global",
+          "*.validator1.test-stack.network.canton.global",
+          "*.splitwell.test-stack.network.canton.global",
+          "*.svc.test-stack.network.canton.global",
+          "*.sv-1.svc.test-stack.network.canton.global",
+          "*.sv-2.svc.test-stack.network.canton.global",
+          "*.sv-3.svc.test-stack.network.canton.global",
+          "*.sv-4.svc.test-stack.network.canton.global",
+          "*.sv.svc.test-stack.network.canton.global"
+        ],
+        "issuerRef": {
+          "name": "letsencrypt-production"
+        },
+        "secretName": "cn-test-stacknet-tls"
+      }
+    },
+    "name": "certificate",
+    "provider": "",
+    "type": "kubernetes:cert-manager.io/v1:Certificate"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {}
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "clouddns-dns01-solver-svc-acct",
+        "namespace": "cluster-ingress"
+      },
+      "type": "Opaque"
+    },
+    "name": "clouddns-dns01-solver-svc-acct",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "cluster-ingress"
+      }
+    },
+    "name": "cluster-ingress",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cn-test-stack-out",
+      "networkTier": "PREMIUM"
+    },
+    "name": "cn-test-stack-out",
+    "provider": "",
+    "type": "gcp:compute/address:Address"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cn-test-stacknet-ip",
+      "networkTier": "PREMIUM"
+    },
+    "name": "cn-test-stacknet-ip",
+    "provider": "",
+    "type": "gcp:compute/address:Address"
+  },
+  {
+    "custom": false,
+    "id": "https://www.googleapis.com/compute/v1/projects/da-cn-scratchnet/global/networks/default",
+    "inputs": {},
+    "name": "default",
+    "provider": "",
+    "type": "gcp:compute/network:Network"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "publicKeyType": "TYPE_X509_PEM_FILE",
+      "serviceAccountId": "projects/da-gcp-canton-domain/serviceAccounts/dns01-solver@da-gcp-canton-domain.iam.gserviceaccount.com"
+    },
+    "name": "dns01-test-stack",
+    "provider": "",
+    "type": "gcp:serviceAccount/key:Key"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "cert-manager.io/v1",
+      "kind": "Issuer",
+      "metadata": {
+        "name": "letsencrypt-production",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "acme": {
+          "email": "team-canton-network@digitalasset.com",
+          "preferredChain": "",
+          "privateKeySecretRef": {
+            "name": "letsencrypt-production-acme-account"
+          },
+          "server": "https://acme-v02.api.letsencrypt.org/directory",
+          "solvers": [
+            {
+              "dns01": {
+                "cloudDNS": {
+                  "project": "da-gcp-canton-domain",
+                  "serviceAccountSecretRef": {
+                    "key": "key.json",
+                    "name": "clouddns-dns01-solver-svc-acct"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "name": "issuer",
+    "provider": "",
+    "type": "kubernetes:cert-manager.io/v1:Issuer"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "base",
+      "compat": "true",
+      "name": "istio-base",
+      "namespace": "istio-system",
+      "repositoryOpts": {
+        "repo": "https://istio-release.storage.googleapis.com/charts"
+      }
+    },
+    "name": "istio-base",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "istio-system"
+      }
+    },
+    "name": "istio-system",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "istiod",
+      "compat": "true",
+      "name": "istiod",
+      "namespace": "cluster-ingress",
+      "repositoryOpts": {
+        "repo": "https://istio-release.storage.googleapis.com/charts"
+      },
+      "values": {
+        "global": {
+          "istioNamespace": "cluster-ingress"
+        },
+        "meshConfig": {
+          "accessLogFile": "/dev/stdout"
+        }
+      }
+    },
+    "name": "istiod",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "logConfig": {
+        "enable": true,
+        "filter": "ERRORS_ONLY"
+      },
+      "natIpAllocateOption": "MANUAL_ONLY",
+      "natIps": [
+        null
+      ],
+      "sourceSubnetworkIpRangesToNat": "LIST_OF_SUBNETWORKS",
+      "subnetworks": [
+        {
+          "name": "subnet-id",
+          "sourceIpRangesToNats": [
+            "ALL_IP_RANGES"
+          ]
+        }
+      ]
+    },
+    "name": "nat-test-stack-gw",
+    "provider": "",
+    "type": "gcp:compute/routerNat:RouterNat"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "network": "https://www.googleapis.com/compute/v1/projects/da-cn-scratchnet/global/networks/default"
+    },
+    "name": "router-test-stack",
+    "provider": "",
+    "type": "gcp:compute/router:Router"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "managedZone": "canton-global",
+      "name": "*.test-stack.network.canton.global.",
+      "project": "da-gcp-canton-domain",
+      "rrdatas": [
+        null
+      ],
+      "ttl": 60,
+      "type": "A"
+    },
+    "name": "test-stack.network.canton.global-subdomains",
+    "provider": "",
+    "type": "gcp:dns/recordSet:RecordSet"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "managedZone": "canton-global",
+      "name": "test-stack.network.canton.global.",
+      "project": "da-gcp-canton-domain",
+      "rrdatas": [
+        null
+      ],
+      "ttl": 60,
+      "type": "A"
+    },
+    "name": "test-stack.network.canton.global",
+    "provider": "",
+    "type": "gcp:dns/recordSet:RecordSet"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "test-stack",
+    "provider": "",
+    "type": "canton:gcp:CantonNetwork"
+  }
+]

@@ -2,10 +2,14 @@ import * as k8s from '@pulumi/kubernetes';
 
 import * as postgres from './postgres';
 import { auth0UserNameEnvVar, installAuth0Secret, installAuth0UISecret } from './auth0';
+import type { Auth0Client } from './auth0types';
 import { installDomain, installParticipant } from './ledger';
 import { exactNamespace, fixedTokens, installCNHelmChart } from './utils';
 
-export function installSplitwell(svc: k8s.helm.v3.Release): k8s.helm.v3.Release {
+export function installSplitwell(
+  auth0Client: Auth0Client,
+  svc: k8s.helm.v3.Release
+): k8s.helm.v3.Release {
   const xns = exactNamespace('splitwell');
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
@@ -46,12 +50,12 @@ export function installSplitwell(svc: k8s.helm.v3.Release): k8s.helm.v3.Release 
 
   const dependsOn = [
     svc,
-    installAuth0Secret(xns, 'splitwell', 'splitwell'),
-    installAuth0Secret(xns, 'validator', 'splitwell_validator'),
-    installAuth0Secret(xns, 'svc', 'svc'),
-    installAuth0Secret(xns, 'scan', 'scan'),
-    installAuth0Secret(xns, 'directory', 'directory'),
-    installAuth0UISecret(xns, 'wallet', 'splitwell'),
+    installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
+    installAuth0Secret(auth0Client, xns, 'validator', 'splitwell_validator'),
+    installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
+    installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
+    installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
+    installAuth0UISecret(auth0Client, xns, 'wallet', 'splitwell'),
   ];
 
   const fixedTokenConfig = fixedTokens()

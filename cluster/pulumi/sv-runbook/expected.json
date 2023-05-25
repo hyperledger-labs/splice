@@ -1,0 +1,405 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "compat": "true",
+      "name": "cluster-ingress",
+      "namespace": "cn-namespace",
+      "values": {
+        "cluster": {
+          "basename": "svrun",
+          "ipAddress": "127.0.0.2",
+          "networkSettings": {
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32"
+            ]
+          }
+        },
+        "enableIngressModes": "sv-external",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "svNamespace": "sv"
+      }
+    },
+    "name": "cluster-ingress",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "ZHVtbXlAY2xpZW50cw=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-directory-ledger-api-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "ZHVtbXlAY2xpZW50cw=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-scan-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-scan-ledger-api-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnZFJUUzNpTHI4clBGYUxVQmJWY3U4cVl4a2xtTXpRby80VVhjVUxZRVNtMmhSQU5DQUFUdTdQN05iVmh3OGtpWDVNcXBlL3I5MS9Gekg3Y2hKVVdBL3FiYXhwNURTWHF2YVUxYjVZdCtyNGRReHpKekZmMjNwdFFubVRJUjV0akorVDBsYlh3bw==",
+          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFN3V6K3pXMVljUEpJbCtUS3FYdjYvZGZ4Y3grM0lTVkZnUDZtMnNhZVEwbDZyMmxOVytXTGZxK0hVTWN5Y3hYOXQ2YlVKNWt5RWViWXlmazlKVzE4S0E9PQ=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "YlVmRlJwbDJ0RWZaQkI3d3pJbzlpUk5HVGo4d01lSW4=",
+          "client-secret": "dW5kZWZpbmVk",
+          "ledger-api-user": "YlVmRlJwbDJ0RWZaQkI3d3pJbzlpUk5HVGo4d01lSW5AY2xpZW50cw==",
+          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWluLy53ZWxsLWtub3duL29wZW5pZC1jb25maWd1cmF0aW9u"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-ledger-api-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "OFM4bzRVNk9ZV1d1dzV2UENJcEZRR3p6V00ySXBIa3g=",
+          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWlu"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ui-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-ui-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "YlVmRlJwbDJ0RWZaQkI3d3pJbzlpUk5HVGo4d01lSW5AY2xpZW50cw=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv1-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv1-ledger-api-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "dXhlUUdJQkt1ZU5EbXVnVnMxUmxNV0VVWmhacXlMeXJAY2xpZW50cw=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv1-validator-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv1-validator-ledger-api-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "ledger-api-user": "ZHVtbXlAY2xpZW50cw=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-svc-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-svc-ledger-api-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "dXhlUUdJQkt1ZU5EbXVnVnMxUmxNV0VVWmhacXlMeXI=",
+          "client-secret": "dW5kZWZpbmVk",
+          "ledger-api-user": "dXhlUUdJQkt1ZU5EbXVnVnMxUmxNV0VVWmhacXlMeXJAY2xpZW50cw==",
+          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWluLy53ZWxsLWtub3duL29wZW5pZC1jb25maWd1cmF0aW9u"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator-ledger-api-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "bDlNUzExUE90YnZQYVZ2Z3puczNUZGo5SURub3NMd2w=",
+          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWlu"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-wallet-ui-auth",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": false,
+    "id": "infra.svrun",
+    "inputs": {
+      "name": "infra.svrun"
+    },
+    "name": "infra.svrun",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "enableServerSideApply": "true"
+    },
+    "name": "k8s",
+    "provider": "",
+    "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant",
+      "namespace": "sv",
+      "values": {
+        "auth": {
+          "jwksEndpoint": "https://auth0.tenant.domain/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "globalDomain": {
+          "alias": "global",
+          "url": "http://svrun.network.com.network.canton.global:5008"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": "postgres"
+      }
+    },
+    "name": "participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "postgres",
+      "namespace": "sv",
+      "values": {
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+      }
+    },
+    "name": "postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-sv-node/",
+      "compat": "true",
+      "name": "sv-1",
+      "namespace": "sv",
+      "values": {
+        "auth": {
+          "audience": "https://canton.network.global",
+          "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "joinWithKeyOnboarding": {
+          "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgdRTS3iLr8rPFaLUBbVcu8qYxklmMzQo/4UXcULYESm2hRANCAATu7P7NbVhw8kiX5Mqpe/r91/FzH7chJUWA/qbaxp5DSXqvaU1b5Yt+r4dQxzJzFf23ptQnmTIR5tjJ+T0lbXwo",
+          "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA==",
+          "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",
+          "svcApiAddress": "svrun.network.com.network.canton.global"
+        },
+        "onboardingName": "DA-Test-Node"
+      }
+    },
+    "name": "sv-1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": false,
+    "id": "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
+    "inputs": {},
+    "name": "sv1",
+    "provider": "",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "sv"
+      }
+    },
+    "name": "sv",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": false,
+    "id": "uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr",
+    "inputs": {},
+    "name": "validator",
+    "provider": "",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "validator",
+      "namespace": "sv",
+      "values": {
+        "auth": {
+          "audience": "https://canton.network.global",
+          "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json"
+        },
+        "clusterUrl": "svrun.network.com.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantAddress": "participant",
+        "scanAddress": "https://svrun.network.com.network.canton.global",
+        "scanPort": "5012",
+        "svSponsorAddress": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",
+        "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
+      }
+    },
+    "name": "validator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  }
+]

@@ -7,6 +7,7 @@
         "format:fix": "prettier --write -- src",
         "format:check": "prettier --check -- src",
         "lint:fix": "eslint --fix --max-warnings=0 -- src",
-        "lint:check": "eslint --max-warnings=0 -- src"
+        "lint:check": "eslint --max-warnings=0 -- src",
+        "dump-config": "ts-node ./dump-config.ts"
     }
 }

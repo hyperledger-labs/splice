@@ -2,7 +2,9 @@
     "name": "sv-runbook",
     "main": "src/index.ts",
     "devDependencies": {
-        "@types/node": "^16"
+        "@types/node": "^16",
+        "@types/sinon": "^10.0.15",
+        "sinon": "^15.0.4"
     },
     "dependencies": {
         "@pulumi/auth0": "^2.19.0",
@@ -14,6 +16,7 @@
         "format:fix": "prettier --write -- src",
         "format:check": "prettier --check -- src",
         "lint:fix": "eslint --fix --max-warnings=0 -- src",
-        "lint:check": "eslint --max-warnings=0 -- src"
+        "lint:check": "eslint --max-warnings=0 -- src",
+        "dump-config": "ts-node ./dump-config.ts"
     }
 }

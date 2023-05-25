@@ -1273,7 +1273,7 @@ function subcmd_papply() {
         _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
     fi
 
-    make -C "${REPO_ROOT}" cluster/build
+    make -C "${REPO_ROOT}" cluster/build -j
 
     args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
           -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")

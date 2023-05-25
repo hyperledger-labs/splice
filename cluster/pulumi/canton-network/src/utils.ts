@@ -5,6 +5,8 @@ import * as _ from 'lodash';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
+import { InfrastructureOutputs } from './infra';
+
 export const config = new pulumi.Config();
 
 export const GLOBAL_TIMEOUT_SEC = 300;
@@ -95,7 +97,7 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
         fixedTokens: fixedTokens(),
-        ipAddress: infraStack.getOutput('ingressIp'),
+        ipAddress: infraStack.requireOutput(InfrastructureOutputs.INGRESS_IP),
         dnsName: CLUSTER_DNS_NAME,
         networkSettings,
       },

@@ -1,0 +1,3437 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ledger-api-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs",
+          "client-secret": "***",
+          "ledger-api-user": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-splitwell-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-scan-ledger-api-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6",
+          "client-secret": "***",
+          "ledger-api-user": "nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-splitwell-scan",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW",
+          "client-secret": "***",
+          "ledger-api-user": "hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-splitwell-splitwell_validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-splitwell-ledger-api-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "ekPlYxilradhEnpWdS80WfW63z1nHvKy",
+          "client-secret": "***",
+          "ledger-api-user": "ekPlYxilradhEnpWdS80WfW63z1nHvKy@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-splitwell-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-svc-ledger-api-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC",
+          "client-secret": "***",
+          "ledger-api-user": "XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-splitwell-svc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ledger-api-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn",
+          "client-secret": "***",
+          "ledger-api-user": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-1-sv-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-secret": "***",
+          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-1-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ledger-api-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "rv4bllgKWAiW9tBtdvURMdHW42MAXghz",
+          "client-secret": "***",
+          "ledger-api-user": "rv4bllgKWAiW9tBtdvURMdHW42MAXghz@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-2-sv-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-secret": "***",
+          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-2-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ledger-api-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk",
+          "client-secret": "***",
+          "ledger-api-user": "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-3-sv-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-secret": "***",
+          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-3-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ledger-api-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN",
+          "client-secret": "***",
+          "ledger-api-user": "CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-4-sv-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-secret": "***",
+          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-4-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ledger-api-auth",
+        "namespace": "svc"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs",
+          "client-secret": "***",
+          "ledger-api-user": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-svc-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-scan-ledger-api-auth",
+        "namespace": "svc"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6",
+          "client-secret": "***",
+          "ledger-api-user": "nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-svc-scan",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv1-ledger-api-auth",
+        "namespace": "svc"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn",
+          "client-secret": "***",
+          "ledger-api-user": "OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-svc-sv-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-svc-ledger-api-auth",
+        "namespace": "svc"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC",
+          "client-secret": "***",
+          "ledger-api-user": "XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-svc-svc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "svc"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-secret": "***",
+          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-svc-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ledger-api-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs",
+          "client-secret": "***",
+          "ledger-api-user": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-validator1-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-scan-ledger-api-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6",
+          "client-secret": "***",
+          "ledger-api-user": "nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-validator1-scan",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-svc-ledger-api-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC",
+          "client-secret": "***",
+          "ledger-api-user": "XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-validator1-svc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-secret": "***",
+          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-validator1-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-splitwell-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ui-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-1-sv-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-1-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ui-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-2-sv-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-2-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ui-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cgxHguMv32JLeew9S6wBDgNPHmPCIKaP",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-3-sv-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cgxHguMv32JLeew9S6wBDgNPHmPCIKaP",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-3-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ui-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "VoSuAamXhvwISHGgaCtULYmbRIWbQeTb",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-4-sv-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "VoSuAamXhvwISHGgaCtULYmbRIWbQeTb",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-4-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-validator1-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-splitwell-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-validator1-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-validator1-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnT291cXh2VWlyM0M5KzJhcEVkT1VDNDBYcmJMVGRrYkJJSzc4bzJtM2xPS2hSQU5DQUFTeEZHZTAyUTRzWFphSHNuRlhTc0ZBK0JQNUo2ZDBpTVV0Y3BSY0tzdHRVZXFpYVRLa2RDSmsvdzZBVXhLVUhJNmV2elYrcUpTM2NiZm90U21EOSthQQ==",
+          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFc1JSbnROa09MRjJXaDdKeFYwckJRUGdUK1NlbmRJakZMWEtVWENyTGJWSHFvbWt5cEhRaVpQOE9nRk1TbEJ5T25yODFmcWlVdDNHMzZMVXBnL2ZtZ0E9PQ=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnKzhqS1Rmcnk1cmtpdG52eTlEeWg1dVBWS1R6Y0t1M3JyUFp5clZXOWUvS2hSQU5DQUFUUitkc0ZDSXp0U0pJMXBYcTJNK3JtVXJadTRqSGt2bWZOUzZGaGJFR1RmaldjVUtGeHNyMmtNUTdnN3FCM0Y3RnY4NUEvcEdGQ1FNNU1OMU1LdnZzSQ==",
+          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFMGZuYkJRaU03VWlTTmFWNnRqUHE1bEsyYnVJeDVMNW56VXVoWVd4QmszNDFuRkNoY2JLOXBERU80TzZnZHhleGIvT1FQNlJoUWtET1REZFRDcjc3Q0E9PQ=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnRTVyMU1wemVUbXZZanRpVkxEQVN3NjNWQTJwZlFtNHBzWDdYbFVKVThmR2hSQU5DQUFScnZwM1k1YWFTa0pEWjFOYXhiS0doOVhlMDRaMldTR2dLYytsanNGdENFSnZTemVWcEhXK25uc2xpNzkza0ovN2ZmWThYWmV1Q01MVElGWlNveml6Sg==",
+          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFYTc2ZDJPV21rcENRMmRUV3NXeWhvZlYzdE9HZGxraG9DblBwWTdCYlFoQ2IwczNsYVIxdnA1N0pZdS9kNUNmKzMzMlBGMlhyZ2pDMHlCV1VxTTRzeVE9PQ=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": false,
+    "id": "https://www.googleapis.com/compute/v1/projects/test-project/global/networks/default",
+    "inputs": {},
+    "name": "default",
+    "provider": "",
+    "type": "gcp:compute/network:Network"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "docs"
+      }
+    },
+    "name": "docs",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/target/cn-cluster-ingress-full-0.0.1.tgz",
+      "compat": "true",
+      "name": "cluster-ingress",
+      "namespace": "cn-namespace",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+      }
+    },
+    "name": "helm-cluster-ingress-cluster-ingress",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-docs/",
+      "compat": "true",
+      "name": "docs",
+      "namespace": "docs",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+      }
+    },
+    "name": "helm-docs-docs",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-domain/",
+      "compat": "true",
+      "name": "domain",
+      "namespace": "splitwell",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": "postgres.splitwell.svc.cluster.local",
+        "resources": {
+          "limits": {
+            "memory": "4Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "4Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-splitwell-domain",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant",
+      "namespace": "splitwell",
+      "timeout": 300,
+      "values": {
+        "auth": {
+          "jwksEndpoint": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "extraDomains": "[{\"alias\":\"splitwell\",\"url\":\"http://domain.splitwell:5008\"}]",
+        "extraEnvVars": [
+          {
+            "name": "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-validator-ledger-api-auth",
+                "optional": false
+              }
+            }
+          }
+        ],
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantUsers": "[{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"splitwell_validator_service_user\"},\"readAs\":[]}]",
+        "postgres": "postgres.splitwell.svc.cluster.local",
+        "postgresSchema": "splitwell_participant",
+        "resources": {
+          "limits": {
+            "memory": "32Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "32Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-splitwell-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-splitwell-app/",
+      "compat": "true",
+      "name": "splitwell-app",
+      "namespace": "splitwell",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": "postgres.splitwell.svc.cluster.local",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-splitwell-splitwell-app",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "splitwell",
+      "namespace": "splitwell",
+      "timeout": 300,
+      "values": {
+        "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwise = {\n  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar\"]\n}",
+        "additionalUsers": [
+          {
+            "name": "CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-splitwell-ledger-api-auth",
+                "optional": false
+              }
+            }
+          }
+        ],
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": "postgres.splitwell.svc.cluster.local",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-splitwell-splitwell",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-sv-node/",
+      "compat": "true",
+      "name": "sv-1-sv-app",
+      "namespace": "sv-1",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "onboardingName": "Canton-Foundation-1",
+        "onboardingType": "found-collective",
+        "participantAddress": "participant.svc",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-1-sv-1-sv-app",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "validator-sv-1",
+      "namespace": "sv-1",
+      "timeout": 300,
+      "values": {
+        "additionalUsers": [],
+        "appDars": [],
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantAddress": "participant.svc",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        },
+        "validatorWalletUser": "auth0|64529b128448ded6aa68048f"
+      }
+    },
+    "name": "helm-sv-1-validator-sv-1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant",
+      "namespace": "sv-2",
+      "timeout": 300,
+      "values": {
+        "auth": {
+          "jwksEndpoint": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "extraDomains": "[]",
+        "extraEnvVars": [
+          {
+            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-validator-ledger-api-auth",
+                "optional": false
+              }
+            }
+          },
+          {
+            "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-sv-ledger-api-auth",
+                "optional": false
+              }
+            }
+          }
+        ],
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantUsers": "[{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"Canton-Foundation-2\"},\"readAs\":[]},{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"fromUser\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}},\"readAs\":[]}]",
+        "postgres": "postgres.sv-2.svc.cluster.local",
+        "postgresSchema": "sv-2_participant",
+        "resources": {
+          "limits": {
+            "memory": "32Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "32Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-2-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-sv-node/",
+      "compat": "true",
+      "name": "sv-2-sv-app",
+      "namespace": "sv-2",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "joinWithKeyOnboarding": {
+          "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA",
+          "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
+          "sponsorApiUrl": "http://sv-app.sv-1:5014",
+          "svcApiAddress": "svc-app.svc"
+        },
+        "onboardingName": "Canton-Foundation-2",
+        "onboardingType": "join-with-key",
+        "participantAddress": "participant",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-2-sv-2-sv-app",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "validator-sv-2",
+      "namespace": "sv-2",
+      "timeout": 300,
+      "values": {
+        "additionalUsers": [],
+        "appDars": [],
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantAddress": "participant",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        },
+        "validatorWalletUser": "auth0|64529b6852dd694167351045"
+      }
+    },
+    "name": "helm-sv-2-validator-sv-2",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant",
+      "namespace": "sv-3",
+      "timeout": 300,
+      "values": {
+        "auth": {
+          "jwksEndpoint": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "extraDomains": "[]",
+        "extraEnvVars": [
+          {
+            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-validator-ledger-api-auth",
+                "optional": false
+              }
+            }
+          },
+          {
+            "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-sv-ledger-api-auth",
+                "optional": false
+              }
+            }
+          }
+        ],
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantUsers": "[{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"Canton-Foundation-3\"},\"readAs\":[]},{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"fromUser\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}},\"readAs\":[]}]",
+        "postgres": "postgres.sv-3.svc.cluster.local",
+        "postgresSchema": "sv-3_participant",
+        "resources": {
+          "limits": {
+            "memory": "32Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "32Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-3-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-sv-node/",
+      "compat": "true",
+      "name": "sv-3-sv-app",
+      "namespace": "sv-3",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "joinWithKeyOnboarding": {
+          "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI",
+          "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
+          "sponsorApiUrl": "http://sv-app.sv-1:5014",
+          "svcApiAddress": "svc-app.svc"
+        },
+        "onboardingName": "Canton-Foundation-3",
+        "onboardingType": "join-with-key",
+        "participantAddress": "participant",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-3-sv-3-sv-app",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "validator-sv-3",
+      "namespace": "sv-3",
+      "timeout": 300,
+      "values": {
+        "additionalUsers": [],
+        "appDars": [],
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantAddress": "participant",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        },
+        "validatorWalletUser": "auth0|64529bb10c1aee4f2c819218"
+      }
+    },
+    "name": "helm-sv-3-validator-sv-3",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant",
+      "namespace": "sv-4",
+      "timeout": 300,
+      "values": {
+        "auth": {
+          "jwksEndpoint": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "extraDomains": "[]",
+        "extraEnvVars": [
+          {
+            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-validator-ledger-api-auth",
+                "optional": false
+              }
+            }
+          },
+          {
+            "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-sv-ledger-api-auth",
+                "optional": false
+              }
+            }
+          }
+        ],
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantUsers": "[{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"Canton-Foundation-4\"},\"readAs\":[]},{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"fromUser\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}},\"readAs\":[]}]",
+        "postgres": "postgres.sv-4.svc.cluster.local",
+        "postgresSchema": "sv-4_participant",
+        "resources": {
+          "limits": {
+            "memory": "32Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "32Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-4-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-sv-node/",
+      "compat": "true",
+      "name": "sv-4-sv-app",
+      "namespace": "sv-4",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "joinWithKeyOnboarding": {
+          "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ",
+          "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
+          "sponsorApiUrl": "http://sv-app.sv-1:5014",
+          "svcApiAddress": "svc-app.svc"
+        },
+        "onboardingName": "Canton-Foundation-4",
+        "onboardingType": "join-with-key",
+        "participantAddress": "participant",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-4-sv-4-sv-app",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "validator-sv-4",
+      "namespace": "sv-4",
+      "timeout": 300,
+      "values": {
+        "additionalUsers": [],
+        "appDars": [],
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantAddress": "participant",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        },
+        "validatorWalletUser": "auth0|64529bc58d30358eacae5611"
+      }
+    },
+    "name": "helm-sv-4-validator-sv-4",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-domain/",
+      "compat": "true",
+      "name": "global-domain",
+      "namespace": "svc",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": "postgres.svc.svc.cluster.local",
+        "resources": {
+          "limits": {
+            "memory": "4Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "4Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-svc-global-domain",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant",
+      "namespace": "svc",
+      "timeout": 300,
+      "values": {
+        "auth": {
+          "jwksEndpoint": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "extraDomains": "[]",
+        "extraEnvVars": [
+          {
+            "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-directory-ledger-api-auth",
+                "optional": false
+              }
+            }
+          },
+          {
+            "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-scan-ledger-api-auth",
+                "optional": false
+              }
+            }
+          },
+          {
+            "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-sv1-ledger-api-auth",
+                "optional": false
+              }
+            }
+          },
+          {
+            "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-svc-ledger-api-auth",
+                "optional": false
+              }
+            }
+          },
+          {
+            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-validator-ledger-api-auth",
+                "optional": false
+              }
+            }
+          }
+        ],
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantUsers": "[{\"name\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"svc_party\"},\"actAs\":[{\"fromUser\":\"self\"}],\"readAs\":[],\"admin\":true},{\"name\":{\"env\":\"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}},\"actAs\":[],\"readAs\":[{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}],\"admin\":false},{\"name\":{\"env\":\"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}},\"actAs\":[{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}],\"readAs\":[],\"admin\":true},{\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"sv1\"},\"actAs\":[{\"fromUser\":\"self\"},{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}],\"readAs\":[],\"admin\":true},{\"name\":{\"env\":\"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"fromUser\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}},\"actAs\":[{\"fromUser\":\"self\"}],\"readAs\":[],\"admin\":true}]",
+        "postgres": "postgres.svc.svc.cluster.local",
+        "postgresSchema": "svc_participant",
+        "resources": {
+          "limits": {
+            "memory": "32Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "32Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-svc-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-svc/",
+      "compat": "true",
+      "name": "svc",
+      "namespace": "svc",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": "postgres.svc.svc.cluster.local",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-svc-svc",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-directory-web-ui/",
+      "compat": "true",
+      "name": "directory-web-ui",
+      "namespace": "validator1",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-validator1-directory-web-ui",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant",
+      "namespace": "validator1",
+      "timeout": 300,
+      "values": {
+        "auth": {
+          "jwksEndpoint": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "extraDomains": "[{\"alias\":\"splitwell\",\"url\":\"http://domain.splitwell:5008\"}]",
+        "extraEnvVars": [
+          {
+            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "ledger-api-user",
+                "name": "cn-app-validator-ledger-api-auth",
+                "optional": false
+              }
+            }
+          }
+        ],
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantUsers": "[{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"validator1_validator_service_user\"},\"readAs\":[]}]",
+        "postgres": "postgres.validator1.svc.cluster.local",
+        "postgresSchema": "validator1_participant",
+        "resources": {
+          "limits": {
+            "memory": "32Gi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "32Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-validator1-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-splitwell-web-ui/",
+      "compat": "true",
+      "name": "splitwell-web-ui",
+      "namespace": "validator1",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-validator1-splitwell-web-ui",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "validator-validator1",
+      "namespace": "validator1",
+      "timeout": 300,
+      "values": {
+        "additionalUsers": [],
+        "appDars": [
+          "cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar",
+          "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"
+        ],
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantAddress": "participant.svc",
+        "postgres": "postgres.validator1.svc.cluster.local",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-validator1-validator-validator1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": false,
+    "id": "infra.mock",
+    "inputs": {
+      "name": "infra.mock"
+    },
+    "name": "infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "postgres",
+      "namespace": "splitwell",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "8Gi"
+          }
+        }
+      }
+    },
+    "name": "splitwell-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "splitwell"
+      }
+    },
+    "name": "splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "sv-1"
+      }
+    },
+    "name": "sv-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "postgres",
+      "namespace": "sv-2",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "8Gi"
+          }
+        }
+      }
+    },
+    "name": "sv-2-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "sv-2"
+      }
+    },
+    "name": "sv-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "postgres",
+      "namespace": "sv-3",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "8Gi"
+          }
+        }
+      }
+    },
+    "name": "sv-3-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "sv-3"
+      }
+    },
+    "name": "sv-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "postgres",
+      "namespace": "sv-4",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "8Gi"
+          }
+        }
+      }
+    },
+    "name": "sv-4-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "sv-4"
+      }
+    },
+    "name": "sv-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "postgres",
+      "namespace": "svc",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "8Gi"
+          }
+        }
+      }
+    },
+    "name": "svc-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "svc"
+      }
+    },
+    "name": "svc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "postgres",
+      "namespace": "validator1",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "35.188.147.4/32",
+              "34.70.206.199/32",
+              "35.224.88.220/32",
+              "104.198.152.233/32",
+              "34.69.77.22/32",
+              "104.154.35.222/32",
+              "35.239.94.218/32",
+              "35.232.124.246/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.27.240.103/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "8Gi"
+          }
+        }
+      }
+    },
+    "name": "validator1-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "validator1"
+      }
+    },
+    "name": "validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  }
+]

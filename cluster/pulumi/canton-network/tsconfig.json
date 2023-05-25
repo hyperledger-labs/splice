@@ -16,7 +16,7 @@
           "es2021.string"
         ],
     },
-    "files": [
-        "index.ts"
+    "include": [
+        "src/**/*.ts"
     ]
 }

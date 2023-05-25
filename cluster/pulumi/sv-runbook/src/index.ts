@@ -32,16 +32,16 @@ const TARGET_CLUSTER = requiredEnv(
 );
 const SV_WALLET_USER_ID = process.env.SV_WALLET_USER_ID || 'auth0|64553aa683015a9687d9cc2e'; // Default to admin@sv.com at the sv-test tenant by default
 const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);
-const CLUSTER_IP = infraStack.getOutput('ingressIp'); // IP of the cluster in which this chart is being installed
+const CLUSTER_IP = infraStack.requireOutput('ingressIp'); // IP of the cluster in which this chart is being installed
 const SV_NAMESPACE = process.env.SV_NAMESPACE || 'sv';
 
-console.log(
+console.error(
   localCharts
     ? 'Using locally built charts'
     : `Using charts from the artifactory, version ${version}`
 );
-console.log(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
-console.log(`Installing SV node in namespace: ${SV_NAMESPACE}`);
+console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
+console.error(`Installing SV node in namespace: ${SV_NAMESPACE}`);
 
 // Copied from ${REPO_ROOT}/apps/app/src/pack/examples/sv/sv-onboarding.conf
 // TODO(#4443): make sure it's OK to reuse these once automated
@@ -143,7 +143,7 @@ const sv = installCNHelmChart(
 
 const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
 installCNHelmChartByNamespaceName(
-  infraStack.getOutput('ingressNs') as pulumi.Output<string>,
+  infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
   'cluster-ingress',
   'cn-cluster-ingress-sv',
   // TODO(#4384): move these values into a file and distribute it with the release

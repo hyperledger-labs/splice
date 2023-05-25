@@ -36,3 +36,21 @@ repos:
         entry: "scripts/fix-ts.py"
         types_or: [javascript, jsx, ts, tsx]
         exclude: "/[.]prettierrc[.]cjs$"
+      - id: pulumi_infra
+        name: check pulumi infrastructure config
+        language: system
+        entry: "make cluster/pulumi/infrastructure/diff-config"
+        files: '^cluster/pulumi/infrastructure/src/.*[.]ts$'
+        pass_filenames: false
+      - id: pulumi_cn
+        name: check pulumi canton-network config
+        language: system
+        entry: "make cluster/pulumi/canton-network/diff-config"
+        files: '^cluster/pulumi/canton-network/src/.*[.]ts$'
+        pass_filenames: false
+      - id: pulumi_sv
+        name: check pulumi sv-runbook config
+        language: system
+        entry: "make cluster/pulumi/sv-runbook/diff-config"
+        files: '^cluster/pulumi/sv-runbook/src/.*[.]ts$'
+        pass_filenames: false

@@ -1043,6 +1043,9 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Deployment Test
          cmd: make cluster/manifest/test
+      - run_bash_command_in_nix:
+         cmd_name: Check Pulumi deployment
+         cmd: make --keep-going cluster/pulumi/test
 
   deploy_cluster:
     circleci_ip_ranges: true

@@ -2,10 +2,11 @@ import * as k8s from '@pulumi/kubernetes';
 
 import * as postgres from './postgres';
 import { auth0UserNameEnvVar, installAuth0Secret, installAuth0UISecret } from './auth0';
+import type { Auth0Client } from './auth0types';
 import { installDomain, installParticipant } from './ledger';
 import { ChartValues, ExactNamespace, exactNamespace, installCNHelmChart } from './utils';
 
-export function installSVC(): k8s.helm.v3.Release {
+export function installSVC(auth0Client: Auth0Client): k8s.helm.v3.Release {
   const xns = exactNamespace('svc');
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
@@ -69,11 +70,11 @@ export function installSVC(): k8s.helm.v3.Release {
 
   const dependsOn = [
     participant,
-    installAuth0Secret(xns, 'directory', 'directory'),
-    installAuth0Secret(xns, 'scan', 'scan'),
-    installAuth0Secret(xns, 'sv1', 'sv-1'),
-    installAuth0Secret(xns, 'svc', 'svc'),
-    installAuth0Secret(xns, 'validator', 'validator'),
+    installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
+    installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
+    installAuth0Secret(auth0Client, xns, 'sv1', 'sv-1'),
+    installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
+    installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
   ];
 
   return installCNHelmChart(
@@ -159,6 +160,7 @@ export function installSvKeySecret(
 }
 
 export function installSvNode(
+  auth0Client: Auth0Client,
   svc: k8s.helm.v3.Release,
   nodename: string,
   onboardingName: string,
@@ -169,10 +171,10 @@ export function installSvNode(
 
   const dependsOn = [
     svc,
-    installAuth0Secret(xns, 'sv', nodename),
-    installAuth0UISecret(xns, 'sv', nodename),
-    installAuth0Secret(xns, 'validator', 'validator'),
-    installAuth0UISecret(xns, 'wallet', 'wallet'),
+    installAuth0Secret(auth0Client, xns, 'sv', nodename),
+    installAuth0UISecret(auth0Client, xns, 'sv', nodename),
+    installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
+    installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
   ].concat(
     joinWithKey ? [installSvKeySecret(xns, joinWithKey.publicKey, joinWithKey.privateKey)] : []
   );

@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
-import { AuthenticationClient, Client, ManagementClient } from 'auth0';
+import { AuthenticationClient, ManagementClient } from 'auth0';
 
+import type { Auth0Client, Auth0SecretMap, Auth0ClientSecret } from './auth0types';
 import { ExactNamespace, fixedTokens } from './utils';
 
 const appToClientId = {
@@ -48,38 +49,41 @@ function requireEnv(name: string): string {
 const clientId = requireEnv('AUTH0_MANAGEMENT_API_CLIENT_ID');
 const clientSecret = requireEnv('AUTH0_MANAGEMENT_API_CLIENT_SECRET');
 
-type Auth0SecretMap = Map<string, Client>;
+export class Auth0Fetch implements Auth0Client {
+  private secrets: Auth0SecretMap | undefined;
 
-async function getAuth0(): Promise<Auth0SecretMap> {
-  const client = new ManagementClient({
-    domain: auth0Domain,
-    clientId: clientId,
-    clientSecret: clientSecret,
-    scope: 'read:clients read:client_keys',
-  });
+  public async getSecrets(): Promise<Auth0SecretMap> {
+    if (this.secrets === undefined) {
+      const client = new ManagementClient({
+        domain: auth0Domain,
+        clientId: clientId,
+        clientSecret: clientSecret,
+        scope: 'read:clients read:client_keys',
+      });
 
-  const clients = await client.getClients();
+      const clients = await client.getClients();
 
-  const secrets = new Map() as Auth0SecretMap;
+      const secrets = new Map() as Auth0SecretMap;
 
-  for (const client of clients) {
-    if (client.client_id && client.client_secret) {
-      secrets.set(client.client_id, client);
+      for (const client of clients) {
+        if (client.client_id && client.client_secret) {
+          secrets.set(client.client_id, client as Auth0ClientSecret);
+        }
+      }
+      this.secrets = secrets;
     }
+    return this.secrets;
   }
-  return secrets;
 }
-
-const auth0Secrets = getAuth0();
 
 async function auth0Secret(
   allSecrets: Auth0SecretMap,
   clientName: string
 ): Promise<{ [key: string]: string }> {
-  const clientSecrets = allSecrets.get(appToClientId[clientName]) || {};
+  const clientSecrets = allSecrets.get(appToClientId[clientName]);
 
-  const clientId = clientSecrets.client_id || '';
-  const clientSecret = clientSecrets.client_secret || '';
+  const clientId = clientSecrets?.client_id || '';
+  const clientSecret = clientSecrets?.client_secret || '';
 
   if (fixedTokens()) {
     const auth0 = new AuthenticationClient({
@@ -95,16 +99,17 @@ async function auth0Secret(
       'ledger-api-user': clientId + '@clients',
     };
   } else {
-    return Promise.resolve({
+    return {
       url: `https://${auth0Domain}/.well-known/openid-configuration`,
       'client-id': clientId,
       'client-secret': clientSecret,
       'ledger-api-user': clientId + '@clients',
-    });
+    };
   }
 }
 
 export function installAuth0Secret(
+  auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
@@ -116,7 +121,9 @@ export function installAuth0Secret(
         name: 'cn-app-' + secretNameApp + '-ledger-api-auth',
         namespace: xns.ns.metadata.name,
       },
-      stringData: auth0Secrets.then((all: Auth0SecretMap) => auth0Secret(all, clientName)),
+      stringData: auth0Client
+        .getSecrets()
+        .then((all: Auth0SecretMap) => auth0Secret(all, clientName)),
     },
     {
       dependsOn: xns.ns,
@@ -125,9 +132,9 @@ export function installAuth0Secret(
 }
 
 function auth0UISecret(allSecrets: Auth0SecretMap, clientName: string, namespaceName: string) {
-  const clientSecrets = allSecrets.get(namespaceToUiClientId[namespaceName]) || {};
+  const clientSecrets = allSecrets.get(namespaceToUiClientId[namespaceName]);
 
-  const clientId = clientSecrets.client_id || '';
+  const clientId = clientSecrets?.client_id || '';
 
   return {
     url: `https://${auth0Domain}`,
@@ -136,6 +143,7 @@ function auth0UISecret(allSecrets: Auth0SecretMap, clientName: string, namespace
 }
 
 export function installAuth0UISecret(
+  auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
@@ -147,9 +155,9 @@ export function installAuth0UISecret(
         name: 'cn-app-' + secretNameApp + '-ui-auth',
         namespace: xns.ns.metadata.name,
       },
-      stringData: auth0Secrets.then((all: Auth0SecretMap) =>
-        auth0UISecret(all, clientName, xns.logicalName)
-      ),
+      stringData: auth0Client
+        .getSecrets()
+        .then((all: Auth0SecretMap) => auth0UISecret(all, clientName, xns.logicalName)),
     },
     {
       dependsOn: xns.ns,

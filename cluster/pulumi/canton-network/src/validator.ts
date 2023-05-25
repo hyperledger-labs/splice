@@ -2,10 +2,15 @@ import * as k8s from '@pulumi/kubernetes';
 
 import * as postgres from './postgres';
 import { auth0UserNameEnvVar, installAuth0Secret, installAuth0UISecret } from './auth0';
+import type { Auth0Client } from './auth0types';
 import { installParticipant } from './ledger';
 import { exactNamespace, installCNHelmChart } from './utils';
 
-export function installValidator(svc: k8s.helm.v3.Release, name: string): k8s.helm.v3.Release {
+export function installValidator(
+  auth0Client: Auth0Client,
+  svc: k8s.helm.v3.Release,
+  name: string
+): k8s.helm.v3.Release {
   const xns = exactNamespace(name);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
@@ -32,21 +37,21 @@ export function installValidator(svc: k8s.helm.v3.Release, name: string): k8s.he
   );
 
   installCNHelmChart(xns, 'directory-web-ui', 'cn-directory-web-ui', {}, [
-    installAuth0UISecret(xns, 'directory', 'directory'),
+    installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
   ]);
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [
-    installAuth0UISecret(xns, 'splitwell', 'splitwell'),
+    installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
   const dependsOn = [
     svc,
     xns.ns,
     participant,
-    installAuth0Secret(xns, 'validator', 'validator'),
-    installAuth0Secret(xns, 'svc', 'svc'),
-    installAuth0Secret(xns, 'scan', 'scan'),
-    installAuth0Secret(xns, 'directory', 'directory'),
-    installAuth0UISecret(xns, 'wallet', 'wallet'),
+    installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
+    installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
+    installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
+    installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
+    installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
   ];
 
   return installCNHelmChart(
