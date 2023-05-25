@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import fetch from 'node-fetch';
+import { AuthenticationClient, Client, ManagementClient } from 'auth0';
 
 import { ExactNamespace, fixedTokens } from './utils';
 
@@ -31,86 +31,72 @@ const namespaceToUiClientId = {
 
 /// Auth0
 
-type Auth0SecretMap = Map<string, { [key: string]: string }>;
+const auth0Account = 'canton-network-dev.us';
+const auth0Domain = `${auth0Account}.auth0.com`;
 
-function getAuth0(): Promise<Auth0SecretMap> {
-  const auth0Token = process.env.AUTH0_MANAGEMENT_API_TOKEN;
-  if (!auth0Token) {
-    console.error('Environment variable AUTH0_MANAGEMENT_API_TOKEN is undefined.');
-    console.error(
-      '   Please see https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#auth0-secrets'
-    );
+function requireEnv(name: string): string {
+  const value = process.env[name];
+
+  if (!value) {
+    console.error(`Environment variable ${name} is undefined.`);
     process.exit(1);
+  } else {
+    return value;
   }
+}
 
-  return fetch('https://canton-network-dev.us.auth0.com/api/v2/clients', {
-    headers: {
-      Authorization: 'Bearer ' + auth0Token,
-    },
-  })
-    .then(response => {
-      if (response.ok) {
-        return response.json();
-      }
+const clientId = requireEnv('AUTH0_MANAGEMENT_API_CLIENT_ID');
+const clientSecret = requireEnv('AUTH0_MANAGEMENT_API_CLIENT_SECRET');
 
-      console.error('Error fetching secrets from Auth0: ' + response.statusText);
-      process.exit(1);
-    })
-    .then((data: [{ client_id: string }]) => {
-      const secrets = new Map() as Auth0SecretMap;
+type Auth0SecretMap = Map<string, Client>;
 
-      data.forEach((app: { client_id: string }) => {
-        secrets.set(app['client_id'], app);
-      });
+async function getAuth0(): Promise<Auth0SecretMap> {
+  const client = new ManagementClient({
+    domain: auth0Domain,
+    clientId: clientId,
+    clientSecret: clientSecret,
+    scope: 'read:clients read:client_keys',
+  });
 
-      return secrets;
-    });
+  const clients = await client.getClients();
+
+  const secrets = new Map() as Auth0SecretMap;
+
+  for (const client of clients) {
+    if (client.client_id && client.client_secret) {
+      secrets.set(client.client_id, client);
+    }
+  }
+  return secrets;
 }
 
 const auth0Secrets = getAuth0();
 
-function getClientToken(clientId: string, clientSecret: string): Promise<string> {
-  return fetch('https://canton-network-dev.us.auth0.com/oauth/token', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      audience: 'https://canton.network.global',
-      grant_type: 'client_credentials',
-    }),
-  })
-    .then(response => {
-      if (response.ok) {
-        return response.json();
-      }
-      console.error('Error fetching clientToken: ' + response.statusText);
-      process.exit(1);
-    })
-    .then((data: { access_token: string }) => data.access_token);
-}
-
-function auth0Secret(
+async function auth0Secret(
   allSecrets: Auth0SecretMap,
   clientName: string
 ): Promise<{ [key: string]: string }> {
   const clientSecrets = allSecrets.get(appToClientId[clientName]) || {};
 
-  const clientId = clientSecrets['client_id'] || '';
-  const clientSecret = clientSecrets['client_secret'] || '';
+  const clientId = clientSecrets.client_id || '';
+  const clientSecret = clientSecrets.client_secret || '';
 
   if (fixedTokens()) {
-    return getClientToken(clientId, clientSecret).then(accessToken => {
-      return {
-        token: accessToken,
-        'ledger-api-user': clientId + '@clients',
-      };
+    const auth0 = new AuthenticationClient({
+      domain: `${auth0Account}.auth0.com`,
+      clientId: clientId,
+      clientSecret: clientSecret,
     });
+    const accessToken = await auth0.clientCredentialsGrant({
+      audience: 'https://canton.network.global',
+    });
+    return {
+      token: accessToken.access_token,
+      'ledger-api-user': clientId + '@clients',
+    };
   } else {
     return Promise.resolve({
-      url: 'https://canton-network-dev.us.auth0.com/.well-known/openid-configuration',
+      url: `https://${auth0Domain}/.well-known/openid-configuration`,
       'client-id': clientId,
       'client-secret': clientSecret,
       'ledger-api-user': clientId + '@clients',
@@ -141,10 +127,10 @@ export function installAuth0Secret(
 function auth0UISecret(allSecrets: Auth0SecretMap, clientName: string, namespaceName: string) {
   const clientSecrets = allSecrets.get(namespaceToUiClientId[namespaceName]) || {};
 
-  const clientId = clientSecrets['client_id'] || '';
+  const clientId = clientSecrets.client_id || '';
 
   return {
-    url: 'https://canton-network-dev.us.auth0.com',
+    url: `https://${auth0Domain}`,
     'client-id': clientId,
   };
 }

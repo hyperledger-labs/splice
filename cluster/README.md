@@ -781,8 +781,6 @@ Our apps need some secrets in order to interact with auth0.
 In order to update these secrets, please set the environment variables `AUTH0_MANAGEMENT_API_CLIENT_ID`
 and `AUTH0_MANAGEMENT_API_CLIENT_SECRET` to the client id and secret of the
 [Auth0 Management API Explorer](https://manage.auth0.com/dashboard/us/canton-network-dev/apis/management/explorer).
-<!--TODO(#4076) Pulumi should deploy via auth0 client id/secrets instead of management token -->
-Also set `AUTH0_MANAGEMENT_API_TOKEN` to the Auth0 Management API token, which can be found on [the Auth0 Management API page](https://manage.auth0.com/dashboard/us/canton-network-dev/apis/management/explorer).
 
 It is recommended you store these in `.envrc.private`.
 

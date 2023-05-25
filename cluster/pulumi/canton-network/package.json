@@ -2,10 +2,10 @@
     "name": "canton-network-pulumi-deployment",
     "version": "1.0.0",
     "main": "src/index.ts",
-    "devDependencies": {
-    },
     "dependencies": {
-        "@pulumi/kubernetes": "^3.22.1"
+        "@pulumi/kubernetes": "^3.22.1",
+        "@types/auth0": "^3.3.2",
+        "auth0": "^3.4.0"
     },
     "scripts": {
         "fix": "npm run format:fix && npm run lint:fix",
