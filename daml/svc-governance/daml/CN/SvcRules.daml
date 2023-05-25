@@ -30,14 +30,16 @@ import CN.Util.ExpiringContract
 -- | Actions that require confirmation from SV nodes before they can be executed.
 --
 -- There are two processes for executing such actions:
--- 1. Any SV can request a vote to exeute such an action upon which the other SV's
+-- 1. Any SV can request a vote to execute such an action upon which the other SV's
 --    can respond with their votes for whether they accept the execution or not.
---    This process requires 2 * f + 1 votes for the vote to be considered definitive
+--    This process requires 2 * f + 1 votes* for the action to be considered definitive
 --    and it can be used for all actions that require confirmation.
 -- 2. Some of the actions that require confirmations should be executed automatically
 --    once the ledger and the wall-clocks of the SV nodes are in a particular state.
 --    These actions are confirmed by each SV node automatically once the action's precondition is met.
---    Once f + 1 confirmations are visible to the leader it executes them.
+--    Once 2 * f + 1 confirmations* are visible to the leader it executes them.
+--
+-- * Simplified for clarity; see `requiredNumVotes` for exact formula.
 --
 -- Process 2 is an optimization of Process 1 for the case where no disagreement to the
 -- action is expected. It avoids the extra round-trip and the complications of having
@@ -46,7 +48,7 @@ import CN.Util.ExpiringContract
 --
 -- We expect honest SV nodes to only create confirmations for actions
 -- whose preconditions are met. We also rely on the execution of these actions to be
--- idempotent, as more than f + 1 confirmations can be created and the leader could
+-- idempotent, as more than the required number of confirmations can be created and the leader could
 -- thus in principle execute the corresponding action multiple times.
 --
 -- Note also that having these two processes also aids in distinguishing between manually initiated
@@ -298,7 +300,7 @@ template SvcRules with
         -- revoking that member's rights in the CometBFT network.
         let newMembers = Map.delete member members
         -- We optimize for prompt removal of a member if the vote said so. We can thus not wait for a leader-election
-        -- and instead just choose the member with the lexicographicall smallest name.
+        -- and instead just choose the member with the lexicographically smallest name.
         let (newLeader, newEpoch)
               | member == leader = (head (Map.keys newMembers), epoch + 1)
               | otherwise        = (leader, epoch)

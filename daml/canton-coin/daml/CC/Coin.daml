@@ -657,7 +657,7 @@ template CoinRules
         requireUnlocked lock
         forA_ (nextChangeScheduledAt newConfigSchedule) $ \t -> do
           now <- getTime
-          require "Next change is not scheduled in the future" (now < t)
+          require "Next change is scheduled in the future" (now < t)
         create this with configSchedule = newConfigSchedule
 
 
