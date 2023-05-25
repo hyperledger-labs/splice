@@ -1,7 +1,7 @@
 package com.daml.network.sv.util
 
-import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
-import com.daml.network.codegen.java.cn.svc
+import cats.data.EitherT
+import com.daml.network.codegen.java.cn.cometbft.{CometBftConfig, CometBftConfigLimits}
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainConfig,
   DomainNodeConfig,
@@ -9,8 +9,12 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   GlobalDomainConfig,
 }
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
+import com.daml.network.codegen.java.cn.{cometbft, svc}
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftError
+import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.util.Contract
+import com.digitalasset.canton.tracing.TraceContext
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -21,6 +25,7 @@ import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySp
 import java.time.Duration as JavaDuration
 import java.util.Base64
 import java.util.concurrent.TimeUnit
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 object SvUtil {
@@ -53,9 +58,39 @@ object SvUtil {
 
   )
 
-  def noFounderDomainNodes: java.util.Map[java.lang.Long, DomainNodeConfig] = {
-    // NOTE: we leave this empty by default, as it will be populated via a reconciliation trigger
-    Map[java.lang.Long, DomainNodeConfig]().asJava
+  def getFounderDomainNodeConfig(
+      cometBftNode: Option[CometBftNode]
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): EitherT[Future, CometBftError, java.util.Map[java.lang.Long, DomainNodeConfig]] = {
+    cometBftNode.fold {
+      // No BFT node are configured
+      EitherT.rightT[Future, CometBftError](Map[java.lang.Long, DomainNodeConfig]().asJava)
+    } { node =>
+      node
+        .getLocalNodeConfig()
+        .map { nodeConfig =>
+          Map(
+            long2Long(defaultSvcDomainNumber) -> new DomainNodeConfig(
+              new CometBftConfig(
+                nodeConfig.cometbftNodes.view
+                  .mapValues(config =>
+                    new cometbft.CometBftNodeConfig(
+                      config.validatorPubKey,
+                      config.votingPower,
+                    )
+                  )
+                  .toMap
+                  .asJava,
+                // TODO(M3-47) - Add support for governance and sequencer keys
+                List.empty.asJava,
+                List.empty.asJava,
+              )
+            )
+          ).asJava
+        }
+    }
   }
 
   def defaultSvcRulesConfig(): SvcRulesConfig = new SvcRulesConfig(

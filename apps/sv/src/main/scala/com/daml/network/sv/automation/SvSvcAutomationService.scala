@@ -3,6 +3,7 @@ package com.daml.network.sv.automation
 import akka.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -19,6 +20,7 @@ class SvSvcAutomationService(
     svcStore: SvSvcStore,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
+    cometBft: Option[CometBftNode],
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit
@@ -42,8 +44,19 @@ class SvSvcAutomationService(
   }
   registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svcStore, connection))
 
-  // TODO(#4628): register PublishLocalCometBftNodeConfigTrigger
-  // TODO(#4628): register ReconcileCometBftNetworkConfigWithSvcRulesTrigger
+  // Register optional BFT triggers
+  cometBft.foreach { node =>
+    registerTrigger(
+      new PublishLocalCometBftNodeConfigTrigger(triggerContext, svcStore, connection, node)
+    )
+    registerTrigger(
+      new ReconcileCometBftNetworkConfigWithSvcRulesTrigger(
+        triggerContext,
+        svcStore,
+        node,
+      )
+    )
+  }
 
   registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
 

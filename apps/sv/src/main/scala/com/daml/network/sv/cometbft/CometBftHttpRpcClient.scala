@@ -2,10 +2,6 @@
 
 package com.daml.network.sv.cometbft
 
-import java.net.http.HttpClient
-import java.util.concurrent.Executor
-import java.util.{Base64, UUID}
-
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftCallResponse.{
@@ -23,6 +19,9 @@ import io.circe.parser.*
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Json}
 
+import java.net.http.HttpClient
+import java.util.concurrent.Executor
+import java.util.{Base64, UUID}
 import scala.annotation.nowarn
 import scala.compat.java8.FutureConverters.CompletionStageOps
 import scala.concurrent.{ExecutionContext, Future}
@@ -52,15 +51,15 @@ class CometBftHttpRpcClient(
   def rawCall(
       path: String,
       params: Map[String, Json] = Map.empty,
-  ): EitherT[Future, QueryError, Json] = {
+  ): EitherT[Future, CometBftError, Json] = {
     callCometBftJsonHttp[Json](path, params).map(_.result)
   }
 
-  def nodeStatus(): EitherT[Future, QueryError, NodeStatus] = {
+  def nodeStatus(): EitherT[Future, CometBftError, NodeStatus] = {
     callCometBftJsonHttp[NodeStatus]("status", Map.empty).map(_.result)
   }
 
-  def query(queryParams: Map[String, Json]): EitherT[Future, QueryError, QueryResponse] = {
+  def query(queryParams: Map[String, Json]): EitherT[Future, CometBftError, QueryResponse] = {
     callCometBftJsonHttp[CometBftQueryResult](AbciQueryMethod, queryParams).map(response =>
       QueryResponse(response.result.response.value)
     )
@@ -68,7 +67,7 @@ class CometBftHttpRpcClient(
 
   def send(
       message: Array[Byte]
-  ): EitherT[Future, QueryError, Unit] = {
+  ): EitherT[Future, CometBftError, Unit] = {
     val encodedRequest =
       Base64.getEncoder.encodeToString(message)
     callCometBftJsonHttp[CometBftBroadcastResult](
@@ -77,10 +76,11 @@ class CometBftHttpRpcClient(
     ).map(_ => {})
   }
 
+  // TODO(#5024) add retries for failures
   private def callCometBftJsonHttp[T: Decoder](
       method: String,
       param: Map[String, Json],
-  ): EitherT[Future, QueryError, CometBftCallResponse[T]] = EitherT {
+  ): EitherT[Future, CometBftError, CometBftCallResponse[T]] = EitherT {
     // id is set to a unique id for correlating requests with responses
     // without an id the requests is treated fully async
     val toSend =
@@ -112,20 +112,30 @@ class CometBftHttpRpcClient(
         if (response.statusCode() == 200) {
           val response = decode[CometBftCallResponse[T]](responseBody)
           response.leftMap(decodeError =>
-            QueryError(
-              s"Failed to decode response: ${decodeError.toString}. Full response: $responseBody",
-              200,
-            )
+            // Errors are sometimes propagated with status 200, so we try to decode the error as well
+            decode[CometBftErrorResponse](responseBody)
+              .fold(
+                errDecodingFailure =>
+                  CometBftError(
+                    s"Failed to decode response as success (${decodeError.toString}) or error (${errDecodingFailure.toString}). Full response: $responseBody",
+                    200,
+                  ),
+                errorResponse =>
+                  CometBftError(
+                    s"CometBFT call failed with error: $errorResponse",
+                    200,
+                  ),
+              )
           )
         } else {
           decode[CometBftErrorResponse](responseBody)
             .fold(
               err =>
-                QueryError(
+                CometBftError(
                   s"Failed to parse json response: $err. Original body response: $responseBody",
                   response.statusCode(),
                 ),
-              res => QueryError(res.error, response.statusCode()),
+              res => CometBftError(res.error.noSpaces, response.statusCode()),
             )
             .asLeft[CometBftCallResponse[T]]
         }
@@ -155,7 +165,9 @@ class CometBftHttpRpcClient(
 object CometBftHttpRpcClient {
 
   private val AbciQueryMethod = "abci_query"
-  private[cometbft] case class CometBftErrorResponse(error: String, id: Int)
+
+  // Ideally error should be a `String`, as defined by the API spec, but it seems that it's not really enforced and sometimes it's an object
+  private[cometbft] case class CometBftErrorResponse(error: Json, id: Int)
 
   private[cometbft] object CometBftErrorResponse {
     implicit val errorDecoder: Decoder[CometBftErrorResponse] =
@@ -179,10 +191,14 @@ object CometBftHttpRpcClient {
     case class NodeInfo(id: String)
 
     implicit val nodeInfoDecoder: Decoder[NodeInfo] = deriveDecoder
-    case class ValidatorInfo(votingPower: String)
+
+    case class CantonBftNodePublicKey(value: String)
+    implicit val cantonBftNodePublicKeyDecoder: Decoder[CantonBftNodePublicKey] = deriveDecoder
+
+    case class ValidatorInfo(votingPower: String, publicKey: CantonBftNodePublicKey)
 
     implicit val validatorInfoDecoder: Decoder[ValidatorInfo] =
-      Decoder.forProduct1("voting_power")(ValidatorInfo.apply)
+      Decoder.forProduct2("voting_power", "pub_key")(ValidatorInfo.apply)
     case class SyncInfo(catchingUp: Boolean)
 
     implicit val syncInfoDecoder: Decoder[SyncInfo] =
@@ -198,7 +214,7 @@ object CometBftHttpRpcClient {
 
   private[cometbft] case class CometBftBroadcastResult(code: Int, hash: String)
 
-  case class QueryError(message: String, responseCode: Int)
+  case class CometBftError(message: String, responseCode: Int)
   case class QueryResponse(value: String)
 }
 

@@ -1,10 +1,17 @@
 package com.daml.network.sv.cometbft
 
-import com.digitalasset.canton.drivers as proto
+import cats.data.EitherT
+import cats.implicits.toTraverseOps
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.sv.util.SvUtil
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.daml.network.codegen.java.cn.svcrules.{MemberInfo, SvcRules}
+import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftError
+import com.daml.network.sv.config.CometBftConfig
+import com.digitalasset.canton.drivers as proto
+import com.digitalasset.canton.drivers.cometbft.{NetworkConfigChangeRequest, SvNodeConfig}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyUtil}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
@@ -13,12 +20,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 /** A handle to a CometBFT node.
-  *
-  * @param owningSvNode: the identifier of the SvNode that owns and manages this CometBFT node.
   */
 class CometBftNode(
-    owningSvNode: String,
-    cometBftService: proto.cometbft.NodeGovernanceServiceGrpc.NodeGovernanceService,
+    cometBftClient: CometBftClient,
+    cometBftConfig: CometBftConfig,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -28,29 +33,72 @@ class CometBftNode(
   /** Reconcile the CometBFT network config seen by this node with the target configuration specified
     * in the `SvcRules` contract.
     *
+    * @param owningSvNode: the identifier of the SvNode that owns and manages this CometBFT node.
     * This method is idempotent and safe to retry.
     */
-  def reconcileNetworkConfig(target: daml.svcrules.SvcRules): Future[Unit] = for {
-    actualConfig <- cometBftService.getNetworkConfig(com.google.protobuf.empty.Empty())
-    // We minimize latency by issuing all change requests at once, which is safe as we expect <= 16 SV nodes
-    _ <- Future.traverse(diffNetworkConfig(owningSvNode, target.members, actualConfig, logger))(
-      // TODO(M3-47): consider moving `diffNetworkConfig` into this class to minimize the parameter passing; it's currently kept outside for ease of unit testing
+  def reconcileNetworkConfig(
+      owningSvNode: String,
+      target: daml.svcrules.SvcRules,
+  )(implicit tc: TraceContext): Future[Unit] = (for {
+    actualConfig <- cometBftClient.readNetworkConfig()
+    networkConfigChanges = diffNetworkConfig(owningSvNode, target.members, actualConfig, logger)
+    // We minimize latency by issuing updates and deletes in parallel, which is safe as we expect <= 16 SV nodes
+    // TODO(M3-47): consider moving `diffNetworkConfig` into this class to minimize the parameter passing; it's currently kept outside for ease of unit testing
+    _ <- networkConfigChanges.requests.traverse(
       submitChangeRequest
     )
-  } yield ()
+  } yield ()).leftMap(error => CometBftException(error)).rethrowT
 
   private def submitChangeRequest(
       changeRequest: proto.cometbft.NetworkConfigChangeRequest
-  ): Future[com.google.protobuf.empty.Empty] = {
+  )(implicit tc: TraceContext) = {
+    logger.debug(s"Updating network config $changeRequest")
     val request = proto.cometbft.UpdateNetworkConfigRequest(
       changeRequestBytes = changeRequest.toByteString,
       signature = com.google.protobuf.ByteString.EMPTY, // TODO(M3-47): actually sign :)
     )
-    cometBftService.updateNetworkConfig(request)
+    cometBftClient
+      .updateNetworkConfig(request)
+      .map { _ =>
+        logger.debug(s"Updated network config $changeRequest")
+      }
+  }
+
+  def getLocalNodeConfig()(implicit
+      tc: TraceContext
+  ): EitherT[Future, CometBftError, SvNodeConfig] = {
+    cometBftClient
+      .nodeStatus()
+      .map { status =>
+        proto.cometbft.SvNodeConfig(
+          cometbftNodes = Map(
+            status.nodeInfo.id ->
+              proto.cometbft.CometBftNodeConfig(
+                validatorPubKey = status.validatorInfo.publicKey.value,
+                votingPower = cometBftConfig.votingPower,
+              )
+          )
+        )
+      }
   }
 }
 
 object CometBftNode {
+
+  def extractSvNodeMemberInfo(rules: SvcRules, svParty: PartyId): Option[MemberInfo] = {
+    val members = rules.members.asScala
+    // require our svParty to be registered as a member
+    members.get(svParty.toProtoPrimitive)
+  }
+
+  private case class CometBftException(error: CometBftError)
+      extends RuntimeException(s"Failed to run CometBFT query with error $error")
+  case class NetworkConfigDiff(
+      deletes: Seq[proto.cometbft.NetworkConfigChangeRequest],
+      updates: Seq[proto.cometbft.NetworkConfigChangeRequest],
+  ) {
+    lazy val requests: Seq[NetworkConfigChangeRequest] = deletes ++ updates
+  }
 
   /** Compute the set of change requests that, when applied, make the current network config
     * match the target config specified by the `SvcRules` contract.
@@ -60,7 +108,7 @@ object CometBftNode {
       targetMemberInfos: java.util.Map[String, daml.svcrules.MemberInfo],
       currentNetworkConfig: proto.cometbft.GetNetworkConfigResponse,
       logger: TracedLogger,
-  ): Seq[proto.cometbft.NetworkConfigChangeRequest] = {
+  ): NetworkConfigDiff = {
     val targetConfig = memberInfosToNetworkConfig(targetMemberInfos)
     val actualOrPendingConfig = getActualOrPendingConfig(owningSvNode, currentNetworkConfig, logger)
 
@@ -85,7 +133,7 @@ object CometBftNode {
     val toDelete = actualOrPendingConfig.filter { case (svNodeId, svNodeConfigState) =>
       !targetConfig.contains(svNodeId) && svNodeConfigState.actualOrPendingConfig.isDefined
     }
-    val deleteConfigRequests = toDelete.collect { case (svNodeId, svNodeConfigState) =>
+    val deleteConfigRequests = toDelete.map { case (svNodeId, svNodeConfigState) =>
       mkChangeRequest(
         svNodeId,
         svNodeConfigState.currentRevision,
@@ -96,16 +144,18 @@ object CometBftNode {
     // Set SV node configs for SV nodes whose config has changed, and for whom we did not yet
     // create a pending change request.
     val missingOrDifferent =
-      targetConfig.collect(Function.unlift { case (svNodeId, targetSvNodeConfig) =>
-        actualOrPendingConfig.get(svNodeId) match {
-          case None => Some((svNodeId, 0L, targetSvNodeConfig))
-          case Some(configState) =>
-            if (configState.actualOrPendingConfig.contains(targetSvNodeConfig))
-              None
-            else
-              Some((svNodeId, configState.currentRevision, targetSvNodeConfig))
+      targetConfig
+        .flatMap { case (svNodeId, targetSvNodeConfig) =>
+          actualOrPendingConfig.get(svNodeId) match {
+            case None =>
+              Some((svNodeId, 0L, targetSvNodeConfig))
+            case Some(configState) =>
+              if (configState.actualOrPendingConfig.contains(targetSvNodeConfig))
+                None
+              else
+                Some((svNodeId, configState.currentRevision, targetSvNodeConfig))
+          }
         }
-      })
     val setConfigRequests = missingOrDifferent.map {
       case (svNodeId, currentRevision, targetSvNodeConfig) =>
         mkChangeRequest(
@@ -115,7 +165,7 @@ object CometBftNode {
         )
     }
 
-    (deleteConfigRequests ++ setConfigRequests).toSeq
+    NetworkConfigDiff(deleteConfigRequests.toSeq, setConfigRequests.toSeq)
   }
 
   /** SvNodeConfig as seen from a specific node. */
@@ -189,14 +239,19 @@ object CometBftNode {
       memberInfos: java.util.Map[String, daml.svcrules.MemberInfo]
   ): immutable.Map[String, proto.cometbft.SvNodeConfig] =
     memberInfos.asScala.values
-      .map(info => (info.name, svNodeConfigToProto(extractDefaultDomainNodeConfig(info).cometBft)))
+      .flatMap(info =>
+        extractDefaultDomainNodeConfig(info).map(domainNode =>
+          info.name -> svNodeConfigToProto(domainNode.cometBft)
+        )
+      )
       .toMap
 
-  def extractDefaultDomainNodeConfig(
+  private def extractDefaultDomainNodeConfig(
       info: daml.svcrules.MemberInfo
-  ): daml.svc.globaldomain.DomainNodeConfig =
-    info.domainNodes.asScala.getOrElse(
-      SvUtil.defaultSvcDomainNumber,
-      throw new NotImplementedError("TODO(#4901): reconcile all configured CometBFT networks"),
+  ) = {
+    // TODO(#4901): reconcile all configured CometBFT networks
+    info.domainNodes.asScala.get(
+      SvUtil.defaultSvcDomainNumber
     )
+  }
 }

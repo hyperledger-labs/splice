@@ -94,4 +94,5 @@ case class SvAppClientConfig(
 case class CometBftConfig(
     enabled: Boolean = false,
     connectionUri: String = "",
+    votingPower: Long = 0,
 )

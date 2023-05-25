@@ -1,0 +1,62 @@
+package com.daml.network.integration.plugins
+
+import cats.implicits.catsSyntaxOptionId
+import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.sv.cometbft.{CometBftConnectionConfig, CometBftContainer}
+import com.digitalasset.canton.integration.EnvironmentSetupPlugin
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.tracing.TraceContext
+import monocle.Monocle.toAppliedFocusOps
+import org.testcontainers.containers.Network
+
+import scala.collection.concurrent.TrieMap
+
+/** Creates a new CometBft deployment for all the configured nodes
+  * The node config must be set for a container to be created
+  * The containers for a given environment share a docker network
+  * The CometBFT container belonging to SV1  is always started as it's the founder member in the genesis.json file
+  */
+class CometBftNetworkPlugin(
+    protected val loggerFactory: NamedLoggerFactory
+) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] {
+
+  private val runningContainers = new TrieMap[CometBftConnectionConfig, CometBftContainer]()
+  override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
+    val network = Network.newNetwork()
+
+    /** SV1 is the validator so it must always be started first
+      */
+    val sv1Node: CometBftConnectionConfig = startNewCometBftContainer("sv1", network)
+
+    CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+      val container = if (name == "sv1") sv1Node else startNewCometBftContainer(name, network)
+      config.focus(_.cometBftConfig).modify(_.map(_.focus(_.connectionUri).replace(container.uri)))
+    }(config)
+
+  }
+
+  override def afterEnvironmentDestroyed(config: CNNodeConfig): Unit = {
+    config.svApps.values.flatMap(_.cometBftConfig.map(_.connectionUri)).foreach { connectionUri =>
+      runningContainers(CometBftConnectionConfig(connectionUri)).shutdown()
+    }
+  }
+
+  def startNewCometBftContainer(id: String, network: Network): CometBftConnectionConfig = {
+    val container = new CometBftContainer(CometBftContainer.SvNetwork(id))
+    container.initialize(network.some)
+    logger.info(
+      s"Started new CometBft container on IP ${container.getIp} and port ${container.getPort}"
+    )(TraceContext.empty)
+    val connectionConfig = CometBftConnectionConfig(
+      s"http://${container.getIp}:${container.getPort}"
+    )
+    runningContainers.put(
+      connectionConfig,
+      container,
+    )
+    connectionConfig
+  }
+
+}

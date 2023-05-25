@@ -24,7 +24,7 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
   def readNetworkConfig()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftHttpRpcClient.QueryError, GetNetworkConfigResponse] = {
+  ): EitherT[Future, CometBftHttpRpcClient.CometBftError, GetNetworkConfigResponse] = {
     client
       .query(GovernanceAbciQueryParams)
       .map { response =>
@@ -42,10 +42,17 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftHttpRpcClient.QueryError, Unit] = {
+  ): EitherT[Future, CometBftHttpRpcClient.CometBftError, Unit] = {
     val updateRequest = CometBftTx(CometBftTx.Message.UpdateNetworkConfigRequest(request))
     client
       .send(updateRequest.toByteArray)
+      .recover {
+        case cometBftError if cometBftError.message.contains("tx already exists in cache") =>
+          logger.info(
+            s"CometBFT network change request $request was identified as a duplicate, ignoring update."
+          )
+          ()
+      }
       .leftMap { error =>
         logger.warn(s"Failed to update CometBFT network config: $error")
         error
@@ -55,7 +62,7 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
   def nodeStatus()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftHttpRpcClient.QueryError, NodeStatus] =
+  ): EitherT[Future, CometBftHttpRpcClient.CometBftError, NodeStatus] =
     client
       .nodeStatus()
       .leftMap { error =>
@@ -66,7 +73,7 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
   def nodeDebugDump()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftHttpRpcClient.QueryError, CometBftNodeDump] = {
+  ): EitherT[Future, CometBftHttpRpcClient.CometBftError, CometBftNodeDump] = {
     val FirstPageNumber = "1"
     val MaxAcceptedValidatorsPerPage = "100"
     (

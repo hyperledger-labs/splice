@@ -31,5 +31,18 @@
       "name": ""
     }
   ],
-  "app_hash": ""
+  "app_hash": "",
+  "app_state": {
+    "sv_node_id": "Canton-Foundation-1",
+    "governance_keys": [
+      {
+        "pub_key": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+      }
+    ],
+    "sequencing_keys": [
+      {
+        "pub_key": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+      }
+    ]
+  }
 }

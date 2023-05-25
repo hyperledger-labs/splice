@@ -11,13 +11,13 @@ import com.daml.network.codegen.java.cn as daml
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.automation.PublishLocalCometBftNodeConfigTrigger.*
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.cometbft.CometBftNode.extractDefaultDomainNodeConfig
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.Contract
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.drivers as proto
+import com.digitalasset.canton.drivers.cometbft.SvNodeConfig
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
@@ -26,15 +26,12 @@ import scala.jdk.CollectionConverters.*
 
 /** A trigger to publish the node-id's and validator keys of an SV's CometBFT nodes
   * to the SVC-wide shared configuration of what validators should be used in the network.
-  *
-  * This is not yet hooked up, as we're missing the CometBFTClient to actually talk to the local node.
-  *
-  * TODO(#4628): hook it up
   */
 class PublishLocalCometBftNodeConfigTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     connection: CNLedgerConnection,
+    cometBftNode: CometBftNode,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -45,23 +42,20 @@ class PublishLocalCometBftNodeConfigTrigger(
   ): Future[Seq[PublishLocalConfigTask]] =
     (for {
       svcRules <- OptionT(store.lookupSvcRules())
-      members = svcRules.payload.members.asScala
-      // require our svParty to be registered as a member
-      info <- OptionT(
-        Future.successful(members.get(store.key.svParty.toProtoPrimitive))
+      svNodeMemberInfo <- OptionT.fromOption[Future](
+        CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
       )
+      localSvNodeConfig <- getLocalSvNodeConfig
       // create a task if the local config is different than the one we have published to the SVC
-      localSvNodeConfig <- getLocalSvNodeConfig()
-      if (CometBftNode.svNodeConfigToProto(
-        extractDefaultDomainNodeConfig(info).cometBft
-      ) != localSvNodeConfig)
-    } yield PublishLocalConfigTask(svcRules, localSvNodeConfig)).value.map(_.toList)
-
-  private def getLocalSvNodeConfig(): OptionT[Future, proto.cometbft.SvNodeConfig] = {
-    throw new NotImplementedError(
-      "TODO(#4628): implement this by querying the local RPC, if available"
-    )
-  }
+      // or if no domain bft is configured
+      if
+      // "TODO(#4901): reconcile all configured CometBFT networks"
+      !svNodeMemberInfo.domainNodes.asScala
+        .get(SvUtil.defaultSvcDomainNumber)
+        .map(domainNodeConfig => CometBftNode.svNodeConfigToProto(domainNodeConfig.cometBft))
+        .contains(localSvNodeConfig)
+    } yield PublishLocalConfigTask(svNodeMemberInfo.name, svcRules, localSvNodeConfig)).value
+      .map(_.toList)
 
   override protected def completeTask(task: PublishLocalConfigTask)(implicit
       tc: TraceContext
@@ -84,22 +78,37 @@ class PublishLocalCometBftNodeConfigTrigger(
   override protected def isStaleTask(
       task: PublishLocalConfigTask
   )(implicit tc: TraceContext): Future[Boolean] =
-    (for {
-      // not stale if the task's SvcRules contract is still active
-      _ <- OptionT(
-        store.multiDomainAcsStore
-          .lookupContractById(daml.svcrules.SvcRules.COMPANION)(task.svcRules.contractId)
-      )
-      // and if the localSvNodeConfig is still the same
-      localSvNodeConfig <- getLocalSvNodeConfig()
-      // TODO(M3-47): figure out how to remove this dummy reference to avoid an unused param warning :'(
-      _ = tc.traceId
-      if (task.localSvNodeConfig == localSvNodeConfig)
-    } yield ()).isEmpty
+    // not stale if the task's SvcRules contract is still active
+    OptionT(
+      store.multiDomainAcsStore
+        .lookupContractById(daml.svcrules.SvcRules.COMPANION)(task.svcRules.contractId)
+    ).foldF {
+      // stale if the contract is no longer active
+      Future.successful(true)
+    } { _ =>
+      // task stale if the local config has changed
+      getLocalSvNodeConfig
+        .map(_ != task.localSvNodeConfig)
+        // not stale if the current local config cannot be read
+        .getOrElse(false)
+    }
+
+  private def getLocalSvNodeConfig(implicit
+      tc: TraceContext
+  ): OptionT[Future, SvNodeConfig] = {
+    cometBftNode
+      .getLocalNodeConfig()
+      .leftMap { failure =>
+        logger.warn(s"Failed to read local SV node config: $failure")
+      }
+      .toOption
+  }
+
 }
 
 object PublishLocalCometBftNodeConfigTrigger {
   case class PublishLocalConfigTask(
+      svNodeId: String,
       svcRules: Contract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
       localSvNodeConfig: proto.cometbft.SvNodeConfig,
   ) extends PrettyPrinting {

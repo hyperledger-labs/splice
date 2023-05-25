@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
+import cats.implicits.catsSyntaxTuple2Semigroupal
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -36,6 +37,7 @@ import com.daml.network.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
   CometBftHttpRpcClient,
+  CometBftNode,
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
@@ -95,6 +97,9 @@ class SvApp(
       tracerProvider,
     ) {
 
+  private val cometBftConfig = config.cometBftConfig
+    .filter(_.enabled)
+
   override def initialize(ledgerClient: CNLedgerClient, svPartyId: PartyId): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
@@ -131,12 +136,14 @@ class SvApp(
       globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global.alias)
       _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
       svcPartyHosting = newSvcPartyHosting(storeKey, participantAdminConnection)
+      cometBftClient = newCometBftClient
       (svcStore, svcAutomation) <- ensureOnboarded(
         svAutomation,
         ledgerClient,
         participantAdminConnection,
         svcPartyHosting,
         globalDomain,
+        cometBftClient,
       )
       _ <- expectConfiguredValidatorOnboardings(
         svAutomation,
@@ -179,23 +186,11 @@ class SvApp(
         loggerFactory,
       )
 
-      cometBftStatusClient = config.cometBftConfig
-        .filter(_.enabled)
-        .map(connectionConfig =>
-          new CometBftClient(
-            new CometBftHttpRpcClient(
-              CometBftConnectionConfig(connectionConfig.connectionUri),
-              loggerFactory,
-            ),
-            loggerFactory,
-          )
-        )
-
       adminHandler = new HttpSvAdminHandler(
         globalDomain,
         svAutomation,
         svcAutomation,
-        cometBftStatusClient,
+        cometBftClient,
         clock,
         loggerFactory,
       )
@@ -293,8 +288,12 @@ class SvApp(
       participantAdminConnection: ParticipantAdminConnection,
       svcPartyHosting: SvcPartyHosting,
       globalDomain: DomainId,
+      cometBftClient: Option[CometBftClient],
   ): Future[(SvSvcStore, SvSvcAutomationService)] = {
     val svStore = svStoreWithIngestion.store
+    val cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
+      new CometBftNode(client, config, loggerFactory)
+    )
     for {
       participantId <- retryProvider.retryForAutomation(
         "get Participant ID",
@@ -316,7 +315,7 @@ class SvApp(
             )
             svcStore = newSvcStore(svStore.key)
             svcAutomation =
-              newSvSvcAutomationService(svStore, svcStore, ledgerClient)
+              newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
             domainId <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
             _ <- waitForAcsIngestion(svcStore.multiDomainAcsStore, domainId)
             onboarded <- isOnboarded(svcStore)
@@ -332,6 +331,7 @@ class SvApp(
                   svStoreWithIngestion,
                   svcAutomation,
                   globalDomain,
+                  cometBftNode,
                 )
               }
           } yield (svcStore, svcAutomation)
@@ -346,6 +346,7 @@ class SvApp(
             globalDomain,
             ledgerClient,
             svcPartyHosting,
+            cometBftNode,
           )
         }
       _ <- waitForSvcMembership(svcStore)
@@ -358,6 +359,7 @@ class SvApp(
       globalDomain: DomainId,
       ledgerClient: CNLedgerClient,
       svcPartyHosting: SvcPartyHosting,
+      cometBftNode: Option[CometBftNode],
   ): Future[(SvSvcStore, SvSvcAutomationService)] = {
     val svStore = svStoreWithIngestion.store
     config.onboarding match {
@@ -392,6 +394,7 @@ class SvApp(
                 svStore,
                 svcStore,
                 ledgerClient,
+                cometBftNode,
               )
               _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
               _ <- addMemberToSvc(
@@ -410,11 +413,12 @@ class SvApp(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
+      cometBftNode: Option[CometBftNode],
   ): Future[Unit] = {
     val svcStore = svcStoreWithIngestion.store
     config.onboarding match {
       case foundingConfig: SvOnboardingConfig.FoundCollective =>
-        foundCollective(foundingConfig, svcStoreWithIngestion, globalDomain)
+        foundCollective(foundingConfig, svcStoreWithIngestion, globalDomain, cometBftNode)
       case _: SvOnboardingConfig.JoinViaSvcApp =>
         joinCollective(svcStore.key.svParty)
       case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
@@ -513,6 +517,7 @@ class SvApp(
       svStore: SvSvStore,
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
+      cometBftNode: Option[CometBftNode],
   ) =
     new SvSvcAutomationService(
       clock,
@@ -521,6 +526,7 @@ class SvApp(
       svcStore,
       ledgerClient,
       retryProvider,
+      cometBftNode,
       loggerFactory,
       timeouts,
     )
@@ -537,6 +543,19 @@ class SvApp(
     retryProvider,
     loggerFactory,
   )
+
+  private def newCometBftClient = {
+    cometBftConfig
+      .map(connectionConfig =>
+        new CometBftClient(
+          new CometBftHttpRpcClient(
+            CometBftConnectionConfig(connectionConfig.connectionUri),
+            loggerFactory,
+          ),
+          loggerFactory,
+        )
+      )
+  }
 
   private def addMemberToSvc(
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
@@ -639,13 +658,14 @@ class SvApp(
       foundingConfig: SvOnboardingConfig.FoundCollective,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
+      cometBftNode: Option[CometBftNode],
   ): Future[Unit] = {
     val svcStore = svcStoreWithIngestion.store
     for {
       _ <- uploadDars(svcStoreWithIngestion.connection)
       _ <- retryProvider.retryForAutomation(
         "bootstrapping SVC",
-        bootstrapSvc(foundingConfig, svcStoreWithIngestion, globalDomain),
+        bootstrapSvc(foundingConfig, svcStoreWithIngestion, globalDomain, cometBftNode),
         logger,
       )
       // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
@@ -690,12 +710,16 @@ class SvApp(
       foundingConfig: SvOnboardingConfig.FoundCollective,
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       domainId: DomainId,
+      cometBftNode: Option[CometBftNode],
   ): Future[Unit] = {
     val svStore = svStoreWithIngestion.store
     val svcParty = svStore.key.svcParty
     val svParty = svStore.key.svParty
     for {
       coinRules <- svStore.lookupCoinRules()
+      founderDomainNodes <- SvUtil
+        .getFounderDomainNodeConfig(cometBftNode)
+        .fold(error => sys.error(s"Failed to initialize the domain nodes: $error"), identity)
       _ <- svStore.lookupSvcRulesWithOffset().flatMap {
         case result @ QueryResult(_, None) => {
           coinRules match {
@@ -705,6 +729,7 @@ class SvApp(
                   show"This should never happen.\nCoinRules: $coinRules"
               )
             case None =>
+              logger.info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
               svStoreWithIngestion.connection
                 .submitCommands(
                   actAs = Seq(svcParty),
@@ -713,7 +738,7 @@ class SvApp(
                     svcParty.toProtoPrimitive,
                     svParty.toProtoPrimitive,
                     foundingConfig.name,
-                    SvUtil.noFounderDomainNodes,
+                    founderDomainNodes,
                     defaultCoinConfig(
                       foundingConfig.initialTickDuration,
                       foundingConfig.initialMaxNumInputs,

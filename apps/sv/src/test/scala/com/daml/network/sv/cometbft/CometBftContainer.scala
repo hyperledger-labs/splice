@@ -63,6 +63,13 @@ class CometBftContainer(nodeType: ContainerType = Testing) extends NamedLogging 
             ),
             "/testconfig",
           )
+          // Share the genesis file
+          .withCopyFileToContainer(
+            MountableFile.forClasspathResource(
+              s"cometbft/sv1/config/genesis.json"
+            ),
+            "/testconfig/config/genesis.json",
+          )
     }
     logger.info(s"Starting CometBFT node $nodeType")(TraceContext.empty)
     modifiedContainer.start()

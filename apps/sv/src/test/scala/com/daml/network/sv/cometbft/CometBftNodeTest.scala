@@ -139,18 +139,19 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
         ), // other configured nodes should not impact the changes for the node of interest
       )
     )
-    logger.info(networkConfig.toString)
-    val actualRequests = CometBftNode.diffNetworkConfig(
-      owningSvNodeId,
-      mkMemberInfos(targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")),
-      networkConfig,
-      logger,
-    )
+    val configDiff = CometBftNode
+      .diffNetworkConfig(
+        owningSvNodeId,
+        mkMemberInfos(targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")),
+        networkConfig,
+        logger,
+      )
+      .requests
     val expectedRequests =
       if (expectChange)
         Seq(mkChangeRequest(nodeNr, targetConfig))
       else Seq()
-    actualRequests shouldBe expectedRequests
+    configDiff shouldBe expectedRequests
   }
 
   "CometBftNode.diffNetworkConfig" should {

@@ -1,6 +1,7 @@
 package com.daml.network.sv.automation
 
 import cats.data.OptionT
+import cats.implicits.catsSyntaxApplicativeId
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
@@ -20,11 +21,18 @@ class ReconcileCometBftNetworkConfigWithSvcRulesTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingTrigger {
-  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
+  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     OptionT(store.lookupSvcRules())
-      .semiflatMap(svcRules => cometBftNode.reconcileNetworkConfig(svcRules.payload))
+      .subflatMap { svcRules =>
+        CometBftNode
+          .extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
+          .map(svcRules.payload -> _)
+      }
       // in all cases there is no more work left to do, and the trigger should just wait for another polling interval
       // before doing another reconciliation
       // TODO(M3-47): consider whether the 10s default polling interval is fast enough; related to #4492, which aims to lower the default polling interval in tests
-      .fold(false)(_ => false)
+      .foldF(false.pure[Future]) { case (svcRules, owningNodeMemberInfo) =>
+        cometBftNode.reconcileNetworkConfig(owningNodeMemberInfo.name, svcRules).map(_ => false)
+      }
+  }
 }

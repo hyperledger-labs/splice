@@ -3,41 +3,45 @@ package com.daml.network.integration.tests
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.plugins.CometBftNetworkPlugin
 import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTestWithSharedEnvironment,
+  CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.cometbft.SvCometBftNetwork
 import com.daml.network.sv.config.CometBftConfig
 import com.daml.network.util.SvTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import monocle.macros.syntax.lens.*
 
-class SvCometBftIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment
-    with SvTestUtil
-    with SvCometBftNetwork {
+import scala.concurrent.duration.*
+
+class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
+
+  registerPlugin(new CometBftNetworkPlugin(NamedLoggerFactory.root))
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+        CNNodeConfigTransforms.updateAllSvAppConfigs_ { config =>
           config
             .focus(_.cometBftConfig)
             .replace(
               Some(
                 CometBftConfig(
                   enabled = true,
-                  connectionUri = startNewCometBftContainer(name).uri,
+                  votingPower = 1,
                 )
               )
             )
         }(config)
       )
+      .withManualStart
 
   "report cometBft status" in { implicit env =>
+    initSvc()
     forAll(env.svs.local) { sv =>
       eventually() {
         sv.cometBftNodeStatus().catchingUp shouldBe false
@@ -46,6 +50,7 @@ class SvCometBftIntegrationTest
   }
 
   "get the debug dump for cometBft" in { implicit env =>
+    initSvc()
     forAll(env.svs.local) { sv =>
       eventually() {
         sv.cometBftNodeDump().abciInfo.isObject shouldBe true
@@ -53,23 +58,22 @@ class SvCometBftIntegrationTest
     }
   }
 
-  "only the SV1 CometBFT node is a validator" in { implicit env =>
-    eventually() {
-      env.svs.local.foreach { sv =>
-        withClue(s"sv ${sv.name} must know all the other BFT nodes as peers") {
-          sv.cometBftNodeDump()
-            .networkInfo
-            .findAllByKey("n_peers")
-            .loneElement
-            .as[Integer]
-            .value shouldBe 3
-        }
+  "sv1 starts as the genesis validator" in { implicit env =>
+    initSvcWithSv1Only()
+    withClue("Configured validator voting power is eventually reconciled") {
+      eventually() {
+        sv1.cometBftNodeStatus().votingPower.doubleValue should be(1d)
       }
-      // SV1 always starts first, and it's set as a validator in the genesis
-      sv1.cometBftNodeStatus().votingPower.doubleValue shouldBe 10
-      // Validate all other nodes are not validators
-      forAll(env.svs.local.filterNot(_.name == sv1.name)) { sv =>
-        sv.cometBftNodeStatus().votingPower.doubleValue shouldBe 0
+    }
+  }
+
+  "all nodes become validators" in { implicit env =>
+    initSvc()
+    forAll(env.svs.local) { sv =>
+      eventually(timeUntilSuccess = 2.minute) {
+        withClue(s"CometBFT node for ${sv.name} becomes a validator") {
+          sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
+        }
       }
     }
   }
