@@ -1,6 +1,7 @@
 module.exports = {
   extends: ["react-app", "react-app/jest", "plugin:@tanstack/eslint-plugin-query/recommended"],
   rules: {
+    "curly": ["error"],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-module-boundary-types": "warn",
     "@typescript-eslint/ban-types": "warn",

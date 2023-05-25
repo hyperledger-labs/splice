@@ -31,7 +31,9 @@ const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => 
   }, [svClient, userAccessToken]);
 
   useEffect(() => {
-    if (isAuthenticated && isAuthorized === 'unset') setIsAuthorized('isLoading');
+    if (isAuthenticated && isAuthorized === 'unset') {
+      setIsAuthorized('isLoading');
+    }
   }, [isAuthenticated, isAuthorized]);
 
   if (isAuthorized !== 'ok') {

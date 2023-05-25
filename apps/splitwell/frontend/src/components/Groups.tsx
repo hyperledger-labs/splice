@@ -59,7 +59,9 @@ interface BalancesProps {
 }
 
 const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean => {
-  if (a.size !== b.size) return false;
+  if (a.size !== b.size) {
+    return false;
+  }
   for (let [k, va] of a) {
     const vb = b.get(k);
     if (va !== vb) {
