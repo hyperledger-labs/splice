@@ -189,8 +189,7 @@ class HttpSvAdminHandler(
           body.action,
           body.url,
           body.description,
-          svcStore,
-          ledgerConnection,
+          svcStoreWithIngestion,
           globalDomain,
         )
         .flatMap {

@@ -154,8 +154,7 @@ class SvApp(
         .map(
           ensureCoinPriceVoteHasCoinPrice(
             _,
-            svcStore,
-            ledgerConnection,
+            svcAutomation,
             globalDomain,
             logger,
           )
@@ -941,12 +940,11 @@ class SvApp(
 
   private def ensureCoinPriceVoteHasCoinPrice(
       defaultCoinPriceVote: BigDecimal,
-      svcStore: SvSvcStore,
-      ledgerConnection: CNLedgerConnection,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
       logger: TracedLogger,
   ): Future[Either[String, Unit]] =
-    svcStore.lookupCoinPriceVoteByThisSv().flatMap {
+    svcStoreWithIngestion.store.lookupCoinPriceVoteByThisSv().flatMap {
       case Some(vote) if vote.payload.coinPrice.toScala.isDefined =>
         logger.info(s"A coin price vote with a defined coin price already exists")
         Future.successful(Right(()))
@@ -956,8 +954,7 @@ class SvApp(
           SvApp
             .updateCoinPriceVote(
               defaultCoinPriceVote,
-              svcStore,
-              ledgerConnection,
+              svcStoreWithIngestion,
               globalDomain,
               logger,
             ),
@@ -1109,8 +1106,7 @@ object SvApp {
       action: String,
       url: String,
       description: String,
-      svcStore: SvSvcStore,
-      ledgerConnection: CNLedgerConnection,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     parseVoteRequestAction(action) match {
@@ -1121,24 +1117,27 @@ object SvApp {
           )
         )
       case Right(action) =>
-        svcStore.lookupVoteRequestByThisSvAndAction(action).flatMap {
+        svcStoreWithIngestion.store.lookupVoteRequestByThisSvAndAction(action).flatMap {
           case QueryResult(_, Some(vote)) =>
             Future.successful(
               Left(s"This vote request has already been created ${vote.contractId}.")
             )
           case result @ QueryResult(_, None) =>
             for {
-              svcRules <- svcStore.getSvcRules()
+              svcRules <- svcStoreWithIngestion.store.getSvcRules()
               reason = new Reason(url, description)
               request = new SvcRules_RequestVote(requester, action, reason)
               cmd = svcRules.contractId.exerciseSvcRules_RequestVote(request)
-              _ <- ledgerConnection.submitCommands(
-                actAs = Seq(svcStore.key.svParty),
-                readAs = Seq(svcStore.key.svcParty),
+              _ <- svcStoreWithIngestion.connection.submitCommands(
+                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
                 commands = cmd.commands().asScala.toSeq,
                 commandId = CNLedgerConnection.CommandId(
                   "com.daml.network.sv.requestVote",
-                  Seq(svcStore.key.svcParty, svcStore.key.svParty),
+                  Seq(
+                    svcStoreWithIngestion.store.key.svcParty,
+                    svcStoreWithIngestion.store.key.svParty,
+                  ),
                   action.toString,
                 ),
                 deduplicationOffset = result.deduplicationOffset,
