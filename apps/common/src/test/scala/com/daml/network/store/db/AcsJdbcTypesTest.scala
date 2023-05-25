@@ -1,4 +1,4 @@
-package com.daml.network.store.tables
+package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Bytes
@@ -7,7 +7,6 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.store.db.PostgresTest
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import org.scalatest.wordspec.AsyncWordSpec
@@ -16,7 +15,7 @@ import slick.jdbc.{JdbcProfile, PostgresProfile}
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
-class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest with PostgresTest {
+class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest with CNPostgresTest {
 
   override val profile: JdbcProfile = PostgresProfile
 

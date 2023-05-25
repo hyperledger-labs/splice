@@ -1,4 +1,4 @@
-package com.daml.network.store.tables
+package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Ref.*

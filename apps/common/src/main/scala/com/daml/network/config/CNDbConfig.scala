@@ -25,9 +25,8 @@ object CNDbConfig {
       with PostgresDbConfig {
     override type Self = Postgres
 
-    // TODO (#4420): replace with the actual migration paths
-    override protected val stableMigrationPath: String = DbConfig.postgresMigrationsPathStable
-    override protected val devMigrationPath: String = DbConfig.postgresMigrationsPathDev
+    override protected val stableMigrationPath: String = postgresMigrationsPathStable
+    override protected val devMigrationPath: String = postgresMigrationsPathDev
 
   }
 
@@ -39,6 +38,12 @@ object CNDbConfig {
     override type Self = Memory
   }
 
+  private val stableDir = "stable"
+  private val devDir = "dev"
+  private val baseMigrationsPath: String = "classpath:db/migration/canton-network/"
+  private val basePostgresMigrationsPath: String = baseMigrationsPath + "postgres/"
+  private val postgresMigrationsPathStable: String = basePostgresMigrationsPath + stableDir
+  private val postgresMigrationsPathDev: String = basePostgresMigrationsPath + devDir
 }
 
 // Copy of canton's CommunityStorageFactory that is not tied to CommunityStorageConfig

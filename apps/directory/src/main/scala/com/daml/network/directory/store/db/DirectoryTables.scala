@@ -1,9 +1,9 @@
-package com.daml.network.directory.store.tables
+package com.daml.network.directory.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionContext
-import com.daml.network.store.tables.AcsTables
+import com.daml.network.store.db.AcsTables
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.PartyId
 import io.circe.Json

@@ -121,7 +121,7 @@ abstract class PostgresDbStorageSetup(
     with NamedLogging
     with NoTracing {
 
-  override type C = Postgres
+  override type C = DbConfig with PostgresDbConfig
 
   override lazy val retryConfig: RetryConfig = RetryConfig.failFast
 
@@ -135,7 +135,7 @@ abstract class PostgresDbStorageSetup(
   */
 class PostgresCISetup(
     override val migrationMode: MigrationMode,
-    override val mkDbConfig: DbBasicConfig => Postgres,
+    override val mkDbConfig: DbBasicConfig => DbConfig with PostgresDbConfig,
     loggerFactory: NamedLoggerFactory,
 )(implicit
     override val executionContext: ExecutionContext
@@ -197,7 +197,7 @@ class PostgresCISetup(
   */
 class PostgresTestContainerSetup(
     override val migrationMode: MigrationMode,
-    override val mkDbConfig: DbBasicConfig => Postgres,
+    override val mkDbConfig: DbBasicConfig => DbConfig with PostgresDbConfig,
     loggerFactory: NamedLoggerFactory,
 )(implicit
     override val executionContext: ExecutionContext
@@ -262,7 +262,7 @@ object DbStorageSetup {
   def postgres(
       loggerFactory: NamedLoggerFactory,
       migrationMode: MigrationMode = MigrationMode.Standard,
-      mkDbConfig: DbBasicConfig => Postgres = _.toPostgresDbConfig,
+      mkDbConfig: DbBasicConfig => DbConfig with PostgresDbConfig = _.toPostgresDbConfig,
   )(implicit ec: ExecutionContext): PostgresDbStorageSetup = {
 
     val isCI = sys.env.contains("CI")

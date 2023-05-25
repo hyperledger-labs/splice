@@ -1,4 +1,4 @@
-package com.daml.network.store.tables
+package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
@@ -91,5 +91,21 @@ trait AcsTables extends AcsJdbcTypes {
         contractMetadataDriverInternal ::
         contractExpiresAt :: HNil
 
+  }
+
+  abstract class TxLogStoreTemplate[Row](_tableTag: Tag, tableName: String)
+      extends profile.api.Table[Row](_tableTag, tableName) {
+
+    val storeId: Rep[Int] = column[Int]("store_id")
+
+    val entryNumber: Rep[Long] = column[Long]("entry_number", O.AutoInc, O.PrimaryKey)
+
+    val eventId: Rep[String] = column[String]("event_id")
+
+    protected def templateColumns =
+      storeId ::
+        entryNumber ::
+        eventId ::
+        HNil
   }
 }

@@ -1,8 +1,8 @@
-package com.daml.network.wallet.store.tables
+package com.daml.network.wallet.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.store.tables.AcsTables
+import com.daml.network.store.db.AcsTables
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import io.circe.Json
 import shapeless.HNil
@@ -41,4 +41,18 @@ object WalletTables extends AcsTables {
 
   lazy val UserWalletAcsStore = new TableQuery(tag => new UserWalletAcsStore(tag))
 
+  case class UserWalletTxLogStoreRow(
+      storeId: Int,
+      entryNumber: Long,
+      eventId: String,
+  )
+
+  class UserWalletTxLogStore(_tableTag: Tag)
+      extends TxLogStoreTemplate[UserWalletTxLogStoreRow](_tableTag, "user_wallet_txlog_store") {
+    def * =
+      (templateColumns ::: HNil).tupled
+        .<>(UserWalletTxLogStoreRow.tupled, UserWalletTxLogStoreRow.unapply)
+  }
+
+  lazy val UserWalletTxLogStore = new TableQuery(tag => new UserWalletTxLogStore(tag))
 }

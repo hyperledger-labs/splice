@@ -48,3 +48,4 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added support for `damlDependencies` in SBT DamlPlugin
 - Added logic to DamlPlugin to support data-dependency paths compatible with Daml Studio & SBT
 - Added (empty) `data-dependencies` to all daml.yaml files
+* Changed `DbStorageSetup` to use `DbConfig with PostgresDbConfig` instead of `CommunityDbConfig.Postgres`.
