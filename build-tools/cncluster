@@ -123,6 +123,31 @@ function _cluster_apply() {
         | kubectl apply -f -
 }
 
+function _cluster_papply() {
+    IMAGE_TAG=$1
+
+    VERSION_NUMBER=$(get-snapshot-version)
+
+    args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
+          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
+
+    if [ -n "${IMAGE_TAG:-}" ]; then
+        args+=(-c "IMAGE_TAG=${IMAGE_TAG}")
+    fi
+
+    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
+        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
+    else
+        args+=(-c "FIXED_TOKENS=0")
+    fi
+
+    _cluster_install_network_gateway
+
+    _info "Applying Pulumi Stack"
+
+    subcmd_pulumi canton-network up --yes --show-sames "${args[@]}"
+}
+
 function _cluster_update_module() {
     module=$1
 
@@ -684,6 +709,30 @@ function subcmd_obliterate_state() {
     kubectl delete Service external --ignore-not-found=true
 
     _info "Cluster state obliterated"
+}
+
+###
+
+subcommand_whitelist[ci_papply]='Run only by CircleCI'
+
+function subcmd_ci_papply() {
+    _assert_lock --for-ci
+
+    # A CI-specific variant of 'cncluster apply' that removes the need
+    # for manual confirmation and ensures that all pods are deleted
+    # and recreated during the apply. With current (September 2022)
+    # DevNet, the ledger is stored in memory and the pod reset
+    # has the effect of clearing out all ledger state.
+
+    if [ -z "${CI-}" ]; then
+        _error "This subcommand is available to CI jobs only."
+        exit 1
+    fi
+
+    _cluster_show
+
+    _cluster_reset
+    _cluster_papply "${SOURCE_IMAGE_TAG}"
 }
 
 ###

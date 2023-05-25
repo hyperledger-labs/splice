@@ -19,7 +19,7 @@ parameters:
     default: "16"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-devnet, deploy-testnet, deploy-staging-b, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   mark-for-testnet:
     type: boolean
@@ -426,7 +426,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet", "none"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet", "none"]
         default: "none"
       additional_nix_args:
         type: string
@@ -451,7 +451,7 @@ commands:
             if [[ << parameters.cluster >> =~ (dev|test)net  ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_DEVNET_KEY"
             fi
-            if [[ << parameters.cluster >> =~ ^(staging|scratchnet.*)$ ]]; then
+            if [[ << parameters.cluster >> =~ ^(staging.*|scratchnet.*)$ ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
             fi
 
@@ -479,7 +479,7 @@ commands:
                   # GOOGLE_CREDENTIALS variable is used by pulumi
                   export GOOGLE_CREDENTIALS=${GCP_DA_CN_DEVNET_KEY}
                 fi
-                if [[ << parameters.cluster >> =~ ^(staging|scratchnet.*)$ ]]; then
+                if [[ << parameters.cluster >> =~ ^(staging.*|scratchnet.*)$ ]]; then
                   echo $GCP_DA_CN_SCRATCHNET_KEY | gcloud auth activate-service-account --key-file=-
                   # GOOGLE_CREDENTIALS variable is used by pulumi
                   export GOOGLE_CREDENTIALS=${GCP_DA_CN_SCRATCHNET_KEY}
@@ -696,7 +696,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
@@ -732,7 +732,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
     steps:
       - run:
           name: Checkout cluster version
@@ -795,7 +795,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
     steps:
       - run_bash_command_in_nix:
           when: always
@@ -839,7 +839,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
       channel_notify:
         # This parameter allows selecting different notification channels, which can be handy when a subteam
         # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
@@ -1054,12 +1054,12 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
     steps:
       - checkout
       - setup_nix
       - run_bash_command_in_nix:
-          cmd_name: Build Helm&Pulumi artifacts
+          cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
             set -eou pipefail
@@ -1076,6 +1076,38 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
 
+  deploy_cluster_pulumi:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      cluster:
+        type: enum
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            set -eou pipefail
+            make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Apply Pulumi configuration to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN"
+          gce_authenticate: true
+          cmd: |
+            set -eou pipefail
+            cncluster activate
+            cncluster ci_papply
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+
   deploy_cluster_testnet_release:
     circleci_ip_ranges: true
     docker:
@@ -1086,7 +1118,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
     steps:
       - checkout
       - setup_nix
@@ -1110,7 +1142,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
       channel_notify:
         type: string
         # #team-canton-network-internal
@@ -1367,7 +1399,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "devnet", "testnet", "scratchneta", "scratchnetb", "scratchnetc"]
+        enum: ["staging", "stagingb", "devnet", "testnet", "scratchneta", "scratchnetb", "scratchnetc"]
     docker:
       - image: cimg/base:2021.04
     environment:
@@ -1691,6 +1723,51 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
+
+  deploy_stagingb:
+    when:
+      equal: [ deploy-staging-b, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+    - deployment_test:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+        workflow_names: "deploy_stagingb"
+    - deploy_cluster_pulumi:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+        cluster: "stagingb"
+        requires:
+           - deployment_test
+           - docker_images_push
+           - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: stagingb
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - slack-context
+        requires:
+          - deployment_test
+          - docker_images_push
+          - deploy_cluster_pulumi
 
   deploy_devnet:
     when:
