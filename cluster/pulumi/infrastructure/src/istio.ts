@@ -1,14 +1,14 @@
-import * as k8s from "@pulumi/kubernetes";
+import * as k8s from '@pulumi/kubernetes';
 
 function configureIstioBase(ns: k8s.core.v1.Namespace): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
-    "istio-base",
+    'istio-base',
     {
-      name: "istio-base",
-      chart: "base",
+      name: 'istio-base',
+      chart: 'base',
       namespace: ns.metadata.name,
       repositoryOpts: {
-        repo: "https://istio-release.storage.googleapis.com/charts",
+        repo: 'https://istio-release.storage.googleapis.com/charts',
       },
     },
     {
@@ -22,21 +22,21 @@ function configureIstiod(
   base: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
-    "istiod",
+    'istiod',
     {
-      name: "istiod",
-      chart: "istiod",
+      name: 'istiod',
+      chart: 'istiod',
       namespace: ingressNs.metadata.name,
       repositoryOpts: {
-        repo: "https://istio-release.storage.googleapis.com/charts",
+        repo: 'https://istio-release.storage.googleapis.com/charts',
       },
       values: {
         global: {
-          istioNamespace: "cluster-ingress",
+          istioNamespace: 'cluster-ingress',
         },
         meshConfig: {
           // Turns on envoy logging
-          accessLogFile: "/dev/stdout",
+          accessLogFile: '/dev/stdout',
         },
       },
     },
@@ -46,10 +46,8 @@ function configureIstiod(
   );
 }
 
-export function configureIstio(
-  ingressNs: k8s.core.v1.Namespace
-): k8s.helm.v3.Release {
-  const nsName = "istio-system";
+export function configureIstio(ingressNs: k8s.core.v1.Namespace): k8s.helm.v3.Release {
+  const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
     metadata: {
       name: nsName,

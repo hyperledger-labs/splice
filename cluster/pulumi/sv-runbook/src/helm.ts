@@ -1,6 +1,7 @@
-import { ExactNamespace, requiredEnv } from "./utils";
-import * as k8s from "@pulumi/kubernetes";
-import * as pulumi from "@pulumi/pulumi";
+import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
+
+import { ExactNamespace, requiredEnv } from './utils';
 
 export function installCNHelmChartByNamespaceName(
   ns: pulumi.Output<string>,
@@ -8,37 +9,29 @@ export function installCNHelmChartByNamespaceName(
   chartName: string,
   values: ChartValues,
   local: boolean,
-  version = "",
+  version = '',
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
-  const repo_root = requiredEnv("REPO_ROOT", "root directory of the repo");
-  const username = requiredEnv(
-    "ARTIFACTORY_USER",
-    "Username for jfrog artifactory"
-  );
-  const password = requiredEnv(
-    "ARTIFACTORY_PASSWORD",
-    "Password for jfrog artifactory"
-  );
+  const repo_root = requiredEnv('REPO_ROOT', 'root directory of the repo');
+  const username = requiredEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
+  const password = requiredEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
   return new k8s.helm.v3.Release(
     name,
     {
       name: name,
-      chart: local ? repo_root + "/cluster/helm/" + chartName + "/" : chartName,
+      chart: local ? repo_root + '/cluster/helm/' + chartName + '/' : chartName,
       namespace: ns,
       version: local ? undefined : version,
       repositoryOpts: local
         ? undefined
         : {
-            repo: "https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm",
+            repo: 'https://digitalasset.jfrog.io/artifactory/api/helm/canton-network-helm',
             username: username,
             password: password,
           },
       values: {
         ...values,
-        imageRepo: local
-          ? "us-central1-docker.pkg.dev/da-cn-images/cn-images"
-          : undefined,
+        imageRepo: local ? 'us-central1-docker.pkg.dev/da-cn-images/cn-images' : undefined,
       },
     },
     {
@@ -53,7 +46,7 @@ export function installCNHelmChart(
   chartName: string,
   values: ChartValues,
   local: boolean,
-  version = "",
+  version = '',
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
   return installCNHelmChartByNamespaceName(

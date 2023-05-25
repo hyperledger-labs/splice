@@ -1,4 +1,4 @@
-import * as k8s from "@pulumi/kubernetes";
+import * as k8s from '@pulumi/kubernetes';
 
 // TODO(#4584): reduce duplication with canton-network project
 // There is no way to read the logical name off a Namespace.  Exactly
@@ -27,10 +27,8 @@ export function exactNamespace(name: string): ExactNamespace {
 
 export function requiredEnv(varName: string, msg: string): string {
   const val = process.env[varName];
-  if (val == undefined || val == "") {
-    throw new Error(
-      `Missing environment variable ${varName} (should define: ${msg})`
-    );
+  if (val == undefined || val == '') {
+    throw new Error(`Missing environment variable ${varName} (should define: ${msg})`);
   }
   return val;
 }

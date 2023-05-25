@@ -1,13 +1,14 @@
-import { dnsServiceAccountKey } from "./secrets";
-import * as gcp from "@pulumi/gcp";
-import * as k8s from "@pulumi/kubernetes";
-import * as certmanager from "@pulumi/kubernetes-cert-manager";
-import * as pulumi from "@pulumi/pulumi";
+import * as gcp from '@pulumi/gcp';
+import * as k8s from '@pulumi/kubernetes';
+import * as certmanager from '@pulumi/kubernetes-cert-manager';
+import * as pulumi from '@pulumi/pulumi';
+
+import { dnsServiceAccountKey } from './secrets';
 
 function ipAddress(addressName: string): gcp.compute.Address {
   return new gcp.compute.Address(addressName, {
     name: addressName,
-    networkTier: "PREMIUM",
+    networkTier: 'PREMIUM',
   });
 }
 
@@ -18,34 +19,32 @@ function clusterDnsEntries(
 ): gcp.dns.RecordSet[] {
   return [
     new gcp.dns.RecordSet(dnsName, {
-      name: dnsName + ".",
+      name: dnsName + '.',
       ttl: 60,
-      type: "A",
+      type: 'A',
       project: process.env.GCP_DNS_PROJECT,
-      managedZone: "canton-global",
+      managedZone: 'canton-global',
       rrdatas: [ingressIp.address],
     }),
-    new gcp.dns.RecordSet(dnsName + "-subdomains", {
+    new gcp.dns.RecordSet(dnsName + '-subdomains', {
       name: `*.${dnsName}.`,
       ttl: 60,
-      type: "A",
+      type: 'A',
       project: process.env.GCP_DNS_PROJECT,
-      managedZone: "canton-global",
+      managedZone: 'canton-global',
       rrdatas: [ingressIp.address],
     }),
   ];
 }
 
-function certManager(
-  certManagerNamespaceName: string
-): certmanager.CertManager {
+function certManager(certManagerNamespaceName: string): certmanager.CertManager {
   const ns = new k8s.core.v1.Namespace(certManagerNamespaceName, {
     metadata: {
       name: certManagerNamespaceName,
     },
   });
 
-  return new certmanager.CertManager("cert-manager", {
+  return new certmanager.CertManager('cert-manager', {
     installCRDs: true,
     helmOptions: {
       namespace: ns.metadata.name,
@@ -60,22 +59,22 @@ function clusterCertificate(
   manager: certmanager.CertManager,
   dnsEntries: gcp.dns.RecordSet[]
 ): k8s.apiextensions.CustomResource {
-  const issuerName = "letsencrypt-production";
-  const issuerServer = "https://acme-v02.api.letsencrypt.org/directory";
+  const issuerName = 'letsencrypt-production';
+  const issuerServer = 'https://acme-v02.api.letsencrypt.org/directory';
 
   const issuer = new k8s.apiextensions.CustomResource(
-    "issuer",
+    'issuer',
     {
-      apiVersion: "cert-manager.io/v1",
-      kind: "Issuer",
+      apiVersion: 'cert-manager.io/v1',
+      kind: 'Issuer',
       metadata: {
         name: issuerName,
         namespace: ns.metadata.name,
       },
       spec: {
         acme: {
-          email: "team-canton-network@digitalasset.com",
-          preferredChain: "",
+          email: 'team-canton-network@digitalasset.com',
+          preferredChain: '',
           privateKeySecretRef: {
             name: `${issuerName}-acme-account`,
           },
@@ -84,10 +83,10 @@ function clusterCertificate(
             {
               dns01: {
                 cloudDNS: {
-                  project: "da-gcp-canton-domain",
+                  project: 'da-gcp-canton-domain',
                   serviceAccountSecretRef: {
-                    key: "key.json",
-                    name: "clouddns-dns01-solver-svc-acct",
+                    key: 'key.json',
+                    name: 'clouddns-dns01-solver-svc-acct',
                   },
                 },
               },
@@ -102,15 +101,15 @@ function clusterCertificate(
   );
 
   new k8s.core.v1.Secret(
-    "clouddns-dns01-solver-svc-acct",
+    'clouddns-dns01-solver-svc-acct',
     {
       metadata: {
-        name: "clouddns-dns01-solver-svc-acct",
+        name: 'clouddns-dns01-solver-svc-acct',
         namespace: ns.metadata.name,
       },
-      type: "Opaque",
+      type: 'Opaque',
       data: {
-        "key.json": dnsServiceAccountKey.privateKey,
+        'key.json': dnsServiceAccountKey.privateKey,
       },
     },
     {
@@ -119,10 +118,10 @@ function clusterCertificate(
   );
 
   return new k8s.apiextensions.CustomResource(
-    "certificate",
+    'certificate',
     {
-      apiVersion: "cert-manager.io/v1",
-      kind: "Certificate",
+      apiVersion: 'cert-manager.io/v1',
+      kind: 'Certificate',
       metadata: {
         name: `cn-${clusterName}-certificate`,
         namespace: ns.metadata.name,
@@ -141,7 +140,7 @@ function clusterCertificate(
           `*.sv.svc.${dnsName}`,
         ],
         issuerRef: {
-          name: "letsencrypt-production",
+          name: 'letsencrypt-production',
         },
         secretName: `cn-${clusterName}net-tls`,
       },
@@ -160,7 +159,7 @@ function natGateway(
   options = {}
 ): gcp.compute.RouterNat {
   const privateNetwork = gcp.compute.Network.get(
-    "default",
+    'default',
     `https://www.googleapis.com/compute/v1/projects/${project}/global/networks/default`
   );
 
@@ -182,18 +181,18 @@ function natGateway(
     {
       router: router.name,
       region: router.region,
-      natIpAllocateOption: "MANUAL_ONLY",
+      natIpAllocateOption: 'MANUAL_ONLY',
       natIps: [egressIp.selfLink],
-      sourceSubnetworkIpRangesToNat: "LIST_OF_SUBNETWORKS",
+      sourceSubnetworkIpRangesToNat: 'LIST_OF_SUBNETWORKS',
       subnetworks: [
         {
           name: subnet.id,
-          sourceIpRangesToNats: ["ALL_IP_RANGES"],
+          sourceIpRangesToNats: ['ALL_IP_RANGES'],
         },
       ],
       logConfig: {
         enable: true,
-        filter: "ERRORS_ONLY",
+        filter: 'ERRORS_ONLY',
       },
     },
     options
@@ -207,11 +206,8 @@ class CantonNetwork extends pulumi.ComponentResource {
   egressIp: gcp.compute.Address;
   ingressNs: k8s.core.v1.Namespace;
 
-  constructor(
-    clusterName: string,
-    opts: pulumi.ComponentResourceOptions | undefined = undefined
-  ) {
-    super("canton:gcp:CantonNetwork", clusterName, {}, opts);
+  constructor(clusterName: string, opts: pulumi.ComponentResourceOptions | undefined = undefined) {
+    super('canton:gcp:CantonNetwork', clusterName, {}, opts);
 
     const dnsName = `${clusterName}.network.canton.global`;
 
@@ -219,25 +215,19 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const egressIp = ipAddress(`cn-${clusterName}-out`);
 
-    const certManagerDeployment = certManager("cert-manager");
+    const certManagerDeployment = certManager('cert-manager');
 
     const dnsEntries = clusterDnsEntries(clusterName, dnsName, ingressIp);
 
-    const ingressNs = new k8s.core.v1.Namespace("cluster-ingress", {
+    const ingressNs = new k8s.core.v1.Namespace('cluster-ingress', {
       metadata: {
-        name: "cluster-ingress",
+        name: 'cluster-ingress',
       },
     });
 
     natGateway(clusterName, egressIp, { parent: this });
 
-    clusterCertificate(
-      clusterName,
-      dnsName,
-      ingressNs,
-      certManagerDeployment,
-      dnsEntries
-    );
+    clusterCertificate(clusterName, dnsName, ingressNs, certManagerDeployment, dnsEntries);
 
     this.ingressIp = ingressIp;
     this.egressIp = egressIp;
