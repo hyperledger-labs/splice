@@ -1,6 +1,7 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cn
+import com.daml.network.console.CNNodeAppBackendReference
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -53,5 +54,10 @@ trait SvTestUtil extends CNNodeTestCommon {
       s"$svName is a member of the SvcRules",
       _ => getSvcRules().data.members should contain key svParty.toProtoPrimitive,
     )
+  }
+
+  def startAllSync(nodes: Seq[CNNodeAppBackendReference]): Unit = {
+    nodes.foreach(_.start())
+    nodes.foreach(_.waitForInitialization())
   }
 }

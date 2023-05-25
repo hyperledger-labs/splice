@@ -656,8 +656,8 @@ class SvTimeBasedIntegrationTest
           )
     }
     initSvc()
-    Seq(aliceValidator, bobValidator).foreach(_.start())
-    Seq(aliceValidator, bobValidator).foreach(_.waitForInitialization())
+    val nodes = Seq(aliceValidator, bobValidator)
+    startAllSync(nodes)
 
     val round = scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
     // There may be rewards left over from other tests, so we first check the
@@ -703,7 +703,7 @@ class SvTimeBasedIntegrationTest
 
   "expire stale `SvOnboarding` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      Seq(
+      val nodes = Seq(
         svc: CNNodeAppBackendReference,
         scan: CNNodeAppBackendReference,
         sv1,
@@ -712,21 +712,8 @@ class SvTimeBasedIntegrationTest
         sv1Validator,
         sv2Validator,
         sv3Validator,
-      ).foreach(
-        _.start()
       )
-      Seq(
-        svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
-        sv1,
-        sv2,
-        sv3,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-      ).foreach(
-        _.waitForInitialization()
-      )
+      startAllSync(nodes)
       getSvcRules().data.members should have size 3
     }
     clue(
@@ -758,7 +745,7 @@ class SvTimeBasedIntegrationTest
 
   "expire stale `SvOnboardingConfirmed` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      Seq(
+      val nodes = Seq(
         svc: CNNodeAppBackendReference,
         scan: CNNodeAppBackendReference,
         sv1,
@@ -767,21 +754,8 @@ class SvTimeBasedIntegrationTest
         sv1Validator,
         sv2Validator,
         sv3Validator,
-      ).foreach(
-        _.start()
       )
-      Seq(
-        svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
-        sv1,
-        sv2,
-        sv3,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-      ).foreach(
-        _.waitForInitialization()
-      )
+      startAllSync(nodes)
       getSvcRules().data.members should have size 3
     }
     val svXParty = allocateRandomSvParty("svX")
@@ -857,7 +831,7 @@ class SvTimeBasedIntegrationTest
 
   "expire stale `Confirmation` contracts" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
-      Seq(
+      val nodes = Seq(
         svc: CNNodeAppBackendReference,
         scan: CNNodeAppBackendReference,
         sv1,
@@ -868,23 +842,8 @@ class SvTimeBasedIntegrationTest
         sv2Validator,
         sv3Validator,
         sv4Validator,
-      ).foreach(
-        _.start()
       )
-      Seq(
-        svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
-        sv1,
-        sv2,
-        sv3,
-        sv4,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-        sv4Validator,
-      ).foreach(
-        _.waitForInitialization()
-      )
+      startAllSync(nodes)
       getSvcRules().data.members should have size 4
     }
     clue(
@@ -956,7 +915,7 @@ class SvTimeBasedIntegrationTest
 
   "detect an inactive leader" in { implicit env =>
     val svcRulesBeforeElection = clue("Initialize SVC with 4 SVs") {
-      Seq(
+      val nodes = Seq(
         svc: CNNodeAppBackendReference,
         scan: CNNodeAppBackendReference,
         sv1,
@@ -967,23 +926,8 @@ class SvTimeBasedIntegrationTest
         sv2Validator,
         sv3Validator,
         sv4Validator,
-      ).foreach(
-        _.start()
       )
-      Seq(
-        svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
-        sv1,
-        sv2,
-        sv3,
-        sv4,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-        sv4Validator,
-      ).foreach(
-        _.waitForInitialization()
-      )
+      startAllSync(nodes)
       val svcRulesBeforeElection = getSvcRules()
       svcRulesBeforeElection.data.members should have size 4
       svcRulesBeforeElection

@@ -87,14 +87,9 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   "SV apps can start one by one" in { implicit env =>
     clue("Starting SVC app and SV1 app") {
       // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
-      svc.start()
-      scan.start()
-      sv1Validator.start()
-      sv1.start()
-      sv1Validator.waitForInitialization()
-      sv1.waitForInitialization()
-      svc.waitForInitialization()
-      scan.waitForInitialization()
+      val nodes =
+        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1Validator, sv1)
+      startAllSync(nodes)
     }
     def startSv(number: Int, sv: SvAppBackendReference, validator: ValidatorAppBackendReference) =
       clue(s"Starting SV$number app") {
@@ -410,7 +405,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      Seq(
+      val nodes = Seq(
         svc: CNNodeAppBackendReference,
         scan: CNNodeAppBackendReference,
         sv1,
@@ -419,21 +414,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         sv1Validator,
         sv2Validator,
         sv3Validator,
-      ).foreach(
-        _.start()
       )
-      Seq(
-        svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
-        sv1,
-        sv2,
-        sv3,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-      ).foreach(
-        _.waitForInitialization()
-      )
+      startAllSync(nodes)
       getSvcRules().data.members should have size 3
     }
     clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
@@ -569,12 +551,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     implicit env =>
       // only 1 SV => slightly faster test
       clue("Initialize SVC with 1 SV") {
-        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1).foreach(
-          _.start()
-        )
-        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1).foreach(
-          _.waitForInitialization()
-        )
+        val nodes = Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1)
+        startAllSync(nodes)
         getSvcRules().data.members should have size 1
       }
       // We are not using sv2.getSvcInfo() to get sv2's party id because we
@@ -625,7 +603,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   "The new sv with same name can be onboarded and overwrite existing member only in devnet" in {
     implicit env =>
       clue("Initialize SVC with 3 SVs") {
-        Seq(
+        val nodes = Seq(
           svc: CNNodeAppBackendReference,
           scan: CNNodeAppBackendReference,
           sv1,
@@ -634,21 +612,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           sv1Validator,
           sv2Validator,
           sv3Validator,
-        ).foreach(
-          _.start()
         )
-        Seq(
-          svc: CNNodeAppBackendReference,
-          scan: CNNodeAppBackendReference,
-          sv1,
-          sv2,
-          sv3,
-          sv1Validator,
-          sv2Validator,
-          sv3Validator,
-        ).foreach(
-          _.waitForInitialization()
-        )
+        startAllSync(nodes)
         getSvcRules().data.members should have size 3
       }
 
@@ -676,8 +641,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
       actAndCheck(
         "start sv4 with a party id different from existing sv4 in SVC", {
-          sv4Validator.startSync()
-          sv4.startSync()
+          val nodes = Seq(sv4Validator: CNNodeAppBackendReference, sv4)
+          startAllSync(nodes)
         },
       )(
         "existing member sv4 is overwritten with different party id",
@@ -740,10 +705,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     implicit env =>
       clue("Starting SVC app and SV1 app") {
         // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
-        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1).foreach(_.start())
-        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1).foreach(
-          _.waitForInitialization()
-        )
+        val nodes = Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1)
+        startAllSync(nodes)
       }
 
       val svcParty = svcClient.getDebugInfo().svcParty
@@ -779,8 +742,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
       clue("start onboarding new SV and SVC party setup on new SV's dedicated participant") {
         // SV4 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
-        sv4Validator.startSync()
-        sv4.startSync()
+        val nodes = Seq(sv4Validator: CNNodeAppBackendReference, sv4)
+        startAllSync(nodes)
       }
 
       createCoinOwnBySvc(svcParticipant, 2.0)
@@ -919,8 +882,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     actAndCheck(
       "restarting all SVs", {
         svs.foreach(_.stop())
-        svs.foreach(_.start())
-        svs.foreach(_.waitForInitialization())
+        startAllSync(svs)
       },
     )(
       "CoinPriceVote contracts didn't change",
