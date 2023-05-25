@@ -232,7 +232,7 @@ class HttpSvHandler(
           isCandidateMember = SvApp.isSvcMemberParty(candidateParty, svcRules)
           isCandidatePartyHostedOnParticipant <- svcPartyHosting
             .isPartyHostedOnTargetParticipant(
-              svcParty,
+              candidateParty,
               globalDomain,
               participantId,
             )
