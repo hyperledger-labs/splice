@@ -2,11 +2,16 @@ package com.daml.network.store.db
 
 import com.daml.network.config.CNDbConfig
 import com.digitalasset.canton.config.DbParametersConfig
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.store.db.{DbStorageSetup, DbTest}
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.*
 import slick.dbio.SuccessAction
 import slick.lifted.{Rep, TableQuery}
+
+import java.util.concurrent.Semaphore
+import scala.concurrent.blocking
 
 trait CNDbTest extends DbTest { this: Suite =>
 
@@ -31,11 +36,46 @@ trait CNDbTest extends DbTest { this: Suite =>
         else SuccessAction(())
     } yield ()
   }
+}
 
+trait CNDbTestLock extends BeforeAndAfterAll with NamedLogging { this: Suite =>
+
+  // Note: all app stores in CN use the same `store_descriptors` table.
+  // Since test are running in parallel, we manually synchronize the tests to avoid conflicts
+  override def beforeAll(): Unit = {
+    CNDbTestLock.acquireCNAppStoreLock(
+      ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
+    )
+    super.beforeAll()
+  }
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    CNDbTestLock.releaseCNAppStoreLock(
+      ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
+    )
+  }
+}
+
+object CNDbTestLock {
+
+  /** Synchronize access to the tables common to all CN app stores so that tests do not interfere */
+  private val accessCNAppStore: Semaphore = new Semaphore(1)
+
+  def acquireCNAppStoreLock(elc: ErrorLoggingContext): Unit = {
+    elc.logger.info(s"Acquiring CN app store test lock")(elc.traceContext)
+    blocking(accessCNAppStore.acquire())
+    elc.logger.info(s"CN app store test lock acquired")(elc.traceContext)
+  }
+
+  def releaseCNAppStoreLock(elc: ErrorLoggingContext): Unit = {
+    elc.logger.info(s"Releasing CN app store test lock")(elc.traceContext)
+    accessCNAppStore.release()
+  }
 }
 
 /** Run db test for running against postgres */
-trait CNPostgresTest extends CNDbTest { this: Suite =>
+trait CNPostgresTest extends CNDbTest with CNDbTestLock { this: Suite =>
 
   override protected def mkDbConfig(basicConfig: DbBasicConfig): CNDbConfig.Postgres =
     CNDbConfig.Postgres(
