@@ -73,7 +73,6 @@ import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import scala.util.{Failure, Success}
 
 class SvApp(
     override val name: InstanceName,
@@ -106,13 +105,11 @@ class SvApp(
       timeouts,
       loggerFactory,
     )
-    initialize(participantAdminConnection, ledgerClient, svPartyId).transform {
-      case Success(s) => Success(s)
-      case Failure(err) =>
-        // TODO(#3474) Replace this by a more general solution for closing resources on
-        // init failures.
-        participantAdminConnection.close()
-        Failure(err)
+    initialize(participantAdminConnection, ledgerClient, svPartyId).recoverWith { case err =>
+      // TODO(#3474) Replace this by a more general solution for closing resources on
+      // init failures.
+      participantAdminConnection.close()
+      Future.failed(err)
     }
   }
 

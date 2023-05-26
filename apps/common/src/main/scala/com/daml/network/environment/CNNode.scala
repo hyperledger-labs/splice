@@ -281,7 +281,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     initializeNode(client)
   }
 
-  initializeF.onComplete { _ =>
+  initializeF.foreach { _ =>
     logger.info(s"Initialization complete, running on version ${BuildInfo.compiledVersion}")
     isInitializedVar.set(true)
   }
