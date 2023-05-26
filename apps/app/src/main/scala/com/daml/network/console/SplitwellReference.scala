@@ -398,8 +398,9 @@ final class SplitwellAppClientReference(
     }
 
   @Help.Summary("List all group invites that you have not already accepted")
-  def listGroupInvites()
-      : Seq[Contract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]] =
+  def listGroupInvites(): Seq[
+    ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]
+  ] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwellAppClient.ListGroupInvites(context))
     }

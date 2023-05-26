@@ -1,13 +1,25 @@
-import { Contract } from './interfaces';
+import { Contract, ReadyContract } from './interfaces';
 
-export const sameContracts = <T>(a: Contract<T>[], b: Contract<T>[]): boolean => {
+function equalWith<T>(a: T[], b: T[], p: (a: T, b: T) => boolean) {
   if (a.length !== b.length) {
     return false;
   }
   for (let i = 0; i < a.length; i++) {
-    if (a[i].contractId !== b[i].contractId) {
+    if (!p(a[i], b[i])) {
       return false;
     }
   }
   return true;
+}
+
+export const sameContracts = <T>(a: Contract<T>[], b: Contract<T>[]): boolean => {
+  return equalWith(a, b, (l, r) => l.contractId === r.contractId);
 };
+
+export function sameReadyContracts<T>(a: ReadyContract<T>[], b: ReadyContract<T>[]): boolean {
+  return equalWith(
+    a,
+    b,
+    (l, r) => l.contract.contractId === r.contract.contractId && l.domainId === r.domainId
+  );
+}

@@ -6,16 +6,24 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import CNNodeTests.BracketSynchronous.*
-import com.daml.network.util.{FrontendLoginUtil, SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.util.{
+  FrontendLoginUtil,
+  SplitwellTestUtil,
+  SplitwellFrontendTestUtil,
+  WalletTestUtil,
+}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import SplitwellUpgradeFrontendIntegrationTest.*
 
 class SplitwellUpgradeFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("aliceSplitwell")
+    extends FrontendIntegrationTestWithSharedEnvironment(aliceSplitwellFE, bobSplitwellFE)
     with FrontendLoginUtil
     with SplitwellTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with SplitwellFrontendTestUtil {
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -23,19 +31,20 @@ class SplitwellUpgradeFrontendIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.dars.upload(darPath)
+        CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
+        for {
+          dar <- Seq(darPath, directoryDarPath)
+          validator <- Seq(aliceValidator, bobValidator)
+        } validator.participantClient.dars.upload(dar)
       })
 
   "splitwell frontend with upgraded domain" should {
     "create per domain install contracts" in { implicit env =>
-      val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
-      val oldSplitwellDomain = inside(splitwellDomains.others) { case Seq(d) =>
-        d
-      }
+      val (splitwellPreferred, oldSplitwellDomain) = preferredAndPriorDomains
 
       onboardWalletUser(aliceWallet, aliceValidator)
       val aliceUser = aliceSplitwell.config.ledgerApiUser
-      withFrontEnd("aliceSplitwell") { implicit webDriver =>
+      withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
         login(3002, aliceUser)
       }
 
@@ -47,13 +56,13 @@ class SplitwellUpgradeFrontendIntegrationTest
         connectSplitwellUpgradeDomain(aliceValidator.participantClient),
         disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
       ) {
-        withFrontEnd("aliceSplitwell") { implicit webDriver =>
+        withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
           reloadPage()
         }
         eventually() {
           aliceSplitwell.listSplitwellInstalls().keys shouldBe Set(
             oldSplitwellDomain,
-            splitwellDomains.preferred,
+            splitwellPreferred,
           )
         }
         // Wait for all install requests to get rejected. Otherwise, we disconnect the user’s participant too soon and
@@ -69,5 +78,201 @@ class SplitwellUpgradeFrontendIntegrationTest
         }
       }
     }
+
+    "fully upgrade an active model" in { implicit env =>
+      val (alice, _) = clue("Setup some users on the old domain") {
+        val alice = onboardWalletUser(aliceWallet, aliceValidator)
+        val bob = onboardWalletUser(bobWallet, bobValidator)
+        (alice, bob)
+      }
+      val aliceDamlUser = aliceSplitwell.config.ledgerApiUser
+      val bobDamlUser = bobSplitwell.config.ledgerApiUser
+
+      val abGroupName = "group1"
+      val aGroupName = "group2"
+      val bGroupName = "group3"
+
+      def checkSoleBalance(amount: String)(implicit wd: WebDriverType) = eventually() {
+        inside(findAll(className("balances-table-row")).toSeq) { case Seq(r1) =>
+          r1.childElement(className("balances-table-receiver")).text should matchText(
+            alice.toProtoPrimitive
+          )
+          r1.childElement(className("balances-table-amount")).text shouldBe amount
+        }
+      }
+
+      val bobWalletResume = clue(
+        "create groups, balance updates, invites, accepted invites"
+      ) {
+
+        val invite = withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
+          login(3002, aliceDamlUser)
+          eventually() { userIsLoggedIn() }
+          createGroupAndInviteLink(aGroupName) withClue "alice creates unshared group"
+          createGroupAndInviteLink(abGroupName) withClue "alice creates group/copies invite"
+        }
+
+        withFrontEnd(bobSplitwellFE) { implicit webDriver =>
+          login(3003, bobDamlUser)
+          eventually() { userIsLoggedIn() }
+          createGroupAndInviteLink(bGroupName)
+          requestGroupMembership(invite) withClue "bob asks to join alice's group"
+        }
+
+        withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
+          click on className("add-user-link") withClue "alice accepts bob's request"
+
+          enterPayment(abGroupName, "42.42", "the answer") withClue "Alice enters a payment"
+        }
+
+        bobWallet.tap(BigDecimal("100"))
+
+        val (_, bobWalletResume) = withFrontEnd(bobSplitwellFE) { implicit webDriver =>
+          checkSoleBalance("-21.2100000000")
+
+          // we want to create the AppPaymentRequest and DeliveryOffer *before*
+          // installing on the upgrade domain, but we don't want to complete
+          // the workflow
+          actAndCheck(
+            "bob creates AppPaymentRequest and DeliveryOffer",
+            click on cssSelector(
+              s""".group-entry[data-group-id="$abGroupName"] ~ * .settle-my-debts-link"""
+            ),
+          )(
+            "Bob was redirected to wallet",
+            { _ =>
+              val bobWalletResume = currentUrl
+              bobWalletResume should startWith(s"http://localhost:3001")
+              bobWalletResume
+            },
+          )
+        }
+
+        withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
+          enterPayment(aGroupName, "33.33", "time left") withClue "Alice enters another payment"
+        }
+
+        bobWalletResume
+      }
+
+      // Switch splitwell preferred domain
+      bracket(
+        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
+      ) {
+        bracket(
+          connectSplitwellUpgradeDomain(bobValidator.participantClient),
+          disconnectSplitwellUpgradeDomain(bobValidator.participantClient),
+        ) {
+          val (preferred, old) = preferredAndPriorDomains
+
+          // this needs an invite copy button to work, hence the
+          // createGroupAndInviteLink above even when we don't use it
+          def groupOnPreferred(groupName: String)(implicit wd: WebDriverType) = {
+            val refreshedInvite = inside(
+              findAll(className("invite-copy-button"))
+                .filter(_.attribute("data-group-id") == Some(groupName))
+                .toSeq
+            ) { case Seq(button) =>
+              button.attribute("data-invite-contract").value
+            }
+            refreshedInvite should include(
+              preferred.toProtoPrimitive
+            ) withClue s"$groupName has moved to upgraded domain"
+          }
+
+          clue("Onboard user's participants gradually to new domain") {
+            withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
+              actAndCheck("refresh so alice upgrades", reloadPage())(
+                "alice installs on new domain",
+                _ => aliceSplitwell.listSplitwellInstalls().keys shouldBe Set(preferred, old),
+              )
+
+              eventually() {
+                groupOnPreferred(aGroupName)
+              }
+            }
+          }
+          clue("Interleave that with more operations") {
+            withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
+              enterPayment(
+                abGroupName,
+                "42.42",
+                "the answer",
+              ) withClue "Alice enters a third payment"
+              enterPayment(
+                aGroupName,
+                "33.33",
+                "time left",
+              ) withClue "Alice enters a fourth payment"
+            }
+          }
+          clue(
+            "Test that once all users are migrated we eventually end up with everything being transferred to the new domain"
+          ) {
+            withFrontEnd(bobSplitwellFE) { implicit webDriver =>
+              actAndCheck("return from wallet to splitwell", go to "http://localhost:3003")(
+                "bob is back on splitwell and upgrading",
+                { _ =>
+                  userIsLoggedIn()
+                  bobSplitwell.listSplitwellInstalls().keys shouldBe Set(preferred, old)
+                  groupOnPreferred(bGroupName)
+                },
+              )
+            }
+
+            withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
+              eventually() {
+                groupOnPreferred(abGroupName)
+              } withClue s"bob's upgrade lets $abGroupName upgrade"
+            }
+
+            withFrontEnd(bobSplitwellFE) { implicit webDriver =>
+              go to bobWalletResume
+              loginOnCurrentPage(3001, bobDamlUser)
+              actAndCheck(
+                "Bob completes payment after migration",
+                click on className("payment-accept"),
+              )(
+                "Bob returns to splitwell",
+                _ => currentUrl should startWith(s"http://localhost:3003"),
+              )
+            }
+          }
+        }
+      }
+    }
   }
+
+  private[this] def preferredAndPriorDomains(implicit env: FixtureParam) = {
+    val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
+    (
+      splitwellDomains.preferred,
+      inside(splitwellDomains.others) { case Seq(d) =>
+        d
+      },
+    )
+  }
+
+  private[this] def enterPayment(groupName: String, amount: String, description: String)(implicit
+      wd: WebDriverType
+  ) = {
+    val groupEntry = s""".group-entry[data-group-id="$groupName"]"""
+    inside(
+      find(cssSelector(s"$groupEntry .enter-payment-amount-field"))
+    ) { case Some(field) =>
+      field.underlying.click()
+      reactTextInput(field).value = amount
+    }
+    inside(find(cssSelector(s"$groupEntry .enter-payment-description-field"))) { case Some(field) =>
+      field.underlying.click()
+      reactTextInput(field).value = description
+    }
+    click on cssSelector(s"$groupEntry .enter-payment-link")
+  }
+}
+
+object SplitwellUpgradeFrontendIntegrationTest {
+  private val aliceSplitwellFE = "aliceSplitwell"
+  private val bobSplitwellFE = "bobSplitwell"
 }

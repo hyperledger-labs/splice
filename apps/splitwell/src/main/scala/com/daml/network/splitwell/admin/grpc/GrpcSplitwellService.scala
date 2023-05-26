@@ -43,7 +43,6 @@ class GrpcSplitwellService(
         // TODO(M4-02): check (or simulate check) of the user's cross-participant access token
         groups <- store.listGroups(userParty)
       } yield {
-        // TODO(#3181) Expose state to frontend
         v0.ListGroupsResponse(groups map encodeContractWithState)
       }
     }
@@ -57,9 +56,7 @@ class GrpcSplitwellService(
         groupInvites <- store.listGroupInvites(userParty)
       } yield {
         v0.ListGroupInvitesResponse(
-          // TODO(#3181) Expose state to frontend
-          groupInvites
-            .map(_.contract.toProtoV0)
+          groupInvites map encodeContractWithState
         )
       }
     }

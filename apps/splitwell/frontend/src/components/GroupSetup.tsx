@@ -1,4 +1,4 @@
-import { Contract, sameContracts, useInterval } from 'common-frontend';
+import { Contract, ReadyContract, sameReadyContracts, useInterval } from 'common-frontend';
 import {
   ListGroupInvitesRequest,
   SplitwellContext,
@@ -7,28 +7,53 @@ import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
 
-import { GroupInvite } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { GroupInvite, SplitwellInstall } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { ContractId } from '@daml/types';
 
 import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
 import { useSplitwellClient } from '../contexts/SplitwellServiceContext';
+import { SplitwellInstalls } from '../utils/installs';
 
 interface GroupSetupProps {
   svc: string;
   provider: string;
   party: string;
   domainId: string;
+  newGroupInstall: ContractId<SplitwellInstall>;
+  installs: SplitwellInstalls;
 }
 
-const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc, domainId }) => {
+type GroupInviteInput = { originalText: string } & (
+  | {
+      type: 'good';
+      inviteContract: ReadyContract<GroupInvite>;
+      install: ContractId<SplitwellInstall>;
+    }
+  | { type: 'noparse'; failure: string }
+  | { type: 'noinstall'; domainId: string }
+);
+
+const GroupSetup: React.FC<GroupSetupProps> = ({
+  party,
+  provider,
+  svc,
+  domainId,
+  newGroupInstall,
+  installs,
+}) => {
   const splitwellClient = useSplitwellClient();
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const [groupId, setGroupId] = useState<string>('');
-  const [groupInvite, setGroupInvite] = useState<string>('');
+  const [groupInvite, setGroupInvite] = useState<GroupInviteInput>({
+    type: 'noparse',
+    failure: 'empty invite text field',
+    originalText: '',
+  });
   const onCreateGroup = async () => {
-    await ledgerApiClient.requestGroup(party, provider, svc, groupId, domainId);
+    await ledgerApiClient.requestGroup(party, provider, svc, groupId, domainId, newGroupInstall);
   };
 
-  const [groupInvites, setGroupInvites] = useState<Contract<GroupInvite>[]>([]);
+  const [groupInvites, setGroupInvites] = useState<ReadyContract<GroupInvite>[]>([]);
 
   const fetchInvites = useCallback(async () => {
     const groupInvites = (
@@ -37,21 +62,59 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc, domainId 
         undefined
       )
     ).getGroupInvitesList();
-    const decoded = groupInvites.map(c => Contract.decode(c, GroupInvite));
-    setGroupInvites(prev => (sameContracts(prev, decoded) ? prev : decoded));
+    const decoded = groupInvites.flatMap(c => {
+      const d = ReadyContract.decodeContractWithState(c, GroupInvite);
+      return d === undefined ? [] : [d];
+    });
+    setGroupInvites(prev => (sameReadyContracts(prev, decoded) ? prev : decoded));
   }, [splitwellClient, party]);
 
   useInterval(fetchInvites);
 
+  const setGroupInviteInput = useCallback(
+    (rawValue: string) => {
+      try {
+        const decodedInvite = JSON.parse(rawValue);
+        const inviteContract = Contract.decodeOpenAPI(decodedInvite, GroupInvite);
+        const inviteDomainId = (decodedInvite as { domainId: string }).domainId;
+        const inviteInstall = installs.get(inviteDomainId);
+        setGroupInvite({
+          originalText: rawValue,
+          ...(inviteInstall
+            ? {
+                type: 'good',
+                inviteContract: { contract: inviteContract, domainId: inviteDomainId },
+                install: inviteInstall,
+              }
+            : { type: 'noinstall', domainId: inviteDomainId }),
+        });
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          setGroupInvite({ originalText: rawValue, type: 'noparse', failure: e.message });
+        } else {
+          throw e;
+        }
+      }
+    },
+    [installs, setGroupInvite]
+  );
+
   const onJoinGroup = async () => {
-    const inviteContract = Contract.decodeOpenAPI(JSON.parse(groupInvite), GroupInvite);
-    await ledgerApiClient.acceptInvite(
-      party,
-      provider,
-      inviteContract.contractId,
-      domainId,
-      inviteContract
-    );
+    // otherwise this callback shouldn't have been called
+    if (groupInvite.type === 'good') {
+      const {
+        inviteContract: { contract: inviteContract, domainId: inviteDomainId },
+        install: inviteInstall,
+      } = groupInvite;
+      await ledgerApiClient.acceptInvite(
+        party,
+        provider,
+        inviteContract.contractId,
+        inviteDomainId,
+        inviteInstall,
+        inviteContract
+      );
+    }
   };
 
   const copyToClipboard = async (text: string) => {
@@ -74,31 +137,39 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc, domainId 
       <TextField
         label="Group Invite"
         id="group-invite-field"
-        value={groupInvite}
-        onChange={event => setGroupInvite(event.target.value)}
+        value={groupInvite.originalText}
+        onChange={event => setGroupInviteInput(event.target.value)}
       ></TextField>
-      <Button variant="contained" id="request-membership-link" onClick={onJoinGroup}>
+      <Button
+        variant="contained"
+        id="request-membership-link"
+        disabled={groupInvite.type !== 'good'}
+        onClick={onJoinGroup}
+      >
         Request to join group
       </Button>
       <List>
         <Typography>Created group invites</Typography>
-        {groupInvites.map(invite => (
-          <ListItem className="invites-list-item" key={invite.contractId}>
-            <Stack direction="row" alignItems="baseline">
-              <Typography variant="button">{invite.payload.group.id.unpack}</Typography>
-              <Button
-                variant="contained"
-                className="invite-copy-button"
-                sx={{ color: 'text.primary', fontWeight: 'regular' }}
-                data-invite-contract={JSON.stringify(invite)}
-                data-group-id={invite.payload.group.id.unpack}
-                onClick={() => copyToClipboard(JSON.stringify(invite))}
-              >
-                Copy invite
-              </Button>
-            </Stack>
-          </ListItem>
-        ))}
+        {groupInvites.map(({ contract: invite, domainId }) => {
+          const encodedInvite = JSON.stringify({ ...invite, domainId });
+          return (
+            <ListItem className="invites-list-item" key={invite.contractId}>
+              <Stack direction="row" alignItems="baseline">
+                <Typography variant="button">{invite.payload.group.id.unpack}</Typography>
+                <Button
+                  variant="contained"
+                  className="invite-copy-button"
+                  sx={{ color: 'text.primary', fontWeight: 'regular' }}
+                  data-invite-contract={encodedInvite}
+                  data-group-id={invite.payload.group.id.unpack}
+                  onClick={() => copyToClipboard(encodedInvite)}
+                >
+                  Copy invite
+                </Button>
+              </Stack>
+            </ListItem>
+          );
+        })}
       </List>
     </Stack>
   );

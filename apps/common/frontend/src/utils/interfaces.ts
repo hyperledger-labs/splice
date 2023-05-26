@@ -3,6 +3,7 @@ import { DisclosedContract } from 'common-protobuf/com/daml/ledger/api/v1/comman
 import { ContractMetadata } from 'common-protobuf/com/daml/ledger/api/v1/contract_metadata_pb';
 import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
 import { Contract as ProtoContract } from 'common-protobuf/com/daml/network/v0/contract_pb';
+import { ContractWithState as ProtoContractWithState } from 'common-protobuf/com/daml/network/v0/contract_with_state_pb';
 import {
   Contract as OpenAPIContract,
   ContractMetadata as OpenAPIContractMetadata,
@@ -14,6 +15,11 @@ export interface Contract<T> {
   contractId: ContractId<T>;
   payload: T;
   metadata: OpenAPIContractMetadata;
+}
+
+export interface ReadyContract<T> {
+  contract: Contract<T>;
+  domainId: string;
 }
 
 export const templateIdToIdentifier = (templateId: string): Identifier => {
@@ -82,5 +88,20 @@ export const Contract = {
       .setContractId(c.contractId)
       .setCreateArguments(tmpl.encodeProto(c.payload).getRecord())
       .setMetadata(encodeProtoMetadata(c.metadata));
+  },
+};
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ReadyContract = {
+  // undefined if c is in-flight between domains
+  decodeContractWithState<T extends object, K>(
+    cws: ProtoContractWithState,
+    tmpl: Template<T, K>
+  ): ReadyContract<T> | undefined {
+    const c = cws.getContract();
+    const domainId = cws.getDomainId();
+    return c === undefined || domainId === ''
+      ? undefined
+      : { contract: Contract.decode(c, tmpl), domainId };
   },
 };

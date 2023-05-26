@@ -6,6 +6,8 @@ import com.daml.network.splitwell.v0
 import com.daml.network.splitwell.v0.SplitwellServiceGrpc.SplitwellServiceStub
 import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
 import com.daml.network.util.{Contract, Codec}
+import com.daml.network.v0 as cnv0
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -60,26 +62,34 @@ object GrpcSplitwellAppClient {
       ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]
     ]] =
       response.groups
-        .traverse { encG =>
-          for {
-            encContract <- encG.contract.toRight(FieldNotSet("contract"))
-            contract <- Contract.fromProto(splitwellCodegen.Group.COMPANION)(encContract)
-            domainId <- Option
-              .when(encG.domainId.nonEmpty)(encG.domainId)
-              .traverse(DomainId.fromProtoPrimitive(_, "domain_id"))
-          } yield ContractWithState(
-            contract,
-            domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
-          )
+        .traverse {
+          contractWithStateFromProto(Contract.fromProto(splitwellCodegen.Group.COMPANION))
         }
         .leftMap(_.toString)
+  }
+
+  private[GrpcSplitwellAppClient] def contractWithStateFromProto[TCid, T](
+      decodeContract: cnv0.Contract => Either[ProtoDeserializationError, Contract[TCid, T]]
+  )(encG: cnv0.ContractWithState) = {
+    for {
+      encContract <- encG.contract.toRight(FieldNotSet("contract"))
+      contract <- decodeContract(encContract)
+      domainId <- Option
+        .when(encG.domainId.nonEmpty)(encG.domainId)
+        .traverse(DomainId.fromProtoPrimitive(_, "domain_id"))
+    } yield ContractWithState(
+      contract,
+      domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+    )
   }
 
   case class ListGroupInvites(context: SplitwellContext)
       extends BaseCommand[
         v0.ListGroupInvitesRequest,
         v0.ListGroupInvitesResponse,
-        Seq[Contract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]],
+        Seq[
+          ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]
+        ],
       ] {
     override def createRequest(): Either[String, v0.ListGroupInvitesRequest] =
       Right(v0.ListGroupInvitesRequest(Some(context.toProtoV0)))
@@ -92,10 +102,12 @@ object GrpcSplitwellAppClient {
     override def handleResponse(
         response: v0.ListGroupInvitesResponse
     ): Either[String, Seq[
-      Contract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]
+      ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]
     ]] =
       response.groupInvites
-        .traverse(Contract.fromProto(splitwellCodegen.GroupInvite.COMPANION)(_))
+        .traverse(
+          contractWithStateFromProto(Contract.fromProto(splitwellCodegen.GroupInvite.COMPANION))
+        )
         .leftMap(_.toString)
   }
 

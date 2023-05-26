@@ -6,7 +6,7 @@ import {
 } from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
 import { GetConnectedDomainsRequest } from 'common-protobuf/com/digitalasset/canton/research/participant/multidomain/state_service_pb';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 
 import { Container, Stack, Typography } from '@mui/material';
 
@@ -22,6 +22,16 @@ type SplitwellDomains = {
   preferred: string;
   others: string[];
 };
+
+function collectFirst<A, B>(xs: A[], f: (elt: A) => B | undefined): B | undefined {
+  for (const x of xs) {
+    const b = f(x);
+    if (b) {
+      return b;
+    }
+  }
+  return undefined;
+}
 
 const Home: React.FC = () => {
   const splitwellClient = useSplitwellClient();
@@ -184,7 +194,25 @@ const Home: React.FC = () => {
     stateSnapshotServiceClient,
   ]);
 
-  if (provider && primaryPartyId && svc && splitwellDomainIds && installs.size > 0) {
+  const pickPreferredInstallDomain = useCallback(() => {
+    if (!splitwellDomainIds) {
+      return [undefined, undefined] as const;
+    }
+    const result = collectFirst(
+      [splitwellDomainIds.preferred, ...splitwellDomainIds.others],
+      id => {
+        const install = installs.get(id);
+        if (install) {
+          return [id, install] as const;
+        }
+      }
+    );
+    return result ? result : ([undefined, undefined] as const);
+  }, [installs, splitwellDomainIds]);
+
+  const [preferredDomainId, preferredInstallDomain] = pickPreferredInstallDomain();
+
+  if (provider && primaryPartyId && svc && splitwellDomainIds && preferredInstallDomain) {
     return (
       <Container>
         <Stack spacing={3}>
@@ -192,13 +220,11 @@ const Home: React.FC = () => {
             party={primaryPartyId}
             provider={provider}
             svc={svc}
-            domainId={splitwellDomainIds.preferred}
+            domainId={preferredDomainId}
+            newGroupInstall={preferredInstallDomain}
+            installs={installs}
           />
-          <Groups
-            party={primaryPartyId}
-            provider={provider}
-            domainId={splitwellDomainIds.preferred}
-          />
+          <Groups party={primaryPartyId} provider={provider} installs={installs} />
         </Stack>
       </Container>
     );

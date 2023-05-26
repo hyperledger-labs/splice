@@ -50,7 +50,7 @@ message ListGroupInvitesRequest {
 }
 
 message ListGroupInvitesResponse {
-  repeated com.daml.network.v0.Contract group_invites = 1;
+  repeated com.daml.network.v0.ContractWithState group_invites = 1;
 }
 
 message ListAcceptedGroupInvitesRequest {
