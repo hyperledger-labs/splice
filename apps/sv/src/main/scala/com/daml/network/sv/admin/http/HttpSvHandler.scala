@@ -21,6 +21,8 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.Status.Code
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.Base64
@@ -225,9 +227,7 @@ class HttpSvHandler(
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
       } yield {
         for {
-          isCandidateOnboardingConfirmed <- svcStore
-            .lookupSvOnboardingConfirmedByParty(candidateParty)
-            .map(_.isDefined)
+          isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
           svcRules <- svcStore.getSvcRules()
           isCandidateMember = SvApp.isSvcMemberParty(candidateParty, svcRules)
           isCandidatePartyHostedOnParticipant <- svcPartyHosting
@@ -253,6 +253,32 @@ class HttpSvHandler(
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
     }
+
+  private def isOnboardingConfirmed(party: PartyId)(implicit tc: TraceContext): Future[Boolean] = {
+    // wait for a bit as it is possible the store ingression is not complete
+    retryProvider
+      .retryForClientCalls(
+        "wait for ",
+        for {
+          maybeConfirmed <- svcStore
+            .lookupSvOnboardingConfirmedByParty(party)
+        } yield
+          if (maybeConfirmed.isDefined) maybeConfirmed
+          else
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(
+                s"SvOnboardingConfirmed contract not found yet"
+              )
+            ),
+        logger,
+      )
+      .recover {
+        case ex: StatusRuntimeException if ex.getStatus.getCode == Code.NOT_FOUND =>
+          None
+        case unexpected => throw unexpected
+      }
+      .map(_.isDefined)
+  }
 
   private def authorizeParticipantForHostingSvcParty(
       participantId: ParticipantId
