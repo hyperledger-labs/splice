@@ -1,8 +1,9 @@
-package com.daml.network.store.db
+package com.daml.network.unit.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Bytes
 import com.daml.lf.data.Time.Timestamp
+import com.daml.network.store.db.{AcsJdbcTypes, CNPostgresTest}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.ledger.offset.Offset
