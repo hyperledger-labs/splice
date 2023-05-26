@@ -165,13 +165,7 @@ class SvcPartyHosting(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResultX]] =
-    participantAdminConnection
-      .listPartyToParticipantMappingsX(
-        filterStore = domain.toProtoPrimitive,
-        operation = Some(TopologyChangeOpX.Replace),
-        filterParty = svcParty.toProtoPrimitive,
-        filterParticipant = participantId.toProtoPrimitive,
-      )
+    listActivePartyToParticipantMappingsX(svcParty, domain, participantId)
 
   def listActivePartyToParticipantMappingsX(
       party: PartyId,
@@ -182,8 +176,8 @@ class SvcPartyHosting(
       .listPartyToParticipantMappingsX(
         filterStore = domain.toProtoPrimitive,
         operation = Some(TopologyChangeOpX.Replace),
+        filterParticipant = participantId.toProtoPrimitive,
         filterParty = party.toProtoPrimitive,
-        filterParticipant = participantId.uid.toProtoPrimitive,
       )
 
   def isPartyHostedOnTargetParticipant(
@@ -192,9 +186,7 @@ class SvcPartyHosting(
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Boolean] =
     if (useXNodes) {
-      // For now there is no initial topology transaction from the target participant
-      // so we blindly accept here.
-      Future.successful(true)
+      listActivePartyToParticipantMappingsX(party, domain, participantId).map(_.nonEmpty)
     } else {
       listActivePartyToParticipantMappings(party, domain, participantId).map(_.nonEmpty)
     }
