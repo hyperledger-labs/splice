@@ -94,6 +94,34 @@ class SvcPreflightIntegrationTest extends FrontendIntegrationTestWithSharedEnvir
           )
         }
 
+        clue(s"We can create a validator onboarding secret via SV$i's UI") {
+          val (_, numberOfSecrets) = actAndCheck(
+            "Opening validator onboarding tab",
+            click on "navlink-validator-onboarding",
+          )(
+            s"Creating an onboarding secret",
+            _ => {
+              waitForQuery(id("create-validator-onboarding-secret"))
+              findAll(className("onboarding-secret-table-row")).toList.size
+            },
+          )
+          actAndCheck(
+            "click",
+            click on "create-validator-onboarding-secret",
+          )(
+            s"We see that SV$i has created an onboarding secret",
+            _ => {
+              val secrets = findAll(className("onboarding-secret-table-row"))
+              secrets.map(row =>
+                row
+                  .childElement(className("onboarding-secret-table-secret"))
+                  .text should have size 44
+              )
+              secrets should have size (numberOfSecrets + 1L)
+            },
+          )
+        }
+
         clue(s"We can log out of SV$i's UI") {
           click on "logout-button"
           waitForQuery(id("oidc-login-button"))
