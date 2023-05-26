@@ -23,9 +23,6 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
-  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
-    domains.signalWhenConnected(defaultAcsDomain)
-
   protected[this] def domainConfig: SvcDomainConfig
 
   override final def defaultAcsDomain = domainConfig.global.alias

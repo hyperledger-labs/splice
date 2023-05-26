@@ -168,7 +168,7 @@ object Contract {
       decoder: TemplateJsonDecoder
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     val contractId = companion.toContractId(new ContractId[T](contract.contractId))
-    fromJson(companion.TEMPLATE_ID, contractId, decoder.decodeTemplate(companion))(contract)
+    fromJson(companion.TEMPLATE_ID, contractId, decoder.decodeTemplate(companion), contract)
   }
 
   def fromJson[ICid <: ContractId[Marker], Marker, View <: DamlRecord[?]](
@@ -181,16 +181,18 @@ object Contract {
       interfaceCompanion.TEMPLATE_ID,
       contractId,
       decoder.decodeInterface(interfaceCompanion),
-    )(contract)
+      contract,
+    )
   }
 
   private def fromJson[TCid <: ContractId[?], T <: DamlRecord[?]](
       companionTemplateId: Identifier,
       contractId: TCid,
       decodePayload: Json => T,
-  )(
-      contract: http.Contract
+      contract: http.Contract,
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
+    val metadata = ContractMetadataUtil.fromJson(contract.metadata)
+    val createArgumentsBlob = protobuf.Any.parseFrom(Hex.decodeHex(contract.createArgumentsBlob))
     for {
       templateId <- LfIdentifier
         .fromString(contract.templateId)
@@ -201,6 +203,26 @@ object Contract {
         templateId.qualifiedName.module.dottedName,
         templateId.qualifiedName.name.dottedName,
       )
+      result <- fromJson(companionTemplateId, contractId, decodePayload)(
+        javaTemplateId,
+        contract.payload,
+        metadata,
+        createArgumentsBlob,
+      )
+    } yield result
+  }
+
+  def fromJson[TCid <: ContractId[?], T <: DamlRecord[?]](
+      companionTemplateId: Identifier,
+      contractId: TCid,
+      decodePayload: Json => T,
+  )(
+      javaTemplateId: Identifier,
+      payload: Json,
+      metadata: ContractMetadata,
+      createArgumentsBlob: protobuf.Any,
+  ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
+    for {
       _ <- Either.cond(
         javaTemplateId == companionTemplateId,
         (),
@@ -209,11 +231,9 @@ object Contract {
           s"Actual template id $javaTemplateId does not match expected template id $companionTemplateId",
         ),
       )
-      payload <- Try(decodePayload(contract.payload)).toEither.left.map(ex =>
+      payload <- Try(decodePayload(payload)).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )
-      metadata = ContractMetadataUtil.fromJson(contract.metadata)
-      createArgumentsBlob = protobuf.Any.parseFrom(Hex.decodeHex(contract.createArgumentsBlob))
     } yield Contract[TCid, T](
       identifier = javaTemplateId,
       contractId = contractId,

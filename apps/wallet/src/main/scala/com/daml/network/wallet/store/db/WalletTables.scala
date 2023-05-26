@@ -3,6 +3,7 @@ package com.daml.network.wallet.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.store.db.AcsTables
+import com.daml.network.store.db.AcsTables.{AcsStoreTemplate, TxLogStoreTemplate}
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import io.circe.Json
 import shapeless.HNil

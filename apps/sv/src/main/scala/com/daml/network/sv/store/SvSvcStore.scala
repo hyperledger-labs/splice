@@ -47,9 +47,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
 
   override final def defaultAcsDomain = appConfig.domains.global.alias
 
-  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
-    domains.signalWhenConnected(defaultAcsDomain)
-
   def lookupSvcRulesWithOffset(
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[

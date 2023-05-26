@@ -28,9 +28,6 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
 
   import MultiDomainAcsStore.QueryResult
 
-  private[directory] def defaultAcsDomainIdF(implicit tc: TraceContext) =
-    domains.signalWhenConnected(defaultAcsDomain)
-
   /** Get the party-id of the provider.
     * All results from the store are scoped to contracts managed by this provider.
     */

@@ -8,7 +8,7 @@ import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import slick.ast.FieldSymbol
-import slick.jdbc.JdbcType
+import slick.jdbc.{GetResult, JdbcType}
 
 import java.sql.{PreparedStatement, ResultSet}
 
@@ -17,11 +17,23 @@ trait AcsJdbcTypes {
 
   import profile.api.*
 
+  protected implicit lazy val byteArrayGetResult: GetResult[Array[Byte]] =
+    GetResult { rs => rs.nextBytes() }
+
   protected implicit lazy val timestampJdbcType: JdbcType[Timestamp] =
     MappedColumnType.base[Timestamp, Long](_.micros, Timestamp.assertFromLong)
 
+  protected implicit lazy val timestampGetResult: GetResult[Timestamp] =
+    GetResult.GetLong.andThen(Timestamp.assertFromLong)
+
+  protected implicit lazy val timestampGetResultOption: GetResult[Option[Timestamp]] =
+    GetResult.GetLongOption.andThen(_.map(Timestamp.assertFromLong))
+
   protected implicit def contractIdJdbcType[T]: JdbcType[ContractId[T]] =
     MappedColumnType.base[ContractId[T], String](_.contractId, new ContractId[T](_))
+
+  protected implicit def contractIdGetResult[T]: GetResult[ContractId[T]] =
+    GetResult.GetString.andThen(new ContractId[T](_))
 
   protected implicit lazy val offsetJdbcType: JdbcType[Offset] =
     MappedColumnType.base[Offset, String](
@@ -50,6 +62,16 @@ trait AcsJdbcTypes {
       },
     )
 
+  protected implicit val templateIdGetResult: GetResult[TemplateId] =
+    GetResult.GetString.andThen { s =>
+      val identifier = Identifier.assertFromString(s)
+      TemplateId(
+        identifier.packageId,
+        identifier.qualifiedName.module.dottedName,
+        identifier.qualifiedName.name.dottedName,
+      )
+    }
+
   protected implicit lazy val domainIdJdbcType: JdbcType[DomainId] =
     MappedColumnType.base[DomainId, String](_.toProtoPrimitive, DomainId.tryFromString)
 
@@ -64,10 +86,10 @@ trait AcsJdbcTypes {
     override def setValue(v: Json, p: PreparedStatement, idx: Int): Unit =
       p.setObject(idx, v.noSpaces, java.sql.Types.OTHER)
 
-    @SuppressWarnings(Array("org.wartremover.warts.Null"))
     override def getValue(r: ResultSet, idx: Int): Json = {
       val value = r.getString(idx)
-      if (r.wasNull()) null
+      if (r.wasNull())
+        throw new IllegalStateException("Tried to deserialize as Json, but the value was null.")
       else
         io.circe.parser
           .parse(value)
@@ -78,6 +100,16 @@ trait AcsJdbcTypes {
       r.updateObject(idx, v.noSpaces, java.sql.Types.OTHER)
 
     override def valueToSQLLiteral(value: Json): String = s"'${value.noSpaces}'"
+  }
+
+  protected implicit lazy val jsonGetResult: GetResult[Json] = GetResult { rs =>
+    val value = rs.nextString()
+    if (rs.wasNull())
+      throw new IllegalStateException("Tried to deserialize as Json, but the value was null.")
+    else
+      io.circe.parser
+        .parse(value)
+        .getOrElse(throw new IllegalStateException("JSONB column didn't contain valid JSON."))
   }
 
 }

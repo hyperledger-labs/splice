@@ -54,9 +54,6 @@ trait UserWalletStore
     ]
     with NamedLogging {
 
-  private def defaultAcsDomainIdF(implicit traceContext: TraceContext) =
-    domains.signalWhenConnected(defaultAcsDomain)
-
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 

@@ -28,8 +28,6 @@ trait ScanStore
 
   override protected def txLogParser = new ScanTxLogParser(loggerFactory)
 
-  def defaultAcsDomainIdF(implicit tc: TraceContext) = domains.signalWhenConnected(defaultAcsDomain)
-
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 

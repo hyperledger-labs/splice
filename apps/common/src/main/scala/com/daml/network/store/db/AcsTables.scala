@@ -7,7 +7,7 @@ import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.DomainId
 import io.circe.Json
 import shapeless.HNil
-import slick.jdbc.PostgresProfile
+import slick.jdbc.{GetResult, PostgresProfile}
 
 trait AcsTables extends AcsJdbcTypes {
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
@@ -54,6 +54,42 @@ trait AcsTables extends AcsJdbcTypes {
   }
 
   lazy val StoreIngestionStates = new TableQuery(tag => new StoreIngestionStates(tag))
+
+}
+
+object AcsTables extends AcsTables {
+  case class AcsStoreRowTemplate(
+      storeId: Int,
+      eventNumber: Long,
+      contractId: ContractId[Any],
+      templateId: TemplateId,
+      createArguments: Json,
+      contractMetadataCreatedAt: Timestamp,
+      contractMetadataContractKeyHash: Option[String] = None,
+      contractMetadataDriverInternal: Array[Byte],
+      contractExpiresAt: Option[Timestamp] = None,
+  )
+
+  object AcsStoreRowTemplate {
+    implicit val GetResultAcsStoreTemplateRow: GetResult[AcsStoreRowTemplate] = GetResult { prs =>
+      import prs.*
+      (AcsStoreRowTemplate.apply _).tupled(
+        (
+          <<[Int],
+          <<[Long],
+          <<[ContractId[Any]],
+          <<[TemplateId],
+          <<[Json],
+          <<[Timestamp],
+          <<[Option[String]],
+          <<[Array[Byte]],
+          <<?[Timestamp],
+        )
+      )
+    }
+  }
+
+  import profile.api.*
 
   abstract class AcsStoreTemplate[Row](_tableTag: Tag, tableName: String)
       extends profile.api.Table[Row](_tableTag, tableName) {

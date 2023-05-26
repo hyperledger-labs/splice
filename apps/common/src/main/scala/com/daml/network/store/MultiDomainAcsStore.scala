@@ -4,6 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.api.v1.{transaction_filter as scalaFilter}
 import com.daml.ledger.javaapi.data.{
+  ContractMetadata,
   CreatedEvent,
   Filter,
   FiltersByParty,
@@ -14,21 +15,29 @@ import com.daml.ledger.javaapi.data.{
   TransactionFilter,
 }
 import com.daml.ledger.javaapi.data.codegen.{
-  ContractCompanion as JavaContractCompanion,
   ContractId,
   DamlRecord,
+  ContractCompanion as JavaContractCompanion,
   InterfaceCompanion as JavaInterfaceCompanion,
 }
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.ledger.api.{InFlightTransferOutEvent, TransferEvent, TreeUpdate}
-import com.daml.network.util.Contract
+import com.daml.network.util.Contract.Companion
+import com.daml.network.util.Contract.Companion.Interface
+import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.util.PrettyInstances.*
+import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.protobuf
+import com.google.protobuf.ByteString
+import io.circe.Json
 import io.grpc.Status
 
+import java.time.Instant
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -449,8 +458,50 @@ object MultiDomainAcsStore {
     def fromCreatedEvent(
         companion: C
     )(filter: MultiDomainAcsStore.ContractFilter, event: CreatedEvent): Option[Contract[TCid, T]]
+
+    def fromJson(companion: C)(
+        templateId: TemplateId,
+        contractId: String,
+        payload: Json,
+        createdAt: Instant,
+        contractKeyHash: Option[String],
+        driverInternal: Array[Byte],
+    )(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
+      val cId = toContractId(companion, contractId)
+      val javaTemplateId =
+        new Identifier(templateId.packageId, templateId.moduleName, templateId.entityName)
+      val metadata = new ContractMetadata(
+        createdAt,
+        ByteString.copyFromUtf8(contractKeyHash.getOrElse("")),
+        ByteString.copyFrom(driverInternal),
+      )
+      fromJson(
+        companion,
+        cId,
+        javaTemplateId,
+        payload,
+        metadata,
+        createArgumentsBlob =
+          com.google.protobuf.Any.getDefaultInstance, // TODO (#5012): this shouldn't be empty to support interfaces
+      )
+    }
+
     def mightContain(filter: MultiDomainAcsStore.ContractFilter)(companion: C): Boolean
+
     def typeId(companion: C): Identifier
+
+    def toContractId(companion: C, contractId: String): TCid
+
+    protected def fromJson(
+        companion: C,
+        cId: TCid,
+        templateId: Identifier,
+        payload: Json,
+        metadata: ContractMetadata,
+        createArgumentsBlob: com.google.protobuf.Any,
+    )(implicit decoder: TemplateJsonDecoder): Either[ProtoDeserializationError, Contract[TCid, T]]
   }
 
   implicit def templateCompanion[TCid <: ContractId[T], T <: Template]
@@ -460,11 +511,34 @@ object MultiDomainAcsStore {
           filter: MultiDomainAcsStore.ContractFilter,
           event: CreatedEvent,
       ): Option[Contract[TCid, T]] = Contract.fromCreatedEvent(companion)(event)
+
       override def mightContain(filter: MultiDomainAcsStore.ContractFilter)(
           companion: Contract.Companion.Template[TCid, T]
       ): Boolean = filter.mightContain(companion)
+
       override def typeId(companion: Contract.Companion.Template[TCid, T]): Identifier =
         companion.TEMPLATE_ID
+
+      override def toContractId(companion: Companion.Template[TCid, T], contractId: String): TCid =
+        companion.toContractId(new ContractId[T](contractId))
+
+      override protected def fromJson(
+          companion: Companion.Template[TCid, T],
+          cId: TCid,
+          templateId: Identifier,
+          payload: Json,
+          metadata: ContractMetadata,
+          createArgumentsBlob: protobuf.Any,
+      )(implicit
+          decoder: TemplateJsonDecoder
+      ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
+        Contract.fromJson(typeId(companion), cId, decoder.decodeTemplate(companion))(
+          templateId,
+          payload,
+          metadata,
+          createArgumentsBlob,
+        )
+      }
     }
 
   implicit def interfaceCompanion[I, Id <: ContractId[I], View <: DamlRecord[_]]
@@ -475,11 +549,34 @@ object MultiDomainAcsStore {
           event: CreatedEvent,
       ): Option[Contract[Id, View]] =
         filter.decodeInterface(companion)(event)
+
       override def mightContain(filter: MultiDomainAcsStore.ContractFilter)(
           companion: Contract.Companion.Interface[Id, I, View]
       ): Boolean = filter.mightContain(companion)
+
       override def typeId(companion: Contract.Companion.Interface[Id, I, View]): Identifier =
         companion.TEMPLATE_ID
+
+      override def toContractId(companion: Interface[Id, I, View], contractId: String): Id =
+        companion.toContractId(new ContractId[I](contractId))
+
+      override protected def fromJson(
+          companion: Interface[Id, I, View],
+          cId: Id,
+          templateId: Identifier,
+          payload: Json,
+          metadata: ContractMetadata,
+          createArgumentsBlob: protobuf.Any,
+      )(implicit
+          decoder: TemplateJsonDecoder
+      ): Either[ProtoDeserializationError, Contract[Id, View]] = {
+        Contract.fromJson(typeId(companion), cId, decoder.decodeInterface(companion))(
+          templateId,
+          payload,
+          metadata,
+          createArgumentsBlob,
+        )
+      }
     }
 
   final case class TransferId(source: DomainId, id: String)

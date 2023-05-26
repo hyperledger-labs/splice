@@ -22,9 +22,6 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
   /** The key identifying the parties considered by this store. */
   def walletKey: WalletStore.Key
 
-  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
-    domains.signalWhenConnected(defaultAcsDomain)
-
   def lookupInstallByParty(
       endUserParty: PartyId
   )(implicit tc: TraceContext): Future[Option[

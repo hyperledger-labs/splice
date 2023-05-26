@@ -27,9 +27,6 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
 
-  private def defaultAcsDomainIdF(implicit tc: TraceContext) =
-    domains.signalWhenConnected(defaultAcsDomain)
-
   protected[this] def domainConfig: ValidatorDomainConfig
 
   override final def defaultAcsDomain = domainConfig.global.alias
