@@ -8,9 +8,6 @@ Release Notes
 
 * Deployment updates:
 
-  * Note that the ingress Helm chart has been renamed to ``canton-network-helm/cn-cluster-ingress-sv``,
-    and similarly, the underlying image has been renamed to ``external-proxy-sv``. They will soon be
-    simplified to include only the configuration essential for an SV node deployment.
   * ``joinWithKeyOnboarding.keyName`` in ``sv-values.yaml`` has been renamed to ``onboardingName``.
   * ``svSponsorPort`` in ``validator-values.yaml`` has been removed. The port is now included in ``svSponsorAddress``. The default sponsor address has
     been changed to ``https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv``.
@@ -19,7 +16,7 @@ Release Notes
   * The SV private and public key are now stored in k8s secrets.
   * Kubernetes `liveness <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-grpc-liveness-probe>`_ and `readiness <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes>`_ probes are configured to probe the `GRPC Health Checking Protocol <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_ of the participant node.
   * The instructions for generating your SV keys now also work on MacOS.
-  * Added support for running the ingress controller behind an existing Kubernetes external proxy.
+  * Ingress Helm charts and instructions have been rewritten to be simpler and are now based on Istio instead of Nginx. See :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`
 
 * Add new ``initial-coin-price-vote`` config option to SV app
 

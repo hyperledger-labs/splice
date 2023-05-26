@@ -408,6 +408,8 @@ particularly if all helm charts are deployed at the same time. The
 ``cn-sv-node`` cannot start until ``participant`` is running and
 ``participant`` cannot start until ``postgres`` is running.
 
+.. _helm-sv-ingress:
+
 
 Configuring the Cluster Ingress
 -------------------------------
@@ -509,8 +511,6 @@ Another reference Helm chart is provided for that, which can be installed using:
 .. code-block:: bash
 
     helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-sv -n cluster-ingress --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=sv
-
-
 
 
 .. _helm-sv-wallet-ui:
