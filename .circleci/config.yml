@@ -413,7 +413,13 @@ commands:
           additional_nix_args: "--keep DATADOG_API_KEY --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_URL --keep CIRCLE_NODE_INDEX --keep CIRCLE_JOB"
           cmd_name: Send time duration of each test to datadog
           cmd: |
-            python3 .circleci/canton-scripts/collect_test_timings_and_send_to_datadog.py
+            # TODO(#5063) - remove this check after all environments are updated.
+            SCRIPT=".circleci/canton-scripts/collect_test_timings_and_send_to_datadog.py"
+            if [ -f "$SCRIPT" ]; then
+              python3 $SCRIPT
+            else
+              echo "Could not find python script, skipping"
+            fi
           cmd_retry_count: 5
 
   # Writes the job time to a file. For accurate reporting, assumes this is the first step in the job,
