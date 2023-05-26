@@ -406,6 +406,24 @@ commands:
             python3 .circleci/canton-scripts/collect_failing_tests_and_send_to_datadog.py
           cmd_retry_count: 5
 
+  collect_test_timings_and_send_to_datadog:
+    steps:
+      - run_bash_command_in_nix:
+          when: always
+          additional_nix_args: "--keep DATADOG_API_KEY --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_URL --keep CIRCLE_NODE_INDEX --keep CIRCLE_JOB"
+          cmd_name: Send time duration of each test to datadog
+          cmd: |
+            python3 .circleci/canton-scripts/collect_test_timings_and_send_to_datadog.py
+          cmd_retry_count: 5
+
+  # Writes the job time to a file. For accurate reporting, assumes this is the first step in the job,
+  # and "collect_test_timings..." is the last step
+  record_job_start_time:
+    steps:
+      - run:
+          name: Write job starting time to file
+          command: date +%s > ~/job_start_time.txt
+
   run_bash_command_in_nix:
     parameters:
       cmd:
@@ -917,6 +935,7 @@ jobs:
       <<: *env
     steps:
       - checkout
+      - record_job_start_time
       - setup_sbt_test_job
       # Surprisingly, running "Test/compile" before speeds up the "scalafixCheck", is a lot faster than just running "scalafixCheck"
       - execute_sbt_command:
@@ -926,6 +945,7 @@ jobs:
           cmd: "lint"
       - run_todo_script
       - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
 
   # We put our Daml tests in their own job for more parallelization
   daml_test:
@@ -935,12 +955,14 @@ jobs:
       <<: *env
     steps:
       - checkout
+      - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "damlTest"
           timeout: "10m"
           extra_env_vars: DAML_DEBUG=1
       - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
 
   # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
   # work on anything but the Scala tests is duplicated across all parallel runs of this job
@@ -977,6 +999,7 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout
+      - record_job_start_time
       - setup_sbt_test_job
       # Used to pull docker images for cometbft
       - docker_login_artifactory
@@ -996,6 +1019,7 @@ jobs:
           extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
       - cleanup_sbt_test_job
       - collect_failing_test_data_and_send_to_datadog
+      - collect_test_timings_and_send_to_datadog
 
   bundle:
     docker:
@@ -1005,6 +1029,7 @@ jobs:
       <<: *env
     steps:
       - checkout
+      - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "bundle"
@@ -1031,6 +1056,7 @@ jobs:
            gsutil cp -n /tmp/artifacts/*.tar.gz gs://release-bundles
          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
 
   deployment_test:
     docker:
@@ -1039,6 +1065,7 @@ jobs:
       <<: *env
     steps:
       - checkout
+      - record_job_start_time
       - setup_nix
       - run_bash_command_in_nix:
          cmd_name: Deployment Test
@@ -1046,6 +1073,7 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Check Pulumi deployment
          cmd: make --keep-going cluster/pulumi/test
+      - collect_test_timings_and_send_to_datadog
 
   deploy_cluster:
     circleci_ip_ranges: true
@@ -1060,6 +1088,7 @@ jobs:
         enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
     steps:
       - checkout
+      - record_job_start_time
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
@@ -1078,6 +1107,7 @@ jobs:
             cncluster ci_apply
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
 
   deploy_cluster_pulumi:
     circleci_ip_ranges: true
@@ -1092,6 +1122,7 @@ jobs:
         enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
     steps:
       - checkout
+      - record_job_start_time
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
@@ -1110,6 +1141,7 @@ jobs:
             cncluster ci_papply
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
 
   deploy_cluster_testnet_release:
     circleci_ip_ranges: true
@@ -1124,6 +1156,7 @@ jobs:
         enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
     steps:
       - checkout
+      - record_job_start_time
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Apply Kubernetes manifest to cluster
@@ -1139,7 +1172,7 @@ jobs:
             cncluster ci_apply
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
-
+      - collect_test_timings_and_send_to_datadog
 
   preflight_check:
     parameters:
@@ -1158,6 +1191,7 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout
+      - record_job_start_time
       - run:
           # necessary for npm/webpack dev server launched in start-frontends.sh later
           # https://webpack.js.org/configuration/watch/#not-enough-watchers
@@ -1215,6 +1249,7 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
+      - collect_test_timings_and_send_to_datadog
 
   auth0_user_cleanup:
     docker:
@@ -1289,6 +1324,7 @@ jobs:
       <<: *env
     steps:
       - checkout
+      - record_job_start_time
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
@@ -1309,6 +1345,7 @@ jobs:
            make docker-push -j
          cmd_retry_count: 5
       - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
 
   publish_public_release:
     machine:
@@ -1317,6 +1354,7 @@ jobs:
       <<: *env
     steps:
       - checkout
+      - record_job_start_time
       - setup_sbt_test_job
       - docker_login_artifactory
       - run_bash_command_in_nix:
@@ -1365,6 +1403,7 @@ jobs:
               git tag --force testnet-next
               git push --force origin testnet-next
            fi
+      - collect_test_timings_and_send_to_datadog
 
   docker_images_build:
     machine:
@@ -1373,12 +1412,14 @@ jobs:
       <<: *env
     steps:
       - checkout
+      - record_job_start_time
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
          cmd: make build -j
       - docker_build
       - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
 
   wait_for_previous_pipeline:
     docker:
@@ -1434,10 +1475,12 @@ workflows:
           <<: *notify-fail
           context:
             - artifactory
+            - datadog
             - slack-context
       - publish_public_release:
           context:
             - artifactory
+            - datadog
           requires:
             - docker_images_push
 
@@ -1456,12 +1499,14 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
+          - datadog
           - slack-context
     # Daml
     - daml_test:
         <<: *notify-fail
         context:
           - artifactory
+          - datadog
           - slack-context
     # Scala
     - scala_test:
@@ -1527,6 +1572,7 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
+          - datadog
           - slack-context
     # Ops
     - update_pipeline_schedule:
@@ -1539,11 +1585,13 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
+          - datadog
           - slack-context
     - docker_images_build:
         <<: *notify-fail
         context:
           - artifactory
+          - datadog
           - slack-context
 
   deploy_scratchnet_A:
@@ -1558,6 +1606,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1565,6 +1614,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1572,6 +1622,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           cluster: scratchneta
           requires:
@@ -1584,6 +1635,7 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1603,6 +1655,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1610,6 +1663,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1617,6 +1671,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           cluster: scratchnetb
           requires:
@@ -1629,6 +1684,7 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1648,6 +1704,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1655,6 +1712,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1662,6 +1720,7 @@ workflows:
           <<: *main-branch-never
           context:
             - artifactory
+            - datadog
             - slack-context
           cluster: scratchnetc
           requires:
@@ -1674,6 +1733,7 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
+            - datadog
             - slack-context
           requires:
             - hold
@@ -1691,12 +1751,14 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
@@ -1709,6 +1771,7 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
         cluster: "staging"
         requires:
@@ -1721,6 +1784,7 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
+          - datadog
           - slack-context
         requires:
           - deployment_test
@@ -1736,12 +1800,14 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
@@ -1754,6 +1820,7 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
         cluster: "stagingb"
         requires:
@@ -1766,6 +1833,7 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
+          - datadog
           - slack-context
         requires:
           - deployment_test
@@ -1781,12 +1849,14 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
@@ -1799,6 +1869,7 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
         cluster: "devnet"
         requires:
@@ -1811,6 +1882,7 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
+          - datadog
           - slack-context
         requires:
           - deployment_test
@@ -1822,6 +1894,7 @@ workflows:
           - preflight_check
         context:
           - artifactory
+          - datadog
 
   deploy_testnet:
     when:
@@ -1832,12 +1905,14 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
         workflow_names: "deploy_testnet testnet_health_check"
     - deploy_cluster_testnet_release:
         <<: *main-branch-only
         context:
           - artifactory
+          - datadog
           - slack-context
         cluster: "testnet"
         requires:
@@ -1847,6 +1922,7 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
+          - datadog
           - slack-context
         requires:
           - deploy_cluster_testnet_release
@@ -1898,6 +1974,7 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
+            - datadog
             - slack-context
           requires:
              - wait_for_previous_pipeline
@@ -1920,6 +1997,7 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
+            - datadog
             - slack-context
           requires:
              - wait_for_previous_pipeline

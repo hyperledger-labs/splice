@@ -1,6 +1,10 @@
 {
-    "daml.extraArguments": "--studio-auto-run-all-scenarios=yes",
-    "files.watcherExclude": {
-        "**/target": true
-    }
+  "daml.extraArguments": "--studio-auto-run-all-scenarios=yes",
+  "files.watcherExclude": {
+    "**/target": true
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.autopep8"
+  },
+  "python.formatting.provider": "none"
 }
