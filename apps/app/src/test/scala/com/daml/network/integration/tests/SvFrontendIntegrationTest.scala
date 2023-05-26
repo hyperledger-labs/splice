@@ -40,8 +40,8 @@ class SvFrontendIntegrationTest
         loggerFactory.assertLogs(
           {
             actAndCheck(
-              "login does not work with wrong password", {
-                login(port, "NobodyCares!")
+              "login does not work with wrong user", {
+                login(port, "WrongUser")
               },
             )(
               "login fails",
