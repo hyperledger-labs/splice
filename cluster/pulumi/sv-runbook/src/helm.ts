@@ -13,8 +13,10 @@ export function installCNHelmChartByNamespaceName(
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
   const repo_root = requiredEnv('REPO_ROOT', 'root directory of the repo');
-  const username = requiredEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
-  const password = requiredEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
+  const username = local ? '' : requiredEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
+  const password = local
+    ? ''
+    : requiredEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
   return new k8s.helm.v3.Release(
     name,
     {

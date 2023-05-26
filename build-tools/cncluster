@@ -1387,6 +1387,29 @@ function subcmd_papply_sv(){
 
 ###
 
+subcommand_whitelist[ci_papply_sv]='Run only by CircleCI'
+
+function subcmd_ci_papply_sv() {
+    _assert_lock --for-ci
+
+    # A CI-specific variant of 'cncluster papply_sv' that removes the need
+    # for manual confirmation, and also always uses the same target cluster
+    # as the one the sv is deployed on.
+
+    if [ -z "${CI-}" ]; then
+        _error "This subcommand is available to CI jobs only."
+        exit 1
+    fi
+
+    _cluster_show
+
+    local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
+
+    subcmd_pulumi sv-runbook up --yes
+}
+
+###
+
 subcommand_whitelist[pdown_sv]="Take the current sv-runbook Pulumi configuration down"
 
 function subcmd_pdown_sv(){
