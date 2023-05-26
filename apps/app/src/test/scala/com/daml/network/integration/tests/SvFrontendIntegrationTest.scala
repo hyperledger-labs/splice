@@ -277,30 +277,31 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "can create a valid vote request and see it in the list" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "sv1 operator can login and browse to the governance tab", {
-            go to s"http://localhost:$port/votes"
-            loginOnCurrentPage(port, sv1.config.ledgerApiUser)
-          },
-        )(
-          "We can see the vote request below",
-          _ => {
+    "can create a valid \"SRARC_RemoveMember\" vote request and see it in the list" in {
+      implicit env =>
+        withFrontEnd("sv1") { implicit webDriver =>
+          actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$port/votes"
+              loginOnCurrentPage(port, sv1.config.ledgerApiUser)
+            },
+          )(
+            "We can see the vote request below",
+            _ => {
 
-            val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-            dropDownAction.selectByIndex(0)
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("SRARC_RemoveMember")
 
-            val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-            dropDownMember.selectByIndex(2)
+              val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+              dropDownMember.selectByIndex(2)
 
-            click on "create-voterequest-submit-button"
+              click on "create-voterequest-submit-button"
 
-            val rows = findAll(className("vote-request-row")).toSeq
-            rows should have size 1
-          },
-        )
-      }
+              val rows = findAll(className("vote-request-row")).toSeq
+              rows should have size 1
+            },
+          )
+        }
     }
   }
 

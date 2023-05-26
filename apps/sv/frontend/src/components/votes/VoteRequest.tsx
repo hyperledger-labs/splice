@@ -21,14 +21,14 @@ import ListVoteRequests from './ListVoteRequests';
 import RemoveMember from './actions/RemoveMember';
 
 const VoteRequest: React.FC = () => {
-  const [actionName, setActionName] = useState('1');
+  const [actionName, setActionName] = useState('SRARC_RemoveMember');
   const [description, setDescription] = useState<string>('');
   const [url, setUrl] = useState<string>('');
   const svcInfosQuery = useSvcInfos();
 
   const actionNameOptions = [{ name: 'Remove Member', value: 'SRARC_RemoveMember' }];
 
-  const [action, setAction] = useState({});
+  const [action, setAction] = useState<object | undefined>(undefined);
   const chooseAction = (action: object) => {
     setAction(action);
   };
@@ -37,8 +37,7 @@ const VoteRequest: React.FC = () => {
   const createVoteRequestMutation = useMutation({
     mutationFn: async () => {
       const requester = svcInfosQuery.data?.svPartyId!;
-      if (actionName === '1') {
-        console.log(action);
+      if (actionName === 'SRARC_RemoveMember') {
         return await createVoteRequest(requester, JSON.stringify(action), url, description);
       }
     },
@@ -73,7 +72,7 @@ const VoteRequest: React.FC = () => {
               </NativeSelect>
             </FormControl>
           </Stack>
-          {actionName === '1' && <RemoveMember chooseAction={chooseAction} />}
+          {actionName === 'SRARC_RemoveMember' && <RemoveMember chooseAction={chooseAction} />}
 
           <Typography variant="h5">Reason</Typography>
 
@@ -104,7 +103,7 @@ const VoteRequest: React.FC = () => {
             onClick={() => {
               createVoteRequestMutation.mutate();
             }}
-            disabled={createVoteRequestMutation.isLoading}
+            disabled={createVoteRequestMutation.isLoading || action === undefined}
           >
             Send request to collective
           </Button>

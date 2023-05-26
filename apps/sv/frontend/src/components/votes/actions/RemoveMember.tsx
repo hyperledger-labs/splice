@@ -11,7 +11,7 @@ function createRow(key: string, value: string, isParty: boolean = false) {
 
 const RemoveMember: React.FC<{ chooseAction: (action: object) => void }> = ({ chooseAction }) => {
   const svcInfosQuery = useSvcInfos();
-  const [member, setMember] = useState('1');
+  const [member, setMember] = useState<string | undefined>(undefined);
 
   if (svcInfosQuery.isLoading) {
     return <Loading />;
@@ -40,6 +40,7 @@ const RemoveMember: React.FC<{ chooseAction: (action: object) => void }> = ({ ch
           value={member}
           onChange={e => setMemberAction(e.target.value)}
         >
+          <option>No member selected</option>
           {memberOptions &&
             memberOptions.map((member, index) => (
               <option key={'member-option-' + index} value={member.key}>
