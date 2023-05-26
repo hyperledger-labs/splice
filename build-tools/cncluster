@@ -665,7 +665,7 @@ function _cluster_reset() {
     _info "Deleting all persistent volume claims..."
     kubectl delete PersistentVolumeClaim --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
 
-    _info "Uninstalling the istio gateway and virtual services"
+    _info "Uninstalling Pulumi canton-network-gateway stack"
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
     _uses_pulumi_stack canton-network-gateway
@@ -676,6 +676,11 @@ function _cluster_reset() {
     _uses_pulumi_stack canton-network
     subcmd_pulumi canton-network refresh --yes
     subcmd_pulumi canton-network down --yes
+
+    _info "Uninstalling Pulumi sv-runbook stack"
+    _uses_pulumi_stack sv-runbook
+    subcmd_pulumi sv-runbook refresh --yes
+    subcmd_pulumi sv-runbook down --yes
 
     _info "Cluster in reset/idle state."
 }
