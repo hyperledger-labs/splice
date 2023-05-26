@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2023-06-04
+----------
+
+* Bugfixes
+
+  * Fix SV reward collection for cases in which an SV has been offline for an extended period of time. Previously, the collection of new rewards was blocked for a potentially very long time after restarting.
+
 2023-05-28
 ----------
 
