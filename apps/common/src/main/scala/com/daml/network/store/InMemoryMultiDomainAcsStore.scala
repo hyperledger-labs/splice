@@ -16,7 +16,7 @@ import com.daml.network.environment.ledger.api.{
 import com.daml.network.util.{Contract, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -134,7 +134,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       update match {
         case TransactionTreeUpdate(tree) =>
           updateState(
-            _.ingestTransaction(domain, tree, contractFilter.contains, txLogParser)
+            _.ingestTransaction(domain, tree, contractFilter.contains, txLogParser, logger)
           ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
             logger.debug(show"Ingested transaction $summary")
             offsetIngestionsToSignal.foreach(_.success(()))
@@ -690,6 +690,7 @@ object InMemoryMultiDomainAcsStore {
         tx: TransactionTree,
         p: CreatedEvent => Boolean,
         txLogParser: TxLogStore.Parser[TXI, TXE],
+        logger: TracedLogger,
     )(implicit
         traceContext: TraceContext
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
@@ -747,7 +748,7 @@ object InMemoryMultiDomainAcsStore {
         },
       )
 
-      val ingestedTxLogEntries = txLogParser.parse(tx)
+      val ingestedTxLogEntries = txLogParser.parse(tx, logger)
 
       val newOffset = tx.getOffset
 

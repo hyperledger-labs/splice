@@ -774,6 +774,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       val reader = new TxLogStore.Reader[TestTxLogIndexRecord, TestTxLogEntry](
         txLogStore = store,
         transactionTreeSource = TransactionTreeSource.StaticForTesting(Seq(tx1, tx2, tx3, tx4)),
+        loggerFactory,
       )
       val initialEventIdD1 = tx2.getRootEventIds.asScala.headOption.value
       val initialEventIdD2 = tx3.getRootEventIds.asScala.headOption.value

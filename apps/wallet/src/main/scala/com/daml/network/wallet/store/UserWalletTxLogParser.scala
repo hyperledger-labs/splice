@@ -432,11 +432,9 @@ class UserWalletTxLogParser(
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
           // all possible exercise events that archive coins.
           case CoinArchive(_) =>
-            // Using a warning to force our tests to fail should we ever introduce a new coin workflow that is not handled above.
-            logger.warn(
+            throw new RuntimeException(
               s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
             )
-            now(State.empty)
 
           case _ =>
             defer { parseTrees(tree, exercised.getChildEventIds.asScala.toList) }
@@ -447,11 +445,9 @@ class UserWalletTxLogParser(
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
           // all possible exercise events that produce new coins.
           case CoinCreate(coin) =>
-            // Using a warning to force our tests to fail should we ever introduce a new coin workflow that is not handled above.
-            logger.warn(
+            throw new RuntimeException(
               s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
             )
-            now(State.empty)
 
           case _ =>
             now(State.empty)
@@ -468,13 +464,20 @@ class UserWalletTxLogParser(
     roots.foldMap(parseTree(tree, _))
   }
 
-  override def parse(tx: TransactionTree)(implicit
+  override def tryParse(tx: TransactionTree)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
     parseTrees(tx, tx.getRootEventIds.asScala.toList).value
       .filterByParty(endUserParty)
       .entries
   }
+
+  override def error(offset: String, eventId: String): Option[TxLogEntry] =
+    Some(
+      TxLogEntry.Unknown(
+        TxLogIndexRecord(offset, eventId)
+      )
+    )
 }
 
 object UserWalletTxLogParser {
@@ -492,9 +495,28 @@ object UserWalletTxLogParser {
 
   object TxLogEntry {
 
+    /* Unknown event, caused the parser failing to parse a transaction tree */
+    final case class Unknown(
+        indexRecord: TxLogIndexRecord
+    ) extends TxLogEntry {
+      override def toResponseItem: httpDef.ListTransactionsResponseItem =
+        httpDef.ListTransactionsResponseItem(
+          transactionType = Unknown.TransactionType,
+          transactionSubtype = "unknown",
+          eventId = indexRecord.eventId,
+          offset = indexRecord.offset,
+          date = java.time.OffsetDateTime.ofInstant(Instant.now(), ZoneOffset.UTC),
+        )
+
+      override def setEventId(eventId: String): TxLogEntry = {
+        copy(indexRecord = indexRecord.copy(eventId = eventId))
+      }
+    }
+    object Unknown {
+      val TransactionType = "unknown"
+    }
+
     /** Balance change due to a transfer */
-    // TODO(M3-04) This needs to include more info, e.g., amount of collected rewards
-    // and exchange rate at the time.
     final case class Transfer(
         indexRecord: TxLogIndexRecord,
         transactionSubtype: String,
@@ -543,7 +565,6 @@ object UserWalletTxLogParser {
     }
 
     /** Balance change not due to a transfer, for example a tap or returning a locked coin to the owner. */
-    // TODO(M3-04) Include more context info here to distinguish different balance changes.
     final case class BalanceChange(
         indexRecord: TxLogIndexRecord,
         transactionSubtype: String,
@@ -693,12 +714,27 @@ object UserWalletTxLogParser {
       )
     }
 
+    private def unknownFromResponseItem(
+        item: httpDef.ListTransactionsResponseItem
+    ): Either[String, TxLogEntry.Unknown] = {
+      val indexRecord = TxLogIndexRecord(
+        offset = item.offset,
+        eventId = item.eventId,
+      )
+      Right(
+        TxLogEntry.Unknown(
+          indexRecord = indexRecord
+        )
+      )
+    }
+
     // Note: deserialization is only needed for the Canton console
     def fromResponseItem(item: httpDef.ListTransactionsResponseItem): Either[String, TxLogEntry] = {
       item.transactionType match {
         case TxLogEntry.Transfer.TransactionType => transferFromResponseItem(item)
         case TxLogEntry.BalanceChange.TransactionType => balanceChangeFromResponseItem(item)
         case TxLogEntry.Notification.TransactionType => notificationFromResponseItem(item)
+        case TxLogEntry.Unknown.TransactionType => unknownFromResponseItem(item)
         case _ => Left(s"Unknown item $item")
       }
     }
@@ -722,6 +758,7 @@ object UserWalletTxLogParser {
         case b: TxLogEntry.BalanceChange => b.receiver == party
         // Only relevant notifications are added to parsing state
         case _: TxLogEntry.Notification => true
+        case _: TxLogEntry.Unknown => true
       }
     )
 
@@ -783,6 +820,7 @@ object UserWalletTxLogParser {
           )
         case _: TxLogEntry.BalanceChange => None
         case n: TxLogEntry.Notification => Some(n)
+        case n: TxLogEntry.Unknown => Some(n)
       }
 
       State(

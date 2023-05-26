@@ -232,7 +232,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ) extends TxLogStore.Entry[TestTxLogIndexRecord]
 
   object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
-    override def parse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TestTxLogEntry] = {
+    override def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TestTxLogEntry] = {
       Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(
         onCreate = (res, event, _) => {
           res :+
@@ -244,5 +244,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         onExercise = (res, _, _) => res,
       )
     }
+
+    override def error(offset: String, eventId: String): Option[TestTxLogEntry] = None
   }
 }

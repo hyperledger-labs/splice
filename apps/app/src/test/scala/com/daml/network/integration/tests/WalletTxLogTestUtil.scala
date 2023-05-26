@@ -19,20 +19,26 @@ trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with Time
   def checkTxHistory(
       wallet: WalletAppClientReference,
       expected: Seq[CheckTxHistoryFn],
+      previousEventId: Option[String] = None,
   ): Unit = {
 
-    val actual = eventually() {
+    val (actual, toCompare) = eventually() {
       val actual = wallet.listTransactions(None, pageSize = 100000)
+      val toCompare = actual
+        .takeWhile(e => !previousEventId.contains(e.indexRecord.eventId))
 
-      actual should have length expected.size.toLong
-      actual
+      toCompare should have length expected.size.toLong
+      (actual, toCompare)
     }
 
-    actual.zip(expected).zipWithIndex.foreach { case ((entry, pf), i) =>
-      clue(s"Entry at position $i") {
-        inside(entry)(pf)
+    toCompare
+      .zip(expected)
+      .zipWithIndex
+      .foreach { case ((entry, pf), i) =>
+        clue(s"Entry at position $i") {
+          inside(entry)(pf)
+        }
       }
-    }
 
     clue("Paginated result should be equal to non-paginated result") {
       val paginatedResult = Iterator

@@ -52,5 +52,6 @@ trait CNNodeAppStoreWithHistory[
       txLog,
       transactionTreeSource = TxLogStore.TransactionTreeSource
         .LedgerConnection(acsContractFilter.ingestionFilter.primaryParty, connection),
+      loggerFactory,
     )
 }

@@ -2,10 +2,13 @@ package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.environment.CNLedgerConnection
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 /** Stores historical information that can be used to construct application-specific historical events,
   * such as a user notification or an item from a bank statement.
@@ -78,13 +81,38 @@ object TxLogStore {
 
   /** Extracts tx log entries from transaction tree events */
   trait Parser[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
-    def parse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE]
+
+    /** Extract application-specific TxLog entries from the given daml transaction */
+    def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE]
+
+    /** Returns a TxLog entry to be stored in case this parser failed to parse the given daml transaction.
+      * Must not throw an error.
+      */
+    def error(offset: String, eventId: String): Option[TXE]
+
+    final def parse(tx: TransactionTree, logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): Seq[TXE] =
+      Try(tryParse(tx))
+        .recoverWith { case e: Throwable =>
+          logger.error(s"Failed to parse transaction: ${e.getMessage}", e)
+          val firstRootEventId = tx.getRootEventIds.asScala.headOption.getOrElse("")
+          Try(error(tx.getOffset, firstRootEventId).toList)
+        }
+        .fold(
+          e => {
+            logger.error(s"Failed to handle parsing error: ${e.getMessage}", e)
+            Seq.empty
+          },
+          entries => entries,
+        )
   }
 
   object Parser {
     final case class Empty[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]]()
         extends Parser[TXI, TXE] {
-      override def parse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE] = Seq.empty
+      override def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE] = Seq.empty
+      override def error(offset: String, eventId: String): Option[TXE] = None
     }
   }
 
@@ -119,7 +147,8 @@ object TxLogStore {
   class Reader[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
       txLogStore: TxLogStore[TXI, TXE],
       transactionTreeSource: TransactionTreeSource,
-  ) {
+      override val loggerFactory: NamedLoggerFactory,
+  ) extends NamedLogging {
 
     def getTxLogByOffset(offset: Int, limit: Int)(implicit
         ec: ExecutionContext,
@@ -153,7 +182,7 @@ object TxLogStore {
       tx <- transactionTreeSource.getTransactionTreeByEventId(entryIndex.eventId)
 
       // Extract application-specific data from the tree
-      entries = txLogStore.txLogParser.parse(tx)
+      entries = txLogStore.txLogParser.parse(tx, logger)
 
       // Find original TxLog entry
       entry = entries

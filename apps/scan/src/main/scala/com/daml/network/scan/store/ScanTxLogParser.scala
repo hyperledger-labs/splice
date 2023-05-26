@@ -60,7 +60,7 @@ class ScanTxLogParser(
     roots.foldMap(parseTree(tree, _))
   }
 
-  override def parse(tx: TransactionTree)(implicit
+  override def tryParse(tx: TransactionTree)(implicit
       tc: TraceContext
   ): Seq[ScanTxLogParser.TxLogEntry] = {
     val ret = parseTrees(tx, tx.getRootEventIds.asScala.toList).entries
@@ -68,13 +68,27 @@ class ScanTxLogParser(
     ret
   }
 
+  override def error(offset: String, eventId: String): Option[TxLogEntry] = Some(
+    TxLogEntry.ErrorTxLogEntry(
+      indexRecord = TxLogIndexRecord.ErrorIndexRecord(
+        offset,
+        eventId,
+      )
+    )
+  )
+
 }
 
 object ScanTxLogParser {
 
-  trait TxLogIndexRecord extends TxLogStore.IndexRecord { def round: Long }
+  trait TxLogIndexRecord extends TxLogStore.IndexRecord
 
   object TxLogIndexRecord {
+    final case class ErrorIndexRecord(
+        offset: String,
+        eventId: String,
+    ) extends TxLogIndexRecord
+
     final case class OpenMiningRoundIndexRecord(
         offset: String,
         eventId: String,
@@ -91,6 +105,7 @@ object ScanTxLogParser {
     trait RewardIndexRecord extends TxLogIndexRecord {
       def party: PartyId
       def amount: BigDecimal
+      def round: Long
     }
 
     final case class AppRewardIndexRecord(
@@ -113,6 +128,9 @@ object ScanTxLogParser {
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}
 
   object TxLogEntry {
+
+    final case class ErrorTxLogEntry(indexRecord: TxLogIndexRecord.ErrorIndexRecord)
+        extends TxLogEntry {}
 
     final case class EmptyTxLogEntry(indexRecord: TxLogIndexRecord) extends TxLogEntry {}
 

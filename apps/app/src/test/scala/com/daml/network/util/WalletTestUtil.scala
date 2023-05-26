@@ -1,7 +1,9 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.ExercisedEvent
+import com.daml.network.codegen.java.cc.api.v1 as coinApiCodegen
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.fees as feesCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
@@ -855,6 +857,56 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         receiver.toLf,
         amount.bigDecimal,
         tc.latestOpenMiningRound.contractId,
+      ),
+      domainId = domainId,
+    )
+  }
+
+  /** Directly creates a new coin. Note that the receiver must be hosted on the same participant as the SVC. */
+  def createCoin(
+      participantClient: CNParticipantClientReference,
+      userId: String,
+      owner: PartyId,
+      amount: BigDecimal = BigDecimal(10),
+      round: Long = 0,
+      holdingFee: BigDecimal = BigDecimal(0.01),
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): Unit = {
+    val coin = new coinCodegen.Coin(
+      svcParty.toProtoPrimitive,
+      owner.toProtoPrimitive,
+      new feesCodegen.ExpiringAmount(
+        amount.bigDecimal,
+        new coinApiCodegen.round.Round(round),
+        new feesCodegen.RatePerRound(holdingFee.bigDecimal),
+      ),
+    )
+    participantClient.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(svcParty, owner),
+      readAs = Seq.empty,
+      update = coin.create(),
+      domainId = domainId,
+    )
+  }
+
+  /* Directly archives the given coin. */
+  def archiveCoin(
+      participantClient: CNParticipantClientReference,
+      userId: String,
+      coin: Contract[coinCodegen.Coin.ContractId, coinCodegen.Coin],
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): Unit = {
+    participantClient.ledger_api_extensions.commands.submitWithResult(
+      userId = userId,
+      actAs = Seq(svcParty, PartyId.tryFromProtoPrimitive(coin.payload.owner)),
+      readAs = Seq.empty,
+      update = coin.contractId.exerciseArchive(
+        new com.daml.network.codegen.java.da.internal.template.Archive()
       ),
       domainId = domainId,
     )
