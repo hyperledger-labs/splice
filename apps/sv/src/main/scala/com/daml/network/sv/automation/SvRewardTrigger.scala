@@ -7,10 +7,11 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -40,9 +41,24 @@ class SvRewardTrigger(
       svReward: SvRewardContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
+      openMiningRounds <- store.getOpenMiningRoundTriple()
+      // find the newest mining round that we can still collect in, and collect if possible
+      bestOpenMiningRound = openMiningRounds.toSeq
+        .filter(_.payload.round.number <= svReward.contract.payload.round.number + 10)
+        .maxByOption(_.payload.round.number)
+      outcome <- bestOpenMiningRound
+        .map(collectSvReward(svReward, _))
+        .getOrElse(ignoreSvReward(svReward))
+    } yield outcome
+  }
+
+  private def collectSvReward(
+      svReward: SvRewardContract,
+      openMiningRound: Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound],
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    for {
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
-      openMiningRound <- store.getLatestActiveOpenMiningRound()
       cmd = svcRules.contractId
         .exerciseSvcRules_CollectSvReward(
           store.key.svParty.toProtoPrimitive,
@@ -59,6 +75,16 @@ class SvRewardTrigger(
         )
     } yield TaskSuccess(
       s"collected `SvReward` of round ${svReward.contract.payload.round.number} and create Coin for SV ${svReward.contract.payload.sv}"
+    )
+  }
+
+  private def ignoreSvReward(
+      svReward: SvRewardContract
+  ): Future[TaskOutcome] = {
+    Future.successful(
+      TaskSuccess(
+        s"ignored `SvReward` of round ${svReward.contract.payload.round.number} becase it's too old to be collected"
+      )
     )
   }
 }

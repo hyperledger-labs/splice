@@ -140,6 +140,19 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       }
     } yield result
 
+  /** Get the triple of open mining rounds that should always be present after boostrapping. */
+  def getOpenMiningRoundTriple()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[SvSvcStore.OpenMiningRoundTriple] =
+    lookupOpenMiningRoundTriple().map(
+      _.getOrElse(
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription("No triple of OpenMiningRound contracts")
+        )
+      )
+    )
+
   def lookupLatestActiveOpenMiningRound()(implicit
       ec: ExecutionContext,
       tc: TraceContext,

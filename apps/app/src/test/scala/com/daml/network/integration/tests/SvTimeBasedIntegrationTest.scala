@@ -537,6 +537,58 @@ class SvTimeBasedIntegrationTest
     }
   }
 
+  "SvReward collection works even if some rewards are too old to collect" in { implicit env =>
+    initSvc()
+    val sv4Party = sv4.getSvcInfo().svParty
+    clue("Stopping SV4 so it can't collect its rewards") {
+      sv4.stop()
+    }
+    actAndCheck(
+      "Advancing by 12 rounds",
+      (1 to 12).foreach(_ => advanceRoundsByOneTick),
+    )(
+      "SV4 has 11 unclaimed rewards contracts",
+      _ => {
+        sv4.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvReward.COMPANION)(
+            svcParty
+          )
+          .filter(_.data.sv == sv4Party.toProtoPrimitive) should have length 11
+        sv4.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cc.coin.Coin.COMPANION)(sv4Party) should have length 0
+      },
+    )
+    actAndCheck(
+      "SV4 starts again",
+      sv4.startSync(),
+    )(
+      "SV4 collects all rewards it can and leaves the one it can't",
+      _ => {
+        sv4.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvReward.COMPANION)(
+            svcParty
+          ) should have length 1
+        sv4.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cc.coin.Coin.COMPANION)(sv4Party) should have length 10
+      },
+    )
+    actAndCheck(
+      "We advance by another round",
+      advanceRoundsByOneTick,
+    )(
+      // TODO(#5059) Implement expiry of SV rewards that are too old
+      "The new reward gets collected by SV4, the old ones still remain (until we implement expiry)",
+      _ => {
+        sv4.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvReward.COMPANION)(
+            svcParty
+          ) should have length 1
+        sv4.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cc.coin.Coin.COMPANION)(sv4Party) should have length 11
+      },
+    )
+  }
+
   "calculation of issuance per coin" in { implicit env =>
     initSvc()
 
