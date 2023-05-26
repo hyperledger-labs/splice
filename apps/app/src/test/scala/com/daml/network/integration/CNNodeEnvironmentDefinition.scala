@@ -1,6 +1,5 @@
 package com.daml.network.integration
 
-import com.digitalasset.canton.concurrent.Threading
 import better.files.{File, Resource}
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.console.{CNParticipantClientReference, ValidatorAppBackendReference}
@@ -69,7 +68,6 @@ case class CNNodeEnvironmentDefinition(
         val svcParty = CNNodeEnvironmentDefinition.allocateParty(
           svc.participantClientWithAdminToken,
           svc.config.ledgerApiUser,
-          svc.config.useXNodes,
         )
         svc.participantClientWithAdminToken.ledger_api.users.create(
           id = svc.config.ledgerApiUser,
@@ -281,23 +279,13 @@ object CNNodeEnvironmentDefinition {
   def waitForNodeInitialization(env: CNNodeConsoleEnvironment): Unit =
     env.coinNodes.local.foreach(_.waitForInitialization())
 
-  def allocateParty(participant: CNParticipantClientReference, hint: String, useXNodes: Boolean) =
-    if (useXNodes) {
-      // TODO(#4968) Revert once party allocation through lapi works
-      val party = participant.participantX.parties.enable(hint)
-      // We need to sleep because otherwise following user creations fail
-      // because the ledger API has not yet learned about the party.
-      Threading.sleep(2000)
-      party
-    } else {
-      participant.ledger_api.parties.allocate(hint, hint).party
-    }
+  def allocateParty(participant: CNParticipantClientReference, hint: String) =
+    participant.ledger_api.parties.allocate(hint, hint).party
 
   def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {
     val validatorParty = allocateParty(
       validator.participantClientWithAdminToken,
       validator.config.ledgerApiUser,
-      validator.config.useXNodes,
     )
     validator.participantClientWithAdminToken.ledger_api.users.create(
       id = validator.config.ledgerApiUser,

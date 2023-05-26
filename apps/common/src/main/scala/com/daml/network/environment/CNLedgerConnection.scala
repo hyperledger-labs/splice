@@ -338,7 +338,7 @@ class CNLedgerConnection(
       offset: LedgerOffset.Absolute,
   ): Future[(Seq[CreatedEvent], Seq[InFlightTransferOutEvent])] = {
     val activeContractsRequest = client.activeContracts(
-      multidomain.GetActiveContractsMergedRequest(
+      multidomain.GetActiveContractsRequest(
         validAtOffset = offset.getOffset,
         filter = Some(filter.toTransactionFilterAllContractsScala),
       )

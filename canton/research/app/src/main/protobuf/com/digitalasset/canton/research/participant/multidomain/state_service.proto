@@ -5,7 +5,6 @@ syntax = "proto3";
 
 package com.digitalasset.canton.research.participant.multidomain;
 
-import "com/daml/ledger/api/v1/active_contracts_service.proto";
 import "com/daml/ledger/api/v1/event.proto";
 import "com/daml/ledger/api/v1/transaction_filter.proto";
 import "com/digitalasset/canton/protocol/v0/topology.proto";
@@ -17,30 +16,11 @@ option java_package = "com.digitalasset.canton.research.participant.multidomain"
 
 // Allows clients to get state from the ledger.
 service StateService {
-  // Get the list of in-flight transfers.
-  // If there are no in-flight transfers, the stream returns a single response message with the offset at which the snapshot has been taken.
-  // Clients SHOULD use the offset in the GetInFlightTransfersResponse message to continue streaming updates with the update service.
-  // Clients SHOULD NOT assume that the set of in-flight transfers they receive reflects the state at the ledger end.
-  // Clients SHOULD be aware of limitations of this endpoint.
-
-  /* About the GetInFlightTransfersResponse
-
-     A transfer included in the response must satisfy:
-      1. Transfer-out was done before or at `valid_at_offset` (which defaults to the ledger end).
-      2. At least one party in `stakeholders` was a confirming party in the transfer-out and
-        was expected to be able to submit the transfer-in.
-
-     Note that 2. may not be valid at the time of the query if topology was changed.
-  */
-  rpc GetInFlightTransfers(GetInFlightTransfersRequest) returns (stream GetInFlightTransfersResponse);
-
-  rpc GetActiveContractsMerged(GetActiveContractsMergedRequest) returns (stream GetActiveContractsMergedResponse);
-
   // Returns a stream of the snapshot of the active contracts at a ledger offset.
   // If there are no active contracts, the stream returns a single response message with the offset at which the snapshot has been taken.
-  // Clients SHOULD use the offset in the last GetActiveContractsResponse message to continue streaming transactions with the transaction service.
+  // Clients SHOULD use the offset in the last GetActiveContractsResponse message to continue streaming transactions with the update service.
   // Clients SHOULD NOT assume that the set of active contracts they receive reflects the state at the ledger end.
-  rpc GetActiveContracts(GetActiveContractsRequest) returns (stream com.daml.ledger.api.v1.GetActiveContractsResponse);
+  rpc GetActiveContracts(GetActiveContractsRequest) returns (stream GetActiveContractsResponse);
 
   // Get the list of connected domains to which the party has the rights to submit to and the
   // participant is connected to.
@@ -51,7 +31,7 @@ service StateService {
   rpc GetLedgerEnd(GetLedgerEndRequest) returns (GetLedgerEndResponse);
 }
 
-message GetActiveContractsMergedRequest {
+message GetActiveContractsRequest {
   // The offset at which the snapshot of the in-flight transfers will be computed.
   // Must be no greater than the current ledger end offset.
   // Must be greater than or equal to the last pruning offset.
@@ -87,7 +67,7 @@ message ContractStateComponent {
   }
 }
 
-message GetActiveContractsMergedResponse {
+message GetActiveContractsResponse {
   // Included only in the last message.
   // The client should start consuming the transactions endpoint with this offset.
   // The format of this field is described in ``ledger_offset.proto``.
@@ -117,66 +97,6 @@ message IncompleteTransferredOut {
 
 message IncompleteTransferredIn {
   TransferredInEvent transferred_in_event = 1;
-}
-
-message GetInFlightTransfersRequest {
-  // Must be a valid domain ID
-  // Required
-  string source_domain_id = 1;
-
-  // The offset at which the snapshot of the in-flight transfers will be computed.
-  // Must be no greater than the current ledger end offset.
-  // Must be greater than or equal to the last pruning offset.
-  // If not set the current ledger end offset will be used.
-  // Optional
-  string valid_at_offset = 2;
-
-  // Return only transfers of contracts which have at least one stakeholder included in this list.
-  // Must be a non-empty list of valid PartyIdString (as described in ``value.proto``).
-  // Required
-  repeated string stakeholders = 3;
-}
-
-// When returning the GetInFlightTransfersResponse as a stream, then
-//   - All but the last GetInFlightTransfersResponse will have empty offset
-//   - The last GetInFlightTransfersResponse will have `offset` and empty `transfer_outs`
-message GetInFlightTransfersResponse {
-  message InFlightTransferredOutEvent {
-    TransferredOutEvent event = 1;
-    com.daml.ledger.api.v1.CreatedEvent created_event = 2;
-  }
-  string offset = 1;
-
-  repeated InFlightTransferredOutEvent transfer_outs = 2;
-}
-
-message GetActiveContractsRequest {
-  // Must correspond to the ledger ID reported by the Ledger Identification Service.
-  // Must be a valid LedgerString (as described in ``value.proto``).
-  // Optional
-  string ledger_id = 1;
-
-  // Templates to include in the served snapshot, per party.
-  // Note: interface filter is not supported
-  // Required
-  com.daml.ledger.api.v1.TransactionFilter filter = 2;
-
-  // If enabled, values served over the API will contain more information than strictly necessary to interpret the data.
-  // In particular, setting the verbose flag to true triggers the ledger to include labels for record fields.
-  // Note: only false is currently supported
-  // Optional
-  bool verbose = 3;
-
-  // The offset at which the snapshot of the active contracts will be computed.
-  // Must be no greater than the current ledger end offset.
-  // Must be greater than or equal to the last pruning offset.
-  // If not set the current ledger end offset will be used.
-  // Optional
-  string active_at_offset = 4;
-
-  // Must be a valid domain ID
-  // Required
-  string domain_id = 5;
 }
 
 message GetConnectedDomainsRequest {

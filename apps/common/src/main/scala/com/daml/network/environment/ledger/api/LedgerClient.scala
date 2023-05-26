@@ -119,10 +119,10 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   }
 
   def activeContracts(
-      request: multidomain.GetActiveContractsMergedRequest
-  ): Source[multidomain.GetActiveContractsMergedResponse, NotUsed] =
+      request: multidomain.GetActiveContractsRequest
+  ): Source[multidomain.GetActiveContractsResponse, NotUsed] =
     ClientAdapter
-      .serverStreaming(request, stateServiceStub.getActiveContractsMerged)
+      .serverStreaming(request, stateServiceStub.getActiveContracts)
 
   def tryGetTransactionTreeById(
       parties: Seq[String],
