@@ -11,4 +11,4 @@ All traffic from pods in that namespace, directed at `<CLUSTER_BASENAME>.network
 routed to the egress pod, and from there routed directly to the ingress controller instead of going outside of
 the cluster and then back in through the load balancer service.
 
-Usage example through pulumi is coming soon.
+See usage example in sv-runbook pulumi stack.

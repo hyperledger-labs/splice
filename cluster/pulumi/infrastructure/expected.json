@@ -83,6 +83,25 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-istio-gateway/",
+      "compat": "true",
+      "name": "cluster-gateway",
+      "namespace": "cluster-ingress",
+      "values": {
+        "cluster": {
+          "basename": "test-stack",
+          "hostname": "test-stack.network.canton.global"
+        }
+      }
+    },
+    "name": "cluster-gateway",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -185,6 +204,200 @@
       }
     },
     "name": "istio-base",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "gateway",
+      "compat": "true",
+      "name": "istio-ingress",
+      "namespace": "cluster-ingress",
+      "repositoryOpts": {
+        "repo": "https://istio-release.storage.googleapis.com/charts"
+      },
+      "values": {
+        "service": {
+          "loadBalancerSourceRanges": [
+            "35.194.81.56/32",
+            "35.198.147.95/32",
+            "35.189.40.124/32",
+            "34.132.91.75/32",
+            "18.210.210.130/32",
+            "35.188.147.4/32",
+            "34.70.206.199/32",
+            "35.224.88.220/32",
+            "104.198.152.233/32",
+            "34.69.77.22/32",
+            "104.154.35.222/32",
+            "35.239.94.218/32",
+            "35.232.124.246/32",
+            "20.250.62.34/32",
+            "3.248.162.60/32",
+            "34.254.73.185/32",
+            "54.228.250.8/32",
+            "52.50.252.242/32",
+            "52.210.114.82/32",
+            "34.27.240.103/32"
+          ],
+          "ports": [
+            {
+              "name": "status-port",
+              "port": 15021,
+              "protocol": "TCP",
+              "targetPort": 15021
+            },
+            {
+              "name": "http2",
+              "port": 80,
+              "protocol": "TCP",
+              "targetPort": 80
+            },
+            {
+              "name": "https",
+              "port": 443,
+              "protocol": "TCP",
+              "targetPort": 443
+            },
+            {
+              "name": "grpc-cd-pub-api",
+              "port": 5008,
+              "protocol": "TCP",
+              "targetPort": 5008
+            },
+            {
+              "name": "grpc-cd-adm-api",
+              "port": 5009,
+              "protocol": "TCP",
+              "targetPort": 5009
+            },
+            {
+              "name": "cd-metrics",
+              "port": 10313,
+              "protocol": "TCP",
+              "targetPort": 10313
+            },
+            {
+              "name": "grpc-svcp-adm",
+              "port": 5002,
+              "protocol": "TCP",
+              "targetPort": 5002
+            },
+            {
+              "name": "grpc-svcp-lg",
+              "port": 5001,
+              "protocol": "TCP",
+              "targetPort": 5001
+            },
+            {
+              "name": "svcp-metrics",
+              "port": 10013,
+              "protocol": "TCP",
+              "targetPort": 10013
+            },
+            {
+              "name": "dir-api",
+              "port": 5010,
+              "protocol": "TCP",
+              "targetPort": 5010
+            },
+            {
+              "name": "grpc-svc-adm",
+              "port": 5005,
+              "protocol": "TCP",
+              "targetPort": 5005
+            },
+            {
+              "name": "scan-api",
+              "port": 5012,
+              "protocol": "TCP",
+              "targetPort": 5012
+            },
+            {
+              "name": "grpc-val1-adm",
+              "port": 5102,
+              "protocol": "TCP",
+              "targetPort": 5102
+            },
+            {
+              "name": "grpc-val1-lg",
+              "port": 5101,
+              "protocol": "TCP",
+              "targetPort": 5101
+            },
+            {
+              "name": "val1-metrics",
+              "port": 10113,
+              "protocol": "TCP",
+              "targetPort": 10113
+            },
+            {
+              "name": "val1-lg-gw",
+              "port": 6101,
+              "protocol": "TCP",
+              "targetPort": 6101
+            },
+            {
+              "name": "grpc-swd-pub",
+              "port": 5108,
+              "protocol": "TCP",
+              "targetPort": 5108
+            },
+            {
+              "name": "grpc-swd-adm",
+              "port": 5109,
+              "protocol": "TCP",
+              "targetPort": 5109
+            },
+            {
+              "name": "swd-metrics",
+              "port": 10413,
+              "protocol": "TCP",
+              "targetPort": 10413
+            },
+            {
+              "name": "grpc-sw-adm",
+              "port": 5202,
+              "protocol": "TCP",
+              "targetPort": 5202
+            },
+            {
+              "name": "grpc-sw-lg",
+              "port": 5201,
+              "protocol": "TCP",
+              "targetPort": 5201
+            },
+            {
+              "name": "sw-metrics",
+              "port": 10213,
+              "protocol": "TCP",
+              "targetPort": 10213
+            },
+            {
+              "name": "sw-lg-gw",
+              "port": 6201,
+              "protocol": "TCP",
+              "targetPort": 6201
+            },
+            {
+              "name": "grpc-sw-api",
+              "port": 5213,
+              "protocol": "TCP",
+              "targetPort": 5213
+            },
+            {
+              "name": "sw-api-gw",
+              "port": 6213,
+              "protocol": "TCP",
+              "targetPort": 6213
+            }
+          ]
+        }
+      }
+    },
+    "name": "istio-ingress",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },

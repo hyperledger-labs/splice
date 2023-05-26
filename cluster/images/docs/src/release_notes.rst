@@ -19,6 +19,7 @@ Release Notes
   * The SV private and public key are now stored in k8s secrets.
   * Kubernetes `liveness <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-grpc-liveness-probe>`_ and `readiness <https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes>`_ probes are configured to probe the `GRPC Health Checking Protocol <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_ of the participant node.
   * The instructions for generating your SV keys now also work on MacOS.
+  * Added support for running the ingress controller behind an existing Kubernetes external proxy.
 
 * Add new ``initial-coin-price-vote`` config option to SV app
 
@@ -32,7 +33,8 @@ Release Notes
 * Bugfixes
 
   * DA's internal automated tests are now resilient to coin price changes allowing us to change coin price votes on DA’s SVs so votes from other SVs have an observable effect.
-    
+
+
 2023-05-21
 ----------
 

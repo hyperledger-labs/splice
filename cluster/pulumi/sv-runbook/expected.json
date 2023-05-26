@@ -5,27 +5,17 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-sv/",
       "compat": "true",
-      "name": "cluster-ingress",
+      "name": "cluster-ingress-sv",
       "namespace": "cn-namespace",
       "values": {
         "cluster": {
-          "basename": "svrun",
-          "ipAddress": "127.0.0.2",
-          "networkSettings": {
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32"
-            ]
-          }
+          "hostname": "svrun.network.canton.global",
+          "svNamespace": "sv"
         },
-        "enableIngressModes": "sv-external",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "svNamespace": "sv"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
     },
-    "name": "cluster-ingress",
+    "name": "cluster-ingress-sv",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -272,11 +262,89 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "gateway",
+      "compat": "true",
+      "name": "istio-egressgateway",
+      "namespace": "sv",
+      "repositoryOpts": {
+        "repo": "https://istio-release.storage.googleapis.com/charts"
+      },
+      "values": {
+        "service": {
+          "ports": [
+            {
+              "name": "status-port",
+              "port": 15021,
+              "protocol": "TCP",
+              "targetPort": 15021
+            },
+            {
+              "name": "http2",
+              "port": 80,
+              "protocol": "TCP",
+              "targetPort": 80
+            },
+            {
+              "name": "https",
+              "port": 443,
+              "protocol": "TCP",
+              "targetPort": 443
+            },
+            {
+              "name": "grpc-svc",
+              "port": 5005,
+              "protocol": "TCP",
+              "targetPort": 5005
+            },
+            {
+              "name": "grpc-domain",
+              "port": 5008,
+              "protocol": "TCP",
+              "targetPort": 5008
+            },
+            {
+              "name": "http-scan",
+              "port": 5012,
+              "protocol": "TCP",
+              "targetPort": 5012
+            }
+          ],
+          "type": "ClusterIP"
+        }
+      }
+    },
+    "name": "istio-egressgateway",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "enableServerSideApply": "true"
     },
     "name": "k8s",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "sv",
+      "values": {
+        "cluster": {
+          "basename": "svrun"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+      }
+    },
+    "name": "loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
@@ -361,6 +429,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv"
       }
     },

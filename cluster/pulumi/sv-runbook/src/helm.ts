@@ -4,7 +4,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace, requiredEnv } from './utils';
 
 export function installCNHelmChartByNamespaceName(
-  ns: pulumi.Output<string>,
+  ns: pulumi.Output<string> | string,
   name: string,
   chartName: string,
   values: ChartValues,

@@ -1,0 +1,182 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: forward-http-full
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+  - "{{ (.Values.cluster).basename }}.network.canton.global"
+  - "wallet.splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "directory.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "scan.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "wallet.splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "sv.sv-1.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "wallet.sv-1.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "sv.sv-2.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "wallet.sv-2.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "sv.sv-3.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "wallet.sv-3.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "sv.sv-4.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "wallet.sv-4.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "directory.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "splitwell.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "wallet.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
+  gateways:
+  - http-gateway
+  - apps-gateway
+  http:
+  - match:
+    - port: 443
+    route:
+    - destination:
+        port:
+          number: 80
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+  - match:
+    - port: 5008
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5008
+  - match:
+    - port: 10313
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10313
+  - match:
+    - port: 5002
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5002
+  - match:
+    - port: 5001
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5001
+  - match:
+    - port: 10013
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10013
+  - match:
+    - port: 5010
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5010
+  - match:
+    - port: 5005
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5005
+  - match:
+    - port: 5012
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5012
+  - match:
+    - port: 5102
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5102
+  - match:
+    - port: 5101
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5101
+  - match:
+    - port: 10113
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10113
+  - match:
+    - port: 6101
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 6101
+  - match:
+    - port: 5108
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5108
+  - match:
+    - port: 5109
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5109
+  - match:
+    - port: 10413
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10413
+  - match:
+    - port: 5202
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5202
+  - match:
+    - port: 5201
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5201
+  - match:
+    - port: 10213
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 10213
+  - match:
+    - port: 6201
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 6201
+  - match:
+    - port: 5213
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 5213
+  - match:
+    - port: 6213
+    route:
+    - destination:
+        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 6213

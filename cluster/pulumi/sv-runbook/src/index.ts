@@ -1,6 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 
 import { installCNHelmChart, installCNHelmChartByNamespaceName } from './helm';
+import { installLoopback } from './loopback';
 import {
   /*configureSecrets, */
   directoryUserParticipantSecret,
@@ -31,8 +32,6 @@ const TARGET_CLUSTER = requiredEnv(
   'the cluster in which the global domain is running'
 );
 const SV_WALLET_USER_ID = process.env.SV_WALLET_USER_ID || 'auth0|64553aa683015a9687d9cc2e'; // Default to admin@sv.com at the sv-test tenant by default
-const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);
-const CLUSTER_IP = infraStack.requireOutput('ingressIp'); // IP of the cluster in which this chart is being installed
 const SV_NAMESPACE = process.env.SV_NAMESPACE || 'sv';
 
 console.error(
@@ -51,7 +50,11 @@ const SV_PUBLIC_KEY =
 const SV_PRIVATE_KEY =
   'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgdRTS3iLr8rPFaLUBbVcu8qYxklmMzQo/4UXcULYESm2hRANCAATu7P7NbVhw8kiX5Mqpe/r91/FzH7chJUWA/qbaxp5DSXqvaU1b5Yt+r4dQxzJzFf23ptQnmTIR5tjJ+T0lbXwo';
 
-const svNamespace = exactNamespace(SV_NAMESPACE);
+const svNamespace = exactNamespace(SV_NAMESPACE, {
+  'istio-injection': 'enabled',
+});
+
+const loopback = installLoopback(svNamespace, CLUSTER_BASENAME, localCharts, version);
 
 const svImagePullDeps = localCharts ? [] : imagePullSecret(svNamespace);
 
@@ -85,6 +88,7 @@ const participant = installCNHelmChart(
   version,
   svImagePullDeps.concat([
     postgres,
+    loopback,
     sv1UserParticipantSecret(svNamespace),
     sv1UserValidatorParticipantSecret(svNamespace),
     scanUserParticipantSecret(svNamespace),
@@ -141,29 +145,18 @@ const sv = installCNHelmChart(
   svImagePullDeps.concat([validator, participant]).concat(svAppSecrets(svNamespace))
 );
 
+const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);
+
 const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
 installCNHelmChartByNamespaceName(
   infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
-  'cluster-ingress',
+  'cluster-ingress-sv',
   'cn-cluster-ingress-sv',
   // TODO(#4384): move these values into a file and distribute it with the release
   {
-    enableIngressModes: 'sv-external',
-    svNamespace: SV_NAMESPACE,
     cluster: {
-      networkSettings: {
-        externalIPRanges: [
-          '35.194.81.56/32',
-          '35.198.147.95/32',
-          '35.189.40.124/32',
-          '34.132.91.75/32',
-        ],
-      },
-      ipAddress: CLUSTER_IP,
-      // TODO(#4443): using basename diverges from the runbook instructions, and is currently
-      // required because we store the tls in secret cn-<basename>net-tls, as opposed to
-      // cn-net-tls as in the runbook.
-      basename: CLUSTER_BASENAME,
+      hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+      svNamespace: SV_NAMESPACE,
     },
   },
   localCharts,

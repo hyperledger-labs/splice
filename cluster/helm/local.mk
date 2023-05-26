@@ -5,14 +5,15 @@ app_charts := \
 	cn-directory-web-ui \
 	cn-docs \
 	cn-domain \
+	cn-istio-fwd \
+	cn-istio-gateway \
 	cn-participant \
 	cn-postgres \
 	cn-splitwell-app \
 	cn-splitwell-web-ui \
 	cn-sv-node \
 	cn-svc \
-	cn-validator \
-	cn-istio-fwd
+	cn-validator
 
 all_charts := $(app_charts) cn-util-lib
 

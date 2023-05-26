@@ -412,15 +412,28 @@ particularly if all helm charts are deployed at the same time. The
 Configuring the Cluster Ingress
 -------------------------------
 
-Internet ingress configuration is often specific to the network configuration and scenario of the cluster being configured. To illustrate the basic requirements of a Canton Network ingress, we have provided a Helm chart that configures the above cluster for external network access.
+The following routes should be configured in your cluster ingress controller:
 
-Requirements:
-+++++++++++++
+* `https://wallet.sv.svc.<YOUR_HOSTNAME>` should be routed to pod `wallet-web-ui` in the `sv` namespace
+* `https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*` should be routed to port 5003 of pod `validator-app` in the `sv` namespace
+* `https://sv.sv.svc.<YOUR_HOSTNAME>` should be routed to pod `sv-web-ui` in the `sv` namespace
+* `https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*` should be routed to port 5014 of pod `sv-app` in the `sv` namespace
 
-cert-manager must be available in the cluster (See `cert-manager documentation <https://cert-manager.io/docs/installation/helm/>`_)
+Internet ingress configuration is often specific to the network configuration and scenario of the
+cluster being configured. To illustrate the basic requirements of an SV node ingress, we have
+provided a Helm chart that configures the above cluster according to the routes above, as detailed in the sections below.
 
-Installation Instructions:
-++++++++++++++++++++++++++
+
+Requirements
+++++++++++++
+
+In order to install the reference charts, the following must be satisfied in your cluster:
+
+* cert-manager must be available in the cluster (See `cert-manager documentation <https://cert-manager.io/docs/installation/helm/>`_)
+* istio should be installed in the cluster (See `istio documentation <https://istio.io/latest/docs/setup/>`_)
+
+Installation Instructions
++++++++++++++++++++++++++
 
 Create a cluster-ingress namespace with image pull permissions from the Artifactory docker repository:
 
@@ -451,40 +464,54 @@ definition:
        namespace: cluster-ingress
     spec:
         dnsNames:
-        - '*.sv.svc.YOUR_DOMAIN.com'
+        - '*.sv.svc.YOUR_HOSTNAME'
         issuerRef:
             name: letsencrypt-production
         secretName: cn-net-tls
 
 
-The ingress configuration is specified in a YAML file with the
-following contents. (externalIPRanges can be extended with additional
-IP addresses you would like to allow to connect to your cluster). The
-instructions below expect this file to be named ``ingress-values.yaml``
+Create a file named ``istio-gateway-values.yaml`` with the following content
+(Tip: on GCP you can get the cluster IP from ``gcloud compute addresses list``):
 
 .. code-block:: yaml
 
-    enableIngressModes: sv-external
-    svNamespace: sv
-    cluster:
-        networkSettings:
-            externalIPRanges:
-                - "35.194.81.56/32"
-                - "35.198.147.95/32"
-                - "35.189.40.124/32"
-                - "34.132.91.75/32"
-        ipAddress: "YOUR_CLUSTER_IP"
+    loadBalancerIP: "YOUR_CLUSTER_IP"
+    loadBalancerSourceRanges:
+        - "35.194.81.56/32"
+        - "35.198.147.95/32"
+        - "35.189.40.124/32"
+        - "34.132.91.75/32"
 
-On GCP you can get the cluster IP from ``gcloud compute addresses list``.
 
-Install the Ingress Helm Chart:
+
+And install it to your cluster:
 
 .. code-block:: bash
 
-    helm install cluster-ingress canton-network-helm/cn-cluster-ingress-sv \
-        -n cluster-ingress \
-        -f ingress-values.yaml \
-        --wait
+    helm repo add istio https://istio-release.storage.googleapis.com/charts
+    helm repo update
+    helm install istio-ingress istio/gateway -n cluster-ingress -f istio-gateway-values.yaml
+
+
+A reference Helm chart that installs a gateway that uses this service is also provided.
+To install it, run the following (assuming environment variable YOUR_HOSTNAME set to to your hostname):
+
+.. code-block:: bash
+
+    helm install cluster-gateway canton-network-helm/cn-istio-gateway -n cluster-ingress --set cluster.hostname=$YOUR_HOSTNAME
+
+
+This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
+Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
+Another reference Helm chart is provided for that, which can be installed using:
+
+
+.. code-block:: bash
+
+    helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-sv -n cluster-ingress --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=sv
+
+
+
 
 .. _helm-sv-wallet-ui:
 
@@ -492,7 +519,7 @@ Logging into the wallet UI
 --------------------------
 
 After you deploy your ingress, open your browser at
-https://wallet.sv.svc.YOUR_DOMAIN.com and login using the
+https://wallet.sv.svc.YOUR_HOSTNAME and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to see your balance
 increase as mining rounds advance every 2.5 minutes and you will see
@@ -508,7 +535,7 @@ Once logged in one should see the transactions page.
 Logging into the SV UI
 ----------------------
 
-Open your browser at https://sv.sv.svc.YOUR_DOMAIN.com to login to the SV Operations user interface.
+Open your browser at https://sv.sv.svc.YOUR_HOSTNAME to login to the SV Operations user interface.
 You can use the credentials of the ``validatorWalletUser`` to login. These are the same credentials you used for the wallet login above. Note that only Super validators will be able to login.
 Once logged in one should see a page with some SV collective information.
 

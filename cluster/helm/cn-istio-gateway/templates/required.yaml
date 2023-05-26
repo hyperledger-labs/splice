@@ -1,4 +1,3 @@
 {{ $_ := required ".Release.Namespace is required." .Release.Namespace }}
-
 {{ $_ := required ".Values.cluster.hostname is required." (.Values.cluster).hostname }}
-{{ $_ := required ".Values.cluster.svNamespace is required." (.Values.cluster).svNamespace }}
+

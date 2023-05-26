@@ -41,7 +41,7 @@
   - [Participant User Configuration](#participant-user-configuration)
   - [Token configuration](#token-configuration)
   - [Pulumi and Helm](#pulumi-and-helm)
-  - [Testing the SV Helm Runbook against a local build](#testing-the-sv-helm-runbook-against-a-local-build)
+  - [Testing the SV Helm Runbook](#testing-the-sv-helm-runbook)
   - [SV Operations](#sv-operations)
     - [Approving new SVs](#approving-new-svs)
       - [Approving via SV API](#approving-via-sv-api)
