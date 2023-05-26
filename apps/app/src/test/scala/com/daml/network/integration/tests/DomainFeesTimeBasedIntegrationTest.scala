@@ -24,6 +24,7 @@ import org.slf4j.event.Level
 
 import java.time.Duration
 import scala.concurrent.Future
+import scala.math.BigDecimal.RoundingMode
 
 class DomainFeesTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -85,7 +86,7 @@ class DomainFeesTimeBasedIntegrationTest
 
         actAndCheck(
           "Advance time to trigger automation to purchase extra traffic",
-          advanceTimeByPollingInterval(aliceValidator),
+          advanceTimeByPollingInterval(bobValidator),
         )(
           "No top-up happens",
           _ => {
@@ -98,7 +99,7 @@ class DomainFeesTimeBasedIntegrationTest
         actAndCheck(
           "Execute taps to consume available traffic balance", {
             val numTaps =
-              (baseRateTrafficBalance / DomainFeesConstants.assumedCoinTxSizeBytes.value).toInt
+              (maxBaseRateTrafficBalance / DomainFeesConstants.assumedCoinTxSizeBytes.value).toInt
             tryTapsAndCountSuccesses(bobWallet, numTaps)
           },
         )(
@@ -108,7 +109,7 @@ class DomainFeesTimeBasedIntegrationTest
 
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
           clue("Execute another tap and see that it fails")(
-            tryTapAndReturnOneOnSuccess(bobWallet, 100) shouldBe 0
+            tryTapAndReturnOneOnSuccess(bobWallet, smallAmount) shouldBe 0
           ),
           entries =>
             forAtLeast(1, entries)(
@@ -130,11 +131,16 @@ class DomainFeesTimeBasedIntegrationTest
           },
         )(
           "Tap is successful once more",
-          _ => tryTapAndReturnOneOnSuccess(bobWallet, 100) shouldBe 1,
+          _ => tryTapAndReturnOneOnSuccess(bobWallet, smallAmount) shouldBe 1,
         )
 
-        clue("Recheck that no traffic contract has been created")(
-          lookupCurrentValidatorTraffic(bobValidator) should have length 0
+        actAndCheck(
+          "Advance time by min top-up interval", {
+            advanceTimeByMinTopupInterval(bobValidator)
+          },
+        )(
+          "Recheck that no traffic contract has been created",
+          _ => lookupCurrentValidatorTraffic(bobValidator) should have length 0,
         )
       }
     }
@@ -158,13 +164,19 @@ class DomainFeesTimeBasedIntegrationTest
           _ => {
             checkInitialTrafficPurchase(aliceValidator)
             checkInitialTrafficPurchase(sv1Validator)
+            purchasedTrafficBalance(
+              aliceValidator
+            ) should be >= topupParameters.topupAmount.toDouble
+            purchasedTrafficBalance(sv1Validator) should be >= getTopupParameters(
+              sv1Validator
+            ).topupAmount.toDouble
           },
         )
 
         actAndCheck(
           "Execute taps to consume available traffic balance for alice validator", {
-            val totalAvailableTrafficBalance: BigDecimal =
-              baseRateTrafficBalance + topupParameters.topupAmount
+            val totalAvailableTrafficBalance =
+              maxBaseRateTrafficBalance + topupParameters.topupAmount
             val numTaps =
               (totalAvailableTrafficBalance / DomainFeesConstants.assumedCoinTxSizeBytes.value).toInt
             tryTapsAndCountSuccesses(aliceWallet, numTaps)
@@ -174,9 +186,11 @@ class DomainFeesTimeBasedIntegrationTest
           actResult => actResult._1 shouldBe actResult._2,
         )
 
+        val trafficBalanceExhaustedAt = env.environment.clock.now.toEpochMilli
+
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
           clue("Execute another tap and see that it fails for alice validator")(
-            tryTapAndReturnOneOnSuccess(aliceWallet, 100) shouldBe 0
+            tryTapAndReturnOneOnSuccess(aliceWallet, smallAmount) shouldBe 0
           ),
           entries =>
             forAtLeast(1, entries)(
@@ -212,34 +226,43 @@ class DomainFeesTimeBasedIntegrationTest
               validatorTraffic.data.numPurchases shouldBe 2
               validatorTraffic.data.totalPurchased shouldBe 2 * topupParameters.topupAmount
             }
+            purchasedTrafficBalance(
+              aliceValidator
+            ) should be >= topupParameters.topupAmount.toDouble
           },
         )
 
         actAndCheck(
-          "Execute taps to consume free base-rate traffic balance for alice validator", {
+          "Execute enough taps to bring traffic balance below top-up threshold", {
+            // The low balance threshold at which top-up occurs is the same as the amount of extra traffic
+            // purchased on each top-up.
+            val topupThreshold = topupParameters.topupAmount
+            val currentTrafficBalance = purchasedTrafficBalance(aliceValidator)
+            // compute free base rate traffic that has accumulated since the traffic balance was
+            // last exhausted by submitting taps
+            val elapsedTimeMillis =
+              env.environment.clock.now.toEpochMilli - trafficBalanceExhaustedAt
+            // consume the accumulated free base-rate traffic balance plus enough extra traffic to bring
+            // traffic balance below top-up threshold
+            val minTrafficBalanceToBeConsumed =
+              baseRateTrafficBalance(
+                elapsedTimeMillis
+              ) + (currentTrafficBalance - topupThreshold + 1)
             val numTaps =
-              (baseRateTrafficBalance / DomainFeesConstants.assumedCoinTxSizeBytes.value).toInt
+              (minTrafficBalanceToBeConsumed / DomainFeesConstants.assumedCoinTxSizeBytes.value)
+                .setScale(0, RoundingMode.CEILING)
+                .toIntExact
             tryTapsAndCountSuccesses(aliceWallet, numTaps)
           },
         )(
-          "Taps are successful",
+          "Taps are successful since sufficient extra traffic balance has been purchased",
           actResult => actResult._1 shouldBe actResult._2,
-        )
-
-        actAndCheck(
-          "Execute another tap for alice validator",
-          tryTapAndReturnOneOnSuccess(aliceWallet, 100),
-        )(
-          "Tap is successful since sufficient extra traffic balance has been purchased",
-          _ shouldBe 1,
         )
 
         actAndCheck(
           "Advance time by min top-up interval for alice validator",
           advanceTimeByMinTopupInterval(aliceValidator),
         )(
-          // The low balance threshold at which top-up occurs is the same as the amount of extra traffic
-          // purchased on each top-up.
           "Top-up is not skipped since the balance is below the top-up threshold",
           _ => {
             inside(lookupCurrentValidatorTraffic(aliceValidator)) { case Seq(validatorTraffic) =>
@@ -249,6 +272,9 @@ class DomainFeesTimeBasedIntegrationTest
               validatorTraffic.data.numPurchases shouldBe 3
               validatorTraffic.data.totalPurchased shouldBe 3 * topupParameters.topupAmount
             }
+            purchasedTrafficBalance(
+              aliceValidator
+            ) should be >= topupParameters.topupAmount.toDouble
           },
         )
 
@@ -308,9 +334,21 @@ class DomainFeesTimeBasedIntegrationTest
   private def baseRateLimits(implicit env: CNNodeTestConsoleEnvironment): BaseRateTrafficLimits =
     scan.getCoinRules().payload.configSchedule.currentValue.globalDomain.fees.baseRateTrafficLimits
 
-  private def baseRateTrafficBalance(implicit env: CNNodeTestConsoleEnvironment): BigDecimal = {
+  private def maxBaseRateTrafficBalance(implicit env: CNNodeTestConsoleEnvironment): BigDecimal = {
     BigDecimal(baseRateLimits.burstWindow.microseconds) / 1e6 * baseRateLimits.rate
   }
+
+  private def baseRateTrafficBalance(
+      accumulationTimeMillis: Long
+  )(implicit env: CNNodeTestConsoleEnvironment): BigDecimal = {
+    val accumulatedBalance = BigDecimal(accumulationTimeMillis) / 1e3 * baseRateLimits.rate
+    accumulatedBalance.min(maxBaseRateTrafficBalance)
+  }
+
+  private def purchasedTrafficBalance(validatorApp: ValidatorAppBackendReference)(implicit
+      env: CNNodeTestConsoleEnvironment
+  ) =
+    scan.getValidatorTrafficBalance(validatorApp.getValidatorPartyId()).remainingBalance
 
   private def getTopupParameters(
       validatorApp: ValidatorAppBackendReference
