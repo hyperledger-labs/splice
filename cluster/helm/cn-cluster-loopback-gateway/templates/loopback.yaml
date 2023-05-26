@@ -16,6 +16,15 @@ spec:
   - number: 443
     name: tls
     protocol: TLS
+  - number: 5005
+    name: grpc-svc
+    protocol: GRPC
+  - number: 5008
+    name: grpc-domain
+    protocol: GRPC
+  - number: 5012
+    name: tls-scan
+    protocol: TLS
   resolution: DNS
 ---
 apiVersion: networking.istio.io/v1alpha3
@@ -41,6 +50,29 @@ spec:
     hosts:
     - "{{ (.Values.cluster).basename }}.network.canton.global"
     - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+    tls:
+      mode: PASSTHROUGH
+  - port:
+      number: 5005
+      name: grpc-svc
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - port:
+      number: 5008
+      name: grpc-domain
+      protocol: GRPC
+    hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+  - hosts:
+    - "{{ (.Values.cluster).basename }}.network.canton.global"
+    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
+    port:
+      name: tls-scan
+      number: 5012
+      protocol: TLS
     tls:
       mode: PASSTHROUGH
 ---
@@ -70,29 +102,20 @@ spec:
   - match:
     - gateways:
       - mesh
-      port: 80
     route:
     - destination:
         host: istio-egressgateway
         subset: loopback
-        port:
-          number: 80
-      weight: 100
   - match:
     - gateways:
       - istio-egressgateway
-      port: 80
     route:
     - destination:
         host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"
-        port:
-          number: 80
-      weight: 100
   tls:
   - match:
     - gateways:
       - mesh
-      port: 443
       sniHosts:
       - "{{ (.Values.cluster).basename }}.network.canton.global"
       - "*.{{ (.Values.cluster).basename }}.network.canton.global"
@@ -100,19 +123,12 @@ spec:
     - destination:
         host: istio-egressgateway
         subset: loopback
-        port:
-          number: 443
-      weight: 100
   - match:
     - gateways:
       - istio-egressgateway
-      port: 443
       sniHosts:
       - "{{ (.Values.cluster).basename }}.network.canton.global"
       - "*.{{ (.Values.cluster).basename }}.network.canton.global"
     route:
     - destination:
         host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"
-        port:
-          number: 443
-      weight: 100

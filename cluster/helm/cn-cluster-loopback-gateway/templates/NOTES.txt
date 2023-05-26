@@ -11,16 +11,4 @@ All traffic from pods in that namespace, directed at `<CLUSTER_BASENAME>.network
 routed to the egress pod, and from there routed directly to the ingress controller instead of going outside of
 the cluster and then back in through the load balancer service.
 
-At the moment, this is configured to handle only traffic on ports 80 & 443 (with TLS passthrough).
-
-Dependencies:
-
-* An istio egress pod. May be installed, e.g. using:
-  `helm install istio-egressgateway istio/gateway --set service.type=ClusterIP -n <namespace>`
-
-* Istio sidecars enabled in the target namespace. May be enabled, e.g. using:
-  `kubectl label namespace <namespace> istio-injection=enabled`
-  (Note that this takes effect only on pods created after this label is set)
-
-An example command for installing this chart is:
-`helm install loopback $REPO_ROOT/cluster/helm/target/cn-cluster-loopback-gateway*.tgz -n <namespace> --set cluster.basename=<CLUSTER_BASENAME>`
+Usage example through pulumi is coming soon.
