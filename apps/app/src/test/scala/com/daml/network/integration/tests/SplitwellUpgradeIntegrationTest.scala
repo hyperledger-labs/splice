@@ -12,21 +12,19 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import CNNodeTests.BracketSynchronous.*
-import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
-import com.daml.ledger.javaapi.data.codegen.{ContractId as JContractId}
+import com.daml.network.util.{MultiDomainTestUtil, SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
-import org.scalactic.source
-import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery
 
 import org.slf4j.event.Level
 import scala.util.Try
 
 class SplitwellUpgradeIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
+    with MultiDomainTestUtil
     with SplitwellTestUtil
     with WalletTestUtil {
 
@@ -180,18 +178,6 @@ class SplitwellUpgradeIntegrationTest
             },
           )
         }
-      }
-    }
-
-    def assertAllOn(
-        onDomain: DomainAlias
-    )(cids: JContractId[?]*)(implicit env: FixtureParam, pos: source.Position) = {
-      val lfIds = cids.map(c => c: LfContractId)
-      val domains = providerSplitwellBackend.participantClient.transfer.lookup_contract_domain(
-        lfIds: _*
-      )
-      tForEvery(Table("contractId", lfIds: _*)) { lfId =>
-        domains.get(lfId) shouldBe Some(onDomain.unwrap)
       }
     }
 

@@ -5,9 +5,11 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.GroupKey
 import CNNodeTests.BracketSynchronous.*
 import com.daml.network.util.{
   FrontendLoginUtil,
+  MultiDomainTestUtil,
   SplitwellTestUtil,
   SplitwellFrontendTestUtil,
   WalletTestUtil,
@@ -18,12 +20,12 @@ import SplitwellUpgradeFrontendIntegrationTest.*
 class SplitwellUpgradeFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment(aliceSplitwellFE, bobSplitwellFE)
     with FrontendLoginUtil
+    with MultiDomainTestUtil
     with SplitwellTestUtil
     with WalletTestUtil
     with SplitwellFrontendTestUtil {
 
   private val darPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
-  private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -33,9 +35,8 @@ class SplitwellUpgradeFrontendIntegrationTest
       .withAdditionalSetup(implicit env => {
         CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
         for {
-          dar <- Seq(darPath, directoryDarPath)
           validator <- Seq(aliceValidator, bobValidator)
-        } validator.participantClient.dars.upload(dar)
+        } validator.participantClient.dars.upload(darPath)
       })
 
   "splitwell frontend with upgraded domain" should {
@@ -87,6 +88,8 @@ class SplitwellUpgradeFrontendIntegrationTest
       }
       val aliceDamlUser = aliceSplitwell.config.ledgerApiUser
       val bobDamlUser = bobSplitwell.config.ledgerApiUser
+
+      val provider = providerSplitwellBackend.getProviderPartyId()
 
       val abGroupName = "group1"
       val aGroupName = "group2"
@@ -234,8 +237,14 @@ class SplitwellUpgradeFrontendIntegrationTest
                 "Bob completes payment after migration",
                 click on className("payment-accept"),
               )(
-                "Bob returns to splitwell",
-                _ => currentUrl should startWith(s"http://localhost:3003"),
+                "Bob returns to splitwell and balance update gets transferred to splitwellUpgrade",
+                _ => {
+                  currentUrl should startWith(s"http://localhost:3003")
+                  val balanceUpdates =
+                    bobSplitwell.listBalanceUpdates(GroupKey(alice, provider, abGroupName))
+                  balanceUpdates should have size 3
+                  assertAllOn(splitwellUpgradeAlias)(balanceUpdates.map(_.contractId): _*)
+                },
               )
             }
           }
