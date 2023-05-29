@@ -334,7 +334,7 @@ following content.
 .. code-block:: yaml
 
     participantAddress: "participant"
-    svSponsorAddress: "https://sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
+    svSponsorAddress: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
     scanPort: "5012"
     scanAddress: "https://TARGET_CLUSTER.network.canton.global"
     # Replace SV_WALLET_USER_ID with the user id in your IAM that you want to use to log into
@@ -366,7 +366,7 @@ The configuration used by the SV app to onboard your SV should be defined in a f
 .. code-block:: yaml
 
     joinWithKeyOnboarding:
-      sponsorApiUrl: "https://sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
+      sponsorApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
       svcApiAddress: "TARGET_CLUSTER.network.canton.global"
     onboardingName: ... your SV name goes here ...
     auth:
