@@ -1657,8 +1657,6 @@
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
-          "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA",
-          "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
           "sponsorApiUrl": "http://sv-app.sv-1:5014",
           "svcApiAddress": "svc-app.svc"
         },
@@ -1921,8 +1919,6 @@
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
-          "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI",
-          "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
           "sponsorApiUrl": "http://sv-app.sv-1:5014",
           "svcApiAddress": "svc-app.svc"
         },
@@ -2185,8 +2181,6 @@
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
-          "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ",
-          "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
           "sponsorApiUrl": "http://sv-app.sv-1:5014",
           "svcApiAddress": "svc-app.svc"
         },

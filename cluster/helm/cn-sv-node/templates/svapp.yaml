@@ -56,8 +56,6 @@ spec:
                 _onboarding {
                   type = "join-with-key"
                   sv-client.admin-api.url = "{{ .sponsorApiUrl }}"
-                  public-key = "{{ .publicKey }}"
-                  private-key = "{{ .privateKey }}"
                 }
             - name: CN_APP_SV_PUBLIC_KEY
               valueFrom:

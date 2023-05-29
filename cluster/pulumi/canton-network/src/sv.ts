@@ -193,8 +193,6 @@ export function installSvNode(
 
   if (joinWithKey) {
     values.joinWithKeyOnboarding = {
-      publicKey: joinWithKey.publicKey,
-      privateKey: joinWithKey.privateKey,
       sponsorApiUrl: 'http://sv-app.sv-1:5014',
       svcApiAddress: 'svc-app.svc',
     };

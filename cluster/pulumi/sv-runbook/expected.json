@@ -402,8 +402,6 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
-          "privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgdRTS3iLr8rPFaLUBbVcu8qYxklmMzQo/4UXcULYESm2hRANCAATu7P7NbVhw8kiX5Mqpe/r91/FzH7chJUWA/qbaxp5DSXqvaU1b5Yt+r4dQxzJzFf23ptQnmTIR5tjJ+T0lbXwo",
-          "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA==",
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",
           "svcApiAddress": "svrun.network.com.network.canton.global"
         },

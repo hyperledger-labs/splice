@@ -130,8 +130,6 @@ const sv = installCNHelmChart(
     joinWithKeyOnboarding: {
       sponsorApiUrl: `https://sv.sv-1.svc.${TARGET_CLUSTER}.network.canton.global/api/v0/sv`,
       svcApiAddress: `${TARGET_CLUSTER}.network.canton.global`,
-      publicKey: SV_PUBLIC_KEY,
-      privateKey: SV_PRIVATE_KEY,
     },
     onboardingName: SV_NAME,
     auth: {
