@@ -169,3 +169,16 @@ export function installCNHelmChart(
 // The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ChartValues = { [key: string]: any };
+
+/// Environment variables
+
+export function requireEnv(name: string): string {
+  const value = process.env[name];
+
+  if (!value) {
+    console.error(`Environment variable ${name} is undefined.`);
+    process.exit(1);
+  } else {
+    return value;
+  }
+}

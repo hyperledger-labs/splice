@@ -83,7 +83,15 @@ async function main() {
   const installCluster = await import('./src/installCluster');
   const secrets = new SecretsFixtureMap();
 
-  installCluster.installCluster({ getSecrets: () => Promise.resolve(secrets) });
+  installCluster.installCluster({
+      getSecrets: () => Promise.resolve(secrets),
+      getClientAccessToken: (clientId: string, clientSecret: string) =>
+          Promise.resolve({
+              access_token: 'access_token',
+              token_type: 'Bearer',
+              expires_in: 86400,
+          }),
+  });
 }
 
 main();

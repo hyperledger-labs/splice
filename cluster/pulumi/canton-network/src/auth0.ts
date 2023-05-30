@@ -1,8 +1,8 @@
 import * as k8s from '@pulumi/kubernetes';
-import { AuthenticationClient, ManagementClient } from 'auth0';
+import { AuthenticationClient, ManagementClient, TokenResponse } from 'auth0';
 
-import type { Auth0Client, Auth0SecretMap, Auth0ClientSecret } from './auth0types';
-import { ExactNamespace, fixedTokens } from './utils';
+import type { Auth0Client, Auth0SecretMap, Auth0ClientSecret, ClientIdMap } from './auth0types';
+import { ExactNamespace, fixedTokens, requireEnv } from './utils';
 
 const appToClientId = {
   validator: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
@@ -19,7 +19,7 @@ const appToClientId = {
   sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
   sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
   sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
-} as { [key: string]: string };
+} as ClientIdMap;
 
 const namespaceToUiClientId = {
   validator1: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
@@ -28,26 +28,12 @@ const namespaceToUiClientId = {
   'sv-2': 'G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6',
   'sv-3': 'cgxHguMv32JLeew9S6wBDgNPHmPCIKaP',
   'sv-4': 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
-} as { [key: string]: string };
+} as ClientIdMap;
 
 /// Auth0
 
 const auth0Account = 'canton-network-dev.us';
 const auth0Domain = `${auth0Account}.auth0.com`;
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    console.error(`Environment variable ${name} is undefined.`);
-    process.exit(1);
-  } else {
-    return value;
-  }
-}
-
-const clientId = requireEnv('AUTH0_MANAGEMENT_API_CLIENT_ID');
-const clientSecret = requireEnv('AUTH0_MANAGEMENT_API_CLIENT_SECRET');
 
 export class Auth0Fetch implements Auth0Client {
   private secrets: Auth0SecretMap | undefined;
@@ -56,8 +42,8 @@ export class Auth0Fetch implements Auth0Client {
     if (this.secrets === undefined) {
       const client = new ManagementClient({
         domain: auth0Domain,
-        clientId: clientId,
-        clientSecret: clientSecret,
+        clientId: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_ID'),
+        clientSecret: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_SECRET'),
         scope: 'read:clients read:client_keys',
       });
 
@@ -74,26 +60,62 @@ export class Auth0Fetch implements Auth0Client {
     }
     return this.secrets;
   }
-}
 
-async function auth0Secret(
-  allSecrets: Auth0SecretMap,
-  clientName: string
-): Promise<{ [key: string]: string }> {
-  const clientSecrets = allSecrets.get(appToClientId[clientName]);
-
-  const clientId = clientSecrets?.client_id || '';
-  const clientSecret = clientSecrets?.client_secret || '';
-
-  if (fixedTokens()) {
+  public async getClientAccessToken(
+    clientId: string,
+    clientSecret: string
+  ): Promise<TokenResponse> {
     const auth0 = new AuthenticationClient({
       domain: `${auth0Account}.auth0.com`,
       clientId: clientId,
       clientSecret: clientSecret,
     });
-    const accessToken = await auth0.clientCredentialsGrant({
+    return await auth0.clientCredentialsGrant({
       audience: 'https://canton.network.global',
     });
+  }
+}
+
+function lookupClientSecrets(
+  allSecrets: Auth0SecretMap,
+  clientIdMap: ClientIdMap,
+  clientName: string
+): Auth0ClientSecret {
+  const appClientId = clientIdMap[clientName];
+
+  if (!appClientId) {
+    throw new Error(`Unknown Auth0 client ID for client: ${clientName}`);
+  }
+
+  const clientSecret = allSecrets.get(appClientId);
+
+  if (!clientSecret) {
+    throw new Error(`Client unknown to Auth0: ${clientName} (Client ID: ${appClientId})`);
+  }
+
+  /* This should never happen, allSecrets contains elements stored with their
+   * client_id as the key. */
+  if (clientSecret.client_id !== appClientId) {
+    throw new Error(
+      `client_id in secret map does not match expected value: ${clientSecret.client_id} !== ${appClientId}`
+    );
+  }
+
+  return clientSecret;
+}
+
+async function auth0Secret(
+  auth0Client: Auth0Client,
+  allSecrets: Auth0SecretMap,
+  clientName: string
+): Promise<{ [key: string]: string }> {
+  const clientSecrets = lookupClientSecrets(allSecrets, appToClientId, clientName);
+
+  const clientId = clientSecrets.client_id;
+  const clientSecret = clientSecrets.client_secret;
+
+  if (fixedTokens()) {
+    const accessToken = await auth0Client.getClientAccessToken(clientId, clientSecret);
     return {
       token: accessToken.access_token,
       'ledger-api-user': clientId + '@clients',
@@ -123,7 +145,7 @@ export function installAuth0Secret(
       },
       stringData: auth0Client
         .getSecrets()
-        .then((all: Auth0SecretMap) => auth0Secret(all, clientName)),
+        .then((all: Auth0SecretMap) => auth0Secret(auth0Client, all, clientName)),
     },
     {
       dependsOn: xns.ns,
@@ -132,13 +154,11 @@ export function installAuth0Secret(
 }
 
 function auth0UISecret(allSecrets: Auth0SecretMap, clientName: string, namespaceName: string) {
-  const clientSecrets = allSecrets.get(namespaceToUiClientId[namespaceName]);
-
-  const clientId = clientSecrets?.client_id || '';
+  const clientSecrets = lookupClientSecrets(allSecrets, namespaceToUiClientId, namespaceName);
 
   return {
     url: `https://${auth0Domain}`,
-    'client-id': clientId,
+    'client-id': clientSecrets.client_id,
   };
 }
 
