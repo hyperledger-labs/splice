@@ -9,6 +9,7 @@ import qualified DA.Set as Set
 import Daml.Script
 import DA.Time
 
+import CC.API.V1.Round
 import CC.Coin
 
 import CN.SvcRules
@@ -121,7 +122,7 @@ testRequiredNumOfConfirmationInDevNet = do
     [(svcRulesCid, _)] <- query @SvcRules svc
     let svName = "sv" <> show i
     phamtonSv <- allocateParty $ svName
-    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName (Round 3)
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
@@ -134,6 +135,7 @@ testRequiredNumOfConfirmationInDevNet = do
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
           newMemberParty = svX
           newMemberName = "svX"
+          nextMiningRound = (Round 3)
   confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
     submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = svParty
@@ -172,6 +174,7 @@ testConfirmationExpiry = do
       svcAction = SRARC_AddMember $ SvcRules_AddMember with
         newMemberParty = svX
         newMemberName = "svX"
+        nextMiningRound = (Round 3)
 
   -- leader tries to expire the confirmation, but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
@@ -201,7 +204,7 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
 
   [(svcRulesCid, _)] <- query @SvcRules svc
   svX <- allocateParty "svX"
-  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2")
+  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" (Round 3))
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   (round, _) <- getLatestOpenRound app
@@ -214,7 +217,7 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
 
   [(svcRulesCid, _)] <- query @SvcRules svc
   svX <- allocateParty "svX"
-  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2")
+  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" (Round 3))
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   (round, _) <- getLatestOpenRound app

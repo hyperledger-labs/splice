@@ -16,6 +16,9 @@ Release Notes
     rather than ``https://sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv``.
   * Fixed an issue in last week’s release where the public/private SV keys were required in both the K8s secret and in ``sv-values.yaml``.
     Now they only need to be specified through the secret.
+  * Fixed how the first round for which a new SV is eligible to receive SV rewards is determined.
+    With the fix, SVs start receiving SV rewards starting from the next round that opens after that SV has joined, i.e.,
+    an SVs will not receive SV rewards for any of the rounds that have opened before the time it has joined.
 
 
 2023-05-28

@@ -234,7 +234,6 @@ data SvcRulesConfig = SvcRulesConfig with
 template SvcRules with
     svc : Party        -- ^ The collective party representing this collective
     epoch : Int        -- ^ The number of leaders that have already been elected.
-    nextMiningRound : Round
     members : Map.Map Party MemberInfo
     leader : Party
     config : SvcRulesConfig
@@ -259,6 +258,7 @@ template SvcRules with
       with
         newMemberParty : Party
         newMemberName : Text
+        nextMiningRound : Round
       controller svc
       do
         requireUnlocked lock
@@ -279,7 +279,6 @@ template SvcRules with
         create SvcRules with
           svc
           epoch
-          nextMiningRound
           leader
           -- existing entry of member with same name as the new member will be overwritten by the new member info
           -- this should only happen if it is in devnet
@@ -309,27 +308,43 @@ template SvcRules with
         create SvcRules with
           svc
           epoch = newEpoch
-          nextMiningRound
           leader = newLeader
           members = newMembers
           config
           isDevNet
           lock
 
+    -- Called by SV candidates to add themselves to the SvcRules once they are confirmed and ready.
+    -- We use the passed rounds for reliably determining the next round, which will be
+    -- the first round in which the new SV will receive rewards.
     nonconsuming choice SvcRules_AddConfirmedMember : ContractId SvcRules
       with
         sv : Party
         svOnboardingConfirmedCid : ContractId SvOnboardingConfirmed
+        earliestRoundCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
       controller sv
       do
         requireUnlocked lock
+
         svOnboardingConfirmed <- fetch svOnboardingConfirmedCid
         archive svOnboardingConfirmedCid
+
         require "SVC matches" (svOnboardingConfirmed.svc == svc)
         require "SV matches" (svOnboardingConfirmed.svParty == sv)
+
+        earliestRound <- fetch earliestRoundCid
+        middleRound <- fetch middleRoundCid
+        latestRound <- fetch latestRoundCid
+        require "middleRound is one after earliestRound" (middleRound.round.number == earliestRound.round.number + 1)
+        require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
+        require "rounds belong to SVC" (earliestRound.svc == svc && middleRound.svc == svc && latestRound.svc == svc)
+
         exercise self SvcRules_AddMember with
           newMemberParty = sv
           newMemberName = svOnboardingConfirmed.svName
+          nextMiningRound = Round (latestRound.round.number + 1)
 
 
     -- Global domain config management

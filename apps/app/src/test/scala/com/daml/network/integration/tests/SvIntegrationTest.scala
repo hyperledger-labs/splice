@@ -9,10 +9,11 @@ import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
+import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSvOnboarding}
-import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.{
   CNNodeAppBackendReference,
   CNParticipantClientReference,
@@ -627,6 +628,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             update = getSvcRules().id.exerciseSvcRules_AddMember(
               fakeSv4Party.toProtoPrimitive,
               "Canton-Foundation-4",
+              new Round(3),
             ),
           )
         },

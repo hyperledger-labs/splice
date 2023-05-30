@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cn
 import com.daml.network.console.CNNodeAppBackendReference
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -36,6 +37,10 @@ trait SvTestUtil extends CNNodeTestCommon {
       svParty: PartyId,
       svName: String,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val nextMiningRound = clue("Getting next open round") {
+      val (openRounds, _) = scan.getOpenAndIssuingMiningRounds()
+      new Round(openRounds.map(_.payload.round.number).max + 1)
+    }
     actAndCheck(
       s"Add the phantom SV \"$svName\"",
       svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
@@ -45,6 +50,7 @@ trait SvTestUtil extends CNNodeTestCommon {
           .exerciseSvcRules_AddMember(
             svParty.toProtoPrimitive,
             svName,
+            nextMiningRound,
           )
           .commands
           .asScala

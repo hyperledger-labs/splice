@@ -605,9 +605,13 @@ class SvApp(
       "add member to Svc",
       for {
         svcRules <- svcStore.getSvcRules()
+        openMiningRounds <- svcStore.getOpenMiningRoundTriple()
         cmd = svcRules.contractId.exerciseSvcRules_AddConfirmedMember(
           svcStore.key.svParty.toProtoPrimitive,
           svOnboardingConfirmed.contractId,
+          openMiningRounds.oldest.contractId,
+          openMiningRounds.middle.contractId,
+          openMiningRounds.newest.contractId,
         )
         _ <- svcStoreWithIngestion.connection.submitCommandsNoDedup(
           Seq(svcStore.key.svParty),

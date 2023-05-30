@@ -100,9 +100,11 @@ initCollective isDevNet = do
     submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid $ SvcRules_OnboardValidator with
       sponsor = sv1
       validator = svParty
+    (_, latestOpenRound) <- getLatestOpenRound app
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
       newMemberParty = svParty
       newMemberName = svName
+      nextMiningRound = Round (latestOpenRound.round.number + 1)
 
   pure (app, svc, (sv1, sv2, sv3, sv4))
 

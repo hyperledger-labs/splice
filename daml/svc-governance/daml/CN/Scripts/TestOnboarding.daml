@@ -7,6 +7,7 @@ import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
 
+import CC.API.V1.Round
 import CC.ValidatorLicense
 
 import CN.CometBft
@@ -14,6 +15,7 @@ import CN.SvcRules
 import CN.SVC.GlobalDomain
 import CN.SvOnboarding
 
+import CC.Scripts.Util
 import CN.Scripts.SvcTestUtils
 
 
@@ -85,12 +87,33 @@ testSvOnboarding = do
     svc
     expiresAt = svOnboardingConfirmed.expiresAt
 
-
+  -- once svX becomes able to read as svc (e.g., after party migration to svX's participant)...
   [(svcRulesCid, _)] <- query @SvcRules svc
-  -- once svX becomes able to read as svc (e.g., after party migration to svX's participant), it completes the onboarding by adding itself to the SvcRules
+
+  -- it gets the open mining rounds, so that it can set it's own `joinedAsOfRound` in a cheat-resistant way
+  [(earliestRoundCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
+
+  -- the rounds need to be passed in the correct order
+  submitMultiMustFail [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid = latestRoundCid
+    middleRoundCid
+    latestRoundCid = earliestRoundCid
+  submitMultiMustFail [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid = earliestRoundCid
+    latestRoundCid = earliestRoundCid
+
+  -- svX completes its own onboarding by adding itself to the SvcRules
   submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
     sv = svX
     svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid
+    latestRoundCid
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   assert (svX `elem` Map.keys svcRules.members)
@@ -179,7 +202,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
     SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
   -- create a SvOnboardingConfirmed contract
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX"
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX" (Round 3)
 
   -- leader can archive the onboarding as svX is added as member
   leaderSubmits app $ \cid -> exerciseCmd cid $
@@ -231,7 +254,7 @@ testSvNameUniquenessNotInDevNet = do
   (fromSome (Map.lookup sv2 svcRules.members)).name === "sv2"
 
   svX <- allocateParty "svX"
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2"
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" (Round 3)
 
 
 testSvMemberOverwriteInDevNet : Script ()
@@ -245,9 +268,9 @@ testSvMemberOverwriteInDevNet = do
   svX <- allocateParty "svX"
 
   -- Failing the template precondition check if the existing member being overwritten is the current leader.
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1"
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" (Round 3)
 
   -- overwriting existing member successfuly
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2"
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" (Round 3)
 
   pure ()

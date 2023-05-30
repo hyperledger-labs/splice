@@ -4,6 +4,7 @@ import com.daml.ledger.api.v1.value.Record.toJavaProto
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
@@ -139,6 +140,7 @@ class GrpcSvcAppService(
                 update = svcRules.contractId.exerciseSvcRules_AddMember(
                   request.svParty,
                   s"mockName:${request.svParty}",
+                  new Round(1),
                 ),
                 domainId = globalDomain,
               )
