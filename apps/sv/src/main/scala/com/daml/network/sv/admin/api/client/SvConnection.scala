@@ -8,7 +8,7 @@ import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -54,6 +54,7 @@ final class SvConnection private (
   def authorizeSvcPartyHosting(
       candidateParticipantId: ParticipantId,
       candidateSequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
+      candidateMediatorIdentity: Option[(MediatorId, Seq[GenericSignedTopologyTransactionX])],
       candidateParty: PartyId,
   )(implicit
       httpClient: HttpRequest => Future[HttpResponse],
@@ -66,6 +67,7 @@ final class SvConnection private (
       HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
         candidateParticipantId,
         candidateSequencerIdentity,
+        candidateMediatorIdentity,
         candidateParty,
       ),
     )

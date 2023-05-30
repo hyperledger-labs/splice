@@ -51,12 +51,11 @@ class XNodeIntegrationTest extends CNNodeIntegrationTest with SvTestUtil with Wa
       }
     }
 
-    // TODO(#5086) Actually onboard sv2-4’s mediators
     clue("Mediator 1 is initialized") {
       sv1.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
-      sv2.mediatorNodeStatus() should matchPattern { case NodeStatus.NotInitialized(_) => }
-      sv3.mediatorNodeStatus() should matchPattern { case NodeStatus.NotInitialized(_) => }
-      sv4.mediatorNodeStatus() should matchPattern { case NodeStatus.NotInitialized(_) => }
+      sv2.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv3.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv4.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
     }
 
     // Check that things work for external validators

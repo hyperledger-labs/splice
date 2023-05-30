@@ -9,6 +9,7 @@ import com.daml.network.environment.{
   ParticipantAdminConnection,
   RetryProvider,
   SequencerAdminConnection,
+  MediatorAdminConnection,
 }
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
@@ -32,7 +33,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOpX,
 }
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -46,6 +47,7 @@ class SvcPartyHosting(
     participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection: Option[SequencerAdminConnection],
     sequencerPublicConfig: Option[ClientConfig],
+    mediatorAdminConnection: Option[MediatorAdminConnection],
     svcParty: PartyId,
     globalDomain: DomainAlias,
     coinAppParameters: SharedCNNodeAppParameters,
@@ -111,11 +113,17 @@ class SvcPartyHosting(
               connection.getSequencerIdentityTransactions(id).map((id, _))
             )
           }
+          mediatorIdentity <- mediatorAdminConnection.traverse { connection =>
+            connection.getMediatorId.flatMap(id =>
+              connection.getMediatorIdentityTransactions(id).map((id, _))
+            )
+          }
           _ = logger.info("candidate SV participant disconnected from global domain")
           response <- getAuthorizationAndAcsFromSponsor(
             sponsorSvConfig,
             participantId,
             sequencerIdentity,
+            mediatorIdentity,
             svParty,
           )
           _ <- participantAdminConnection.uploadAcsSnapshot(response.acsSnapshot)
@@ -126,15 +134,17 @@ class SvcPartyHosting(
           _ = logger.info("candidate SV participant reconnected to global domain")
           _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
           _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
-          conAndSnapshot = for {
-            con <- sequencerAdminConnection
+          xNodeParams = for {
+            seqCon <- sequencerAdminConnection
             publicConfig <- sequencerPublicConfig
             snapshot <- response.sequencerSnapshot
-          } yield (con, publicConfig, snapshot)
-          _ <- conAndSnapshot.traverse_ { case (con, publicConfig, snapshot) =>
+            sequencerId <- sequencerIdentity.map(_._1)
+            medCon <- mediatorAdminConnection
+          } yield (seqCon, publicConfig, snapshot, sequencerId, medCon)
+          _ <- xNodeParams.traverse_ { case (seqCon, publicConfig, snapshot, sequencerId, medCon) =>
             logger.info(s"Bootstrapping sequencer from snapshot")
             for {
-              _ <- con
+              _ <- seqCon
                 .assignFromSnapshot(
                   snapshot.topologySnapshot,
                   snapshot.staticDomainParameters,
@@ -146,6 +156,17 @@ class SvcPartyHosting(
                 globalDomain,
                 setSequencerEndpoint(publicConfig),
               )
+              _ = logger.info(s"Initializing mediator")
+              _ <- medCon.initialize(
+                domainId,
+                snapshot.staticDomainParameters,
+                sequencerId,
+                new GrpcSequencerConnection(
+                  toEndpoints(publicConfig),
+                  transportSecurity = publicConfig.tls.isDefined,
+                  customTrustCertificates = None,
+                ),
+              )
             } yield ()
           }
         } yield Right(())
@@ -154,21 +175,18 @@ class SvcPartyHosting(
     }
   }
 
+  // TODO(#5107) Consider using something other than a ClientConfig in the config file
+  // to simplify conversion to GrpcSequencerConnection.
+  private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
+    NonEmpty.mk(Seq, Endpoint(config.address, config.port))
+
   private def setSequencerEndpoint(
       endpoint: ClientConfig
   ): DomainConnectionConfig => DomainConnectionConfig = conf =>
     conf.copy(
       sequencerConnection = conf.sequencerConnection match {
         case con: GrpcSequencerConnection =>
-          con.copy(endpoints =
-            NonEmpty.mk(
-              Seq,
-              Endpoint(
-                endpoint.address,
-                endpoint.port,
-              ),
-            )
-          )
+          con.copy(endpoints = toEndpoints(endpoint))
         case con =>
           throw new IllegalArgumentException(s"Expected GrpcSequencerConnection but got $con")
       }
@@ -187,6 +205,7 @@ class SvcPartyHosting(
       sponsorSvConfig: SvAppClientConfig,
       candidateParticipantId: ParticipantId,
       candidateSequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
+      candidateMediatorIdentity: Option[(MediatorId, Seq[GenericSignedTopologyTransactionX])],
       svParty: PartyId,
   )(implicit
       traceContext: TraceContext
@@ -203,7 +222,12 @@ class SvcPartyHosting(
         loggerFactory,
       ).flatMap { svConnection =>
         svConnection
-          .authorizeSvcPartyHosting(candidateParticipantId, candidateSequencerIdentity, svParty)
+          .authorizeSvcPartyHosting(
+            candidateParticipantId,
+            candidateSequencerIdentity,
+            candidateMediatorIdentity,
+            svParty,
+          )
           .andThen(_ => svConnection.close())
       },
       logger,

@@ -15,15 +15,16 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
 }
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseQueryX}
 import com.digitalasset.canton.topology.store.{TimeQuery, TimeQueryX}
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
+  MediatorDomainStateX,
   ParticipantPermission,
   ParticipantPermissionX,
   PartyToParticipantX,
@@ -261,6 +262,31 @@ class ParticipantAdminConnection(
       TopologyAdminCommandsX.Write.Propose(
         SequencerDomainStateX
           .create(domain = domainId, threshold = threshold, active = active, observers = passive),
+        signedBy.toList,
+        None,
+      )
+    )
+
+  def proposeMediators(
+      domainId: DomainId,
+      group: NonNegativeInt,
+      threshold: PositiveInt,
+      active: Seq[MediatorId],
+      passive: Seq[MediatorId] = Seq.empty,
+      signedBy: Option[Fingerprint] = None,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, MediatorDomainStateX]] =
+    runCmd(
+      TopologyAdminCommandsX.Write.Propose(
+        MediatorDomainStateX
+          .create(
+            domain = domainId,
+            group = group,
+            threshold = threshold,
+            active = active,
+            observers = passive,
+          ),
         signedBy.toList,
         None,
       )

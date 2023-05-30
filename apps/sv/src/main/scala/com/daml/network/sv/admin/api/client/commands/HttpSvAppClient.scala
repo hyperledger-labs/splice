@@ -16,7 +16,7 @@ import com.digitalasset.canton.domain.sequencing.sequencer.{
 }
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.protocol.v0
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
@@ -231,6 +231,7 @@ object HttpSvAppClient {
   case class OnboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       sequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
+      mediatorIdentity: Option[(MediatorId, Seq[GenericSignedTopologyTransactionX])],
       candidate: PartyId,
   ) extends BaseCommand[
         http.OnboardSvPartyMigrationAuthorizeResponse,
@@ -249,6 +250,12 @@ object HttpSvAppClient {
           participantId.toProtoPrimitive,
           sequencerIdentity.map { case (id, txs) =>
             definitions.SequencerIdentity(
+              id.toProtoPrimitive,
+              txs.map(tx => Base64.getEncoder.encodeToString(tx.toByteString.toByteArray)).toVector,
+            )
+          },
+          mediatorIdentity.map { case (id, txs) =>
+            definitions.MediatorIdentity(
               id.toProtoPrimitive,
               txs.map(tx => Base64.getEncoder.encodeToString(tx.toByteString.toByteArray)).toVector,
             )

@@ -161,6 +161,7 @@ class SvApp(
         storeKey,
         participantAdminConnection,
         sequencerAdminConnection,
+        mediatorAdminConnection,
       )
       cometBftClient = newCometBftClient
       (svcStore, svcAutomation) <- ensureOnboarded(
@@ -208,6 +209,7 @@ class SvApp(
         clock,
         participantAdminConnection,
         sequencerAdminConnection,
+        mediatorAdminConnection,
         retryProvider,
         svcPartyHosting,
         loggerFactory,
@@ -565,11 +567,13 @@ class SvApp(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
       sequencerAdminConnection: Option[SequencerAdminConnection],
+      mediatorAdminConnection: Option[MediatorAdminConnection],
   ) = new SvcPartyHosting(
     config.onboarding,
     participantAdminConnection,
     sequencerAdminConnection,
     config.xNodes.map(_.sequencer.publicApi),
+    mediatorAdminConnection,
     storeKey.svcParty,
     config.domains.global.alias,
     coinAppParameters,
