@@ -247,7 +247,11 @@ class ParticipantAdminConnection(
         .collectOfMapping[SequencerDomainStateX]
         .result
         .headOption
-        .getOrElse(throw new IllegalStateException(s"No sequencer state for domain $domainId"))
+        .getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(s"No sequencer state for domain $domainId")
+            .asRuntimeException()
+        )
         .transaction
         .transaction
         .mapping

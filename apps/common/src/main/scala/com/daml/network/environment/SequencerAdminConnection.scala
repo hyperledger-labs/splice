@@ -21,6 +21,7 @@ import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, Topology
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import TopologyMappingX.Code.{NamespaceDelegationX, OwnerToKeyMappingX}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -97,7 +98,9 @@ class SequencerAdminConnection(
     ).map { txs =>
       txs.headOption
         .getOrElse(
-          throw new IllegalStateException(s"Sequencer state for domain $domainId was empty")
+          throw Status.NOT_FOUND
+            .withDescription(s"No sequencer state for domain $domainId")
+            .asRuntimeException()
         )
     }
 
