@@ -18,22 +18,22 @@ val staticParameters =
     devVersionSupport = true,
     uniqueContractKeys = false,
   )
-    .toStaticDomainParameters(globalSeqSv1.config.crypto)
+    .toStaticDomainParameters(globalSequencerSv1.config.crypto)
     .flatMap(StaticDomainParameters(_).leftMap(_.toString))
     .getOrElse(sys.error("whatever"))
 
-val domainId = globalSeqSv1.domain.bootstrap(
+val domainId = globalSequencerSv1.domain.bootstrap(
   "global-domain",
   staticParameters,
   // TODO(#5087) Make this a union space
-  domainOwners = Seq(sv1Participant, globalSeqSv1, globalMedSv1),
-  sequencers = Seq(globalSeqSv1),
-  mediators = Seq(globalMedSv1),
+  domainOwners = Seq(sv1Participant, globalSequencerSv1, globalMediatorSv1),
+  sequencers = Seq(globalSequencerSv1),
+  mediators = Seq(globalMediatorSv1),
 )
 
 println("Connecting all participants to global domain...")
 participantsX.local.foreach(
-  _.domains.connect_local(globalSeqSv1, alias = Some(DomainAlias.tryCreate("global")))
+  _.domains.connect_local(globalSequencerSv1, alias = Some(DomainAlias.tryCreate("global")))
 )
 
 println(s"Collecting admin tokens...")

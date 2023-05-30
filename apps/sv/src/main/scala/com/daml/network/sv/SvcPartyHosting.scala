@@ -169,39 +169,40 @@ class SvcPartyHosting(
           _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
           _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
           xNodeParams = for {
-            seqCon <- sequencerAdminConnection
+            sequencerConnection <- sequencerAdminConnection
             publicConfig <- sequencerPublicConfig
             snapshot <- response.sequencerSnapshot
             sequencerId <- sequencerId
-            medCon <- mediatorAdminConnection
-          } yield (seqCon, publicConfig, snapshot, sequencerId, medCon)
-          _ <- xNodeParams.traverse_ { case (seqCon, publicConfig, snapshot, sequencerId, medCon) =>
-            logger.info(s"Bootstrapping sequencer from snapshot")
-            for {
-              _ <- seqCon
-                .assignFromSnapshot(
-                  snapshot.topologySnapshot,
-                  snapshot.staticDomainParameters,
-                  snapshot.sequencerSnapshot,
+            mediatorConnection <- mediatorAdminConnection
+          } yield (sequencerConnection, publicConfig, snapshot, sequencerId, mediatorConnection)
+          _ <- xNodeParams.traverse_ {
+            case (sequencerConnection, publicConfig, snapshot, sequencerId, mediatorConnection) =>
+              logger.info(s"Bootstrapping sequencer from snapshot")
+              for {
+                _ <- sequencerConnection
+                  .assignFromSnapshot(
+                    snapshot.topologySnapshot,
+                    snapshot.staticDomainParameters,
+                    snapshot.sequencerSnapshot,
+                  )
+                _ = logger.info("Sequencer bootstrapping complete")
+                _ = logger.info("Changing participant connection to point to new sequencer")
+                _ <- participantAdminConnection.modifyDomainConnectionConfig(
+                  globalDomain,
+                  setSequencerEndpoint(publicConfig),
                 )
-              _ = logger.info("Sequencer bootstrapping complete")
-              _ = logger.info("Changing participant connection to point to new sequencer")
-              _ <- participantAdminConnection.modifyDomainConnectionConfig(
-                globalDomain,
-                setSequencerEndpoint(publicConfig),
-              )
-              _ = logger.info(s"Initializing mediator")
-              _ <- medCon.initialize(
-                domainId,
-                snapshot.staticDomainParameters,
-                sequencerId,
-                new GrpcSequencerConnection(
-                  toEndpoints(publicConfig),
-                  transportSecurity = publicConfig.tls.isDefined,
-                  customTrustCertificates = None,
-                ),
-              )
-            } yield ()
+                _ = logger.info(s"Initializing mediator")
+                _ <- mediatorConnection.initialize(
+                  domainId,
+                  snapshot.staticDomainParameters,
+                  sequencerId,
+                  new GrpcSequencerConnection(
+                    toEndpoints(publicConfig),
+                    transportSecurity = publicConfig.tls.isDefined,
+                    customTrustCertificates = None,
+                  ),
+                )
+              } yield ()
           }
         } yield Right(())
       case None =>

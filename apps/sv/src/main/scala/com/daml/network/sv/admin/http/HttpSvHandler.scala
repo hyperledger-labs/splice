@@ -356,21 +356,21 @@ class HttpSvHandler(
 
       // TODO(#5095) Reconsider if this should be part of this onboarding flow
       // or a separate step.
-      sequencerSnapshot <- sequencerId.traverse { seqId =>
-        val seqCon = sequencerAdminConnection.getOrElse(
+      sequencerSnapshot <- sequencerId.traverse { sequencerId =>
+        val sequencerConnection = sequencerAdminConnection.getOrElse(
           throw new IllegalStateException(
             s"Onboarding sequencer configured to use X nodes but sponsoring SV is not"
           )
         )
-        onboardSequencer(seqCon, seqId)
+        onboardSequencer(sequencerConnection, sequencerId)
       }
-      _ <- mediatorId.traverse { medId =>
-        val medCon = mediatorAdminConnection.getOrElse(
+      _ <- mediatorId.traverse { mediatorId =>
+        val mediatorConnection = mediatorAdminConnection.getOrElse(
           throw new IllegalStateException(
             s"Onboarding mediator configured to use X nodes but sponsoring SV is not"
           )
         )
-        onboardMediator(medCon, medId)
+        onboardMediator(mediatorConnection, mediatorId)
       }
 
     } yield v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
@@ -388,14 +388,14 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext) = {
     logger.info("Querying sequencer domain state")
     for {
-      seqState <- participantAdminConnection.latestSequencerDomainStateX(globalDomain)
+      sequencerState <- participantAdminConnection.latestSequencerDomainStateX(globalDomain)
       ourParticipant <- participantAdminConnection.getParticipantId(true)
       _ = logger.info("Proposing new sequencer")
       _ <- participantAdminConnection.proposeSequencers(
         globalDomain,
-        seqState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
-        seqState.active :+ sequencerId,
-        seqState.observers,
+        sequencerState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
+        sequencerState.active :+ sequencerId,
+        sequencerState.observers,
         Some(ourParticipant.uid.namespace.fingerprint),
       )
       msg = "Waiting to observe new sequencer proposal"
@@ -461,15 +461,15 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext) = {
     logger.info("Querying mediator domain state")
     for {
-      medState <- mediatorAdminConnection.getMediatorState(globalDomain)
+      mediatorState <- mediatorAdminConnection.getMediatorState(globalDomain)
       ourParticipant <- participantAdminConnection.getParticipantId(true)
       _ = logger.info("Proposing new mediator")
       _ <- participantAdminConnection.proposeMediators(
         globalDomain,
-        medState.group,
-        medState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
-        mediatorId +: medState.active,
-        medState.observers,
+        mediatorState.group,
+        mediatorState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
+        mediatorId +: mediatorState.active,
+        mediatorState.observers,
         Some(ourParticipant.uid.namespace.fingerprint),
       )
       msg = "Waiting to observe new mediator proposal"
