@@ -25,9 +25,10 @@ val staticParameters =
 val domainId = globalSeqSv1.domain.bootstrap(
   "global-domain",
   staticParameters,
-  domainOwners = Seq.empty[InstanceReferenceX] ++ sequencersX.local ++ mediatorsX.local,
-  sequencers = sequencersX.local,
-  mediators = mediatorsX.local,
+  // TODO(#5087) Make this a union space
+  domainOwners = Seq(sv1Participant, globalSeqSv1, globalMedSv1),
+  sequencers = Seq(globalSeqSv1),
+  mediators = Seq(globalMedSv1),
 )
 
 println("Connecting all participants to global domain...")

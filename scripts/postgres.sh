@@ -162,7 +162,3 @@ case "$1_$2" in
         echo "    stop             removes the postgres instance along with all data"
     ;;
 esac
-
-
-
-

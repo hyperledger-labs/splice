@@ -99,8 +99,15 @@ if [ $x -eq 1 ]; then
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv2_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv3_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv4_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_sv1_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_sv1_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "seq_sv1_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "seq_sv2_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "seq_sv3_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "seq_sv4_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "med_sv1_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "med_sv2_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "med_sv3_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "med_sv4_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_x"
 fi
 
