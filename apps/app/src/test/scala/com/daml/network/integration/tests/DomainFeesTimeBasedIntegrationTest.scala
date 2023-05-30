@@ -1,6 +1,8 @@
 package com.daml.network.integration.tests
 
 import cats.syntax.traverse.*
+import com.daml.network.codegen.java.da.types as daTypes
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.globaldomain.{BaseRateTrafficLimits, ValidatorTraffic}
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs
 import com.daml.network.console.{ValidatorAppBackendReference, WalletAppClientReference}
@@ -25,6 +27,8 @@ import org.slf4j.event.Level
 import java.time.Duration
 import scala.concurrent.Future
 import scala.math.BigDecimal.RoundingMode
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class DomainFeesTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -324,12 +328,81 @@ class DomainFeesTimeBasedIntegrationTest
     }
   }
 
+  "SV automation" should {
+    "archive duplicate validator traffic contracts" in { implicit env =>
+      val minTopupAmount = scan.getCoinConfigAsOf(getLedgerTime).globalDomain.fees.minTopupAmount
+      actAndCheck(
+        "Purchase initial traffic with varying amounts", {
+          buyInitialExtraTraffic(bobValidator, bobValidatorWallet, minTopupAmount)
+          buyInitialExtraTraffic(bobValidator, bobValidatorWallet, 4 * minTopupAmount)
+          buyInitialExtraTraffic(bobValidator, bobValidatorWallet, 2 * minTopupAmount)
+          buyInitialExtraTraffic(bobValidator, bobValidatorWallet, 3 * minTopupAmount)
+        },
+      )(
+        "Purchase with highest amount takes effect while other duplicate contracts are archived",
+        _ => {
+          advanceTimeByPollingInterval(sv1)
+          inside(listAllValidatorTrafficContracts(bobValidator)) { case Seq(validatorTraffic) =>
+            validatorTraffic.data.totalPurchased shouldBe 4 * minTopupAmount
+          }
+        },
+      )
+    }
+  }
+
+  private def buyInitialExtraTraffic(
+      validatorApp: ValidatorAppBackendReference,
+      validatorWallet: WalletAppClientReference,
+      amount: Long,
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val transferContext = scan.getTransferContextWithInstances(getLedgerTime)
+    val coinRules = scan.getCoinRules()
+    val coin = validatorWallet.tap(100)
+    val update = transferContext.coinRules.contractId.exerciseCoinRules_BuyExtraTraffic(
+      Seq[v1.coin.TransferInput](
+        new v1.coin.transferinput.InputCoin(
+          coin.toInterface(v1.coin.Coin.INTERFACE)
+        )
+      ).asJava,
+      new v1.coin.PaymentTransferContext(
+        coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+        new v1.coin.TransferContext(
+          transferContext.latestOpenMiningRound.contractId
+            .toInterface(v1.round.OpenMiningRound.INTERFACE),
+          Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
+          Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
+          None.toJava,
+        ),
+      ),
+      validatorApp.getValidatorPartyId().toProtoPrimitive,
+      new daTypes.either.Left(
+        scan.getCoinConfigAsOf(getLedgerTime).globalDomain.activeDomain
+      ),
+      amount,
+    )
+    validatorApp.participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+      validatorApp.config.ledgerApiUser,
+      Seq(validatorApp.getValidatorPartyId()),
+      Seq(validatorApp.getValidatorPartyId()),
+      update,
+      disclosedContracts = Seq(
+        coinRules.toDisclosedContract,
+        transferContext.latestOpenMiningRound.toDisclosedContract,
+      ),
+    )
+  }
+
   private def lookupCurrentValidatorTraffic(validatorApp: ValidatorAppBackendReference) =
-    validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(ValidatorTraffic.COMPANION)(validatorApp.getValidatorPartyId())
+    listAllValidatorTrafficContracts(validatorApp)
       // ignore duplicate validator traffic contracts with lower total purchased traffic
+      // TODO(#5025): remove these lines
       .sortWith(_.data.totalPurchased > _.data.totalPurchased)
       .slice(0, 1)
+
+  // TODO(#5025): Temporarily added auxiliary method till #5025 is unresolved.
+  private def listAllValidatorTrafficContracts(validatorApp: ValidatorAppBackendReference) =
+    validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
+      .filterJava(ValidatorTraffic.COMPANION)(validatorApp.getValidatorPartyId())
 
   private def baseRateLimits(implicit env: CNNodeTestConsoleEnvironment): BaseRateTrafficLimits = {
     val now = sv1.participantClientWithAdminToken.ledger_api.time.get()

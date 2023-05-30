@@ -23,6 +23,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.daml.network.sv.config.SvAppBackendConfig
+import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
@@ -30,7 +31,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -529,6 +530,25 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.listContractsOnDomain(vl.ValidatorLicense.COMPANION, _)
     )
 
+  def listDuplicateValidatorTrafficContracts(
+      validator: PartyId,
+      domainId: DomainId,
+      limit: Int,
+  ): Future[Option[SvSvcStore.DuplicateValidatorTrafficContracts]] = {
+    multiDomainAcsStore
+      .listContractsOnDomain(
+        cc.globaldomain.ValidatorTraffic.COMPANION,
+        domainId,
+        (vt: SvSvcStore.ValidatorTrafficContract) =>
+          vt.payload.validator == validator.toProtoPrimitive && vt.payload.domainId == domainId.toProtoPrimitive,
+      )
+      // sort the contracts by total purchased traffic, and ...
+      .map(_.sortWith(_.payload.totalPurchased > _.payload.totalPurchased))
+      // ... pick the one with the highest traffic as the reference contract and consider the rest duplicates
+      // upto a max of `limit` contracts
+      .map(vts => vts.headOption.map(DuplicateValidatorTrafficContracts(_, vts.slice(1, limit))))
+  }
+
   def listCoinPriceVotes()(implicit
       tc: TraceContext
   ): Future[
@@ -706,6 +726,7 @@ object SvSvcStore {
         mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
         mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc),
+        mkFilter(cc.globaldomain.ValidatorTraffic.COMPANION)(vt => vt.payload.svc == svc),
         // TODO(M3-46): copy more of the filter over from SvcStore, as we merge more triggers and console commands
       ) ++
         (if (appConfig.enableCoinRulesUpgrade)
@@ -741,5 +762,19 @@ object SvSvcStore {
     }
 
     def toSeq: Seq[OpenMiningRoundContract] = Seq(oldest, middle, newest)
+  }
+
+  type ValidatorTrafficContract =
+    Contract[cc.globaldomain.ValidatorTraffic.ContractId, cc.globaldomain.ValidatorTraffic]
+
+  case class DuplicateValidatorTrafficContracts(
+      reference: ValidatorTrafficContract,
+      duplicates: Seq[ValidatorTrafficContract],
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(
+        param("reference", _.reference),
+        param("duplicates", _.duplicates),
+      )
   }
 }

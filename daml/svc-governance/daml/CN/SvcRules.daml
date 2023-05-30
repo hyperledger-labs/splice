@@ -15,6 +15,7 @@ import CC.Util
 import CC.API.V1.Coin (CoinCreateSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
+import CC.GlobalDomain (ValidatorTraffic)
 
 import qualified CN.CometBft as CometBft
 import CN.SvOnboarding
@@ -901,6 +902,20 @@ template SvcRules with
         staleConfirmation <- fetch staleConfirmationCid
         require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
         archive staleConfirmationCid
+    
+
+    -- Cleaning up duplicate validator traffic contracts
+    ----------------------------------------------------
+
+    nonconsuming choice SvcRules_ArchiveDuplicateValidatorTrafficContracts : ()
+      with
+        coinRulesCid : ContractId CoinRules
+        trafficCid : ContractId ValidatorTraffic
+        duplicateCids : [ContractId ValidatorTraffic]
+      controller leader
+      do
+        requireUnlocked lock
+        exercise coinRulesCid CoinRules_ArchiveDuplicateValidatorTrafficContracts with ..
 
 
     -- Lock or Unlock Choices that could be observed by SVC
