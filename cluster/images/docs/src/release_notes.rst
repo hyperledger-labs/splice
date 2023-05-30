@@ -6,6 +6,10 @@ Release Notes
 2023-06-04
 ----------
 
+* Frontend updates:
+
+  * Reorganized the information tab in SV UI and included rules governing canton coin (e.g. fees) in SV UI.
+
 * Bugfixes
 
   * Fixed the SV onboarding URL in the Helm runbook. It must be ``https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv``

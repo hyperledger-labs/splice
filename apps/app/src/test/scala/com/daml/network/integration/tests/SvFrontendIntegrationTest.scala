@@ -58,17 +58,27 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "have a proper table" in { implicit env =>
+    "have three information tabs" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
-          "svc infos are displayed", {
+          "svc and coin infos are displayed in pretty json", {
             login(port, sv1.config.ledgerApiUser)
           },
         )(
-          "We see a table with sv1 as SV Name",
+          "We see the three tab panels",
           _ => {
-            val rows = findAll(className("value-name")).toSeq
-            rows should have length 15
+            inside(find(id("information-tab-general"))) { case Some(e) =>
+              e.text shouldBe "General"
+            }
+            inside(find(id("information-tab-svc-configuration"))) { case Some(e) =>
+              e.text shouldBe "SVC Configuration"
+            }
+            inside(find(id("information-tab-cc-configuration"))) { case Some(e) =>
+              e.text shouldBe "Canton Coin Configuration"
+            }
+            click on "information-tab-general"
+            val rows = findAll(className("general-svc-value-name")).toSeq
+            rows should have length 8
             forExactly(1, rows)(
               _.text should matchText(sv1.getSvcInfo().svUser)
             )

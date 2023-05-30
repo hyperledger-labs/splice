@@ -18,7 +18,7 @@ const PartyId: React.FC<PartyIdProps> = props => {
         <div
           style={{
             display: 'inline-flex',
-            maxWidth: '160px',
+            maxWidth: '400px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             fontWeight: 'lighter',

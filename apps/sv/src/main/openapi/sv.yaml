@@ -600,7 +600,7 @@ components:
         - sv_user
         - sv_party_id
         - svc_party_id
-        - coin_rules_contract_id
+        - coin_rules
         - svc_rules
       properties:
         # User representing the SV
@@ -613,8 +613,8 @@ components:
         svc_party_id:
           type: string
         # Contract ID of the CoinRules contract associated with the SVC
-        coin_rules_contract_id:
-          type: string
+        coin_rules:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"

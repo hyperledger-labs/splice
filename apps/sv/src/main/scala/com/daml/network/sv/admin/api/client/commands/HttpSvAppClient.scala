@@ -42,7 +42,7 @@ object HttpSvAppClient {
       svUser: String,
       svParty: PartyId,
       svcParty: PartyId,
-      coinRules: CoinRules.ContractId,
+      coinRules: Contract[CoinRules.ContractId, CoinRules],
       svcRules: Contract[SvcRules.ContractId, SvcRules],
   )
 
@@ -198,19 +198,20 @@ object HttpSvAppClient {
               svUser,
               svPartyId,
               svcPartyId,
-              coinRulesContractId,
+              coinRules,
               svcRules,
             )
           ) =>
         for {
           svPartyId <- Codec.decode(Codec.Party)(svPartyId)
           svcPartyId <- Codec.decode(Codec.Party)(svcPartyId)
+          coinRules <- Contract.fromJson(CoinRules.COMPANION)(coinRules).left.map(_.toString)
           svcRules <- Contract.fromJson(SvcRules.COMPANION)(svcRules).left.map(_.toString)
         } yield SvcInfo(
           svUser,
           svPartyId,
           svcPartyId,
-          new CoinRules.ContractId(coinRulesContractId),
+          coinRules,
           svcRules,
         )
     }

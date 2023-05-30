@@ -1,18 +1,13 @@
-import { Loading, PartyId, SvClientProvider } from 'common-frontend';
-import TitledTable from 'common-frontend/lib/components/TitledTable';
+import { Loading, PartyId, SvClientProvider, TitledTable } from 'common-frontend';
 import React from 'react';
+import JSONPretty from 'react-json-pretty';
+import 'react-json-pretty/themes/monikai.css';
 
-import { Box } from '@mui/material';
-import TableBody from '@mui/material/TableBody';
+import { Box, Tab, TableBody, TableRow, Tabs } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
-import TableRow from '@mui/material/TableRow';
 
 import { useSvcInfos } from '../contexts/SvContext';
 import { config } from '../utils';
-
-function createRow(key: string, value: string, isParty: boolean = false) {
-  return { key, value, isParty };
-}
 
 function getInfoTable(title: string, rows: { key: string; value: string; isParty: boolean }[]) {
   return (
@@ -23,12 +18,12 @@ function getInfoTable(title: string, rows: { key: string; value: string; isParty
       <TableBody>
         {rows.map(row => (
           <TableRow key={row.key}>
-            <TableCell align="left" className="key-name">
+            <TableCell align="left" className="general-svc-key-name">
               {row.key}
             </TableCell>
             <TableCell
               align="left"
-              className="value-name"
+              className="general-svc-value-name"
               style={{ wordBreak: row.isParty ? 'normal' : 'break-all' }}
             >
               {row.isParty ? <PartyId partyId={row.value} /> : row.value}
@@ -39,8 +34,10 @@ function getInfoTable(title: string, rows: { key: string; value: string; isParty
     </TitledTable>
   );
 }
-
-const SvcView: React.FC = () => {
+function createRow(key: string, value: string, isParty: boolean = false) {
+  return { key, value, isParty };
+}
+const GeneralInformationView: React.FC = () => {
   const resp = useSvcInfos();
   if (!resp.isLoading) {
     const data = resp.data!;
@@ -57,35 +54,12 @@ const SvcView: React.FC = () => {
     const svcInfos = [
       createRow('svcLeaderPartyId', data.svcRules.payload.leader.toString(), true),
       createRow('svcPartyId', data.svcPartyId, true),
-      createRow('coinRulesContractId', data.coinRulesContractId),
-      createRow('svcRulesContractId', data.svcRules.contractId),
-      createRow('isDevNet', data.svcRules.payload.isDevNet ? 'True' : 'False'),
-    ];
-    const configInfos = [
-      createRow(
-        'svOnboardingConfirmedTimeout (μs)',
-        data.svcRules.payload.config.svOnboardingConfirmedTimeout.microseconds
-      ),
-      createRow(
-        'actionConfirmationTimeout (μs)',
-        data.svcRules.payload.config.actionConfirmationTimeout.microseconds
-      ),
-      createRow(
-        'maxNumCometBftNodes',
-        data.svcRules.payload.config.domainNodeConfigLimits.cometBft.maxNumCometBftNodes
-      ),
-      // TODO(#4902): display all fields of the config, in particular the ones related to the global domain configuration
-      createRow(
-        'numUnclaimedRewardsThreshold',
-        data.svcRules.payload.config.numUnclaimedRewardsThreshold
-      ),
     ];
     return (
       <Box>
         {getInfoTable('Super Validator Information', svInfos)}
         {getInfoTable('Super Validator Collective Members', membersInfos)}
         {getInfoTable('Super Validator Collective Information', svcInfos)}
-        {getInfoTable('Super Validator Collective Configuration', configInfos)}
       </Box>
     );
   } else {
@@ -97,10 +71,83 @@ const SvcView: React.FC = () => {
   }
 };
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel = (props: TabPanelProps) => {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+};
+
+function tabProps(info: string) {
+  return {
+    id: `information-tab-${info}`,
+    'aria-controls': `information-panel-${info}`,
+  };
+}
+const SvcViewPrettyJSON = () => {
+  const [value, setValue] = React.useState(0);
+
+  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+    setValue(newValue);
+  };
+
+  const resp = useSvcInfos();
+  if (resp.isLoading) {
+    return <Loading />;
+  }
+  const data = resp.data;
+  var JSONPrettyMon = require('react-json-pretty/dist/monikai');
+
+  return (
+    <>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={value} onChange={handleChange} aria-label="json tabs">
+          <Tab label="General" {...tabProps('general')} />
+          <Tab label="SVC Configuration" {...tabProps('svc-configuration')} />
+          <Tab label="Canton Coin Configuration" {...tabProps('cc-configuration')} />
+        </Tabs>
+      </Box>
+      <TabPanel value={value} index={0}>
+        <GeneralInformationView />
+      </TabPanel>
+      <TabPanel value={value} index={1}>
+        <JSONPretty
+          id="svc-rules-information"
+          style={{ fontSize: '10pt' }}
+          data={data?.svcRules}
+          theme={JSONPrettyMon}
+        />
+      </TabPanel>
+      <TabPanel value={value} index={2}>
+        <JSONPretty
+          id="coin-rules-information"
+          style={{ fontSize: '10pt' }}
+          data={data?.coinRules}
+          theme={JSONPrettyMon}
+        />
+      </TabPanel>
+    </>
+  );
+};
+
 const SvcWithContexts: React.FC = () => {
   return (
     <SvClientProvider url={config.services.sv.url}>
-      <SvcView />
+      <SvcViewPrettyJSON />
     </SvClientProvider>
   );
 };

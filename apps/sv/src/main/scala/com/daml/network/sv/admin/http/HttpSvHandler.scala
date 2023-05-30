@@ -234,7 +234,7 @@ class HttpSvHandler(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         svcPartyId = svcParty.toProtoPrimitive,
-        coinRulesContractId = coinRules.contractId.toString,
+        coinRules = coinRules.toJson,
         svcRules = svcRules.toJson,
       )
     }
