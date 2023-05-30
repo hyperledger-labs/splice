@@ -102,6 +102,11 @@ final case class SvSequencerConfig(
     publicApi: ClientConfig,
 )
 
+final case class SvMediatorConfig(
+    adminApi: ClientConfig
+)
+
 final case class SvXNodesConfig(
-    sequencer: SvSequencerConfig
+    sequencer: SvSequencerConfig,
+    mediator: SvMediatorConfig,
 )

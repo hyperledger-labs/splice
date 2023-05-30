@@ -179,6 +179,12 @@ class SvAppBackendReference(
       httpCommand(HttpSvAdminAppClient.GetSequencerNodeStatus())
     }
 
+  @Help.Summary("Get the mediator node status")
+  def mediatorNodeStatus(): NodeStatus[CNNodeStatus] =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
+    }
+
   /** Remote participant this sv app is configured to interact with. */
   lazy val participantClient =
     new CNParticipantClientReference(

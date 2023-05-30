@@ -260,4 +260,27 @@ object HttpSvAdminAppClient {
     }
   }
 
+  case class GetMediatorNodeStatus()
+      extends BaseCommand[
+        http.GetMediatorNodeStatusResponse,
+        NodeStatus[CNNodeStatus],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetMediatorNodeStatusResponse] =
+      client.getMediatorNodeStatus(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      http.GetMediatorNodeStatusResponse,
+      Either[String, NodeStatus[CNNodeStatus]],
+    ] = { case http.GetMediatorNodeStatusResponse.OK(response) =>
+      CNNodeStatus.fromJsonNodeStatus(CNNodeStatus.fromJsonV0)(response)
+    }
+  }
 }

@@ -2,7 +2,11 @@ package com.daml.network.sv.admin.http
 
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.environment.{CNNodeStatus, SequencerAdminConnection}
+import com.daml.network.environment.{
+  CNNodeStatus,
+  MediatorAdminConnection,
+  SequencerAdminConnection,
+}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.http.v0.definitions.{
   CometBftNodeDumpResponse,
@@ -33,6 +37,7 @@ class HttpSvAdminHandler(
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
     sequencerAdminConnection: Option[SequencerAdminConnection],
+    mediatorAdminConnection: Option[MediatorAdminConnection],
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -285,6 +290,16 @@ class HttpSvAdminHandler(
     )
   }
 
+  override def getMediatorNodeStatus(
+      respond: SvAdminResource.GetMediatorNodeStatusResponse.type
+  )()(extracted: String): Future[
+    SvAdminResource.GetMediatorNodeStatusResponse
+  ] = withNewTrace(workflowId) { implicit tc => _ =>
+    withMediatorConnectionOrNotFound(respond.NotFound)(
+      _.getStatus.map(CNNodeStatus.toJsonNodeStatus(_))
+    )
+  }
+
   private def withClientOrNotFound[T](
       notFound: ErrorResponse => T
   )(call: CometBftClient => Future[T]) = cometBftClient
@@ -298,6 +313,14 @@ class HttpSvAdminHandler(
   )(call: SequencerAdminConnection => Future[T]) = sequencerAdminConnection
     .fold {
       notFound(ErrorResponse("Sequencer is not configured."))
+        .pure[Future]
+    } { call }
+
+  private def withMediatorConnectionOrNotFound[T](
+      notFound: ErrorResponse => T
+  )(call: MediatorAdminConnection => Future[T]) = mediatorAdminConnection
+    .fold {
+      notFound(ErrorResponse("Mediator is not configured."))
         .pure[Future]
     } { call }
 }

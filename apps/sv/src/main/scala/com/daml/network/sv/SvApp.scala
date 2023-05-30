@@ -112,9 +112,17 @@ class SvApp(
         loggerFactory,
       )
     )
+    val mediatorAdminConnection = config.xNodes.map(config =>
+      new MediatorAdminConnection(
+        config.mediator.adminApi,
+        timeouts,
+        loggerFactory,
+      )
+    )
     initialize(
       participantAdminConnection,
       sequencerAdminConnection,
+      mediatorAdminConnection,
       ledgerClient,
       svPartyId,
     )
@@ -123,6 +131,7 @@ class SvApp(
         // init failures.
         participantAdminConnection.close()
         sequencerAdminConnection.foreach(_.close())
+        mediatorAdminConnection.foreach(_.close())
         Future.failed(err)
       }
   }
@@ -130,6 +139,7 @@ class SvApp(
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
       sequencerAdminConnection: Option[SequencerAdminConnection],
+      mediatorAdminConnection: Option[MediatorAdminConnection],
       ledgerClient: CNLedgerClient,
       svPartyId: PartyId,
   ): Future[SvApp.State] = {
@@ -209,6 +219,7 @@ class SvApp(
         svcAutomation,
         cometBftClient,
         sequencerAdminConnection,
+        mediatorAdminConnection,
         clock,
         loggerFactory,
       )
