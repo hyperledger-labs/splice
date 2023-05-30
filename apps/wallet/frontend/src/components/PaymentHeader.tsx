@@ -1,36 +1,20 @@
 import * as React from 'react';
-import BigNumber from 'bignumber.js';
-import { AmountDisplay, useInterval } from 'common-frontend';
+import { AmountDisplay } from 'common-frontend';
+import ErrorDisplay from 'common-frontend/lib/components/ErrorDisplay';
 import Loading from 'common-frontend/lib/components/Loading';
-import { useCallback, useState } from 'react';
 
 import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
-import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks';
-import { WalletBalance } from '../models/models';
+import { useBalance, useCoinPrice } from '../hooks';
 import CurrentUser from './CurrentUser';
 import { LogoutButton } from './LogoutButton';
 
 const PaymentHeader: React.FC = () => {
-  const walletClient = useWalletClient();
-
   const coinPriceQuery = useCoinPrice();
+  const balanceQuery = useBalance();
 
-  const [walletBalance, setWalletBalance] = useState<WalletBalance>({
-    availableCC: new BigNumber(0),
-  });
-
-  const fetchBalance = useCallback(async () => {
-    const balance = await walletClient.getBalance();
-    setWalletBalance(balance);
-  }, [walletClient]);
-
-  useInterval(fetchBalance);
-
-  if (coinPriceQuery.isLoading) {
-    return <Loading />;
-  }
+  const isLoading = coinPriceQuery.isLoading || balanceQuery.isLoading;
+  const isError = coinPriceQuery.isError || balanceQuery.isError;
 
   return (
     <Box bgcolor="colors.neutral.20">
@@ -46,16 +30,22 @@ const PaymentHeader: React.FC = () => {
             <Divider flexItem orientation="vertical" />
             <LogoutButton />
           </Stack>
-          <Typography className="available-balance">
-            Total Available Balance:{' '}
-            <AmountDisplay amount={walletBalance.availableCC} currency="CC" /> /{' '}
-            <AmountDisplay
-              amount={walletBalance.availableCC}
-              currency="CC"
-              convert="CCtoUSD"
-              coinPrice={coinPriceQuery.data}
-            />
-          </Typography>
+          {isLoading ? (
+            <Loading />
+          ) : isError ? (
+            <ErrorDisplay message={'Error while fetching coin price and balance'} />
+          ) : (
+            <Typography className="available-balance">
+              Total Available Balance:{' '}
+              <AmountDisplay amount={balanceQuery.data.availableCC} currency="CC" /> /{' '}
+              <AmountDisplay
+                amount={balanceQuery.data.availableCC}
+                currency="CC"
+                convert="CCtoUSD"
+                coinPrice={coinPriceQuery.data}
+              />
+            </Typography>
+          )}
         </Stack>
         {/*Empty element to align the other two to left and center*/}
         <div style={{ flex: 1 }} />

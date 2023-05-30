@@ -32,6 +32,7 @@ interface UserState {
 }
 
 export enum OnboardedStatus {
+  // TODO(#5149) We should not have a separate Loading state for Onboarding
   Loading,
   NotOnboarded,
   Onboarded,
