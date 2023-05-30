@@ -12,7 +12,7 @@ fi
 set -euo pipefail
 
 if [ "${2-}" != "--artifactory" ]; then
-    echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:$(version-gen)"
+    echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${GCP_REPO_NAME}/${appname}:$(get-docker-image-tag)"
 else
-    echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:$(version-gen)"
+    echo "digitalasset-canton-network-docker.jfrog.io/digitalasset/${appname}:$(get-docker-image-tag)"
 fi

@@ -26,4 +26,4 @@ fi
 
 
 # get the deployment version tag
-echo "git-${revision_prefix}$(git rev-parse HEAD)${revision_suffix}"
+echo "${revision_prefix}$(get-snapshot-version)${revision_suffix}"

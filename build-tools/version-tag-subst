@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-IMAGE_TAG=$(version-gen)
+IMAGE_TAG=$(get-docker-image-tag)
 
 VERSION_NUMBER=$(get-snapshot-version)
 

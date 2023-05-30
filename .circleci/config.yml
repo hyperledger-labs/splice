@@ -1055,7 +1055,7 @@ jobs:
          cmd: |
            echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
            export GOOGLE_CLOUD_PROJECT=da-cn-images
-           VERSION=$(version-gen)
+           VERSION=$(get-snapshot-version)
            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
            # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
            # which would lead to an error due to a misisng `delete` permission

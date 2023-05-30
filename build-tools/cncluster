@@ -18,7 +18,7 @@ fi
 
 ##
 
-SOURCE_IMAGE_TAG=$(version-gen)
+SOURCE_IMAGE_TAG=$(get-docker-image-tag)
 GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
 CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 
