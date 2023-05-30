@@ -100,16 +100,23 @@ if [ $x -eq 1 ]; then
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv3_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv4_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_splitwell"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_splitwell_upgrade"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv1_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv2_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv3_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv4_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_splitwell_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_splitwell_upgrade_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv1_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv2_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv3_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv4_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_splitwell_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_splitwell_upgrade_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell_x"
 fi
 
 function tmux_cmd() {

@@ -7,33 +7,59 @@ import com.digitalasset.canton.console.ParticipantReference
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
-import com.digitalasset.canton.console.InstanceReferenceX
+import com.digitalasset.canton.console.LocalInstanceReferenceX
 import com.digitalasset.canton.DomainAlias
 
 println("Running canton bootstrap script...")
 
-val staticParameters =
-  DomainParametersConfig(
-    protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
-    devVersionSupport = true,
-    uniqueContractKeys = false,
-  )
-    .toStaticDomainParameters(globalSequencerSv1.config.crypto)
+val domainParametersConfig = DomainParametersConfig(
+  protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
+  devVersionSupport = true,
+  uniqueContractKeys = false,
+)
+
+def staticParameters(sequencer: LocalInstanceReferenceX) =
+  domainParametersConfig
+    .toStaticDomainParameters(sequencer.config.crypto)
     .flatMap(StaticDomainParameters(_).leftMap(_.toString))
     .getOrElse(sys.error("whatever"))
 
-val domainId = globalSequencerSv1.domain.bootstrap(
+val globalDomainId = globalSequencerSv1.domain.bootstrap(
   "global-domain",
-  staticParameters,
+  staticParameters(globalSequencerSv1),
   // TODO(#5087) Make this a union space
   domainOwners = Seq(sv1Participant, globalSequencerSv1, globalMediatorSv1),
   sequencers = Seq(globalSequencerSv1),
   mediators = Seq(globalMediatorSv1),
 )
 
+Seq(
+  ("splitwell", splitwellSequencer, splitwellMediator),
+  ("splitwellUpgrade", splitwellUpgradeSequencer, splitwellUpgradeMediator),
+).foreach { case (name, sequencer, mediator) =>
+  sequencer.domain.bootstrap(
+    name,
+    staticParameters(sequencer),
+    domainOwners = Seq(sequencer, mediator),
+    sequencers = Seq(sequencer),
+    mediators = Seq(mediator),
+  )
+}
+
 println("Connecting all participants to global domain...")
 participantsX.local.foreach(
   _.domains.connect_local(globalSequencerSv1, alias = Some(DomainAlias.tryCreate("global")))
+)
+
+println("Connecting splitwell, alice & bob participant to splitwell domain...")
+Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(
+  _.domains.connect_local(splitwellSequencer, alias = Some(DomainAlias.tryCreate("splitwell")))
+)
+// We only connect splitwell by default since we want to simulate users connecting gradually to the domain.
+println("Connecting splitwell to upgraded domain...")
+splitwellParticipant.domains.connect_local(
+  splitwellUpgradeSequencer,
+  alias = Some(DomainAlias.tryCreate("splitwellUpgrade")),
 )
 
 println(s"Collecting admin tokens...")

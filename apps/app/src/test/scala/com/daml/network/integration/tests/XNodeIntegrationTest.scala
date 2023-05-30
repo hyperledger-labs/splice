@@ -21,10 +21,12 @@ class XNodeIntegrationTest extends CNNodeIntegrationTest with SvTestUtil with Wa
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyX(this.getClass.getSimpleName)
+      .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")
 
   "SV onboarding on X nodes" in { implicit env =>
+    initSvc()
     clue("Sequencers are initialized") {
       sv1.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
       sv2.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
@@ -57,6 +59,8 @@ class XNodeIntegrationTest extends CNNodeIntegrationTest with SvTestUtil with Wa
       sv3.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
       sv4.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
     }
+
+    aliceValidator.startSync()
 
     // Check that things work for external validators
     clue("Alice can tap") {

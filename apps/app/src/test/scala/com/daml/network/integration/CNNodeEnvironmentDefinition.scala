@@ -218,7 +218,7 @@ object CNNodeEnvironmentDefinition {
       .withInitializedNodes()
 
   def simpleTopologyX(testName: String): CNNodeEnvironmentDefinition =
-    fromResource("simple-topology-x.conf", testName)
+    fromResources(Seq("simple-topology.conf", "x-node-overrides.conf"), testName)
       .withAllocatedValidatorUsers()
       .withAllocatedSvcAndSvUsers()
       .withInitializedNodes()
@@ -259,12 +259,18 @@ object CNNodeEnvironmentDefinition {
 
   def fromResource(path: String, testName: String): CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition(
-      baseConfig = loadConfigFromResource(path),
+      baseConfig = loadConfigFromResources(path),
       context = testName,
     )
 
-  private def loadConfigFromResource(path: String): CNNodeConfig = {
-    val rawConfig = ConfigFactory.parseString(Resource.getAsString(path))
+  def fromResources(paths: Seq[String], testName: String): CNNodeEnvironmentDefinition =
+    CNNodeEnvironmentDefinition(
+      baseConfig = loadConfigFromResources(paths: _*),
+      context = testName,
+    )
+
+  private def loadConfigFromResources(paths: String*): CNNodeConfig = {
+    val rawConfig = ConfigFactory.parseString(paths.map(Resource.getAsString(_)).mkString("\n"))
     CNNodeConfig.loadOrThrow(rawConfig)
   }
 
