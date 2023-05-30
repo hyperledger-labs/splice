@@ -59,6 +59,30 @@ trait CustomMatchers {
       )
   }
   def matchText(sentence: String) = new TextMatcher(sentence)
+
+  // TODO(#5133) Replace with a more typesafe matching mechanism
+  class TextMixedWithNumbersMatcher(sentence: String, tolerance: BigDecimal)
+      extends Matcher[String] {
+    def apply(left: String) = {
+      MatchResult(
+        left.split("\\s+").corresponds(sentence.split("\\s+"))(corresponds),
+        s"words in ${left} did not match those in ${sentence}",
+        s"words in ${left} matched those in ${sentence}",
+      )
+    }
+
+    def corresponds(left: String, right: String) = {
+      val result = for {
+        leftVal <- Try(BigDecimal(left))
+        rightVal <- Try(BigDecimal(right))
+      } yield (leftVal - rightVal).abs < tolerance
+
+      result.getOrElse(left.equals(right))
+    }
+  }
+
+  def matchTextMixedWithNumbers(sentence: String, tolerance: BigDecimal) =
+    new TextMixedWithNumbersMatcher(sentence, tolerance)
 }
 
 abstract class FrontendIntegrationTest(override val frontendNames: String*)

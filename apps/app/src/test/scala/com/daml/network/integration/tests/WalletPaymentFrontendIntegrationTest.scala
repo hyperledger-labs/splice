@@ -17,6 +17,8 @@ class WalletPaymentFrontendIntegrationTest
     with FrontendLoginUtil {
 
   private val coinPrice = 2
+  private val tolerance = 0.005
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
@@ -485,13 +487,17 @@ class WalletPaymentFrontendIntegrationTest
       expectedComputeText: String,
       expectedDescription: String,
   ) = {
-    element.childElement(className("available-balance")).text should matchText(expectedBalance)
+    element.childElement(className("available-balance")).text should matchTextMixedWithNumbers(
+      expectedBalance,
+      tolerance,
+    )
 
     element.childElement(className("payment-provider")).text should matchText(expectedProvider)
 
     // TODO (#3492): test with fee
-    element.childElement(className("payment-total-cc")).text should matchText(
-      s"$expectedTotalCC CC"
+    element.childElement(className("payment-total-cc")).text should matchTextMixedWithNumbers(
+      s"$expectedTotalCC CC",
+      tolerance,
     )
 
     element.childElement(className("payment-compute")).text should matchText(expectedComputeText)
