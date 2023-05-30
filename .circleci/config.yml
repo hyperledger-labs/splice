@@ -1205,9 +1205,15 @@ jobs:
       - record_job_start_time
       - setup_nix
       - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            set -eou pipefail
+            make cluster/build
+      - run_bash_command_in_nix:
           cmd_name: Apply Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
             set -eou pipefail
@@ -1215,6 +1221,9 @@ jobs:
             git checkout testnet-next
 
             cncluster activate
+            export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
+            export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
+            export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
             cncluster ci_apply
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
