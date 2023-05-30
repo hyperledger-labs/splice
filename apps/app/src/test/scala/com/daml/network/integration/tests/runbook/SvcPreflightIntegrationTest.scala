@@ -52,7 +52,7 @@ class SvcPreflightIntegrationTest extends FrontendIntegrationTestWithSharedEnvir
             s"We see a table with correct info data about SV$i",
             _ => {
               val svInfo = sv.getSvcInfo()
-              inside(findAll(className("value-name")).toSeq.take(2)) {
+              inside(findAll(className("general-svc-value-name")).toSeq.take(2)) {
                 case Seq(svUser, svPartyId) =>
                   svUser.text should matchText(svInfo.svUser)
                   svPartyId.text should matchText(svInfo.svParty.toProtoPrimitive)
