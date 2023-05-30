@@ -90,6 +90,24 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+  /admin/domain/sequencer/status:
+    get:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "getSequencerNodeStatus"
+      responses:
+        "200":
+          description: "Status of sequencer node"
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/NodeStatus"
+        "404":
+          description: "Sequencer is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
   /admin/sv/identity/approve:
     post:
       tags: [sv]

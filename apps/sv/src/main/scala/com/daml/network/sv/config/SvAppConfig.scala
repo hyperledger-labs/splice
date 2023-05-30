@@ -79,7 +79,7 @@ case class SvAppBackendConfig(
     initialCoinPriceVote: Option[BigDecimal] = None,
     enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,
-    useXNodes: Boolean = false,
+    xNodes: Option[SvXNodesConfig] = None,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 
@@ -95,4 +95,12 @@ case class CometBftConfig(
     enabled: Boolean = false,
     connectionUri: String = "",
     votingPower: Long = 0,
+)
+
+final case class SvSequencerConfig(
+    adminApi: ClientConfig
+)
+
+final case class SvXNodesConfig(
+    sequencer: SvSequencerConfig
 )

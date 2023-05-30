@@ -25,19 +25,7 @@ class HttpAdminHandler(
       respond: v0.CommonAdminResource.GetHealthStatusResponse.type
   )(): Future[v0.CommonAdminResource.GetHealthStatusResponse] = withNewTrace(workflowId) { _ => _ =>
     status
-      .map {
-        case data.NodeStatus.Success(status) =>
-          definitions.NodeStatus(success = Some(status.toJsonV0))
-        case data.NodeStatus.NotInitialized(active) =>
-          definitions.NodeStatus(
-            notInitialized = Some(
-              definitions.NotInitialized(active)
-            )
-          )
-        case data.NodeStatus.Failure(_) =>
-          definitions.NodeStatus(None, None)
-      }
-      .map(respond.OK(_))
+      .map(s => respond.OK(CNNodeStatus.toJsonNodeStatus(s)))
   }
 
   override def getVersion(

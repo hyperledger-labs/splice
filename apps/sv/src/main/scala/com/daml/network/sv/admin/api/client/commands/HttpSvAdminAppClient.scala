@@ -8,6 +8,7 @@ import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpComman
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
+import com.daml.network.environment.CNNodeStatus
 import com.daml.network.http.v0.definitions.{CometBftNodeDumpResponse, CometBftNodeStatusResponse}
 import com.daml.network.http.v0.svAdmin.{
   GetCometBftNodeDebugDumpResponse,
@@ -15,6 +16,7 @@ import com.daml.network.http.v0.svAdmin.{
 }
 import com.daml.network.http.v0.{definitions, svAdmin as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.duration.FiniteDuration
@@ -231,6 +233,30 @@ object HttpSvAdminAppClient {
       Either[String, CometBftNodeDumpResponse],
     ] = { case http.GetCometBftNodeDebugDumpResponse.OK(response) =>
       response.response.toRight(response.error.map(_.error).getOrElse("No response found"))
+    }
+  }
+
+  case class GetSequencerNodeStatus()
+      extends BaseCommand[
+        http.GetSequencerNodeStatusResponse,
+        NodeStatus[CNNodeStatus],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSequencerNodeStatusResponse] =
+      client.getSequencerNodeStatus(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      http.GetSequencerNodeStatusResponse,
+      Either[String, NodeStatus[CNNodeStatus]],
+    ] = { case http.GetSequencerNodeStatusResponse.OK(response) =>
+      CNNodeStatus.fromJsonNodeStatus(CNNodeStatus.fromJsonV0)(response)
     }
   }
 

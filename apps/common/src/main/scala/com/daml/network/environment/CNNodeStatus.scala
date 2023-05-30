@@ -66,6 +66,38 @@ case class CNNodeStatus(
 }
 
 object CNNodeStatus {
+  def fromStatus[S <: NodeStatus.Status](status: S): CNNodeStatus =
+    CNNodeStatus(
+      status.uid,
+      status.uptime,
+      status.ports,
+      status.active,
+    )
+  def toJsonNodeStatus[S <: NodeStatus.Status](status: NodeStatus[S]): jsonV0.NodeStatus =
+    status match {
+      case NodeStatus.Success(status) =>
+        jsonV0.NodeStatus(success = Some(CNNodeStatus.fromStatus(status).toJsonV0))
+      case NodeStatus.NotInitialized(active) =>
+        jsonV0.NodeStatus(
+          notInitialized = Some(jsonV0.NotInitialized(active))
+        )
+      case NodeStatus.Failure(_) =>
+        jsonV0.NodeStatus(None, None)
+    }
+
+  def fromJsonNodeStatus[S <: NodeStatus.Status](
+      deserialize: jsonV0.Status => Either[String, S]
+  )(status: jsonV0.NodeStatus): Either[String, NodeStatus[S]] =
+    status match {
+      case jsonV0.NodeStatus(None, Some(success)) => {
+        deserialize(success).map(NodeStatus.Success(_))
+      }
+      case jsonV0.NodeStatus(Some(notInitialized), None) => {
+        Right(NodeStatus.NotInitialized(notInitialized.active))
+      }
+      case _ => Left("Unsuccessful status response")
+    }
+
   def fromJsonV0(json: jsonV0.Status): Either[String, CNNodeStatus] = {
     for {
       uid <- UniqueIdentifier

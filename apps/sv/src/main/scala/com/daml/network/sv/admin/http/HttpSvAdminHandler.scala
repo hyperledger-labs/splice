@@ -2,6 +2,7 @@ package com.daml.network.sv.admin.http
 
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
+import com.daml.network.environment.{CNNodeStatus, SequencerAdminConnection}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.http.v0.definitions.{
   CometBftNodeDumpResponse,
@@ -31,6 +32,7 @@ class HttpSvAdminHandler(
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
+    sequencerAdminConnection: Option[SequencerAdminConnection],
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -273,6 +275,16 @@ class HttpSvAdminHandler(
     }
   }
 
+  override def getSequencerNodeStatus(
+      respond: SvAdminResource.GetSequencerNodeStatusResponse.type
+  )()(extracted: String): Future[
+    SvAdminResource.GetSequencerNodeStatusResponse
+  ] = withNewTrace(workflowId) { implicit tc => _ =>
+    withSequencerConnectionOrNotFound(respond.NotFound)(
+      _.getStatus.map(CNNodeStatus.toJsonNodeStatus(_))
+    )
+  }
+
   private def withClientOrNotFound[T](
       notFound: ErrorResponse => T
   )(call: CometBftClient => Future[T]) = cometBftClient
@@ -281,4 +293,11 @@ class HttpSvAdminHandler(
         .pure[Future]
     } { call }
 
+  private def withSequencerConnectionOrNotFound[T](
+      notFound: ErrorResponse => T
+  )(call: SequencerAdminConnection => Future[T]) = sequencerAdminConnection
+    .fold {
+      notFound(ErrorResponse("Sequencer is not configured."))
+        .pure[Future]
+    } { call }
 }

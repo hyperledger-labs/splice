@@ -105,16 +105,31 @@ class SvApp(
       timeouts,
       loggerFactory,
     )
-    initialize(participantAdminConnection, ledgerClient, svPartyId).recoverWith { case err =>
-      // TODO(#3474) Replace this by a more general solution for closing resources on
-      // init failures.
-      participantAdminConnection.close()
-      Future.failed(err)
-    }
+    val sequencerAdminConnection = config.xNodes.map(config =>
+      new SequencerAdminConnection(
+        config.sequencer.adminApi,
+        timeouts,
+        loggerFactory,
+      )
+    )
+    initialize(
+      participantAdminConnection,
+      sequencerAdminConnection,
+      ledgerClient,
+      svPartyId,
+    )
+      .recoverWith { case err =>
+        // TODO(#3474) Replace this by a more general solution for closing resources on
+        // init failures.
+        participantAdminConnection.close()
+        sequencerAdminConnection.foreach(_.close())
+        Future.failed(err)
+      }
   }
 
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
+      sequencerAdminConnection: Option[SequencerAdminConnection],
       ledgerClient: CNLedgerClient,
       svPartyId: PartyId,
   ): Future[SvApp.State] = {
@@ -132,7 +147,11 @@ class SvApp(
       )
       globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global.alias)
       _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
-      svcPartyHosting = newSvcPartyHosting(storeKey, participantAdminConnection)
+      svcPartyHosting = newSvcPartyHosting(
+        storeKey,
+        participantAdminConnection,
+        useXNodes = sequencerAdminConnection.isDefined,
+      )
       cometBftClient = newCometBftClient
       (svcStore, svcAutomation) <- ensureOnboarded(
         svAutomation,
@@ -188,6 +207,7 @@ class SvApp(
         svAutomation,
         svcAutomation,
         cometBftClient,
+        sequencerAdminConnection,
         clock,
         loggerFactory,
       )
@@ -250,6 +270,7 @@ class SvApp(
     } yield {
       SvApp.State(
         participantAdminConnection,
+        sequencerAdminConnection,
         storage,
         svStore,
         svcStore,
@@ -475,7 +496,7 @@ class SvApp(
   private def getParticipantId(
       participantAdminConnection: ParticipantAdminConnection
   ): Future[ParticipantId] = {
-    participantAdminConnection.getParticipantId(config.useXNodes)
+    participantAdminConnection.getParticipantId(config.xNodes.isDefined)
   }
 
   private def newSvStore(key: SvStore.Key) = SvSvStore(
@@ -531,11 +552,12 @@ class SvApp(
   private def newSvcPartyHosting(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
+      useXNodes: Boolean,
   ) = new SvcPartyHosting(
     config.onboarding,
     participantAdminConnection,
     storeKey.svcParty,
-    config.useXNodes,
+    useXNodes,
     coinAppParameters,
     retryProvider,
     loggerFactory,
@@ -989,6 +1011,7 @@ class SvApp(
 object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
+      sequencerAdminConnection: Option[SequencerAdminConnection],
       storage: Storage,
       svStore: SvSvStore,
       svcStore: SvSvcStore,
@@ -1015,6 +1038,10 @@ object SvApp {
         SyncCloseable("svc store", svcStore.close()),
         SyncCloseable("sv automation", svAutomation.close()),
         SyncCloseable("svc automation", svcAutomation.close()),
+        SyncCloseable(
+          s"Sequencer Admin connection",
+          sequencerAdminConnection.foreach(_.close()),
+        ),
         SyncCloseable(
           s"Participant Admin connection",
           participantAdminConnection.close(),

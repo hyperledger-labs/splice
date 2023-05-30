@@ -5,6 +5,7 @@ import akka.stream.Materializer
 import cats.data.EitherT
 
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import com.daml.network.environment.CNNodeStatus
 import com.daml.network.http.v0.{commonAdmin as http, definitions}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
@@ -39,18 +40,8 @@ object HttpAdminAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = {
-      case http.GetHealthStatusResponse.OK(response) => {
-        response match {
-          case definitions.NodeStatus(None, Some(success)) => {
-            deserialize(success).map(NodeStatus.Success(_))
-          }
-          case definitions.NodeStatus(Some(notInitialized), None) => {
-            Right(NodeStatus.NotInitialized(notInitialized.active))
-          }
-          case _ => Left("Unsuccessful status response")
-        }
-      }
+    ) = { case http.GetHealthStatusResponse.OK(response) =>
+      CNNodeStatus.fromJsonNodeStatus(deserialize)(response)
     }
   }
 

@@ -462,6 +462,10 @@ object CNNodeConfig {
     implicit val approvedSvIdentityConfigReader: ConfigReader[ApprovedSvIdentityConfig] =
       deriveReader[ApprovedSvIdentityConfig]
     implicit val cometBftConfigReader: ConfigReader[CometBftConfig] = deriveReader
+    implicit val svSequencerConfig: ConfigReader[SvSequencerConfig] =
+      deriveReader[SvSequencerConfig]
+    implicit val svXNodesConfig: ConfigReader[SvXNodesConfig] =
+      deriveReader[SvXNodesConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig]
 
@@ -595,6 +599,10 @@ object CNNodeConfig {
     implicit val approvedSvIdentityConfigWriter: ConfigWriter[ApprovedSvIdentityConfig] =
       deriveWriter[ApprovedSvIdentityConfig]
     implicit val cometBftConfigWriter: ConfigWriter[CometBftConfig] = deriveWriter
+    implicit val svSequencerConfig: ConfigWriter[SvSequencerConfig] =
+      deriveWriter[SvSequencerConfig]
+    implicit val svXNodesConfig: ConfigWriter[SvXNodesConfig] =
+      deriveWriter[SvXNodesConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

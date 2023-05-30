@@ -6,12 +6,13 @@ import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cc.round as cr
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions.{CometBftNodeDumpResponse, CometBftNodeStatusResponse}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
@@ -163,6 +164,12 @@ class SvAppBackendReference(
   def cometBftNodeDump(): CometBftNodeDumpResponse =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetCometBftNodeDump())
+    }
+
+  @Help.Summary("Get the sequencer node status")
+  def sequencerNodeStatus(): NodeStatus[CNNodeStatus] =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.GetSequencerNodeStatus())
     }
 
   /** Remote participant this sv app is configured to interact with. */
