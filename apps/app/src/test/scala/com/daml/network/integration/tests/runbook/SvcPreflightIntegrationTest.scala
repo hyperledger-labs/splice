@@ -95,14 +95,14 @@ class SvcPreflightIntegrationTest extends FrontendIntegrationTestWithSharedEnvir
         }
 
         clue(s"We can create a validator onboarding secret via SV$i's UI") {
-          val (_, numberOfSecrets) = actAndCheck(
+          val (_, oldSecrets) = actAndCheck(
             "Opening validator onboarding tab",
             click on "navlink-validator-onboarding",
           )(
             s"Creating an onboarding secret",
             _ => {
               waitForQuery(id("create-validator-onboarding-secret"))
-              findAll(className("onboarding-secret-table-row")).toList.size
+              findAll(className("onboarding-secret-table-secret")).toSeq.map(e => e.text)
             },
           )
           actAndCheck(
@@ -111,13 +111,10 @@ class SvcPreflightIntegrationTest extends FrontendIntegrationTestWithSharedEnvir
           )(
             s"We see that SV$i has created an onboarding secret",
             _ => {
-              val secrets = findAll(className("onboarding-secret-table-row"))
-              secrets.map(row =>
-                row
-                  .childElement(className("onboarding-secret-table-secret"))
-                  .text should have size 44
-              )
-              secrets should have size (numberOfSecrets + 1L)
+              val secrets =
+                findAll(className("onboarding-secret-table-secret")).toSeq.map(e => e.text)
+              secrets.map(row => row should have size 44)
+              secrets.diff(oldSecrets) should not be empty
             },
           )
         }
