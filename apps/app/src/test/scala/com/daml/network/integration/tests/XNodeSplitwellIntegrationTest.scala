@@ -3,6 +3,7 @@ package com.daml.network.integration.tests
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -16,7 +17,7 @@ import org.slf4j.event.Level
 
 import scala.concurrent.Future
 
-class SplitwellIntegrationTest
+class XNodeSplitwellIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with SplitwellTestUtil
     with WalletTestUtil {
@@ -26,7 +27,10 @@ class SplitwellIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       .withAdditionalSetup(implicit env => {
         aliceValidator.participantClient.dars.upload(darPath)
         bobValidator.participantClient.dars.upload(darPath)
