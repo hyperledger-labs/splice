@@ -1,5 +1,4 @@
-import { ConfigReader } from 'common-frontend';
-import { authSchema, serviceSchema, testAuthSchema } from 'common-frontend/lib/config/schema';
+import { ConfigReader, authSchema, serviceSchema, testAuthSchema } from 'common-frontend';
 import { z } from 'zod';
 
 const reader = new ConfigReader(

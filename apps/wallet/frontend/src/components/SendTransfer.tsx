@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { DirectoryField } from 'common-frontend';
+import { useCoinPrice } from 'common-frontend/scan-api';
 import addHours from 'date-fns/addHours';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +22,6 @@ import {
 } from '@mui/material';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice } from '../hooks';
 
 const SendTransfer: React.FC = () => {
   const { createTransferOffer } = useWalletClient();

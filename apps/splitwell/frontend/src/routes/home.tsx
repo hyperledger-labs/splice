@@ -1,5 +1,5 @@
 import { usePrimaryParty, useUserState, useStateSnapshotServiceClient } from 'common-frontend';
-import { useScanClient } from 'common-frontend/lib';
+import { useGetSvcPartyId } from 'common-frontend/scan-api';
 import {
   ListSplitwellInstallsRequest,
   SplitwellContext,
@@ -37,22 +37,13 @@ const Home: React.FC = () => {
   const splitwellClient = useSplitwellClient();
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const stateSnapshotServiceClient = useStateSnapshotServiceClient();
-  const scanClient = useScanClient();
+  const { data: svc = undefined } = useGetSvcPartyId();
   const { updateStatus } = useUserState();
 
   const [provider, setProvider] = useState<string | undefined>();
   const [installs, setInstalls] = useState<Map<string, ContractId<SplitwellInstall>>>(new Map());
   const [splitwellDomainIds, setSplitwellDomainIds] = useState<SplitwellDomains | undefined>();
   const [connectedDomainIds, setConnectedDomainIds] = useState<string[]>([]);
-  const [svc, setSvc] = useState<string | undefined>();
-
-  useEffect(() => {
-    const fetchSvc = async () => {
-      const svcPartyId = await scanClient.getSvcPartyId();
-      setSvc(svcPartyId);
-    };
-    fetchSvc();
-  }, [scanClient]);
 
   const primaryPartyId = usePrimaryParty(ledgerApiClient);
 

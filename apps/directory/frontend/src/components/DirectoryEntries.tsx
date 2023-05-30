@@ -1,5 +1,4 @@
-import { IntervalDisplay } from 'common-frontend';
-import DateDisplay from 'common-frontend/lib/components/DateDisplay';
+import { IntervalDisplay, DateDisplay } from 'common-frontend';
 import React from 'react';
 
 import { Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';

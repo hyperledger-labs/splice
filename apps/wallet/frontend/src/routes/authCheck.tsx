@@ -1,9 +1,13 @@
 import * as React from 'react';
-import { Login, useUserState } from 'common-frontend';
-import ErrorDisplay from 'common-frontend/lib/components/ErrorDisplay';
-import Loading from 'common-frontend/lib/components/Loading';
-import { AuthConfig, TestAuthConfig } from 'common-frontend/lib/config/schema';
-import { OnboardedStatus } from 'common-frontend/lib/contexts/UserContext';
+import {
+  ErrorDisplay,
+  Loading,
+  Login,
+  useUserState,
+  OnboardedStatus,
+  AuthConfig,
+  TestAuthConfig,
+} from 'common-frontend';
 import { Outlet } from 'react-router-dom';
 
 import Onboarding from '../components/Onboarding';

@@ -6,8 +6,9 @@ import {
   ErrorDisplay,
   RateDisplay,
   useUserState,
+  Loading,
 } from 'common-frontend';
-import Loading from 'common-frontend/lib/components/Loading';
+import { useCoinPrice } from 'common-frontend/scan-api';
 import formatISO from 'date-fns/formatISO';
 
 import {
@@ -29,7 +30,7 @@ import Typography from '@mui/material/Typography';
 
 import { Party } from '@daml/types';
 
-import { useCoinPrice, useTransactions } from '../hooks';
+import { useTransactions } from '../hooks';
 import { Transaction } from '../models/models';
 
 const TransactionHistory: React.FC = () => {

@@ -1,4 +1,4 @@
-import { SubscriptionButton } from 'common-frontend/lib/components/WalletButtons';
+import { SubscriptionButton } from 'common-frontend';
 import React, { useState } from 'react';
 
 import { Stack, Typography } from '@mui/material';

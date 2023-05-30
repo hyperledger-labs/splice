@@ -1,6 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { DateDisplay, Loading, SvClientProvider } from 'common-frontend';
-import CopyableTypography from 'common-frontend/lib/components/CopyableTypography';
+import { DateDisplay, Loading, SvClientProvider, CopyableTypography } from 'common-frontend';
 import React from 'react';
 
 import { Button, Stack, Table, TableContainer, TableHead, Typography } from '@mui/material';

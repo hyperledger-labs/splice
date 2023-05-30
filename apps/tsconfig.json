@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es6",
     "lib": ["dom", "dom.iterable", "esnext"],
     "module": "esnext",
     "declaration": true,
     "sourceMap": true,
     "strict": true,
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

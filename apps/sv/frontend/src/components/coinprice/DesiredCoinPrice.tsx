@@ -1,7 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, Loading, PartyId, SvClientProvider } from 'common-frontend';
-import DateDisplay from 'common-frontend/lib/components/DateDisplay';
+import { AmountDisplay, DateDisplay, Loading, PartyId, SvClientProvider } from 'common-frontend';
 import React, { useCallback, useState } from 'react';
 
 import EditIcon from '@mui/icons-material/Edit';

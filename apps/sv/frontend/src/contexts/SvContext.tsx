@@ -1,6 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { useSvClient } from 'common-frontend';
-import { Contract } from 'common-frontend/lib/utils/interfaces';
+import { useSvClient, Contract } from 'common-frontend';
 
 import { CoinRules } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
 import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';

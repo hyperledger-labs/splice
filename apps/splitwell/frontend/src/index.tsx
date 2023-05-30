@@ -1,11 +1,13 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import {
   DirectoryClientProvider,
   AuthProvider,
-  ScanClientProvider,
   UserProvider,
   StateSnapshotServiceClientProvider,
   theme,
 } from 'common-frontend';
+import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {
@@ -26,21 +28,33 @@ import Root from './routes/root';
 import { config } from './utils/config';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchInterval: 500, // re-fetch all queries every 500ms by default
+      },
+    },
+  });
+
   return (
     <AuthProvider authConf={config.auth}>
-      <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
-        <SplitwellClientProvider url={config.services.splitwell.url}>
-          <DirectoryClientProvider url={config.services.directory.url}>
-            <ScanClientProvider url={config.services.scan.url}>
-              <SplitwellLedgerApiClientProvider url={config.services.ledgerApi.url}>
-                <StateSnapshotServiceClientProvider url={config.services.ledgerApi.url}>
-                  {children}
-                </StateSnapshotServiceClientProvider>
-              </SplitwellLedgerApiClientProvider>
-            </ScanClientProvider>
-          </DirectoryClientProvider>
-        </SplitwellClientProvider>
-      </UserProvider>
+      <QueryClientProvider client={queryClient}>
+        <ReactQueryDevtools initialIsOpen={false} />
+
+        <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
+          <SplitwellClientProvider url={config.services.splitwell.url}>
+            <DirectoryClientProvider url={config.services.directory.url}>
+              <ScanClientProvider url={config.services.scan.url}>
+                <SplitwellLedgerApiClientProvider url={config.services.ledgerApi.url}>
+                  <StateSnapshotServiceClientProvider url={config.services.ledgerApi.url}>
+                    {children}
+                  </StateSnapshotServiceClientProvider>
+                </SplitwellLedgerApiClientProvider>
+              </ScanClientProvider>
+            </DirectoryClientProvider>
+          </SplitwellClientProvider>
+        </UserProvider>
+      </QueryClientProvider>
     </AuthProvider>
   );
 };

@@ -1,11 +1,10 @@
 import * as React from 'react';
-import { AmountDisplay } from 'common-frontend';
-import ErrorDisplay from 'common-frontend/lib/components/ErrorDisplay';
-import Loading from 'common-frontend/lib/components/Loading';
+import { AmountDisplay, ErrorDisplay, Loading } from 'common-frontend';
+import { useCoinPrice } from 'common-frontend/scan-api';
 
 import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
-import { useBalance, useCoinPrice } from '../hooks';
+import { useBalance } from '../hooks';
 import CurrentUser from './CurrentUser';
 import { LogoutButton } from './LogoutButton';
 

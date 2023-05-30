@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { Loading, Login, useUserState } from 'common-frontend';
-import { AuthConfig, TestAuthConfig } from 'common-frontend/lib/config/schema';
+import { AuthConfig, TestAuthConfig, Loading, Login, useUserState } from 'common-frontend';
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 

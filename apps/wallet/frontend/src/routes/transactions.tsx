@@ -1,5 +1,5 @@
 import * as React from 'react';
-import DevNetOnly from 'common-frontend/lib/components/DevNetOnly';
+import { DevNetOnly } from 'common-frontend';
 
 import { Box } from '@mui/material';
 

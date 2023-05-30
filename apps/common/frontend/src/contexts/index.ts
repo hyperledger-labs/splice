@@ -18,5 +18,6 @@ export {
   useUserState,
   UserContext,
   UserProvider,
+  OnboardedStatus,
   type UserStatusResponse,
 } from './UserContext';

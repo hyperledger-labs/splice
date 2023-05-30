@@ -6,8 +6,8 @@ import {
   DirectoryEntry as DirectoryEntryComponent,
   DirectoryField,
   ReadyContract,
+  TransferButton,
 } from 'common-frontend';
-import { TransferButton } from 'common-frontend/lib/components/WalletButtons';
 import {
   GroupKey,
   ListAcceptedGroupInvitesRequest,

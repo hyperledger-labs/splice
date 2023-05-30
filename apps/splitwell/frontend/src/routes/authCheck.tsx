@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { Login, useUserState } from 'common-frontend';
-import { AuthConfig, TestAuthConfig } from 'common-frontend/lib/config/schema';
+import { AuthConfig, TestAuthConfig, Login, useUserState } from 'common-frontend';
 import { Outlet } from 'react-router-dom';
 
 interface AuthCheckProps {

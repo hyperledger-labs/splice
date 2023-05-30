@@ -1,5 +1,6 @@
 import BigNumber from 'bignumber.js';
 import { AmountDisplay, DirectoryEntry, ErrorDisplay, Loading, RateDisplay } from 'common-frontend';
+import { useCoinPrice } from 'common-frontend/scan-api';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -22,7 +23,7 @@ import { Currency, ReceiverAmount } from '@daml.js/wallet-payments-0.1.0/lib/CN/
 import { ContractId } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice, useAppPaymentRequest } from '../hooks';
+import { useAppPaymentRequest } from '../hooks';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmPayment: React.FC = () => {

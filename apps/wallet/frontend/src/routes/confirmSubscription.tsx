@@ -1,7 +1,12 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, ErrorDisplay, IntervalDisplay } from 'common-frontend';
-import Loading from 'common-frontend/lib/components/Loading';
-import React from 'react';
+import {
+  AmountDisplay,
+  DirectoryEntry,
+  Loading,
+  ErrorDisplay,
+  IntervalDisplay,
+} from 'common-frontend';
+import { useCoinPrice } from 'common-frontend/scan-api';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
@@ -10,7 +15,7 @@ import { SubscriptionRequest as damlSubscriptionRequest } from '@daml.js/wallet-
 import { ContractId } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice, useSubscriptionRequest } from '../hooks';
+import { useSubscriptionRequest } from '../hooks';
 import { SubscriptionRequestWithContext } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 

@@ -1,7 +1,13 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, ErrorDisplay, IntervalDisplay } from 'common-frontend';
-import Loading from 'common-frontend/lib/components/Loading';
+import {
+  AmountDisplay,
+  DirectoryEntry,
+  ErrorDisplay,
+  IntervalDisplay,
+  Loading,
+} from 'common-frontend';
+import { useCoinPrice } from 'common-frontend/scan-api';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
 import parseISO from 'date-fns/parseISO';
@@ -23,7 +29,7 @@ import { SubscriptionPayData } from '@daml.js/wallet-payments-0.1.0/lib/CN/Walle
 import { Party } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useCoinPrice, useSubscriptions } from '../hooks';
+import { useSubscriptions } from '../hooks';
 import { SubscriptionState, WalletSubscription } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
