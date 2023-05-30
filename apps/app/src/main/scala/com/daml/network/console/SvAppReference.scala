@@ -1,6 +1,5 @@
 package com.daml.network.console
 
-import akka.util.ByteString
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cc.round as cr
@@ -14,7 +13,8 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -63,10 +63,17 @@ abstract class SvAppReference(
 
   def onboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
+      sequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
       candidateParty: PartyId,
-  ): ByteString =
+  ): HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.OnboardSvPartyMigrationAuthorize(participantId, candidateParty))
+      httpCommand(
+        HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
+          participantId,
+          sequencerIdentity,
+          candidateParty,
+        )
+      )
     }
 }
 

@@ -13,11 +13,12 @@ import com.digitalasset.canton.admin.api.client.data.{
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListPartyToParticipantResult as ListPartyToParticipantResultX
 }
+import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseQueryX}
 import com.digitalasset.canton.topology.store.{TimeQuery, TimeQueryX}
 import com.digitalasset.canton.topology.transaction.{
@@ -26,9 +27,12 @@ import com.digitalasset.canton.topology.transaction.{
   ParticipantPermissionX,
   PartyToParticipantX,
   RequestSide,
+  SequencerDomainStateX,
   TopologyChangeOp,
   TopologyChangeOpX,
 }
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 
@@ -209,4 +213,55 @@ class ParticipantAdminConnection(
         TopologyAdminCommands.Init.GetId()
       ).map(ParticipantId(_))
     }
+
+  def latestSequencerDomainStateX(
+      domainId: DomainId
+  )(implicit traceContext: TraceContext): Future[SequencerDomainStateX] =
+    runCmd(
+      TopologyAdminCommandsX.Read.ListAll(
+        BaseQueryX(
+          filterStore = domainId.filterString,
+          proposals = false,
+          timeQuery = TimeQueryX.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        )
+      )
+    ).map { transactions =>
+      transactions
+        .collectOfMapping[SequencerDomainStateX]
+        .result
+        .headOption
+        .getOrElse(throw new IllegalStateException(s"No sequencer state for domain $domainId"))
+        .transaction
+        .transaction
+        .mapping
+    }
+
+  def loadTopologyTransactions(txs: Seq[GenericSignedTopologyTransactionX])(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    runCmd(
+      TopologyAdminCommandsX.Write.AddTransactions(txs)
+    )
+
+  def proposeSequencers(
+      domainId: DomainId,
+      threshold: PositiveInt,
+      active: Seq[SequencerId],
+      passive: Seq[SequencerId] = Seq.empty,
+      signedBy: Option[Fingerprint] = None,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, SequencerDomainStateX]] =
+    runCmd(
+      TopologyAdminCommandsX.Write.Propose(
+        SequencerDomainStateX
+          .create(domain = domainId, threshold = threshold, active = active, observers = passive),
+        signedBy.toList,
+        None,
+      )
+    )
+
 }

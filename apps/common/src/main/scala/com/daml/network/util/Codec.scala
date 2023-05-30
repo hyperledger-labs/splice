@@ -9,7 +9,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId as Ja
 import com.daml.lf.data.{Decimal, Numeric}
 import com.digitalasset.canton.{topology, LfTimestamp}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId, UniqueIdentifier}
 import io.grpc.{Status, StatusRuntimeException}
 
 /** Trait for values used in our requests.
@@ -91,6 +91,16 @@ object Codec {
   object Participant extends CodecCompanion[ParticipantId] {
     type Enc = String
     def instance = participantValue
+  }
+
+  implicit val sequencerValue: Codec[SequencerId, String] = new Codec[SequencerId, String] {
+    def encode(d: SequencerId) = d.filterString
+    def decode(e: String) = SequencerId.fromProtoPrimitive(e, "sequencer").left.map(_.message)
+  }
+
+  object Sequencer extends CodecCompanion[SequencerId] {
+    type Enc = String
+    def instance = sequencerValue
   }
 
   implicit val codegenPartyValue: Codec[ApiTypes.Party, String] =

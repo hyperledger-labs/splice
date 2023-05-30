@@ -1,12 +1,20 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
+import cats.syntax.either.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
-import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{
+  CNLedgerConnection,
+  ParticipantAdminConnection,
+  RetryProvider,
+  SequencerAdminConnection,
+}
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -15,12 +23,15 @@ import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{Codec, Contract}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.{CommunityCryptoConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
-import com.digitalasset.canton.topology.transaction.RequestSide
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.transaction.{RequestSide, SignedTopologyTransactionX}
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -37,6 +48,7 @@ class HttpSvHandler(
     isDevNet: Boolean,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
+    sequencerAdminConnection: Option[SequencerAdminConnection],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
@@ -51,6 +63,16 @@ class HttpSvHandler(
   private val svcStore = svcStoreWithIngestion.store
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
+
+  // TODO(#5091) Stop hardcoding domain parameters
+  private val staticDomainParameters = DomainParametersConfig(
+    protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
+    devVersionSupport = true,
+    uniqueContractKeys = false,
+  ).toStaticDomainParameters(CommunityCryptoConfig())
+    .valueOr(err =>
+      throw new IllegalArgumentException(s"Static domain parameters are invalid: $err")
+    )
 
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
@@ -225,6 +247,17 @@ class HttpSvHandler(
       (for {
         participantId <- Codec.decode(Codec.Participant)(body.participantId)
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
+        sequencerIdentity <- body.sequencerIdentity.traverse { rawId =>
+          for {
+            id <- Codec.decode(Codec.Sequencer)(rawId.id)
+            txs <- rawId.identityTransactions
+              .traverse(r =>
+                SignedTopologyTransactionX.fromByteArray(Base64.getDecoder().decode(r))
+              )
+              .left
+              .map(_.message)
+          } yield (id, txs)
+        }
       } yield {
         for {
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
@@ -249,7 +282,7 @@ class HttpSvHandler(
                   s"Candidate party $candidateParty is not authorized by participant $participantId"
                 )
               )
-            else authorizeParticipantForHostingSvcParty(participantId)
+            else authorizeParticipantForHostingSvcParty(participantId, sequencerIdentity)
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
     }
@@ -281,7 +314,8 @@ class HttpSvHandler(
   }
 
   private def authorizeParticipantForHostingSvcParty(
-      participantId: ParticipantId
+      participantId: ParticipantId,
+      sequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
   )(implicit tc: TraceContext) = {
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
     for {
@@ -321,8 +355,101 @@ class HttpSvHandler(
       )
       // TODO(M3-57) consider if a more space-efficient encoding is necessary
       encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
+
+      // TODO(#5095) Reconsider if this should be part of this onboarding flow
+      // or a separate step.
+      sequencerSnapshot <- sequencerIdentity.traverse { case (seqId, seqIdTxs) =>
+        val seqCon = sequencerAdminConnection.getOrElse(
+          throw new IllegalStateException(
+            s"Onboarding sequencer configured to use X nodes but sponsoring SV is not"
+          )
+        )
+        onboardSequencer(seqCon, seqId, seqIdTxs)
+      }
+
     } yield v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
-      definitions.OnboardSvPartyMigrationAuthorizeResponse(encoded)
+      definitions.OnboardSvPartyMigrationAuthorizeResponse(
+        encoded,
+        sequencerSnapshot,
+      )
+    )
+  }
+
+  // TODO(#5092) Make sequencer onboarding idempotent
+  private def onboardSequencer(
+      sequencerAdminConnection: SequencerAdminConnection,
+      sequencerId: SequencerId,
+      sequencerIdentityTransactions: Seq[GenericSignedTopologyTransactionX],
+  )(implicit traceContext: TraceContext) = {
+    logger.info(
+      s"Loading topology transactions for sequencer $sequencerId"
+    )
+    for {
+      _ <- participantAdminConnection.loadTopologyTransactions(sequencerIdentityTransactions)
+      _ = logger.info("Querying sequencer domain state")
+      seqState <- participantAdminConnection.latestSequencerDomainStateX(globalDomain)
+      ourParticipant <- participantAdminConnection.getParticipantId(true)
+      _ = logger.info("Proposing new sequencer")
+      _ <- participantAdminConnection.proposeSequencers(
+        globalDomain,
+        seqState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
+        seqState.active :+ sequencerId,
+        seqState.observers,
+        Some(ourParticipant.uid.namespace.fingerprint),
+      )
+      msg = "Waiting to observe new sequencer proposal"
+      _ = logger.info(msg)
+      _ <- retryProvider.retryForClientCalls(
+        msg,
+        for {
+          state <- sequencerAdminConnection.getSequencerState(globalDomain)
+        } yield {
+          if (!state.item.active.forgetNE.contains(sequencerId)) {
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Sequencer $sequencerId was not a member of ${state.item.active.forgetNE}"
+              )
+              .asRuntimeException()
+          } else {
+            state.item
+          }
+        },
+        logger,
+      )
+      // TODO(#5094) We need to generate a dummy transaction before generating the export
+      // to make sure that the new sequencer gets a sequencer counter that is included in the snapshot.
+      party <- svcStoreWithIngestion.connection.allocatePartyViaLedgerApi(
+        hint = None,
+        displayName = None,
+      )
+      msg = "Wait for sequencer to observe party allocation"
+      _ = logger.info(msg)
+      _ <- retryProvider.retryForClientCalls(
+        msg,
+        for {
+          state <- sequencerAdminConnection.getPartyToParticipantState(party)
+        } yield {
+          if (state.isEmpty) {
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Sequencer has not yet observed allocation of $party"
+              )
+              .asRuntimeException()
+          }
+        },
+        logger,
+      )
+      _ = logger.info(s"Downloading toplogy and sequencer snapshot")
+      topologySnapshot <- sequencerAdminConnection.getTopologySnapshot(globalDomain)
+      sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(
+        topologySnapshot.lastChangeTimestamp.getOrElse(
+          throw new IllegalStateException(s"Topology snapshot has no last change timestamp")
+        )
+      )
+    } yield definitions.SequencerSnapshot(
+      topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV0.toByteArray),
+      sequencerSnapshot = Base64.getEncoder.encodeToString(sequencerSnapshot.toByteArray),
+      staticDomainParameters = Base64.getEncoder.encodeToString(staticDomainParameters.toByteArray),
     )
   }
 

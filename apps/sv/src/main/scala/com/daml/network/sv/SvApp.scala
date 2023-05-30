@@ -150,7 +150,7 @@ class SvApp(
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
         participantAdminConnection,
-        useXNodes = sequencerAdminConnection.isDefined,
+        sequencerAdminConnection,
       )
       cometBftClient = newCometBftClient
       (svcStore, svcAutomation) <- ensureOnboarded(
@@ -197,6 +197,7 @@ class SvApp(
         isDevNet,
         clock,
         participantAdminConnection,
+        sequencerAdminConnection,
         retryProvider,
         svcPartyHosting,
         loggerFactory,
@@ -552,12 +553,12 @@ class SvApp(
   private def newSvcPartyHosting(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
-      useXNodes: Boolean,
+      sequencerAdminConnection: Option[SequencerAdminConnection],
   ) = new SvcPartyHosting(
     config.onboarding,
     participantAdminConnection,
+    sequencerAdminConnection,
     storeKey.svcParty,
-    useXNodes,
     coinAppParameters,
     retryProvider,
     loggerFactory,

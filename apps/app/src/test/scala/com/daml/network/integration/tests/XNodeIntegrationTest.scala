@@ -18,11 +18,10 @@ class XNodeIntegrationTest extends CNNodeIntegrationTest with SvTestUtil with Wa
       .simpleTopologyX(this.getClass.getSimpleName)
 
   "tap on X nodes" in { implicit env =>
-    // TODO(#4974) Make sure all of them get properly initialized
     sv1.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
-    sv2.sequencerNodeStatus() should matchPattern { case NodeStatus.NotInitialized(_) => }
-    sv3.sequencerNodeStatus() should matchPattern { case NodeStatus.NotInitialized(_) => }
-    sv4.sequencerNodeStatus() should matchPattern { case NodeStatus.NotInitialized(_) => }
+    sv2.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+    sv3.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+    sv4.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
 
     onboardWalletUser(aliceWallet, aliceValidator)
     aliceWallet.tap(1000)

@@ -2,15 +2,24 @@ package com.daml.network.sv.admin.api.client.commands
 
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import akka.util.ByteString
 import cats.data.EitherT
+import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.util.{TemplateJsonDecoder, Contract, Codec}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.google.protobuf.ByteString
+import com.digitalasset.canton.domain.sequencing.sequencer.{
+  SequencerSnapshot as CantonSequencerSnapshot
+}
+import com.digitalasset.canton.protocol.StaticDomainParameters
+import com.digitalasset.canton.protocol.v0
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
+import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.util.Base64
@@ -208,8 +217,25 @@ object HttpSvAppClient {
     }
   }
 
-  case class OnboardSvPartyMigrationAuthorize(participantId: ParticipantId, candidate: PartyId)
-      extends BaseCommand[http.OnboardSvPartyMigrationAuthorizeResponse, ByteString] {
+  case class SequencerSnapshot(
+      topologySnapshot: GenericStoredTopologyTransactionsX,
+      sequencerSnapshot: CantonSequencerSnapshot,
+      staticDomainParameters: StaticDomainParameters,
+  )
+
+  case class OnboardSvPartyMigrationAuthorizeResponse(
+      acsSnapshot: ByteString,
+      sequencerSnapshot: Option[SequencerSnapshot],
+  )
+
+  case class OnboardSvPartyMigrationAuthorize(
+      participantId: ParticipantId,
+      sequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
+      candidate: PartyId,
+  ) extends BaseCommand[
+        http.OnboardSvPartyMigrationAuthorizeResponse,
+        OnboardSvPartyMigrationAuthorizeResponse,
+      ] {
 
     override def submitRequest(
         client: Client,
@@ -221,6 +247,12 @@ object HttpSvAppClient {
       client.onboardSvPartyMigrationAuthorize(
         body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
           participantId.toProtoPrimitive,
+          sequencerIdentity.map { case (id, txs) =>
+            definitions.SequencerIdentity(
+              id.toProtoPrimitive,
+              txs.map(tx => Base64.getEncoder.encodeToString(tx.toByteString.toByteArray)).toVector,
+            )
+          },
           candidate.toProtoPrimitive,
         ),
         headers = headers,
@@ -230,9 +262,34 @@ object HttpSvAppClient {
         decoder: TemplateJsonDecoder
     ) = {
       case http.OnboardSvPartyMigrationAuthorizeResponse.OK(
-            definitions.OnboardSvPartyMigrationAuthorizeResponse(encodedAcsSnapshot)
+            definitions.OnboardSvPartyMigrationAuthorizeResponse(
+              encodedAcsSnapshot,
+              sequencerSnapshot,
+            )
           ) =>
-        Right(ByteString(Base64.getDecoder.decode(encodedAcsSnapshot)))
+        for {
+          sequencerSnapshot <- sequencerSnapshot
+            .traverse { snapshot =>
+              for {
+                topologySnapshot <- StoredTopologyTransactionsX
+                  .fromProtoV0(
+                    v0.TopologyTransactions.parseFrom(
+                      Base64.getDecoder().decode(snapshot.topologySnapshot)
+                    )
+                  )
+                sequencerSnapshot <- CantonSequencerSnapshot
+                  .fromByteArray(Base64.getDecoder().decode(snapshot.sequencerSnapshot))
+                staticDomainParameters <- StaticDomainParameters.fromByteArray(
+                  Base64.getDecoder().decode(snapshot.staticDomainParameters)
+                )
+              } yield SequencerSnapshot(topologySnapshot, sequencerSnapshot, staticDomainParameters)
+            }
+            .left
+            .map(_.message)
+        } yield OnboardSvPartyMigrationAuthorizeResponse(
+          ByteString.copyFrom(Base64.getDecoder.decode(encodedAcsSnapshot)),
+          sequencerSnapshot,
+        )
     }
   }
 }

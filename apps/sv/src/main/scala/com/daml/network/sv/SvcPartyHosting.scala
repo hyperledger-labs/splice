@@ -2,9 +2,16 @@ package com.daml.network.sv
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{
+  ParticipantAdminConnection,
+  RetryProvider,
+  SequencerAdminConnection,
+}
 import com.daml.network.sv.admin.api.client.SvConnection
+import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
@@ -18,9 +25,9 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyChangeOpX,
 }
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.Instant
@@ -31,8 +38,8 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SvcPartyHosting(
     onboardingConfig: SvOnboardingConfig,
     participantAdminConnection: ParticipantAdminConnection,
+    sequencerAdminConnection: Option[SequencerAdminConnection],
     svcParty: PartyId,
-    useXNodes: Boolean,
     coinAppParameters: SharedCNNodeAppParameters,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -42,6 +49,8 @@ class SvcPartyHosting(
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends NamedLogging {
+
+  private val useXNodes = sequencerAdminConnection.isDefined
 
   def svcPartyIsAuthorized(
       domainId: DomainId,
@@ -89,9 +98,19 @@ class SvcPartyHosting(
               ).map(_ => ())
             }
           _ <- participantAdminConnection.disconnectFromAllDomains()
+          sequencerIdentity <- sequencerAdminConnection.traverse { connection =>
+            connection.getSequencerId.flatMap(id =>
+              connection.getSequencerIdentityTransactions(id).map((id, _))
+            )
+          }
           _ = logger.info("candidate SV participant disconnected from global domain")
-          acsBytes <- getAuthorizationAndAcsFromSponsor(sponsorSvConfig, participantId, svParty)
-          _ <- participantAdminConnection.uploadAcsSnapshot(acsBytes)
+          response <- getAuthorizationAndAcsFromSponsor(
+            sponsorSvConfig,
+            participantId,
+            sequencerIdentity,
+            svParty,
+          )
+          _ <- participantAdminConnection.uploadAcsSnapshot(response.acsSnapshot)
           _ = logger.info(
             "Imported Acs snapshot from sponsor SV participant to candidate participant"
           )
@@ -99,6 +118,23 @@ class SvcPartyHosting(
           _ = logger.info("candidate SV participant reconnected to global domain")
           _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
           _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
+          conAndSnapshot = for {
+            con <- sequencerAdminConnection
+            snapshot <- response.sequencerSnapshot
+          } yield (con, snapshot)
+          _ <- conAndSnapshot.traverse_ { case (con, snapshot) =>
+            logger.info(s"Bootstrapping sequencer from snapshot")
+            con
+              .assignFromSnapshot(
+                snapshot.topologySnapshot,
+                snapshot.staticDomainParameters,
+                snapshot.sequencerSnapshot,
+              )
+              .map { _ =>
+                logger.info(s"Sequencer bootstrapping complete")
+              // TODO(#5096) Connect our participant to the sequencer
+              }
+          }
         } yield Right(())
       case None =>
         Future.successful(Left("unexpected on-boarding config"))
@@ -117,8 +153,11 @@ class SvcPartyHosting(
   private def getAuthorizationAndAcsFromSponsor(
       sponsorSvConfig: SvAppClientConfig,
       candidateParticipantId: ParticipantId,
+      candidateSequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
       svParty: PartyId,
-  )(implicit traceContext: TraceContext): Future[ByteString] = {
+  )(implicit
+      traceContext: TraceContext
+  ): Future[HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse] = {
     logger.info(
       s"Requesting to authorize SVC party hosting via SV at: ${sponsorSvConfig.adminApi.url}"
     )
@@ -131,8 +170,7 @@ class SvcPartyHosting(
         loggerFactory,
       ).flatMap { svConnection =>
         svConnection
-          .authorizeSvcPartyHosting(candidateParticipantId, svParty)
-          .map(bs => ByteString.copyFrom(bs.asByteBuffer))
+          .authorizeSvcPartyHosting(candidateParticipantId, candidateSequencerIdentity, svParty)
           .andThen(_ => svConnection.close())
       },
       logger,

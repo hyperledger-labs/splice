@@ -2,14 +2,14 @@ package com.daml.network.sv.admin.api.client
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import akka.util.ByteString
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -51,16 +51,23 @@ final class SvConnection private (
 
   /** Ask the sponsoring SV to authorize hosting the SVC party at the candidate participant and to prepare the ACS snapshot.
     */
-  def authorizeSvcPartyHosting(candidateParticipantId: ParticipantId, candidateParty: PartyId)(
-      implicit
+  def authorizeSvcPartyHosting(
+      candidateParticipantId: ParticipantId,
+      candidateSequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
+      candidateParty: PartyId,
+  )(implicit
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[ByteString] =
+  ): Future[HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.OnboardSvPartyMigrationAuthorize(candidateParticipantId, candidateParty),
+      HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
+        candidateParticipantId,
+        candidateSequencerIdentity,
+        candidateParty,
+      ),
     )
 }
 

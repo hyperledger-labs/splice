@@ -545,8 +545,23 @@ components:
       properties:
         participant_id:
           type: string
+        sequencer_identity:
+          "$ref": "#/components/schemas/SequencerIdentity"
         candidate_party_id:
           type: string
+
+    SequencerIdentity:
+      type: object
+      required:
+        - id
+        - identity_transactions
+      properties:
+        id:
+          type: string
+        identity_transactions:
+          type: array
+          items:
+            type: string
 
     OnboardSvPartyMigrationAuthorizeResponse:
       type: object
@@ -554,6 +569,22 @@ components:
         - acs_snapshot
       properties:
         acs_snapshot:
+          type: string
+        sequencer_snapshot:
+          "$ref": "#/components/schemas/SequencerSnapshot"
+
+    SequencerSnapshot:
+      type: object
+      required:
+        - topology_snapshot
+        - sequencer_snapshot
+        - static_domain_parameters
+      properties:
+        topology_snapshot:
+          type: string
+        sequencer_snapshot:
+          type: string
+        static_domain_parameters:
           type: string
 
     GetSvcInfoResponse:

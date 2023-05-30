@@ -719,7 +719,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       ) {
         val randomParty = allocateRandomSvParty("random")
         assertThrowsAndLogsCommandFailures(
-          sv1.onboardSvPartyMigrationAuthorize(sv4.participantClient.id, randomParty),
+          sv1.onboardSvPartyMigrationAuthorize(sv4.participantClient.id, None, randomParty),
           _.errorMessage should include(
             "Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
           ),
@@ -731,7 +731,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       ) {
         val sv1Party = sv1.getSvcInfo().svParty
         assertThrowsAndLogsCommandFailures(
-          sv1.onboardSvPartyMigrationAuthorize(sv4.participantClient.id, sv1Party),
+          sv1.onboardSvPartyMigrationAuthorize(sv4.participantClient.id, None, sv1Party),
           _.errorMessage should include(
             s"Candidate party $sv1Party is not authorized by participant"
           ),
