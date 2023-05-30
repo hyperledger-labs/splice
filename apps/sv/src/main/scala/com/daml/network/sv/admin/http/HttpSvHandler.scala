@@ -29,8 +29,7 @@ import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
-import com.digitalasset.canton.topology.transaction.{RequestSide, SignedTopologyTransactionX}
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 import io.grpc.Status.Code
@@ -249,28 +248,8 @@ class HttpSvHandler(
       (for {
         participantId <- Codec.decode(Codec.Participant)(body.participantId)
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
-        sequencerIdentity <- body.sequencerIdentity.traverse { rawId =>
-          for {
-            id <- Codec.decode(Codec.Sequencer)(rawId.id)
-            txs <- rawId.identityTransactions
-              .traverse(r =>
-                SignedTopologyTransactionX.fromByteArray(Base64.getDecoder().decode(r))
-              )
-              .left
-              .map(_.message)
-          } yield (id, txs)
-        }
-        mediatorIdentity <- body.mediatorIdentity.traverse(rawId =>
-          for {
-            id <- Codec.decode(Codec.Mediator)(rawId.id)
-            txs <- rawId.identityTransactions
-              .traverse(r =>
-                SignedTopologyTransactionX.fromByteArray(Base64.getDecoder().decode(r))
-              )
-              .left
-              .map(_.message)
-          } yield (id, txs)
-        )
+        sequencerId <- body.sequencerId.traverse(Codec.decode(Codec.Sequencer))
+        mediatorId <- body.mediatorId.traverse(Codec.decode(Codec.Mediator))
       } yield {
         for {
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
@@ -298,8 +277,8 @@ class HttpSvHandler(
             else
               authorizeParticipantForHostingSvcParty(
                 participantId,
-                sequencerIdentity,
-                mediatorIdentity,
+                sequencerId,
+                mediatorId,
               )
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
@@ -333,8 +312,8 @@ class HttpSvHandler(
 
   private def authorizeParticipantForHostingSvcParty(
       participantId: ParticipantId,
-      sequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
-      mediatorIdentity: Option[(MediatorId, Seq[GenericSignedTopologyTransactionX])],
+      sequencerId: Option[SequencerId],
+      mediatorId: Option[MediatorId],
   )(implicit tc: TraceContext) = {
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
     for {
@@ -377,21 +356,21 @@ class HttpSvHandler(
 
       // TODO(#5095) Reconsider if this should be part of this onboarding flow
       // or a separate step.
-      sequencerSnapshot <- sequencerIdentity.traverse { case (seqId, seqIdTxs) =>
+      sequencerSnapshot <- sequencerId.traverse { seqId =>
         val seqCon = sequencerAdminConnection.getOrElse(
           throw new IllegalStateException(
             s"Onboarding sequencer configured to use X nodes but sponsoring SV is not"
           )
         )
-        onboardSequencer(seqCon, seqId, seqIdTxs)
+        onboardSequencer(seqCon, seqId)
       }
-      _ <- mediatorIdentity.traverse { case (medId, medIdTxs) =>
+      _ <- mediatorId.traverse { medId =>
         val medCon = mediatorAdminConnection.getOrElse(
           throw new IllegalStateException(
             s"Onboarding mediator configured to use X nodes but sponsoring SV is not"
           )
         )
-        onboardMediator(medCon, medId, medIdTxs)
+        onboardMediator(medCon, medId)
       }
 
     } yield v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
@@ -406,14 +385,9 @@ class HttpSvHandler(
   private def onboardSequencer(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
-      sequencerIdentityTransactions: Seq[GenericSignedTopologyTransactionX],
   )(implicit traceContext: TraceContext) = {
-    logger.info(
-      s"Loading topology transactions for sequencer $sequencerId"
-    )
+    logger.info("Querying sequencer domain state")
     for {
-      _ <- participantAdminConnection.loadTopologyTransactions(sequencerIdentityTransactions)
-      _ = logger.info("Querying sequencer domain state")
       seqState <- participantAdminConnection.latestSequencerDomainStateX(globalDomain)
       ourParticipant <- participantAdminConnection.getParticipantId(true)
       _ = logger.info("Proposing new sequencer")
@@ -484,14 +458,9 @@ class HttpSvHandler(
   private def onboardMediator(
       mediatorAdminConnection: MediatorAdminConnection,
       mediatorId: MediatorId,
-      mediatorIdentityTransactions: Seq[GenericSignedTopologyTransactionX],
   )(implicit traceContext: TraceContext) = {
-    logger.info(
-      s"Loading topology transactions for mediator $mediatorId"
-    )
+    logger.info("Querying mediator domain state")
     for {
-      _ <- participantAdminConnection.loadTopologyTransactions(mediatorIdentityTransactions)
-      _ = logger.info("Querying mediator domain state")
       medState <- mediatorAdminConnection.getMediatorState(globalDomain)
       ourParticipant <- participantAdminConnection.getParticipantId(true)
       _ = logger.info("Proposing new mediator")

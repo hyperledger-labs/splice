@@ -19,7 +19,14 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{
+  DomainId,
+  MediatorId,
+  ParticipantId,
+  PartyId,
+  SequencerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseQueryX}
 import com.digitalasset.canton.topology.store.{TimeQuery, TimeQueryX}
 import com.digitalasset.canton.topology.transaction.{
@@ -32,6 +39,10 @@ import com.digitalasset.canton.topology.transaction.{
   SequencerDomainStateX,
   TopologyChangeOp,
   TopologyChangeOpX,
+}
+import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
+  NamespaceDelegationX,
+  OwnerToKeyMappingX,
 }
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
@@ -242,7 +253,7 @@ class ParticipantAdminConnection(
         .mapping
     }
 
-  def loadTopologyTransactions(txs: Seq[GenericSignedTopologyTransactionX])(implicit
+  def addTopologyTransactions(txs: Seq[GenericSignedTopologyTransactionX])(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
@@ -324,4 +335,30 @@ class ParticipantAdminConnection(
       _ <- setDomainConnectionConfig(newConfig)
     } yield ()
 
+  def getIdentityTransactions(
+      domainId: DomainId,
+      id: UniqueIdentifier,
+  )(implicit traceContext: TraceContext): Future[Seq[GenericSignedTopologyTransactionX]] =
+    runCmd(
+      TopologyAdminCommandsX.Read.ListAll(
+        BaseQueryX(
+          filterStore = domainId.filterString,
+          proposals = false,
+          timeQuery = TimeQueryX.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        )
+      )
+    ).map { transactions =>
+      transactions.result
+        .map(_.transaction)
+        .filter(tx =>
+          Set(NamespaceDelegationX, OwnerToKeyMappingX).contains(
+            tx.transaction.mapping.code
+          ) && (tx.transaction.mapping.maybeUid.contains(
+            id
+          ) || tx.transaction.mapping.namespace == id.namespace)
+        )
+    }
 }

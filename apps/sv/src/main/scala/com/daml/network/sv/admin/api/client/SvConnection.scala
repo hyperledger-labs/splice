@@ -9,7 +9,6 @@ import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -53,8 +52,8 @@ final class SvConnection private (
     */
   def authorizeSvcPartyHosting(
       candidateParticipantId: ParticipantId,
-      candidateSequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
-      candidateMediatorIdentity: Option[(MediatorId, Seq[GenericSignedTopologyTransactionX])],
+      candidateSequencerId: Option[SequencerId],
+      candidateMediatorId: Option[MediatorId],
       candidateParty: PartyId,
   )(implicit
       httpClient: HttpRequest => Future[HttpResponse],
@@ -66,8 +65,8 @@ final class SvConnection private (
       config.url,
       HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
         candidateParticipantId,
-        candidateSequencerIdentity,
-        candidateMediatorIdentity,
+        candidateSequencerId,
+        candidateMediatorId,
         candidateParty,
       ),
     )

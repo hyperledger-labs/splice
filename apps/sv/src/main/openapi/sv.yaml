@@ -563,38 +563,12 @@ components:
       properties:
         participant_id:
           type: string
-        sequencer_identity:
-          "$ref": "#/components/schemas/SequencerIdentity"
-        mediator_identity:
-          "$ref": "#/components/schemas/MediatorIdentity"
+        sequencer_id:
+          type: string
+        mediator_id:
+          type: string
         candidate_party_id:
           type: string
-
-    SequencerIdentity:
-      type: object
-      required:
-        - id
-        - identity_transactions
-      properties:
-        id:
-          type: string
-        identity_transactions:
-          type: array
-          items:
-            type: string
-
-    MediatorIdentity:
-      type: object
-      required:
-        - id
-        - identity_transactions
-      properties:
-        id:
-          type: string
-        identity_transactions:
-          type: array
-          items:
-            type: string
 
     OnboardSvPartyMigrationAuthorizeResponse:
       type: object

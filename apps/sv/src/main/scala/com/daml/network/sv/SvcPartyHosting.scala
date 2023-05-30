@@ -32,7 +32,6 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyChangeOpX,
 }
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
@@ -107,23 +106,58 @@ class SvcPartyHosting(
                 RequestSide.To,
               ).map(_ => ())
             }
+          _ = logger.info("Adding sequencer identity transactions")
+          sequencerId <- sequencerAdminConnection.traverse { connection =>
+            for {
+              sequencerId <- connection.getSequencerId
+              identity <- connection.getSequencerIdentityTransactions(sequencerId)
+              _ <- participantAdminConnection.addTopologyTransactions(identity)
+              _ <- retryProvider.retryForAutomation(
+                "Wait to observe sequencer identity transactions",
+                participantAdminConnection.getIdentityTransactions(domainId, sequencerId.uid).map {
+                  txs =>
+                    if (txs.length != identity.length) {
+                      throw Status.FAILED_PRECONDITION
+                        .withDescription(
+                          s"Expected ${identity.length} identity transactions for sequencer ${sequencerId} but got ${txs.length}"
+                        )
+                        .asRuntimeException()
+                    }
+                },
+                logger,
+              )
+            } yield sequencerId
+          }
+          _ = logger.info("Adding mediator identity transactions")
+          mediatorId <- mediatorAdminConnection.traverse { connection =>
+            for {
+              mediatorId <- connection.getMediatorId
+              identity <- connection.getMediatorIdentityTransactions(mediatorId)
+              _ <- participantAdminConnection.addTopologyTransactions(identity)
+              _ <- retryProvider.retryForAutomation(
+                "Wait to observe mediator identity transactions",
+                participantAdminConnection.getIdentityTransactions(domainId, mediatorId.uid).map {
+                  txs =>
+                    if (txs.length != identity.length) {
+                      throw Status.FAILED_PRECONDITION
+                        .withDescription(
+                          s"Expected ${identity.length} identity transactions for mediator ${mediatorId} but got ${txs.length}"
+                        )
+                        .asRuntimeException()
+                    }
+                },
+                logger,
+              )
+            } yield mediatorId
+          }
+          _ = logger.info("Disconnecting from all domains")
           _ <- participantAdminConnection.disconnectFromAllDomains()
-          sequencerIdentity <- sequencerAdminConnection.traverse { connection =>
-            connection.getSequencerId.flatMap(id =>
-              connection.getSequencerIdentityTransactions(id).map((id, _))
-            )
-          }
-          mediatorIdentity <- mediatorAdminConnection.traverse { connection =>
-            connection.getMediatorId.flatMap(id =>
-              connection.getMediatorIdentityTransactions(id).map((id, _))
-            )
-          }
           _ = logger.info("candidate SV participant disconnected from global domain")
           response <- getAuthorizationAndAcsFromSponsor(
             sponsorSvConfig,
             participantId,
-            sequencerIdentity,
-            mediatorIdentity,
+            sequencerId,
+            mediatorId,
             svParty,
           )
           _ <- participantAdminConnection.uploadAcsSnapshot(response.acsSnapshot)
@@ -138,7 +172,7 @@ class SvcPartyHosting(
             seqCon <- sequencerAdminConnection
             publicConfig <- sequencerPublicConfig
             snapshot <- response.sequencerSnapshot
-            sequencerId <- sequencerIdentity.map(_._1)
+            sequencerId <- sequencerId
             medCon <- mediatorAdminConnection
           } yield (seqCon, publicConfig, snapshot, sequencerId, medCon)
           _ <- xNodeParams.traverse_ { case (seqCon, publicConfig, snapshot, sequencerId, medCon) =>
@@ -204,8 +238,8 @@ class SvcPartyHosting(
   private def getAuthorizationAndAcsFromSponsor(
       sponsorSvConfig: SvAppClientConfig,
       candidateParticipantId: ParticipantId,
-      candidateSequencerIdentity: Option[(SequencerId, Seq[GenericSignedTopologyTransactionX])],
-      candidateMediatorIdentity: Option[(MediatorId, Seq[GenericSignedTopologyTransactionX])],
+      candidateSequencerId: Option[SequencerId],
+      candidateMediatorId: Option[MediatorId],
       svParty: PartyId,
   )(implicit
       traceContext: TraceContext
@@ -224,8 +258,8 @@ class SvcPartyHosting(
         svConnection
           .authorizeSvcPartyHosting(
             candidateParticipantId,
-            candidateSequencerIdentity,
-            candidateMediatorIdentity,
+            candidateSequencerId,
+            candidateMediatorId,
             svParty,
           )
           .andThen(_ => svConnection.close())
