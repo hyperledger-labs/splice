@@ -1292,6 +1292,60 @@ jobs:
           channel_notify: << parameters.channel_notify >>
       - collect_test_timings_and_send_to_datadog
 
+  preflight_sv_check:
+    parameters:
+      cluster:
+        type: enum
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging"]
+      channel_notify:
+        type: string
+        # #team-canton-network-internal
+        default: C03J6NCPSE4
+    machine:
+      image: ubuntu-2004:202010-01
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_vpn
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: wait for cluster to be ready
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster wait
+          cmd_retry_count: 5
+      - checkout_cluster_version:
+          cluster: <<parameters.cluster>>
+      # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
+      # sucks at cache invalidation
+      - restore_sbt_cache
+      - restore_precompiled_classes
+      - execute_sbt_command:
+          cmd: "Test/compile"
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Run SV preflight tests
+          additional_nix_args: "--keep SV_WEB_UI_PASSWORD"
+          cluster: << parameters.cluster >>
+          cmd: |
+            cncluster preflight_sv
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - cleanup_sbt_test_job
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
+      - collect_test_timings_and_send_to_datadog
+
   reset_cluster:
     parameters:
       cluster:
@@ -1728,6 +1782,16 @@ workflows:
             - deployment_test
             - docker_images_push
             - deploy_cluster
+      - preflight_sv_check:
+          <<: *main-branch-never
+          cluster: scratchneta
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+            - deploy_sv_runbook
       - reset_cluster:
           <<: *main-branch-never
           cluster: scratchneta
@@ -1736,7 +1800,7 @@ workflows:
             - datadog
           requires:
             - preflight_check
-            - deploy_sv_runbook
+            - preflight_sv_check
 
   deploy_scratchnet_B:
     when:
@@ -1795,6 +1859,16 @@ workflows:
             - deployment_test
             - docker_images_push
             - deploy_cluster
+      - preflight_sv_check:
+          <<: *main-branch-never
+          cluster: scratchnetb
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+            - deploy_sv_runbook
       - reset_cluster:
           <<: *main-branch-never
           cluster: scratchnetb
@@ -1803,7 +1877,7 @@ workflows:
             - datadog
           requires:
             - preflight_check
-            - deploy_sv_runbook
+            - preflight_sv_check
 
   deploy_scratchnet_C:
     when:
@@ -1862,6 +1936,16 @@ workflows:
             - deployment_test
             - docker_images_push
             - deploy_cluster
+      - preflight_sv_check:
+          <<: *main-branch-never
+          cluster: scratchnetc
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+            - deploy_sv_runbook
       - reset_cluster:
           <<: *main-branch-never
           cluster: scratchnetc
@@ -1870,7 +1954,7 @@ workflows:
             - datadog
           requires:
             - preflight_check
-            - deploy_sv_runbook
+            - preflight_sv_check
 
   deploy_staging:
     when:
@@ -1930,6 +2014,16 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
+    - preflight_sv_check:
+        <<: *main-branch-never
+        cluster: staging
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - deploy_sv_runbook
 
   deploy_stagingb:
     when:

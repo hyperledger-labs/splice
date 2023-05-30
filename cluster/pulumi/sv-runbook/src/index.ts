@@ -42,13 +42,11 @@ console.error(
 console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
 console.error(`Installing SV node in namespace: ${SV_NAMESPACE}`);
 
-// Copied from ${REPO_ROOT}/apps/app/src/pack/examples/sv/sv-onboarding.conf
-// TODO(#4443): make sure it's OK to reuse these once automated
-const SV_NAME = 'DA-Test-Node';
+const SV_NAME = 'DA-Helm-Test-Node';
 const SV_PUBLIC_KEY =
-  'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA==';
+  'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==';
 const SV_PRIVATE_KEY =
-  'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgdRTS3iLr8rPFaLUBbVcu8qYxklmMzQo/4UXcULYESm2hRANCAATu7P7NbVhw8kiX5Mqpe/r91/FzH7chJUWA/qbaxp5DSXqvaU1b5Yt+r4dQxzJzFf23ptQnmTIR5tjJ+T0lbXwo';
+  'MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCBsFuFa7Eumkdg4dcf/vxIXgAje2ULVz+qTKP3s/tHqKw==';
 
 const svNamespace = exactNamespace(SV_NAMESPACE, {
   'istio-injection': 'enabled',

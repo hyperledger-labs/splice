@@ -1008,7 +1008,8 @@ printTests := {
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
   def isXNodeTest(name: String): Boolean = name.contains("XNode")
-  def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
+  def isPreflightIntegrationTest(name: String): Boolean =
+    name.contains("PreflightIntegrationTest") || name.contains("PreflightSvIntegrationTest")
   def printTestNames(
       testSet: String,
       testNames: Seq[String],

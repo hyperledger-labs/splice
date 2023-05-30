@@ -71,8 +71,8 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnZFJUUzNpTHI4clBGYUxVQmJWY3U4cVl4a2xtTXpRby80VVhjVUxZRVNtMmhSQU5DQUFUdTdQN05iVmh3OGtpWDVNcXBlL3I5MS9Gekg3Y2hKVVdBL3FiYXhwNURTWHF2YVUxYjVZdCtyNGRReHpKekZmMjNwdFFubVRJUjV0akorVDBsYlh3bw==",
-          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFN3V6K3pXMVljUEpJbCtUS3FYdjYvZGZ4Y3grM0lTVkZnUDZtMnNhZVEwbDZyMmxOVytXTGZxK0hVTWN5Y3hYOXQ2YlVKNWt5RWViWXlmazlKVzE4S0E9PQ=="
+          "private": "TUVFQ0FRQXdFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNFSnpBbEFnRUJCQ0JzRnVGYTdFdW1rZGc0ZGNmL3Z4SVhnQWplMlVMVnorcVRLUDNzL3RIcUt3PT0=",
+          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFMWViK0prSDJRRlJDWmVkTy9QNWNxNWQyK3lmZHdQK2pFKzl3M2NUNkJxZkh4Q2QvUHlBMG1tV01lUG92U2htZjk3SGxVYWpGdU4wNWtaZ3h2amNQUXc9PQ=="
         }
       },
       "kind": "Secret",
@@ -405,7 +405,7 @@
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",
           "svcApiAddress": "svrun.network.com.network.canton.global"
         },
-        "onboardingName": "DA-Test-Node"
+        "onboardingName": "DA-Helm-Test-Node"
       }
     },
     "name": "sv-1",

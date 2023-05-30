@@ -261,6 +261,7 @@ subcommands. A few highlights include the following:
 * `cncluster ports` - Show a table of all ports exposed from the
   cluster, along with what is on each port.
 * `cncluster preflight` - Run the preflight check against the cluster.
+* `cncluster preflight_sv` - Run the SV preflight check against the cluster.
 * `cncluster push` - Rebuild and push one or more modules into a
   cluster. This command takes care to ensure that the specified modules
   within the cluster are updated to match your local working copy. (It
