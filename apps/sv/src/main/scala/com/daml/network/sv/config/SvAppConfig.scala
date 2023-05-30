@@ -98,7 +98,8 @@ case class CometBftConfig(
 )
 
 final case class SvSequencerConfig(
-    adminApi: ClientConfig
+    adminApi: ClientConfig,
+    publicApi: ClientConfig,
 )
 
 final case class SvXNodesConfig(

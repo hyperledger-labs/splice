@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.{DomainAlias, DiscardOps}
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
@@ -18,6 +18,7 @@ import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseQueryX}
 import com.digitalasset.canton.topology.store.{TimeQuery, TimeQueryX}
@@ -35,6 +36,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import io.grpc.Status
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
@@ -263,5 +265,37 @@ class ParticipantAdminConnection(
         None,
       )
     )
+
+  def getDomainConnectionConfig(
+      domain: DomainAlias
+  )(implicit traceContext: TraceContext): Future[DomainConnectionConfig] =
+    for {
+      configuredDomains <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListConfiguredDomains)
+    } yield configuredDomains
+      .collectFirst {
+        case (config, _) if config.domain == domain => config
+      }
+      .getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(s"Domain $domain is not configured on the participant")
+          .asRuntimeException()
+      )
+
+  def setDomainConnectionConfig(config: DomainConnectionConfig)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    runCmd(
+      ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(config)
+    )
+
+  def modifyDomainConnectionConfig(
+      domain: DomainAlias,
+      f: DomainConnectionConfig => DomainConnectionConfig,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    for {
+      oldConfig <- getDomainConnectionConfig(domain)
+      newConfig = f(oldConfig)
+      _ <- setDomainConnectionConfig(newConfig)
+    } yield ()
 
 }

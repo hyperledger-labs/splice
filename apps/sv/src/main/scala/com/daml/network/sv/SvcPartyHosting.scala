@@ -14,11 +14,17 @@ import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListPartyToParticipantResult as ListPartyToParticipantResultX
 }
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.transaction.{
   ParticipantPermission,
   RequestSide,
@@ -39,7 +45,9 @@ class SvcPartyHosting(
     onboardingConfig: SvOnboardingConfig,
     participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection: Option[SequencerAdminConnection],
+    sequencerPublicConfig: Option[ClientConfig],
     svcParty: PartyId,
+    globalDomain: DomainAlias,
     coinAppParameters: SharedCNNodeAppParameters,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -120,26 +128,51 @@ class SvcPartyHosting(
           _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
           conAndSnapshot = for {
             con <- sequencerAdminConnection
+            publicConfig <- sequencerPublicConfig
             snapshot <- response.sequencerSnapshot
-          } yield (con, snapshot)
-          _ <- conAndSnapshot.traverse_ { case (con, snapshot) =>
+          } yield (con, publicConfig, snapshot)
+          _ <- conAndSnapshot.traverse_ { case (con, publicConfig, snapshot) =>
             logger.info(s"Bootstrapping sequencer from snapshot")
-            con
-              .assignFromSnapshot(
-                snapshot.topologySnapshot,
-                snapshot.staticDomainParameters,
-                snapshot.sequencerSnapshot,
+            for {
+              _ <- con
+                .assignFromSnapshot(
+                  snapshot.topologySnapshot,
+                  snapshot.staticDomainParameters,
+                  snapshot.sequencerSnapshot,
+                )
+              _ = logger.info("Sequencer bootstrapping complete")
+              _ = logger.info("Changing participant connection to point to new sequencer")
+              _ <- participantAdminConnection.modifyDomainConnectionConfig(
+                globalDomain,
+                setSequencerEndpoint(publicConfig),
               )
-              .map { _ =>
-                logger.info(s"Sequencer bootstrapping complete")
-              // TODO(#5096) Connect our participant to the sequencer
-              }
+            } yield ()
           }
         } yield Right(())
       case None =>
         Future.successful(Left("unexpected on-boarding config"))
     }
   }
+
+  private def setSequencerEndpoint(
+      endpoint: ClientConfig
+  ): DomainConnectionConfig => DomainConnectionConfig = conf =>
+    conf.copy(
+      sequencerConnection = conf.sequencerConnection match {
+        case con: GrpcSequencerConnection =>
+          con.copy(endpoints =
+            NonEmpty.mk(
+              Seq,
+              Endpoint(
+                endpoint.address,
+                endpoint.port,
+              ),
+            )
+          )
+        case con =>
+          throw new IllegalArgumentException(s"Expected GrpcSequencerConnection but got $con")
+      }
+    )
 
   private def getSponsorSvConfig(
       onboardingConfig: SvOnboardingConfig
