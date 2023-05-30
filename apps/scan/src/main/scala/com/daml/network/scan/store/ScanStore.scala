@@ -8,8 +8,9 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.Validat
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore}
-import com.daml.network.util.Contract
+import com.daml.network.util.{CoinConfigSchedule, Contract}
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -91,11 +92,17 @@ trait ScanStore
       tc: TraceContext
   ): Future[Long]
 
-  def getBaseRateTrafficLimits()(implicit
+  def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[cc.globaldomain.BaseRateTrafficLimits] =
     lookupCoinRules().map(
-      _.map(_.payload.configSchedule.currentValue.globalDomain.fees.baseRateTrafficLimits)
+      _.map(cr =>
+        CoinConfigSchedule(cr)
+          .getConfigAsOf(t)
+          .globalDomain
+          .fees
+          .baseRateTrafficLimits
+      )
         .getOrElse(
           throw Status.NOT_FOUND.withDescription("No active SvcRules contract").asRuntimeException()
         )

@@ -7,6 +7,7 @@ import DA.Exception
 import Daml.Script
 import CC.Coin
 import CC.Scripts.Util
+import CC.Schedule
 import qualified CC.API.V1.Coin as API
 
 template CheckError
@@ -70,7 +71,8 @@ testTransferExceedsMaxLockHolders: Script ()
 testTransferExceedsMaxLockHolders = do
     DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
     [(_, coinRules)] <- query @CoinRules app.svc
-    let config = coinRules.configSchedule.currentValue
+    now <- getTime
+    let config = getValueAsOf now coinRules.configSchedule
     bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) bobValidator.primaryParty
     coin <- tap app alice 100.0
     context <- getPaymentTransferContext app alice

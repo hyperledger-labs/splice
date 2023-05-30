@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.da.types as damlTypes
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorTrafficBalance
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.Contract
+import com.daml.network.util.{CoinConfigSchedule, Contract}
 import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
@@ -47,13 +47,12 @@ class TopupValidatorTrafficBalanceTrigger(
     for {
       validatorTreasury <- getValidatorTreasury()
       coinRules <- scanConnection.getCoinRules()
-      globalDomainConfig = coinRules.payload.configSchedule.currentValue.globalDomain
+      globalDomainConfig = CoinConfigSchedule(coinRules).getConfigAsOf(clock.now).globalDomain
       activeDomainId = DomainId.tryFromString(globalDomainConfig.activeDomain)
       currentValidatorTraffic <- store.lookupValidatorTrafficWithOffset(activeDomainId)
       currentTrafficBalance <- scanConnection.getValidatorTrafficBalance(
         store.key.validatorParty
       )
-      // TODO(#4510): retrieve value for the current time
       topupParameters = ExtraTrafficTopupParameters(
         globalDomainConfig.fees,
         buyExtraTrafficConfig,

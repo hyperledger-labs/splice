@@ -15,9 +15,11 @@ import DA.Time
 import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round (Round(..))
 import CC.Coin
+import CC.CoinConfig
 import CC.Issuance
 import CC.Round
 import CC.RelRound
+import CC.Schedule
 
 import CC.Scripts.Parameters
 import CN.Util.Assert
@@ -535,3 +537,9 @@ assertError f = do
       pure False
     catch (_ : AnyException) -> pure True
   unless isThrown (abort "expected exception but didn't get one")
+
+getCoinConfig : CCApp -> Script (CoinConfig USD)
+getCoinConfig app = do     
+  Some (_, coinRules) <- queryCoinRulesByKey app.svc
+  now <- getTime
+  pure $ getValueAsOf now coinRules.configSchedule

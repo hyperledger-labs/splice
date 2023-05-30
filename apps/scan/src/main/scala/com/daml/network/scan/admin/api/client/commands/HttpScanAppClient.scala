@@ -6,11 +6,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  coinconfig as coinConfigCodegen,
-  round as roundCodegen,
-}
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
@@ -78,11 +74,6 @@ object HttpScanAppClient {
       )
     }
   }
-
-  case class ConfigSchedule(
-      currentConfig: coinConfigCodegen.CoinConfig[coinConfigCodegen.USD],
-      futureConfigs: Map[Instant, coinConfigCodegen.CoinConfig[coinConfigCodegen.USD]],
-  )
 
   /** Rounds are sorted in ascending order according to their round number. */
   case class GetSortedOpenAndIssuingMiningRounds(

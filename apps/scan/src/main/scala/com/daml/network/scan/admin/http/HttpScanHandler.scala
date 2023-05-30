@@ -410,7 +410,7 @@ class HttpScanHandler(
       validatorParty: PartyId
   )(implicit tc: TraceContext): Future[RateLimiterWithExtraTraffic] = {
     store
-      .getBaseRateTrafficLimits()
+      .getBaseRateTrafficLimitsAsOf(clock.now)
       .map(baseRateLimits => {
         validatorTrafficRateLimiters
           .putIfAbsent(

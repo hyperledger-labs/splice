@@ -31,14 +31,14 @@ testSetConfigSchedule = do
       coinConfig3 = makeCoinConfig (seconds 170) (RatePerRound 0.000003)
       coinConfig4 = makeCoinConfig (seconds 100) (RatePerRound 0.00001)
       existingSchedule = Schedule with
-        currentValue = coinConfig_initial
+        initialValue = coinConfig_initial
         futureValues =
           [ (thirteenHoursLater, coinConfig2)
           , (oneYearLater, coinConfig3)
           , (hundredYearsLater, coinConfig4)
           ]
       newScheduleWithOutdatedConfigs = Schedule with
-        currentValue = coinConfig_initial
+        initialValue = coinConfig_initial
         futureValues =
           [ (hundredYearsBefore, coinConfig1)
           , (thirteenHoursLater, coinConfig2)
@@ -46,7 +46,7 @@ testSetConfigSchedule = do
           , (hundredYearsLater, coinConfig4)
           ]
       newScheduleWithDifferentCurrentConfig = Schedule with
-        currentValue = coinConfig3
+        initialValue = coinConfig3
         futureValues = []
 
   submitMulti [app.svc] [app.svc] $
@@ -62,7 +62,7 @@ testSetConfigSchedule = do
     exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_SetConfigSchedule with
       newConfigSchedule = newScheduleWithOutdatedConfigs
 
-  -- Fail to set new coinfig schedule as computed current config is not the same as currentValue of new config schedule
+  -- Fail to set new coinfig schedule as computed current config is not the same as initialValue of new config schedule
   submitMulti [app.svc] [app.svc] $
     exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_SetConfigSchedule with
       newConfigSchedule = newScheduleWithDifferentCurrentConfig

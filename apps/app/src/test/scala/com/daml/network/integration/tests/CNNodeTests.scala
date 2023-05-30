@@ -17,7 +17,12 @@ import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.sv.config.SvOnboardingConfig.FoundCollective
-import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
+import com.daml.network.util.{
+  Auth0Util,
+  CNNodeUtil,
+  CoinConfigSchedule,
+  CommonCNNodeAppInstanceReferences,
+}
 import com.daml.network.util.CNNodeUtil.defaultCoinConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -30,7 +35,6 @@ import scala.language.implicitConversions
 import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
-import com.daml.network.util.CNNodeUtil
 import com.daml.network.integration.plugins.WaitForPorts
 import com.digitalasset.canton.topology.DomainId
 import org.scalatest.matchers.{MatchResult, Matcher}
@@ -205,9 +209,10 @@ object CNNodeTests {
         tickDuration: NonNegativeFiniteDuration,
         maxNumInputs: Int = 100,
         holdingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
-    ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
+    )(implicit env: CNNodeTestConsoleEnvironment): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
+      val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
       val activeDomainId =
-        currentSchedule.currentValue.globalDomain.activeDomain // TODO(#4510): adjust by 'now' to fetch the proper value
+        CoinConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain
       defaultCoinConfig(
         tickDuration,
         maxNumInputs,

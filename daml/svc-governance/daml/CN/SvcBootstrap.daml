@@ -49,7 +49,7 @@ template SvcBootstrap with
         coinRulesCid <- create CoinRules with
           svc
           configSchedule = Schedule with
-            currentValue = coinConfig
+            initialValue = coinConfig
             futureValues = []
           enabledChoices
           isDevNet

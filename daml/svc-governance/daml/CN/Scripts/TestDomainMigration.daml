@@ -62,7 +62,7 @@ testDomainMigration = do
   -- choosing a 30 day headroom until the active domain switches.
   now <- getTime
   executeCoinConfigChange app $ \configSchedule ->
-    let config = configSchedule.currentValue
+    let config = configSchedule.initialValue
         globalDomainConfig = config.globalDomain
         newDomainId = "global-domain-id-1"
         newGlobalDomainConfigAnnounce = globalDomainConfig with
@@ -70,7 +70,7 @@ testDomainMigration = do
         newGlobalDomainConfigSwitched = newGlobalDomainConfigAnnounce with
           activeDomain = newDomainId
     in  Schedule with
-          currentValue = config with globalDomain = newGlobalDomainConfigAnnounce
+          initialValue = config with globalDomain = newGlobalDomainConfigAnnounce
           futureValues = [
             (addRelTime now (days 30), config with globalDomain = newGlobalDomainConfigSwitched
             )]

@@ -331,8 +331,10 @@ class DomainFeesTimeBasedIntegrationTest
       .sortWith(_.data.totalPurchased > _.data.totalPurchased)
       .slice(0, 1)
 
-  private def baseRateLimits(implicit env: CNNodeTestConsoleEnvironment): BaseRateTrafficLimits =
-    scan.getCoinRules().payload.configSchedule.currentValue.globalDomain.fees.baseRateTrafficLimits
+  private def baseRateLimits(implicit env: CNNodeTestConsoleEnvironment): BaseRateTrafficLimits = {
+    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
+    scan.getCoinConfigAsOf(now).globalDomain.fees.baseRateTrafficLimits
+  }
 
   private def maxBaseRateTrafficBalance(implicit env: CNNodeTestConsoleEnvironment): BigDecimal = {
     BigDecimal(baseRateLimits.burstWindow.microseconds) / 1e6 * baseRateLimits.rate
@@ -353,8 +355,9 @@ class DomainFeesTimeBasedIntegrationTest
   private def getTopupParameters(
       validatorApp: ValidatorAppBackendReference
   )(implicit env: CNNodeTestConsoleEnvironment): ExtraTrafficTopupParameters = {
+    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
     ExtraTrafficTopupParameters(
-      scan.getCoinRules().payload.configSchedule.currentValue.globalDomain.fees,
+      scan.getCoinConfigAsOf(now).globalDomain.fees,
       validatorApp.config.domains.global.buyExtraTraffic,
       validatorApp.config.automation.pollingInterval,
     )

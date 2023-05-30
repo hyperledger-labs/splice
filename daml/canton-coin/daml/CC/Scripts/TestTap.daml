@@ -15,8 +15,8 @@ testTap = do
     cid <- tap app alice 100.0
     Some coin <- queryContractId @Coin alice.primaryParty cid
     coin.amount.initialAmount === 100.0
-    Some (_, coinRules) <- queryCoinRulesByKey app.svc
-    coin.amount.ratePerRound.rate === coinRules.configSchedule.currentValue.transferConfig.holdingFee.rate
+    config <- getCoinConfig app
+    coin.amount.ratePerRound.rate === config.transferConfig.holdingFee.rate
 
     let newPrice = 3.7 : Decimal
     advanceToIssuanceWithPrice app newPrice
@@ -24,6 +24,6 @@ testTap = do
     cid <- tap app alice 100.0
     Some coin <- queryContractId @Coin alice.primaryParty cid
     coin.amount.initialAmount === 100.0
-    Some (_, coinRules) <- queryCoinRulesByKey app.svc
-    coin.amount.ratePerRound.rate === coinRules.configSchedule.currentValue.transferConfig.holdingFee.rate / newPrice
+    config <- getCoinConfig app
+    coin.amount.ratePerRound.rate === config.transferConfig.holdingFee.rate / newPrice
     return ()

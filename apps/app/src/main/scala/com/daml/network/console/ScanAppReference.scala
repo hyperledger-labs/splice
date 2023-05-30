@@ -1,6 +1,7 @@
 package com.daml.network.console
 
 import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
@@ -10,14 +11,13 @@ import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
-import com.daml.network.util.{CNNodeUtil, Contract}
+import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract}
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
-import scala.jdk.CollectionConverters.*
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
@@ -73,16 +73,10 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "Get the (cached) config schedule for the CoinRules. Note that changes to the config might take some time to propagate due to the client-side caching."
+    "Get the (cached) coin config effective now. Note that changes to the config might take some time to propagate due to the client-side caching."
   )
-  def getConfigSchedule(now: CantonTimestamp): HttpScanAppClient.ConfigSchedule = {
-    val cr = getTransferContextWithInstances(now).coinRules
-    HttpScanAppClient.ConfigSchedule(
-      currentConfig = cr.payload.configSchedule.currentValue,
-      futureConfigs = cr.payload.configSchedule.futureValues.asScala.map { t =>
-        t._1 -> t._2
-      }.toMap,
-    )
+  def getCoinConfigAsOf(now: CantonTimestamp): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
+    CoinConfigSchedule(getTransferContextWithInstances(now).coinRules).getConfigAsOf(now)
   }
 
   @Help.Summary(

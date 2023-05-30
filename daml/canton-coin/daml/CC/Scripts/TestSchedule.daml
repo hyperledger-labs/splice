@@ -22,7 +22,7 @@ testSchedule = script do
   where
     schedule =
       Schedule with
-        currentValue = "s minBound"
+        initialValue = "s minBound"
         futureValues =
           [ (10, "s 10")
           , (1000, "s 1000")

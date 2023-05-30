@@ -320,8 +320,9 @@ trait TimeTestUtil extends CNNodeTestCommon {
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
+    val now = sv1.participantClient.ledger_api.time.get()
     val validatorTopupParameters = ExtraTrafficTopupParameters(
-      scan.getCoinRules().payload.configSchedule.currentValue.globalDomain.fees,
+      scan.getCoinConfigAsOf(now).globalDomain.fees,
       validatorAppRef.config.domains.global.buyExtraTraffic,
       validatorAppRef.config.automation.pollingInterval,
     )
@@ -351,7 +352,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       currentSchedule: Schedule[Instant, CoinConfig[USD]],
       newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
   )(implicit env: CNNodeTestConsoleEnvironment): Schedule[Instant, CoinConfig[USD]] = {
-    val now = svc.participantClientWithAdminToken.ledger_api.time.get()
+    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
     val configSchedule = {
       new cc.schedule.Schedule(
         mkUpdatedCoinConfig(currentSchedule, defaultTickDuration),

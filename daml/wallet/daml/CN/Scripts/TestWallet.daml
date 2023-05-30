@@ -8,7 +8,6 @@ import DA.List
 import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round (Round(..))
 import CC.Coin
-import CC.CoinConfig hiding (CC, USD)
 import CC.Schedule
 import CC.GlobalDomain
 import CN.Wallet.Install
@@ -194,8 +193,8 @@ testCCPaymentRequest = script do
   featuredValidator <- featureApp app (CCUser validatorUserId aliceValidator.primaryParty)
 
   -- retrieve the config
-  Some (_, CoinRules{configSchedule = Schedule{currentValue = CoinConfig {transferConfig = transferConfig}} }) <- queryCoinRulesByKey app.svc
-
+  config <- getCoinConfig app
+  let transferConfig = config.transferConfig
   coin <- tap app alice 27.0
   (transferRequest, deliveryOffer) <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [

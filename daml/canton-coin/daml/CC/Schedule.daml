@@ -7,26 +7,26 @@ import DA.List (dedupSort, head)
 
 -- | A schedule of values that change over time.
 data Schedule t a = Schedule with
-    currentValue : a
+    initialValue : a -- ^ Initial value to use until the future values come into effect.
     futureValues : [(t, a)] -- ^ sorted in ascending order
   deriving (Eq, Show)
 
 instance Functor (Schedule t) where
   fmap f (Schedule{..}) = Schedule with
-    currentValue = f currentValue
+    initialValue = f initialValue
     futureValues = [ (t, f x) | (t, x) <- futureValues]
 
 -- | Get the value as of a specific time
 getValueAsOf : Ord t => t -> Schedule t a -> a
 getValueAsOf time schedule =
   case schedule.futureValues of
-    [] -> schedule.currentValue
+    [] -> schedule.initialValue
     ((effectiveAsOf, value) :: futureValues)
       | time < effectiveAsOf ->
           -- all future values are effective later than our time of interest
-          schedule.currentValue
+          schedule.initialValue
       | otherwise ->
-          getValueAsOf time Schedule with currentValue = value; futureValues
+          getValueAsOf time Schedule with initialValue = value; futureValues
 
 -- | Check the validity of a schedule given a function to check the validity of its values
 validSchedule : Ord t => Schedule t a -> (a -> Bool) -> Bool
@@ -37,7 +37,7 @@ validSchedule schedule validateValue =
     ts = map fst schedule.futureValues
 
 allValues : Schedule t a -> [a]
-allValues schedule = schedule.currentValue :: map snd schedule.futureValues
+allValues schedule = schedule.initialValue :: map snd schedule.futureValues
 
 nextChangeScheduledAt : Schedule t a -> Optional t
 nextChangeScheduledAt schedule

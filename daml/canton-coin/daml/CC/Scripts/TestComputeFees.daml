@@ -94,8 +94,8 @@ testScaledHoldingFees = do
     newConfigSchedule = coinRules.configSchedule with
       futureValues = [(
           addRelTime now (minutes 1),
-          coinRules.configSchedule.currentValue with
-            transferConfig = coinRules.configSchedule.currentValue.transferConfig with
+          coinRules.configSchedule.initialValue with
+            transferConfig = coinRules.configSchedule.initialValue.transferConfig with
               holdingFee = RatePerRound holdingFee
         )]
 

@@ -221,7 +221,8 @@ class SvTimeBasedIntegrationTest
     val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
 
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
-    scan.getCoinRules().payload.configSchedule.currentValue.globalDomain.activeDomain
+    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
+    scan.getCoinConfigAsOf(now).globalDomain.activeDomain
     svcClient.setConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
@@ -473,7 +474,7 @@ class SvTimeBasedIntegrationTest
 
     // one tick - round 0 closes.
     advanceRoundsByOneTick
-    val config = defaultIssuanceCurve.currentValue
+    val config = defaultIssuanceCurve.initialValue
     val RoundsPerYear =
       BigDecimal(365 * 24 * 60 * 60).bigDecimal.divide(BigDecimal(150.0).bigDecimal)
     val coinsToIssueToSvc = config.coinToIssuePerYear
