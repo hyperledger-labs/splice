@@ -113,7 +113,7 @@ class GrpcSvcAppService(
       } yield Empty()
     }
 
-  // TODO(#2241) only needed for mock SVC bootstrap; remove after we have proper SVC bootstrap
+  // TODO(#4367) only needed for mock SVC bootstrap; remove after we have proper SVC bootstrap
   override def joinCollective(request: JoinCollectiveRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       logger.info(s"Party ${request.svParty} wants to join the SV collective")

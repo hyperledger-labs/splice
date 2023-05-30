@@ -39,7 +39,7 @@ object SvOnboardingConfig {
       initialCoinPrice: BigDecimal = 1.0,
   ) extends SvOnboardingConfig
 
-  // TODO(#2241): mock; remove once not needed anymore
+  // TODO(#4367): mock; remove once not needed anymore
   case class JoinViaSvcApp(name: String = "not yet used") extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -72,9 +72,10 @@ case class SvAppBackendConfig(
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
     isDevNet: Boolean = false,
-    // TODO(#2241): consider renaming this to `expectedValidatorOnboardings` once naming has stabilized
+    // TODO(#4284): rename this to `expectedValidatorOnboardings`
     expectedOnboardings: List[ExpectedOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
+    // TODO(#4367) make this an `Option` with default `= None`
     onboarding: SvOnboardingConfig = SvOnboardingConfig.JoinViaSvcApp(),
     initialCoinPriceVote: Option[BigDecimal] = None,
     enableCoinRulesUpgrade: Boolean = false,

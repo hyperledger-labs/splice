@@ -14,7 +14,7 @@ service SvcService {
   // Withdraw a featured app right from an app provider, with a textual reasoning
   rpc WithdrawFeaturedAppRight (WithdrawFeaturedAppRightRequest) returns (google.protobuf.Empty);
 
-  // TODO(#2241) part of mock SVC bootstrap; remove
+  // TODO(#4367) part of mock SVC bootstrap; remove
   rpc JoinCollective (JoinCollectiveRequest) returns (google.protobuf.Empty);
 
   // set config schedule in USD
@@ -49,7 +49,7 @@ message WithdrawFeaturedAppRightRequest {
   string reason = 2;
 }
 
-// TODO(#2241) part of mock SVC bootstrap; remove
+// TODO(#4367) part of mock SVC bootstrap; remove
 message JoinCollectiveRequest {
   // Party representing the SV that wants to join
   string sv_party = 1;

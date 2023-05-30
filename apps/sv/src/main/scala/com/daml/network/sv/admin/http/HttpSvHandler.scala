@@ -629,7 +629,7 @@ class HttpSvHandler(
       secret: String,
       validatorOnboarding: Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding],
   )(implicit tc: TraceContext): Future[Unit] =
-    // TODO(#2241) Add check to ensure that a validator can't get onboarded twice
+    // TODO(#4114) Make this idempotent
     for {
       svcRules <- svcStore.getSvcRules()
       cmds = (

@@ -95,7 +95,6 @@ initCollective isDevNet = do
           primaryParty = svc
 
   -- add more sv nodes
-  -- TODO(#2241) consider replicating the proper SV onboarding flow here
   forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
     [(svcRulesCid, _)] <- query @SvcRules svc
     submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid $ SvcRules_OnboardValidator with

@@ -100,7 +100,7 @@ object GrpcSvcAppClient {
     override def handleResponse(response: Empty): Either[String, Unit] = Right(())
   }
 
-  // TODO(#2241) part of mock SVC bootstrap; remove
+  // TODO(#4367) part of mock SVC bootstrap; remove
   case class JoinCollective(svParty: PartyId)
       extends BaseCommand[
         JoinCollectiveRequest,

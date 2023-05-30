@@ -1,6 +1,6 @@
 package com.daml.network.svc.admin.api.client
 
-// TODO(#2241) we can probably remove this file entirely once we have proper bootstrap in place
+// TODO(#4367) remember to rm this file entirely once the SV app doesn't need the SVC app anymore
 
 import com.daml.network.environment.AppConnection
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient

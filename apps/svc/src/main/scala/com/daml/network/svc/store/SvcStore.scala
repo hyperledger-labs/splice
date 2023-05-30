@@ -46,7 +46,6 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
       )
     )
 
-  // TODO(#2241) move to SV app once ready to move away from mock SVC bootstrap
   def lookupSvcRules()(implicit
       ec: ExecutionContext,
       tc: TraceContext,

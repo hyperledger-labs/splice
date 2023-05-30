@@ -474,7 +474,7 @@ class SvApp(
             } yield ()
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
         }
-      // TODO(#2241) throw an error here if onboarding config is not set (once it becomes optional)
+      // TODO(#4367) throw an error here if onboarding config is not set (once it becomes optional)
       // case None => sys.error("Not onboarded but no onboarding config found; exiting.")
     }
   }
