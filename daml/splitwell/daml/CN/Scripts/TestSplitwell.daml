@@ -119,21 +119,15 @@ completeTransfer app provider acceptedPaymentCid = do
 
 testProviderHosted : Script ()
 testProviderHosted = script do
-  app <- setupApp
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runNextIssuance app
   runCoinDepositBots app
 
-  validator <- setupValidator app "validator1"
-  alice <- setupUser app "alice" validator
-  bob <- setupUser app "bob" validator
-  charlie <- setupUser app "charlie" validator
-  provider <- setupUser app "provider" validator
-
-  featureApp app provider
+  featureApp app provider1
 
   testCase app Parties with
-    getProvider = const provider
-    getValidator = const validator
+    getProvider = const provider1
+    getValidator = const provider1Validator.primaryParty
     ..
 
 -- | Parties used in the test.

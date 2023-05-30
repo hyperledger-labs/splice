@@ -14,11 +14,7 @@ import CC.Scripts.Parameters
 
 testUnclaimedRewards : Script ()
 testUnclaimedRewards = do
-  -- bootstrap app
-  app <- setupApp
-  validator1 <- setupValidator app "validator1"
-  provider1 <- setupUser app "provider1" validator1
-  user <- setupUser app "user" validator1
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   -- bare-create all three kinds of rewards
   appCoupon1 <- submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
@@ -35,9 +31,9 @@ testUnclaimedRewards = do
     round = Round 0
     featured = False
 
-  validatorCoupon1 <- submitMulti [app.svc, user.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+  validatorCoupon1 <- submitMulti [app.svc, alice.primaryParty] [] $ createCmd ValidatorRewardCoupon with
     svc = app.svc
-    user = user.primaryParty
+    user = alice.primaryParty
     amount = 2.3
     round = Round 0
 

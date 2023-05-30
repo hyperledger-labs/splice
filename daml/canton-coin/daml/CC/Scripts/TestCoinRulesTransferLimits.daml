@@ -68,13 +68,10 @@ testTransferExceedsMaxOutputs = do
 
 testTransferExceedsMaxLockHolders: Script ()
 testTransferExceedsMaxLockHolders = do
-    app <- setupApp
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
     [(_, coinRules)] <- query @CoinRules app.svc
-    validator <- setupValidator app "validator"
-    alice <- setupUser app "alice" validator
     let config = coinRules.configSchedule.currentValue
-    bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) validator
-    charlie <- setupUser app "charlie" validator
+    bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) bobValidator.primaryParty
     coin <- tap app alice 100.0
     context <- getPaymentTransferContext app alice
     now <- getTime

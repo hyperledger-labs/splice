@@ -14,12 +14,8 @@ import CC.Scripts.Util
 
 testUsageFees: Script ()
 testUsageFees = do
-  app <- setupApp
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   now <- getTime
-  validator <- setupValidator app "validator"
-  alice <- setupUser app "alice" validator
-  bob <- setupUser app "bob" validator
-  provider <- setupUser app "provider" validator
 
   let coin1Amount = 33.0
       coin2Amount = 33.0
@@ -39,7 +35,7 @@ testUsageFees = do
 
   normalizedBalanceBeforeTransfer <- getNormalizedBalance app.svc
 
-  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider.primaryParty] [app.svc] $ exerciseCmd context.coinRules API.CoinRules_Transfer with
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules API.CoinRules_Transfer with
     transfer = API.Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -123,10 +119,7 @@ testUsageFees = do
 
 testCoinUsedInRoundBeforeItsCreation: Script ()
 testCoinUsedInRoundBeforeItsCreation = do
-  app <- setupApp
-  validator <- setupValidator app "validator"
-  alice <- setupUser app "alice" validator
-  bob <- setupUser app "bob" validator
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runNextIssuance app
   context <- getPaymentTransferContext app alice
   coinRound2Cid <- tap app alice 100.0
@@ -165,14 +158,12 @@ testCoinUsedInRoundBeforeItsCreation = do
 
 testCoinUsedAfterHoldingFeeChanged: Script ()
 testCoinUsedAfterHoldingFeeChanged = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  now <- getTime
+  
   let holdingFee = 0.000005
       smallerHoldingFee = 0.00005
       transferAmount = 10.0
-  app <- setupApp
-  validator <- setupValidator app "validator"
-  alice <- setupUser app "alice" validator
-  bob <- setupUser app "bob" validator
-  now <- getTime
 
   Some (coinRulesCid, coinRules) <- queryCoinRulesByKey app.svc
 

@@ -16,10 +16,7 @@ import CC.Scripts.Util
 
 testLockedCoin : Script ()
 testLockedCoin = do
-  app <- setupApp
-
-  alice <- setupUser app "alice" app.svc
-  bob <- setupUser app "bob" app.svc
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
   roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
@@ -41,8 +38,7 @@ testLockedCoin = do
 
 testCoin : Script ()
 testCoin = do
-  app <- setupApp
-  alice <- setupUser app "alice" app.svc
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   cid <- tap app alice defaultTransferConfig.holdingFee.rate
   replicateA_ 3 $ runNextIssuance app
@@ -53,9 +49,7 @@ testCoin = do
 
 testAppRewardCoupon : Script ()
 testAppRewardCoupon = do
-  app <- setupApp
-  alice <- setupUser app "alice" app.svc
-  bob <- setupUser app "bob" app.svc
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   _ <- tap app alice 10.0
   payWithTransferFeeRatio app alice bob.primaryParty 5.0 1.0
@@ -67,9 +61,7 @@ testAppRewardCoupon = do
 
 testValidatorRewardCoupon : Script ()
 testValidatorRewardCoupon = do
-  app <- setupApp
-  validator <- setupValidator app "validator"
-  alice <- setupUser app "alice" validator
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   _ <- tap app alice 10.0
   pay app alice alice.primaryParty 5.0
@@ -80,16 +72,14 @@ testValidatorRewardCoupon = do
 
   [(right, _)] <- query @ValidatorRight alice.primaryParty
 
-  testChoice @"enable_ValidatorRewardCoupon_ArchiveAsValidator" app [validator, app.svc] [alice.primaryParty] $ \coinRules ->
-    exerciseCmd cid (ValidatorRewardCoupon_ArchiveAsValidator validator right coinRules)
+  testChoice @"enable_ValidatorRewardCoupon_ArchiveAsValidator" app [aliceValidator.primaryParty, app.svc] [alice.primaryParty] $ \coinRules ->
+    exerciseCmd cid (ValidatorRewardCoupon_ArchiveAsValidator aliceValidator.primaryParty right coinRules)
 
   pure ()
 
 testCoinRules : Script ()
 testCoinRules = do
-  app <- setupApp
-
-  alice <- setupUser app "alice" app.svc
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   (round, _) <- getLatestOpenRound app
   testChoice @"enable_CoinRules_DevNet_Tap" app [alice.primaryParty] [app.svc] $ \coinRules ->

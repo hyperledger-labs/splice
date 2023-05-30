@@ -25,11 +25,8 @@ template Test
 
 
 test = script do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
     now <- getTime
-    app <- setupApp
-    alice <- setupUser app "alice" app.svc
-    bob <- setupUser app "bob" app.svc
-    provider <- setupUser app "provider" app.svc
     context <- getPaymentTransferContext app alice
     test <- submitUser alice.userId $ createCmd Test with
       sender = alice.primaryParty
@@ -45,7 +42,7 @@ test = script do
               amount = 20.0
               lock = Some API.TimeLock with
                 expiresAt = addRelTime now (days 1)
-                holders = [bob.primaryParty, provider.primaryParty]
+                holders = [bob.primaryParty, provider1.primaryParty]
           , API.TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0
@@ -62,7 +59,7 @@ test = script do
               amount = 20.0
               lock = Some API.TimeLock with
                 expiresAt = addRelTime now (days 1)
-                holders = [bob.primaryParty, provider.primaryParty]
+                holders = [bob.primaryParty, provider1.primaryParty]
           , API.TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0
@@ -82,14 +79,12 @@ test = script do
 
 testScaledHoldingFees: Script ()
 testScaledHoldingFees = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
   let
     holdingFee = 1.0
     initialCoinPrice = 2.0
     scaledHoldingFee = (holdingFee / initialCoinPrice)
-  app <- setupApp
-  validator <- setupValidator app "validator"
-  alice <- setupUser app "alice" validator
-  bob <- setupUser app "bob" validator
 
   Some (coinRulesCid, coinRules) <- queryCoinRulesByKey app.svc
 

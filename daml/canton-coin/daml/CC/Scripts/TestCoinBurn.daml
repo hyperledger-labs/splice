@@ -8,38 +8,25 @@ import CC.Scripts.Util
 -- see the various steps in action.
 testCoinBurn : Script ()
 testCoinBurn = do
-  -- bootstrap app
-  app <- setupApp
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   -- -- start issuing so the SVC has some coins to invite users
   runNextIssuance app
   runCoinDepositBots app
 
-  -- bootstrap user and service provider party
-  validator1 <- setupValidator app "validator1"
-  provider1 <- setupUser app "provider1" validator1
-  provider2 <- setupUser app "provider2" validator1
-  user <- setupUser app "user" validator1
-
   advanceToIssuanceWithPrice app 1.1
   runCoinDepositBots app
 
   -- svc transfers 20 coin to user
-  tap app user 20.0
+  tap app alice 20.0
   runCoinDepositBots app
 
   -- user pays provider 1
-  pay app user provider1.primaryParty 5.0
+  pay app alice provider1.primaryParty 5.0
   runCoinDepositBots app
 
   advanceToIssuanceWithPrice app 1.2
   runCoinDepositBots app
-
-  -- test declaration of validator rights after the fact
-  recordValidatorOf app validator1 validator1
-  recordValidatorOf app user.primaryParty validator1
-  recordValidatorOf app provider1.primaryParty validator1
-  recordValidatorOf app provider2.primaryParty provider2.primaryParty
 
   -- uncomment the following line to see how 'Validator1' can gather his rewards
   -- after having being declared as validator
