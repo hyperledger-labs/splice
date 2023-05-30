@@ -109,6 +109,7 @@ if [ $x -eq 1 ]; then
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv3_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv4_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_x"
 fi
 
 function tmux_cmd() {

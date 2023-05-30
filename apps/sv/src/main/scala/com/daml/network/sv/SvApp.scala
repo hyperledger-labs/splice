@@ -285,6 +285,7 @@ class SvApp(
       SvApp.State(
         participantAdminConnection,
         sequencerAdminConnection,
+        mediatorAdminConnection,
         storage,
         svStore,
         svcStore,
@@ -1030,6 +1031,7 @@ object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
       sequencerAdminConnection: Option[SequencerAdminConnection],
+      mediatorAdminConnection: Option[MediatorAdminConnection],
       storage: Storage,
       svStore: SvSvStore,
       svcStore: SvSvcStore,
@@ -1059,6 +1061,10 @@ object SvApp {
         SyncCloseable(
           s"Sequencer Admin connection",
           sequencerAdminConnection.foreach(_.close()),
+        ),
+        SyncCloseable(
+          s"Mediator Admin connection",
+          mediatorAdminConnection.foreach(_.close()),
         ),
         SyncCloseable(
           s"Participant Admin connection",

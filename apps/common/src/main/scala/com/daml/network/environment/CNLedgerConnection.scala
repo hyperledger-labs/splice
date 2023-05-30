@@ -6,6 +6,7 @@ import akka.stream.{KillSwitch, KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
+import com.daml.lf.archive.DarParser
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.{
   Command,
@@ -607,9 +608,8 @@ class CNLedgerConnection(
       darFile <- Future {
         ByteString.readFrom(Files.newInputStream(path))
       }
-      // TODO(tech-debt) Consider if we want to be clever
-      // and only upload if it has not already been uploaded.
-      _ <- client.uploadDarFile(darFile)
+      hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
+      _ <- uploadDarFileInternal(hash, darFile)
       // TODO(tech-debt): The ledger API does not block until the package is vetted.
       //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
       _ = Threading.sleep(500)
