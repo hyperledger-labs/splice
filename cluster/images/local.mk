@@ -83,7 +83,7 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 
 %/$(docker-local-image-tag): force-update-version
 	mkdir -p $(@D)
-	overwrite-if-changed $$(basename $$(dirname $(@D))):$(shell get-docker-image-tag) $@
+	overwrite-if-changed $$(basename $$(dirname $(@D))):$(shell get-snapshot-version) $@
 
 %/$(docker-image-tag): force-update-version
 	mkdir -p $(@D)
