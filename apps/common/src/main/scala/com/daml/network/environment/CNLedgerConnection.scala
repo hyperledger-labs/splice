@@ -37,8 +37,8 @@ import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
-  RunOnShutdown,
   SyncCloseable,
+  FutureUnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
@@ -620,7 +620,7 @@ class CNLedgerConnection(
   def submitTransferAndWaitNoDedup(
       submitter: PartyId,
       command: LedgerClient.TransferCommand,
-  )(implicit traceContext: TraceContext): Future[LedgerOffset] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     val commandId = UUID.randomUUID().toString()
     val listenDomain = command match {
       case in: LedgerClient.TransferCommand.In => in.target
@@ -654,21 +654,24 @@ class CNLedgerConnection(
       )
     )
 
-    retryProvider.runOnShutdown(new RunOnShutdown {
-      override def name: String = "close-completions-stream"
-      override def done: Boolean = completion.isCompleted
-      override def run(): Unit = ks.shutdown()
-    })
-
-    completion.flatMap { case ((offset, _), ()) =>
-      offset match {
-        case absolute: LedgerOffset.Absolute =>
-          completionOffsetCallback(listenDomain, absolute.getOffset).map(_ => offset)
-        case other =>
-          logger.warn(s"Encountered unexpected non-absolute ledger offset $other")
-          Future.successful(offset)
+    retryProvider
+      .waitUnlessShutdown(completion)
+      .flatMap { case ((offset, _), ()) =>
+        FutureUnlessShutdown.outcomeF(offset match {
+          case absolute: LedgerOffset.Absolute =>
+            completionOffsetCallback(listenDomain, absolute.getOffset).map(_ => ())
+          case other =>
+            logger.warn(s"Encountered unexpected non-absolute ledger offset $other")
+            Future.unit
+        })
       }
-    }
+      .onShutdown {
+        logger.debug(
+          s"shutting down while awaiting completion of transfer $commandId; pretending a completion arrived"
+        )
+        ks.shutdown()
+        ()
+      }
   }
 
   // simulate the completion check of command service; future only yields
