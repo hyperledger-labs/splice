@@ -792,8 +792,8 @@ commands:
            if [[ ${cluster_version:0:4} == "git-" ]]; then
               # Deprecated cluster version format
               cluster_git_commit="${cluster_version:4}"
-           elif [[ ${cluster_version} ~= ^[0-9.]*-snapshot[0-9.]*v[0-9a-z]* ]]
-              cluster_git_commit="$(echo ${cluster_version} | sed 's/.*v//')"
+           elif [[ ${cluster_version} =~ ^[0-9.]*-snapshot[0-9.]*v[0-9a-z]* ]]; then
+              cluster_git_commit="${cluster_version//.*v/}"
            else
               echo "Unexpected cluster version format: ${cluster_version}."
               exit 2
