@@ -8,5 +8,14 @@
         "typescript": "^4.0.0",
         "@pulumi/pulumi": "^3.0.0",
         "@pulumi/kubernetes": "3.21.4"
+    },
+    "scripts": {
+        "fix": "npm run format:fix && npm run lint:fix",
+        "check": "npm run format:check && npm run lint:check",
+        "format:fix": "prettier --write -- src",
+        "format:check": "prettier --check -- src",
+        "lint:fix": "eslint --fix --max-warnings=0 -- src",
+        "lint:check": "eslint --max-warnings=0 -- src",
+        "dump-config": "ts-node ./dump-config.ts"
     }
 }

@@ -746,7 +746,7 @@ lazy val pulumi =
         val log = streams.value.log
         npmInstall.value
         runCommand(
-          Seq("npm", "run", "fix", "--workspaces", "--if-present"),
+          Seq("npm", "run", "fix"),
           log,
           None,
           Some(npmRootDir.value),
@@ -756,7 +756,7 @@ lazy val pulumi =
         val log = streams.value.log
         npmInstall.value
         runCommand(
-          Seq("npm", "run", "fix", "--workspaces", "--if-present"),
+          Seq("npm", "run", "check"),
           log,
           None,
           Some(npmRootDir.value),
