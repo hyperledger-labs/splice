@@ -169,13 +169,14 @@ class ParticipantAdminConnection(
       operation: Option[TopologyChangeOpX] = None,
       filterParty: String = "",
       filterParticipant: String = "",
+      timeQuery: TimeQueryX = TimeQueryX.HeadState,
   )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResultX]] = {
     runCmd(
       TopologyAdminCommandsX.Read.ListPartyToParticipant(
         BaseQueryX(
           filterStore,
           proposals = false,
-          TimeQueryX.HeadState,
+          timeQuery,
           operation,
           filterSigningKey = "",
           protocolVersion = None,

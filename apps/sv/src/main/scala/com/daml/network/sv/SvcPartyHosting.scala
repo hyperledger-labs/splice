@@ -26,6 +26,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.store.TimeQueryX
 import com.digitalasset.canton.topology.transaction.{
   ParticipantPermission,
   RequestSide,
@@ -295,19 +296,54 @@ class SvcPartyHosting(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResultX]] =
-    listActivePartyToParticipantMappingsX(svcParty, domain, participantId)
+    listActivePartyToParticipantMappingsX(svcParty, domain, Some(participantId))
+
+  /** Return the transaction that first added the participant to PartyToParticipant
+    * if the participant is still included in the latest state.
+    */
+  def getSvcPartyToParticipantTransactionX(
+      domain: DomainId,
+      participantId: ParticipantId,
+  )(implicit traceContext: TraceContext): Future[Option[ListPartyToParticipantResultX]] =
+    for {
+      // We only fetch transactions for the svc party so one per SV on/offboarding which
+      // we expect to be rare so we can fetch the entire history.
+      xs <- listActivePartyToParticipantMappingsX(
+        svcParty,
+        domain,
+        None,
+        TimeQueryX.Range(None, None),
+      )
+    } yield {
+      // topology read service _should_ sort this but given that we assume everything
+      // fits in memory we may as well go for the extra safeguard.
+      xs.sortBy(_.context.serial).foldLeft[Option[ListPartyToParticipantResultX]](None) {
+        // Participant is no longer hosting the party
+        case (_, newMapping) if !newMapping.item.participantIds.contains(participantId) => None
+        // Participant starts hosting party
+        case (None, newMapping) if newMapping.item.participantIds.contains(participantId) =>
+          Some(newMapping)
+        // Participant is hosting party but this is not the mapping that added it.
+        case (Some(mapping), newMapping)
+            if newMapping.item.participantIds.contains(participantId) =>
+          Some(mapping)
+        case _ => None
+      }
+    }
 
   def listActivePartyToParticipantMappingsX(
       party: PartyId,
       domain: DomainId,
-      participantId: ParticipantId,
+      participantId: Option[ParticipantId],
+      timeQuery: TimeQueryX = TimeQueryX.HeadState,
   )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResultX]] =
     participantAdminConnection
       .listPartyToParticipantMappingsX(
         filterStore = domain.toProtoPrimitive,
         operation = Some(TopologyChangeOpX.Replace),
-        filterParticipant = participantId.toProtoPrimitive,
+        filterParticipant = participantId.fold("")(_.toProtoPrimitive),
         filterParty = party.toProtoPrimitive,
+        timeQuery = timeQuery,
       )
 
   def isPartyHostedOnTargetParticipant(
@@ -316,7 +352,7 @@ class SvcPartyHosting(
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Boolean] =
     if (useXNodes) {
-      listActivePartyToParticipantMappingsX(party, domain, participantId).map(_.nonEmpty)
+      listActivePartyToParticipantMappingsX(party, domain, Some(participantId)).map(_.nonEmpty)
     } else {
       listActivePartyToParticipantMappings(party, domain, participantId).map(_.nonEmpty)
     }
@@ -328,8 +364,8 @@ class SvcPartyHosting(
   )(implicit traceContext: TraceContext): Future[Instant] =
     if (useXNodes) {
       // check if svc party has already been authorized to be hosted by the participant
-      listActiveSvcPartyMappingsX(domain, participantId).flatMap {
-        case Seq() =>
+      getSvcPartyToParticipantTransactionX(domain, participantId).flatMap {
+        case None =>
           for {
             sourceParticipant <- participantAdminConnection.getParticipantId(useXNodes)
             // Get the existing mapping
@@ -353,17 +389,11 @@ class SvcPartyHosting(
           } yield {
             authorizedAt
           }
-        case Seq(mapping) =>
+        case Some(mapping) =>
           logger.info(
             s"Party ${svcParty.toProtoPrimitive} already authorized to participant ${participantId.toProtoPrimitive}"
           )
           Future.successful(mapping.context.validFrom)
-        case _ =>
-          Future.failed(
-            new IllegalStateException(
-              "More than 1 svc party to participant mapping which is not expected"
-            )
-          )
       }
     } else {
       // check if svc party has already been authorized to be hosted by the participant
