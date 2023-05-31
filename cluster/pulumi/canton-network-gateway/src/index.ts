@@ -19,4 +19,4 @@ function configureForwardAll(ingressNs: pulumi.Output<string>) {
   });
 }
 
-configureForwardAll(ingressNs);
+configureForwardAll(ingressNs as pulumi.Output<string>);
