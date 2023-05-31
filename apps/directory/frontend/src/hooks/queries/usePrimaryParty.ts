@@ -9,7 +9,15 @@ const usePrimaryParty = (): UseQueryResult<string> => {
     queryKey: ['fetchPrimaryParty', ledgerApi],
     refetchInterval: false, // primary party ID is static
     queryFn: async () => {
-      return ledgerApi!.getPrimaryParty();
+      try {
+        return ledgerApi!.getPrimaryParty();
+      } catch (err) {
+        console.error('Error finding primary party for user', err);
+        console.error(JSON.stringify(err));
+        throw new Error(
+          'Error finding primary party for user, please confirm user onboarded to this participant.'
+        );
+      }
     },
     enabled: !!ledgerApi, // wait for dependencies to be defined
   });

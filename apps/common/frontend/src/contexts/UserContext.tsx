@@ -17,25 +17,10 @@ interface UserState {
   userAccessToken?: string;
 
   isAuthenticated: boolean;
-  onboardedStatus: OnboardedStatus;
-  primaryPartyId?: string; // undefined when not onboarded
-
-  // It makes to sense to track user onboarding status & party info in the user store,
-  // but to avoid circular dependencies between the UserContext and the WalletServiceContext
-  // (which needs a userId or userAccessToken to authenticate requests to the `userStatus` gRPC endpoint)
-  // we expose an external callback to update the User store's internal state after login happens
-  updateStatus: (status: UserStatusResponse) => void;
 
   loginWithSst: (id: string, secret: string, audience: string, scope?: string) => void;
   loginWithOidc: () => void;
   logout: () => void;
-}
-
-export enum OnboardedStatus {
-  // TODO(#5149) We should not have a separate Loading state for Onboarding
-  Loading,
-  NotOnboarded,
-  Onboarded,
 }
 
 export const UserContext = React.createContext<UserState | undefined>(undefined);
@@ -63,9 +48,7 @@ export const UserProvider: React.FC<{
   //   - oidc: OpenID Connect logins based on OAuth2.0
   const authMethod: 'sst' | 'oidc' = isHs256UnsafeAuthConfig(authConf) ? 'sst' : 'oidc';
 
-  const [onboardedStatus, setOnboardedStatus] = useState(OnboardedStatus.Loading);
   const [userId, setUserId] = useState<string>();
-  const [primaryPartyId, setPrimaryPartyId] = useState<string>();
   const [userAccessToken, setUserAccessToken] = useState<string>();
 
   const auth = useAuthSafe();
@@ -146,26 +129,14 @@ export const UserProvider: React.FC<{
     <UserContext.Provider
       value={{
         isAuthenticated,
-        onboardedStatus,
         userId,
         userAccessToken,
-        primaryPartyId,
-        updateStatus: ({ userOnboarded, userWalletInstalled, partyId }) => {
-          if (userOnboarded && userWalletInstalled) {
-            setOnboardedStatus(OnboardedStatus.Onboarded);
-          } else {
-            setOnboardedStatus(OnboardedStatus.NotOnboarded);
-          }
-          setPrimaryPartyId(partyId);
-        },
         loginWithSst,
         loginWithOidc,
         logout: () => {
           console.debug('Logout initiated');
           setUserId(undefined);
-          setPrimaryPartyId(undefined);
           setUserAccessToken(undefined);
-          setOnboardedStatus(OnboardedStatus.Loading);
 
           if (auth && authMethod === 'oidc') {
             auth.removeUser();
@@ -187,18 +158,11 @@ export const useUserState: () => UserState = () => {
   if (!user) {
     throw new Error('User context not initialized');
   }
-  console.debug(
-    `user state: userId: ${user.userId}, primaryParty: ${user.primaryPartyId}, isAuthenticated: ${user.isAuthenticated}, onboarded: ${user.onboardedStatus}`
-  );
+  console.debug(`user state: userId: ${user.userId}, isAuthenticated: ${user.isAuthenticated}`);
   return user;
 };
 
-export interface UserStatusResponse {
-  userOnboarded: boolean;
-  userWalletInstalled: boolean;
-  partyId: string;
-}
-
+// TODO(#4363) - delete this in favor of the react-query based usePrimaryParty hook (currently in directory codebase)
 export function usePrimaryParty(ledgerApiClient: LedgerApiClient): string | undefined {
   const [primaryParty, setPrimaryParty] = useState<string>();
 

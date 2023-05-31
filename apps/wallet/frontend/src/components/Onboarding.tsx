@@ -1,31 +1,23 @@
-import { useUserState } from 'common-frontend';
+import { Loading, useUserState } from 'common-frontend';
 import { useState } from 'react';
 
 import { Button, Grid, Typography } from '@mui/material';
 
 import { useValidatorClient } from '../contexts/ValidatorServiceContext';
-import { useWalletClient } from '../contexts/WalletServiceContext';
 
 const Onboarding: React.FC = () => {
   const validatorService = useValidatorClient();
-  const walletService = useWalletClient();
-  const { userId, updateStatus } = useUserState();
+  const { userId } = useUserState();
+
   const [onboardClicked, setOnboardClicked] = useState<boolean>(false);
 
   if (!userId) {
-    return <div>Loading...</div>;
+    return <Loading />;
   }
 
   const onOnboardUser = async () => {
     setOnboardClicked(true);
     await validatorService.registerUser();
-    let status = await walletService.userStatus();
-    // it may take a while for the wallet to realize the user is onboarded, so we retry
-    while (!status.userOnboarded) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      status = await walletService.userStatus();
-    }
-    updateStatus(status);
   };
 
   return (

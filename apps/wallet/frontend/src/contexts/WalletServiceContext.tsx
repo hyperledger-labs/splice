@@ -3,7 +3,6 @@ import {
   BaseApiMiddleware,
   Contract,
   OpenAPILoggingMiddleware,
-  UserStatusResponse,
   useUserState,
 } from 'common-frontend';
 import React, { useContext, useMemo } from 'react';
@@ -45,6 +44,12 @@ const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
 export interface WalletProps {
   url: string;
+}
+
+export interface UserStatusResponse {
+  userOnboarded: boolean;
+  userWalletInstalled: boolean;
+  partyId: string;
 }
 
 export interface WalletClient {

@@ -1,5 +1,5 @@
-import { ErrorDisplay, Loading, useUserState } from 'common-frontend';
-import React, { useEffect } from 'react';
+import { ErrorDisplay, Loading } from 'common-frontend';
+import React from 'react';
 
 import { Box, Container } from '@mui/material';
 
@@ -8,16 +8,8 @@ import RequestDirectoryEntry from '../components/RequestDirectoryEntry';
 import { useDirectoryInstall, usePrimaryParty } from '../hooks';
 
 const Home: React.FC = () => {
-  const { updateStatus } = useUserState();
   const primaryPartyIdQuery = usePrimaryParty();
-  const { data: primaryPartyId } = primaryPartyIdQuery;
   const directoryInstallQuery = useDirectoryInstall();
-
-  useEffect(() => {
-    if (primaryPartyId) {
-      updateStatus({ userOnboarded: true, userWalletInstalled: true, partyId: primaryPartyId });
-    }
-  }, [primaryPartyId, updateStatus]);
 
   if (primaryPartyIdQuery.isError) {
     return <ErrorDisplay message={'Error while fetching primary party'} />;

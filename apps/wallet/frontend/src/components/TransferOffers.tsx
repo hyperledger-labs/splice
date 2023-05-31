@@ -5,7 +5,6 @@ import {
   Contract,
   DirectoryEntry,
   DateDisplay,
-  useUserState,
   ErrorDisplay,
   Loading,
 } from 'common-frontend';
@@ -20,14 +19,14 @@ import Typography from '@mui/material/Typography';
 import { Currency } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useTransferOffers } from '../hooks';
+import { usePrimaryParty, useTransferOffers } from '../hooks';
 import { WalletTransferOffer } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const TransferOffers: React.FC = () => {
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
   const coinPriceQuery = useCoinPrice();
-  const { primaryPartyId } = useUserState();
+  const primaryPartyId = usePrimaryParty();
 
   const toWalletTransferOffer = useCallback(
     async (

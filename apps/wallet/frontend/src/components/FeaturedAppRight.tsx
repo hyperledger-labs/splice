@@ -6,10 +6,13 @@ import { Star } from '@mui/icons-material';
 import { Button, Tooltip } from '@mui/material';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { usePrimaryParty } from '../hooks';
 
 const FeaturedAppRight: React.FC = () => {
   const { selfGrantFeaturedAppRights } = useWalletClient();
-  const { isLoading: featuredQueryLoading, data: featured } = useLookupFeaturedAppRight();
+  const primaryPartyId = usePrimaryParty();
+  const { isLoading: featuredQueryLoading, data: featured } =
+    useLookupFeaturedAppRight(primaryPartyId);
 
   if (featuredQueryLoading) {
     return <></>;

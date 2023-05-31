@@ -1,13 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import {
-  AmountDisplay,
-  DirectoryEntry,
-  ErrorDisplay,
-  RateDisplay,
-  useUserState,
-  Loading,
-} from 'common-frontend';
+import { AmountDisplay, DirectoryEntry, ErrorDisplay, RateDisplay, Loading } from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import formatISO from 'date-fns/formatISO';
 
@@ -30,14 +23,14 @@ import Typography from '@mui/material/Typography';
 
 import { Party } from '@daml/types';
 
-import { useTransactions } from '../hooks';
+import { usePrimaryParty, useTransactions } from '../hooks';
 import { Transaction, TransactionSubtype } from '../models/models';
 
 const TransactionHistory: React.FC = () => {
   const txQuery = useTransactions();
 
   const coinPriceQuery = useCoinPrice();
-  const { primaryPartyId } = useUserState();
+  const primaryPartyId = usePrimaryParty();
 
   const isLoading = coinPriceQuery.isLoading || txQuery.isLoading;
   const isError = coinPriceQuery.isError || txQuery.isError || !primaryPartyId;
@@ -279,7 +272,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
 };
 
 const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transaction }) => {
-  const { primaryPartyId } = useUserState();
+  const primaryPartyId = usePrimaryParty();
 
   if (transaction.transactionType === 'balance_change') {
     return <></>;

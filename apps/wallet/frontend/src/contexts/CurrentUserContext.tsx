@@ -1,7 +1,9 @@
-import { useDirectoryClient, useUserState } from 'common-frontend';
+import { useDirectoryClient } from 'common-frontend';
 import { createContext, useContext, useEffect, useState } from 'react';
 
 import { Party } from '@daml/types';
+
+import { usePrimaryParty } from '../hooks';
 
 type CurrentUser =
   | { state: 'onboarded'; primaryParty: Party; directoryEntry: string | undefined }
@@ -13,7 +15,8 @@ const CurrentUserContext: React.Context<CurrentUser> = createContext<CurrentUser
 
 export const CurrentUserProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const { lookupEntryByParty } = useDirectoryClient();
-  const { primaryPartyId } = useUserState();
+  const primaryPartyId = usePrimaryParty();
+
   const [currentUser, setCurrentUser] = useState<CurrentUser>({ state: 'not_onboarded' });
 
   useEffect(() => {

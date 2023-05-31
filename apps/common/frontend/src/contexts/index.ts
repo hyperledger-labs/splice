@@ -13,11 +13,4 @@ export {
   useLedgerApiClient,
 } from './LedgerApiContext';
 
-export {
-  usePrimaryParty,
-  useUserState,
-  UserContext,
-  UserProvider,
-  OnboardedStatus,
-  type UserStatusResponse,
-} from './UserContext';
+export { usePrimaryParty, useUserState, UserContext, UserProvider } from './UserContext';
