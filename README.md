@@ -681,7 +681,8 @@ To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala
 ### Managing Canton for Tests
 
 To speed up our tests run against a long-running Canton instance.
-To start the instance run `./start-canton.sh`. It can be stopped via `./stop-canton.sh`.
+To start the instance run `./start-canton.sh` for backend test and `./start-canton.sh -m` for frontend test.
+It can be stopped via `./stop-canton.sh`.
 
 There are 3 tmux windows open in the tmux session for Canton in wallclock time, Canton in simtime and
 toxyproxy. You can switch between those with `Ctrl-b w`.
@@ -876,9 +877,9 @@ Run `sbt apps-frontends/compile`, or the more general `sbt compile` to generate 
 To test out the wallet frontend, you first need to start Canton and
 our own apps. Here we use the topology from our tests:
 
-1. Start Canton
+1. Start Canton with minimal topology for front-end test.
 ```
-./start-canton.sh
+./start-canton.sh -m
 ```
 
 2. Start the Coin apps and run the bootstrap script to

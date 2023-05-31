@@ -9,6 +9,7 @@ function usage() {
   echo "  -p postgres_mode postgres mode used in scripts/postgres.sh, default 'docker'"
   echo "  -w               only start canton instance with wall clock time"
   echo "  -s               only start canton instance with simulated time"
+  echo "  -m               start canton with a minimal topology for frontend testing"
   echo "  -x               use experimental canton x instances instead of the default nodes"
 }
 
@@ -19,7 +20,9 @@ simtime=1
 x=0
 POSTGRES_MODE=docker
 
-while getopts "hdap:wsxy" arg; do
+bootstrapScriptPath=bootstrap-canton.sc
+
+while getopts "hdap:wsmxy" arg; do
   case ${arg} in
     h)
       usage
@@ -38,6 +41,10 @@ while getopts "hdap:wsxy" arg; do
     s)
       wallclocktime=0
       echo "starting canton with simulated time only"
+      ;;
+    m)
+      bootstrapScriptPath=bootstrap-canton-minimal.sc
+      echo "starting canton with with minimal topology for frontend test"
       ;;
     x)
       x=1
@@ -171,7 +178,7 @@ if [ $wallclocktime -eq 1 ]; then
         --log-level-canton=DEBUG \
         --log-encoder json \
         --log-file-name log/canton.clog \
-        --bootstrap bootstrap-canton.sc"
+        --bootstrap $bootstrapScriptPath"
   else
     # For now we reuse canton.tokens here which makes it not possible to run the wallclock canton and X node canton at the same time.
     tmux_cmd canton-x \
@@ -192,7 +199,7 @@ if [ $simtime -eq 1 ]; then
         --log-level-canton=DEBUG \
         --log-encoder json \
         --log-file-name log/canton-simtime.clog \
-        --bootstrap bootstrap-canton.sc"
+        --bootstrap $bootstrapScriptPath"
   else
     # For now we reuse canton-simtime.tokens here which makes it not possible to run the simtime canton and X node canton at the same time.
     tmux_cmd canton-x-simtime \

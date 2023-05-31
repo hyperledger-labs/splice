@@ -102,14 +102,18 @@ function usage() {
   echo "  -d   start in detached mode"
   echo "  -a   run all frontends with canton-network-test auth0 tenant and no test auth"
   echo "  -p   run the frontends needed for the preflight self-hosted directory UI test"
+  echo "  -e   run frontends with dedicated validator for users"
+  echo "  -s   run frontends with multiple super validators for SvIntegrationTest in CI"
 }
 
 # default values
 daemon=0
 enable_test_auth="true"
 use_preflight_frontends=0
+dedicated_validator_for_users=0
+multiple_svs=0
 
-while getopts "hdap" arg; do
+while getopts "hdapes" arg; do
   case ${arg} in
     h)
       usage
@@ -123,6 +127,12 @@ while getopts "hdap" arg; do
       ;;
     p)
       use_preflight_frontends=1
+      ;;
+    e)
+      dedicated_validator_for_users=1
+      ;;
+    s)
+      multiple_svs=1
       ;;
     ?)
       usage
@@ -170,18 +180,26 @@ done
 
 # The set of frontends we want to start as part of typical integration testing
 function start_local_frontends() {
+  validator_for_bob="alice"
+  if [ $dedicated_validator_for_users -eq 1 ]; then
+    validator_for_bob="bob"
+  fi
+
   # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
-  start_frontend   wallet    3000 alice   "alice" $enable_test_auth
-  start_frontend   wallet    3001 bob     "bob"   $enable_test_auth
-  start_frontend   splitwell 3002 alice   "alice" $enable_test_auth
-  start_frontend   splitwell 3003 bob     "bob"   $enable_test_auth
-  start_frontend   directory 3004 alice   "alice" $enable_test_auth
-  start_frontend   splitwell 3005 charlie "alice" $enable_test_auth
-  start_frontend   sv        3010 sv1     "sv1"   $enable_test_auth
-  start_frontend   wallet    3011 sv1     "sv1"   $enable_test_auth
-  start_frontend   sv        3012 sv2     "sv2"   $enable_test_auth
-  start_frontend   scan      3006 scan    "scan"  "false"           "none"
+  start_frontend   wallet    3000 alice   "alice"              $enable_test_auth
+  start_frontend   wallet    3001 bob     $validator_for_bob   $enable_test_auth
+  start_frontend   splitwell 3002 alice   "alice"              $enable_test_auth
+  start_frontend   splitwell 3003 bob     $validator_for_bob   $enable_test_auth
+  start_frontend   directory 3004 alice   "alice"              $enable_test_auth
+  start_frontend   splitwell 3005 charlie "alice"              $enable_test_auth
+  start_frontend   sv        3010 sv1     "sv1"                $enable_test_auth
+  start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth
+  start_frontend   scan      3006 scan    "scan"               "false"           "none"
   start_json_api 5201 "--allow-insecure-tokens"
+
+  if [ $multiple_svs -eq 1 ]; then
+    start_frontend sv 3012 sv2 "sv2" $enable_test_auth
+  fi
 }
 
 # The set of frontends we want to start for the preflight self-hosted directory UI test

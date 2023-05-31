@@ -32,6 +32,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceEntryName = perTestCaseName("alice.cns")
+
       waitForWalletUser(aliceValidatorWallet)
       val aliceValidatorParty = aliceValidatorWallet.userStatus().party
 

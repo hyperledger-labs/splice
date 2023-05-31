@@ -8,19 +8,18 @@ import com.digitalasset.canton.topology.PartyId
 
 println("Waiting for SVC initialization...")
 // We need to do this at the beginning, otherwise later commands can fail because CoinRules is locked.n
-Seq(sv1, sv2, sv3, sv4).foreach(_.waitForInitialization())
+sv1.waitForInitialization()
 
 println("Waiting for validator initialization...")
 aliceValidator.waitForInitialization()
-bobValidator.waitForInitialization()
 
 println("Uploading DAR files...")
-Seq(aliceValidator.participantClient, bobValidator.participantClient).foreach { p =>
-  p.dars.upload("daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
-  p.dars.upload("daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
-}
+// all user validator shared the same participant so we can only upload once.
+aliceValidator.participantClient.dars.upload("daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
+aliceValidator.participantClient.dars.upload("daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 
 println("Onboarding users...")
+val bobValidator = aliceValidator
 val charlieValidator = aliceValidator
 
 val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
