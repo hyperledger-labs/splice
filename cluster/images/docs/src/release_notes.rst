@@ -26,6 +26,8 @@ Release Notes
   * The downloaded bundle now includes sample values files for the helm charts, and the
     instructions have been modified to list the required user-specific configuration changes
     required before using them.
+  * `auth.jwksEndpoint` value in the Helm values of the participant has been renamed to `auth.jwksUrl` to
+    align with the other Helm charts, and the instructions for setting them have also been made more consistent.
 
 
 2023-05-28

@@ -356,7 +356,7 @@
       "namespace": "sv",
       "values": {
         "auth": {
-          "jwksEndpoint": "https://auth0.tenant.domain/.well-known/jwks.json",
+          "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "globalDomain": {
@@ -398,7 +398,7 @@
       "values": {
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0.tenant.domain.us.auth0.com/.well-known/jwks.json"
+          "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
@@ -456,7 +456,7 @@
       "values": {
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0.tenant.domain.us.auth0.com/.well-known/jwks.json"
+          "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",

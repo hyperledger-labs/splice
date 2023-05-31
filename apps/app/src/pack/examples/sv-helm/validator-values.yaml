@@ -9,4 +9,5 @@ validatorWalletUser: "SV_WALLET_USER_ID"
 clusterUrl: "TARGET_CLUSTER.network.canton.global"
 auth:
   audience: https://canton.network.global
-  jwksUrl: https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json
+  # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
+  jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"

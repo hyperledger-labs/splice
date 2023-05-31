@@ -30,8 +30,8 @@ spec:
           value: {{ .Values.participantUsers | toJson }}
         - name: CANTON_PARTICIPANT_EXTRA_DOMAINS
           value: {{ .Values.extraDomains | toJson }}
-        - name: AUTH_JWKS_ENDPOINT
-          value: {{ .Values.auth.jwksEndpoint }}
+        - name: AUTH_JWKS_URL
+          value: {{ .Values.auth.jwksUrl }}
         - name: AUTH_TARGET_AUDIENCE
           value: {{ .Values.auth.targetAudience }}
         {{ .Values.extraEnvVars | toYaml | nindent 8 }}
@@ -69,7 +69,7 @@ spec:
           initialDelaySeconds: 20
           periodSeconds: 10
           failureThreshold: 3
-          timeoutSeconds: 10          
+          timeoutSeconds: 10
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}

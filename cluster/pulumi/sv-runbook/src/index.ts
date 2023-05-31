@@ -93,13 +93,12 @@ const participant = installCNHelmChart(
   ])
 );
 
-// TODO(#5202): align YOUR_ISTANCE_NAME vs OIDC_AUTHORITY_URL
 const validatorValues = loadYamlFromFile(
   `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`,
   {
     TARGET_CLUSTER: TARGET_CLUSTER,
     SV_WALLET_USER_ID: SV_WALLET_USER_ID,
-    YOUR_INSTANCE_NAME: AUTH0_DOMAIN.replaceAll('.us.auth0.com', ''),
+    OIDC_AUTHORITY_URL: AUTH0_DOMAIN,
   }
 );
 
@@ -118,7 +117,7 @@ const svValues = loadYamlFromFile(
   {
     TARGET_CLUSTER: TARGET_CLUSTER,
     YOUR_SV_NAME: SV_NAME,
-    YOUR_INSTANCE_NAME: AUTH0_DOMAIN.replaceAll('.us.auth0.com', ''),
+    OIDC_AUTHORITY_URL: AUTH0_DOMAIN,
   }
 );
 
