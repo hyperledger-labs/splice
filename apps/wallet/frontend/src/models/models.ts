@@ -22,11 +22,16 @@ export interface WalletBalance {
   availableCC: BigNumber;
 }
 
+export interface TransactionSubtype {
+  templateId: string;
+  choice: string;
+}
+
 export type Transaction = Transfer | BalanceChange;
 export interface Transfer {
   id: string;
   transactionType: 'transfer';
-  transactionSubtype: string;
+  transactionSubtype: TransactionSubtype;
   receivers: TransactionReceiver[]; // will be empty for e.g. mergers & self-transfers
   senderId: Party;
   providerId: Party;
@@ -37,7 +42,7 @@ export interface Transfer {
 export interface BalanceChange {
   id: string;
   transactionType: 'balance_change';
-  transactionSubtype: string;
+  transactionSubtype: TransactionSubtype;
   receivers: TransactionReceiver[];
   date: Date;
   coinPrice: BigNumber;

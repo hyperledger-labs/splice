@@ -4,7 +4,7 @@ import cats.{Eval, Monoid}
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.*
-import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
+import com.daml.ledger.javaapi.data.codegen.{Choice, ContractId, DamlRecord}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.CoinCreateSummary
 import com.daml.network.codegen.java.cc.coin.InvalidTransferReason
@@ -41,6 +41,9 @@ import com.daml.network.history.{
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Codec, Contract, ExerciseNode, ExerciseNodeCompanion}
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.Notification.NotificationTransactionSubtype
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.Transfer.TransferTransactionSubtype
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -48,7 +51,7 @@ import java.time.{Instant, ZoneOffset}
 import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
-import scala.math.BigDecimal.{javaBigDecimal2bigDecimal, RoundingMode}
+import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
@@ -390,7 +393,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.LockedCoinExpired,
+                TxLogEntry.BalanceChange.LockedCoinOwnerExpired,
               )
             )
 
@@ -495,6 +498,24 @@ object UserWalletTxLogParser {
 
   object TxLogEntry {
 
+    sealed abstract class TransactionSubtype(
+        val companion: ExerciseNodeCompanion,
+        coinOperation: Option[String],
+    ) {
+      val templateId: Identifier = companion.templateOrInterface match {
+        case Left(value) => value.TEMPLATE_ID
+        case Right(value) => value.TEMPLATE_ID
+      }
+      val choice: Choice[companion.Tpl, companion.Arg, companion.Res] = companion.choice
+
+      def toResponseItem: httpDef.TransactionSubtype = httpDef.TransactionSubtype(
+        templateId =
+          s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}",
+        choice = choice.name,
+        coinOperation = coinOperation,
+      )
+    }
+
     /* Unknown event, caused the parser failing to parse a transaction tree */
     final case class Unknown(
         indexRecord: TxLogIndexRecord
@@ -502,7 +523,7 @@ object UserWalletTxLogParser {
       override def toResponseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
           transactionType = Unknown.TransactionType,
-          transactionSubtype = "unknown",
+          transactionSubtype = httpDef.TransactionSubtype("unknown", "unknown"),
           eventId = indexRecord.eventId,
           offset = indexRecord.offset,
           date = java.time.OffsetDateTime.ofInstant(Instant.now(), ZoneOffset.UTC),
@@ -519,7 +540,7 @@ object UserWalletTxLogParser {
     /** Balance change due to a transfer */
     final case class Transfer(
         indexRecord: TxLogIndexRecord,
-        transactionSubtype: String,
+        transactionSubtype: TransferTransactionSubtype,
         date: Instant,
         provider: String,
         sender: (String, BigDecimal),
@@ -532,7 +553,7 @@ object UserWalletTxLogParser {
       override def toResponseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
           transactionType = Transfer.TransactionType,
-          transactionSubtype = transactionSubtype,
+          transactionSubtype = transactionSubtype.toResponseItem,
           eventId = indexRecord.eventId,
           offset = indexRecord.offset,
           date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
@@ -552,22 +573,48 @@ object UserWalletTxLogParser {
     }
     object Transfer {
       val TransactionType = "transfer"
-      val P2PPaymentCompleted = "p2p_payment_completed"
-      val AppPaymentAccepted = "app_payment_accepted"
-      val AppPaymentCollected = "app_payment_collected"
-      val SubscriptionInitialPaymentAccepted = "subscription_initial_payment_accepted"
-      val SubscriptionInitialPaymentCollected = "subscription_initial_payment_collected"
-      val SubscriptionPaymentAccepted = "subscription_payment_accepted"
-      val SubscriptionPaymentCollected = "subscription_payment_collected"
-      val WalletAutomation = "wallet_automation"
-      val ExtraTrafficPurchase = "extra_traffic_purchase"
-      val Transfer = "unknown_transfer"
+      sealed abstract class TransferTransactionSubtype(
+          companion: ExerciseNodeCompanion
+      ) extends TransactionSubtype(companion, None)
+
+      object TransferTransactionSubtype {
+        val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
+          P2PPaymentCompleted,
+          AppPaymentAccepted,
+          AppPaymentCollected,
+          SubscriptionInitialPaymentAccepted,
+          SubscriptionInitialPaymentCollected,
+          SubscriptionPaymentAccepted,
+          SubscriptionPaymentCollected,
+          WalletAutomation,
+          ExtraTrafficPurchase,
+          Transfer,
+        ).map(txSubtype => txSubtype.choice.name -> txSubtype).toMap
+
+        def find(choiceName: String): Option[TransferTransactionSubtype] =
+          values.get(choiceName)
+      }
+      case object P2PPaymentCompleted
+          extends TransferTransactionSubtype(AcceptedTransferOffer_Complete)
+      case object AppPaymentAccepted extends TransferTransactionSubtype(AppPaymentRequest_Accept)
+      case object AppPaymentCollected extends TransferTransactionSubtype(AcceptedAppPayment_Collect)
+      case object SubscriptionInitialPaymentAccepted
+          extends TransferTransactionSubtype(SubscriptionRequest_AcceptAndMakePayment)
+      case object SubscriptionInitialPaymentCollected
+          extends TransferTransactionSubtype(SubscriptionInitialPayment_Collect)
+      case object SubscriptionPaymentAccepted
+          extends TransferTransactionSubtype(SubscriptionIdleState_MakePayment)
+      case object SubscriptionPaymentCollected
+          extends TransferTransactionSubtype(SubscriptionPayment_Collect)
+      case object WalletAutomation extends TransferTransactionSubtype(WalletAppInstall_ExecuteBatch)
+      case object ExtraTrafficPurchase extends TransferTransactionSubtype(CoinRules_BuyExtraTraffic)
+      case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
     }
 
     /** Balance change not due to a transfer, for example a tap or returning a locked coin to the owner. */
     final case class BalanceChange(
         indexRecord: TxLogIndexRecord,
-        transactionSubtype: String,
+        transactionSubtype: BalanceChangeTransactionSubtype,
         date: Instant,
         receiver: String,
         amount: BigDecimal,
@@ -576,7 +623,7 @@ object UserWalletTxLogParser {
       override def toResponseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
           transactionType = BalanceChange.TransactionType,
-          transactionSubtype = transactionSubtype,
+          transactionSubtype = transactionSubtype.toResponseItem,
           eventId = indexRecord.eventId,
           offset = indexRecord.offset,
           date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
@@ -594,31 +641,65 @@ object UserWalletTxLogParser {
 
     object BalanceChange {
       val TransactionType = "balance_change"
-      val Tap = "tap"
-      val Mint = "mint"
-      val SvRewardCollected = "sv_reward_collected"
-      val AppPaymentRejected = "app_payment_rejected"
-      val AppPaymentExpired = "app_payment_expired"
-      val SubscriptionInitialPaymentRejected = "subscription_initial_payment_rejected"
-      val SubscriptionInitialPaymentExpired = "subscription_initial_payment_expired"
-      val SubscriptionPaymentRejected = "subscription_payment_rejected"
-      val SubscriptionPaymentExpired = "subscription_payment_expired"
-      val LockedCoinUnlocked = "locked_coin_unlock"
-      val LockedCoinExpired = "locked_coin_expired"
-      val CoinExpired = "coin_expired"
+
+      sealed abstract class BalanceChangeTransactionSubtype(companion: ExerciseNodeCompanion)
+          extends TransactionSubtype(companion, None)
+
+      object BalanceChangeTransactionSubtype {
+        val values: Map[String, BalanceChangeTransactionSubtype] =
+          Set[BalanceChangeTransactionSubtype](
+            Tap,
+            Mint,
+            SvRewardCollected,
+            AppPaymentRejected,
+            AppPaymentExpired,
+            SubscriptionInitialPaymentRejected,
+            SubscriptionInitialPaymentExpired,
+            SubscriptionPaymentRejected,
+            SubscriptionPaymentExpired,
+            LockedCoinUnlocked,
+            LockedCoinOwnerExpired,
+            LockedCoinExpired,
+            CoinExpired,
+          ).map(txSubtype => txSubtype.choice.name -> txSubtype).toMap
+
+        def find(choiceName: String): Option[BalanceChangeTransactionSubtype] =
+          values.get(choiceName)
+      }
+      case object Tap extends BalanceChangeTransactionSubtype(com.daml.network.history.Tap)
+      case object Mint extends BalanceChangeTransactionSubtype(com.daml.network.history.Mint)
+      case object SvRewardCollected
+          extends BalanceChangeTransactionSubtype(SvcRules_CollectSvReward)
+      case object AppPaymentRejected
+          extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Reject)
+      case object AppPaymentExpired
+          extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Expire)
+      case object SubscriptionInitialPaymentRejected
+          extends BalanceChangeTransactionSubtype(SubscriptionInitialPayment_Reject)
+      case object SubscriptionInitialPaymentExpired
+          extends BalanceChangeTransactionSubtype(SubscriptionInitialPayment_Expire)
+      case object SubscriptionPaymentRejected
+          extends BalanceChangeTransactionSubtype(SubscriptionPayment_Reject)
+      case object SubscriptionPaymentExpired
+          extends BalanceChangeTransactionSubtype(SubscriptionPayment_Expire)
+      case object LockedCoinUnlocked extends BalanceChangeTransactionSubtype(LockedCoinUnlock)
+      case object LockedCoinOwnerExpired
+          extends BalanceChangeTransactionSubtype(LockedCoinOwnerExpireLock)
+      case object LockedCoinExpired extends BalanceChangeTransactionSubtype(LockedCoinExpireCoin)
+      case object CoinExpired extends BalanceChangeTransactionSubtype(CoinExpire)
     }
 
     /** An event that does not change anyone's coin balance. */
     final case class Notification(
         indexRecord: TxLogIndexRecord,
-        transactionSubtype: String,
+        transactionSubtype: NotificationTransactionSubtype,
         date: Instant,
         details: String,
     ) extends TxLogEntry {
       override def toResponseItem: httpDef.ListTransactionsResponseItem =
         httpDef.ListTransactionsResponseItem(
           transactionType = Notification.TransactionType,
-          transactionSubtype = transactionSubtype,
+          transactionSubtype = transactionSubtype.toResponseItem,
           eventId = indexRecord.eventId,
           offset = indexRecord.offset,
           date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
@@ -632,11 +713,43 @@ object UserWalletTxLogParser {
 
     object Notification {
       val TransactionType = "notification"
-      val DirectTransferFailed = "direct_transfer_failed"
-      val AppPaymentFailed = "app_payment_failed"
-      val SubscriptionInitialPaymentFailed = "subscription_initial_payment_failed"
-      val SubscriptionPaymentFailed = "subscription_payment_failed"
-      val SubscriptionExpired = "subscription_expired"
+
+      /** @param coinOperation the constructor name of the CoinOperation. Only relevant for WalletAppInstall_ExecuteBatch
+        */
+      sealed abstract class NotificationTransactionSubtype(
+          companion: ExerciseNodeCompanion,
+          val coinOperation: Option[String],
+      ) extends TransactionSubtype(companion, coinOperation)
+      object NotificationTransactionSubtype {
+        val values: Map[(String, Option[String]), NotificationTransactionSubtype] =
+          Set[NotificationTransactionSubtype](
+            DirectTransferFailed,
+            SubscriptionPaymentFailed,
+            SubscriptionExpired,
+          ).map(txSubtype =>
+            (
+              txSubtype.choice.name,
+              txSubtype.coinOperation,
+            ) -> txSubtype
+          ).toMap
+        def find(
+            choiceName: String,
+            coinOperationConstructor: Option[String],
+        ): Option[NotificationTransactionSubtype] =
+          values.get((choiceName, coinOperationConstructor))
+      }
+      case object DirectTransferFailed
+          extends NotificationTransactionSubtype(
+            WalletAppInstall_ExecuteBatch,
+            Some("CO_CompleteAcceptedTransfer"),
+          )
+      case object SubscriptionPaymentFailed
+          extends NotificationTransactionSubtype(
+            WalletAppInstall_ExecuteBatch,
+            Some("CO_SubscriptionMakePayment"),
+          )
+      case object SubscriptionExpired
+          extends NotificationTransactionSubtype(SubscriptionIdleState_ExpireSubscription, None)
     }
 
     private def transferFromResponseItem(
@@ -647,6 +760,9 @@ object UserWalletTxLogParser {
         eventId = item.eventId,
       )
       for {
+        transactionSubtype <- TransferTransactionSubtype
+          .find(item.transactionSubtype.choice)
+          .toRight("TransactionSubtype not found")
         provider <- item.provider.toRight("Provider missing")
         sender <- item.sender.toRight("Sender missing")
         senderAmount <- Codec.decode(Codec.BigDecimal)(sender.amount)
@@ -664,7 +780,7 @@ object UserWalletTxLogParser {
         validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(validatorRewardsUsedStr)
       } yield TxLogEntry.Transfer(
         indexRecord = indexRecord,
-        transactionSubtype = item.transactionSubtype,
+        transactionSubtype = transactionSubtype,
         date = item.date.toInstant,
         provider = provider,
         sender = sender.party -> senderAmount,
@@ -684,11 +800,14 @@ object UserWalletTxLogParser {
         eventId = item.eventId,
       )
       for {
+        transactionSubtype <- BalanceChangeTransactionSubtype
+          .find(item.transactionSubtype.choice)
+          .toRight("TransactionSubtype not found")
         receiverAndAmount <- item.receivers.flatMap(_.headOption).toRight("No receivers")
         coinPriceStr <- item.coinPrice.toRight("Coin price missing")
         coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
       } yield TxLogEntry.BalanceChange(
-        transactionSubtype = item.transactionSubtype,
+        transactionSubtype = transactionSubtype,
         indexRecord = indexRecord,
         date = item.date.toInstant,
         receiver = receiverAndAmount.party,
@@ -705,9 +824,12 @@ object UserWalletTxLogParser {
         eventId = item.eventId,
       )
       for {
+        transactionSubtype <- NotificationTransactionSubtype
+          .find(item.transactionSubtype.choice, item.transactionSubtype.coinOperation)
+          .toRight("TransactionSubtype not found")
         details <- item.details.toRight("Details missing")
       } yield TxLogEntry.Notification(
-        transactionSubtype = item.transactionSubtype,
+        transactionSubtype = transactionSubtype,
         indexRecord = indexRecord,
         date = item.date.toInstant,
         details = details,
@@ -763,7 +885,7 @@ object UserWalletTxLogParser {
     )
 
     /** Sets the transaction type of all transfer events to the given type */
-    def setTransferSubtype(transactionSubtype: String): State = {
+    def setTransferSubtype(transactionSubtype: TransferTransactionSubtype): State = {
       State(
         entries = entries.map {
           case b: TxLogEntry.Transfer =>
@@ -791,7 +913,7 @@ object UserWalletTxLogParser {
       * This is useful for app payments where the payment collection first unlocks locked coins and immediately uses
       * them for a transfer. In this case, we only want to display one balance change for the user.
       */
-    def mergeBalanceChangesIntoTransfer(transactionSubtype: String): State = {
+    def mergeBalanceChangesIntoTransfer(transactionSubtype: TransferTransactionSubtype): State = {
       val balanceChanges = entries.foldLeft(Map[String, BigDecimal]())((changes, entry) =>
         entry match {
           case b: TxLogEntry.BalanceChange =>
@@ -842,7 +964,7 @@ object UserWalletTxLogParser {
         tx: TransactionTree,
         event: TreeEvent,
         owner: String,
-        transactionSubtype: String,
+        transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
       val newEntry = TxLogEntry.BalanceChange(
         indexRecord = TxLogIndexRecord(
@@ -863,7 +985,7 @@ object UserWalletTxLogParser {
         tx: TransactionTree,
         event: TreeEvent,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
-        transactionSubtype: String,
+        transactionSubtype: TransferTransactionSubtype,
     ): State = {
       val newEntry = TxLogEntry.Transfer(
         indexRecord = TxLogIndexRecord(
@@ -925,7 +1047,8 @@ object UserWalletTxLogParser {
               offset = tx.getOffset,
               eventId = transferEvent.getEventId,
             ),
-            transactionSubtype = TxLogEntry.BalanceChange.TransactionType,
+            transactionSubtype =
+              TxLogEntry.BalanceChange.Tap, // This doesn't matter - it'll be removed by mergeBalanceChangesIntoTransfer
             date = tx.getEffectiveAt,
             receiver = burntCoin.owner,
             amount = -burntCoin.amount.initialAmount,
@@ -948,7 +1071,7 @@ object UserWalletTxLogParser {
         tx: TransactionTree,
         event: TreeEvent,
         ccsum: CoinCreateSummary[T],
-        transactionSubtype: String,
+        transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
       // Note: CoinCreateSummary only contains the contract id of the new coin, but not the coin payload.
       // However, the new coin is always created in the same transaction.
@@ -985,7 +1108,7 @@ object UserWalletTxLogParser {
     def fromNotification(
         tx: TransactionTree,
         event: TreeEvent,
-        transactionSubtype: String,
+        transactionSubtype: NotificationTransactionSubtype,
         details: String,
     ): State = {
       val newEntry = TxLogEntry.Notification(

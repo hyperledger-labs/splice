@@ -8,6 +8,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithS
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransactionSubtype
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
@@ -632,23 +633,24 @@ class WalletTxLogIntegrationTest
       )
 
       // All parties see the same representation of the transfer
-      def checkSubscriptionPaymentTransfer(transactionType: String): CheckTxHistoryFn = {
-        case logEntry: walletLogEntry.Transfer =>
-          // This is the actual payment, transferring the unlocked coin to
-          // the receivers
-          logEntry.transactionSubtype shouldBe transactionType
-          inside(logEntry.sender) { case (sender, amount) =>
-            sender shouldBe aliceUserParty.toProtoPrimitive
-            amount shouldBe BigDecimal(0)
-          }
+      def checkSubscriptionPaymentTransfer(
+          transactionSubtype: TransactionSubtype
+      ): CheckTxHistoryFn = { case logEntry: walletLogEntry.Transfer =>
+        // This is the actual payment, transferring the unlocked coin to
+        // the receivers
+        logEntry.transactionSubtype shouldBe transactionSubtype
+        inside(logEntry.sender) { case (sender, amount) =>
+          sender shouldBe aliceUserParty.toProtoPrimitive
+          amount shouldBe BigDecimal(0)
+        }
 
-          inside(logEntry.receivers) { case Seq((receiver, amount)) =>
-            receiver shouldBe charlieUserParty.toProtoPrimitive
-            amount shouldBe subscriptionPrice
-          }
+        inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+          receiver shouldBe charlieUserParty.toProtoPrimitive
+          amount shouldBe subscriptionPrice
+        }
 
-          logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          logEntry.coinPrice shouldBe coinPrice
+        logEntry.senderHoldingFees shouldBe BigDecimal(0)
+        logEntry.coinPrice shouldBe coinPrice
       }
 
       checkTxHistory(
@@ -884,23 +886,24 @@ class WalletTxLogIntegrationTest
       )
 
       // All parties see the same representation of the transfer
-      def checkSubscriptionPaymentTransfer(transactionType: String): CheckTxHistoryFn = {
-        case logEntry: walletLogEntry.Transfer =>
-          // This is the actual payment, transferring the unlocked coin to
-          // the receivers
-          logEntry.transactionSubtype shouldBe transactionType
-          inside(logEntry.sender) { case (sender, amount) =>
-            sender shouldBe aliceUserParty.toProtoPrimitive
-            amount shouldBe BigDecimal(0)
-          }
+      def checkSubscriptionPaymentTransfer(
+          transactionSubtype: TransactionSubtype
+      ): CheckTxHistoryFn = { case logEntry: walletLogEntry.Transfer =>
+        // This is the actual payment, transferring the unlocked coin to
+        // the receivers
+        logEntry.transactionSubtype shouldBe transactionSubtype
+        inside(logEntry.sender) { case (sender, amount) =>
+          sender shouldBe aliceUserParty.toProtoPrimitive
+          amount shouldBe BigDecimal(0)
+        }
 
-          inside(logEntry.receivers) { case Seq((receiver, amount)) =>
-            receiver shouldBe charlieUserParty.toProtoPrimitive
-            amount shouldBe subscriptionPrice
-          }
+        inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+          receiver shouldBe charlieUserParty.toProtoPrimitive
+          amount shouldBe subscriptionPrice
+        }
 
-          logEntry.senderHoldingFees shouldBe BigDecimal(0)
-          logEntry.coinPrice shouldBe coinPrice
+        logEntry.senderHoldingFees shouldBe BigDecimal(0)
+        logEntry.coinPrice shouldBe coinPrice
       }
 
       checkTxHistory(

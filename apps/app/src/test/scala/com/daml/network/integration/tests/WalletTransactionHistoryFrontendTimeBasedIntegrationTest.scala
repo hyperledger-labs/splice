@@ -5,7 +5,6 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
-import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.OptionValues
 
@@ -95,7 +94,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
               matchTransactionAmountRange(tx)(
                 coinPrice = 2,
                 expectedAction = "Balance Change",
-                expectedSubtype = UserWalletTxLogParser.TxLogEntry.BalanceChange.SvRewardCollected,
+                expectedSubtype = "SV Reward Collected",
                 expectedPartyDescription = None,
                 // Rewards depend on round activity which can fluctuate a bit due to automation so we accept a wide range.
                 expectedAmountCC = (BigDecimal(66500), BigDecimal(66600)),
@@ -115,7 +114,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
         matchTransaction(balanceChange)(
           coinPrice = 2,
           expectedAction = "Balance Change",
-          expectedSubtype = UserWalletTxLogParser.TxLogEntry.BalanceChange.Tap,
+          expectedSubtype = "Tap",
           expectedPartyDescription = None,
           expectedAmountCC = BigDecimal(5),
         )
@@ -137,8 +136,8 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)
-              UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionInitialPaymentCollected
-            else UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionPaymentCollected,
+              "Subscription Initial Payment Collected"
+            else "Subscription Payment Collected",
           expectedPartyDescription = Some(s"$directoryExpectedCns via $directoryExpectedCns"),
           expectedAmountCC = BigDecimal(0), // 0 USD
         )
@@ -147,8 +146,8 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)
-              UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionInitialPaymentAccepted
-            else UserWalletTxLogParser.TxLogEntry.Transfer.SubscriptionPaymentAccepted,
+              "Subscription Initial Payment Accepted"
+            else "Subscription Payment Accepted",
           expectedPartyDescription =
             Some(s"Automation via ${aliceValidator.getValidatorPartyId().toProtoPrimitive}"),
           expectedAmountCC = BigDecimal("-0.5"), // 1 USD

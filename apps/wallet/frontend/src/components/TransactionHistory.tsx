@@ -31,7 +31,7 @@ import Typography from '@mui/material/Typography';
 import { Party } from '@daml/types';
 
 import { useTransactions } from '../hooks';
-import { Transaction } from '../models/models';
+import { Transaction, TransactionSubtype } from '../models/models';
 
 const TransactionHistory: React.FC = () => {
   const txQuery = useTransactions();
@@ -161,11 +161,120 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
       </Icon>
       <Stack>
         <Typography className="tx-action">{text}</Typography>
-        <Typography className="tx-subtype" variant="body2">
-          ({transaction.transactionSubtype})
-        </Typography>
+        <TransactionSubtypeText subtype={transaction.transactionSubtype} />
       </Stack>
     </Stack>
+  );
+};
+
+const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ subtype }) => {
+  let text: string;
+  // This should be replaced by localization in the future.
+  switch (subtype.choice) {
+    case 'WalletAppInstall_ExecuteBatch':
+      // WalletAutomation
+      text = 'Automation';
+      break;
+    case 'SubscriptionIdleState_MakePayment':
+      // SubscriptionPaymentAccepted
+      text = 'Subscription Payment Accepted';
+      break;
+    case 'SubscriptionPayment_Collect':
+      // SubscriptionPaymentCollected
+      text = 'Subscription Payment Collected';
+      break;
+    case 'AppPaymentRequest_Accept':
+      // AppPaymentAccepted
+      text = 'App Payment Accepted';
+      break;
+    case 'CoinRules_BuyExtraTraffic':
+      // ExtraTrafficPurchase
+      text = 'Extra Traffic Purchase';
+      break;
+    case 'AcceptedAppPayment_Collect':
+      // AppPaymentCollected
+      text = 'App Payment Collected';
+      break;
+    case 'AcceptedTransferOffer_Complete':
+      // P2PPaymentCompleted
+      text = 'P2P Payment Completed';
+      break;
+    case 'SubscriptionRequest_AcceptAndMakePayment':
+      // SubscriptionInitialPaymentAccepted
+      text = 'Subscription Initial Payment Accepted';
+      break;
+    case 'CoinRules_Transfer':
+      // Transfer
+      text = 'Transfer';
+      break;
+    case 'SubscriptionInitialPayment_Collect':
+      // SubscriptionInitialPaymentCollected
+      text = 'Subscription Initial Payment Collected';
+      break;
+    case 'AcceptedAppPayment_Expire':
+      // AppPaymentExpired
+      text = 'App Payment Expired';
+      break;
+    case 'CoinRules_Mint':
+      // Mint
+      text = 'Mint';
+      break;
+    case 'Coin_Expire':
+      // CoinExpired
+      text = 'Coin Expired';
+      break;
+    case 'SvcRules_CollectSvReward':
+      // SvRewardCollected
+      text = 'SV Reward Collected';
+      break;
+    case 'SubscriptionPayment_Reject':
+      // SubscriptionPaymentRejected
+      text = 'Subscription Payment Rejected';
+      break;
+    case 'LockedCoin_Unlock':
+      // LockedCoinUnlocked
+      text = 'Locked Coin Unlocked';
+      break;
+    case 'SubscriptionInitialPayment_Reject':
+      // SubscriptionInitialPaymentRejected
+      text = 'Subscription Initial Payment Rejected';
+      break;
+    case 'LockedCoin_OwnerExpireLock':
+      // LockedCoinOwnerExpired
+      text = 'Locked Coin Owner Expired';
+      break;
+    case 'LockedCoin_ExpireCoin':
+      // LockedCoinExpired
+      text = 'Locked Coin Expired';
+      break;
+    case 'AcceptedAppPayment_Reject':
+      // AppPaymentRejected
+      text = 'App Payment Rejected';
+      break;
+    case 'SubscriptionInitialPayment_Expire':
+      // SubscriptionInitialPaymentExpired
+      text = 'Subscription Initial Payment Expired';
+      break;
+    case 'SubscriptionPayment_Expire':
+      // SubscriptionPaymentExpired
+      text = 'Subscription Payment Expired';
+      break;
+    case 'CoinRules_DevNet_Tap':
+      // Tap
+      text = 'Tap';
+      break;
+    case 'SubscriptionIdleState_ExpireSubscription':
+      // SubscriptionExpired
+      text = 'Subscription Expired';
+      break;
+    default:
+      console.warn('Unknown Transaction Subtype', subtype);
+      text = subtype.choice;
+  }
+  return (
+    <Typography className="tx-subtype" variant="body2">
+      ({text})
+    </Typography>
   );
 };
 

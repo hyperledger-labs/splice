@@ -835,6 +835,19 @@ components:
         amount:
           type: string
 
+    TransactionSubtype:
+      type: object
+      required:
+        - template_id
+        - choice
+      properties:
+        template_id:
+          type: string
+        choice:
+          type: string
+        coin_operation:
+          type: string
+
     ListTransactionsResponseItem:
       type: object
       required:
@@ -852,7 +865,7 @@ components:
         transaction_type:
           type: string
         transaction_subtype:
-          type: string
+          $ref: "#/components/schemas/TransactionSubtype"
         event_id:
           type: string
         offset:
