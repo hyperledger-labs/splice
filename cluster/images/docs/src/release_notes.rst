@@ -6,6 +6,11 @@ Release Notes
 2023-06-04
 ----------
 
+* Deployment updates:
+
+  * Docker images now use the same versioning scheme as helm charts:
+    ``<major>.<minor>.<patch>-snapshot.<commit_date>.<number_of_commits>.0.v<commit_sha_8>``
+
 * Frontend updates:
 
   * Reorganized the information tab in SV UI and included rules governing canton coin (e.g. fees) in SV UI.
