@@ -2,7 +2,7 @@ import 'common-typeface-termina';
 
 import { createTheme, TypographyStyle } from '@mui/material';
 
-import { generateHslPalette, generateRemValue } from './utils';
+import { generateHslPalette, generateRemValue, stylePillButton } from './utils';
 
 // TS module augmentation to add custom theme vars for storing our CN-theme color values
 declare module '@mui/material/styles' {
@@ -23,12 +23,14 @@ declare module '@mui/material/styles' {
   interface Palette {
     colors: {
       neutral: Record<string, string>;
+      primary: Record<string, string>;
     };
   }
   // allow configuration using `createTheme`
   interface PaletteOptions {
     colors?: {
       neutral?: Record<string, string>;
+      primary?: Record<string, string>;
     };
   }
 }
@@ -56,6 +58,7 @@ let theme = createTheme({
     mode: 'dark',
     colors: {
       neutral: generateHslPalette(0, 0, [0, 10, 15, 25, 30, 40, 50, 60, 70, 80]),
+      primary: generateHslPalette(195, 96, [79, 89]),
     },
   },
 });
@@ -69,7 +72,8 @@ theme = createTheme(theme, {
    */
   palette: {
     primary: {
-      main: '#96E4FD',
+      main: theme.palette.colors.primary[79],
+      light: theme.palette.colors.primary[89],
     },
     secondary: {
       main: '#F3FF97',
@@ -162,6 +166,9 @@ theme = createTheme(theme, {
    */
   components: {
     MuiButton: {
+      defaultProps: {
+        disableRipple: true,
+      },
       variants: [
         {
           props: { variant: 'primary-button' },
@@ -185,22 +192,32 @@ theme = createTheme(theme, {
             },
           },
         },
-        {
-          props: { variant: 'pill' },
-          style: {
-            borderRadius: 9999,
-            backgroundColor: theme.palette.primary.main,
-            color: 'black',
-          },
-        },
-        {
-          props: { variant: 'pill', color: 'warning' },
-          style: {
-            borderRadius: 9999,
-            backgroundColor: theme.palette.warning.main,
-            color: 'white',
-          },
-        },
+        // primary pill button
+        stylePillButton({
+          bgColor: theme.palette.primary.main,
+          bgHoverColor: theme.palette.primary.light,
+          bgDisableColor: theme.palette.colors.neutral[25],
+          borderFocus: `2px solid ${theme.palette.primary.main}`,
+          textColor: 'black',
+        }),
+        // secondary pill button (border style)
+        stylePillButton({
+          props: { color: 'secondary' },
+          bgDisableColor: theme.palette.colors.neutral[25],
+          border: `1px solid ${theme.palette.secondary.main}`,
+          borderFocus: `2px solid ${theme.palette.secondary.main}`,
+          textColor: 'white',
+          textHoverColor: theme.palette.secondary.main,
+        }),
+        // warning pill button (border style)
+        stylePillButton({
+          props: { color: 'warning' },
+          bgDisableColor: theme.palette.colors.neutral[25],
+          border: `1px solid ${theme.palette.warning.main}`,
+          borderFocus: `2px solid ${theme.palette.warning.main}`,
+          textColor: 'white',
+          textHoverColor: theme.palette.warning.main,
+        }),
         {
           props: { variant: 'outlined', color: 'secondary', size: 'small' },
           style: {
