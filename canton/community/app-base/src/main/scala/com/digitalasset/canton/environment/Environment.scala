@@ -220,7 +220,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         )
       )
     case ClockConfig.WallClock(_) => None
-    case ClockConfig.RemoteClock(_) => None
+    case ClockConfig.RemoteClock(_, _) => None
   }
 
   val clock: Clock = simClock.getOrElse(createClock(None))
@@ -238,8 +238,13 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         )
         clock.advanceTo(parent.now)
         clock
-      case ClockConfig.RemoteClock(clientConfig) =>
-        new RemoteClock(clientConfig, config.parameters.timeouts.processing, clockLoggerFactory)
+      case ClockConfig.RemoteClock(clientConfig, useXNodes) =>
+        new RemoteClock(
+          clientConfig,
+          config.parameters.timeouts.processing,
+          clockLoggerFactory,
+          useXNodes,
+        )
       case ClockConfig.WallClock(skewW) =>
         val skewMs = skewW.asJava.toMillis
         val tickTock =

@@ -238,7 +238,8 @@ object ClockConfig {
     * For such cases we can use a remote clock. However, no user should ever require this.
     * @param remoteApi admin-port of the node to read the time from
     */
-  final case class RemoteClock(remoteApi: ClientConfig) extends ClockConfig
+  final case class RemoteClock(remoteApi: ClientConfig, useXNodes: Boolean = false)
+      extends ClockConfig
 
 }
 

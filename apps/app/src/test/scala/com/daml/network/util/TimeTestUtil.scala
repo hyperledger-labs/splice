@@ -70,25 +70,41 @@ trait TimeTestUtil extends CNNodeTestCommon {
         }
 
         // it doesn't seem to matter which participant we run these from - all get synced
-        val now = svc.participantClient.ledger_api.time.get()
-        try {
-          // actually advance the time
-          logger.info(s"advancing time by $duration ...")
-          svc.participantClient.ledger_api.time.set(now, now.plus(duration))
-        } catch {
-          case _: CommandFailure =>
+        def actuallyAdvanceTime(i: Int): Unit = {
+          // We retry a bounded number of times, as we're running simtime tests with a clock
+          // that ticks concurrently to ensure topology transactions get accepted.
+          // TODO(#5187): remove the need for this retry once we don't need the background clock
+          val maxNumRetries = 10
+          if (i < maxNumRetries) {
+            val now = svc.participantClient.ledger_api.time.get()
+            try {
+              // actually advance the time
+              logger.info(s"advancing time by $duration ...")
+              svc.participantClient.ledger_api.time.set(now, now.plus(duration))
+              // We don't get feedback about the success of setting the time here, so we check ourselves.
+              // It should be at least now, but can be more because of the background clock.
+              // TODO(#5187): check for equality once we get rid of the background clock
+              if (svc.participantClient.ledger_api.time.get() < now) {
+                actuallyAdvanceTime(i + 1)
+              }
+            } catch {
+              case c: CommandFailure if c.toString contains "current_time mismatch" =>
+                actuallyAdvanceTime(i + 1)
+              case _: CommandFailure =>
+                fail(
+                  "Could not advance time. " +
+                    "Is Canton configured with `parameters.clock.type = sim-clock`?"
+                )
+            }
+          } else {
             fail(
-              "Could not advance time. " +
+              s"Failed to advance time within $maxNumRetries retries. " +
                 "Is Canton configured with `parameters.clock.type = sim-clock`?"
             )
+          }
         }
-        // We don't get feedback about the success of setting the time here, so we check ourselves.
-        if (svc.participantClient.ledger_api.time.get() == now) {
-          fail(
-            "Could not advance time. " +
-              "Are participants configured with `testing-time.type = monotonic-time`?"
-          )
-        }
+        actuallyAdvanceTime(0)
+
       }
     }
   }

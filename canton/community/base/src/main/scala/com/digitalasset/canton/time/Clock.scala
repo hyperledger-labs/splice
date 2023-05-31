@@ -17,13 +17,14 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.time.Clock.SystemClockRunningBackwards
 import com.digitalasset.canton.topology.admin.v0.InitializationServiceGrpc
+import com.digitalasset.canton.topology.admin.v1.IdentityInitializationServiceXGrpc
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, PriorityBlockingQueueUtil}
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.empty.Empty
 
-import java.time.{Clock as JClock, Duration, Instant}
+import java.time.{Duration, Instant, Clock as JClock}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
 import java.util.concurrent.{Callable, PriorityBlockingQueue, TimeUnit}
 import scala.annotation.tailrec
@@ -376,6 +377,7 @@ class RemoteClock(
     config: ClientConfig,
     timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
+    useXNodes: Boolean,
 )(implicit val ec: ExecutionContextExecutor)
     extends Clock
     with NamedLogging {
@@ -385,6 +387,7 @@ class RemoteClock(
     Threading.singleThreadScheduledExecutor(loggerFactory.threadName + "-remoteclock", logger)
   private val channel = ClientChannelBuilder.createChannelToTrustedServer(config)
   private val service = InitializationServiceGrpc.stub(channel)
+  private val serviceX = IdentityInitializationServiceXGrpc.stub(channel)
   private val running = new AtomicBoolean(true)
   private val updating = new AtomicReference[Option[CantonTimestamp]](None)
 
@@ -439,7 +442,9 @@ class RemoteClock(
   @tailrec
   private def getRemoteTime: CantonTimestamp = {
     val req = for {
-      pbTimestamp <- EitherT.right[ProtoDeserializationError](service.currentTime(Empty()))
+      pbTimestamp <- EitherT.right[ProtoDeserializationError](
+        if (useXNodes) serviceX.currentTime(Empty()) else service.currentTime(Empty())
+      )
       timestamp <- EitherT.fromEither[Future](CantonTimestamp.fromProtoPrimitive(pbTimestamp))
     } yield timestamp
     import TraceContext.Implicits.Empty.*

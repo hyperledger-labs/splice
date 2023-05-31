@@ -435,7 +435,7 @@ object CNNodeConfigTransforms {
     val tokens: mutable.Map[Int, String] = mutable.Map.empty
 
     val tokenDataSource = clockConfig match {
-      case ClockConfig.RemoteClock(_) => Source.fromFile("canton-simtime.tokens")
+      case ClockConfig.RemoteClock(_, _) => Source.fromFile("canton-simtime.tokens")
       case ClockConfig.WallClock(_) => Source.fromFile("canton.tokens")
       case ClockConfig.SimClock =>
         sys.error(

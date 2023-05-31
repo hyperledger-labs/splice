@@ -18,7 +18,7 @@ import java.time.Duration
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
-class DirectoryTimeBasedIntegrationTest
+class XNodeDirectoryTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
@@ -30,14 +30,14 @@ class DirectoryTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXWithSimTime(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.dars.upload(directoryDarPath)
-        bobValidator.participantClient.dars.upload(directoryDarPath)
+        aliceValidator.participantClient.dars_extensions.upload_if_not_exist(directoryDarPath)
+        bobValidator.participantClient.dars_extensions.upload_if_not_exist(directoryDarPath)
       })
 
   "Directory service" should {

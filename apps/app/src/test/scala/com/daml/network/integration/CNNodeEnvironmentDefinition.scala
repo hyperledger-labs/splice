@@ -195,6 +195,33 @@ case class CNNodeEnvironmentDefinition(
       ctx => (conf => transform(ctx, conf)) +: this.configTransformsWithContext(ctx)
     )
 
+  private def withSimTime(useXNodes: Boolean): CNNodeEnvironmentDefinition =
+    addConfigTransformsToFront((_, conf) =>
+      conf
+        .focus(_.parameters.clock)
+        .replace(
+          ClockConfig.RemoteClock(
+            // This reads the right port as the bump is added to the front
+            conf.svcApp
+              .getOrElse(throw new IllegalArgumentException("expected svc app to be configured"))
+              .participantClient
+              .clientAdminApi,
+            useXNodes,
+          )
+        )
+    )
+      .addConfigTransformsToFront((_, conf) =>
+        CNNodeConfigTransforms.bumpCantonPortsBy(10_000)(conf)
+      )
+      // we bump remote app ports separately in order to not confuse
+      // the PreflightIntegrationTest which also uses bumpCantonPortsBy
+      .addConfigTransformsToFront((_, conf) =>
+        CNNodeConfigTransforms.bumpDirectoryClientsPortsBy(10_000)(conf)
+      )
+      .addConfigTransformsToFront((_, conf) =>
+        CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
+      )
+
   override lazy val environmentFactory: EnvironmentFactory[CNNodeEnvironmentImpl] =
     CNNodeEnvironmentFactory
 
@@ -223,35 +250,11 @@ object CNNodeEnvironmentDefinition {
       .withAllocatedSvcAndSvUsers()
       .withInitializedNodes()
 
+  def simpleTopologyXWithSimTime(testName: String): CNNodeEnvironmentDefinition =
+    simpleTopologyX(testName).withSimTime(useXNodes = true)
+
   def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopology(testName)
-      // all of these transforms need to happen before the auth-related default transforms,
-      // which use the `clock` parameter to determine which `.tokens` file to read
-      // and the ledger API ports to identify the tokens in that file; hence we add them `ToFront`
-      .addConfigTransformsToFront((_, conf) =>
-        conf
-          .focus(_.parameters.clock)
-          .replace(
-            ClockConfig.RemoteClock(
-              // This reads the right port as the bump is added to the front
-              conf.svcApp
-                .getOrElse(throw new IllegalArgumentException("expected svc app to be configured"))
-                .participantClient
-                .clientAdminApi
-            )
-          )
-      )
-      .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.bumpCantonPortsBy(10_000)(conf)
-      )
-      // we bump remote app ports separately in order to not confuse
-      // the PreflightIntegrationTest which also uses bumpCantonPortsBy
-      .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.bumpDirectoryClientsPortsBy(10_000)(conf)
-      )
-      .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
-      )
+    simpleTopology(testName).withSimTime(useXNodes = false)
 
   def preflightTopology(testName: String): CNNodeEnvironmentDefinition = {
     fromResource("preflight-topology.conf", testName)

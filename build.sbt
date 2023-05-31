@@ -1004,6 +1004,8 @@ printTests := {
   val pwFrontEndSimTime =
     new PrintWriter(new FileWriter(s"test-full-class-names-frontend-sim-time.log", true))
   val pwXNode = new PrintWriter(new FileWriter(s"test-full-class-names-xnode.log", true))
+  val pwXNodeSimTime =
+    new PrintWriter(new FileWriter(s"test-full-class-names-xnode-sim-time.log", true))
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
@@ -1066,7 +1068,12 @@ printTests := {
     (
       "XNode tests with wall clock time",
       pwXNode,
-      (t: String) => isXNodeTest(t),
+      (t: String) => isXNodeTest(t) && !isTimeBasedTest(t),
+    ),
+    (
+      "XNode tests with simulated time",
+      pwXNodeSimTime,
+      (t: String) => isXNodeTest(t) && isTimeBasedTest(t),
     ),
   ).foreach { case (testSet, pw, predicate) =>
     printTestNames(testSet, allTestNames, pw, predicate)
@@ -1077,6 +1084,7 @@ printTests := {
   pwFrontEnd.close()
   pwFrontEndSimTime.close()
   pwXNode.close()
+  pwXNodeSimTime.close()
 }
 
 Global / excludeLintKeys += `root` / wartremoverErrors
