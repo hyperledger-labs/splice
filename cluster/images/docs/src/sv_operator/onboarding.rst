@@ -31,7 +31,7 @@ Assuming that you have extended the ``examples/sv/sv-participant.conf`` to match
 
 .. parsed-literal::
 
-  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/sv/sv-participant.conf --bootstrap examples/sv/sv-participant.sc
+  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../|canton_subdir|/bin/canton --config examples/sv/sv-participant.conf --bootstrap examples/sv/sv-participant.sc
 
 ..
   For manually running this runbook using the same PostgreSQL setup we use for `./start-canton.sh`, run:

@@ -4,12 +4,15 @@ in
 stdenv.mkDerivation rec {
   name = "canton";
   version = sources.version;
-  src = builtins.fetchTarball {
+  src = builtins.fetchurl {
     url = "https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-${sources.version}.tar.gz";
     sha256 = sources.sha256;
   };
+  dontUnpack = true;
   installPhase = ''
-    mkdir - p $out
-    cp -r * $out
+    mkdir -p $out
+    tar --strip-components=1 -C $out -xzf $src
+    # extract the first component of the path names
+    tar -tzf $src | sed -ne '1s,/.*,,p' > $out/SUBDIR;
   '';
 }

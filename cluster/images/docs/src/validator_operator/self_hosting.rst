@@ -71,7 +71,7 @@ you extracted Canton research next to the Canton network tarball. If you placed 
 
 .. parsed-literal::
 
-  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant.conf --bootstrap examples/validator/validator-participant.sc
+  DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../|canton_subdir|/bin/canton --config examples/validator/validator-participant.conf --bootstrap examples/validator/validator-participant.sc
 
 Next, open a second terminal and navigate to the extracted bundle's root directory.
 In order to become a validator, you need the sponsorship of a current supervalidator.
@@ -349,7 +349,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
 .. parsed-literal::
 
-    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../canton-research-2.7.0-SNAPSHOT/bin/canton --config examples/validator/validator-participant-secure.conf --bootstrap examples/validator/validator-participant-secure.sc
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../|canton_subdir|/bin/canton --config examples/validator/validator-participant-secure.conf --bootstrap examples/validator/validator-participant-secure.sc
 
 9. Now start the validator again:
 
