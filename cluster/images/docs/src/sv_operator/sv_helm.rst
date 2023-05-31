@@ -40,6 +40,13 @@ See instructions in the :ref:`Generating an SV identity section <sv-identity>`.
    please provide that IP address to your contact at Digital Asset to
    add it to the firewall rules.
 
+7) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
+
+.. parsed-literal::
+
+  tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
+
+
 
 Preparing a Cluster for Installation
 ------------------------------------
@@ -257,7 +264,7 @@ For technical reasons, please also create the following dummy secrets (a require
     kubectl create --namespace sv secret generic cn-app-svc-ledger-api-auth "--from-literal=ledger-api-user=dummy"
 
 
-The SV app app is configured with a secret as follows:
+The SV app is configured with a secret as follows:
 
 .. code-block:: bash
 
@@ -309,42 +316,17 @@ similar.
 
 |chart_version_set|
 
-There should also be a file, ``participant-values.yaml``, that refers to
-the domain in the cluster to which you are connecting. As in other
-sections of this runbook, please replace ``TARGET_CLUSTER`` with
-``dev`` or ``test`` per the cluster to which you are connecting. The
-``participant-values.yaml`` file also contains an additional configuration
-block for specifying the Auth0 instance. This will need to be updated
-to match your configuration.
+Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` as follows:
 
-.. code-block:: yaml
-
-    postgres: postgres
-    globalDomain:
-      alias: global
-      url: http://TARGET_CLUSTER.network.canton.global:5008
-    auth:
-      jwksEndpoint: "${OIDC_AUTHORITY_URL}/.well-known/jwks.json"
-      targetAudience: "https://canton.network.global"
+- Replace ``TARGET_CLUSTER`` in the `globalDomain.url` entry with |cn_cluster|, per the cluster to which you are connecting.
+- Replace ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
 An SV node includes a validator app so you also need to configure
-that. Create a file called ``validator-values.yaml`` with the
-following content.
+that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
-.. code-block:: yaml
-
-    participantAddress: "participant"
-    svSponsorAddress: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
-    scanPort: "5012"
-    scanAddress: "https://TARGET_CLUSTER.network.canton.global"
-    # Replace SV_WALLET_USER_ID with the user id in your IAM that you want to use to log into
-    # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
-    # not only the suffix ``43b68e1e4978b000cefba352``:
-    validatorWalletUser: "SV_WALLET_USER_ID"
-    clusterUrl: "TARGET_CLUSTER.network.canton.global"
-    auth:
-      audience: https://canton.network.global
-      jwksUrl: https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json
+- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace ``SV_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
+- Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document. For auth0, that should be achieved by replacing ``YOUR_INSTANCE_NAME`` with your instance name in auth0.
 
 The private and public key for your SV are defined in a K8s secret.
 If you haven't done so yet, please first follow the instructions in
@@ -360,21 +342,13 @@ idenitty.
         --from-literal=public=YOUR_PUBLIC_KEY \
         --from-literal=private=YOUR_PRIVATE_KEY
 
-The configuration used by the SV app to onboard your SV should be defined in a file named
-``sv-values.yaml``.
+For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml`` as follows:
 
-.. code-block:: yaml
+- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
+- Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document. For auth0, that should be achieved by replacing ``YOUR_INSTANCE_NAME`` with your instance name in auth0.
 
-    joinWithKeyOnboarding:
-      sponsorApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
-      svcApiAddress: "TARGET_CLUSTER.network.canton.global"
-    onboardingName: ... your SV name goes here ...
-    auth:
-      audience: https://canton.network.global
-      jwksUrl: https://YOUR_INSTANCE_NAME.us.auth0.com/.well-known/jwks.json
-
-
-With this file in place, you can execute the following helm commands
+With these files in place, you can execute the following helm commands
 in sequence. It's generally a good idea to wait until each deployment
 reaches a stable state prior to moving on to the next step.
 
@@ -382,9 +356,9 @@ reaches a stable state prior to moving on to the next step.
 
     helm repo update
     helm install postgres canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} --wait
-    helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f participant-values.yaml --wait
-    helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f validator-values.yaml --wait
-    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f sv-values.yaml --wait
+    helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
+    helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml --wait
+    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in each of the three new

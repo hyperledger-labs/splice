@@ -1,0 +1,9 @@
+postgres: postgres
+globalDomain:
+  alias: global
+# replace TARGET_CLUSTER with your actual target cluster
+  url: http://TARGET_CLUSTER.network.canton.global:5008
+auth:
+# replace OIDC_AUTHORITY_URL with your provider's OIDS URL
+  jwksEndpoint: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+  targetAudience: "https://canton.network.global"

@@ -21,6 +21,12 @@ Release Notes
     With the fix, SVs start receiving SV rewards starting from the next round that opens after that SV has joined, i.e.,
     an SVs will not receive SV rewards for any of the rounds that have opened before the time it has joined.
 
+* Deployment updates:
+
+  * The downloaded bundle now includes sample values files for the helm charts, and the
+    instructions have been modified to list the required user-specific configuration changes
+    required before using them.
+
 
 2023-05-28
 ----------

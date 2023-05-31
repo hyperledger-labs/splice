@@ -15,11 +15,12 @@ import {
   svValidatorSecrets,
   svcUserParticipantSecret,
 } from './secrets';
-import { exactNamespace, requiredEnv } from './utils';
+import { exactNamespace, requiredEnv, loadYamlFromFile } from './utils';
 
 // Note that for now this assumes the entire cluster is under this scripts's control,
 // i.e. it was only initialized with the `infrastructure` pulumi, no other `cncluster` scripts (specifically, no other secrets or namespaces created).
 
+const REPO_ROOT = requiredEnv('REPO_ROOT', 'root directory of the repo');
 const version = process.env.CHARTS_VERSION;
 const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
 const CLUSTER_BASENAME = requiredEnv(
@@ -65,23 +66,19 @@ const postgres = installCNHelmChart(
   version
 );
 
+const participantValues = loadYamlFromFile(
+  `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
+  {
+    TARGET_CLUSTER: TARGET_CLUSTER,
+    OIDC_AUTHORITY_URL: AUTH0_DOMAIN,
+  }
+);
+
 const participant = installCNHelmChart(
   svNamespace,
   'participant',
   'cn-participant',
-  // TODO(#4384): move these values into a file and distribute it with the release
-  {
-    postgres: 'postgres',
-    globalDomain: {
-      alias: 'global',
-      url: `http://${TARGET_CLUSTER}.network.canton.global:5008`,
-    },
-    auth: {
-      jwksEndpoint: `https://${AUTH0_DOMAIN}/.well-known/jwks.json`,
-      // TODO(#4552): support arbitrary audience
-      targetAudience: 'https://canton.network.global',
-    },
-  },
+  participantValues,
   localCharts,
   version,
   svImagePullDeps.concat([
@@ -96,46 +93,40 @@ const participant = installCNHelmChart(
   ])
 );
 
+// TODO(#5202): align YOUR_ISTANCE_NAME vs OIDC_AUTHORITY_URL
+const validatorValues = loadYamlFromFile(
+  `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`,
+  {
+    TARGET_CLUSTER: TARGET_CLUSTER,
+    SV_WALLET_USER_ID: SV_WALLET_USER_ID,
+    YOUR_INSTANCE_NAME: AUTH0_DOMAIN.replaceAll('.us.auth0.com', ''),
+  }
+);
+
 const validator = installCNHelmChart(
   svNamespace,
   'validator',
   'cn-validator',
-  // TODO(#4384): move these values into a file and distribute it with the release
-  {
-    participantAddress: 'participant',
-    svSponsorAddress: `https://sv.sv-1.svc.${TARGET_CLUSTER}.network.canton.global/api/v0/sv`,
-    scanPort: '5012',
-    scanAddress: `https://${TARGET_CLUSTER}.network.canton.global`,
-    validatorWalletUser: SV_WALLET_USER_ID,
-    clusterUrl: `${TARGET_CLUSTER}.network.canton.global`,
-    auth: {
-      // TODO(#4552): support arbitrary audience
-      audience: 'https://canton.network.global',
-      jwksUrl: `https://${AUTH0_DOMAIN}/.well-known/jwks.json`,
-    },
-  },
+  validatorValues,
   localCharts,
   version,
   svImagePullDeps.concat([participant]).concat(svValidatorSecrets(svNamespace))
+);
+
+const svValues = loadYamlFromFile(
+  `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
+  {
+    TARGET_CLUSTER: TARGET_CLUSTER,
+    YOUR_SV_NAME: SV_NAME,
+    YOUR_INSTANCE_NAME: AUTH0_DOMAIN.replaceAll('.us.auth0.com', ''),
+  }
 );
 
 const sv = installCNHelmChart(
   svNamespace,
   'sv-1',
   'cn-sv-node',
-  // TODO(#4384): move these values into a file and distribute it with the release
-  {
-    joinWithKeyOnboarding: {
-      sponsorApiUrl: `https://sv.sv-1.svc.${TARGET_CLUSTER}.network.canton.global/api/v0/sv`,
-      svcApiAddress: `${TARGET_CLUSTER}.network.canton.global`,
-    },
-    onboardingName: SV_NAME,
-    auth: {
-      // TODO(#4552): support arbitrary audience
-      audience: 'https://canton.network.global',
-      jwksUrl: `https://${AUTH0_DOMAIN}/.well-known/jwks.json`,
-    },
-  },
+  svValues,
   localCharts,
   version,
   svImagePullDeps.concat([validator, participant]).concat(svAppSecrets(svNamespace))
@@ -148,7 +139,6 @@ installCNHelmChartByNamespaceName(
   infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
   'cluster-ingress-sv',
   'cn-cluster-ingress-sv',
-  // TODO(#4384): move these values into a file and distribute it with the release
   {
     cluster: {
       hostname: `${CLUSTER_BASENAME}.network.canton.global`,

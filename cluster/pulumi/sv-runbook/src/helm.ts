@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 
-import { ExactNamespace, requiredEnv } from './utils';
+import { ChartValues, ExactNamespace, requiredEnv } from './utils';
 
 export function installCNHelmChartByNamespaceName(
   ns: pulumi.Output<string> | string,
@@ -61,9 +61,3 @@ export function installCNHelmChart(
     dependsOn.concat([ns.ns])
   );
 }
-
-// TODO(#4584): reduce duplication with canton-network project
-// Typically used for overriding chart values.
-// The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ChartValues = { [key: string]: any };

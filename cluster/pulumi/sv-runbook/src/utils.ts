@@ -1,4 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
+import * as fs from 'fs';
+import { PathLike } from 'fs';
+import { load } from 'js-yaml';
 
 // TODO(#4584): reduce duplication with canton-network project
 // There is no way to read the logical name off a Namespace.  Exactly
@@ -36,3 +39,17 @@ export function requiredEnv(varName: string, msg: string): string {
   }
   return val;
 }
+
+export function loadYamlFromFile(
+  path: PathLike,
+  replaceStrings: { [template: string]: string }
+): ChartValues {
+  let yamlStr = fs.readFileSync(path, 'utf-8');
+  for (const t in replaceStrings) {
+    yamlStr = yamlStr.replaceAll(t, replaceStrings[t]);
+  }
+  return load(yamlStr) as ChartValues;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ChartValues = { [key: string]: any };
