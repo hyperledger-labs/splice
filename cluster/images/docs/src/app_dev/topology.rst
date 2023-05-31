@@ -70,7 +70,7 @@ Default Application Topology
   * there are five different APIs in use:
 
     1. The **Domain API** is used by the validator nodes to connect to the CN
-       Public Domain, which they use to coordinate transactions on the
+       Global Domain, which they use to coordinate transactions on the
        app's data.
 
     2. The **Ledger API** is used by the app backend to read and act in the
@@ -130,18 +130,18 @@ Limitations
 ###########
 
 * **high-throughput apps (> 1 tx/s and < 100 tx/s)**: providers of high-throughput apps (> 1 tx/s on
-  average) should run their own domain, and only use the CN Public Domain for
+  average) should run their own domain, and only use the CN Global Domain for
   interacting with other apps (e.g., settling payments in CC). This requires:
 
   * the app Daml package to be split into two packages:
 
     * The **app integration Daml package** contains all contracts that are
-      used to interact with other apps (e.g. CC) on the CN Public Domain.
+      used to interact with other apps (e.g. CC) on the CN Global Domain.
     * The **app workflow Daml package** should contain the contracts for which
       the high transaction throughput is required. They are expected to be
       hosted on the app provider's domain. They also create contracts from the
       app integration Daml package at a low volume. These contracts are then
-      transferred between the provider's domain and the CN Public domain as
+      transferred between the provider's domain and the CN global domain as
       required to advance the workflow.
 
   * the app backend and app UI must manage the transfer of contracts between

@@ -24,9 +24,9 @@ Glossary
       to other entities on the Canton network.
 
 
-    CN Public Domain
+    CN Global Domain
 
-      * public synchronization domain
+      * global synchronization domain
       * can host small apps directly on domain
       * acts as shared synchronization domain to intermediate between different apps' domains
       * run by super validator collective with BFT
@@ -39,7 +39,7 @@ Glossary
       * used for domain fees
       * fees in USD
       * coins accrue holding fees that pay for the coin's usage of SVC storage space
-      * all cc transactions are fully public
+      * all cc transactions are public
       * supports locked coins that can be unlocked by lock holder
       * support transfers single sender, multi-receiver transfers
       * transfers cost admin fees and produce app reward for receiver and

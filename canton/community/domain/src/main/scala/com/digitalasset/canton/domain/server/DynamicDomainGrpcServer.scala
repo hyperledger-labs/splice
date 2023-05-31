@@ -20,7 +20,7 @@ import io.grpc.protobuf.services.ProtoReflectionService
 import scala.annotation.nowarn
 import scala.concurrent.ExecutionContextExecutorService
 
-/** Creates a dynamic public domain server to which domain services can be added at a later time,
+/** Creates a dynamic domain server to which domain services can be added at a later time,
   * while providing a gRPC health service from the start.
   * This is useful to bring up the embedded domain or sequencer node endpoint with health service, prior to them being
   * initialized.

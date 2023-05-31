@@ -361,7 +361,7 @@ class WalletIntegrationTest
           domainId = Some(splitwellDomainId),
         ),
       )(
-        "request and delivery offer get transferred to public domain",
+        "request and delivery offer get transferred to global domain",
         { case (offer, request, _) =>
           val domains = aliceValidator.participantClientWithAdminToken.transfer
             .lookup_contract_domain(offer, request)

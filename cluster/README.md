@@ -56,7 +56,7 @@ for the first time.
 
 ## Available Clusters
 
-The public Canton Network clusters are currently hosted in Google
+The global Canton Network clusters are currently hosted in Google
 Cloud. There are multiple clusters, each with a different purpose, all
 of which are accessible only through VPN:
 
@@ -107,7 +107,7 @@ For an external partner to have access to a Canton Network cluster,
 they must be granted access to the *GCP DA Canton DevNet* VPN. The
 request to grant this access must go through an approval and
 notification process, with the setup itself done by IT
-support. Partner access through this VPN is only to public cluster
+support. Partner access through this VPN is only to global Canton Network
 services and not the administration APIs.
 
 The process by which access is granted is this:

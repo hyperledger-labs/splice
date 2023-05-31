@@ -18,7 +18,7 @@ Deployment
         there is no resource contention
 
     * deploy the app backend and make its app read API accessible to all users
-      (VPN for internal applications, internet-accessible for a public app)
+      (VPN for internal applications, internet-accessible for an open app)
     * deploy a web-server hosting the app user UI
     * instruct your validator node to host your app Daml package
 
