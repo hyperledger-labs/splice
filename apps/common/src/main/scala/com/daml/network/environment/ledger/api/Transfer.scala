@@ -3,7 +3,7 @@ package com.daml.network.environment.ledger.api
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
-import com.digitalasset.canton.research.participant.multidomain
+import com.digitalasset.canton.participant.protocol.v0.multidomain
 
 final case class Transfer[+E](
     updateId: String,

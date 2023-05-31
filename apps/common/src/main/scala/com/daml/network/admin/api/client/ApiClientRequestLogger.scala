@@ -30,8 +30,8 @@ class ApiClientRequestLogger(
   private val requestsToIgnore: Set[String] =
     Set(
       "com.daml.ledger.api.v1.TransactionService/GetLedgerEnd",
-      "com.digitalasset.canton.research.participant.multidomain.StateService/GetLedgerEnd",
-      "com.digitalasset.canton.research.participant.multidomain.StateService/GetConnectedDomains",
+      "com.digitalasset.canton.participant.protocol.v0.multidomain.StateService/GetLedgerEnd",
+      "com.digitalasset.canton.participant.protocol.v0.multidomain.StateService/GetConnectedDomains",
     )
 
   override def interceptCall[ReqT, RespT](

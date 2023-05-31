@@ -873,6 +873,9 @@ object BuildCommon {
       )
   }
 
+  // TODO(#5178) We can remove this in favor of our fork.
+  // However, at the moment we want to be able to iterate on multi-domain changes
+  // more frequently than upgrading our fork so we will keep our copy.
   lazy val `canton-research-services` = {
     sbt
       .Project("canton-research-services", file("canton/research/app"))

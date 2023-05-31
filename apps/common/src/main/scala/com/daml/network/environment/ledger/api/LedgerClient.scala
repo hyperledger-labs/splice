@@ -27,7 +27,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.research.participant.multidomain
+import com.digitalasset.canton.participant.protocol.v0.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}

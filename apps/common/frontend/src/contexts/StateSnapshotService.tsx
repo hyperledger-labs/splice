@@ -1,4 +1,4 @@
-import { StateServicePromiseClient } from 'common-protobuf/com/digitalasset/canton/research/participant/multidomain/state_service_grpc_web_pb';
+import { StateServicePromiseClient } from 'common-protobuf/com/digitalasset/canton/participant/protocol/v0/multidomain/state_service_grpc_web_pb';
 import React, { useContext } from 'react';
 
 const StateSnapshotServiceContext = React.createContext<StateServicePromiseClient | undefined>(

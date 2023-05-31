@@ -42,7 +42,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
-import com.digitalasset.canton.research.participant.multidomain
+import com.digitalasset.canton.participant.protocol.v0.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}

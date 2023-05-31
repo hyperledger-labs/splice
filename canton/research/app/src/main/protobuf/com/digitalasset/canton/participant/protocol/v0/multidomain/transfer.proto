@@ -1,16 +1,16 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-package com.digitalasset.canton.research.participant.multidomain;
+package com.digitalasset.canton.participant.protocol.v0.multidomain;
 
 import "com/daml/ledger/api/v1/event.proto";
 import "google/protobuf/timestamp.proto";
 
-option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
+option csharp_namespace = "Com.Digitalasset.Canton.Participant.Protocol.V0.Multidomain";
 option java_outer_classname = "TransferOuterClass";
-option java_package = "com.digitalasset.canton.research.participant.multidomain";
+option java_package = "com.digitalasset.canton.participant.protocol.v0.multidomain";
 
 // Complete view of an on-ledger transfer.
 message Transfer {

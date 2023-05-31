@@ -1,16 +1,16 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 syntax = "proto3";
 
-package com.digitalasset.canton.research.participant.multidomain;
+package com.digitalasset.canton.participant.protocol.v0.multidomain;
 
-import "com/digitalasset/canton/research/participant/multidomain/transfer_command.proto";
+import "com/digitalasset/canton/participant/protocol/v0/multidomain/transfer_command.proto";
 import "google/protobuf/empty.proto";
 
-option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
+option csharp_namespace = "Com.Digitalasset.Canton.Participant.Protocol.V0.Multidomain";
 option java_outer_classname = "TransferSubmissionServiceOuterClass";
-option java_package = "com.digitalasset.canton.research.participant.multidomain";
+option java_package = "com.digitalasset.canton.participant.protocol.v0.multidomain";
 
 // Allows clients to attempt advancing the ledger's state by submitting commands.
 // The final states of their submissions are disclosed by the Command Completion Service.
