@@ -11,12 +11,14 @@ import com.daml.network.config.{
 import com.daml.network.svc.config.SvcAppClientConfig
 import com.digitalasset.canton.config.*
 
-case class ExpectedOnboardingConfig(
+case class ExpectedValidatorOnboardingConfig(
     secret: String,
     expiresIn: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
 )
-object ExpectedOnboardingConfig {
-  def hideConfidential(config: ExpectedOnboardingConfig): ExpectedOnboardingConfig = {
+object ExpectedValidatorOnboardingConfig {
+  def hideConfidential(
+      config: ExpectedValidatorOnboardingConfig
+  ): ExpectedValidatorOnboardingConfig = {
     val hidden = "****"
     config.copy(secret = hidden)
   }
@@ -72,8 +74,7 @@ case class SvAppBackendConfig(
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
     isDevNet: Boolean = false,
-    // TODO(#4284): rename this to `expectedValidatorOnboardings`
-    expectedOnboardings: List[ExpectedOnboardingConfig] = Nil,
+    expectedValidatorOnboardings: List[ExpectedValidatorOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     // TODO(#4367) make this an `Option` with default `= None`
     onboarding: SvOnboardingConfig = SvOnboardingConfig.JoinViaSvcApp(),

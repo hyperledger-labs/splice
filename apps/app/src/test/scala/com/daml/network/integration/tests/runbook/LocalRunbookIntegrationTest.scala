@@ -9,7 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.config.ExpectedOnboardingConfig
+import com.daml.network.sv.config.ExpectedValidatorOnboardingConfig
 import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
@@ -165,7 +165,9 @@ class LocalRunbookIntegrationTest
         if (svName.unwrap == "sv1") {
           (
             svName,
-            svConfig.focus(_.expectedOnboardings).replace(List(ExpectedOnboardingConfig(secret))),
+            svConfig
+              .focus(_.expectedValidatorOnboardings)
+              .replace(List(ExpectedValidatorOnboardingConfig(secret))),
           )
         } else {
           (svName, svConfig)

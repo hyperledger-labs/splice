@@ -930,11 +930,16 @@ class SvApp(
       globalDomain: DomainId,
       clock: Clock,
   ): Future[List[Unit]] = {
-    if (config.expectedOnboardings.map(_.secret).toSet.size != config.expectedOnboardings.size) {
+    if (
+      config.expectedValidatorOnboardings
+        .map(_.secret)
+        .toSet
+        .size != config.expectedValidatorOnboardings.size
+    ) {
       sys.error("Expected onboarding secrets must be unique! Check your SV app config.")
     }
     Future.sequence(
-      config.expectedOnboardings.map(c =>
+      config.expectedValidatorOnboardings.map(c =>
         expectConfiguredValidatorOnboarding(
           c.secret,
           c.expiresIn,
