@@ -8,7 +8,7 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig, SvXNodesConfig}
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.daml.network.wallet.config.WalletAppClientConfig
@@ -423,6 +423,13 @@ object CNNodeConfigTransforms {
         )
       )
     })
+
+  def disableDistributedDomain: CNNodeConfigTransform =
+    updateAllSvAppConfigs_(c =>
+      c.copy(
+        xNodes = Some(SvXNodesConfig(None))
+      )
+    )
 
   /** Canton has a built in authorizer that accepts "canton admin tokens",
     * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]

@@ -27,7 +27,7 @@ class XNodeSplitwellIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )

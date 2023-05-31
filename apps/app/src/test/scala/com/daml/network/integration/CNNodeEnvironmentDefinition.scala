@@ -244,14 +244,23 @@ object CNNodeEnvironmentDefinition {
       .withAllocatedSvcAndSvUsers()
       .withInitializedNodes()
 
-  def simpleTopologyX(testName: String): CNNodeEnvironmentDefinition =
+  def simpleTopologyXDistributedDomain(testName: String): CNNodeEnvironmentDefinition =
     fromResources(Seq("simple-topology.conf", "x-node-overrides.conf"), testName)
       .withAllocatedValidatorUsers()
       .withAllocatedSvcAndSvUsers()
       .withInitializedNodes()
 
-  def simpleTopologyXWithSimTime(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopologyX(testName).withSimTime(useXNodes = true)
+  def simpleTopologyXDistributedDomainWithSimTime(testName: String): CNNodeEnvironmentDefinition =
+    simpleTopologyXDistributedDomain(testName).withSimTime(useXNodes = true)
+
+  def simpleTopologyXCentralizedDomain(testName: String): CNNodeEnvironmentDefinition =
+    simpleTopologyXDistributedDomain(testName)
+      .addConfigTransformsToFront((_, conf) =>
+        CNNodeConfigTransforms.disableDistributedDomain(conf)
+      )
+
+  def simpleTopologyXCentralizedDomainWithSimTime(testName: String): CNNodeEnvironmentDefinition =
+    simpleTopologyXCentralizedDomain(testName).withSimTime(useXNodes = true)
 
   def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
     simpleTopology(testName).withSimTime(useXNodes = false)

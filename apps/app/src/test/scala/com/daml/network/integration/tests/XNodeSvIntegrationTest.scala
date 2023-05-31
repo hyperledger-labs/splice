@@ -32,11 +32,7 @@ import com.daml.network.util.{Codec, SvTestUtil}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.topology.transaction.{
-  ParticipantPermission,
-  RequestSide,
-  TopologyChangeOp,
-}
+import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
 
 import java.time.Instant
 import scala.concurrent.duration.*
@@ -44,7 +40,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.Random
 
-class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
+class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   private val cantonCoinDarPath =
     "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
@@ -52,7 +48,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withManualStart
 
   "start and restart cleanly" in { implicit env =>
@@ -247,7 +243,7 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     initSvc()
     // Upload the DAR so validator onboarding can succeed. Usually this is done through the validator app
     // but because here we don't start one, we need to perform this step manually.
-    bobValidator.participantClient.dars.upload(cantonCoinDarPath)
+    bobValidator.participantClient.dars_extensions.upload_if_not_exist(cantonCoinDarPath)
     val sv = sv4 // not a leader
     val svParty = sv.getSvcInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
@@ -721,7 +717,12 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       ) {
         val randomParty = allocateRandomSvParty("random")
         assertThrowsAndLogsCommandFailures(
-          sv1.onboardSvPartyMigrationAuthorize(sv4.participantClient.id, None, None, randomParty),
+          sv1.onboardSvPartyMigrationAuthorize(
+            sv4.participantClient.participantX.id,
+            None,
+            None,
+            randomParty,
+          ),
           _.errorMessage should include(
             "Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
           ),
@@ -733,7 +734,12 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       ) {
         val sv1Party = sv1.getSvcInfo().svParty
         assertThrowsAndLogsCommandFailures(
-          sv1.onboardSvPartyMigrationAuthorize(sv4.participantClient.id, None, None, sv1Party),
+          sv1.onboardSvPartyMigrationAuthorize(
+            sv4.participantClient.participantX.id,
+            None,
+            None,
+            sv1Party,
+          ),
           _.errorMessage should include(
             s"Candidate party $sv1Party is not authorized by participant"
           ),
@@ -755,24 +761,20 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       }
 
       eventually() {
-        svcParticipant.topology.party_to_participant_mappings
+        svcParticipant.participantX.topology.party_to_participant_mappings
           .list(
-            operation = Some(TopologyChangeOp.Add),
-            filterStore = globalDomainId.toProtoPrimitive,
+            operation = Some(TopologyChangeOpX.Replace),
+            filterStore = globalDomainId.filterString,
             filterParty = svcPartyStr,
-            filterParticipant = sv4Participant.id.uid.id.unwrap,
-            filterRequestSide = Some(RequestSide.From),
-            filterPermission = Some(ParticipantPermission.Observation),
+            filterParticipant = sv4Participant.participantX.id.toProtoPrimitive,
           ) should have size 1
 
-        sv4Participant.topology.party_to_participant_mappings
+        sv4Participant.participantX.topology.party_to_participant_mappings
           .list(
-            operation = Some(TopologyChangeOp.Add),
-            filterStore = globalDomainId.toProtoPrimitive,
+            operation = Some(TopologyChangeOpX.Replace),
+            filterStore = globalDomainId.filterString,
             filterParty = svcPartyStr,
-            filterParticipant = sv4Participant.id.uid.id.unwrap,
-            filterRequestSide = Some(RequestSide.To),
-            filterPermission = Some(ParticipantPermission.Observation),
+            filterParticipant = sv4Participant.participantX.id.toProtoPrimitive,
           ) should have size 1
         val coinFromSv4Participant = getCoins(sv4Participant, svcParty)
         val coinFromSvcParticipant = getCoins(svcParticipant, svcParty)

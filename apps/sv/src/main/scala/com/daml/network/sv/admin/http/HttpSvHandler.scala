@@ -19,7 +19,7 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.{SvApp, SvcPartyHosting}
+import com.daml.network.sv.{LocalDomainNodeConnections, SvApp, SvcPartyHosting}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -48,8 +48,7 @@ class HttpSvHandler(
     isDevNet: Boolean,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
-    sequencerAdminConnection: Option[SequencerAdminConnection],
-    mediatorAdminConnection: Option[MediatorAdminConnection],
+    localDomainNodeConnections: Option[LocalDomainNodeConnections],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
@@ -357,19 +356,23 @@ class HttpSvHandler(
       // TODO(#5095) Reconsider if this should be part of this onboarding flow
       // or a separate step.
       sequencerSnapshot <- sequencerId.traverse { sequencerId =>
-        val sequencerConnection = sequencerAdminConnection.getOrElse(
-          throw new IllegalStateException(
-            s"Onboarding sequencer configured to use X nodes but sponsoring SV is not"
+        val sequencerConnection = localDomainNodeConnections
+          .map(_.sequencerAdminConnection)
+          .getOrElse(
+            throw new IllegalStateException(
+              s"Onboarding sequencer configured to use X nodes but sponsoring SV is not"
+            )
           )
-        )
         onboardSequencer(sequencerConnection, sequencerId)
       }
       _ <- mediatorId.traverse { mediatorId =>
-        val mediatorConnection = mediatorAdminConnection.getOrElse(
-          throw new IllegalStateException(
-            s"Onboarding mediator configured to use X nodes but sponsoring SV is not"
+        val mediatorConnection = localDomainNodeConnections
+          .map(_.mediatorAdminConnection)
+          .getOrElse(
+            throw new IllegalStateException(
+              s"Onboarding mediator configured to use X nodes but sponsoring SV is not"
+            )
           )
-        )
         onboardMediator(mediatorConnection, mediatorId)
       }
 

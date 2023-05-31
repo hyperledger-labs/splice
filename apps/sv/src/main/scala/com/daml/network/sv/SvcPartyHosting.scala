@@ -5,12 +5,7 @@ import akka.stream.Materializer
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{
-  ParticipantAdminConnection,
-  RetryProvider,
-  SequencerAdminConnection,
-  MediatorAdminConnection,
-}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
@@ -45,11 +40,11 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SvcPartyHosting(
     onboardingConfig: SvOnboardingConfig,
     participantAdminConnection: ParticipantAdminConnection,
-    sequencerAdminConnection: Option[SequencerAdminConnection],
+    localDomainNodeConnections: Option[LocalDomainNodeConnections],
     sequencerPublicConfig: Option[ClientConfig],
-    mediatorAdminConnection: Option[MediatorAdminConnection],
     svcParty: PartyId,
     globalDomain: DomainAlias,
+    useXNodes: Boolean,
     coinAppParameters: SharedCNNodeAppParameters,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -59,8 +54,6 @@ class SvcPartyHosting(
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
 ) extends NamedLogging {
-
-  private val useXNodes = sequencerAdminConnection.isDefined
 
   def svcPartyIsAuthorized(
       domainId: DomainId,
@@ -108,48 +101,51 @@ class SvcPartyHosting(
               ).map(_ => ())
             }
           _ = logger.info("Adding sequencer identity transactions")
-          sequencerId <- sequencerAdminConnection.traverse { connection =>
-            for {
-              sequencerId <- connection.getSequencerId
-              identity <- connection.getSequencerIdentityTransactions(sequencerId)
-              _ <- participantAdminConnection.addTopologyTransactions(identity)
-              _ <- retryProvider.retryForAutomation(
-                "Wait to observe sequencer identity transactions",
-                participantAdminConnection.getIdentityTransactions(domainId, sequencerId.uid).map {
-                  txs =>
-                    if (txs.length != identity.length) {
-                      throw Status.FAILED_PRECONDITION
-                        .withDescription(
-                          s"Expected ${identity.length} identity transactions for sequencer ${sequencerId} but got ${txs.length}"
-                        )
-                        .asRuntimeException()
-                    }
-                },
-                logger,
-              )
-            } yield sequencerId
+          sequencerId <- localDomainNodeConnections.map(_.sequencerAdminConnection).traverse {
+            connection =>
+              for {
+                sequencerId <- connection.getSequencerId
+                identity <- connection.getSequencerIdentityTransactions(sequencerId)
+                _ <- participantAdminConnection.addTopologyTransactions(identity)
+                _ <- retryProvider.retryForAutomation(
+                  "Wait to observe sequencer identity transactions",
+                  participantAdminConnection
+                    .getIdentityTransactions(domainId, sequencerId.uid)
+                    .map { txs =>
+                      if (txs.length != identity.length) {
+                        throw Status.FAILED_PRECONDITION
+                          .withDescription(
+                            s"Expected ${identity.length} identity transactions for sequencer ${sequencerId} but got ${txs.length}"
+                          )
+                          .asRuntimeException()
+                      }
+                    },
+                  logger,
+                )
+              } yield sequencerId
           }
           _ = logger.info("Adding mediator identity transactions")
-          mediatorId <- mediatorAdminConnection.traverse { connection =>
-            for {
-              mediatorId <- connection.getMediatorId
-              identity <- connection.getMediatorIdentityTransactions(mediatorId)
-              _ <- participantAdminConnection.addTopologyTransactions(identity)
-              _ <- retryProvider.retryForAutomation(
-                "Wait to observe mediator identity transactions",
-                participantAdminConnection.getIdentityTransactions(domainId, mediatorId.uid).map {
-                  txs =>
-                    if (txs.length != identity.length) {
-                      throw Status.FAILED_PRECONDITION
-                        .withDescription(
-                          s"Expected ${identity.length} identity transactions for mediator ${mediatorId} but got ${txs.length}"
-                        )
-                        .asRuntimeException()
-                    }
-                },
-                logger,
-              )
-            } yield mediatorId
+          mediatorId <- localDomainNodeConnections.map(_.mediatorAdminConnection).traverse {
+            connection =>
+              for {
+                mediatorId <- connection.getMediatorId
+                identity <- connection.getMediatorIdentityTransactions(mediatorId)
+                _ <- participantAdminConnection.addTopologyTransactions(identity)
+                _ <- retryProvider.retryForAutomation(
+                  "Wait to observe mediator identity transactions",
+                  participantAdminConnection.getIdentityTransactions(domainId, mediatorId.uid).map {
+                    txs =>
+                      if (txs.length != identity.length) {
+                        throw Status.FAILED_PRECONDITION
+                          .withDescription(
+                            s"Expected ${identity.length} identity transactions for mediator ${mediatorId} but got ${txs.length}"
+                          )
+                          .asRuntimeException()
+                      }
+                  },
+                  logger,
+                )
+              } yield mediatorId
           }
           _ = logger.info("Disconnecting from all domains")
           _ <- participantAdminConnection.disconnectFromAllDomains()
@@ -170,17 +166,16 @@ class SvcPartyHosting(
           _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
           _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
           xNodeParams = for {
-            sequencerConnection <- sequencerAdminConnection
+            localDomainNodeConnections <- localDomainNodeConnections
             publicConfig <- sequencerPublicConfig
             snapshot <- response.sequencerSnapshot
             sequencerId <- sequencerId
-            mediatorConnection <- mediatorAdminConnection
-          } yield (sequencerConnection, publicConfig, snapshot, sequencerId, mediatorConnection)
+          } yield (localDomainNodeConnections, publicConfig, snapshot, sequencerId)
           _ <- xNodeParams.traverse_ {
-            case (sequencerConnection, publicConfig, snapshot, sequencerId, mediatorConnection) =>
+            case (localDomainNodeConnections, publicConfig, snapshot, sequencerId) =>
               logger.info(s"Bootstrapping sequencer from snapshot")
               for {
-                _ <- sequencerConnection
+                _ <- localDomainNodeConnections.sequencerAdminConnection
                   .assignFromSnapshot(
                     snapshot.topologySnapshot,
                     snapshot.staticDomainParameters,
@@ -193,7 +188,7 @@ class SvcPartyHosting(
                   setSequencerEndpoint(publicConfig),
                 )
                 _ = logger.info(s"Initializing mediator")
-                _ <- mediatorConnection.initialize(
+                _ <- localDomainNodeConnections.mediatorAdminConnection.initialize(
                   domainId,
                   snapshot.staticDomainParameters,
                   sequencerId,

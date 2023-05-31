@@ -467,6 +467,8 @@ object CNNodeConfig {
       deriveReader[SvSequencerConfig]
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =
       deriveReader[SvMediatorConfig]
+    implicit val svXNodesDomainConfig: ConfigReader[SvXNodesDomainConfig] =
+      deriveReader[SvXNodesDomainConfig]
     implicit val svXNodesConfig: ConfigReader[SvXNodesConfig] =
       deriveReader[SvXNodesConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
@@ -609,6 +611,8 @@ object CNNodeConfig {
       deriveWriter[SvSequencerConfig]
     implicit val svMediatorConfig: ConfigWriter[SvMediatorConfig] =
       deriveWriter[SvMediatorConfig]
+    implicit val svXNodesDomainConfig: ConfigWriter[SvXNodesDomainConfig] =
+      deriveWriter[SvXNodesDomainConfig]
     implicit val svXNodesConfig: ConfigWriter[SvXNodesConfig] =
       deriveWriter[SvXNodesConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =

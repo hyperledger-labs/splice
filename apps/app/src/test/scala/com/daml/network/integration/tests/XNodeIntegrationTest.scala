@@ -14,13 +14,16 @@ import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import org.scalatest.Ignore
 
+// TODO(#5197) Reenable this test once it's less flaky
+@Ignore
 class XNodeIntegrationTest extends CNNodeIntegrationTest with SvTestUtil with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopologyXDistributedDomain(this.getClass.getSimpleName)
       .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")

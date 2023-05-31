@@ -109,6 +109,13 @@ final case class SvMediatorConfig(
 )
 
 final case class SvXNodesConfig(
+    // Optional to support multiple SVs without a distributed domain.
+    // TODO(#5195) Consider making this mandatory once we only support
+    // decentralized domains in production setups.
+    domain: Option[SvXNodesDomainConfig]
+)
+
+final case class SvXNodesDomainConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
 )

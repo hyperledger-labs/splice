@@ -56,10 +56,17 @@ import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
+  FlagCloseable,
   FlagCloseableAsync,
+  Lifecycle,
   SyncCloseable,
 }
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  NamedLoggerFactory,
+  NamedLogging,
+  TracedLogger,
+}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -73,6 +80,24 @@ import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+
+/** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
+  * Note that this is optional. An SV app can run without a dedicated domain node.
+  * TODO(#5195) Consider making this mandatory.
+  */
+final case class LocalDomainNodeConnections(
+    sequencerAdminConnection: SequencerAdminConnection,
+    mediatorAdminConnection: MediatorAdminConnection,
+    timeouts: ProcessingTimeout,
+    loggerFactory: NamedLoggerFactory,
+) extends FlagCloseable
+    with NamedLogging {
+
+  override protected def onClosed() = {
+    Lifecycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
+    super.onClosed()
+  }
+}
 
 class SvApp(
     override val name: InstanceName,
@@ -105,24 +130,27 @@ class SvApp(
       timeouts,
       loggerFactory,
     )
-    val sequencerAdminConnection = config.xNodes.map(config =>
-      new SequencerAdminConnection(
-        config.sequencer.adminApi,
-        timeouts,
-        loggerFactory,
+    val localDomainNodeConnections = config.xNodes
+      .flatMap(_.domain)
+      .map(config =>
+        LocalDomainNodeConnections(
+          new SequencerAdminConnection(
+            config.sequencer.adminApi,
+            timeouts,
+            loggerFactory,
+          ),
+          new MediatorAdminConnection(
+            config.mediator.adminApi,
+            timeouts,
+            loggerFactory,
+          ),
+          timeouts,
+          loggerFactory,
+        )
       )
-    )
-    val mediatorAdminConnection = config.xNodes.map(config =>
-      new MediatorAdminConnection(
-        config.mediator.adminApi,
-        timeouts,
-        loggerFactory,
-      )
-    )
     initialize(
       participantAdminConnection,
-      sequencerAdminConnection,
-      mediatorAdminConnection,
+      localDomainNodeConnections,
       ledgerClient,
       svPartyId,
     )
@@ -130,16 +158,14 @@ class SvApp(
         // TODO(#3474) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
-        sequencerAdminConnection.foreach(_.close())
-        mediatorAdminConnection.foreach(_.close())
+        localDomainNodeConnections.foreach(_.close())
         Future.failed(err)
       }
   }
 
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
-      sequencerAdminConnection: Option[SequencerAdminConnection],
-      mediatorAdminConnection: Option[MediatorAdminConnection],
+      localDomainNodeConnections: Option[LocalDomainNodeConnections],
       ledgerClient: CNLedgerClient,
       svPartyId: PartyId,
   ): Future[SvApp.State] = {
@@ -160,8 +186,7 @@ class SvApp(
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
         participantAdminConnection,
-        sequencerAdminConnection,
-        mediatorAdminConnection,
+        localDomainNodeConnections,
       )
       cometBftClient = newCometBftClient
       (svcStore, svcAutomation) <- ensureOnboarded(
@@ -208,8 +233,7 @@ class SvApp(
         isDevNet,
         clock,
         participantAdminConnection,
-        sequencerAdminConnection,
-        mediatorAdminConnection,
+        localDomainNodeConnections,
         retryProvider,
         svcPartyHosting,
         loggerFactory,
@@ -220,8 +244,7 @@ class SvApp(
         svAutomation,
         svcAutomation,
         cometBftClient,
-        sequencerAdminConnection,
-        mediatorAdminConnection,
+        localDomainNodeConnections,
         clock,
         loggerFactory,
       )
@@ -284,8 +307,7 @@ class SvApp(
     } yield {
       SvApp.State(
         participantAdminConnection,
-        sequencerAdminConnection,
-        mediatorAdminConnection,
+        localDomainNodeConnections,
         storage,
         svStore,
         svcStore,
@@ -567,16 +589,15 @@ class SvApp(
   private def newSvcPartyHosting(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
-      sequencerAdminConnection: Option[SequencerAdminConnection],
-      mediatorAdminConnection: Option[MediatorAdminConnection],
+      localDomainNodeConnections: Option[LocalDomainNodeConnections],
   ) = new SvcPartyHosting(
     config.onboarding,
     participantAdminConnection,
-    sequencerAdminConnection,
-    config.xNodes.map(_.sequencer.publicApi),
-    mediatorAdminConnection,
+    localDomainNodeConnections,
+    config.xNodes.flatMap(_.domain).map(_.sequencer.publicApi),
     storeKey.svcParty,
     config.domains.global.alias,
+    config.xNodes.isDefined,
     coinAppParameters,
     retryProvider,
     loggerFactory,
@@ -1039,8 +1060,7 @@ class SvApp(
 object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
-      sequencerAdminConnection: Option[SequencerAdminConnection],
-      mediatorAdminConnection: Option[MediatorAdminConnection],
+      localDomainNodeConnections: Option[LocalDomainNodeConnections],
       storage: Storage,
       svStore: SvSvStore,
       svcStore: SvSvcStore,
@@ -1068,12 +1088,8 @@ object SvApp {
         SyncCloseable("sv automation", svAutomation.close()),
         SyncCloseable("svc automation", svcAutomation.close()),
         SyncCloseable(
-          s"Sequencer Admin connection",
-          sequencerAdminConnection.foreach(_.close()),
-        ),
-        SyncCloseable(
-          s"Mediator Admin connection",
-          mediatorAdminConnection.foreach(_.close()),
+          s"Domain connections",
+          localDomainNodeConnections.foreach(_.close()),
         ),
         SyncCloseable(
           s"Participant Admin connection",
