@@ -20,6 +20,7 @@ import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   OwnerToKeyMappingX,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -98,7 +99,9 @@ class MediatorAdminConnection(
     ).map { txs =>
       txs.headOption
         .getOrElse(
-          throw new IllegalStateException(s"Mediator state for domain $domainId was empty")
+          throw Status.NOT_FOUND
+            .withDescription(s"No mediator state for domain $domainId")
+            .asRuntimeException()
         )
         .item
     }
