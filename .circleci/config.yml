@@ -305,6 +305,9 @@ commands:
       timeout:
         type: string
         default: "25m"
+      no_output_timeout: 
+        type: string
+        default: "10m"
       succeed_on_error:
         # Will cause the command to always succeed regardless of the sbt exit code.
         type: boolean
@@ -335,6 +338,7 @@ commands:
     steps:
       - run_bash_command_in_nix:
           cmd_name: Executing "sbt << parameters.cmd >>"
+          no_output_timeout: << parameters.no_output_timeout >>
           when: << parameters.when >>
           additional_nix_args: << parameters.additional_nix_args >>
           cmd: |
@@ -633,6 +637,7 @@ commands:
           # it is in our best interest for our tests to be faster than this,
           # but failing CI because of slow tests is also not very nice
           timeout: "20m"
+          no_output_timeout: "20m"
 
   setup_vpn:
     steps:

@@ -90,7 +90,7 @@ object JvmRulesPlugin extends AutoPlugin {
       //
       // 'slowpoke'/notification message if tests run for more than 5mins, repeat at 30s intervals from there
       Test / testOptions += Tests
-        .Argument(TestFrameworks.ScalaTest, "-W", "120", "30"),
+        .Argument(TestFrameworks.ScalaTest, "-W", "60", "30"),
       //
       // CHP: Disable output for successful tests
       // G: But after finishing tests for a module, output summary of failed tests for that module, with full stack traces
