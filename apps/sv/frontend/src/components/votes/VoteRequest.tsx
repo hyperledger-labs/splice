@@ -80,7 +80,11 @@ const VoteRequest: React.FC = () => {
             <Typography variant="h6">URL</Typography>
             <Box display="flex">
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
-                <TextField id="create-reason-url" onChange={e => setUrl(e.target.value)} />
+                <TextField
+                  id="create-reason-url"
+                  onChange={e => setUrl(e.target.value)}
+                  value={url}
+                />
               </FormControl>
             </Box>
           </Stack>
@@ -92,12 +96,12 @@ const VoteRequest: React.FC = () => {
               rows={4}
               multiline
               onChange={e => setDescription(e.target.value)}
+              value={description}
             />
           </Stack>
 
           <Button
             id="create-voterequest-submit-button"
-            variant="pill"
             fullWidth
             size="large"
             onClick={() => {

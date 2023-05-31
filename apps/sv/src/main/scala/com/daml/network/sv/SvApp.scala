@@ -1182,8 +1182,8 @@ object SvApp {
   def createVoteRequest(
       requester: String,
       action: String,
-      url: String,
-      description: String,
+      reasonUrl: String,
+      reasonDescription: String,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
@@ -1195,7 +1195,7 @@ object SvApp {
           )
         )
       case Right(action) =>
-        svcStoreWithIngestion.store.lookupVoteRequestByThisSvAndAction(action).flatMap {
+        svcStoreWithIngestion.store.lookupVoteRequestByThisSvAndActionWithOffset(action).flatMap {
           case QueryResult(_, Some(vote)) =>
             Future.successful(
               Left(s"This vote request has already been created ${vote.contractId}.")
@@ -1203,7 +1203,7 @@ object SvApp {
           case result @ QueryResult(_, None) =>
             for {
               svcRules <- svcStoreWithIngestion.store.getSvcRules()
-              reason = new Reason(url, description)
+              reason = new Reason(reasonUrl, reasonDescription)
               request = new SvcRules_RequestVote(requester, action, reason)
               cmd = svcRules.contractId.exerciseSvcRules_RequestVote(request)
               _ <- svcStoreWithIngestion.connection.submitCommands(
@@ -1224,7 +1224,98 @@ object SvApp {
             } yield Right(())
         }
     }
+  }
 
+  def castVote(
+      voteRequestCid: cn.svcrules.VoteRequest.ContractId,
+      isAccepted: Boolean,
+      reasonUrl: String,
+      reasonDescription: String,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      globalDomain: DomainId,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[Either[String, cn.svcrules.Vote.ContractId]] = {
+    svcStoreWithIngestion.store
+      .lookupVoteByThisSvAndVoteRequestWithOffset(voteRequestCid)
+      .flatMap {
+        case QueryResult(_, Some(_)) =>
+          Future.successful(
+            Left(s"This vote has already been created for vote request $voteRequestCid.")
+          )
+        case result @ QueryResult(_, None) =>
+          for {
+            svcRules <- svcStoreWithIngestion.store.getSvcRules()
+            reason = new Reason(reasonUrl, reasonDescription)
+            cmd = svcRules.contractId
+              .exerciseSvcRules_CastVote(
+                voteRequestCid,
+                svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
+                isAccepted,
+                reason,
+              )
+            res <- svcStoreWithIngestion.connection.submitWithResult(
+              actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+              readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+              update = cmd,
+              commandId = CNLedgerConnection.CommandId(
+                "com.daml.network.sv.castVote",
+                Seq(
+                  svcStoreWithIngestion.store.key.svcParty,
+                  svcStoreWithIngestion.store.key.svParty,
+                ),
+                voteRequestCid.contractId,
+              ),
+              deduplicationConfig = DedupOffset(
+                offset = result.deduplicationOffset
+              ),
+              domainId = globalDomain,
+            )
+          } yield Right(res.exerciseResult)
+      }
+  }
+
+  def updateVote(
+      voteCid: cn.svcrules.Vote.ContractId,
+      isAccepted: Boolean,
+      reasonUrl: String,
+      reasonDescription: String,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      globalDomain: DomainId,
+      logger: TracedLogger,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[Option[cn.svcrules.Vote.ContractId]] = {
+    val reason = new Reason(reasonUrl, reasonDescription)
+    svcStoreWithIngestion.store
+      .lookupVoteById(voteCid)
+      .flatMap {
+        case None =>
+          // The vote of contract id voteCid not found
+          Future.successful(None)
+        case Some(vote) if vote.payload.accept == isAccepted && vote.payload.reason == reason =>
+          logger.info(s"The vote has already been updated to these value ${vote.payload}.")
+          Future.successful(Some(voteCid))
+        case Some(_) =>
+          for {
+            svcRules <- svcStoreWithIngestion.store.getSvcRules()
+            cmd = svcRules.contractId
+              .exerciseSvcRules_UpdateVote(
+                voteCid,
+                svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
+                isAccepted,
+                reason,
+              )
+            res <- svcStoreWithIngestion.connection.submitWithResultNoDedup(
+              actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+              readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+              update = cmd,
+              domainId = globalDomain,
+            )
+          } yield Some(res.exerciseResult)
+      }
   }
 
   private[sv] def approveSvIdentity(

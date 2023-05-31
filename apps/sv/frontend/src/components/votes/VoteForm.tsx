@@ -1,0 +1,205 @@
+import { useMutation } from '@tanstack/react-query';
+import { SvClientProvider } from 'common-frontend';
+import React, { useState } from 'react';
+
+import CheckIcon from '@mui/icons-material/Check';
+import ClearIcon from '@mui/icons-material/Clear';
+import EditIcon from '@mui/icons-material/Edit';
+import SendIcon from '@mui/icons-material/Send';
+import {
+  Button,
+  IconButton,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
+  Typography,
+  ToggleButtonGroup,
+  ToggleButton,
+  TextField,
+} from '@mui/material';
+
+import { ContractId } from '@daml/types';
+
+import { VoteRequest } from '../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
+import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
+import { SvVote } from '../../models/models';
+import { config } from '../../utils';
+
+interface VoteFormProps {
+  vote?: SvVote;
+  voteRequestCid: ContractId<VoteRequest>;
+}
+
+const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [voteEditing, setVoteEditing] = useState<'accept' | 'reject' | undefined>(undefined);
+  const [reasonUrl, setReasonUrl] = useState<string>('');
+  const [reasonBody, setReasonBody] = useState<string>('');
+  const { castVote, updateVote } = useSvAdminClient();
+
+  const castOrUpdateVoteMutation = useMutation({
+    mutationFn: () => {
+      return vote
+        ? updateVote(vote.contractId, voteEditing === 'accept', reasonUrl, reasonBody)
+        : castVote(voteRequestCid, voteEditing === 'accept', reasonUrl, reasonBody);
+    },
+    onSettled: async () => {
+      setIsEditing(false);
+    },
+  });
+
+  const handleChange = (
+    event: React.MouseEvent<HTMLElement>,
+    value: 'accept' | 'reject' | undefined
+  ) => {
+    if (value) {
+      setVoteEditing(value);
+    }
+  };
+
+  const voteFromLedger = vote ? (vote.accept ? 'accept' : 'reject') : undefined;
+
+  const startEditing = () => {
+    setVoteEditing(voteFromLedger);
+    setReasonUrl(vote ? vote.reason.url : '');
+    setReasonBody(vote ? vote.reason.body : '');
+    setIsEditing(true);
+  };
+
+  return (
+    <>
+      <Typography variant="h5">
+        {vote ? 'Your Vote ' : 'You have not voted yet '}
+        {!isEditing &&
+          (vote ? (
+            <IconButton id="edit-vote-button" onClick={startEditing}>
+              <EditIcon fontSize={'small'} />
+            </IconButton>
+          ) : (
+            <Button
+              id="cast-vote-button"
+              size="small"
+              variant="contained"
+              disabled={castOrUpdateVoteMutation.isLoading}
+              onClick={startEditing}
+            >
+              vote
+            </Button>
+          ))}
+      </Typography>
+      <Stack direction="column" mb={4} spacing={1}>
+        <TableContainer>
+          <Table style={{ tableLayout: 'auto' }} className="sv-voting-table">
+            <TableBody>
+              <TableRow>
+                <TableCell>
+                  <Typography variant="h6">Your Vote</Typography>
+                </TableCell>
+                <TableCell>
+                  <ToggleButtonGroup
+                    value={isEditing ? voteEditing : voteFromLedger}
+                    exclusive
+                    onChange={handleChange}
+                    aria-label="Platform"
+                    disabled={!isEditing || castOrUpdateVoteMutation.isLoading}
+                  >
+                    <ToggleButton id="reject-vote-button" color="error" value="reject">
+                      <ClearIcon />
+                      Reject
+                    </ToggleButton>
+                    <ToggleButton id="accept-vote-button" color="success" value="accept">
+                      <CheckIcon />
+                      Accept
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>
+                  <Typography variant="h6">Vote Reason</Typography>
+                </TableCell>
+                <TableCell>
+                  {isEditing ? (
+                    <TextField
+                      sx={{ width: '100%' }}
+                      id="vote-reason-body"
+                      rows={4}
+                      multiline
+                      onChange={e => setReasonBody(e.target.value)}
+                      value={reasonBody}
+                      disabled={castOrUpdateVoteMutation.isLoading}
+                    />
+                  ) : (
+                    <Typography id="vote-request-modal-vote-reason-body" variant="h6">
+                      {vote ? vote.reason.body : ''}
+                    </Typography>
+                  )}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>
+                  <Typography variant="h6">Reason Url</Typography>
+                </TableCell>
+                <TableCell>
+                  {isEditing ? (
+                    <TextField
+                      sx={{ width: '100%' }}
+                      id="vote-reason-url"
+                      onChange={e => setReasonUrl(e.target.value)}
+                      value={reasonUrl}
+                      disabled={castOrUpdateVoteMutation.isLoading}
+                    />
+                  ) : (
+                    <Typography id="vote-request-modal-vote-reason-url" variant="h6">
+                      {vote ? vote.reason.url : ''}
+                    </Typography>
+                  )}
+                </TableCell>
+              </TableRow>
+              {isEditing && (
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="h6"></Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={2}>
+                      <Button
+                        variant="outlined"
+                        disabled={castOrUpdateVoteMutation.isLoading}
+                        onClick={() => setIsEditing(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        id="save-vote-button"
+                        variant="contained"
+                        disabled={castOrUpdateVoteMutation.isLoading}
+                        endIcon={<SendIcon />}
+                        onClick={() => castOrUpdateVoteMutation.mutate()}
+                      >
+                        Save
+                      </Button>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Stack>
+    </>
+  );
+};
+
+const VoteFormWithContexts: React.FC<VoteFormProps> = props => {
+  return (
+    <SvClientProvider url={config.services.sv.url}>
+      <VoteForm {...props} />
+    </SvClientProvider>
+  );
+};
+
+export default VoteFormWithContexts;

@@ -2,6 +2,7 @@ package com.daml.network.sv.admin.http
 
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
+import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{
   CNNodeStatus,
   MediatorAdminConnection,
@@ -9,11 +10,14 @@ import com.daml.network.environment.{
 }
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.http.v0.definitions.{
+  BatchListVotesByVoteRequestsRequest,
+  CastVoteRequest,
   CometBftNodeDumpResponse,
   CometBftNodeStatusResponse,
   CometBftStatusOrError,
   CreateVoteRequest,
   ErrorResponse,
+  UpdateVoteRequest,
 }
 import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.http.v0.{definitions, svAdmin as v0}
@@ -218,14 +222,86 @@ class HttpSvAdminHandler(
       }
     }
 
-  def listSvcRulesVotes(
-      respond: SvAdminResource.ListSvcRulesVotesResponse.type
-  )()(adminUser: String): Future[v0.SvAdminResource.ListSvcRulesVotesResponse] =
+  def lookupSvcRulesVoteRequest(respond: SvAdminResource.LookupSvcRulesVoteRequestResponse.type)(
+      voteRequestContractId: String
+  )(adminUser: String): Future[v0.SvAdminResource.LookupSvcRulesVoteRequestResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      svcStore
+        .lookupVoteRequest(
+          new cn.svcrules.VoteRequest.ContractId(voteRequestContractId)
+        )
+        .flatMap {
+          case Some(voteRequest) =>
+            Future.successful(
+              v0.SvAdminResource.LookupSvcRulesVoteRequestResponse.OK(
+                definitions.LookupSvcRulesVoteRequestResponse(
+                  voteRequest.toJson
+                )
+              )
+            )
+          case None =>
+            Future.failed(
+              HttpErrorHandler.notFound(
+                s"No VoteRequest found contract: $voteRequestContractId"
+              )
+            )
+        }
+    }
+
+  def castVote(respond: SvAdminResource.CastVoteResponse.type)(
+      body: CastVoteRequest
+  )(user: String): Future[SvAdminResource.CastVoteResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      SvApp
+        .castVote(
+          new cn.svcrules.VoteRequest.ContractId(body.voteRequestContractId),
+          body.isAccepted,
+          body.reasonUrl,
+          body.reasonDescription,
+          svcStoreWithIngestion,
+          globalDomain,
+        )
+        .flatMap {
+          case Left(cause) => Future.failed(HttpErrorHandler.badRequest(cause))
+          case Right(_) => Future.successful(v0.SvAdminResource.CastVoteResponseCreated)
+        }
+    }
+
+  def updateVote(respond: SvAdminResource.UpdateVoteResponse.type)(
+      body: UpdateVoteRequest
+  )(user: String): Future[SvAdminResource.UpdateVoteResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      SvApp
+        .updateVote(
+          new cn.svcrules.Vote.ContractId(body.voteContractId),
+          body.isAccepted,
+          body.reasonUrl,
+          body.reasonDescription,
+          svcStoreWithIngestion,
+          globalDomain,
+          logger,
+        )
+        .flatMap {
+          case None =>
+            Future.failed(
+              HttpErrorHandler.notFound(s"No Vote found contract: ${body.voteContractId}")
+            )
+          case Some(_) => Future.successful(v0.SvAdminResource.UpdateVoteResponseOK)
+        }
+    }
+
+  def batchListVotesByVoteRequests(
+      respond: SvAdminResource.BatchListVotesByVoteRequestsResponse.type
+  )(
+      body: BatchListVotesByVoteRequestsRequest
+  )(adminUser: String): Future[v0.SvAdminResource.BatchListVotesByVoteRequestsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
-        svcRulesVotes <- svcStore.listVotes()
+        svcRulesVotes <- svcStore.listVotesByVoteRequests(
+          body.voteRequestContractIds.map(new cn.svcrules.VoteRequest.ContractId(_))
+        )
       } yield {
-        definitions.ListSvcRulesVotesResponse(
+        definitions.ListVotesResponse(
           svcRulesVotes.map(_.toJson).toVector
         )
       }

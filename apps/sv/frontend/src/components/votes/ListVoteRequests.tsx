@@ -1,12 +1,18 @@
 import { DateDisplay, Loading, SvClientProvider } from 'common-frontend';
-import React, { useState } from 'react';
+import { Contract } from 'common-frontend';
+import React, { useMemo, useState } from 'react';
 
+import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import {
   Box,
+  Button,
+  Card,
+  CardHeader,
   Collapse,
   IconButton,
+  Modal,
   Table,
   TableBody,
   TableCell,
@@ -15,28 +21,59 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import Container from '@mui/material/Container';
 
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { ActionRequiringConfirmation, SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { ContractId } from '@daml/types';
 
+import { VoteRequest } from '../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
 import { useSvcInfos } from '../../contexts/SvContext';
 import { useListSvcRulesVoteRequests } from '../../hooks/useListVoteRequests';
+import { useListVotes } from '../../hooks/useListVotes';
 import { config } from '../../utils';
+import VoteRequestModalContent from './VoteRequestModalContent';
 
 const ListVoteRequests: React.FC = () => {
-  const ListVoteRequestsQuery = useListSvcRulesVoteRequests();
-  const svcInfosQuery = useSvcInfos();
+  const listVoteRequestsQuery = useListSvcRulesVoteRequests();
+  const voteRequestIds = listVoteRequestsQuery.data
+    ? listVoteRequestsQuery.data.map(v => v.contractId)
+    : [];
+  const votesQuery = useListVotes(voteRequestIds);
 
-  if (ListVoteRequestsQuery.isLoading || svcInfosQuery.isLoading) {
+  const svcInfosQuery = useSvcInfos();
+  const [voteRequestContractId, setVoteRequestContractId] = useState<
+    ContractId<VoteRequest> | undefined
+  >(undefined);
+  const [isVoteRequestModalOpen, setVoteRequestModalOpen] = useState<boolean>(false);
+
+  const openModalWithVoteRequest = (voteRequestContractId: ContractId<VoteRequest>) => {
+    setVoteRequestContractId(voteRequestContractId);
+    setVoteRequestModalOpen(true);
+  };
+
+  const handleClose = () => setVoteRequestModalOpen(false);
+
+  const svPartyId = svcInfosQuery.data?.svPartyId;
+  const alreadyVotedRequestIds = useMemo(() => {
+    return svPartyId && votesQuery.data
+      ? new Set(votesQuery.data.filter(v => v.voter === svPartyId).map(v => v.requestCid))
+      : new Set();
+  }, [votesQuery.data, svPartyId]);
+
+  if (listVoteRequestsQuery.isLoading || svcInfosQuery.isLoading || votesQuery.isLoading) {
     return <Loading />;
   }
 
-  if (ListVoteRequestsQuery.isError || svcInfosQuery.isError) {
+  if (listVoteRequestsQuery.isError || svcInfosQuery.isError || votesQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
-  const voteRequests = ListVoteRequestsQuery.data.sort((a, b) => {
+  const voteRequests = listVoteRequestsQuery.data.sort((a, b) => {
     return parseInt(b.metadata.createdAt) - parseInt(a.metadata.createdAt);
   });
+
+  const voteRequestsNotVoted = voteRequests.filter(v => !alreadyVotedRequestIds.has(v.contractId));
+  const voteRequestsVoted = voteRequests.filter(v => alreadyVotedRequestIds.has(v.contractId));
 
   function getAction(action: ActionRequiringConfirmation) {
     if (action.tag === 'ARC_SvcRules') {
@@ -59,56 +96,69 @@ const ListVoteRequests: React.FC = () => {
       <Typography mt={6} variant="h5">
         Action Needed
       </Typography>
-      <TableContainer>
-        <Table style={{ tableLayout: 'auto' }} className="sv-voting-table">
-          <TableHead>
-            <TableRow>
-              <TableCell></TableCell>
-              <TableCell>Action</TableCell>
-              <TableCell>Requester</TableCell>
-              <TableCell>Expires At</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {voteRequests.map((request, index) => {
-              return (
-                <VoteRequestRow
-                  key={request.contractId}
-                  action={getAction(request.payload.action)}
-                  requester={
-                    svcInfosQuery.data!.svcRules.payload.members.get(request.payload.requester)
-                      ?.name!
-                  }
-                  expires={new Date(request.payload.expiresAt)}
-                  idx={index}
-                  description={request.payload.reason.body}
-                  url={request.payload.reason.url}
-                />
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <ListVoteRequestsTable
+        voteRequests={voteRequestsNotVoted}
+        getAction={getAction}
+        svcRules={svcInfosQuery.data!.svcRules}
+        openModalWithVoteRequest={openModalWithVoteRequest}
+        tableBodyId={'sv-voting-action-needed-table-body'}
+      />
+      <Typography mt={6} variant="h5">
+        In Progress
+      </Typography>
+      <ListVoteRequestsTable
+        voteRequests={voteRequestsVoted}
+        getAction={getAction}
+        svcRules={svcInfosQuery.data!.svcRules}
+        openModalWithVoteRequest={openModalWithVoteRequest}
+        tableBodyId={'sv-voting-in-progress-table-body'}
+      />
+      <Modal
+        open={isVoteRequestModalOpen}
+        onClose={handleClose}
+        aria-labelledby="voterequest-modal-title"
+        aria-describedby="voterequest-modal-description"
+      >
+        <Box sx={{ flex: 1, overflowY: 'scroll', maxHeight: '100%' }}>
+          <Container maxWidth="md" sx={{ marginTop: '64px' }}>
+            <Card variant="elevation" sx={{ backgroundColor: '#2F2F2F' }}>
+              <CardHeader
+                title="Vote Request"
+                action={
+                  <IconButton onClick={handleClose}>
+                    <CloseIcon />
+                  </IconButton>
+                }
+              />
+              <VoteRequestModalContent voteRequestContractId={voteRequestContractId} />
+            </Card>
+          </Container>
+        </Box>
+      </Modal>
     </>
   );
 };
 
 interface VoteRequestsRowProps {
+  contractId: ContractId<VoteRequest>;
   action: string | undefined;
   requester: string;
   expires: Date;
   idx: number;
   description: string;
   url: string;
+  openModalWithVoteRequest: (contractId: ContractId<VoteRequest>) => void;
 }
 
 const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
+  contractId,
   action,
   requester,
   expires,
   idx,
   description,
   url,
+  openModalWithVoteRequest,
 }) => {
   const [open, setOpen] = useState(-1);
   return (
@@ -123,10 +173,21 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
             {open === idx ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
-        <TableCell>{action}</TableCell>
-        <TableCell>{requester}</TableCell>
+        <TableCell className="vote-row-action">{action}</TableCell>
+        <TableCell className="vote-row-requester">{requester}</TableCell>
         <TableCell>
           <DateDisplay datetime={expires.toISOString()} />
+        </TableCell>
+        <TableCell className="vote-row-review">
+          <Button
+            size="small"
+            variant="contained"
+            color="primary"
+            onClick={() => openModalWithVoteRequest(contractId)}
+            className="vote-row-review-button"
+          >
+            Review
+          </Button>
         </TableCell>
       </TableRow>
       <TableRow>
@@ -163,6 +224,55 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
         </TableCell>
       </TableRow>
     </>
+  );
+};
+
+interface ListVoteRequestsTableProps {
+  voteRequests: Contract<VoteRequest>[];
+  getAction: (action: ActionRequiringConfirmation) => string | undefined;
+  svcRules: Contract<SvcRules>;
+  openModalWithVoteRequest: (voteRequestContractId: ContractId<VoteRequest>) => void;
+  tableBodyId: string;
+}
+
+const ListVoteRequestsTable: React.FC<ListVoteRequestsTableProps> = ({
+  voteRequests,
+  getAction,
+  svcRules,
+  openModalWithVoteRequest,
+  tableBodyId,
+}) => {
+  return (
+    <TableContainer>
+      <Table style={{ tableLayout: 'auto' }} id="sv-voting-action-needed-table">
+        <TableHead>
+          <TableRow>
+            <TableCell></TableCell>
+            <TableCell>Action</TableCell>
+            <TableCell>Requester</TableCell>
+            <TableCell>Expires At</TableCell>
+            <TableCell></TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody id={tableBodyId}>
+          {voteRequests.map((request, index) => {
+            return (
+              <VoteRequestRow
+                key={request.contractId}
+                contractId={request.contractId}
+                action={getAction(request.payload.action)}
+                requester={svcRules.payload.members.get(request.payload.requester)?.name!}
+                expires={new Date(request.payload.expiresAt)}
+                idx={index}
+                description={request.payload.reason.body}
+                url={request.payload.reason.url}
+                openModalWithVoteRequest={openModalWithVoteRequest}
+              />
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 };
 

@@ -18,7 +18,7 @@ const RemoveMember: React.FC<{ chooseAction: (action: object) => void }> = ({ ch
   }
 
   if (svcInfosQuery.isError) {
-    return <p>Error, something went wrong.</p>;
+    return <p>Not yet implemented.</p>;
   }
 
   var memberOptions: { key: string; value: string }[] = [];

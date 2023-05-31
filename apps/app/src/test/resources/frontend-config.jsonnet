@@ -78,6 +78,12 @@ local validatorNodes(clusterAddress) = {
     directory: { url: "http://localhost:5110" },
     scan: { url: "http://localhost:5012" },
   },
+  sv2: {
+    sv: { url: "http://localhost:5614" },
+    validator: { url: "http://localhost:5003" },
+    directory: { url: "http://localhost:5110" },
+    scan: { url: "http://localhost:5012" },
+  },
 };
 
 local services(node, clusterAddress) =

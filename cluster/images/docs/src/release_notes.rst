@@ -9,6 +9,7 @@ Release Notes
 * Frontend updates:
 
   * Reorganized the information tab in SV UI and included rules governing canton coin (e.g. fees) in SV UI.
+  * Added review buttons and a pop-up modal for displaying detail and casting vote of a vote request.
 
 * Bugfixes
 

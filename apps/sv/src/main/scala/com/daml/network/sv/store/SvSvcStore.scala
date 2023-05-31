@@ -565,16 +565,50 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.listContractsOnDomain(cn.svcrules.VoteRequest.COMPANION, _)
     )
 
-  def listVotes()(implicit
+  def lookupVoteRequest(contractId: cn.svcrules.VoteRequest.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore
+        .lookupContractByIdOnDomain(cn.svcrules.VoteRequest.COMPANION)(_, contractId)
+    )
+
+  def listVotesByVoteRequests(voteRequestCids: Seq[cn.svcrules.VoteRequest.ContractId])(implicit
       tc: TraceContext
   ): Future[
     Seq[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]
-  ] =
+  ] = {
+    val cidSet = voteRequestCids.toSet
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(cn.svcrules.Vote.COMPANION, _)
+      multiDomainAcsStore.listContractsOnDomain(
+        cn.svcrules.Vote.COMPANION,
+        _,
+        co => cidSet.contains(co.payload.requestCid),
+      )
+    )
+  }
+
+  def lookupVoteByThisSvAndVoteRequestWithOffset(
+      voteRequestCid: cn.svcrules.VoteRequest.ContractId
+  )(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]]] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(cn.svcrules.Vote.COMPANION)(
+        _,
+        co =>
+          co.payload.requestCid == voteRequestCid && co.payload.voter == key.svParty.toProtoPrimitive,
+      )
     )
 
-  def lookupVoteRequestByThisSvAndAction(action: ActionRequiringConfirmation)(implicit
+  def lookupVoteById(voteCid: cn.svcrules.Vote.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.lookupContractByIdOnDomain(cn.svcrules.Vote.COMPANION)(_, voteCid)
+    )
+
+  def lookupVoteRequestByThisSvAndActionWithOffset(action: ActionRequiringConfirmation)(implicit
       tc: TraceContext
   ): Future[
     QueryResult[Option[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]]

@@ -154,18 +154,85 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListSvcRulesVoteRequestsResponse"
-  /admin/sv/votes:
+  /admin/sv/voterequests/{vote_request_contract_id}:
     get:
       tags: [sv]
       x-jvm-package: svAdmin
-      operationId: "listSvcRulesVotes"
+      operationId: "lookupSvcRulesVoteRequest"
+      parameters:
+        - name: "vote_request_contract_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "404":
+          description: "VoteRequest contract not found."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupSvcRulesVoteRequestResponse"
+  /admin/sv/votes:
+    post:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "castVote"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CastVoteRequest"
+      responses:
+        "201":
+          description: Created
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+    put:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "updateVote"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateVoteRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+        "404":
+          description: "VoteRequest contract not found."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+  /admin/sv/votes-by-request-ids:
+    post:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "BatchListVotesByVoteRequests"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/BatchListVotesByVoteRequestsRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListSvcRulesVotesResponse"
+                "$ref": "#/components/schemas/ListVotesResponse"
   /admin/sv/voterequest/create:
     post:
       tags: [sv]
@@ -472,7 +539,7 @@ components:
         description:
           type: string
 
-    ListSvcRulesVotesResponse:
+    ListVotesResponse:
       type: object
       required:
         - svc_rules_votes
@@ -492,6 +559,47 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
 
+    LookupSvcRulesVoteRequestResponse:
+      type: object
+      required:
+        - svc_rules_vote_request
+      properties:
+        svc_rules_vote_request:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    CastVoteRequest:
+      type: object
+      required:
+        - vote_request_contract_id
+        - is_accepted
+        - reason_url
+        - reason_description
+      properties:
+        vote_request_contract_id:
+          type: string
+        is_accepted:
+          type: boolean
+        reason_url:
+          type: string
+        reason_description:
+          type: string
+
+    UpdateVoteRequest:
+      type: object
+      required:
+        - vote_contract_id
+        - is_accepted
+        - reason_url
+        - reason_description
+      properties:
+        vote_contract_id:
+          type: string
+        is_accepted:
+          type: boolean
+        reason_url:
+          type: string
+        reason_description:
+          type: string
 
     ListCoinPriceVotesResponse:
       type: object
@@ -520,6 +628,16 @@ components:
       properties:
         coin_price:
           type: string
+
+    BatchListVotesByVoteRequestsRequest:
+      type: object
+      required:
+        - vote_request_contract_ids
+      properties:
+        vote_request_contract_ids:
+          type: array
+          items:
+            type: string
 
     StartSvOnboardingRequest:
       type: object

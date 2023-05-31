@@ -1,0 +1,262 @@
+import {
+  CopyableTypography,
+  DateDisplay,
+  Loading,
+  PartyId,
+  SvClientProvider,
+} from 'common-frontend';
+import React, { ReactElement, useCallback } from 'react';
+
+import CheckIcon from '@mui/icons-material/Check';
+import ClearIcon from '@mui/icons-material/Clear';
+import {
+  CardContent,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
+  Typography,
+  TableHead,
+} from '@mui/material';
+
+import { ContractId, Party } from '@daml/types';
+
+import { VoteRequest } from '../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
+import { useSvcInfos } from '../../contexts/SvContext';
+import { useListVotes } from '../../hooks/useListVotes';
+import { useVoteRequest } from '../../hooks/useVoteRequest';
+import { SvVote } from '../../models/models';
+import { config } from '../../utils';
+import VoteForm from './VoteForm';
+import ActionView from './actions/views/ActionView';
+
+interface VoteRequestModalProps {
+  voteRequestContractId?: ContractId<VoteRequest>;
+}
+
+const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({ voteRequestContractId }) => {
+  const voteRequestQuery = useVoteRequest(voteRequestContractId);
+  const votesQuery = useListVotes(voteRequestContractId ? [voteRequestContractId] : []);
+
+  const svcInfosQuery = useSvcInfos();
+  const svPartyId = svcInfosQuery.data?.svPartyId;
+
+  const getMemberName = useCallback(
+    (partyId: string) => {
+      const member = svcInfosQuery.data?.svcRules.payload.members.get(partyId);
+      return member ? member.name : '';
+    },
+    [svcInfosQuery.data]
+  );
+
+  if (voteRequestQuery.isLoading) {
+    return <Loading />;
+  }
+
+  if (voteRequestQuery.isError) {
+    return <p>Error, something went wrong.</p>;
+  }
+
+  if (!voteRequestQuery.data) {
+    return <p>no VoteRequest contractId is specified</p>;
+  }
+
+  if (votesQuery.isLoading) {
+    return <Loading />;
+  }
+
+  if (votesQuery.isError) {
+    return <p>Error, something went wrong.</p>;
+  }
+
+  if (!votesQuery.data) {
+    return <p>no VoteRequest contractId is specified</p>;
+  }
+
+  const curSvVote: SvVote | undefined = votesQuery.data.find(v => v.voter === svPartyId);
+
+  const allVotes = votesQuery.data.sort((a, b) => {
+    return b.expiresAt.valueOf() - a.expiresAt.valueOf();
+  });
+
+  const acceptedVotes = allVotes.filter(v => v.accept);
+  const rejectedVotes = allVotes.filter(v => !v.accept);
+
+  return (
+    <>
+      <CardContent sx={{ paddingX: '64px' }}>
+        <Stack direction="column" mb={4} spacing={1}>
+          <Typography variant="h5">Requested Action</Typography>
+          <ActionView action={voteRequestQuery.data.payload.action} />
+        </Stack>
+        <Stack direction="column" mb={4} spacing={1}>
+          <Typography variant="h5">Request Information</Typography>
+          <TableContainer>
+            <Table style={{ tableLayout: 'auto' }} className="sv-voting-table">
+              <TableBody>
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="h6">Contract Id</Typography>
+                  </TableCell>
+                  <TableCell>
+                    {voteRequestContractId && (
+                      <CopyableTypography variant="body2" text={voteRequestContractId} />
+                    )}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="h6">Requested by</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <PartyId
+                      id="vote-request-modal-requested-by"
+                      partyId={voteRequestQuery.data.payload.requester}
+                    />
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="h6">Request Reason</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="h6" id="vote-request-modal-reason-body">
+                      {voteRequestQuery.data.payload.reason.body}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="h6">Reason Url</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="h6" id="vote-request-modal-reason-url">
+                      {voteRequestQuery.data.payload.reason.url}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="h6">Expires At</Typography>
+                  </TableCell>
+                  <TableCell>
+                    <DateDisplay datetime={voteRequestQuery.data.payload.expiresAt} />
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    <Typography variant="h6">Current Vote Status</Typography>
+                  </TableCell>
+                  <TableCell color="default">
+                    <Stack spacing={4} direction="row">
+                      <Typography id="vote-request-modal-rejected-count" variant="h6">
+                        <ClearIcon color="error" fontSize="inherit" /> {rejectedVotes.length}
+                      </Typography>
+                      <Typography id="vote-request-modal-accepted-count" variant="h6">
+                        <CheckIcon color="success" fontSize="inherit" /> {acceptedVotes.length}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Stack>
+        <Stack>
+          {voteRequestContractId && (
+            <VoteForm vote={curSvVote} voteRequestCid={voteRequestContractId} />
+          )}
+        </Stack>
+        <Stack direction="column" mb={4} spacing={1}>
+          <Typography variant="h5">Votes</Typography>
+          <TableContainer>
+            <Table style={{ tableLayout: 'fixed' }} className="sv-accepted-vote-table">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Super Validator</TableCell>
+                  <TableCell>Super Validator Party ID</TableCell>
+                  <TableCell>Reason</TableCell>
+                  <TableCell>Reason Url</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <VoteRows
+                  icon={<CheckIcon color="success" fontSize="inherit" />}
+                  votesTitle="Accepted"
+                  votes={acceptedVotes}
+                  getMemberName={getMemberName}
+                />
+                <VoteRows
+                  icon={<ClearIcon color="error" fontSize="inherit" />}
+                  votesTitle="Rejected"
+                  votes={rejectedVotes}
+                  getMemberName={getMemberName}
+                />
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Stack>
+      </CardContent>
+    </>
+  );
+};
+
+interface VoteRowProps {
+  svName: string;
+  sv: Party;
+  reasonBody: string;
+  reasonUrl: string;
+}
+
+const VoteRow: React.FC<VoteRowProps> = ({ svName, sv, reasonBody, reasonUrl }) => (
+  <TableRow className="vote-table-row">
+    <TableCell className="sv-name">{svName}</TableCell>
+    <TableCell>
+      <PartyId partyId={sv} className="sv-party" />
+    </TableCell>
+    <TableCell className="vote-reason-body">{reasonBody}</TableCell>
+    <TableCell className="url">{reasonUrl}</TableCell>
+  </TableRow>
+);
+
+const VoteRows: React.FC<{
+  icon: ReactElement;
+  votes: SvVote[];
+  votesTitle: string;
+  getMemberName: (svParty: Party) => string;
+}> = ({ icon, votes, votesTitle, getMemberName }) => (
+  <>
+    <TableRow className="vote-table-row">
+      {votes.length > 0 && (
+        <TableCell className="sv-name">
+          <Typography variant="h6">
+            {icon} {votesTitle}
+          </Typography>
+        </TableCell>
+      )}
+    </TableRow>
+    {votes.map(vote => {
+      return (
+        <VoteRow
+          key={vote.voter}
+          sv={vote.voter}
+          svName={getMemberName(vote.voter)}
+          reasonBody={vote.reason.body}
+          reasonUrl={vote.reason.url}
+        />
+      );
+    })}
+  </>
+);
+
+const VoteRequestModalContentWithContexts: React.FC<VoteRequestModalProps> = props => {
+  return (
+    <SvClientProvider url={config.services.sv.url}>
+      <VoteRequestModalContent {...props} />
+    </SvClientProvider>
+  );
+};
+
+export default VoteRequestModalContentWithContexts;
