@@ -788,14 +788,20 @@ commands:
                exit 1
            fi
 
-           if [ ${cluster_version:0:4} != "git-" ]; then
+
+           if [[ ${cluster_version:0:4} == "git-" ]]; then
+              # Deprecated cluster version format
+              cluster_git_commit="${cluster_version:4}"
+           elif [[ ${cluster_version} ~= ^[0-9.]*-snapshot[0-9.]*v[0-9a-z]* ]]
+              cluster_git_commit="$(echo ${cluster_version} | sed 's/.*v//')"
+           else
               echo "Unexpected cluster version format: ${cluster_version}."
               exit 2
            fi
 
-           echo "Checking out: ${cluster_version:4}"
-           if ! git checkout ${cluster_version:4}; then
-              echo "Cannot checkout cluster version: ${cluster_version:4}."
+           echo "Checking out: ${cluster_git_commit}"
+           if ! git checkout ${cluster_git_commit}; then
+              echo "Cannot checkout cluster version: ${cluster_git_commit}."
               exit 3
            fi
 
