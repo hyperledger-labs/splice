@@ -409,7 +409,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       walletClient: WalletAppClientReference,
       validator: ValidatorAppBackendReference,
   ) = {
-    validator.participantClient.dars.upload(directoryDarPath)
+    validator.participantClient.upload_dar_unless_exists(directoryDarPath)
     onboardWalletUser(walletClient, validator)
   }
 

@@ -8,7 +8,6 @@ import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.{
   DirectoryAppClientReference,
   LedgerApiExtensions,
-  ParticipantAdministrationExtensions,
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
@@ -56,8 +55,7 @@ object CNNodeTests {
       extends BaseIntegrationTest[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
       with IsolatedCNNodeEnvironments
       with CNNodeTestCommon
-      with LedgerApiExtensions
-      with ParticipantAdministrationExtensions {
+      with LedgerApiExtensions {
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 

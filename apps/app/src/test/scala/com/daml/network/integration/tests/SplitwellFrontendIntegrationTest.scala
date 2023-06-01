@@ -36,8 +36,8 @@ class SplitwellFrontendIntegrationTest
       .withAdditionalSetup(implicit env => {
         CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
         Seq(splitwellDarPath, directoryDarPath).foreach { path =>
-          aliceValidator.participantClient.dars.upload(path)
-          bobValidator.participantClient.dars.upload(path)
+          aliceValidator.participantClient.upload_dar_unless_exists(path)
+          bobValidator.participantClient.upload_dar_unless_exists(path)
         }
       })
 

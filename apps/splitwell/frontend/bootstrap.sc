@@ -16,8 +16,8 @@ bobValidator.waitForInitialization()
 
 println("Uploading DAR files...")
 Seq(aliceValidator.participantClient, bobValidator.participantClient).foreach { p =>
-  p.dars.upload("daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
-  p.dars.upload("daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
+  p.upload_dar_unless_exists("daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
+  p.upload_dar_unless_exists("daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 }
 
 println("Onboarding users...")
@@ -43,11 +43,11 @@ charlieValidator.participantClient.ledger_api_extensions.acs
 
 println("Ensuring that directory entries are allocated correctly...")
 def ensureDirectoryEntry(
-                          user: PartyId,
-                          name: String,
-                          directory: DirectoryAppClientReference,
-                          wallet: WalletAppClientReference,
-                        ) {
+    user: PartyId,
+    name: String,
+    directory: DirectoryAppClientReference,
+    wallet: WalletAppClientReference,
+) {
   try {
     val nameUser = directory.lookupEntryByName(name).payload.user
     if (nameUser == user.toProtoPrimitive) {

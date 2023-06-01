@@ -2,10 +2,12 @@ package com.daml.network.console
 
 import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import com.daml.lf.archive.DarParser
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.{CNNodeBackendConfig, NetworkAppClientConfig}
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
+import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.{
@@ -30,6 +32,8 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId}
+
+import java.io.File
 
 import scala.concurrent.duration.*
 import scala.util.control.NonFatal
@@ -213,4 +217,17 @@ class CNParticipantClientReference(
   val participantX = new RemoteParticipantReferenceX(consoleEnvironment, name) {
     override val config = config_
   }
+
+  // TODO(#5141) Consider removing this once Canton no longer explodes
+  // when uploading the same DAR twice.
+  def upload_dar_unless_exists(
+      path: String
+  ): Unit = {
+    val hash = DarParser.assertReadArchiveFromFile(new File(path)).main.getHash
+    val pkgs = this.ledger_api.packages.list()
+    if (!pkgs.map(_.packageId).contains(hash)) {
+      discard[String](this.dars.upload(path))
+    }
+  }
+
 }

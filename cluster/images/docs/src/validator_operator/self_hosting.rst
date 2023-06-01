@@ -183,7 +183,7 @@ The Canton Network includes a Canton Name Service (CNS), which maps party IDs to
 
 First - you will need to upload the directory's dar file to your validator's participant. Go to the terminal in which you are running the validator (the one using "validator.conf"), and type ::
 
-  validatorApp.participantClient.dars.upload("dars/directory-service-0.1.0.dar")
+  validatorApp.participantClient.upload_dar_unless_exists("dars/directory-service-0.1.0.dar")
 
 Before you can use the Directory UI, you need to configure the URL of the directory backend similar to
 how you configured the Wallet UI earlier. For that,
@@ -216,7 +216,7 @@ are running the validator (the one using "validator.conf"), and type:
 .. parsed-literal::
 
    @ validatorApp.participantClient.domains.connect("splitwell", "http://|cn_cluster|.network.canton.global:5108")
-   @ validatorApp.participantClient.dars.upload("dars/splitwell-0.1.0.dar")
+   @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-0.1.0.dar")
 
 .. note::
    Note, that if you are not connecting to the splitwell instance
@@ -369,7 +369,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
   ::
 
-    validatorApp.participantClient.dars.upload("dars/directory-service-0.1.0.dar")
+    validatorApp.participantClient.upload_dar_unless_exists("dars/directory-service-0.1.0.dar")
 
 11. If you have not already done so, while trying out the insecure
     setup.  Follow the steps for :ref:`configuring the wallet UI <configuring-wallet-ui>`

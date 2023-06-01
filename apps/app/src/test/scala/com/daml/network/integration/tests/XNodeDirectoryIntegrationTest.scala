@@ -44,8 +44,8 @@ class XNodeDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTes
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.dars_extensions.upload_if_not_exist(directoryDarPath)
-        bobValidator.participantClient.dars_extensions.upload_if_not_exist(directoryDarPath)
+        aliceValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
+        bobValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
       })
 
   "Directory service" should {

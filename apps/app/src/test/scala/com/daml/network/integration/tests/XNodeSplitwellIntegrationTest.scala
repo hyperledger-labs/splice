@@ -32,8 +32,8 @@ class XNodeSplitwellIntegrationTest
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.dars.upload(darPath)
-        bobValidator.participantClient.dars.upload(darPath)
+        aliceValidator.participantClient.upload_dar_unless_exists(darPath)
+        bobValidator.participantClient.upload_dar_unless_exists(darPath)
       })
 
   "splitwell" should {

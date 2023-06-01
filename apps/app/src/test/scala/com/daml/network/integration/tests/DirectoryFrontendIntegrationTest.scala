@@ -25,7 +25,7 @@ class DirectoryFrontendIntegrationTest
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.dars.upload(directoryDarPath)
+        aliceValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
       })
 
   "A directory UI" should {

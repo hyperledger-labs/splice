@@ -36,7 +36,7 @@ class SplitwellUpgradeFrontendIntegrationTest
         CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
         for {
           validator <- Seq(aliceValidator, bobValidator)
-        } validator.participantClient.dars.upload(darPath)
+        } validator.participantClient.upload_dar_unless_exists(darPath)
       })
 
   "splitwell frontend with upgraded domain" should {

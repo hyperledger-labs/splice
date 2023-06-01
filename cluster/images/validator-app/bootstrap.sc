@@ -10,5 +10,5 @@ def main() {
 
   // TODO (M3-90): This will later be replaced by the app manager
   logger.info(s"Uploading DARs: ${dars}")
-  dars.foreach(validator_backend.participantClient.dars.upload(_))
+  dars.foreach(validator_backend.participantClient.upload_dar_unless_exists(_))
 }

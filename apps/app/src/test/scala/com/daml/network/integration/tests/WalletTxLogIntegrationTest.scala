@@ -39,8 +39,8 @@ class WalletTxLogIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // Some tests use the splitwell app to generate multi-party payments
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.dars.upload(splitwellDarPath)
-        bobValidator.participantClient.dars.upload(splitwellDarPath)
+        aliceValidator.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        bobValidator.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
   }
 

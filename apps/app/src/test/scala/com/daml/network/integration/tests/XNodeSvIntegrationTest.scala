@@ -243,7 +243,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     initSvc()
     // Upload the DAR so validator onboarding can succeed. Usually this is done through the validator app
     // but because here we don't start one, we need to perform this step manually.
-    bobValidator.participantClient.dars_extensions.upload_if_not_exist(cantonCoinDarPath)
+    bobValidator.participantClient.upload_dar_unless_exists(cantonCoinDarPath)
     val sv = sv4 // not a leader
     val svParty = sv.getSvcInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0

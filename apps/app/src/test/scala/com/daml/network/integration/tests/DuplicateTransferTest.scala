@@ -23,7 +23,7 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
       .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.dars.upload(darPath)
+        aliceValidator.participantClient.upload_dar_unless_exists(darPath)
       })
 
   val globalDomain = DomainAlias.tryCreate("global")

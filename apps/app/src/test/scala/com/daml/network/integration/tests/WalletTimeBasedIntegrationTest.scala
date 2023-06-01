@@ -41,10 +41,10 @@ class WalletTimeBasedIntegrationTest
         )(config)
       })
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.dars.upload(splitwellDarPath)
-        bobValidator.participantClient.dars.upload(splitwellDarPath)
-        aliceValidator.participantClient.dars.upload(directoryDarPath)
-        bobValidator.participantClient.dars.upload(directoryDarPath)
+        aliceValidator.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        bobValidator.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        aliceValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
+        bobValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
       })
 
   "A wallet" should {
