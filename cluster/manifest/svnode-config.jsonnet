@@ -114,6 +114,7 @@ local deployments(num, svConfig, config) =
         },
       ],
       namespace=namespace,
+      memoryLimitMiB=4096,
     ),
     c.deployment(config, "sv-web-ui", [
       {

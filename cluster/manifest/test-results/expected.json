@@ -1151,7 +1151,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
@@ -1215,11 +1215,11 @@
                         "readinessProbe": null,
                         "resources": {
                            "limits": {
-                              "memory": "1536Mi"
+                              "memory": "4096Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "1536Mi"
+                              "memory": "4096Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1726,7 +1726,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
@@ -1790,11 +1790,11 @@
                         "readinessProbe": null,
                         "resources": {
                            "limits": {
-                              "memory": "1536Mi"
+                              "memory": "4096Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "1536Mi"
+                              "memory": "4096Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -2608,7 +2608,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
@@ -2672,11 +2672,11 @@
                         "readinessProbe": null,
                         "resources": {
                            "limits": {
-                              "memory": "1536Mi"
+                              "memory": "4096Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "1536Mi"
+                              "memory": "4096Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -3490,7 +3490,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                              "value": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4"
                            },
                            {
                               "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
@@ -3554,11 +3554,11 @@
                         "readinessProbe": null,
                         "resources": {
                            "limits": {
-                              "memory": "1536Mi"
+                              "memory": "4096Mi"
                            },
                            "requests": {
                               "cpu": 1,
-                              "memory": "1536Mi"
+                              "memory": "4096Mi"
                            }
                         },
                         "volumeMounts": [ ]
