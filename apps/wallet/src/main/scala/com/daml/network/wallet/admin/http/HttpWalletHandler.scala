@@ -4,7 +4,6 @@ import akka.stream.Materializer
 import cats.implicits.showInterpolator
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
-import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.{Template, Unit as DUnit}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.daml.network.admin.http.HttpErrorHandler
@@ -29,7 +28,7 @@ import com.daml.network.environment.ledger.api.{DedupConfig, DedupDuration}
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{CNNodeUtil, Codec, Contract}
+import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
 import com.daml.network.wallet.{UserWalletManager, UserWalletService}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
@@ -281,9 +280,11 @@ class HttpWalletHandler(
         coinRules <- scanConnection.getCoinRules()
         result <- exerciseWalletAction((installCid, _) =>
           Future.successful(
-            installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(coinRules.contractId)
+            installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(
+              coinRules.contract.contractId
+            )
           )
-        )(user, _.exerciseResult, dislosedContracts = Seq(coinRules.toDisclosedContract))
+        )(user, _.exerciseResult, dislosedContracts = DisclosedContracts(coinRules))
       } yield d0.SelfGrantFeaturedAppRightResponse(Codec.encodeContractId(result))
     }
 
@@ -719,12 +720,13 @@ class HttpWalletHandler(
       user: String,
       getResponse: ChoiceResult => Response,
       dedup: Option[(CommandId, DedupConfig)] = None,
-      dislosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      dislosedContracts: DisclosedContracts = DisclosedContracts(),
   )(implicit tc: TraceContext): Future[Response] = {
     val userWallet = getUserWallet(user)
     val userStore = userWallet.store
     val userParty = userStore.key.endUserParty
     for {
+      // TODO (#4906) pick install & domainId based on disclosed contracts' domain IDs
       install <- userStore.getInstall()
       update <- getUpdate(install.contractId, userStore)
       domainId <- store.domains.getDomainId(walletManager.globalDomain)
@@ -735,7 +737,7 @@ class HttpWalletHandler(
             Seq(userParty),
             update,
             domainId,
-            dislosedContracts,
+            dislosedContracts assertOnDomain domainId,
           )
         case Some((commandId, dedupConfig)) =>
           userWallet.connection
@@ -746,7 +748,7 @@ class HttpWalletHandler(
               commandId,
               dedupConfig,
               domainId,
-              dislosedContracts,
+              dislosedContracts assertOnDomain domainId,
             )
       }
 

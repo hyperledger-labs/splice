@@ -359,11 +359,13 @@ components:
       properties:
         cached_coin_rules_contract_id:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractId"
+        cached_coin_rules_domain_id:
+          type: string
     GetCoinRulesResponse:
       type: object
       properties:
         coin_rules_update:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContract"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractWithState"
       required: ["coin_rules_update"]
     ListFeaturedAppRightsResponse:
       type: object

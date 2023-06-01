@@ -212,7 +212,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // current config: maxNumInputs = 4
     // We then schedule a reduction of maxNumInputs to 3
     val now = svc.participantClientWithAdminToken.ledger_api.time.get()
-    val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
+    val currentConfigSchedule = scan.getCoinRules().contract.payload.configSchedule
     val configSchedule = new cc.schedule.Schedule(
       mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 4),
       List(

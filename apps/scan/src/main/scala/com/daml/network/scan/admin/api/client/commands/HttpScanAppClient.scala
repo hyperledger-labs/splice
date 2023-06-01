@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRou
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
+import com.daml.network.store.MultiDomainAcsStore, MultiDomainAcsStore.ContractWithState
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -56,7 +57,7 @@ object HttpScanAppClient {
     * (2) this class has no featuredAppRight contract.
     */
   case class TransferContextWithInstances(
-      coinRules: Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
+      coinRules: ContractWithState[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
       latestOpenMiningRound: Contract[
         roundCodegen.OpenMiningRound.ContractId,
         roundCodegen.OpenMiningRound,
@@ -68,7 +69,7 @@ object HttpScanAppClient {
     def toUnfeaturedAppTransferContext() = {
       val openMiningRound = latestOpenMiningRound
       new v1.coin.AppTransferContext(
-        coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+        coinRules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
         openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
         None.toJava,
       )
@@ -133,18 +134,25 @@ object HttpScanAppClient {
   }
 
   case class GetCoinRules(
-      cachedCoinRules: Option[Contract[CoinRules.ContractId, CoinRules]]
+      cachedCoinRules: Option[ContractWithState[CoinRules.ContractId, CoinRules]]
   ) extends BaseCommand[
         http.GetCoinRulesResponse,
-        Contract[CoinRules.ContractId, CoinRules],
+        ContractWithState[CoinRules.ContractId, CoinRules],
       ] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinRulesResponse] = {
+      import MultiDomainAcsStore.ContractState.*
       client.getCoinRules(
-        GetCoinRulesRequest(cachedCoinRules.map(_.contractId.contractId)),
+        GetCoinRulesRequest(
+          cachedCoinRules.map(_.contract.contractId.contractId),
+          cachedCoinRules.flatMap(_.state match {
+            case Assigned(domain) => Some(domain.toProtoPrimitive)
+            case InFlight => None
+          }),
+        ),
         headers,
       )
     }
@@ -152,7 +160,7 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetCoinRulesResponse.OK(response) =>
         for {
-          coinRules <- Contract.handleMaybeCachedContract(coinCodegen.CoinRules.COMPANION)(
+          coinRules <- ContractWithState.handleMaybeCached(coinCodegen.CoinRules.COMPANION)(
             cachedCoinRules,
             response.coinRulesUpdate,
           )
@@ -161,18 +169,25 @@ object HttpScanAppClient {
   }
 
   case class GetCoinRulesV1Test(
-      cachedCoinRules: Option[Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test]]
+      cachedCoinRules: Option[ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test]]
   ) extends BaseCommand[
         http.GetCoinRulesV1TestResponse,
-        Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test],
+        ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test],
       ] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinRulesV1TestResponse] = {
+      import MultiDomainAcsStore.ContractState.*
       client.getCoinRulesV1Test(
-        GetCoinRulesRequest(cachedCoinRules.map(_.contractId.contractId)),
+        GetCoinRulesRequest(
+          cachedCoinRules.map(_.contract.contractId.contractId),
+          cachedCoinRules.flatMap(_.state match {
+            case Assigned(domain) => Some(domain.toProtoPrimitive)
+            case InFlight => None
+          }),
+        ),
         headers,
       )
     }
@@ -180,7 +195,7 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetCoinRulesV1TestResponse.OK(response) =>
         for {
-          coinRules <- Contract.handleMaybeCachedContract(CoinRulesV1Test.COMPANION)(
+          coinRules <- ContractWithState.handleMaybeCached(CoinRulesV1Test.COMPANION)(
             cachedCoinRules,
             response.coinRulesUpdate,
           )

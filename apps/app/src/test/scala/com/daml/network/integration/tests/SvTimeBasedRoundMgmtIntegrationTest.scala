@@ -79,7 +79,7 @@ class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTest {
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
     initSvc()
-    val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
+    val currentConfigSchedule = scan.getCoinRules().contract.payload.configSchedule
 
     val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
     svcClient.setConfigSchedule(
@@ -179,7 +179,7 @@ class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTest {
 
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
     initSvc()
-    val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
+    val currentConfigSchedule = scan.getCoinRules().contract.payload.configSchedule
 
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
     val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
@@ -354,7 +354,7 @@ class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTest {
 
   "round management with very tightly scheduled config" in { implicit env =>
     initSvc()
-    val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
+    val currentConfigSchedule = scan.getCoinRules().contract.payload.configSchedule
 
     val config101 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 101)
     val config102 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 102)

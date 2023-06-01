@@ -82,7 +82,7 @@ class ScanTimeBasedIntegrationTest
 
     val newHoldingFee = 0.1
     clue("schedule a config change, and advance time for it to take effect") {
-      val currentConfigSchedule = scan.getCoinRules().payload.configSchedule
+      val currentConfigSchedule = scan.getCoinRules().contract.payload.configSchedule
       val configSchedule =
         createConfigSchedule(
           currentConfigSchedule,

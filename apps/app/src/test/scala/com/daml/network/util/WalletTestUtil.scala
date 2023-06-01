@@ -19,6 +19,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.digitalasset.canton.console.CommandExecutionFailedException
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -239,6 +240,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
+    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = signatories,
@@ -246,9 +248,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = acceptedPayment.exerciseAcceptedAppPayment_Collect(
         appTc
       ),
-      domainId = domainId,
-      disclosedContracts =
-        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+      domainId = disclosure inferDomain domainId,
+      disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
 
@@ -265,14 +266,14 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
+    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
       readAs = Seq(),
       update = acceptedPayment.exerciseAcceptedAppPayment_Reject(appTc),
-      domainId = domainId,
-      disclosedContracts =
-        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+      domainId = disclosure inferDomain domainId,
+      disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
 
@@ -290,6 +291,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
+    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands
       .submitWithResult(
         userId = userId,
@@ -298,9 +300,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         update = acceptedPayment.exerciseSubscriptionInitialPayment_Collect(
           appTc
         ),
-        domainId = domainId,
-        disclosedContracts =
-          Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+        domainId = disclosure inferDomain domainId,
+        disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
       )
       .exerciseResult
   }
@@ -317,6 +318,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
+    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
@@ -324,9 +326,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = acceptedPayment.exerciseSubscriptionInitialPayment_Reject(
         appTc
       ),
-      domainId = domainId,
-      disclosedContracts =
-        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+      domainId = disclosure inferDomain domainId,
+      disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
 
@@ -344,6 +345,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
+    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty, senderParty),
@@ -351,9 +353,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = payment.exerciseSubscriptionPayment_Collect(
         appTc
       ),
-      domainId = domainId,
-      disclosedContracts =
-        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+      domainId = disclosure inferDomain domainId,
+      disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
 
@@ -369,6 +370,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
+    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
@@ -376,9 +378,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = payment.exerciseSubscriptionPayment_Reject(
         appTc
       ),
-      domainId = domainId,
-      disclosedContracts =
-        Seq(tc.coinRules.toDisclosedContract, tc.latestOpenMiningRound.toDisclosedContract),
+      domainId = disclosure inferDomain domainId,
+      disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
 
@@ -853,12 +854,15 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId = aliceWallet.config.ledgerApiUser,
       actAs = Seq(svcParty, receiver),
       readAs = Seq.empty,
-      update = tc.coinRules.contractId.exerciseCoinRules_Mint(
+      update = tc.coinRules.contract.contractId.exerciseCoinRules_Mint(
         receiver.toLf,
         amount.bigDecimal,
         tc.latestOpenMiningRound.contractId,
       ),
-      domainId = domainId,
+      domainId = domainId orElse (tc.coinRules.state match {
+        case ContractState.InFlight => None
+        case ContractState.Assigned(domain) => Some(domain)
+      }),
     )
   }
 

@@ -47,7 +47,9 @@ class TopupValidatorTrafficBalanceTrigger(
     for {
       validatorTreasury <- getValidatorTreasury()
       coinRules <- scanConnection.getCoinRules()
-      globalDomainConfig = CoinConfigSchedule(coinRules).getConfigAsOf(clock.now).globalDomain
+      globalDomainConfig = CoinConfigSchedule(coinRules)
+        .getConfigAsOf(clock.now)
+        .globalDomain
       activeDomainId = DomainId.tryFromString(globalDomainConfig.activeDomain)
       currentValidatorTraffic <- store.lookupValidatorTrafficWithOffset(activeDomainId)
       currentTrafficBalance <- scanConnection.getValidatorTrafficBalance(

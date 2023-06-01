@@ -23,6 +23,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import com.daml.network.util.DisclosedContracts
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.ledger.client.GrpcChannel
@@ -170,7 +171,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+      disclosedContracts: DisclosedContracts,
   ): CommandServiceOuterClass.SubmitAndWaitRequest = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
     commandsBuilder
@@ -180,7 +181,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       .addAllActAs(actAs.asJava)
       .addAllReadAs(readAs.asJava)
       .addAllCommands(commands.map(_.toProtoCommand).asJava)
-      .addAllDisclosedContracts(disclosedContracts.asJava)
+      .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
     deduplicationOffsetOrDuration match {
       case DedupOffset(offset) =>
         commandsBuilder.setDeduplicationOffset(offset)
@@ -203,7 +204,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+      disclosedContracts: DisclosedContracts,
   )(implicit ec: ExecutionContext): Future[String] = {
     val request = submitAndWaitRequest(
       workflowId,
@@ -228,7 +229,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+      disclosedContracts: DisclosedContracts,
   )(implicit ec: ExecutionContext): Future[Transaction] = {
     val request = submitAndWaitRequest(
       workflowId,
@@ -253,7 +254,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+      disclosedContracts: DisclosedContracts,
   )(implicit ec: ExecutionContext): Future[TransactionTree] = {
     val request = submitAndWaitRequest(
       workflowId,

@@ -2,6 +2,7 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import cats.syntax.traverse.*
 import com.daml.ledger.api.v1.{transaction_filter as scalaFilter}
 import com.daml.ledger.javaapi.data.{
   ContractMetadata,
@@ -571,7 +572,35 @@ object MultiDomainAcsStore {
       }
   }
 
-  sealed abstract class ContractState extends PrettyPrinting
+  object ContractWithState {
+    implicit val pretty: Pretty[ContractWithState[?, ?]] = {
+      import Pretty.*
+      prettyOfClass[ContractWithState[?, ?]](
+        param("contract", _.contract),
+        param("state", _.state),
+      )
+    }
+
+    import com.daml.network.http.v0.definitions.{MaybeCachedContract, MaybeCachedContractWithState}
+
+    def handleMaybeCached[TCid <: ContractId[T], T <: DamlRecord[?]](
+        companion: Companion.Template[TCid, T]
+    )(
+        cachedValue: Option[ContractWithState[TCid, T]],
+        maybeCached: MaybeCachedContractWithState,
+    )(implicit decoder: TemplateJsonDecoder): Either[String, ContractWithState[TCid, T]] = {
+      import ContractState.*
+      for {
+        contract <- Contract.handleMaybeCachedContract(companion)(
+          cachedValue map (_.contract),
+          MaybeCachedContract(maybeCached.contract),
+        )
+        state <- maybeCached.domainId.traverse(d => DomainId fromString d map Assigned)
+      } yield ContractWithState(contract, state getOrElse InFlight)
+    }
+  }
+
+  sealed abstract class ContractState extends PrettyPrinting with Product with Serializable
 
   object ContractState {
     case class Assigned(

@@ -7,7 +7,6 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.lf.archive.DarParser
-import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
@@ -28,7 +27,7 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
-import com.daml.network.util.UploadablePackage
+import com.daml.network.util.{UploadablePackage, DisclosedContracts}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -137,7 +136,7 @@ class CNLedgerConnection(
       readAs: Seq[PartyId],
       commands: Seq[Command],
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[Unit] = {
     callCallbacksOnCompletionAndWaitForOffset(
       client
@@ -162,7 +161,7 @@ class CNLedgerConnection(
       readAs: Seq[PartyId],
       commands: Seq[Command],
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[Transaction] = {
     callCallbacksOnCompletionAndWaitForOffset(
       client
@@ -186,7 +185,7 @@ class CNLedgerConnection(
       commandId: CommandId,
       deduplicationOffset: String,
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[Unit] = {
     callCallbacksOnCompletionAndWaitForOffset(
       client
@@ -212,7 +211,7 @@ class CNLedgerConnection(
       commandId: CommandId,
       deduplicationOffset: String,
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[Transaction] = {
     callCallbacksOnCompletionAndWaitForOffset(
       client
@@ -236,7 +235,7 @@ class CNLedgerConnection(
       readAs: Seq[PartyId],
       update: Update[T],
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[T] =
     submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId, disclosedContracts).map(
       _._2
@@ -249,7 +248,7 @@ class CNLedgerConnection(
       commandId: CommandId,
       deduplicationOffset: String,
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[(String, T)] = {
     doSubmitWithResultAndOffset(
       actAs,
@@ -269,7 +268,7 @@ class CNLedgerConnection(
       readAs: Seq[PartyId],
       update: Update[T],
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[(String, T)] =
     doSubmitWithResultAndOffset(
       actAs,
@@ -288,7 +287,7 @@ class CNLedgerConnection(
       commandId: CommandId,
       deduplicationConfig: DedupConfig,
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq(),
+      disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[T] =
     doSubmitWithResultAndOffset(
       actAs,
@@ -308,7 +307,7 @@ class CNLedgerConnection(
       commandIdForSubmission: String,
       dedup: DedupConfig,
       domainId: DomainId,
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+      disclosedContracts: DisclosedContracts,
   ): Future[(String, T)] = {
     for {
       tree <- callCallbacksOnCompletionAndWaitForOffset(

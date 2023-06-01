@@ -1,7 +1,6 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.network.automation.{
   OnReadyContractTrigger,
   TaskOutcome,
@@ -16,7 +15,7 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, DisclosedContracts}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -54,7 +53,7 @@ class SubscriptionPaymentTrigger(
     def rejectPayment(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
-        disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+        disclosedContracts: DisclosedContracts,
         log: String => Unit = logger.warn(_),
     ) = {
       log(s"rejecting subscription payment: $reason")
@@ -76,7 +75,7 @@ class SubscriptionPaymentTrigger(
         ],
         deduplicationOffset: String,
         transferContext: v1.coin.AppTransferContext,
-        disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+        disclosedContracts: DisclosedContracts,
     ) = {
       val cmd =
         contextId

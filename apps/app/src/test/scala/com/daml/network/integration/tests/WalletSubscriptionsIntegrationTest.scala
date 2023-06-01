@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionRequest
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{DisclosedContracts, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
 
@@ -131,7 +131,7 @@ class WalletSubscriptionsIntegrationTest
                 optTimeout = None,
                 commands = collectCommand,
                 disclosedContracts =
-                  Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
+                  DisclosedContracts(coinRules, openRound).toLedgerApiDisclosedContracts,
               )
           },
         )(
@@ -163,7 +163,7 @@ class WalletSubscriptionsIntegrationTest
                 optTimeout = None,
                 commands = collectCommand2,
                 disclosedContracts =
-                  Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
+                  DisclosedContracts(coinRules, openRound).toLedgerApiDisclosedContracts,
               )
           },
         )(

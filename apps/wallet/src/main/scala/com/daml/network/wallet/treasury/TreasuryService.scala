@@ -4,7 +4,6 @@ import akka.Done
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
-import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.api.v1
@@ -35,7 +34,7 @@ import com.daml.network.codegen.java.cn.wallet.install.{
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{CNNodeUtil, Contract, HasHealth}
+import com.daml.network.util.{CNNodeUtil, Contract, DisclosedContracts, HasHealth}
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
@@ -363,7 +362,7 @@ class TreasuryService(
       inputs: Seq[TransferInput],
       batch: CoinOperationBatch,
       readAs: Set[PartyId],
-      disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+      disclosedContracts: DisclosedContracts,
   )(implicit tc: TraceContext): Future[Done] = {
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
     logger.debug(s"executing batch $batch with inputs $inputs")
@@ -436,11 +435,11 @@ class TreasuryService(
       logger.debug("Using upgraded coinRules")
       for {
         rules <- scanConnection.getCoinRulesV1Test()
-      } yield (rules.toDisclosedContract, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
+      } yield (rules, rules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
     } else {
       for {
         rules <- scanConnection.getCoinRules()
-      } yield (rules.toDisclosedContract, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
+      } yield (rules, rules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
     }
 
   /** Select transfer inputs and transfer context to satisfy the coin operations.
@@ -461,7 +460,7 @@ class TreasuryService(
         Seq[v1.coin.TransferInput],
         Set[PartyId],
         v1.coin.PaymentTransferContext,
-        Seq[CommandsOuterClass.DisclosedContract],
+        DisclosedContracts,
     )
   ]] = {
     for {
@@ -550,10 +549,10 @@ class TreasuryService(
             .toJava,
         )
         val contractsToDisclose =
-          Seq(
+          DisclosedContracts(
             disclosedCoinRules,
-            openRound.toDisclosedContract,
-          ) ++ openIssuingRounds.map(_.toDisclosedContract)
+            openRound,
+          ) ++ DisclosedContracts(openIssuingRounds.map(r => r: DisclosedContracts.Arg): _*)
         Some(
           (
             inputs,

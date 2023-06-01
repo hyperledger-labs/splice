@@ -11,6 +11,7 @@ import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
+import com.daml.network.store.MultiDomainAcsStore.ContractWithState
 import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract}
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -59,7 +60,7 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Returns the CoinRules."
   )
-  def getCoinRules(): Contract[CoinRules.ContractId, CoinRules] =
+  def getCoinRules(): ContractWithState[CoinRules.ContractId, CoinRules] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetCoinRules(None))
     }
@@ -67,7 +68,7 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Returns an upgraded CoinRules (for testing upgrades)"
   )
-  def getCoinRulesV1Test(): Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test] =
+  def getCoinRulesV1Test(): ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetCoinRulesV1Test(None))
     }

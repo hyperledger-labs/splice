@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cc.round.{
   SummarizingMiningRound,
 }
 import com.daml.network.http.v0.{definitions, scan as v0}
-import com.daml.network.http.v0.definitions.MaybeCachedContract
+import com.daml.network.http.v0.definitions.{MaybeCachedContract, MaybeCachedContractWithState}
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
@@ -156,21 +156,24 @@ class HttpScanHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         coinRulesO <- store.lookupCoinRules()
-        coinRules = coinRulesO.getOrElse(
+        coinRules = coinRulesO getOrElse {
           throw new NoSuchElementException("found no coinrules instance")
-        )
-      } yield {
-        val response = body.cachedCoinRulesContractId match {
-          case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
-            logger.debug(
-              show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
-            )
-            MaybeCachedContract(None)
-          case Some(_) => // else: coin rules are cached but outdated.
-            MaybeCachedContract(Some(coinRules.toJson))
-          case None =>
-            MaybeCachedContract(Some(coinRules.toJson))
         }
+      } yield {
+        val response = MaybeCachedContractWithState(
+          body.cachedCoinRulesContractId match {
+            case Some(cachedContractId)
+                if cachedContractId == coinRules.contract.contractId.contractId =>
+              logger.debug(
+                show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+              )
+              None
+            case Some(_) // else: coin rules are cached but outdated.
+                | None =>
+              Some(coinRules.contract.toJson)
+          },
+          domainId = Some(coinRules.domain.toProtoPrimitive),
+        )
         definitions.GetCoinRulesResponse(
           coinRulesUpdate = response
         )
@@ -196,17 +199,20 @@ class HttpScanHandler(
           )
         )
       } yield {
-        val response = body.cachedCoinRulesContractId match {
-          case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
-            logger.debug(
-              show"Not sending ${PrettyContractId(ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
-            )
-            MaybeCachedContract(None)
-          case Some(_) => // else: coin rules are cached but outdated.
-            MaybeCachedContract(Some(coinRules.toJson))
-          case None =>
-            MaybeCachedContract(Some(coinRules.toJson))
-        }
+        val response = MaybeCachedContractWithState(
+          body.cachedCoinRulesContractId match {
+            case Some(cachedContractId)
+                if cachedContractId == coinRules.contract.contractId.contractId =>
+              logger.debug(
+                show"Not sending ${PrettyContractId(ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+              )
+              None
+            case Some(_) // else: coin rules are cached but outdated.
+                | None =>
+              Some(coinRules.contract.toJson)
+          },
+          domainId = Some(coinRules.domain.toProtoPrimitive),
+        )
         definitions.GetCoinRulesResponse(
           coinRulesUpdate = response
         )

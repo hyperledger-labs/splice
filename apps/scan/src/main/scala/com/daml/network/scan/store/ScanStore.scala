@@ -13,6 +13,7 @@ import com.daml.network.store.{
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
 }
+import MultiDomainAcsStore.ReadyContract
 import com.daml.network.util.{CoinConfigSchedule, Contract}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -48,18 +49,21 @@ trait ScanStore
 
   def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomain(cc.coin.CoinRules.COMPANION)(_, (_: Any) => true)
-    )
+  ): Future[Option[ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] = for {
+    domain <- defaultAcsDomainIdF
+    contractO <- multiDomainAcsStore
+      .findContractOnDomain(cc.coin.CoinRules.COMPANION)(domain, (_: Any) => true)
+  } yield contractO.map(ReadyContract(_, domain))
 
   def lookupCoinRulesV1Test()(implicit tc: TraceContext): Future[
-    Option[Contract[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore
-        .findContractOnDomain(ccV1Test.coin.CoinRulesV1Test.COMPANION)(_, (_: Any) => true)
-    )
+    Option[
+      ReadyContract[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]
+    ]
+  ] = for {
+    domain <- defaultAcsDomainIdF
+    contractO <- multiDomainAcsStore
+      .findContractOnDomain(ccV1Test.coin.CoinRulesV1Test.COMPANION)(domain, (_: Any) => true)
+  } yield contractO.map(ReadyContract(_, domain))
 
   def getTotalCoinBalance()(implicit tc: TraceContext): Future[(BigDecimal, BigDecimal)]
 

@@ -194,7 +194,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
           .commands
           .asScala
           .toSeq,
-        disclosedContracts = Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
+        disclosedContracts = DisclosedContracts(coinRules, openRound).toLedgerApiDisclosedContracts,
       )
     }
 
@@ -216,6 +216,8 @@ trait TimeTestUtil extends CNNodeTestCommon {
 
     val authorizers =
       Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
+
+    val disclosure = DisclosedContracts(coinRules, openRound)
 
     userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
@@ -241,8 +243,8 @@ trait TimeTestUtil extends CNNodeTestCommon {
             None.toJava,
           ),
         ),
-      domainId = domainId,
-      disclosedContracts = Seq(coinRules.toDisclosedContract, openRound.toDisclosedContract),
+      domainId = disclosure inferDomain domainId,
+      disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
 

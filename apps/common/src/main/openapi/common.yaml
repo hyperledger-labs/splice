@@ -129,6 +129,19 @@ components:
       properties:
         contract:
           $ref: "#/components/schemas/Contract"
+    # As with MaybeCachedContract, but additionally with a "state", which is either
+    # a domain indicating the contract is on that domain or nothing for an in-flight
+    # contract.  With an unmatching contract-id, this response will include both a
+    # contract-id and a state.  However, the domain will always reflect the contract's
+    # current state, even if the contract-id matches; either the domain echoed back if
+    # it has not changed, or missing if it is in-flight.
+    MaybeCachedContractWithState:
+      type: object
+      properties:
+        contract:
+          $ref: "#/components/schemas/Contract"
+        domain_id:
+          type: string
     # A map from 'active-contract-id' -> 'MaybeCachedContract'.
     # At the moment this type is used to let clients know which mining rounds they already have cached,
     # which mining rounds they should add to their cache and which they should remove from their cache

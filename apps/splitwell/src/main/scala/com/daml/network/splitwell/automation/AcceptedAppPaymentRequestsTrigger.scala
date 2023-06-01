@@ -1,12 +1,11 @@
 package com.daml.network.splitwell.automation
 
 import akka.stream.Materializer
-import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
   TaskOutcome,
-  TaskSuccess,
   TriggerContext,
+  OnReadyContractTrigger,
+  TaskSuccess,
 }
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
@@ -15,6 +14,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.DisclosedContracts
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -54,7 +54,7 @@ class AcceptedAppPaymentRequestsTrigger(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
         domainId: DomainId,
-        disclosedContracts: Seq[CommandsOuterClass.DisclosedContract],
+        disclosedContracts: DisclosedContracts,
     ) = {
       logger.warn(s"rejecting accepted app payment: $reason")
       val cmd = payment.contract.contractId.exerciseAcceptedAppPayment_Reject(transferContext)

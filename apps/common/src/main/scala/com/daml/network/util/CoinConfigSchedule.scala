@@ -1,6 +1,7 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc
+import com.daml.network.store.MultiDomainAcsStore.{ContractWithState, ReadyContract}
 import com.digitalasset.canton.data.CantonTimestamp
 
 import java.time.Instant
@@ -26,8 +27,15 @@ case class CoinConfigSchedule(
 object CoinConfigSchedule {
 
   /** Convenience constructor to get a CoinRules' config schedule. */
-  def apply(cr: Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]): CoinConfigSchedule =
-    CoinConfigSchedule(cr.payload.configSchedule)
+  def apply(
+      cr: ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
+  ): CoinConfigSchedule =
+    CoinConfigSchedule(cr.contract.payload.configSchedule)
+
+  def apply(
+      cr: ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
+  ): CoinConfigSchedule =
+    CoinConfigSchedule(cr.contract.payload.configSchedule)
 
   def apply(
       schedule: cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]

@@ -2,7 +2,6 @@ package com.daml.network.scan.admin.api.client
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
@@ -12,7 +11,8 @@ import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder}
+import com.daml.network.store.MultiDomainAcsStore.ContractWithState
+import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder, DisclosedContracts}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
@@ -58,9 +58,9 @@ final class ScanConnection private (
   private def signalPossiblyOutdatedCoinRulesCache(inactiveContract: String): Unit =
     coinRulesCache.get() match {
       case Some(CachedCoinRules(_, cachedContract))
-          if cachedContract.contractId.contractId == inactiveContract =>
+          if (cachedContract.contract.contractId.contractId: String) == inactiveContract =>
         logger.info(
-          show"Invalidating the CoinRules cache with value ${PrettyContractId(cachedContract)}"
+          show"Invalidating the CoinRules cache with value ${PrettyContractId(cachedContract.contract)}"
         )(TraceContext.empty)
         coinRulesCache.set(None)
       case _ => ()
@@ -110,7 +110,7 @@ final class ScanConnection private (
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
-  ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
+  ): Future[ContractWithState[CoinRules.ContractId, CoinRules]] = {
     val now = clock.now
     coinRulesCache.get() match {
       case Some(CachedCoinRules(cacheValidUntil, coinRules)) if now.isBefore(cacheValidUntil) =>
@@ -131,7 +131,7 @@ final class ScanConnection private (
           // otherwise, an inactive locked coinRules will failed interpretation in the local participant
           // and the cached coinRules contract will never be invalidated as other participant will not be able to validate if it is inactive.
           // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-          if (!coinRules.payload.lock)
+          if (!coinRules.contract.payload.lock)
             coinRulesCache.set(
               Some(
                 CachedCoinRules(
@@ -148,7 +148,7 @@ final class ScanConnection private (
   def getCoinRulesV1Test()(implicit
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test]] = {
+  ): Future[ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test]] = {
     // Note that we did not implement caching here as part of this upgrade PoC
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetCoinRulesV1Test(None))
   }
@@ -244,7 +244,7 @@ final class ScanConnection private (
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[(coinCodegen.AppTransferContext, Seq[CommandsOuterClass.DisclosedContract])] = {
+  ): Future[(coinCodegen.AppTransferContext, DisclosedContracts)] = {
     for {
       context <- getTransferContextWithInstances()
       featured <- lookupFeaturedAppRight(providerPartyId)
@@ -253,11 +253,12 @@ final class ScanConnection private (
       val openMiningRound = context.latestOpenMiningRound
       (
         new coinCodegen.AppTransferContext(
-          coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
+          coinRules.contract.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
           openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
           featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
         ),
-        Seq(coinRules.toDisclosedContract, openMiningRound.toDisclosedContract),
+        // TODO (#5229) assuming same state for round as rules
+        DisclosedContracts(coinRules, openMiningRound),
       )
     }
   }
@@ -267,7 +268,7 @@ final class ScanConnection private (
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[
-    Either[String, (coinCodegen.AppTransferContext, Seq[CommandsOuterClass.DisclosedContract])]
+    Either[String, (coinCodegen.AppTransferContext, DisclosedContracts)]
   ] = {
     for {
       context <- getTransferContextWithInstances()
@@ -279,13 +280,14 @@ final class ScanConnection private (
           Right(
             (
               new coinCodegen.AppTransferContext(
-                coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
+                coinRules.contract.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
                 openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
                 featured
                   .map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE))
                   .toJava,
               ),
-              Seq(coinRules.toDisclosedContract, openMiningRound.toDisclosedContract),
+              // TODO (#5229) assuming same state for round as rules
+              DisclosedContracts(coinRules, openMiningRound),
             )
           )
         case None => Left("round is not an open mining round")
@@ -316,7 +318,7 @@ object ScanConnection {
 
   private case class CachedCoinRules(
       cacheValidUntil: CantonTimestamp,
-      coinRules: Contract[CoinRules.ContractId, CoinRules],
+      coinRules: ContractWithState[CoinRules.ContractId, CoinRules],
   ) {}
 
   private case class CachedMiningRounds(

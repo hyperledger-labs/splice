@@ -12,7 +12,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
-import com.daml.network.util.{DomainFeesConstants, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{DisclosedContracts, DomainFeesConstants, TimeTestUtil, WalletTestUtil}
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -358,14 +358,14 @@ class DomainFeesTimeBasedIntegrationTest
     val transferContext = scan.getTransferContextWithInstances(getLedgerTime)
     val coinRules = scan.getCoinRules()
     val coin = validatorWallet.tap(100)
-    val update = transferContext.coinRules.contractId.exerciseCoinRules_BuyExtraTraffic(
+    val update = transferContext.coinRules.contract.contractId.exerciseCoinRules_BuyExtraTraffic(
       Seq[v1.coin.TransferInput](
         new v1.coin.transferinput.InputCoin(
           coin.toInterface(v1.coin.Coin.INTERFACE)
         )
       ).asJava,
       new v1.coin.PaymentTransferContext(
-        coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+        coinRules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
         new v1.coin.TransferContext(
           transferContext.latestOpenMiningRound.contractId
             .toInterface(v1.round.OpenMiningRound.INTERFACE),
@@ -385,10 +385,10 @@ class DomainFeesTimeBasedIntegrationTest
       Seq(validatorApp.getValidatorPartyId()),
       Seq(validatorApp.getValidatorPartyId()),
       update,
-      disclosedContracts = Seq(
-        coinRules.toDisclosedContract,
-        transferContext.latestOpenMiningRound.toDisclosedContract,
-      ),
+      disclosedContracts = DisclosedContracts(
+        coinRules,
+        transferContext.latestOpenMiningRound,
+      ).toLedgerApiDisclosedContracts,
     )
   }
 
