@@ -72,17 +72,16 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
       }
 
       clue(s"We can create a validator onboarding secret via this SV's UI") {
-        val (_, oldSecrets) = actAndCheck(
+        val (_, oldFirstSecret) = actAndCheck(
           "Opening validator onboarding tab",
           click on "navlink-validator-onboarding",
         )(
           s"Creating an onboarding secret",
           _ => {
             waitForQuery(id("create-validator-onboarding-secret"))
-            val secrets =
-              findAll(className("onboarding-secret-table-secret")).toSeq.map(e => e.text)
-            secrets should not be empty
-            secrets
+            waitForQuery(className("onboarding-secret-table"))
+            val secretsItr = findAll(className("onboarding-secret-table-secret"))
+            if (secretsItr.hasNext) Some(secretsItr.next().text) else None
           },
         )
         actAndCheck(
@@ -91,10 +90,14 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
         )(
           s"We see that this SV has created an onboarding secret",
           _ => {
-            val secrets =
-              findAll(className("onboarding-secret-table-secret")).toSeq.map(e => e.text)
-            secrets.map(row => row should have size 44)
-            secrets.diff(oldSecrets) should not be empty
+            val secretsItr = findAll(className("onboarding-secret-table-secret"))
+            val firstSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
+            firstSecret should not be oldFirstSecret
+            inside(firstSecret) { case Some(s) =>
+              s should have size 44
+            }
+            val secondSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
+            secondSecret shouldBe oldFirstSecret
           },
         )
       }
