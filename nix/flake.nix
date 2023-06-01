@@ -14,6 +14,7 @@
               if system == "aarch64-darwin"
               then import nixpkgs { system = "x86_64-darwin"; overlays = import ./overlays.nix; }
               else pkgs;
+            npmPkgs = pkgs.callPackage ./npmpkgs/default.nix { inherit system; };
 
         in
         {
@@ -22,7 +23,7 @@
             protoc-gen-grpc-web = pkgs.protoc-gen-grpc-web;
             reredirects = pkgs.python3.pkgs.sphinx-reredirects;
           };
-          devShells.default = import ./shell.nix { inherit pkgs x86Pkgs; };
+          devShells.default = import ./shell.nix { inherit pkgs x86Pkgs npmPkgs; };
         }
       );
 }

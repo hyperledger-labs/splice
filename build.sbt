@@ -866,6 +866,12 @@ runShellcheck := {
   runCommand(Seq("pre-commit", "run", "--all-files", "shellcheck"), log)
 }
 
+lazy val syncpackCheck = taskKey[Unit]("Check all apps' package.json dependency versions match")
+syncpackCheck := {
+  val log = streams.value.log
+  runCommand(Seq("syncpack", "list-mismatches"), log, None, Some(baseDirectory.value / "apps"))
+}
+
 lazy val jsonnetfmtCheck = taskKey[Unit]("Check format of `.jsonnet` files`")
 jsonnetfmtCheck := {
   val log = streams.value.log

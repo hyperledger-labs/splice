@@ -1,14 +1,14 @@
 {
   "name": "common-typeface-termina",
+  "description": "",
   "version": "1.0.0",
-  "private": "true",
+  "author": "",
+  "keywords": [],
+  "license": "ISC",
   "main": "index.css",
-  "types": "index.d.ts",
+  "private": "true",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "types": "index.d.ts"
 }

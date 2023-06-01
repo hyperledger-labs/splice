@@ -1,4 +1,4 @@
-{ pkgs, x86Pkgs }:
+{ pkgs, x86Pkgs, npmPkgs }:
 let
   inherit (pkgs) stdenv fetchzip;
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
@@ -36,6 +36,8 @@ in pkgs.mkShell {
     lnav
     nix
     nodejs
+    nodePackages.node2nix
+    npmPkgs.syncpack
     openapi-generator-cli
     openjdk11
     pigz
