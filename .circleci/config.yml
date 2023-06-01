@@ -1738,8 +1738,6 @@ workflows:
         start_canton_options: "-d -p external -x -w"
         resource_class: "2xlarge"
         parallelism: 3
-        # TODO(#5242) Remove retries once we bump to a Canton release with the fix
-        cmd_retry_count: 2
     - scala_test:
         <<: *notify-fail
         context:
