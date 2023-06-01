@@ -2128,15 +2128,6 @@ workflows:
            - deployment_test
            - docker_images_push
            - wait_for_previous_pipeline
-    - deploy_sv_runbook:
-        <<: *main-branch-never
-        context:
-          - artifactory
-          - datadog
-          - slack-context
-        cluster: stagingb
-        requires:
-          - deploy_cluster
     - preflight_check:
         cluster: stagingb
         <<: *main-branch-only
