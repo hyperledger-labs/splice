@@ -24,7 +24,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     tableName: String,
     resolveDomainId: => Future[DomainId], // no support for multi-domain yet
     override protected val loggerFactory: NamedLoggerFactory,
-    override val txLogParser: TxLogStore.Parser[TXI, TXE],
     @unused futureSupervisor: FutureSupervisor,
     @unused retryProvider: RetryProvider,
 )(implicit
@@ -33,12 +32,28 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     traceContext: TraceContext,
     closeContext: CloseContext,
 ) extends MultiDomainAcsStore
-    with TxLogStore[TXI, TXE]
     with AcsTables
     with NamedLogging {
 
   import MultiDomainAcsStore.*
   import profile.api.*
+
+  // TODO (#5247): resolve/compute from ingestion filters
+  val storeId: Int = 1
+
+  @unused
+  private def minimumLastOffset(): Future[Option[String]] = {
+    storage
+      .querySingle(
+        sql"""
+        select min(last_ingested_offset)
+        from store_ingestion_states
+        where store_id = $storeId
+         """.as[String].headOption,
+        "minimumLastOffset",
+      )
+      .value
+  }
 
   override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
       implicit companionClass: ContractCompanion[C, TCid, T]
@@ -56,7 +71,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                contract_metadata_driver_internal,
                contract_expires_at
           from #$tableName
-          where contract_id = ${lengthLimited(id.contractId)}
+          where store_id = $storeId and contract_id = ${lengthLimited(id.contractId)}
            """.as[AcsStoreRowTemplate].headOption,
         "lookupContractById",
       )
@@ -64,22 +79,10 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .value
   }
 
-  override def findContractWithOffset[C, TCid <: ContractId[_], T](
-      companion: C
-  )(p: Contract[TCid, T] => Boolean)(implicit
-      companionClass: ContractCompanion[C, TCid, T]
-  ): Future[QueryResult[Option[ContractWithState[TCid, T]]]] = ???
-
-  override def findContractOnDomainWithOffset[C, TCid <: ContractId[_], T](
-      companion: C
-  )(domain: DomainId, p: Contract[TCid, T] => Boolean)(implicit
-      companionClass: ContractCompanion[C, TCid, T]
-  ): Future[QueryResult[Option[Contract[TCid, T]]]] = ???
-
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean,
-      limit: Option[Long],
+      limit: Long,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Seq[ContractWithState[TCid, T]]] = ???
@@ -87,7 +90,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean,
-      limit: Option[Long],
+      limit: Long,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] =
     ???
 
@@ -95,7 +98,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       companion: C,
       domain: DomainId,
       filter: Contract[TCid, T] => Boolean,
-      limit: Option[Long],
+      limit: Long,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[Contract[TCid, T]]] = ???
 
   override def streamReadyContracts[C, TCid <: ContractId[_], T](companion: C)(implicit
@@ -115,24 +118,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   ): Future[Unit] = ???
 
   override def ingestionSink: IngestionSink = ???
-
-  override def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]] = ???
-
-  override def getLatestTxLogIndex(query: TXI => Boolean)(implicit
-      ec: ExecutionContext
-  ): Future[TXI] = ???
-
-  override def getTxLogIndicesAfterEventId(
-      domainId: DomainId,
-      beginAfterEventId: String,
-      limit: Int,
-  )(implicit ec: ExecutionContext): Future[Seq[TXI]] = ???
-
-  override def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]] = ???
 
   override def close(): Unit = ()
 

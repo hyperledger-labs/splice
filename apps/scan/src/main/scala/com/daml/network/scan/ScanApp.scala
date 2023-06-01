@@ -88,7 +88,7 @@ class ScanApp(
       _ <- retryProvider.retryForAutomation(
         "wait for open mining round",
         store.multiDomainAcsStore
-          .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = Some(1))
+          .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = 1)
           .map { cs =>
             if (cs.isEmpty) {
               throw Status.FAILED_PRECONDITION

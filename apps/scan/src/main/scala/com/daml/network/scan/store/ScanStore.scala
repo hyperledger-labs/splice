@@ -6,8 +6,13 @@ import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
+import com.daml.network.scan.store
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore}
+import com.daml.network.store.{
+  CNNodeAppStoreWithHistory,
+  InMemoryMultiDomainAcsStore,
+  MultiDomainAcsStore,
+}
 import com.daml.network.util.{CoinConfigSchedule, Contract}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -35,6 +40,11 @@ trait ScanStore
   protected[this] def scanConfig: ScanAppBackendConfig
 
   override final def defaultAcsDomain = scanConfig.domains.global.alias
+
+  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
+    store.ScanTxLogParser.TxLogIndexRecord,
+    store.ScanTxLogParser.TxLogEntry,
+  ]
 
   def lookupCoinRules()(implicit
       tc: TraceContext

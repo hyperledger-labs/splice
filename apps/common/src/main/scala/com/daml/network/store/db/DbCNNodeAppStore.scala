@@ -1,7 +1,13 @@
 package com.daml.network.store.db
 
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStore, InMemoryDomainStore, OffsetStore, TxLogStore}
+import com.daml.network.store.{
+  CNNodeAppStore,
+  InMemoryDomainStore,
+  InMemoryMultiDomainAcsStore,
+  OffsetStore,
+  TxLogStore,
+}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -29,12 +35,17 @@ abstract class DbCNNodeAppStore[
       tableName,
       defaultAcsDomainIdF,
       loggerFactory,
-      txLogParser,
       futureSupervisor,
       retryProvider,
     )
 
-  override def txLog = multiDomainAcsStore
+  override def txLog: TxLogStore[TXI, TXE] = new InMemoryMultiDomainAcsStore(
+    loggerFactory,
+    acsContractFilter,
+    txLogParser,
+    futureSupervisor,
+    retryProvider,
+  )
 
   override lazy val domains: InMemoryDomainStore =
     new InMemoryDomainStore(

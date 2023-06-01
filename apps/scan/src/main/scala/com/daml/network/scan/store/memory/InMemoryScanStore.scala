@@ -41,7 +41,10 @@ class InMemoryScanStore(
     for {
       // TODO(#2930): This is a very naive preliminary implementation that will be completely replaced soon
       domainId <- defaultAcsDomainIdF
-      coins <- multiDomainAcsStore.listContractsOnDomain(coinCodegen.Coin.COMPANION, domainId)
+      coins <- multiDomainAcsStore.listContractsOnDomain(
+        coinCodegen.Coin.COMPANION,
+        domainId,
+      )
       totalCoins = coins.foldLeft(BigDecimal(0.0))((b, coin) =>
         b + coin.payload.amount.initialAmount
       )
@@ -233,7 +236,6 @@ class InMemoryScanStore(
           ValidatorTraffic.COMPANION,
           defaultDomainId,
           _ => true,
-          None,
         )
     )
   }

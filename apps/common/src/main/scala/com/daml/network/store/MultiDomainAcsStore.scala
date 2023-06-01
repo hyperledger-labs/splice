@@ -46,6 +46,8 @@ trait MultiDomainAcsStore extends AutoCloseable {
 
   import MultiDomainAcsStore.*
 
+  private val DefaultLimit: Long = 1000L
+
   def lookupContractById[C, TCid <: ContractId[_], T](
       companion: C
   )(id: ContractId[_])(implicit
@@ -127,59 +129,16 @@ trait MultiDomainAcsStore extends AutoCloseable {
       )
     )
 
-  /** Find a contract that satisfies a predicate.
-    *
-    * Caution: this function traverses all contracts!
-    * Not intended for production use, but very useful for prototyping.
-    */
-  def findContractWithOffset[C, TCid <: ContractId[_], T](
-      companion: C
-  )(
-      p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
-  ): Future[QueryResult[Option[ContractWithState[TCid, T]]]]
-
-  /** Find a contract that satisfies a predicate on the given domain.
-    * Only contracts with state ContractState.Assigned(domain) are considered
-    * so contracts are omitted if they have been transferred or are in-flight.
-    * This should generally only be used
-    * for contracts that exist in per-domain variations and are never transferred, e.g.,
-    * install contracts.
-    *
-    * Caution: this function traverses all contracts!
-    * Not intended for production use, but very useful for prototyping.
-    */
-  def findContractOnDomainWithOffset[C, TCid <: ContractId[_], T](
-      companion: C
-  )(
-      domain: DomainId,
-      p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-  )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
-  ): Future[QueryResult[Option[Contract[TCid, T]]]]
-
-  def findContractOnDomain[C, TCid <: ContractId[_], T](
-      companion: C
-  )(
-      domain: DomainId,
-      p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-  )(implicit
-      executionContext: ExecutionContext,
-      companionClass: ContractCompanion[C, TCid, T],
-  ): Future[Option[Contract[TCid, T]]] =
-    findContractOnDomainWithOffset(companion)(domain, p).map(_.value)
-
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-      limit: Option[Long] = None,
+      limit: Long = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ContractWithState[TCid, T]]]
 
   def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-      limit: Option[Long] = None,
+      limit: Long = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]]
 
   /** Only contracts with state ContractState.Assigned(domain) are considered
@@ -192,7 +151,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
       companion: C,
       domain: DomainId,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-      limit: Option[Long] = None,
+      limit: Long = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[Contract[TCid, T]]]
 
   private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
@@ -205,7 +164,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
         listReadyContracts(
           companion = companion,
           filter = co => now.toInstant isAfter expiresAt(co.payload),
-          limit = Some(limit.toLong),
+          limit = limit.toLong,
         )
 
   /** Stream all ready contracts that can be acted upon.

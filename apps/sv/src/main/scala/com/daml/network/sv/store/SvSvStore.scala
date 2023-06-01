@@ -3,7 +3,12 @@ package com.daml.network.sv.store
 import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{
+  CNNodeAppStoreWithoutHistory,
+  InMemoryMultiDomainAcsStore,
+  MultiDomainAcsStore,
+  TxLogStore,
+}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvStore
@@ -22,6 +27,11 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
   protected[this] def domainConfig: SvDomainConfig
 
   override final def defaultAcsDomain = domainConfig.global.alias
+
+  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
+    TxLogStore.IndexRecord,
+    TxLogStore.Entry[TxLogStore.IndexRecord],
+  ]
 
   def lookupValidatorOnboardingBySecretWithOffset(
       secret: String
@@ -65,7 +75,7 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       tc: TraceContext
   ): Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(vo.ValidatorOnboarding.COMPANION, _)
+      multiDomainAcsStore.listContractsOnDomain(vo.ValidatorOnboarding.COMPANION, _, limit = 1000L)
     )
 
   def lookupApprovedSvIdentityByNameWithOffset(

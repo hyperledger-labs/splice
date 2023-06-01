@@ -6,7 +6,12 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{
+  CNNodeAppStoreWithoutHistory,
+  InMemoryMultiDomainAcsStore,
+  MultiDomainAcsStore,
+  TxLogStore,
+}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -16,7 +21,6 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-
 import MultiDomainAcsStore.ReadyContract
 
 trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
@@ -26,6 +30,11 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
 
   protected[this] def domainConfig: SplitwellDomainConfig
   override final def defaultAcsDomain = domainConfig.splitwell.preferred.alias
+
+  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
+    TxLogStore.IndexRecord,
+    TxLogStore.Entry[TxLogStore.IndexRecord],
+  ]
 
   def lookupInstallWithOffset(
       domainId: DomainId,

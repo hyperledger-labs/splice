@@ -201,7 +201,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       case (c, Some(id)) => ContractWithState(c, ContractState.Assigned(id))
     }
     for {
-      actualList <- store.listContracts(AppRewardCoupon.COMPANION)
+      actualList <- store.listContracts(AppRewardCoupon.COMPANION, limit = expected.size.toLong)
       _ = actualList shouldBe expected_
       _ <- expected_.traverse_ { c =>
         store
@@ -726,7 +726,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         _ <- d1.switchToUpdates()
         _ <- d1.create(transferInProgress(1))
         _ <- d1.create(testDeliveryOffer(2))
-        cs <- store.listContracts(DeliveryOffer.INTERFACE)
+        cs <- store.listContracts(DeliveryOffer.INTERFACE, limit = 2)
       } yield {
         cs shouldBe Seq(
           ContractWithState(

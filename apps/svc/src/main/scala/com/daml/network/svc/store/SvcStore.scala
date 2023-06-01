@@ -3,7 +3,12 @@ package com.daml.network.svc.store
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{
+  CNNodeAppStoreWithoutHistory,
+  InMemoryMultiDomainAcsStore,
+  MultiDomainAcsStore,
+  TxLogStore,
+}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
@@ -26,6 +31,11 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
   protected[this] def domainConfig: SvcDomainConfig
 
   override final def defaultAcsDomain = domainConfig.global.alias
+
+  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
+    TxLogStore.IndexRecord,
+    TxLogStore.Entry[TxLogStore.IndexRecord],
+  ]
 
   def lookupCoinRules()(implicit
       tc: TraceContext

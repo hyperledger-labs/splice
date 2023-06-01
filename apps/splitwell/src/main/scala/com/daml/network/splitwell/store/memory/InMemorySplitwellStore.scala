@@ -78,7 +78,9 @@ class InMemorySplitwellStore(
       followerContracts <- multiDomainAcsStore.listReadyContracts(
         followerCompanion
       )
-      leaderContracts <- multiDomainAcsStore.listReadyContracts(leaderCompanion)
+      leaderContracts <- multiDomainAcsStore.listReadyContracts(
+        leaderCompanion
+      )
     } yield {
       val leaderContractsById = leaderContracts.map(c => getLeaderId(c.contract.payload) -> c).toMap
       followerContracts.collect(Function.unlift { c =>

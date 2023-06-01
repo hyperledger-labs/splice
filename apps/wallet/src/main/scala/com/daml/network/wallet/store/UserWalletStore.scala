@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.{CNNodeAppStoreWithHistory, OffsetStore}
+import com.daml.network.store.{CNNodeAppStoreWithHistory, InMemoryMultiDomainAcsStore, OffsetStore}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.UserWalletStore.{
@@ -57,10 +57,17 @@ trait UserWalletStore
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
+  // TODO (#5164): Remove this override so that multiDomainAcsStore is just the generic MultiDomainAcsStore
+  def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
+    UserWalletTxLogParser.TxLogIndexRecord,
+    UserWalletTxLogParser.TxLogEntry,
+  ]
+
   def lookupInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
   ] = for {
     domainId <- defaultAcsDomainIdF
+    // TODO (#5164): Replace with a wallet-specific lookup by templateId
     ct <- multiDomainAcsStore
       .findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(domainId, (_: Any) => true)
   } yield ct
@@ -161,7 +168,7 @@ trait UserWalletStore
           subsCodegen.SubscriptionIdleState.ContractId,
           subsCodegen.SubscriptionIdleState,
         ]) => isReadyForPayment(c.payload),
-        Some(limit.toLong),
+        limit.toLong,
       )
     }
 
@@ -265,7 +272,10 @@ trait UserWalletStore
       submittingRound: Long,
   )(implicit tc: TraceContext): Future[Seq[(BigDecimal, InputCoin)]] = for {
     domainId <- defaultAcsDomainIdF
-    coins <- multiDomainAcsStore.listContractsOnDomain(coinCodegen.Coin.COMPANION, domainId)
+    coins <- multiDomainAcsStore.listContractsOnDomain(
+      coinCodegen.Coin.COMPANION,
+      domainId,
+    )
   } yield coins
     .map(c =>
       (
@@ -357,6 +367,7 @@ trait UserWalletStore
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
   ] =
     defaultAcsDomainIdF.flatMap(
+      // TODO (#5164): Replace with a wallet-specific lookup by templateId
       multiDomainAcsStore.findContractOnDomain(coinCodegen.FeaturedAppRight.COMPANION)(_, _ => true)
     )
 
@@ -365,7 +376,10 @@ trait UserWalletStore
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorRight.ContractId, ValidatorRight]]] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(coinCodegen.ValidatorRight.COMPANION, _)
+      multiDomainAcsStore.listContractsOnDomain(
+        coinCodegen.ValidatorRight.COMPANION,
+        _,
+      )
     )
 
   def listTransactions(

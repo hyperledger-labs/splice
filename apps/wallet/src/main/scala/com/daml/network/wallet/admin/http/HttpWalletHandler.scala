@@ -85,7 +85,9 @@ class HttpWalletHandler(
     for {
       userStore <- getUserStore(user)
       currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
-      coins <- userStore.multiDomainAcsStore.listContracts(coinCodegen.Coin.COMPANION)
+      coins <- userStore.multiDomainAcsStore.listContracts(
+        coinCodegen.Coin.COMPANION
+      )
       lockedCoins <- userStore.multiDomainAcsStore.listContracts(
         coinCodegen.LockedCoin.COMPANION
       )
@@ -263,7 +265,9 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
-        contracts <- userStore.multiDomainAcsStore.listContracts(templateCompanion)
+        contracts <- userStore.multiDomainAcsStore.listContracts(
+          templateCompanion
+        )
       } yield mkResponse(contracts.map(_.contract.toJson).toVector)
     }
 
@@ -461,8 +465,12 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { implicit tc => _ =>
       for {
         userStore <- getUserStore(user)
-        coins <- userStore.multiDomainAcsStore.listContracts(coinCodegen.Coin.COMPANION)
-        lockedCoins <- userStore.multiDomainAcsStore.listContracts(coinCodegen.LockedCoin.COMPANION)
+        coins <- userStore.multiDomainAcsStore.listContracts(
+          coinCodegen.Coin.COMPANION
+        )
+        lockedCoins <- userStore.multiDomainAcsStore.listContracts(
+          coinCodegen.LockedCoin.COMPANION
+        )
         now = clock.now
         currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
       } yield {

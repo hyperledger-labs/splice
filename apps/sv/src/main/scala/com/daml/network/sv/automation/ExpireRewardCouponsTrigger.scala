@@ -33,7 +33,7 @@ class ExpireRewardCouponsTrigger(
     for {
       appRewards <- store.listAppRewardCouponsGroupedByCounterparty(
         closedRound.payload.round.number,
-        totalCouponsLimit = Some(100),
+        totalCouponsLimit = 100L,
       )
       appRewardCmds = appRewards.map(group =>
         svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
@@ -47,7 +47,7 @@ class ExpireRewardCouponsTrigger(
       )
       validatorRewards <- store.listValidatorRewardCouponsGroupedByCounterparty(
         closedRound.payload.round.number,
-        totalCouponsLimit = Some(100),
+        totalCouponsLimit = 100L,
       )
       validatorRewardCmds = validatorRewards.map(group =>
         svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(

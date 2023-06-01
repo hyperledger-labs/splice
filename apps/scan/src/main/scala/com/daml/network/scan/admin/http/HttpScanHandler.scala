@@ -68,19 +68,23 @@ class HttpScanHandler(
       body: com.daml.network.http.v0.definitions.GetOpenAndIssuingMiningRoundsRequest
   ): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
+      val limit = 100L
       for {
         domainId <- store.defaultAcsDomainIdF
         issuingRounds <- store.multiDomainAcsStore.listContractsOnDomain(
           IssuingMiningRound.COMPANION,
           domainId,
+          limit = limit,
         )
         openRounds <- store.multiDomainAcsStore.listContractsOnDomain(
           OpenMiningRound.COMPANION,
           domainId,
+          limit = limit,
         )
         summarizingRounds <- store.multiDomainAcsStore.listContractsOnDomain(
           SummarizingMiningRound.COMPANION,
           domainId,
+          limit = limit,
         )
         issuingRoundsCachedByClient = body.cachedIssuingRoundContractIds.toSet
         openRoundsCachedByClient = body.cachedOpenMiningRoundContractIds.toSet
@@ -218,6 +222,7 @@ class HttpScanHandler(
         rounds <- store.multiDomainAcsStore.listContractsOnDomain(
           roundCodegen.ClosedMiningRound.COMPANION,
           domainId,
+          limit = 100,
         )
       } yield {
         val filteredRounds = rounds.sortBy(_.payload.round.number)
@@ -234,6 +239,7 @@ class HttpScanHandler(
         apps <- store.multiDomainAcsStore.listContractsOnDomain(
           coinCodegen.FeaturedAppRight.COMPANION,
           domainId,
+          limit = 100,
         )
       } yield {
         definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.toJson))

@@ -6,7 +6,12 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{
+  CNNodeAppStoreWithoutHistory,
+  InMemoryMultiDomainAcsStore,
+  MultiDomainAcsStore,
+  TxLogStore,
+}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -40,12 +45,19 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
 
   override final def defaultAcsDomain = domainConfig.global.alias
 
+  // TODO (#5162): Remove this override so that multiDomainAcsStore is just the generic MultiDomainAcsStore
+  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
+    TxLogStore.IndexRecord,
+    TxLogStore.Entry[TxLogStore.IndexRecord],
+  ]
+
   /** Lookup the directory install for a user */
   def lookupInstallByUserWithOffset(
       user: PartyId
   )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
-  ]]] =
+  ]]] = {
+    // TODO (#5162): Replace with call to directory-specific query
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore
         .findContractOnDomainWithOffset(directoryCodegen.DirectoryInstall.COMPANION)(
@@ -53,19 +65,22 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
           co => co.payload.user == user.toProtoPrimitive,
         )
     )
+  }
 
   /** Lookup a directory entry by name. */
   def lookupEntryByNameWithOffset(
       name: String
   )(implicit tc: TraceContext): Future[QueryResult[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ]] =
+  ]] = {
+    // TODO (#5162): Replace with call to directory-specific query
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.findContractOnDomainWithOffset(directoryCodegen.DirectoryEntry.COMPANION)(
         _,
         co => co.payload.name == name,
       )
     )
+  }
 
   def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
@@ -95,6 +110,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   ] =
     for {
       domainId <- defaultAcsDomainIdF
+      // TODO (#5162): This belongs to in-memory implementation, DB should do a directory-specific query
       list <- multiDomainAcsStore.listContractsOnDomain(
         directoryCodegen.DirectoryEntry.COMPANION,
         domainId,
@@ -121,6 +137,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   )(implicit tc: TraceContext): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
     for {
       domainId <- defaultAcsDomainIdF
+      // TODO (#5162): This belongs to in-memory implementation, DB should do a directory-specific query
       dueSubscriptions <- multiDomainAcsStore.listContractsOnDomain(
         subsCodegen.SubscriptionIdleState.COMPANION,
         domainId,
