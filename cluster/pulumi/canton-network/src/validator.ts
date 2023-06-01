@@ -6,11 +6,11 @@ import type { Auth0Client } from './auth0types';
 import { installParticipant } from './ledger';
 import { exactNamespace, installCNHelmChart } from './utils';
 
-export function installValidator(
+export async function installValidator(
   auth0Client: Auth0Client,
   svc: k8s.helm.v3.Release,
   name: string
-): k8s.helm.v3.Release {
+): Promise<k8s.helm.v3.Release> {
   const xns = exactNamespace(name);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
@@ -37,21 +37,21 @@ export function installValidator(
   );
 
   installCNHelmChart(xns, 'directory-web-ui', 'cn-directory-web-ui', {}, [
-    installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
+    await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
   ]);
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [
-    installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
+    await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
   const dependsOn = [
     svc,
     xns.ns,
     participant,
-    installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
-    installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
-    installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
-    installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
-    installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
+    await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
+    await installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
+    await installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
+    await installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
+    await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
   ];
 
   return installCNHelmChart(

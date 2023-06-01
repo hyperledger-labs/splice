@@ -32,14 +32,19 @@ const SV4_KEY = {
     'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ',
 };
 
-export function installCluster(auth0Client: Auth0Client): void {
-  const svc = installSVC(auth0Client);
+export async function installCluster(auth0Client: Auth0Client): Promise<void> {
+  const svc = await installSVC(auth0Client);
+  const validator = await installValidator(auth0Client, svc, 'validator1');
+  const splitwell = await installSplitwell(auth0Client, svc);
 
-  const validator = installValidator(auth0Client, svc, 'validator1');
-  const splitwell = installSplitwell(auth0Client, svc);
-
-  installSvNode(auth0Client, svc, 'sv-1', 'Canton-Foundation-1', 'auth0|64529b128448ded6aa68048f');
-  installSvNode(
+  await installSvNode(
+    auth0Client,
+    svc,
+    'sv-1',
+    'Canton-Foundation-1',
+    'auth0|64529b128448ded6aa68048f'
+  );
+  await installSvNode(
     auth0Client,
     svc,
     'sv-2',
@@ -47,7 +52,7 @@ export function installCluster(auth0Client: Auth0Client): void {
     'auth0|64529b6852dd694167351045',
     SV2_KEY
   );
-  installSvNode(
+  await installSvNode(
     auth0Client,
     svc,
     'sv-3',
@@ -55,7 +60,7 @@ export function installCluster(auth0Client: Auth0Client): void {
     'auth0|64529bb10c1aee4f2c819218',
     SV3_KEY
   );
-  installSvNode(
+  await installSvNode(
     auth0Client,
     svc,
     'sv-4',

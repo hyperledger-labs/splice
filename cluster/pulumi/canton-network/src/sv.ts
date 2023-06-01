@@ -6,7 +6,7 @@ import type { Auth0Client } from './auth0types';
 import { installDomain, installParticipant } from './ledger';
 import { ChartValues, ExactNamespace, exactNamespace, installCNHelmChart } from './utils';
 
-export function installSVC(auth0Client: Auth0Client): k8s.helm.v3.Release {
+export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.Release> {
   const xns = exactNamespace('svc');
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
@@ -70,11 +70,11 @@ export function installSVC(auth0Client: Auth0Client): k8s.helm.v3.Release {
 
   const dependsOn = [
     participant,
-    installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
-    installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
-    installAuth0Secret(auth0Client, xns, 'sv1', 'sv-1'),
-    installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
-    installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
+    await installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
+    await installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
+    await installAuth0Secret(auth0Client, xns, 'sv1', 'sv-1'),
+    await installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
+    await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
   ];
 
   return installCNHelmChart(
@@ -159,22 +159,22 @@ export function installSvKeySecret(
   );
 }
 
-export function installSvNode(
+export async function installSvNode(
   auth0Client: Auth0Client,
   svc: k8s.helm.v3.Release,
   nodename: string,
   onboardingName: string,
   validatorWalletUser: string,
   joinWithKey?: { publicKey: string; privateKey: string }
-): void {
+): Promise<void> {
   const xns = exactNamespace(nodename);
 
   const dependsOn = [
     svc,
-    installAuth0Secret(auth0Client, xns, 'sv', nodename),
-    installAuth0UISecret(auth0Client, xns, 'sv', nodename),
-    installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
-    installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
+    await installAuth0Secret(auth0Client, xns, 'sv', nodename),
+    await installAuth0UISecret(auth0Client, xns, 'sv', nodename),
+    await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
+    await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
   ].concat(
     joinWithKey ? [installSvKeySecret(xns, joinWithKey.publicKey, joinWithKey.privateKey)] : []
   );

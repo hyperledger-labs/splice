@@ -1,8 +1,38 @@
 import * as k8s from '@pulumi/kubernetes';
-import { AuthenticationClient, ManagementClient, TokenResponse } from 'auth0';
+import * as pulumi from '@pulumi/pulumi';
+import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
+import { AuthenticationClient, ManagementClient } from 'auth0';
 
-import type { Auth0Client, Auth0SecretMap, Auth0ClientSecret, ClientIdMap } from './auth0types';
+import type {
+  Auth0Client,
+  Auth0SecretMap,
+  Auth0ClientAccessToken,
+  Auth0ClientSecret,
+  ClientIdMap,
+} from './auth0types';
 import { ExactNamespace, fixedTokens, requireEnv } from './utils';
+
+type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
+
+/* Access tokens deployed into a cluster need to have a lifetime at
+ * least as long as the cluster is expected to run. This means that
+ * cached tokens set to expire during the expected lifetime of an
+ * environment need to be refreshed at deployment even if they aren't
+ * quite expired.
+ *
+ * This constant sets the length of time tokens are expected to remain
+ * valid. It is currently eight days, based on the seven day life of
+ * TestNet and a short additional grace period.
+ */
+const REQUIRED_TOKEN_LIFETIME = 8 * 86400;
+
+const AUTH0_FIXED_TOKEN_CACHE_NAME = 'auth0-fixed-token-cache';
+
+function addTimeSeconds(t: Date, seconds: number): Date {
+  const t2 = new Date(t);
+  t2.setSeconds(t2.getSeconds() + seconds);
+  return t2;
+}
 
 const appToClientId = {
   validator: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
@@ -37,42 +67,168 @@ const auth0Domain = `${auth0Account}.auth0.com`;
 
 export class Auth0Fetch implements Auth0Client {
   private secrets: Auth0SecretMap | undefined;
+  private auth0Cache: Auth0CacheMap | undefined;
+
+  private k8sApi: CoreV1Api;
+
+  constructor() {
+    const kc = new KubeConfig();
+    kc.loadFromDefault();
+
+    this.k8sApi = kc.makeApiClient(CoreV1Api);
+  }
+
+  private async loadSecrets(): Promise<Auth0SecretMap> {
+    const client = new ManagementClient({
+      domain: auth0Domain,
+      clientId: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_ID'),
+      clientSecret: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_SECRET'),
+      scope: 'read:clients read:client_keys',
+    });
+
+    const clients = await client.getClients();
+    const secrets = new Map() as Auth0SecretMap;
+
+    for (const client of clients) {
+      if (client.client_id && client.client_secret) {
+        secrets.set(client.client_id, client as Auth0ClientSecret);
+      }
+    }
+    return secrets;
+  }
+
+  public async loadAuth0Cache(): Promise<void> {
+    pulumi.log.info('Loading Auth0 Cache');
+    const cacheMap = {} as Auth0CacheMap;
+
+    try {
+      const cacheSecret = await this.k8sApi.readNamespacedSecret(
+        AUTH0_FIXED_TOKEN_CACHE_NAME,
+        'default'
+      );
+
+      const { data } = cacheSecret.body;
+
+      for (const clientId in data) {
+        cacheMap[clientId] = JSON.parse(Buffer.from(data[clientId], 'base64').toString('ascii'));
+      }
+
+      pulumi.log.info('Auth0 cache loaded...');
+    } catch (e) {
+      pulumi.log.info('No Auth0 cache secret found.');
+    }
+
+    this.auth0Cache = cacheMap;
+  }
+
+  async saveAuth0Cache(): Promise<void> {
+    pulumi.log.info('Saving Auth0 cache');
+    const data = {} as Record<string, string>;
+
+    if (!this.auth0Cache) {
+      console.error('No auth0 cache loaded in Auth0Fetch');
+      process.exit(1);
+    }
+
+    for (const clientId in this.auth0Cache) {
+      const cachedToken = this.auth0Cache[clientId];
+
+      data[clientId] = Buffer.from(JSON.stringify(cachedToken)).toString('base64');
+    }
+
+    try {
+      await this.k8sApi.createNamespacedSecret('default', {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name: AUTH0_FIXED_TOKEN_CACHE_NAME,
+        },
+        data,
+      });
+    } catch (_) {
+      try {
+        console.log('Deleting existing secret');
+        await this.k8sApi.deleteNamespacedSecret(AUTH0_FIXED_TOKEN_CACHE_NAME, 'default');
+
+        console.log('Creating new secret');
+        await this.k8sApi.createNamespacedSecret('default', {
+          apiVersion: 'v1',
+          kind: 'Secret',
+          metadata: {
+            name: AUTH0_FIXED_TOKEN_CACHE_NAME,
+          },
+          data,
+        });
+      } catch (e) {
+        console.log('Auth0 cache update failed:', e);
+        process.exit(1);
+      }
+    }
+
+    pulumi.log.info('Auth0 cache saved');
+  }
 
   public async getSecrets(): Promise<Auth0SecretMap> {
     if (this.secrets === undefined) {
-      const client = new ManagementClient({
-        domain: auth0Domain,
-        clientId: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_ID'),
-        clientSecret: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_SECRET'),
-        scope: 'read:clients read:client_keys',
-      });
-
-      const clients = await client.getClients();
-
-      const secrets = new Map() as Auth0SecretMap;
-
-      for (const client of clients) {
-        if (client.client_id && client.client_secret) {
-          secrets.set(client.client_id, client as Auth0ClientSecret);
-        }
-      }
-      this.secrets = secrets;
+      this.secrets = await this.loadSecrets();
     }
     return this.secrets;
   }
 
-  public async getClientAccessToken(
-    clientId: string,
-    clientSecret: string
-  ): Promise<TokenResponse> {
+  public async getClientAccessToken(clientId: string, clientSecret: string): Promise<string> {
+    pulumi.log.info('Getting access token for Auth0 client: ' + clientId);
+
+    const now = new Date();
+
+    if (this.auth0Cache) {
+      const cachedSecret = this.auth0Cache[clientId];
+      if (cachedSecret) {
+        const cachedSecretExpiry = new Date(cachedSecret.expiry);
+        if (addTimeSeconds(now, REQUIRED_TOKEN_LIFETIME) > cachedSecretExpiry) {
+          pulumi.log.info('Ignoring expired cached Auth0 token for client: ' + clientId);
+        } else {
+          pulumi.log.info('Using cached Auth0 token for client: ' + clientId);
+          return cachedSecret.accessToken;
+        }
+      }
+    }
+
+    pulumi.log.info('Querying access token for Auth0 client: ' + clientId);
     const auth0 = new AuthenticationClient({
       domain: `${auth0Account}.auth0.com`,
       clientId: clientId,
       clientSecret: clientSecret,
     });
-    return await auth0.clientCredentialsGrant({
+    const tokenResponse = await auth0.clientCredentialsGrant({
       audience: 'https://canton.network.global',
     });
+
+    const { expires_in } = tokenResponse;
+
+    if (expires_in < REQUIRED_TOKEN_LIFETIME) {
+      /* If you see this error, you either need to decrease the required token
+       * lifetime or extend the length of the tokens issued by Auth0.
+       */
+      console.error(
+        'Auth0 access token issued with expiry too short to meet REQUIRED_TOKEN_LIFETIME'
+      );
+      process.exit(1);
+    }
+
+    const expiry = addTimeSeconds(now, expires_in);
+
+    if (this.auth0Cache && tokenResponse.access_token) {
+      pulumi.log.info(
+        'Caching access token for Auth0 client: ' + clientId + ' expiry: ' + expiry.toJSON()
+      );
+
+      this.auth0Cache[clientId] = {
+        accessToken: tokenResponse.access_token,
+        expiry: expiry.toJSON(),
+      };
+    }
+
+    return tokenResponse.access_token;
   }
 }
 
@@ -117,7 +273,7 @@ async function auth0Secret(
   if (fixedTokens()) {
     const accessToken = await auth0Client.getClientAccessToken(clientId, clientSecret);
     return {
-      token: accessToken.access_token,
+      token: accessToken,
       'ledger-api-user': clientId + '@clients',
     };
   } else {
@@ -130,12 +286,12 @@ async function auth0Secret(
   }
 }
 
-export function installAuth0Secret(
+export async function installAuth0Secret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
-): k8s.core.v1.Secret {
+): Promise<k8s.core.v1.Secret> {
   return new k8s.core.v1.Secret(
     'auth0-secret-' + xns.logicalName + '-' + clientName,
     {
@@ -143,9 +299,7 @@ export function installAuth0Secret(
         name: 'cn-app-' + secretNameApp + '-ledger-api-auth',
         namespace: xns.ns.metadata.name,
       },
-      stringData: auth0Client
-        .getSecrets()
-        .then((all: Auth0SecretMap) => auth0Secret(auth0Client, all, clientName)),
+      stringData: await auth0Secret(auth0Client, await auth0Client.getSecrets(), clientName),
     },
     {
       dependsOn: xns.ns,
@@ -162,12 +316,12 @@ function auth0UISecret(allSecrets: Auth0SecretMap, clientName: string, namespace
   };
 }
 
-export function installAuth0UISecret(
+export async function installAuth0UISecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
-): k8s.core.v1.Secret {
+): Promise<k8s.core.v1.Secret> {
   return new k8s.core.v1.Secret(
     'auth0-ui-secret-' + xns.logicalName + '-' + clientName,
     {
@@ -175,9 +329,7 @@ export function installAuth0UISecret(
         name: 'cn-app-' + secretNameApp + '-ui-auth',
         namespace: xns.ns.metadata.name,
       },
-      stringData: auth0Client
-        .getSecrets()
-        .then((all: Auth0SecretMap) => auth0UISecret(all, clientName, xns.logicalName)),
+      stringData: auth0UISecret(await auth0Client.getSecrets(), clientName, xns.logicalName),
     },
     {
       dependsOn: xns.ns,
