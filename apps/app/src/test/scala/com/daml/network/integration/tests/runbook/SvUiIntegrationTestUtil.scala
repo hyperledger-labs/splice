@@ -79,7 +79,10 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
           s"Creating an onboarding secret",
           _ => {
             waitForQuery(id("create-validator-onboarding-secret"))
-            findAll(className("onboarding-secret-table-secret")).toSeq.map(e => e.text)
+            val secrets =
+              findAll(className("onboarding-secret-table-secret")).toSeq.map(e => e.text)
+            secrets should not be empty
+            secrets
           },
         )
         actAndCheck(
