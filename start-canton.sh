@@ -208,7 +208,7 @@ if [ $simtime -eq 1 ]; then
         --log-level-canton=DEBUG \
         --log-encoder json \
         --log-file-name log/canton-x-simtime.clog \
-        --bootstrap bootstrap-canton-x-simtime.sc"
+        --bootstrap bootstrap-canton-x.sc"
   fi
 fi
 
