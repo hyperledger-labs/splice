@@ -1006,10 +1006,13 @@ printTests := {
   val pwXNode = new PrintWriter(new FileWriter(s"test-full-class-names-xnode.log", true))
   val pwXNodeSimTime =
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-sim-time.log", true))
+  val pwXNodeDistributedDomain =
+    new PrintWriter(new FileWriter(s"test-full-class-names-xnode-distributed-domain.log", true))
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
   def isXNodeTest(name: String): Boolean = name.contains("XNode")
+  def isDistributedDomainTest(name: String): Boolean = name.contains("DistributedDomain")
   def isPreflightIntegrationTest(name: String): Boolean =
     name.contains("PreflightIntegrationTest") || name.contains("PreflightSvIntegrationTest")
   def printTestNames(
@@ -1068,12 +1071,17 @@ printTests := {
     (
       "XNode tests with wall clock time",
       pwXNode,
-      (t: String) => isXNodeTest(t) && !isTimeBasedTest(t),
+      (t: String) => isXNodeTest(t) && !isTimeBasedTest(t) && !isDistributedDomainTest(t),
     ),
     (
       "XNode tests with simulated time",
       pwXNodeSimTime,
-      (t: String) => isXNodeTest(t) && isTimeBasedTest(t),
+      (t: String) => isXNodeTest(t) && isTimeBasedTest(t) && !isDistributedDomainTest(t),
+    ),
+    (
+      "XNode tests with a distributed domain and wall clock time",
+      pwXNodeDistributedDomain,
+      (t: String) => isXNodeTest(t) && !isTimeBasedTest(t) && isDistributedDomainTest(t),
     ),
   ).foreach { case (testSet, pw, predicate) =>
     printTestNames(testSet, allTestNames, pw, predicate)
@@ -1085,6 +1093,7 @@ printTests := {
   pwFrontEndSimTime.close()
   pwXNode.close()
   pwXNodeSimTime.close()
+  pwXNodeDistributedDomain.close()
 }
 
 Global / excludeLintKeys += `root` / wartremoverErrors

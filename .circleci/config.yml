@@ -305,7 +305,7 @@ commands:
       timeout:
         type: string
         default: "25m"
-      no_output_timeout: 
+      no_output_timeout:
         type: string
         default: "10m"
       succeed_on_error:
@@ -1722,6 +1722,17 @@ workflows:
         name: "scala_test x nodes sim time"
         test_names_file: "test-full-class-names-xnode-sim-time.log"
         start_canton_options: "-d -p external -x -s"
+        resource_class: "2xlarge"
+        parallelism: 1
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test x nodes distributed domain wall clock time"
+        test_names_file: "test-full-class-names-xnode-distributed-domain.log"
+        start_canton_options: "-d -p external -x -w"
         resource_class: "2xlarge"
         parallelism: 1
     - bundle:

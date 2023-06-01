@@ -18,7 +18,10 @@ import org.scalatest.Ignore
 
 // TODO(#5197) Reenable this test once it's less flaky
 @Ignore
-class XNodeIntegrationTest extends CNNodeIntegrationTest with SvTestUtil with WalletTestUtil {
+class XNodeDistributedDomainIntegrationTest
+    extends CNNodeIntegrationTest
+    with SvTestUtil
+    with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
