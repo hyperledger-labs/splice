@@ -183,10 +183,11 @@ abstract class ScanAppReference(
     "Get a list of validators and their domain fees spends, sorted by the amount of extra traffic purchased"
   )
   def getTopValidatorsByPurchasedTraffic(
-      limit: Int
+      round: Long,
+      limit: Int,
   ): Seq[HttpScanAppClient.ValidatorPurchasedTraffic] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetTopValidatorsByPurchasedTraffic(limit))
+      httpCommand(HttpScanAppClient.GetTopValidatorsByPurchasedTraffic(round, limit))
     }
 
   @Help.Summary("Get the available traffic balance for a validator")

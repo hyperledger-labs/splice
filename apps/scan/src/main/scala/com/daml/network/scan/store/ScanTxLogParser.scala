@@ -7,14 +7,15 @@ import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.CNNodeUtil.dollarsToCC
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
-
 import java.time.Instant
+import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
@@ -35,6 +36,8 @@ class ScanTxLogParser(
         exercised match {
           case Transfer(node) =>
             State.fromTransfer(tree, root, node)
+          case CoinRules_BuyExtraTraffic(node) =>
+            State.fromBuyExtraTraffic(tree, exercised, node)
           case _ => parseTrees(tree, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -123,6 +126,15 @@ object ScanTxLogParser {
         party: PartyId,
         amount: BigDecimal,
     ) extends RewardIndexRecord
+
+    final case class ExtraTrafficPurchaseIndexRecord(
+        offset: String,
+        eventId: String,
+        round: Long,
+        validator: PartyId,
+        trafficPurchased: Long,
+        ccSpent: BigDecimal,
+    ) extends TxLogIndexRecord
   }
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}
@@ -146,6 +158,7 @@ object ScanTxLogParser {
     object OpenMiningRoundLogEntry {
       val transaction_type = "open_mining_round"
     }
+
   }
 
   case class State(
@@ -171,6 +184,7 @@ object ScanTxLogParser {
         tx: TransactionTree,
         event: TreeEvent,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
+        rootEventId: Option[String] = None,
     ): State = {
       val appRewards = node.result.value.summary.inputAppRewardAmount
       val validatorRewards = node.result.value.summary.inputValidatorRewardAmount
@@ -189,7 +203,7 @@ object ScanTxLogParser {
             TxLogEntry.EmptyTxLogEntry(
               indexRecord = TxLogIndexRecord.AppRewardIndexRecord(
                 offset = tx.getOffset(),
-                eventId = event.getEventId(),
+                eventId = rootEventId.getOrElse(event.getEventId()),
                 round = round.number,
                 party = party,
                 amount = appRewards,
@@ -206,7 +220,7 @@ object ScanTxLogParser {
             TxLogEntry.EmptyTxLogEntry(
               indexRecord = TxLogIndexRecord.ValidatorRewardIndexRecord(
                 offset = tx.getOffset(),
-                eventId = event.getEventId(),
+                eventId = rootEventId.getOrElse(event.getEventId()),
                 round = round.number,
                 party = party,
                 amount = validatorRewards,
@@ -218,6 +232,49 @@ object ScanTxLogParser {
         }
 
       State.empty.appended(appRewardEntry).appended(validatorRewardEntry)
+    }
+
+    def fromBuyExtraTraffic(
+        tx: TransactionTree,
+        event: ExercisedEvent,
+        node: ExerciseNode[CoinRules_BuyExtraTraffic.Arg, CoinRules_BuyExtraTraffic.Res],
+    )(implicit lc: ErrorLoggingContext): State = {
+
+      // second child event is the transfer of CC from validator to SVC to buy extra traffic
+      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      val transferNode = (transferEvent match {
+        case e: ExercisedEvent => Transfer.unapply(e)
+        case _ => None
+      }).getOrElse(
+        throw new RuntimeException(s"Unable to parse event ${transferEvent.getEventId} as Transfer")
+      )
+      val validatorParty = Codec
+        .decode(Codec.Party)(transferNode.argument.value.transfer.sender)
+        .getOrElse(
+          throw Status.INTERNAL
+            .withDescription(
+              s"Cannot decode party ID ${transferNode.argument.value.transfer.sender}"
+            )
+            .asRuntimeException()
+        )
+      val round = transferNode.result.value.round
+      val trafficPurchased = node.argument.value.extraTraffic
+      val ccSpent = transferNode.argument.value.transfer.outputs.get(0).amount
+      val buyExtraTrafficEntry = TxLogEntry.EmptyTxLogEntry(
+        indexRecord = TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
+          offset = tx.getOffset(),
+          eventId = event.getEventId(),
+          round = round.number,
+          validator = validatorParty,
+          trafficPurchased = trafficPurchased,
+          ccSpent = ccSpent,
+        )
+      )
+
+      State(immutable.Queue(buyExtraTrafficEntry))
+        // append the entries for rewards
+        .appended(State.fromTransfer(tx, transferEvent, transferNode, Some(event.getEventId())))
+
     }
 
     def fromOpenMiningRoundCreate(
@@ -265,5 +322,6 @@ object ScanTxLogParser {
         entries = immutable.Queue(newEntry)
       )
     }
+
   }
 }

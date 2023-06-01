@@ -88,7 +88,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]]
 
-  def getTopValidatorsByPurchasedTraffic(limit: Int)(implicit
+  def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[ValidatorPurchasedTraffic]]
 

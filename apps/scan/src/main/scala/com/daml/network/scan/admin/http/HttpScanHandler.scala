@@ -385,11 +385,14 @@ class HttpScanHandler(
 
   override def getTopValidatorsByPurchasedTraffic(
       response: ScanResource.GetTopValidatorsByPurchasedTrafficResponse.type
-  )(limit: Int): Future[ScanResource.GetTopValidatorsByPurchasedTrafficResponse] = {
+  )(
+      asOfEndOfRound: Long,
+      limit: Int,
+  ): Future[ScanResource.GetTopValidatorsByPurchasedTrafficResponse] = {
     withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#4965): Provide an upper bound for limit
       store
-        .getTopValidatorsByPurchasedTraffic(limit)
+        .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit)
         .map(validatorTraffic =>
           v0.ScanResource.GetTopValidatorsByPurchasedTrafficResponse.OK(
             definitions.GetTopValidatorsByPurchasedTrafficResponse(
@@ -400,8 +403,7 @@ class HttpScanHandler(
                     t.numPurchases,
                     t.totalTrafficPurchased,
                     Codec.encode(t.totalCcSpent),
-                    Codec.encode(t.totalUsdSpent),
-                    t.lastPurchasedAt.atOffset(ZoneOffset.UTC),
+                    t.lastPurchasedInRound,
                   )
                 )
                 .toVector

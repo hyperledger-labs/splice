@@ -297,11 +297,17 @@ class DomainFeesTimeBasedIntegrationTest
             },
         )
 
-      /* TODO(#4982) - re-enable this test once the scan endpoint has been fixed
         // Check that Scan correctly reports validator traffic purchases
-        clue("Scan reports validator traffic purchases correctly") {
-          eventually() {
-            val validatorsByPurchasedTraffic = scan.getTopValidatorsByPurchasedTraffic(10)
+        actAndCheck(
+          "Advance rounds to make all traffic purchases visible in Scan",
+          (1 to 4).foreach(_ => advanceRoundsByOneTick),
+        )(
+          "Scan reports validator traffic purchases correctly",
+          _ => {
+            val validatorsByPurchasedTraffic = scan.getTopValidatorsByPurchasedTraffic(
+              scan.getRoundOfLatestData()._1,
+              10,
+            )
             // Only Alice's validator and the SV1 validator will purchase extra traffic
             // - Alice validator purchases the most traffic (3 times)
             // - SV1 validator purchases traffic once initially and never after that since no traffic goes through it
@@ -321,9 +327,8 @@ class DomainFeesTimeBasedIntegrationTest
                 },
               ),
             )
-          }
-        }
-       */
+          },
+        )
       }
     }
   }
@@ -395,11 +400,11 @@ class DomainFeesTimeBasedIntegrationTest
   private def lookupCurrentValidatorTraffic(validatorApp: ValidatorAppBackendReference) =
     listAllValidatorTrafficContracts(validatorApp)
       // ignore duplicate validator traffic contracts with lower total purchased traffic
-      // TODO(#5025): remove these lines
+      // TODO(#4914): remove these lines
       .sortWith(_.data.totalPurchased > _.data.totalPurchased)
       .slice(0, 1)
 
-  // TODO(#5025): Temporarily added auxiliary method till #5025 is unresolved.
+  // TODO(#4914): Temporarily added auxiliary method till we properly dedup domain traffic purchases.
   private def listAllValidatorTrafficContracts(validatorApp: ValidatorAppBackendReference) =
     validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(ValidatorTraffic.COMPANION)(validatorApp.getValidatorPartyId())
@@ -473,7 +478,7 @@ class DomainFeesTimeBasedIntegrationTest
     }
   }
 
-  def checkValidatorsByPurchasedTraffic(
+  private def checkValidatorsByPurchasedTraffic(
       actual: Seq[ValidatorPurchasedTraffic],
       expected: Seq[ValidatorPurchasedTraffic => Assertion],
   ): Unit = {

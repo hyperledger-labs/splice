@@ -250,6 +250,12 @@ paths:
       operationId: "getTopValidatorsByPurchasedTraffic"
       parameters:
         - in: query
+          name: round
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: query
           name: limit
           required: true
           schema:
@@ -485,7 +491,7 @@ components:
             $ref: "#/components/schemas/ValidatorPurchasedTraffic"
     ValidatorPurchasedTraffic:
       type: object
-      required: ["validator", "numPurchases", "totalTrafficPurchased", "totalCcSpent", "totalUsdSpent", "lastPurchasedAt"]
+      required: ["validator", "numPurchases", "totalTrafficPurchased", "totalCcSpent", "lastPurchasedInRound"]
       properties:
         validator:
           type: string
@@ -497,8 +503,6 @@ components:
           format: int64
         totalCcSpent:
           type: string
-        totalUsdSpent:
-          type: string
-        lastPurchasedAt:
-          type: string
-          format: date-time
+        lastPurchasedInRound:
+          type: integer
+          format: int64

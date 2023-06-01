@@ -3,20 +3,17 @@ package com.daml.network.scan.store.memory
 import cats.implicits.*
 import cats.kernel.Monoid
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.{InMemoryCNNodeAppStore, TxLogStore}
-import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
-import scala.collection.immutable.Map
 import scala.concurrent.*
 
 import java.time.Instant
@@ -164,12 +161,12 @@ class InMemoryScanStore(
   ) =
     for {
       ret <- log
-        .getTxLogIndicesByFilter(_ match {
+        .getTxLogIndicesByFilter {
           case reward: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord
               if reward.round == round && rewardTypeFilter(reward) =>
             true
           case _ => false
-        })
+        }
         .map(rewards =>
           rewards.foldLeft(Map[PartyId, BigDecimal]())((m, reward) =>
             reward match {
@@ -226,51 +223,79 @@ class InMemoryScanStore(
       }),
     )
 
-  private def listValidatorTrafficContracts()(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]] = {
-    // TODO(#4913): read from all domains in the global domain
-    defaultAcsDomainIdF.flatMap(defaultDomainId =>
-      multiDomainAcsStore
-        .listContractsOnDomain(
-          ValidatorTraffic.COMPANION,
-          defaultDomainId,
-          _ => true,
-        )
-    )
-  }
+  private def trafficPurchasesByValidatorInRound(
+      round: Long
+  ): Future[Map[PartyId, ValidatorPurchasedTraffic]] =
+    txLog
+      .getTxLogIndicesByFilter {
+        case indexRecord: ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord
+            if indexRecord.round == round =>
+          true
+        case _ => false
+      }
+      .map(
+        _.foldLeft(Map.empty[PartyId, ValidatorPurchasedTraffic])((acc, entry) => {
+          entry match {
+            case e: ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord =>
+              acc.updatedWith(e.validator) {
+                case None =>
+                  Some(
+                    ValidatorPurchasedTraffic(
+                      e.validator,
+                      1,
+                      e.trafficPurchased,
+                      e.ccSpent,
+                      e.round,
+                    )
+                  )
+                case Some(t) =>
+                  Some(
+                    ValidatorPurchasedTraffic(
+                      t.validator,
+                      t.numPurchases + 1,
+                      t.totalTrafficPurchased + e.trafficPurchased,
+                      t.totalCcSpent + e.ccSpent,
+                      Math.max(t.lastPurchasedInRound, e.round),
+                    )
+                  )
+              }
+            case _ =>
+              throw Status.INTERNAL
+                .withDescription("Unexpected log entry type")
+                .asRuntimeException()
+          }
+        })
+      )
 
-  override def getTopValidatorsByPurchasedTraffic(limit: Int)(implicit
+  override def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[ValidatorPurchasedTraffic]] = {
-    listValidatorTrafficContracts().map(
-      _.groupBy(_.payload.validator).toSeq
-        .map { case (validator, trafficSeq) =>
-          trafficSeq.foldLeft(
-            ValidatorPurchasedTraffic(
-              PartyId.tryFromProtoPrimitive(validator),
-              0,
-              0,
-              0,
-              0,
-              Instant.MIN,
-            )
-          )((t1, t2) =>
-            ValidatorPurchasedTraffic(
-              t1.validator,
-              t1.numPurchases + t2.payload.numPurchases,
-              t1.totalTrafficPurchased + t2.payload.totalPurchased,
-              t1.totalCcSpent + t2.payload.ccSpent,
-              t1.totalUsdSpent + t2.payload.usdSpent,
-              if (t2.payload.lastPurchasedAt.isAfter(t1.lastPurchasedAt))
-                t2.payload.lastPurchasedAt
-              else t1.lastPurchasedAt,
-            )
-          )
-        }
+    def combine(t1: ValidatorPurchasedTraffic, t2: ValidatorPurchasedTraffic) = {
+      require(t1.validator == t2.validator)
+      ValidatorPurchasedTraffic(
+        t1.validator,
+        t1.numPurchases + t2.numPurchases,
+        t1.totalTrafficPurchased + t2.totalTrafficPurchased,
+        t1.totalCcSpent + t2.totalCcSpent,
+        Math.max(t1.lastPurchasedInRound, t2.lastPurchasedInRound),
+      )
+    }
+
+    for {
+      _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
+      perRound <- (0L to asOfEndOfRound).toList.traverse(trafficPurchasesByValidatorInRound)
+    } yield {
+      perRound
+        .foldLeft(Map.empty[PartyId, ValidatorPurchasedTraffic])((acc, forRound) => {
+          acc ++ forRound.map { case (k, v) =>
+            k -> combine(acc.getOrElse(k, ValidatorPurchasedTraffic(k, 0, 0, 0, 0)), v)
+          }
+        })
+        .toSeq
+        .map(_._2)
         .sortWith(_.totalTrafficPurchased > _.totalTrafficPurchased)
-        .slice(0, limit)
-    )
+        .take(limit)
+    }
   }
 
   override def getTotalPaidValidatorTraffic(

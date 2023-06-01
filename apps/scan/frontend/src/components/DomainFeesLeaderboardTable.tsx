@@ -1,6 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DateDisplay, TitledTable } from 'common-frontend';
+import { AmountDisplay, TitledTable } from 'common-frontend';
 
 import { TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 
@@ -12,7 +12,7 @@ export const DomainFeesLeaderboardTable: React.FC = () => {
       totalTrafficPurchased: 123456,
       totalCcSpent: BigNumber(12345.12345),
       totalUsdSpent: BigNumber(12345.12345),
-      lastPurchasedAt: '2023-01-01T11:11:11Z',
+      lastPurchasedInRound: 4,
     };
   });
   return (
@@ -23,8 +23,7 @@ export const DomainFeesLeaderboardTable: React.FC = () => {
           <TableCell align="right">Number of Purchases</TableCell>
           <TableCell align="right">Total Traffic Purchased</TableCell>
           <TableCell align="right">Total CC Spent</TableCell>
-          <TableCell align="right">Total USD Spent</TableCell>
-          <TableCell align="right">Last Purchased At</TableCell>
+          <TableCell align="right">Last Purchased In Round</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -44,18 +43,10 @@ const ValidatorRow: React.FC<{
     numPurchases: number;
     totalTrafficPurchased: number;
     totalCcSpent: BigNumber;
-    totalUsdSpent: BigNumber;
-    lastPurchasedAt: string;
+    lastPurchasedInRound: number;
   };
 }> = ({ app }) => {
-  const {
-    name,
-    numPurchases,
-    totalTrafficPurchased,
-    totalCcSpent,
-    totalUsdSpent,
-    lastPurchasedAt,
-  } = app;
+  const { name, numPurchases, totalTrafficPurchased, totalCcSpent, lastPurchasedInRound } = app;
   return (
     <TableRow>
       <TableCell>{name}</TableCell>
@@ -64,12 +55,7 @@ const ValidatorRow: React.FC<{
       <TableCell align="right">
         <AmountDisplay amount={totalCcSpent} currency="CC" />
       </TableCell>
-      <TableCell align="right">
-        <AmountDisplay amount={totalUsdSpent} currency="USD" />
-      </TableCell>
-      <TableCell align="right">
-        <DateDisplay datetime={lastPurchasedAt} />
-      </TableCell>
+      <TableCell align="right">{lastPurchasedInRound}</TableCell>
     </TableRow>
   );
 };
