@@ -451,12 +451,13 @@ Create a file named ``istio-gateway-values.yaml`` with the following content
 
 .. code-block:: yaml
 
-    loadBalancerIP: "YOUR_CLUSTER_IP"
-    loadBalancerSourceRanges:
-        - "35.194.81.56/32"
-        - "35.198.147.95/32"
-        - "35.189.40.124/32"
-        - "34.132.91.75/32"
+    service:
+        loadBalancerIP: "YOUR_CLUSTER_IP"
+        loadBalancerSourceRanges:
+            - "35.194.81.56/32"
+            - "35.198.147.95/32"
+            - "35.189.40.124/32"
+            - "34.132.91.75/32"
 
 
 

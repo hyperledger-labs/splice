@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+2023-06-11
+----------
+
+* Documentation:
+
+  * Fixed missing ``service`` level indentation in sample istio-gateway helm chart values in the ingress installation instructions
+
+
 2023-06-04
 ----------
 
