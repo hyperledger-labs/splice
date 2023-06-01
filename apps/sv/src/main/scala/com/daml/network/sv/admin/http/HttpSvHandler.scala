@@ -118,7 +118,13 @@ class HttpSvHandler(
           )
         case Right(token) =>
           SvApp
-            .isApprovedSvIdentity(token.candidateName, token.candidateParty, body.token, svStore)
+            .isApprovedSvIdentity(
+              token.candidateName,
+              token.candidateParty,
+              body.token,
+              svStore,
+              logger,
+            )
             .flatMap {
               case Left(reason) =>
                 Future.failed(

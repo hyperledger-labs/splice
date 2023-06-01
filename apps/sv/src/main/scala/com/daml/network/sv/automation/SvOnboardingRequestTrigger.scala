@@ -72,6 +72,7 @@ class SvOnboardingRequestTrigger(
           PartyId.tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty),
           svOnboarding.contract.payload.token,
           svStore,
+          logger,
         )
       (party, name) <- approval match {
         case Left(reason) => {

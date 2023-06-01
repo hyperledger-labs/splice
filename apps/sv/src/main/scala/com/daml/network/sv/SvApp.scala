@@ -1397,7 +1397,20 @@ object SvApp {
       candidateParty: PartyId,
       rawToken: String,
       svStore: SvSvStore,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Either[String, (PartyId, String)]] = {
+      logger: TracedLogger,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Either[String, (PartyId, String)]] = {
+
+    // We want to make sure that:
+    // 1. we log warnings whenever an auth check fails
+    // 2. details about the fails are not communicated to requesters
+    def authFailure(reason: String, details: String): Left[String, (PartyId, String)] = {
+      logger.warn(s"SV candidate authentication failure: $reason ($details)")
+      Left(reason)
+    }
+
     svStore
       .lookupApprovedSvIdentityByName(candidateName)
       .map(approvedSvO =>
@@ -1406,15 +1419,29 @@ object SvApp {
             .toRight(s"no matching approved SV identity found for $candidateName")
           token <- SvOnboardingToken.verifyAndDecode(rawToken)
           _ <-
-            if (token.candidateName == candidateName) Right(())
-            else Left("provided candidate name doesn't match name in token")
+            if (candidateName == token.candidateName) Right(())
+            else
+              authFailure(
+                "provided candidate name doesn't match name in token",
+                s"$candidateName != ${token.candidateName}",
+              )
           _ <-
             if (token.candidateKey == approvedSv.payload.candidateKey) Right(())
-            else Left("candidate key doesn't match approved key")
+            else
+              authFailure(
+                "candidate key doesn't match approved key",
+                s"${token.candidateKey} != ${approvedSv.payload.candidateKey}",
+              )
           _ <-
-            if (token.candidateParty == candidateParty) Right(())
-            else Left("provided party name doesn't match party in token")
-          _ <- if (token.svcParty == svStore.key.svcParty) Right(()) else Left("wrong svc party")
+            if (candidateParty == token.candidateParty) Right(())
+            else
+              authFailure(
+                "provided party doesn't match party in token",
+                s"$candidateParty != ${token.candidateParty}",
+              )
+          _ <-
+            if (token.svcParty == svStore.key.svcParty) Right(())
+            else authFailure("wrong svc party", s"${token.svcParty} != ${svStore.key.svcParty}")
         } yield (token.candidateParty, token.candidateName)
       )
   }
