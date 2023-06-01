@@ -390,10 +390,10 @@ Configuring the Cluster Ingress
 
 The following routes should be configured in your cluster ingress controller:
 
-* `https://wallet.sv.svc.<YOUR_HOSTNAME>` should be routed to pod `wallet-web-ui` in the `sv` namespace
-* `https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*` should be routed to port 5003 of pod `validator-app` in the `sv` namespace
-* `https://sv.sv.svc.<YOUR_HOSTNAME>` should be routed to pod `sv-web-ui` in the `sv` namespace
-* `https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*` should be routed to port 5014 of pod `sv-app` in the `sv` namespace
+* ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``wallet-web-ui`` in the ``sv`` namespace
+* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5003 of pod ``validator-app`` in the ``sv`` namespace
+* ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``sv-web-ui`` in the ``sv`` namespace
+* ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5014 of pod ``sv-app`` in the ``sv`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have
