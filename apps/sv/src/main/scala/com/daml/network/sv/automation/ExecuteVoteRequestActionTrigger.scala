@@ -54,9 +54,8 @@ class ExecuteVoteRequestActionTrigger(
             requiredNumVotes = SvUtil.requiredNumVotes(svcRules)
             votes <- store.listEligibleVotes(voteRequestId)
             acceptVotes = votes.count(_.payload.accept)
-            refusedVotes = votes.count(!_.payload.accept)
             taskOutcome <-
-              if (votes.size >= requiredNumVotes && acceptVotes > refusedVotes) {
+              if (acceptVotes >= requiredNumVotes) {
                 val cmd = svcRules.contractId.exerciseSvcRules_ExecuteDefiniteVote(
                   voteRequestId,
                   votes
