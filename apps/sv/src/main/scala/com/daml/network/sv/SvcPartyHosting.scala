@@ -11,7 +11,7 @@ import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListPartyToParticipantResult as ListPartyToParticipantResultX
@@ -169,36 +169,34 @@ class SvcPartyHosting(
             localDomainNodeConnections <- localDomainNodeConnections
             publicConfig <- sequencerPublicConfig
             snapshot <- response.sequencerSnapshot
-            sequencerId <- sequencerId
-          } yield (localDomainNodeConnections, publicConfig, snapshot, sequencerId)
-          _ <- xNodeParams.traverse_ {
-            case (localDomainNodeConnections, publicConfig, snapshot, sequencerId) =>
-              logger.info(s"Bootstrapping sequencer from snapshot")
-              for {
-                _ <- localDomainNodeConnections.sequencerAdminConnection
-                  .assignFromSnapshot(
-                    snapshot.topologySnapshot,
-                    snapshot.staticDomainParameters,
-                    snapshot.sequencerSnapshot,
-                  )
-                _ = logger.info("Sequencer bootstrapping complete")
-                _ = logger.info("Changing participant connection to point to new sequencer")
-                _ <- participantAdminConnection.modifyDomainConnectionConfig(
-                  globalDomain,
-                  setSequencerEndpoint(publicConfig),
-                )
-                _ = logger.info(s"Initializing mediator")
-                _ <- localDomainNodeConnections.mediatorAdminConnection.initialize(
-                  domainId,
+          } yield (localDomainNodeConnections, publicConfig, snapshot)
+          _ <- xNodeParams.traverse_ { case (localDomainNodeConnections, publicConfig, snapshot) =>
+            logger.info(s"Bootstrapping sequencer from snapshot")
+            for {
+              _ <- localDomainNodeConnections.sequencerAdminConnection
+                .assignFromSnapshot(
+                  snapshot.topologySnapshot,
                   snapshot.staticDomainParameters,
-                  sequencerId,
-                  new GrpcSequencerConnection(
-                    toEndpoints(publicConfig),
-                    transportSecurity = publicConfig.tls.isDefined,
-                    customTrustCertificates = None,
-                  ),
+                  snapshot.sequencerSnapshot,
                 )
-              } yield ()
+              _ = logger.info("Sequencer bootstrapping complete")
+              _ = logger.info("Changing participant connection to point to new sequencer")
+              _ <- participantAdminConnection.modifyDomainConnectionConfig(
+                globalDomain,
+                setSequencerEndpoint(publicConfig),
+              )
+              _ = logger.info(s"Initializing mediator")
+              _ <- localDomainNodeConnections.mediatorAdminConnection.initialize(
+                domainId,
+                snapshot.staticDomainParameters,
+                new GrpcSequencerConnection(
+                  toEndpoints(publicConfig),
+                  transportSecurity = publicConfig.tls.isDefined,
+                  customTrustCertificates = None,
+                  SequencerAlias.Default,
+                ),
+              )
+            } yield ()
           }
         } yield Right(())
       case None =>

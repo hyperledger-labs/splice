@@ -27,7 +27,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
 
     import com.daml.nonempty.+-:
     val url = inside(upgradeConfig.sequencerConnection) {
-      case GrpcSequencerConnection(topEndpoint +-: _, _, _) =>
+      case GrpcSequencerConnection(topEndpoint +-: _, _, _, _) =>
         topEndpoint.toURI(false).toString
     }
 

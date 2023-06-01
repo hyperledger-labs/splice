@@ -14,10 +14,7 @@ import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
-import org.scalatest.Ignore
 
-// TODO(#5197) Reenable this test once it's less flaky
-@Ignore
 class XNodeDistributedDomainIntegrationTest
     extends CNNodeIntegrationTest
     with SvTestUtil
@@ -42,19 +39,19 @@ class XNodeDistributedDomainIntegrationTest
 
     clue("SV participants are connected to their own sequencers") {
       inside(sv1.participantClient.domains.config(globalDomain).value.sequencerConnection) {
-        case GrpcSequencerConnection(endpoints, _, _) =>
+        case GrpcSequencerConnection(endpoints, _, _, _) =>
           endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5008)))
       }
       inside(sv2.participantClient.domains.config(globalDomain).value.sequencerConnection) {
-        case GrpcSequencerConnection(endpoints, _, _) =>
+        case GrpcSequencerConnection(endpoints, _, _, _) =>
           endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5608)))
       }
       inside(sv3.participantClient.domains.config(globalDomain).value.sequencerConnection) {
-        case GrpcSequencerConnection(endpoints, _, _) =>
+        case GrpcSequencerConnection(endpoints, _, _, _) =>
           endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5708)))
       }
       inside(sv4.participantClient.domains.config(globalDomain).value.sequencerConnection) {
-        case GrpcSequencerConnection(endpoints, _, _) =>
+        case GrpcSequencerConnection(endpoints, _, _, _) =>
           endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5808)))
       }
     }

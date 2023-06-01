@@ -43,4 +43,9 @@ MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for infor
 FAILED_PRECONDITION/DAML_INTERPRETATION_ERROR.+'Contract is not locked' was not met
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
 
+# TODO(#5246) Remove this once Canton fixes their bug
+java.lang.IllegalStateException: Unable to find mediator group 0
+# TODO(#5250) Remove this once Canton fixes their bug
+MEDIATOR_INVALID_MESSAGE.* Received a mediator response .*with an unknown request id
+
 # Make sure to have a trailing newline

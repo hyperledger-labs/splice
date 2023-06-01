@@ -13,5 +13,6 @@ The payload to event time bound.*has been been exceeded by payload time
 
 # TODO(#5187): remove this ignore line once we don't bump the clock for x-nodes all the time
 The submitted command has invalid arguments: current_time mismatch
+Cannot advance clock: Specified current time .*does not match ledger time
 
 # Make sure to have a trailing newline
