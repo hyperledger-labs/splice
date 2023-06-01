@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules_ConfirmSvOnboarding,
+  VoteRequest,
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
@@ -653,6 +654,22 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
           co.payload.requester == key.svParty.toProtoPrimitive && co.payload.action.toValue == action.toValue,
       )
     )
+
+  /** List the votes that are eligible to determine the outcome of a vote request;
+    * - the vote must refer to that request
+    * - the vote must be cast by one of the given members
+    * - there must not be any votes cast by the same member
+    */
+  def listEligibleVotes(voteRequestId: VoteRequest.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]] =
+    for {
+      domain <- defaultAcsDomainIdF
+      votes <- multiDomainAcsStore.listContractsOnDomain(
+        cn.svcrules.Vote.COMPANION,
+        domain,
+      )
+    } yield votes.filter(_.payload.requestCid == voteRequestId).distinctBy(_.payload.voter)
 
   def lookupCoinPriceVoteByThisSv()(implicit
       tc: TraceContext

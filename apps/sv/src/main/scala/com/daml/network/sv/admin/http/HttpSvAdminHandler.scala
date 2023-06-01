@@ -8,7 +8,6 @@ import com.daml.network.environment.{
   MediatorAdminConnection,
   SequencerAdminConnection,
 }
-import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.http.v0.definitions.{
   BatchListVotesByVoteRequestsRequest,
   CastVoteRequest,
@@ -21,6 +20,7 @@ import com.daml.network.http.v0.definitions.{
 }
 import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.http.v0.{definitions, svAdmin as v0}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.{LocalDomainNodeConnections, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}

@@ -1,8 +1,9 @@
 package com.daml.network.console
 
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cc.round as cr
+import com.daml.network.codegen.java.cn.svc.coinprice as cp
+import com.daml.network.codegen.java.cn.svcrules.{Vote, VoteRequest}
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
@@ -158,6 +159,66 @@ class SvAppBackendReference(
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.ListOpenMiningRounds
+      )
+    }
+  }
+
+  @Help.Summary("Create a vote request (via admin API)")
+  def createVoteRequest(
+      requester: String,
+      action: String,
+      reasonUrl: String,
+      reasonDescription: String,
+  ): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.CreateVoteRequest(requester, action, reasonUrl, reasonDescription)
+      )
+    }
+  }
+
+  @Help.Summary("List vote requests (via admin API)")
+  def listVoteRequests(): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.ListVoteRequests
+      )
+    }
+  }
+
+  @Help.Summary("Cast a vote (via admin API)")
+  def castVote(
+      voteRequestCid: VoteRequest.ContractId,
+      isAccepted: Boolean,
+      reasonUrl: String,
+      reasonDescription: String,
+  ): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.CastVote(voteRequestCid, isAccepted, reasonUrl, reasonDescription)
+      )
+    }
+  }
+
+  @Help.Summary("Update a vote (via admin API)")
+  def updateVote(
+      voteRequestCid: VoteRequest.ContractId,
+      isAccepted: Boolean,
+      reasonUrl: String,
+      reasonDescription: String,
+  ): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.UpdateVote(voteRequestCid, isAccepted, reasonUrl, reasonDescription)
+      )
+    }
+  }
+
+  @Help.Summary("List votes (via admin API)")
+  def listVotes(voteRequestCid: Vector[String]): Seq[Contract[Vote.ContractId, Vote]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.ListVotes(voteRequestCid)
       )
     }
   }

@@ -31,6 +31,7 @@ class LeaderBasedAutomationService(
   registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
   registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
+  registerTrigger(new ExecuteVoteRequestActionTrigger(triggerContext, svTaskContext))
   registerTrigger(new ArchiveDuplicateValidatorTrafficTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpiredCoinTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svTaskContext))
