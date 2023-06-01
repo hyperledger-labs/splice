@@ -47,7 +47,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
 
   import MultiDomainAcsStore.*
 
-  private val DefaultLimit: Long = 1000L
+  private val DefaultLimit: Limit = HardLimit(1000L)
 
   def lookupContractById[C, TCid <: ContractId[_], T](
       companion: C
@@ -133,13 +133,13 @@ trait MultiDomainAcsStore extends AutoCloseable {
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-      limit: Long = DefaultLimit,
+      limit: Limit = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ContractWithState[TCid, T]]]
 
   def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-      limit: Long = DefaultLimit,
+      limit: Limit = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]]
 
   /** Only contracts with state ContractState.Assigned(domain) are considered
@@ -152,7 +152,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
       companion: C,
       domain: DomainId,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-      limit: Long = DefaultLimit,
+      limit: Limit = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[Contract[TCid, T]]]
 
   private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
@@ -165,7 +165,9 @@ trait MultiDomainAcsStore extends AutoCloseable {
         listReadyContracts(
           companion = companion,
           filter = co => now.toInstant isAfter expiresAt(co.payload),
-          limit = limit.toLong,
+          limit = PageLimit( // this is called until the result size is 0, effectively paginating
+            limit.toLong
+          ),
         )
 
   /** Stream all ready contracts that can be acted upon.

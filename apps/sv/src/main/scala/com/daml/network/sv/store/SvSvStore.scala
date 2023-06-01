@@ -75,7 +75,7 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       tc: TraceContext
   ): Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(vo.ValidatorOnboarding.COMPANION, _, limit = 1000L)
+      multiDomainAcsStore.listContractsOnDomain(vo.ValidatorOnboarding.COMPANION, _)
     )
 
   def lookupApprovedSvIdentityByNameWithOffset(

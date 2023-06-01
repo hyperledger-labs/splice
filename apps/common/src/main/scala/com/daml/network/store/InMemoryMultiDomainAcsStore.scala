@@ -172,26 +172,26 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   private def listContracts[T](
       fromCreatedEvent: CreatedEvent => Option[T],
       filter: T => Boolean,
-      limit: Long,
+      limit: Limit,
   ): Future[Seq[(T, ContractState)]] = Future {
     val st = stateVar
-    st.createEvents.values
-      .collect(Function.unlift { ev =>
-        fromCreatedEvent(ev).map { parsedEv =>
-          val state = st
-            .getContractState(new ContractId(ev.getContractId))
-          (parsedEv, state)
-        }
-      })
-      .take(limit.intValue())
-      .filter { case (ev, _) => filter(ev) }
-      .toSeq
+    applyLimit(
+      limit,
+      st.createEvents.values
+        .collect(Function.unlift { ev =>
+          fromCreatedEvent(ev).map { parsedEv =>
+            val state = st
+              .getContractState(new ContractId(ev.getContractId))
+            (parsedEv, state)
+          }
+        }),
+    ).filter { case (ev, _) => filter(ev) }.toSeq
   }
 
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean,
-      limit: Long,
+      limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Seq[ContractWithState[TCid, T]]] = {
@@ -209,31 +209,25 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       companion: C,
       domainId: DomainId,
       filter: Contract[TCid, T] => Boolean,
-      limit: Long,
+      limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Seq[Contract[TCid, T]]] =
     listContracts(companion, filter, limit).map { contracts =>
-      applyLimit(
-        limit,
-        contracts.collect {
-          case ContractWithState(contract, ContractState.Assigned(domain)) if domain == domainId =>
-            contract
-        },
-      )
+      contracts.collect {
+        case ContractWithState(contract, ContractState.Assigned(domain)) if domain == domainId =>
+          contract
+      }
     }
 
   def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-      limit: Long,
+      limit: Limit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] =
     for {
       contracts <- listContracts(companion, filter, limit)(companionClass)
-    } yield applyLimit(
-      limit,
-      contracts.view.collect(Function.unlift(_.toReadyContract)).toSeq,
-    )
+    } yield contracts.view.collect(Function.unlift(_.toReadyContract)).toSeq
 
   private def lookupContractById[T](
       fromCreatedEvent: CreatedEvent => Option[T]
@@ -403,17 +397,22 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     }
   }
 
-  private def applyLimit[T](limit: Long, result: Seq[T]): Seq[T] = {
-    val resultSize = result.size
-    if (resultSize > limit) {
-      noTracingLogger.warn(
-        "Size of the result exceeded the limit. Result size: {}. Limit: {}",
-        resultSize.toLong,
-        limit,
-      )
-      applyLimit(limit, result)
-    } else {
-      result
+  private def applyLimit[T](limit: Limit, result: Iterable[T]): Iterable[T] = {
+    limit match {
+      case PageLimit(limit) =>
+        result.take(limit.intValue())
+      case HardLimit(limit) =>
+        val resultSize = result.size
+        if (resultSize > limit) {
+          noTracingLogger.warn(
+            "Size of the result exceeded the limit. Result size: {}. Limit: {}",
+            resultSize.toLong,
+            limit,
+          )
+          result.take(limit.intValue())
+        } else {
+          result
+        }
     }
   }
 

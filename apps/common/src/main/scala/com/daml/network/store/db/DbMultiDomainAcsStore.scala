@@ -6,7 +6,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.TransferEvent
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
-import com.daml.network.store.{MultiDomainAcsStore, TxLogStore}
+import com.daml.network.store.{Limit, MultiDomainAcsStore, TxLogStore}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.{LengthLimitedString, String255}
@@ -82,7 +82,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean,
-      limit: Long,
+      limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Seq[ContractWithState[TCid, T]]] = ???
@@ -90,7 +90,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean,
-      limit: Long,
+      limit: Limit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] =
     ???
 
@@ -98,7 +98,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       companion: C,
       domain: DomainId,
       filter: Contract[TCid, T] => Boolean,
-      limit: Long,
+      limit: Limit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[Contract[TCid, T]]] = ???
 
   override def streamReadyContracts[C, TCid <: ContractId[_], T](companion: C)(implicit

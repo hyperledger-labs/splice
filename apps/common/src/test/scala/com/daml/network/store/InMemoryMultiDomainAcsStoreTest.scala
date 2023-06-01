@@ -201,7 +201,10 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       case (c, Some(id)) => ContractWithState(c, ContractState.Assigned(id))
     }
     for {
-      actualList <- store.listContracts(AppRewardCoupon.COMPANION, limit = expected.size.toLong)
+      actualList <- store.listContracts(
+        AppRewardCoupon.COMPANION,
+        limit = HardLimit(expected.size.toLong),
+      )
       _ = actualList shouldBe expected_
       _ <- expected_.traverse_ { c =>
         store
@@ -325,6 +328,24 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         _ <- assertList()
         _ <- assertTestState()
       } yield succeed
+    }
+    "respect the limit and log a warning for HardLimit" in {
+      implicit val store = mkStore()
+      for {
+        _ <- d1.switchToUpdates()
+        _ <- d1.create(c(1))
+        _ <- d1.create(c(2))
+        resultHard <- loggerFactory.assertLogs(
+          store.listContracts(AppRewardCoupon.COMPANION, limit = HardLimit(1)),
+          _.warningMessage should include(
+            "Size of the result exceeded the limit. Result size: 2. Limit: 1"
+          ),
+        )
+        resultPage <- store.listContracts(AppRewardCoupon.COMPANION, limit = PageLimit(1))
+      } yield {
+        resultHard should have size 1
+        resultPage should have size 1
+      }
     }
     "single domain acs" in {
       implicit val store = mkStore()
@@ -726,7 +747,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         _ <- d1.switchToUpdates()
         _ <- d1.create(transferInProgress(1))
         _ <- d1.create(testDeliveryOffer(2))
-        cs <- store.listContracts(DeliveryOffer.INTERFACE, limit = 2)
+        cs <- store.listContracts(DeliveryOffer.INTERFACE, limit = HardLimit(2L))
       } yield {
         cs shouldBe Seq(
           ContractWithState(

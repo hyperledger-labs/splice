@@ -25,6 +25,7 @@ import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
+  PageLimit,
   TxLogStore,
 }
 import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
@@ -58,8 +59,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     TxLogStore.IndexRecord,
     TxLogStore.Entry[TxLogStore.IndexRecord],
   ]
-
-  private val DefaultLimit = 1000L
 
   def lookupSvcRulesWithOffset(
   )(implicit tc: TraceContext): Future[
@@ -143,7 +142,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       openMiningRounds <- multiDomainAcsStore.listContractsOnDomain(
         cc.round.OpenMiningRound.COMPANION,
         domain,
-        limit = DefaultLimit,
       )
       result = openMiningRounds.sortBy(contract => contract.payload.round.number) match {
         case Seq(oldest, middle, newest) =>
@@ -202,7 +200,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       confirmations <- multiDomainAcsStore.listContractsOnDomain(
         cn.svcrules.Confirmation.COMPANION,
         domain,
-        limit = DefaultLimit,
       )
     } yield confirmations.filter(_.payload.action.toValue == action.toValue)
   }
@@ -219,7 +216,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         _,
         (co: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
           co.payload.round.number == round,
-        limit,
+        limit = PageLimit(limit),
       )
     )
 
@@ -254,7 +251,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         _,
         (co: Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]) =>
           co.payload.round.number == round,
-        limit,
+        limit = PageLimit(limit),
       )
     )
 
@@ -285,7 +282,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       rounds <- multiDomainAcsStore.listContractsOnDomain(
         cc.round.ClosedMiningRound.COMPANION,
         domain,
-        limit = DefaultLimit,
       )
     } yield rounds.sortBy(_.payload.round.number).headOption
 
@@ -308,7 +304,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       closedRounds <- multiDomainAcsStore.listContractsOnDomain(
         cc.round.ClosedMiningRound.COMPANION,
         domain,
-        limit = DefaultLimit,
       )
       archivableClosedRounds <- closedRounds.traverse(round => {
         for {
@@ -440,7 +435,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
           svcRules.payload.members.asScala
             .get(co.payload.candidateParty)
             .exists(_.name == co.payload.candidateName),
-        limit = DefaultLimit,
       )
     } yield svOnboardings
 
@@ -463,7 +457,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
                   CNNodeUtil
                     .coinExpiresAt(coin(e.payload))
                     .number <= latest.payload.round.number - 2,
-                limit = DefaultLimit,
               )
           } yield allExpired.view.take(limit).map(ReadyContract(_, domainId)).toSeq
         }
@@ -480,7 +473,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         cc.coin.UnclaimedReward.COMPANION,
         domain,
         (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
-        limit,
+        limit = PageLimit(limit),
       )
     } yield svOnboardings
 
@@ -507,7 +500,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       votes <- multiDomainAcsStore.listContractsOnDomain(
         cn.svc.coinprice.CoinPriceVote.COMPANION,
         domain,
-        limit = DefaultLimit,
       )
     } yield votes
 
@@ -550,7 +542,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.listContractsOnDomain(
         vl.ValidatorLicense.COMPANION,
         _,
-        limit = DefaultLimit,
       )
     )
 
@@ -565,7 +556,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         domainId,
         (vt: SvSvcStore.ValidatorTrafficContract) =>
           vt.payload.validator == validator.toProtoPrimitive && vt.payload.domainId == domainId.toProtoPrimitive,
-        limit = DefaultLimit,
       )
       // sort the contracts by total purchased traffic, and ...
       .map(_.sortWith(_.payload.totalPurchased > _.payload.totalPurchased))
@@ -583,7 +573,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.listContractsOnDomain(
         cn.svc.coinprice.CoinPriceVote.COMPANION,
         _,
-        limit = DefaultLimit,
       )
     )
 
@@ -594,7 +583,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       multiDomainAcsStore.listContractsOnDomain(
         cn.svcrules.VoteRequest.COMPANION,
         _,
-        limit = DefaultLimit,
       )
     )
 
@@ -617,7 +605,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
         cn.svcrules.Vote.COMPANION,
         _,
         co => cidSet.contains(co.payload.requestCid),
-        limit = DefaultLimit,
       )
     )
   }
@@ -735,7 +722,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
               svcRules.payload.members.keySet
                 .contains(c.payload.requester) && c.payload.epoch == svcRules.payload.epoch
           },
-          limit = DefaultLimit,
         )
       )
       .map(

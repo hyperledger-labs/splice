@@ -142,14 +142,12 @@ class SummarizingMiningRoundTrigger(
   private def queryRewards(round: Long, domain: DomainId)(implicit
       ec: ExecutionContext
   ): Future[RoundRewards] = {
-    val limit: Long = 1000L
     for {
       appRewardCoupons <- store.multiDomainAcsStore.listContractsOnDomain(
         cc.coin.AppRewardCoupon.COMPANION,
         domain,
         (c: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
           c.payload.round.number == round,
-        limit = limit,
       )
       validatorRewardCoupons <- store.multiDomainAcsStore.listContractsOnDomain(
         cc.coin.ValidatorRewardCoupon.COMPANION,
@@ -158,7 +156,6 @@ class SummarizingMiningRoundTrigger(
           cc.coin.ValidatorRewardCoupon.ContractId,
           cc.coin.ValidatorRewardCoupon,
         ]) => c.payload.round.number == round,
-        limit = limit,
       )
     } yield {
       RoundRewards(

@@ -16,6 +16,7 @@ import com.daml.network.scan.admin.http.HttpScanHandler
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
+import com.daml.network.store.PageLimit
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -88,7 +89,7 @@ class ScanApp(
       _ <- retryProvider.retryForAutomation(
         "wait for open mining round",
         store.multiDomainAcsStore
-          .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = 1)
+          .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = PageLimit(1))
           .map { cs =>
             if (cs.isEmpty) {
               throw Status.FAILED_PRECONDITION
