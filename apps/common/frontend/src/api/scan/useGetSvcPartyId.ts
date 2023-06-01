@@ -6,7 +6,7 @@ const useGetSvcPartyId = (): UseQueryResult<string> => {
   const scanClient = useScanClient();
 
   return useQuery({
-    queryKey: ['getSvcPartyId'],
+    queryKey: ['scan-api', 'getSvcPartyId'],
     queryFn: async () => {
       const response = await scanClient.getSvcPartyId();
       return response.svcPartyId;

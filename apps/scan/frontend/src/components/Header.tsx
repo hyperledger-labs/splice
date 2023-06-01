@@ -1,7 +1,10 @@
-import { Refresh } from '@mui/icons-material';
-import { Button, Stack, Typography } from '@mui/material';
+import { useGetRoundOfLatestData } from 'common-frontend/scan-api';
+
+import { Stack, Typography } from '@mui/material';
 
 const Header: React.FC = () => {
+  const { data: latestRound } = useGetRoundOfLatestData();
+
   return (
     <Stack direction="row" justifyContent="space-between" alignItems="center">
       <Typography
@@ -13,10 +16,9 @@ const Header: React.FC = () => {
         Canton Coin Scan
       </Typography>
       <Stack direction="row" alignItems="center">
-        <Typography variant="body2">The content on this page is static.</Typography>
-        <Button color="secondary" variant="text" startIcon={<Refresh />}>
-          <Typography variant="body2">Refresh Page</Typography>
-        </Button>
+        <Typography variant="body2">
+          The content on this page is computed as of round: {latestRound?.round || '--'}.
+        </Typography>
       </Stack>
     </Stack>
   );

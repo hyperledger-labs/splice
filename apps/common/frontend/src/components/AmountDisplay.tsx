@@ -2,7 +2,7 @@ import * as React from 'react';
 import BigNumber from 'bignumber.js';
 
 type AmountDisplayProps = {
-  amount: BigNumber;
+  amount?: BigNumber;
   currency: Currency;
   convert?: Conversion;
   coinPrice?: number | BigNumber;
@@ -10,6 +10,11 @@ type AmountDisplayProps = {
 
 const AmountDisplay: React.FC<AmountDisplayProps> = props => {
   var { amount, currency } = props;
+
+  if (!amount) {
+    return <>--.-- {currency}</>;
+  }
+
   if (props.convert && props.coinPrice) {
     switch (true) {
       case currency === 'CC' && props.convert === 'CCtoUSD':

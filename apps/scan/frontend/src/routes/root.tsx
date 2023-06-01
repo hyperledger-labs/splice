@@ -44,7 +44,7 @@ const Root: React.FC = () => {
       </Grid>
 
       <Grid item xs={12} lg={6}>
-        <Box mb={4}>
+        <Box mb={0}>
           <Tabs value={selected}>
             {navLinks.map(navLink => {
               return (

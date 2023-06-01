@@ -1,0 +1,19 @@
+import { UseQueryResult, useQuery } from '@tanstack/react-query';
+import { GetTopProvidersByAppRewardsResponse } from 'scan-openapi';
+
+import { useScanClient } from './ScanClientContext';
+import useGetRoundOfLatestData from './useGetRoundOfLatestData';
+
+const useTopAppProviders = (): UseQueryResult<GetTopProvidersByAppRewardsResponse> => {
+  const scanClient = useScanClient();
+  const latestRoundQuery = useGetRoundOfLatestData();
+  const latestRoundNumber = latestRoundQuery.data?.round;
+
+  return useQuery({
+    queryKey: ['scan-api', 'getTopProvidersByAppRewards', latestRoundNumber],
+    queryFn: async () => scanClient.getTopProvidersByAppRewards(+latestRoundNumber!, 10),
+    enabled: latestRoundNumber !== undefined, // include round 0 as valid
+  });
+};
+
+export default useTopAppProviders;

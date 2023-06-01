@@ -10,7 +10,7 @@ const useCoinPrice = (): UseQueryResult<BigNumber> => {
   const scanClient = useScanClient();
 
   return useQuery({
-    queryKey: ['coinPrice'],
+    queryKey: ['scan-api', 'coinPrice'],
     queryFn: async () => {
       const request: GetOpenAndIssuingMiningRoundsRequest = {
         cachedOpenMiningRoundContractIds: [],

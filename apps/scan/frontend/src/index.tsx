@@ -1,4 +1,7 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { theme } from 'common-frontend';
+import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {
@@ -16,6 +19,25 @@ import DomainFeesLeaderboard from './routes/domainFeesLeaderboard';
 import RecentActivity from './routes/recentActivity';
 import Root from './routes/root';
 import ValidatorLeaderboard from './routes/validatorLeaderboard';
+import { config } from './utils';
+
+const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        // rounds update every 2.5 minutes, but polling every minute seems like a nice sweet spot
+        refetchInterval: 60 * 1000,
+      },
+    },
+  });
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ReactQueryDevtools initialIsOpen={false} />
+      <ScanClientProvider url={config.services.scan.url}>{children}</ScanClientProvider>
+    </QueryClientProvider>
+  );
+};
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -35,7 +57,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <RouterProvider router={router} />
+      <Providers>
+        <RouterProvider router={router} />
+      </Providers>
     </ThemeProvider>
   </React.StrictMode>
 );

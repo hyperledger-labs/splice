@@ -8,7 +8,7 @@ const useGetCoinRules = (): UseQueryResult<Contract<CoinRules>> => {
   const scanClient = useScanClient();
 
   return useQuery({
-    queryKey: ['getCoinRules', CoinRules],
+    queryKey: ['scan-api', 'getCoinRules', CoinRules],
     queryFn: async () => {
       const response = await scanClient.getCoinRules({});
       if (!response.coinRulesUpdate.contract) {

@@ -10,7 +10,7 @@ const useLookupFeaturedAppRight = (
   const scanClient = useScanClient();
 
   return useQuery({
-    queryKey: ['lookupFeaturedAppRight', primaryPartyId, FeaturedAppRight],
+    queryKey: ['scan-api', 'lookupFeaturedAppRight', primaryPartyId, FeaturedAppRight],
     queryFn: async () => {
       const response = await scanClient.lookupFeaturedAppRight(primaryPartyId!);
 
