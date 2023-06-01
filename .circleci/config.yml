@@ -640,6 +640,10 @@ commands:
       extra_post_sbt_cmd:
         type: string
         default: ""
+      cmd_retry_count:
+        description: Number of times to retry the command
+        type: integer
+        default: 0
     steps:
       - execute_sbt_command:
           # run all tests except the live cluster ones
@@ -653,6 +657,7 @@ commands:
           # but failing CI because of slow tests is also not very nice
           timeout: "20m"
           no_output_timeout: "20m"
+          cmd_retry_count: << parameters.cmd_retry_count >>
 
   setup_vpn:
     steps:
@@ -1016,6 +1021,10 @@ jobs:
         type: integer
       resource_class:
         type: string
+      cmd_retry_count:
+        description: Number of times to retry the command
+        type: integer
+        default: 0
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -1043,6 +1052,7 @@ jobs:
           start_canton_options: << parameters.start_canton_options >>
           extra_pre_sbt_cmd: << parameters.extra_pre_sbt_cmd >>
           extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
+          cmd_retry_count: << parameters.cmd_retry_count >>
       - cleanup_sbt_test_job
       - collect_failing_test_data_and_send_to_datadog
       - collect_test_timings_and_send_to_datadog
@@ -1728,6 +1738,8 @@ workflows:
         start_canton_options: "-d -p external -x -w"
         resource_class: "2xlarge"
         parallelism: 3
+        # TODO(#5242) Remove retries once we bump to a Canton release with the fix
+        cmd_retry_count: 2
     - scala_test:
         <<: *notify-fail
         context:
