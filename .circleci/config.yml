@@ -1750,6 +1750,18 @@ workflows:
           - artifactory
           - datadog
           - slack-context
+    - docker_images_push:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - publish_public_release:
+        context:
+          - artifactory
+          - datadog
+        requires:
+          - docker_images_push
 
   deploy_scratchnet_A:
     when:
