@@ -309,7 +309,7 @@ lazy val `apps-common` =
       buildInfoKeys := Seq[BuildInfoKey](
         BuildInfoKey(
           "compiledVersion",
-          BuildUtil.runCommandOptionalLog(Seq("./build-tools/version-gen")),
+          BuildUtil.runCommandOptionalLog(Seq("./build-tools/get-snapshot-version")),
         ),
         BuildInfoKey(
           "commitUnixTimestamp",

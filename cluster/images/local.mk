@@ -83,11 +83,11 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 
 %/$(docker-local-image-tag): force-update-version
 	mkdir -p $(@D)
-	overwrite-if-changed $$(basename $$(dirname $(@D))):$(shell version-gen) $@
+	overwrite-if-changed $$(basename $$(dirname $(@D))):$(shell get-snapshot-version) $@
 
 %/$(docker-image-tag): force-update-version
 	mkdir -p $(@D)
-	image-tag-gen $$(basename $$(dirname $(@D))) > $@
+	get-docker-image-name $$(basename $$(dirname $(@D))) > $@
 
 %/$(docker-build): %/$(docker-local-image-tag) %/Dockerfile
 	mkdir -pv $(@D)
@@ -98,4 +98,4 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 	cd $(@D)/.. && docker-push $$(cat $(abspath $<)) $(docker_opt)
 
 %/$(docker-promote):  %/$(docker-image-tag)
-	cd $(@D)/.. && docker-promote $$(cat $(abspath $<)) $(shell image-tag-gen $$(basename $$(dirname $(@D))) --artifactory)
+	cd $(@D)/.. && docker-promote $$(cat $(abspath $<)) $(shell get-docker-image-name $$(basename $$(dirname $(@D))) --artifactory)

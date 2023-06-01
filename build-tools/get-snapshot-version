@@ -7,4 +7,28 @@ commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
 number_of_commits=$(git rev-list --count "$sha")
 commit_sha_8=$(git log -n1 --format=%h --abbrev=8 "$sha")
 
-echo "$prefix-snapshot.$commit_date.$number_of_commits.0.v$commit_sha_8"
+if [ -n "${CNCLUSTER_STATIC_DIRTY_VERSION}" ]; then
+    if [ -n "${CI}" ]; then
+        >&2 echo "CNCLUSTER_STATIC_DIRTY_VERSION and CI must not be set together"
+        exit 1
+    fi
+    echo "$prefix${USER}-dirty"
+    exit 0
+fi
+
+if [ -z "${CI}" ]; then
+    user_suffix="-${USER}"
+fi
+
+if [[ $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
+    if [ -z "${CI}" ]; then
+        dirty_suffix="-dirty"
+    else
+        >&2 echo "Repo was dirty on CI"
+        git status
+        git --no-pager diff --cached
+        exit 1
+    fi
+fi
+
+echo "$prefix$user_suffix-snapshot.$commit_date.$number_of_commits.0.v$commit_sha_8$dirty_suffix"

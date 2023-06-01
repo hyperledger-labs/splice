@@ -1,8 +1,6 @@
 #! /usr/bin/env bash
 
-IMAGE_TAG=$(version-gen)
+SNAPSHOT_VERSION=$(get-snapshot-version)
 
-VERSION_NUMBER=$(get-snapshot-version)
-
-sed --expression="s/IMAGE_TAG/${IMAGE_TAG}/g" | \
-    sed --expression="s/VERSION_NUMBER/${VERSION_NUMBER}/g"
+sed --expression="s/IMAGE_TAG/${SNAPSHOT_VERSION}/g" | \
+    sed --expression="s/VERSION_NUMBER/${SNAPSHOT_VERSION}/g"
