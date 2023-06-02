@@ -3,7 +3,6 @@ package com.daml.network.sv.admin.api.client.commands
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
-import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
@@ -222,13 +221,11 @@ object HttpSvAppClient {
   )
 
   case class OnboardSvPartyMigrationAuthorizeResponse(
-      acsSnapshot: ByteString,
-      sequencerSnapshot: Option[SequencerSnapshot],
+      acsSnapshot: ByteString
   )
 
   case class OnboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
-      sequencerId: Option[SequencerId],
       candidate: PartyId,
   ) extends BaseCommand[
         http.OnboardSvPartyMigrationAuthorizeResponse,
@@ -245,7 +242,6 @@ object HttpSvAppClient {
       client.onboardSvPartyMigrationAuthorize(
         body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
           participantId.toProtoPrimitive,
-          sequencerId.map(Codec.encode(_)),
           candidate.toProtoPrimitive,
         ),
         headers = headers,
@@ -256,30 +252,50 @@ object HttpSvAppClient {
     ) = {
       case http.OnboardSvPartyMigrationAuthorizeResponse.OK(
             definitions.OnboardSvPartyMigrationAuthorizeResponse(
-              encodedAcsSnapshot,
-              sequencerSnapshot,
+              encodedAcsSnapshot
             )
           ) =>
-        for {
-          sequencerSnapshot <- sequencerSnapshot
-            .traverse { snapshot =>
-              for {
-                topologySnapshot <- StoredTopologyTransactionsX
-                  .fromProtoV0(
-                    v0.TopologyTransactions.parseFrom(
-                      Base64.getDecoder().decode(snapshot.topologySnapshot)
-                    )
-                  )
-                sequencerSnapshot <- CantonSequencerSnapshot
-                  .fromByteArray(Base64.getDecoder().decode(snapshot.sequencerSnapshot))
-              } yield SequencerSnapshot(topologySnapshot, sequencerSnapshot)
-            }
-            .left
-            .map(_.message)
-        } yield OnboardSvPartyMigrationAuthorizeResponse(
-          ByteString.copyFrom(Base64.getDecoder.decode(encodedAcsSnapshot)),
-          sequencerSnapshot,
+        Right(
+          OnboardSvPartyMigrationAuthorizeResponse(
+            ByteString.copyFrom(Base64.getDecoder.decode(encodedAcsSnapshot))
+          )
         )
+    }
+  }
+
+  case class OnboardSvSequencer(
+      sequencerId: SequencerId
+  ) extends BaseCommand[
+        http.OnboardSvSequencerResponse,
+        SequencerSnapshot,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.OnboardSvSequencerResponse] =
+      client.onboardSvSequencer(
+        body = definitions.OnboardSvSequencerRequest(
+          Codec.encode(sequencerId)
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.OnboardSvSequencerResponse.OK(definitions.OnboardSvSequencerResponse(snapshot)) =>
+        (for {
+          topologySnapshot <- StoredTopologyTransactionsX
+            .fromProtoV0(
+              v0.TopologyTransactions.parseFrom(
+                Base64.getDecoder().decode(snapshot.topologySnapshot)
+              )
+            )
+          sequencerSnapshot <- CantonSequencerSnapshot
+            .fromByteArray(Base64.getDecoder().decode(snapshot.sequencerSnapshot))
+        } yield SequencerSnapshot(topologySnapshot, sequencerSnapshot)).left.map(_.message)
     }
   }
 

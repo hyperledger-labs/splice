@@ -2,25 +2,17 @@ package com.daml.network.sv
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import cats.syntax.foldable.*
-import cats.syntax.traverse.*
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListPartyToParticipantResult as ListPartyToParticipantResultX
 }
-import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.store.TimeQueryX
 import com.digitalasset.canton.topology.transaction.{
   ParticipantPermission,
@@ -28,7 +20,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyChangeOpX,
 }
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -40,9 +32,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SvcPartyHosting(
     onboardingConfig: SvOnboardingConfig,
     participantAdminConnection: ParticipantAdminConnection,
-    localDomainNode: Option[LocalDomainNode],
     svcParty: PartyId,
-    globalDomain: DomainAlias,
     useXNodes: Boolean,
     coinAppParameters: SharedCNNodeAppParameters,
     retryProvider: RetryProvider,
@@ -99,36 +89,12 @@ class SvcPartyHosting(
                 RequestSide.To,
               ).map(_ => ())
             }
-          _ = logger.info("Adding sequencer identity transactions")
-          sequencerId <- localDomainNode.map(_.sequencerAdminConnection).traverse { connection =>
-            for {
-              sequencerId <- connection.getSequencerId
-              identity <- connection.getSequencerIdentityTransactions(sequencerId)
-              _ <- participantAdminConnection.addTopologyTransactions(identity)
-              _ <- retryProvider.retryForAutomation(
-                "Wait to observe sequencer identity transactions",
-                participantAdminConnection
-                  .getIdentityTransactions(domainId, sequencerId.uid)
-                  .map { txs =>
-                    if (txs.length != identity.length) {
-                      throw Status.FAILED_PRECONDITION
-                        .withDescription(
-                          s"Expected ${identity.length} identity transactions for sequencer ${sequencerId} but got ${txs.length}"
-                        )
-                        .asRuntimeException()
-                    }
-                  },
-                logger,
-              )
-            } yield sequencerId
-          }
           _ = logger.info("Disconnecting from all domains")
           _ <- participantAdminConnection.disconnectFromAllDomains()
           _ = logger.info("candidate SV participant disconnected from global domain")
           response <- getAuthorizationAndAcsFromSponsor(
             sponsorSvConfig,
             participantId,
-            sequencerId,
             svParty,
           )
           _ <- participantAdminConnection.uploadAcsSnapshot(response.acsSnapshot)
@@ -139,49 +105,11 @@ class SvcPartyHosting(
           _ = logger.info("candidate SV participant reconnected to global domain")
           _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
           _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
-          xNodeParams = for {
-            localDomainNode <- localDomainNode
-            snapshot <- response.sequencerSnapshot
-          } yield (localDomainNode, snapshot)
-          _ <- xNodeParams.traverse_ { case (localDomainNode, snapshot) =>
-            logger.info(s"Bootstrapping sequencer from snapshot")
-            for {
-              _ <- localDomainNode.sequencerAdminConnection
-                .assignFromSnapshot(
-                  snapshot.topologySnapshot,
-                  localDomainNode.staticDomainParameters,
-                  snapshot.sequencerSnapshot,
-                )
-              _ = logger.info("Sequencer bootstrapping complete")
-              _ = logger.info("Changing participant connection to point to new sequencer")
-              _ <- participantAdminConnection.modifyDomainConnectionConfig(
-                globalDomain,
-                setSequencerEndpoint(localDomainNode.sequencerPublicConfig),
-              )
-            } yield ()
-          }
         } yield Right(())
       case None =>
         Future.successful(Left("unexpected on-boarding config"))
     }
   }
-
-  // TODO(#5107) Consider using something other than a ClientConfig in the config file
-  // to simplify conversion to GrpcSequencerConnection.
-  private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
-    NonEmpty.mk(Seq, Endpoint(config.address, config.port))
-
-  private def setSequencerEndpoint(
-      endpoint: ClientConfig
-  ): DomainConnectionConfig => DomainConnectionConfig = conf =>
-    conf.copy(
-      sequencerConnection = conf.sequencerConnection match {
-        case con: GrpcSequencerConnection =>
-          con.copy(endpoints = toEndpoints(endpoint))
-        case con =>
-          throw new IllegalArgumentException(s"Expected GrpcSequencerConnection but got $con")
-      }
-    )
 
   private def getSponsorSvConfig(
       onboardingConfig: SvOnboardingConfig
@@ -195,7 +123,6 @@ class SvcPartyHosting(
   private def getAuthorizationAndAcsFromSponsor(
       sponsorSvConfig: SvAppClientConfig,
       candidateParticipantId: ParticipantId,
-      candidateSequencerId: Option[SequencerId],
       svParty: PartyId,
   )(implicit
       traceContext: TraceContext
@@ -214,7 +141,6 @@ class SvcPartyHosting(
         svConnection
           .authorizeSvcPartyHosting(
             candidateParticipantId,
-            candidateSequencerId,
             svParty,
           )
           .andThen(_ => svConnection.close())

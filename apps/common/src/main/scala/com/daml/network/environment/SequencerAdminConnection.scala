@@ -145,7 +145,7 @@ class SequencerAdminConnection(
       EnterpriseSequencerAdminCommands.Snapshot(ts)
     )
 
-  def assignFromSnapshot(
+  def initialize(
       topologySnapshot: GenericStoredTopologyTransactionsX,
       domainParameters: StaticDomainParameters,
       sequencerSnapshot: SequencerSnapshot,

@@ -2,7 +2,6 @@ package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
 import cats.syntax.foldable.*
-import cats.syntax.traverse.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
@@ -241,7 +240,6 @@ class HttpSvHandler(
       (for {
         participantId <- Codec.decode(Codec.Participant)(body.participantId)
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
-        sequencerId <- body.sequencerId.traverse(Codec.decode(Codec.Sequencer))
       } yield {
         for {
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
@@ -268,8 +266,7 @@ class HttpSvHandler(
               )
             else
               authorizeParticipantForHostingSvcParty(
-                participantId,
-                sequencerId,
+                participantId
               )
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
@@ -291,6 +288,29 @@ class HttpSvHandler(
       }).fold(
         errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
         _.map(_ => v0.SvResource.OnboardSvMediatorResponseOK),
+      )
+    }
+
+  def onboardSvSequencer(
+      respond: v0.SvResource.OnboardSvSequencerResponse.type
+  )(
+      body: definitions.OnboardSvSequencerRequest
+  )(fake: Unit): Future[v0.SvResource.OnboardSvSequencerResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      (for {
+        sequencerId <- Codec.decode(Codec.Sequencer)(body.sequencerId)
+        sequencerConnection <- localDomainNode
+          .map(_.sequencerAdminConnection)
+          .toRight("Onboarding sequencer configured to use X nodes but sponsoring SV is not")
+      } yield {
+        onboardSequencer(sequencerConnection, sequencerId)
+      }).fold(
+        errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
+        _.map(snapshot =>
+          v0.SvResource.OnboardSvSequencerResponseOK(
+            definitions.OnboardSvSequencerResponse(snapshot)
+          )
+        ),
       )
     }
 
@@ -321,8 +341,7 @@ class HttpSvHandler(
   }
 
   private def authorizeParticipantForHostingSvcParty(
-      participantId: ParticipantId,
-      sequencerId: Option[SequencerId],
+      participantId: ParticipantId
   )(implicit tc: TraceContext) = {
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
     for {
@@ -354,23 +373,9 @@ class HttpSvHandler(
       )
       // TODO(M3-57) consider if a more space-efficient encoding is necessary
       encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
-
-      // TODO(#5095) Reconsider if this should be part of this onboarding flow
-      // or a separate step.
-      sequencerSnapshot <- sequencerId.traverse { sequencerId =>
-        val sequencerConnection = localDomainNode
-          .map(_.sequencerAdminConnection)
-          .getOrElse(
-            throw new IllegalStateException(
-              s"Onboarding sequencer configured to use X nodes but sponsoring SV is not"
-            )
-          )
-        onboardSequencer(sequencerConnection, sequencerId)
-      }
     } yield v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
       definitions.OnboardSvPartyMigrationAuthorizeResponse(
-        encoded,
-        sequencerSnapshot,
+        encoded
       )
     )
   }
@@ -379,7 +384,7 @@ class HttpSvHandler(
   private def onboardSequencer(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext) = {
+  )(implicit traceContext: TraceContext): Future[definitions.SequencerSnapshot] = {
     logger.info("Querying sequencer domain state")
     for {
       sequencerState <- participantAdminConnection.latestSequencerDomainStateX(globalDomain)

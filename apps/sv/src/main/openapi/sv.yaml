@@ -379,6 +379,26 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "401":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
+  /onboard/sv/sequencer:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "onboardSvSequencer"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvSequencerRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardSvSequencerResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
   /onboard/sv/mediator:
     post:
       tags: [sv]
@@ -697,8 +717,6 @@ components:
       properties:
         participant_id:
           type: string
-        sequencer_id:
-          type: string
         candidate_party_id:
           type: string
 
@@ -709,6 +727,20 @@ components:
       properties:
         acs_snapshot:
           type: string
+
+    OnboardSvSequencerRequest:
+      type: object
+      required:
+        - sequencer_id
+      properties:
+        sequencer_id:
+          type: string
+
+    OnboardSvSequencerResponse:
+      type: object
+      required:
+        - sequencer_snapshot
+      properties:
         sequencer_snapshot:
           "$ref": "#/components/schemas/SequencerSnapshot"
 

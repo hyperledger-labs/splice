@@ -174,7 +174,6 @@ class SvApp(
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
         participantAdminConnection,
-        localDomainNode,
       )
       cometBftClient = newCometBftClient
       (svcStore, svcAutomation, svcRulesLock) <- ensureOnboarded(
@@ -399,21 +398,28 @@ class SvApp(
         }
       _ <- waitForSvcMembership(svcStore)
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
-      _ <- onboardMediatorIfRequired(
-        globalDomain,
-        participantAdminConnection,
-        localDomainNode,
-        svcRulesLock,
-      )
+      _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
+        for {
+          _ <- localDomainNode.onboardLocalSequencer(
+            config.domains.global.alias,
+            globalDomain,
+            participantAdminConnection,
+            svConnection,
+          )
+          _ <- localDomainNode.onboardLocalMediator(
+            globalDomain,
+            participantAdminConnection,
+            svConnection,
+            svcRulesLock,
+          )
+        } yield ()
+      }
     } yield (svcStore, svcAutomation, svcRulesLock)
   }
 
-  private def onboardMediatorIfRequired(
-      domainId: DomainId,
-      participantAdminConnection: ParticipantAdminConnection,
-      localDomainNodeO: Option[LocalDomainNode],
-      svcRulesLock: SvcRulesLock,
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  private def withLocalDomainNode[A](
+      localDomainNodeO: Option[LocalDomainNode]
+  )(f: (LocalDomainNode, SvConnection) => Future[A]): Future[Unit] =
     (for {
       localDomainNode <- localDomainNodeO
       svConfig <- config.onboarding match {
@@ -427,9 +433,7 @@ class SvApp(
         coinAppParameters.processingTimeouts,
         loggerFactory,
       ).flatMap { svConnection =>
-        localDomainNode
-          .onboardLocalMediator(domainId, participantAdminConnection, svConnection, svcRulesLock)
-          .andThen(_ => svConnection.close())
+        f(localDomainNode, svConnection).andThen(_ => svConnection.close())
       }
     }
 
@@ -610,13 +614,10 @@ class SvApp(
   private def newSvcPartyHosting(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
-      localDomainNode: Option[LocalDomainNode],
   ) = new SvcPartyHosting(
     config.onboarding,
     participantAdminConnection,
-    localDomainNode,
     storeKey.svcParty,
-    config.domains.global.alias,
     config.xNodes.isDefined,
     coinAppParameters,
     retryProvider,

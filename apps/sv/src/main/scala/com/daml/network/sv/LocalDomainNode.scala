@@ -6,11 +6,12 @@ import com.daml.network.environment.*
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.SequencerAlias
+import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.DomainId
@@ -100,8 +101,54 @@ final class LocalDomainNode(
     } yield ()
   }
 
+  /** Onboard the sequencer operated by this SV to the domain.
+    */
+  def onboardLocalSequencer(
+      domainAlias: DomainAlias,
+      domainId: DomainId,
+      participantAdminConnection: ParticipantAdminConnection,
+      svConnection: SvConnection,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.info("Adding sequencer identity transactions")
+    for {
+      sequencerId <- sequencerAdminConnection.getSequencerId
+      identity <- sequencerAdminConnection.getSequencerIdentityTransactions(sequencerId)
+      _ <- participantAdminConnection.addTopologyTransactions(identity)
+      _ <- retryProvider.retryForAutomation(
+        "Wait to observe sequencer identity transactions",
+        participantAdminConnection.getIdentityTransactions(domainId, sequencerId.uid).map { txs =>
+          if (txs.length != identity.length) {
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Expected ${identity.length} identity transactions for sequencer ${sequencerId} but got ${txs.length}"
+              )
+              .asRuntimeException()
+          }
+        },
+        logger,
+      )
+      _ = logger.info(s"Onboarding sequencer $sequencerId through sponsoring SV")
+      snapshot <- svConnection.onboardSvSequencer(sequencerId)
+      _ = logger.info(s"Onboarded sequencer $sequencerId")
+      _ = logger.info(s"Initializing sequencer $sequencerId")
+      _ <- sequencerAdminConnection.initialize(
+        snapshot.topologySnapshot,
+        staticDomainParameters,
+        snapshot.sequencerSnapshot,
+      )
+      _ = logger.info(
+        "Sequencer initialized, changing participant connection to point to new sequencer"
+      )
+      _ <- participantAdminConnection.modifyDomainConnectionConfig(
+        domainAlias,
+        LocalDomainNode.setSequencerEndpoint(sequencerPublicConfig),
+      )
+      _ = logger.info("Participant is now connected to new sequencer")
+    } yield ()
+  }
+
   override protected def onClosed() = {
-    Lifecycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
+    Lifecycle.close(sequencerAdminConnection, sequencerAdminConnection)(logger)
     super.onClosed()
   }
 }
@@ -109,6 +156,18 @@ final class LocalDomainNode(
 object LocalDomainNode {
   // TODO(#5107) Consider using something other than a ClientConfig in the config file
   // to simplify conversion to GrpcSequencerConnection.
-  def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
+  private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
     NonEmpty.mk(Seq, Endpoint(config.address, config.port))
+
+  private def setSequencerEndpoint(
+      endpoint: ClientConfig
+  ): DomainConnectionConfig => DomainConnectionConfig = conf =>
+    conf.copy(
+      sequencerConnection = conf.sequencerConnection match {
+        case con: GrpcSequencerConnection =>
+          con.copy(endpoints = toEndpoints(endpoint))
+        case con =>
+          throw new IllegalArgumentException(s"Expected GrpcSequencerConnection but got $con")
+      }
+    )
 }
