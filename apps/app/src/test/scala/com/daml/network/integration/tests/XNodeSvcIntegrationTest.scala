@@ -11,12 +11,12 @@ import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-class SvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class XNodeSvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1

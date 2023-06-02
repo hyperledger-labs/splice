@@ -17,12 +17,12 @@ import org.slf4j.event.Level
 
 import scala.concurrent.Future
 
-class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class XNodeWalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         // we want fine-grained control when we send a CoinOperation from the wallet & query the scan app
         CNNodeConfigTransforms.updateAllAutomationConfigs(

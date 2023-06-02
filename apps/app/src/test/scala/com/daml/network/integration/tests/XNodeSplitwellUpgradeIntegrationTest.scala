@@ -22,7 +22,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.slf4j.event.Level
 import scala.util.Try
 
-class SplitwellUpgradeIntegrationTest
+class XNodeSplitwellUpgradeIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with MultiDomainTestUtil
     with SplitwellTestUtil
@@ -33,7 +33,7 @@ class SplitwellUpgradeIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
         aliceValidator.participantClient.upload_dar_unless_exists(darPath)

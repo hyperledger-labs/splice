@@ -25,14 +25,14 @@ import org.slf4j.event.Level
 import scala.concurrent.Future
 import scala.util.Try
 
-class WalletIntegrationTest
+class XNodeWalletIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil {
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         config.copy(akkaConfig =
           Some(

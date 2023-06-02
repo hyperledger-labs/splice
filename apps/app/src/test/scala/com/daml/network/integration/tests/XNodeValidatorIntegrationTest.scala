@@ -25,12 +25,12 @@ import org.slf4j.event.Level
 import scala.concurrent.Future
 import scala.util.Try
 
-class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class XNodeValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withManualStart
 
   "start and restart cleanly" in { implicit env =>

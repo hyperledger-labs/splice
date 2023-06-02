@@ -16,14 +16,14 @@ import monocle.macros.syntax.lens.*
 
 import scala.concurrent.duration.*
 
-class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
+class XNodeSvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   registerPlugin(new CometBftNetworkPlugin(NamedLoggerFactory.root))
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppConfigs_ { config =>
           config

@@ -10,12 +10,12 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
+class XNodeSvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withManualStart
 

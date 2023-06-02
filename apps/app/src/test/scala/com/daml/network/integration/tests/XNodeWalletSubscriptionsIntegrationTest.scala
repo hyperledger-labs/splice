@@ -1,17 +1,28 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionRequest
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTestWithSharedEnvironment,
+  CNNodeTestConsoleEnvironment,
+}
 import com.daml.network.util.{DisclosedContracts, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
-class WalletSubscriptionsIntegrationTest
+class XNodeWalletSubscriptionsIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil {
+
+  override def environmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
 
   "A wallet" should {
     "fail to get a non-existent subscription request" in { implicit env =>

@@ -15,11 +15,14 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.jdk.CollectionConverters.*
 
 // TODO(tech-debt): Add tests that cover all possible CoinEvents
-class ScanIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with CNNodeTestCommon {
+class XNodeScanIntegrationTest
+    extends CNNodeIntegrationTest
+    with WalletTestUtil
+    with CNNodeTestCommon {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
