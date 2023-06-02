@@ -408,7 +408,7 @@ class SvApp(
       localDomainNode <- localDomainNodeO
       svConfig <- config.onboarding match {
         case conf: SvOnboardingConfig.JoinWithKey => Some(conf.svClient.adminApi)
-        case _: SvOnboardingConfig.FoundCollective | _: SvOnboardingConfig.JoinViaSvcApp => None
+        case _: SvOnboardingConfig.FoundCollective => None
       }
     } yield (localDomainNode, svConfig)).traverse_ { case (localDomainNode, svConfig) =>
       SvConnection(
