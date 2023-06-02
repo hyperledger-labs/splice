@@ -37,6 +37,7 @@ import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
+import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 
@@ -306,7 +307,12 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       .newBuilder()
     hint.foreach(requestBuilder.setPartyIdHint(_))
     displayName.foreach(requestBuilder.setDisplayName(_))
-    wrapFuture(partyManagementServiceStub.allocateParty(requestBuilder.build, _))
+    wrapFuture(
+      partyManagementServiceStub
+        // TODO(#5300) remove deadline after we don't want to retry this anymore
+        .withDeadlineAfter(10, TimeUnit.SECONDS)
+        .allocateParty(requestBuilder.build, _)
+    )
       .map(_.getPartyDetails.getParty)
   }
 

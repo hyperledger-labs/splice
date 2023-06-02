@@ -473,12 +473,22 @@ class CNLedgerConnection(
   ): Future[PartyId] =
     client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive)
 
-  def createPartyAndUser(
+  private def createPartyAndUser(
       user: String,
       userRights: Seq[User.Right],
-  ): Future[PartyId] = {
+  )(implicit traceContext: TraceContext): Future[PartyId] = {
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    var suffix: Option[Int] = None
     for {
-      party <- allocatePartyViaLedgerApi(Some(sanitizeUserIdToPartyString(user)), Some(user))
+      party <- retryProvider.retryForClientCalls(
+        // TODO(#5300) consider removing these retries once Canton X party allocation is more stable
+        "Allocate party via Ledger API",
+        allocatePartyViaLedgerApi(
+          Some(sanitizeUserIdToPartyString(user) + suffix.fold("")(i => s"_$i")),
+          Some(user),
+        ).andThen(_ => { suffix = Some(suffix.getOrElse(0) + 1) }),
+        logger,
+      )
       partyId <- createUserWithPrimaryParty(user, party, userRights)
     } yield partyId
   }
@@ -505,7 +515,7 @@ class CNLedgerConnection(
   def getOrAllocateParty(
       username: String,
       userRights: Seq[User.Right] = Seq.empty,
-  ): Future[PartyId] = {
+  )(implicit traceContext: TraceContext): Future[PartyId] = {
     for {
       existingPartyId <- getOptionalPrimaryParty(username).recover {
         case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
