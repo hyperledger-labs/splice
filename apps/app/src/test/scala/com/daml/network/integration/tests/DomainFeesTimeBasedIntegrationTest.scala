@@ -298,14 +298,13 @@ class DomainFeesTimeBasedIntegrationTest
         )
 
         // Check that Scan correctly reports validator traffic purchases
-        actAndCheck(
-          "Advance rounds to make all traffic purchases visible in Scan",
-          (1 to 4).foreach(_ => advanceRoundsByOneTick),
-        )(
-          "Scan reports validator traffic purchases correctly",
-          _ => {
+        clue("Scan reports validator traffic purchases correctly")(
+          eventually() {
+            advanceTime(tickDurationWithBuffer)
+            val roundOfLatestData = scan.getRoundOfLatestData()._1
+            roundOfLatestData should be >= 3L
             val validatorsByPurchasedTraffic = scan.getTopValidatorsByPurchasedTraffic(
-              scan.getRoundOfLatestData()._1,
+              roundOfLatestData,
               10,
             )
             // Only Alice's validator and the SV1 validator will purchase extra traffic
@@ -327,7 +326,7 @@ class DomainFeesTimeBasedIntegrationTest
                 },
               ),
             )
-          },
+          }
         )
       }
     }
