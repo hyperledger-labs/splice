@@ -214,6 +214,8 @@ class SvApp(
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
+      svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
+
       handler = new HttpSvHandler(
         globalDomain,
         config.ledgerApiUser,
@@ -222,6 +224,7 @@ class SvApp(
         isDevNet,
         clock,
         participantAdminConnection,
+        svcRulesLock,
         localDomainNode,
         retryProvider,
         svcPartyHosting,

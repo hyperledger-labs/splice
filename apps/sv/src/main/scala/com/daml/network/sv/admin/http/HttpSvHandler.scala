@@ -18,7 +18,7 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.{LocalDomainNode, SvApp, SvcPartyHosting}
+import com.daml.network.sv.{LocalDomainNode, SvApp, SvcPartyHosting, SvcRulesLock}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -45,6 +45,7 @@ class HttpSvHandler(
     isDevNet: Boolean,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
+    svcRulesLock: SvcRulesLock,
     localDomainNode: Option[LocalDomainNode],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
@@ -327,11 +328,7 @@ class HttpSvHandler(
     for {
       // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-      _ <- retryProvider.retryForClientCalls(
-        "locking SvcRules and CoinRules contracts",
-        lockSvcRulesAndCoinRules(),
-        logger,
-      )
+      _ <- svcRulesLock.lock()
       _ = logger.info(
         s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
       )
@@ -344,11 +341,7 @@ class HttpSvHandler(
       )
       _ = logger
         .info(s"Sponsor SV finished authorizing svc party to participant $participantId")
-      _ <- retryProvider.retryForClientCalls(
-        "unlocking SvcRules and CoinRules contracts",
-        unlockSvcRulesAndCoinRules(),
-        logger,
-      )
+      _ <- svcRulesLock.unlock()
 
       _ = logger.info(
         s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
@@ -678,26 +671,4 @@ class HttpSvHandler(
         }
       } yield outcome
     }
-
-  private def lockSvcRulesAndCoinRules()(implicit tc: TraceContext) = for {
-    svcRules <- svcStore.getSvcRules()
-    coinRules <- svcStore.getCoinRules()
-    res <- svcStoreWithIngestion.connection.submitWithResultNoDedup(
-      Seq(svParty),
-      Seq(svcParty),
-      svcRules.contractId.exerciseSvcRules_Lock(svParty.toProtoPrimitive, coinRules.contractId),
-      globalDomain,
-    )
-  } yield res
-
-  private def unlockSvcRulesAndCoinRules()(implicit tc: TraceContext) = for {
-    svcRules <- svcStore.getSvcRules()
-    coinRules <- svcStore.getCoinRules()
-    res <- svcStoreWithIngestion.connection.submitWithResultNoDedup(
-      Seq(svParty),
-      Seq(svcParty),
-      svcRules.contractId.exerciseSvcRules_Unlock(svParty.toProtoPrimitive, coinRules.contractId),
-      globalDomain,
-    )
-  } yield res
 }
