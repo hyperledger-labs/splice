@@ -380,9 +380,9 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     ).fold(e => logger.debug(s"Failed to get network requests: $e"), _ => ())
   }
 
-  private def dumpDebugInfoOnFailure[T](value: => T)(implicit
+  protected def dumpDebugInfoOnFailure[T](value: => T)(implicit
       webDriver: WebDriverType
-  ) = {
+  ): T = {
     try {
       value
     } catch {

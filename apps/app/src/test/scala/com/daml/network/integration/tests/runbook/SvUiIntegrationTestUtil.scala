@@ -72,34 +72,36 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
       }
 
       clue(s"We can create a validator onboarding secret via this SV's UI") {
-        val (_, oldFirstSecret) = actAndCheck(
-          "Opening validator onboarding tab",
-          click on "navlink-validator-onboarding",
-        )(
-          s"Creating an onboarding secret",
-          _ => {
-            waitForQuery(id("create-validator-onboarding-secret"))
-            waitForQuery(className("onboarding-secret-table"))
-            val secretsItr = findAll(className("onboarding-secret-table-secret"))
-            if (secretsItr.hasNext) Some(secretsItr.next().text) else None
-          },
-        )
-        actAndCheck(
-          "click",
-          click on "create-validator-onboarding-secret",
-        )(
-          s"We see that this SV has created an onboarding secret",
-          _ => {
-            val secretsItr = findAll(className("onboarding-secret-table-secret"))
-            val firstSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
-            firstSecret should not be oldFirstSecret
-            inside(firstSecret) { case Some(s) =>
-              s should have size 44
-            }
-            val secondSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
-            secondSecret shouldBe oldFirstSecret
-          },
-        )
+        dumpDebugInfoOnFailure {
+          val (_, oldFirstSecret) = actAndCheck(
+            "Opening validator onboarding tab",
+            click on "navlink-validator-onboarding",
+          )(
+            s"Creating an onboarding secret",
+            _ => {
+              waitForQuery(id("create-validator-onboarding-secret"))
+              waitForQuery(className("onboarding-secret-table"))
+              val secretsItr = findAll(className("onboarding-secret-table-secret"))
+              if (secretsItr.hasNext) Some(secretsItr.next().text) else None
+            },
+          )
+          actAndCheck(
+            "click",
+            click on "create-validator-onboarding-secret",
+          )(
+            s"We see that this SV has created an onboarding secret",
+            _ => {
+              val secretsItr = findAll(className("onboarding-secret-table-secret"))
+              val firstSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
+              firstSecret should not be oldFirstSecret
+              inside(firstSecret) { case Some(s) =>
+                s should have size 44
+              }
+              val secondSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
+              secondSecret shouldBe oldFirstSecret
+            },
+          )
+        }
       }
 
       clue(s"We can log out of this SV's UI") {
