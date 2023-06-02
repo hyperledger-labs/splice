@@ -18,7 +18,7 @@ import org.slf4j.event.Level
 import java.time.Duration
 import java.util.UUID
 
-class WalletTxLogIntegrationTest
+class XNodeWalletTxLogIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
@@ -31,7 +31,7 @@ class WalletTxLogIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging
