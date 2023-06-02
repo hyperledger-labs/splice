@@ -1012,15 +1012,8 @@ class SvApp(
     if (config.approvedSvIdentities.map(_.name).toSet.size != config.approvedSvIdentities.size) {
       sys.error("Approved SV names must be unique! Check your SV app config.")
     }
-    Future.sequence(
-      config.approvedSvIdentities.map(c =>
-        approveConfiguredSvIdentity(
-          c.name,
-          c.publicKey,
-          svStoreWithIngestion,
-          globalDomain,
-        )
-      )
+    Future.traverse(config.approvedSvIdentities)(c =>
+      approveConfiguredSvIdentity(c.name, c.publicKey, svStoreWithIngestion, globalDomain)
     )
   }
 
@@ -1029,13 +1022,15 @@ class SvApp(
       key: String,
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
-  ): Future[Unit] = {
-    logger.info("Ensuring that a SV state contract exists for the configured name and key")
-    SvApp.approveSvIdentity(name, key, svStoreWithIngestion, globalDomain, logger).map {
-      case Left(reason) => logger.info(s"Failed to approve SV identity: $reason")
-      case Right(()) => ()
-    }
-  }
+  ): Future[Unit] =
+    retryProvider.retryForAutomation(
+      "Create ApprovedSvIdentity contract for preconfigured SV identity",
+      SvApp.approveSvIdentity(name, key, svStoreWithIngestion, globalDomain, logger).map {
+        case Left(reason) => logger.info(s"Failed to approve SV identity: $reason")
+        case Right(()) => ()
+      },
+      logger,
+    )
 
   private def ensureCoinPriceVoteHasCoinPrice(
       defaultCoinPriceVote: BigDecimal,
