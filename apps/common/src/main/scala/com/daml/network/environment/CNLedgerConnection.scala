@@ -691,7 +691,9 @@ class CNLedgerConnection(
     (LedgerOffset, LedgerClient.Completion)
   ]] = {
     import io.grpc.Status.{DEADLINE_EXCEEDED, UNAVAILABLE}
-    val howLongToWait = timeouts.network.asFiniteApproximation
+    import scala.concurrent.duration.*
+    // TODO(#5232) Bump this back to timeouts.network.asFiniteApproximation
+    val howLongToWait = 10.seconds
     Flow[LedgerClient.CompletionStreamResponse]
       .completionTimeout(howLongToWait)
       .mapError { case te: concurrent.TimeoutException =>

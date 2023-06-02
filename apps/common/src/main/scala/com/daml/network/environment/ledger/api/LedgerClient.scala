@@ -373,6 +373,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       command: LedgerClient.TransferCommand,
   ): Future[Unit] =
     transferSubmissionServiceStub
+      .withDeadline(getReducedDeadline())
       .submit(
         LedgerClient
           .TransferSubmitRequest(
