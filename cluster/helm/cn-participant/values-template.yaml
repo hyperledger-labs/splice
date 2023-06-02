@@ -14,7 +14,7 @@ postgres: postgres.svc.svc.cluster.local
 postgresSchema: svc_participant
 
 auth:
-  jwksEndpoint: "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
+  jwksUrl: "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
   targetAudience: "https://canton.network.global"
 
 extraDomains: '[]'
