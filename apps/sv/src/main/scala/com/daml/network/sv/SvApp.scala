@@ -963,15 +963,13 @@ class SvApp(
     ) {
       sys.error("Expected onboarding secrets must be unique! Check your SV app config.")
     }
-    Future.sequence(
-      config.expectedValidatorOnboardings.map(c =>
-        expectConfiguredValidatorOnboarding(
-          c.secret,
-          c.expiresIn,
-          svStoreWithIngestion,
-          globalDomain,
-          clock,
-        )
+    Future.traverse(config.expectedValidatorOnboardings)(c =>
+      expectConfiguredValidatorOnboarding(
+        c.secret,
+        c.expiresIn,
+        svStoreWithIngestion,
+        globalDomain,
+        clock,
       )
     )
   }
@@ -982,22 +980,24 @@ class SvApp(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
       clock: Clock,
-  ): Future[Unit] = {
-    logger.info("Ensuring that a validator lifecycle contract exists for preconfigured secret")
-    SvApp
-      .prepareValidatorOnboarding(
-        secret,
-        expiresIn,
-        svStoreWithIngestion,
-        globalDomain,
-        clock,
-        logger,
-      )
-      .map {
-        case Left(reason) => logger.info(s"Did not prepare validator onboarding: $reason")
-        case Right(()) => ()
-      }
-  }
+  ): Future[Unit] =
+    retryProvider.retryForAutomation(
+      "Create ValidatorOnboarding contract for preconfigured secret",
+      SvApp
+        .prepareValidatorOnboarding(
+          secret,
+          expiresIn,
+          svStoreWithIngestion,
+          globalDomain,
+          clock,
+          logger,
+        )
+        .map {
+          case Left(reason) => logger.info(s"Did not prepare validator onboarding: $reason")
+          case Right(()) => ()
+        },
+      logger,
+    )
 
   private def approveConfiguredSvIdentities(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],

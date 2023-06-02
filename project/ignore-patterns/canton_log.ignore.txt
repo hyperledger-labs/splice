@@ -46,4 +46,11 @@ ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to loc
 # TODO(#5250) Remove this once Canton fixes their bug
 MEDIATOR_INVALID_MESSAGE.* Received a mediator response .*with an unknown request id
 
+# TODO(#5307) Remove once Canton fixed their bug
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*request uuid.*must not be used until
+TransactionProcessor.*Submission timed out
+
+# TODO(#5308) Remove this once Canton fixes their bug
+Response message for request.+timed out at
+
 # Make sure to have a trailing newline
