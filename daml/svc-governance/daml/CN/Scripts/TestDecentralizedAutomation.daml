@@ -199,7 +199,7 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
 
   -- lock choices in svcRules and coinRules
   submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
-    sponsor = sv2
+    sv = sv2
     coinRulesCid
 
   [(svcRulesCid, _)] <- query @SvcRules svc
@@ -212,7 +212,7 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
 
   -- unlock choices in svcRules and coinRules
   submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
-    sponsor = sv2
+    sv = sv2
     coinRulesCid
 
   [(svcRulesCid, _)] <- query @SvcRules svc
@@ -227,67 +227,79 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
 
 testActivityLockOnLockedCoinChoices: Script ()
 testActivityLockOnLockedCoinChoices = do
-  (app, _, (_, _, _, _)) <- initDevNetCollective
+  (app, _, (sv1, _, _, _)) <- initDevNetCollective
 
   alice <- setupUser app "alice" app.svc
   bob <- setupUser app "bob" app.svc
 
   cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
   roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
-  ensureHonorsActivityLock app [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
+  ensureHonorsActivityLock app sv1 [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
     exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock coinRules roundCid)
 
   cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
   passTime (minutes 6)
   roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
-  ensureHonorsActivityLock app [alice.primaryParty] [app.svc] $ \coinRules ->
+  ensureHonorsActivityLock app sv1 [alice.primaryParty] [app.svc] $ \coinRules ->
     exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_OwnerExpireLock coinRules roundCid)
 
   cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 1)
   replicateA_ 4 $ runNextIssuance app
   (round, _) <- getLatestOpenRound app
-  ensureHonorsActivityLock app [app.svc] [app.svc] $ \coinRules ->
+  ensureHonorsActivityLock app sv1 [app.svc] [app.svc] $ \coinRules ->
     exerciseCmd cid (LockedCoin_ExpireCoin round coinRules)
   pure ()
 
 testActivityLockOnCoinChoices : Script ()
 testActivityLockOnCoinChoices = do
-  (app, _, (_, _, _, _)) <- initDevNetCollective
+  (app, _, (sv1, _, _, _)) <- initDevNetCollective
   alice <- setupUser app "alice" app.svc
 
   cid <- tap app alice defaultTransferConfig.holdingFee.rate
   replicateA_ 3 $ runNextIssuance app
   (round, _) <- getLatestOpenRound app
-  ensureHonorsActivityLock app [app.svc] [app.svc] $ \coinRules ->
+  ensureHonorsActivityLock app sv1 [app.svc] [app.svc] $ \coinRules ->
     exerciseCmd cid (Coin_Expire round coinRules)
   pure ()
 
-ensureHonorsActivityLock : CCApp -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script ()
-ensureHonorsActivityLock app actAs readAs buildCommand = do
-  lockSvcRules app
+
+
+testLockControllers : Script ()
+testLockControllers = script do
+  (app, svc, (sv1, _, _, _)) <- initDevNetCollective
+  nonSv <- allocateParty "nonSv"
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  submitMultiMustFail [nonSv] [app.svc] $ exerciseCmd svcRulesCid (SvcRules_Lock nonSv coinRulesCid)
+  submitMulti [sv1] [app.svc] $ exerciseCmd svcRulesCid (SvcRules_Lock sv1 coinRulesCid)
+  pure ()
+
+ensureHonorsActivityLock : CCApp -> Party -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script ()
+ensureHonorsActivityLock app sv actAs readAs buildCommand = do
+  lockSvcRules app sv
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
   submitMultiMustFail actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
 
-  unlockSvcRules app
+  unlockSvcRules app sv
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
   submitMulti actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
   pure ()
 
-lockSvcRules : CCApp -> Script ()
-lockSvcRules app = do
+lockSvcRules : CCApp -> Party -> Script ()
+lockSvcRules app sv = do
   [(svcRulesCid, _)] <- query @SvcRules app.svc
   [(coinRulesCid, _)] <- query @CoinRules app.svc
-  submitMulti [app.svc] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
-    sponsor = app.svc
+  submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
+    sv
     coinRulesCid
   pure ()
 
-unlockSvcRules : CCApp -> Script ()
-unlockSvcRules app = do
+unlockSvcRules : CCApp -> Party -> Script ()
+unlockSvcRules app sv = do
   [(svcRulesCid, _)] <- query @SvcRules app.svc
   [(coinRulesCid, _)] <- query @CoinRules app.svc
-  submitMulti [app.svc] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
-    sponsor = app.svc
+  submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
+    sv
     coinRulesCid
   pure ()
 

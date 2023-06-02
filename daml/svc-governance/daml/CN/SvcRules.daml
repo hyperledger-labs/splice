@@ -917,7 +917,7 @@ template SvcRules with
         staleConfirmation <- fetch staleConfirmationCid
         require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
         archive staleConfirmationCid
-    
+
 
     -- Cleaning up duplicate validator traffic contracts
     ----------------------------------------------------
@@ -939,12 +939,13 @@ template SvcRules with
     -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
     choice SvcRules_Lock : ContractId SvcRules
       with
-        sponsor : Party
+        sv : Party
         coinRulesCid : ContractId CoinRules
-      controller sponsor
+      controller sv
       do
-        exercise coinRulesCid CoinRules_Lock
+        require "SV is a collective member" (sv `Map.member` members)
         require "it is currently not locked" (not lock)
+        exercise coinRulesCid CoinRules_Lock
         create SvcRules with
           lock = True
           ..
@@ -952,12 +953,13 @@ template SvcRules with
     -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
     choice SvcRules_Unlock : ContractId SvcRules
       with
-        sponsor : Party
+        sv : Party
         coinRulesCid : ContractId CoinRules
-      controller sponsor
+      controller sv
       do
-        exercise coinRulesCid CoinRules_Unlock
+        require "SV is a collective member" (sv `Map.member` members)
         require "It is currently locked" lock
+        exercise coinRulesCid CoinRules_Unlock
         create SvcRules with
           lock = False
           ..
