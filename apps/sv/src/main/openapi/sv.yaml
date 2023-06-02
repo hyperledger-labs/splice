@@ -379,6 +379,22 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "401":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
+  /onboard/sv/mediator:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "onboardSvMediator"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvMediatorRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
   /devnet/onboard/validator/prepare:
     post:
       tags: [sv]
@@ -683,8 +699,6 @@ components:
           type: string
         sequencer_id:
           type: string
-        mediator_id:
-          type: string
         candidate_party_id:
           type: string
 
@@ -697,6 +711,14 @@ components:
           type: string
         sequencer_snapshot:
           "$ref": "#/components/schemas/SequencerSnapshot"
+
+    OnboardSvMediatorRequest:
+      type: object
+      required:
+        - mediator_id
+      properties:
+        mediator_id:
+          type: string
 
     SequencerSnapshot:
       type: object

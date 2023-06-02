@@ -100,7 +100,7 @@ object Codec {
   }
 
   implicit val sequencerValue: Codec[SequencerId, String] = new Codec[SequencerId, String] {
-    def encode(d: SequencerId) = d.filterString
+    def encode(d: SequencerId) = d.toProtoPrimitive
     def decode(e: String) = SequencerId.fromProtoPrimitive(e, "sequencer").left.map(_.message)
   }
 
@@ -110,7 +110,7 @@ object Codec {
   }
 
   implicit val mediatorValue: Codec[MediatorId, String] = new Codec[MediatorId, String] {
-    def encode(d: MediatorId) = d.filterString
+    def encode(d: MediatorId) = d.toProtoPrimitive
     def decode(e: String) = MediatorId.fromProtoPrimitive(e, "mediator").left.map(_.message)
   }
 

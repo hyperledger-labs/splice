@@ -14,7 +14,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -64,7 +64,6 @@ abstract class SvAppReference(
   def onboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       sequencerId: Option[SequencerId],
-      mediatorId: Option[MediatorId],
       candidateParty: PartyId,
   ): HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse =
     consoleEnvironment.run {
@@ -72,7 +71,6 @@ abstract class SvAppReference(
         HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
           participantId,
           sequencerId,
-          mediatorId,
           candidateParty,
         )
       )

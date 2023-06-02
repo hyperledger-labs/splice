@@ -721,7 +721,6 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           sv1.onboardSvPartyMigrationAuthorize(
             sv4.participantClient.participantX.id,
             None,
-            None,
             randomParty,
           ),
           _.errorMessage should include(
@@ -737,7 +736,6 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         assertThrowsAndLogsCommandFailures(
           sv1.onboardSvPartyMigrationAuthorize(
             sv4.participantClient.participantX.id,
-            None,
             None,
             sv1Party,
           ),

@@ -18,7 +18,7 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.{LocalDomainNodeConnections, SvApp, SvcPartyHosting}
+import com.daml.network.sv.{LocalDomainNode, SvApp, SvcPartyHosting}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -45,7 +45,7 @@ class HttpSvHandler(
     isDevNet: Boolean,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
-    localDomainNodeConnections: Option[LocalDomainNodeConnections],
+    localDomainNode: Option[LocalDomainNode],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
@@ -241,7 +241,6 @@ class HttpSvHandler(
         participantId <- Codec.decode(Codec.Participant)(body.participantId)
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
         sequencerId <- body.sequencerId.traverse(Codec.decode(Codec.Sequencer))
-        mediatorId <- body.mediatorId.traverse(Codec.decode(Codec.Mediator))
       } yield {
         for {
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
@@ -270,10 +269,28 @@ class HttpSvHandler(
               authorizeParticipantForHostingSvcParty(
                 participantId,
                 sequencerId,
-                mediatorId,
               )
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
+    }
+
+  def onboardSvMediator(
+      respond: v0.SvResource.OnboardSvMediatorResponse.type
+  )(
+      body: definitions.OnboardSvMediatorRequest
+  )(fake: Unit): Future[v0.SvResource.OnboardSvMediatorResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      (for {
+        mediatorId <- Codec.decode(Codec.Mediator)(body.mediatorId)
+        mediatorConnection <- localDomainNode
+          .map(_.mediatorAdminConnection)
+          .toRight("Onboarding mediator configured to use X nodes but sponsoring SV is not")
+      } yield {
+        onboardMediator(mediatorConnection, mediatorId)
+      }).fold(
+        errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
+        _.map(_ => v0.SvResource.OnboardSvMediatorResponseOK),
+      )
     }
 
   private def isOnboardingConfirmed(party: PartyId)(implicit tc: TraceContext): Future[Boolean] = {
@@ -305,7 +322,6 @@ class HttpSvHandler(
   private def authorizeParticipantForHostingSvcParty(
       participantId: ParticipantId,
       sequencerId: Option[SequencerId],
-      mediatorId: Option[MediatorId],
   )(implicit tc: TraceContext) = {
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
     for {
@@ -349,7 +365,7 @@ class HttpSvHandler(
       // TODO(#5095) Reconsider if this should be part of this onboarding flow
       // or a separate step.
       sequencerSnapshot <- sequencerId.traverse { sequencerId =>
-        val sequencerConnection = localDomainNodeConnections
+        val sequencerConnection = localDomainNode
           .map(_.sequencerAdminConnection)
           .getOrElse(
             throw new IllegalStateException(
@@ -358,17 +374,6 @@ class HttpSvHandler(
           )
         onboardSequencer(sequencerConnection, sequencerId)
       }
-      _ <- mediatorId.traverse { mediatorId =>
-        val mediatorConnection = localDomainNodeConnections
-          .map(_.mediatorAdminConnection)
-          .getOrElse(
-            throw new IllegalStateException(
-              s"Onboarding mediator configured to use X nodes but sponsoring SV is not"
-            )
-          )
-        onboardMediator(mediatorConnection, mediatorId)
-      }
-
     } yield v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
       definitions.OnboardSvPartyMigrationAuthorizeResponse(
         encoded,
@@ -450,6 +455,9 @@ class HttpSvHandler(
   }
 
   // TODO(#5105) Make mediator onboarding idempotent
+  // TODO(#5095) Replace this in favor of a Daml based flow. Note that for now
+  // there is no authorization check here. The daml flow will naturally give us one
+  // so implementing it here seems like wasted effort.
   private def onboardMediator(
       mediatorAdminConnection: MediatorAdminConnection,
       mediatorId: MediatorId,

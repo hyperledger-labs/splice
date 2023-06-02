@@ -11,7 +11,7 @@ import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListPartyToParticipantResult as ListPartyToParticipantResultX
@@ -28,7 +28,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyChangeOpX,
 }
-import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -40,8 +40,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SvcPartyHosting(
     onboardingConfig: SvOnboardingConfig,
     participantAdminConnection: ParticipantAdminConnection,
-    localDomainNodeConnections: Option[LocalDomainNodeConnections],
-    sequencerPublicConfig: Option[ClientConfig],
+    localDomainNode: Option[LocalDomainNode],
     svcParty: PartyId,
     globalDomain: DomainAlias,
     useXNodes: Boolean,
@@ -101,51 +100,27 @@ class SvcPartyHosting(
               ).map(_ => ())
             }
           _ = logger.info("Adding sequencer identity transactions")
-          sequencerId <- localDomainNodeConnections.map(_.sequencerAdminConnection).traverse {
-            connection =>
-              for {
-                sequencerId <- connection.getSequencerId
-                identity <- connection.getSequencerIdentityTransactions(sequencerId)
-                _ <- participantAdminConnection.addTopologyTransactions(identity)
-                _ <- retryProvider.retryForAutomation(
-                  "Wait to observe sequencer identity transactions",
-                  participantAdminConnection
-                    .getIdentityTransactions(domainId, sequencerId.uid)
-                    .map { txs =>
-                      if (txs.length != identity.length) {
-                        throw Status.FAILED_PRECONDITION
-                          .withDescription(
-                            s"Expected ${identity.length} identity transactions for sequencer ${sequencerId} but got ${txs.length}"
-                          )
-                          .asRuntimeException()
-                      }
-                    },
-                  logger,
-                )
-              } yield sequencerId
-          }
-          _ = logger.info("Adding mediator identity transactions")
-          mediatorId <- localDomainNodeConnections.map(_.mediatorAdminConnection).traverse {
-            connection =>
-              for {
-                mediatorId <- connection.getMediatorId
-                identity <- connection.getMediatorIdentityTransactions(mediatorId)
-                _ <- participantAdminConnection.addTopologyTransactions(identity)
-                _ <- retryProvider.retryForAutomation(
-                  "Wait to observe mediator identity transactions",
-                  participantAdminConnection.getIdentityTransactions(domainId, mediatorId.uid).map {
-                    txs =>
-                      if (txs.length != identity.length) {
-                        throw Status.FAILED_PRECONDITION
-                          .withDescription(
-                            s"Expected ${identity.length} identity transactions for mediator ${mediatorId} but got ${txs.length}"
-                          )
-                          .asRuntimeException()
-                      }
+          sequencerId <- localDomainNode.map(_.sequencerAdminConnection).traverse { connection =>
+            for {
+              sequencerId <- connection.getSequencerId
+              identity <- connection.getSequencerIdentityTransactions(sequencerId)
+              _ <- participantAdminConnection.addTopologyTransactions(identity)
+              _ <- retryProvider.retryForAutomation(
+                "Wait to observe sequencer identity transactions",
+                participantAdminConnection
+                  .getIdentityTransactions(domainId, sequencerId.uid)
+                  .map { txs =>
+                    if (txs.length != identity.length) {
+                      throw Status.FAILED_PRECONDITION
+                        .withDescription(
+                          s"Expected ${identity.length} identity transactions for sequencer ${sequencerId} but got ${txs.length}"
+                        )
+                        .asRuntimeException()
+                    }
                   },
-                  logger,
-                )
-              } yield mediatorId
+                logger,
+              )
+            } yield sequencerId
           }
           _ = logger.info("Disconnecting from all domains")
           _ <- participantAdminConnection.disconnectFromAllDomains()
@@ -154,7 +129,6 @@ class SvcPartyHosting(
             sponsorSvConfig,
             participantId,
             sequencerId,
-            mediatorId,
             svParty,
           )
           _ <- participantAdminConnection.uploadAcsSnapshot(response.acsSnapshot)
@@ -166,35 +140,23 @@ class SvcPartyHosting(
           _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
           _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
           xNodeParams = for {
-            localDomainNodeConnections <- localDomainNodeConnections
-            publicConfig <- sequencerPublicConfig
+            localDomainNode <- localDomainNode
             snapshot <- response.sequencerSnapshot
-          } yield (localDomainNodeConnections, publicConfig, snapshot)
-          _ <- xNodeParams.traverse_ { case (localDomainNodeConnections, publicConfig, snapshot) =>
+          } yield (localDomainNode, snapshot)
+          _ <- xNodeParams.traverse_ { case (localDomainNode, snapshot) =>
             logger.info(s"Bootstrapping sequencer from snapshot")
             for {
-              _ <- localDomainNodeConnections.sequencerAdminConnection
+              _ <- localDomainNode.sequencerAdminConnection
                 .assignFromSnapshot(
                   snapshot.topologySnapshot,
-                  localDomainNodeConnections.staticDomainParameters,
+                  localDomainNode.staticDomainParameters,
                   snapshot.sequencerSnapshot,
                 )
               _ = logger.info("Sequencer bootstrapping complete")
               _ = logger.info("Changing participant connection to point to new sequencer")
               _ <- participantAdminConnection.modifyDomainConnectionConfig(
                 globalDomain,
-                setSequencerEndpoint(publicConfig),
-              )
-              _ = logger.info(s"Initializing mediator")
-              _ <- localDomainNodeConnections.mediatorAdminConnection.initialize(
-                domainId,
-                localDomainNodeConnections.staticDomainParameters,
-                new GrpcSequencerConnection(
-                  toEndpoints(publicConfig),
-                  transportSecurity = publicConfig.tls.isDefined,
-                  customTrustCertificates = None,
-                  SequencerAlias.Default,
-                ),
+                setSequencerEndpoint(localDomainNode.sequencerPublicConfig),
               )
             } yield ()
           }
@@ -234,7 +196,6 @@ class SvcPartyHosting(
       sponsorSvConfig: SvAppClientConfig,
       candidateParticipantId: ParticipantId,
       candidateSequencerId: Option[SequencerId],
-      candidateMediatorId: Option[MediatorId],
       svParty: PartyId,
   )(implicit
       traceContext: TraceContext
@@ -254,7 +215,6 @@ class SvcPartyHosting(
           .authorizeSvcPartyHosting(
             candidateParticipantId,
             candidateSequencerId,
-            candidateMediatorId,
             svParty,
           )
           .andThen(_ => svConnection.close())

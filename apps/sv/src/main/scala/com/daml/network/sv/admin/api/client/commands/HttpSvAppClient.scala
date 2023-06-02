@@ -229,7 +229,6 @@ object HttpSvAppClient {
   case class OnboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       sequencerId: Option[SequencerId],
-      mediatorId: Option[MediatorId],
       candidate: PartyId,
   ) extends BaseCommand[
         http.OnboardSvPartyMigrationAuthorizeResponse,
@@ -246,8 +245,7 @@ object HttpSvAppClient {
       client.onboardSvPartyMigrationAuthorize(
         body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
           participantId.toProtoPrimitive,
-          sequencerId.map(_.toProtoPrimitive),
-          mediatorId.map(_.toProtoPrimitive),
+          sequencerId.map(Codec.encode(_)),
           candidate.toProtoPrimitive,
         ),
         headers = headers,
@@ -283,5 +281,31 @@ object HttpSvAppClient {
           sequencerSnapshot,
         )
     }
+  }
+
+  case class OnboardSvMediator(
+      mediatorId: MediatorId
+  ) extends BaseCommand[
+        http.OnboardSvMediatorResponse,
+        Unit,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.OnboardSvMediatorResponse] =
+      client.onboardSvMediator(
+        body = definitions.OnboardSvMediatorRequest(
+          Codec.encode(mediatorId)
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = _ => Right(())
   }
 }

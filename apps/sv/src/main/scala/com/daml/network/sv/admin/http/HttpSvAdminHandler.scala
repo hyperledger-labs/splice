@@ -21,7 +21,7 @@ import com.daml.network.http.v0.definitions.{
 import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.http.v0.{definitions, svAdmin as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
-import com.daml.network.sv.{LocalDomainNodeConnections, SvApp}
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -40,7 +40,7 @@ class HttpSvAdminHandler(
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
-    localDomainNodeConnections: Option[LocalDomainNodeConnections],
+    localDomainNode: Option[LocalDomainNode],
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -385,7 +385,7 @@ class HttpSvAdminHandler(
 
   private def withSequencerConnectionOrNotFound[T](
       notFound: ErrorResponse => T
-  )(call: SequencerAdminConnection => Future[T]) = localDomainNodeConnections
+  )(call: SequencerAdminConnection => Future[T]) = localDomainNode
     .map(_.sequencerAdminConnection)
     .fold {
       notFound(ErrorResponse("Sequencer is not configured."))
@@ -394,7 +394,7 @@ class HttpSvAdminHandler(
 
   private def withMediatorConnectionOrNotFound[T](
       notFound: ErrorResponse => T
-  )(call: MediatorAdminConnection => Future[T]) = localDomainNodeConnections
+  )(call: MediatorAdminConnection => Future[T]) = localDomainNode
     .map(_.mediatorAdminConnection)
     .fold {
       notFound(ErrorResponse("Mediator is not configured."))

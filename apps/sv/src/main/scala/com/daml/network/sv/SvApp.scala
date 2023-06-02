@@ -6,6 +6,7 @@ import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
+import cats.syntax.foldable.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -61,18 +62,10 @@ import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
-  FlagCloseable,
   FlagCloseableAsync,
-  Lifecycle,
   SyncCloseable,
 }
-import com.digitalasset.canton.logging.{
-  ErrorLoggingContext,
-  NamedLoggerFactory,
-  NamedLogging,
-  TracedLogger,
-}
-import com.digitalasset.canton.protocol.StaticDomainParameters
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -86,25 +79,6 @@ import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-
-/** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
-  * Note that this is optional. An SV app can run without a dedicated domain node.
-  * TODO(#5195) Consider making this mandatory.
-  */
-final case class LocalDomainNodeConnections(
-    sequencerAdminConnection: SequencerAdminConnection,
-    mediatorAdminConnection: MediatorAdminConnection,
-    staticDomainParameters: StaticDomainParameters,
-    timeouts: ProcessingTimeout,
-    loggerFactory: NamedLoggerFactory,
-) extends FlagCloseable
-    with NamedLogging {
-
-  override protected def onClosed() = {
-    Lifecycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
-    super.onClosed()
-  }
-}
 
 class SvApp(
     override val name: InstanceName,
@@ -137,10 +111,10 @@ class SvApp(
       timeouts,
       loggerFactory,
     )
-    val localDomainNodeConnections = config.xNodes
+    val localDomainNode = config.xNodes
       .flatMap(_.domain)
       .map(config =>
-        LocalDomainNodeConnections(
+        new LocalDomainNode(
           new SequencerAdminConnection(
             config.sequencer.adminApi,
             timeouts,
@@ -156,13 +130,15 @@ class SvApp(
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
             ),
+          config.sequencer.publicApi,
           timeouts,
           loggerFactory,
+          retryProvider,
         )
       )
     initialize(
       participantAdminConnection,
-      localDomainNodeConnections,
+      localDomainNode,
       ledgerClient,
       svPartyId,
     )
@@ -170,14 +146,14 @@ class SvApp(
         // TODO(#3474) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
-        localDomainNodeConnections.foreach(_.close())
+        localDomainNode.foreach(_.close())
         Future.failed(err)
       }
   }
 
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
-      localDomainNodeConnections: Option[LocalDomainNodeConnections],
+      localDomainNode: Option[LocalDomainNode],
       ledgerClient: CNLedgerClient,
       svPartyId: PartyId,
   ): Future[SvApp.State] = {
@@ -198,13 +174,14 @@ class SvApp(
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
         participantAdminConnection,
-        localDomainNodeConnections,
+        localDomainNode,
       )
       cometBftClient = newCometBftClient
       (svcStore, svcAutomation) <- ensureOnboarded(
         svAutomation,
         ledgerClient,
         participantAdminConnection,
+        localDomainNode,
         svcPartyHosting,
         globalDomain,
         cometBftClient,
@@ -245,7 +222,7 @@ class SvApp(
         isDevNet,
         clock,
         participantAdminConnection,
-        localDomainNodeConnections,
+        localDomainNode,
         retryProvider,
         svcPartyHosting,
         loggerFactory,
@@ -256,7 +233,7 @@ class SvApp(
         svAutomation,
         svcAutomation,
         cometBftClient,
-        localDomainNodeConnections,
+        localDomainNode,
         clock,
         loggerFactory,
       )
@@ -319,7 +296,7 @@ class SvApp(
     } yield {
       SvApp.State(
         participantAdminConnection,
-        localDomainNodeConnections,
+        localDomainNode,
         storage,
         svStore,
         svcStore,
@@ -353,6 +330,7 @@ class SvApp(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
+      localDomainNode: Option[LocalDomainNode],
       svcPartyHosting: SvcPartyHosting,
       globalDomain: DomainId,
       cometBftClient: Option[CometBftClient],
@@ -417,8 +395,33 @@ class SvApp(
           )
         }
       _ <- waitForSvcMembership(svcStore)
+      _ <- onboardMediatorIfRequired(globalDomain, participantAdminConnection, localDomainNode)
     } yield (svcStore, svcAutomation)
   }
+
+  private def onboardMediatorIfRequired(
+      domainId: DomainId,
+      participantAdminConnection: ParticipantAdminConnection,
+      localDomainNodeO: Option[LocalDomainNode],
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    (for {
+      localDomainNode <- localDomainNodeO
+      svConfig <- config.onboarding match {
+        case conf: SvOnboardingConfig.JoinWithKey => Some(conf.svClient.adminApi)
+        case _: SvOnboardingConfig.FoundCollective | _: SvOnboardingConfig.JoinViaSvcApp => None
+      }
+    } yield (localDomainNode, svConfig)).traverse_ { case (localDomainNode, svConfig) =>
+      SvConnection(
+        svConfig,
+        retryProvider,
+        coinAppParameters.processingTimeouts,
+        loggerFactory,
+      ).flatMap { svConnection =>
+        localDomainNode
+          .onboardLocalMediator(domainId, participantAdminConnection, svConnection)
+          .andThen(_ => svConnection.close())
+      }
+    }
 
   private def startOnboardingWithSvcPartyMigration(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
@@ -601,12 +604,11 @@ class SvApp(
   private def newSvcPartyHosting(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
-      localDomainNodeConnections: Option[LocalDomainNodeConnections],
+      localDomainNode: Option[LocalDomainNode],
   ) = new SvcPartyHosting(
     config.onboarding,
     participantAdminConnection,
-    localDomainNodeConnections,
-    config.xNodes.flatMap(_.domain).map(_.sequencer.publicApi),
+    localDomainNode,
     storeKey.svcParty,
     config.domains.global.alias,
     config.xNodes.isDefined,
@@ -1072,7 +1074,7 @@ class SvApp(
 object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
-      localDomainNodeConnections: Option[LocalDomainNodeConnections],
+      localDomainNode: Option[LocalDomainNode],
       storage: Storage,
       svStore: SvSvStore,
       svcStore: SvSvcStore,
@@ -1101,7 +1103,7 @@ object SvApp {
         SyncCloseable("svc automation", svcAutomation.close()),
         SyncCloseable(
           s"Domain connections",
-          localDomainNodeConnections.foreach(_.close()),
+          localDomainNode.foreach(_.close()),
         ),
         SyncCloseable(
           s"Participant Admin connection",

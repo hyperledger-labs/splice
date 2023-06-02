@@ -53,7 +53,6 @@ final class SvConnection private (
   def authorizeSvcPartyHosting(
       candidateParticipantId: ParticipantId,
       candidateSequencerId: Option[SequencerId],
-      candidateMediatorId: Option[MediatorId],
       candidateParty: PartyId,
   )(implicit
       httpClient: HttpRequest => Future[HttpResponse],
@@ -66,8 +65,22 @@ final class SvConnection private (
       HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
         candidateParticipantId,
         candidateSequencerId,
-        candidateMediatorId,
         candidateParty,
+      ),
+    )
+
+  def onboardSvMediator(
+      mediatorId: MediatorId
+  )(implicit
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateDecoder: TemplateJsonDecoder,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[Unit] =
+    runHttpCmd(
+      config.url,
+      HttpSvAppClient.OnboardSvMediator(
+        mediatorId
       ),
     )
 }
