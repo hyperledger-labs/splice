@@ -706,6 +706,13 @@ set-option default-terminal "screen-256color"
 This is sufficient for most cases. If you insist on using `tmux-256color` instead of switching to `screen-256color`,
 you will need to install ncurses and setup terminfo following the instructions [here](https://gist.github.com/bbqtd/a4ac060d6f6b9ea6fe3aabe735aa9d95).
 
+#### Using a local build of Canton
+
+When debugging and fixing issues in Canton itself, it can be useful to run a local build of Canton.
+You can do so as follows:
+1. Checkout `https://github.com/DACH-NY/canton` and follow its `contributing/README.md` to get it to build.
+2. Call `sbt bundle` to build a **research** release in `<YOUR_CANTON_REPO>/research/app/target/release`.
+3. Call `start-canton.sh -c <YOUR_CANTON_REPO>/research/app/target/release/canton-research-<VERSION>-SNAPSHOT/bin/canton`
 
 ### Managing Frontends for Tests
 
