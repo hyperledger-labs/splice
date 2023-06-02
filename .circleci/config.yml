@@ -585,9 +585,6 @@ commands:
     parameters:
       test_names_file:
         type: string
-      default_splitted_test_cmd:
-        type: string
-        default: "test"
     steps:
       - execute_sbt_command:
           cmd: printTests
@@ -595,43 +592,37 @@ commands:
       - run:
           name: Splitting tests
           command: |
-            # TODO(#5336) remove this check after #5097 is apply to testnet
-            if [ -f "<< parameters.test_names_file >>" ]; then
-              echo "[fix negative test times]"
-              # scalatest actually reported occasionally test times with negative numbers
-              # this confused the circleci test runner. the easiest fix (suggested by circleci)
-              # is to use sed to adapt any such time and set it to 0
-              TIMING_DATA_FILE="$CIRCLE_INTERNAL_TASK_DATA/circle-test-results/results.json"
-              if [[ -e $TIMING_DATA_FILE ]]; then
-                sed -ri 's/"run_time": ?\-[0-9]+\.?[0-9]+,/"run_time":0.0,/g' "$TIMING_DATA_FILE"
-              fi
-              echo "[split tests ${extraargs}]"
-              rm -f tests-to-run.txt
+            echo "[fix negative test times]"
+            # scalatest actually reported occasionally test times with negative numbers
+            # this confused the circleci test runner. the easiest fix (suggested by circleci)
+            # is to use sed to adapt any such time and set it to 0
+            TIMING_DATA_FILE="$CIRCLE_INTERNAL_TASK_DATA/circle-test-results/results.json"
+            if [[ -e $TIMING_DATA_FILE ]]; then
+              sed -ri 's/"run_time": ?\-[0-9]+\.?[0-9]+,/"run_time":0.0,/g' "$TIMING_DATA_FILE"
+            fi
+            echo "[split tests ${extraargs}]"
+            rm -f tests-to-run.txt
 
-              # Set time-default to 5 minutes so that tests with unknown duration get distributed evenly.
-              # (The default for tests with unknown duration would be 1s.)
-              # The tests run command wants to invoke the test runner for each test. That doesn't work for us.
-              # However, what we do instead is we just print the tests it wants to run into a file and pass
-              # that content then to sbt ...
-              cat << parameters.test_names_file >> | circleci tests run --command "xargs ./.circleci/grab-tests.sh" $extraargs --split-by=timings --test-selector=classname --time-default=5m
+            # Set time-default to 5 minutes so that tests with unknown duration get distributed evenly.
+            # (The default for tests with unknown duration would be 1s.)
+            # The tests run command wants to invoke the test runner for each test. That doesn't work for us.
+            # However, what we do instead is we just print the tests it wants to run into a file and pass
+            # that content then to sbt ...
+            cat << parameters.test_names_file >> | circleci tests run --command "xargs ./.circleci/grab-tests.sh" $extraargs --split-by=timings --test-selector=classname --time-default=5m
 
-              # if we are re-running but don't have anything todo, then the file won't be there and we can halt
-              if [ -e tests-to-run.txt ]; then
-                splitted=$(cat tests-to-run.txt)
-                tests=$(echo $splitted | tr '\n' ' ')
-                count=$(echo $tests | wc -w)
-                echo "We are running $count tests in this batch:"
-                cat \<<< "$splitted"
-                echo "export RUN_SPLITTED_TESTS_CMD=\"testOnly $tests\"" >> "$BASH_ENV"
-                mkdir tests
-                for t in $tests; do echo " " > tests/$t; done # CircleCI refuses to upload empty files
-              else
-                echo "re-running this bucket can be aborted, as nothing flaked here"
-                circleci-agent step halt
-              fi
+            # if we are re-running but don't have anything todo, then the file won't be there and we can halt
+            if [ -e tests-to-run.txt ]; then
+              splitted=$(cat tests-to-run.txt)
+              tests=$(echo $splitted | tr '\n' ' ')
+              count=$(echo $tests | wc -w)
+              echo "We are running $count tests in this batch:"
+              cat \<<< "$splitted"
+              echo "export RUN_SPLITTED_TESTS_CMD=\"testOnly $tests\"" >> "$BASH_ENV"
+              mkdir tests
+              for t in $tests; do echo " " > tests/$t; done # CircleCI refuses to upload empty files
             else
-              echo "<< parameters.test_names_file >> not found, using default command << parameters.default_splitted_test_cmd >>"
-              echo "export RUN_SPLITTED_TESTS_CMD=\"<< parameters.default_splitted_test_cmd >>\"" >> "$BASH_ENV"
+              echo "re-running this bucket can be aborted, as nothing flaked here"
+              circleci-agent step halt
             fi
       - store_artifacts:
           name: Upload list of tests executed in this run (as empty files)
@@ -1326,7 +1317,6 @@ jobs:
           cmd_retry_count: 2
       - split_tests_for_parallel_run:
           test_names_file: "test-full-class-names-preflight.log"
-          default_splitted_test_cmd: "apps-app/testOnly *PreflightIntegrationTest"
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
