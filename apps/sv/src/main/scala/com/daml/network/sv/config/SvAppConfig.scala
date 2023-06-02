@@ -43,9 +43,6 @@ object SvOnboardingConfig {
       initialCoinPrice: BigDecimal = 1.0,
   ) extends SvOnboardingConfig
 
-  // TODO(#4367): mock; remove once not needed anymore
-  case class JoinViaSvcApp(name: String = "not yet used") extends SvOnboardingConfig
-
   case class JoinWithKey(
       name: String,
       svClient: SvAppClientConfig, // an SV that we'll contact to start our onboarding
@@ -78,8 +75,8 @@ case class SvAppBackendConfig(
     isDevNet: Boolean = false,
     expectedValidatorOnboardings: List[ExpectedValidatorOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
-    // TODO(#4367) make this an `Option` with default `= None`
-    onboarding: SvOnboardingConfig = SvOnboardingConfig.JoinViaSvcApp(),
+    // TODO(#5288) make this an `Option` with default `= None`
+    onboarding: SvOnboardingConfig,
     initialCoinPriceVote: Option[BigDecimal] = None,
     enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,

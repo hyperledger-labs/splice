@@ -489,8 +489,6 @@ class SvApp(
     config.onboarding match {
       case foundingConfig: SvOnboardingConfig.FoundCollective =>
         foundCollective(foundingConfig, svcStoreWithIngestion, globalDomain, cometBftNode)
-      case _: SvOnboardingConfig.JoinViaSvcApp =>
-        joinCollective(svcStore.key.svParty)
       case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
@@ -512,8 +510,6 @@ class SvApp(
             } yield ()
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
         }
-      // TODO(#4367) throw an error here if onboarding config is not set (once it becomes optional)
-      // case None => sys.error("Not onboarded but no onboarding config found; exiting.")
     }
   }
 
@@ -748,22 +744,6 @@ class SvApp(
       // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
       _ <- waiveSvcRights(svcStore.key.svcParty, svcStoreWithIngestion.connection)
     } yield ()
-  }
-
-  private def joinCollective(svPartyId: PartyId): Future[Unit] = {
-    retryProvider.retryForAutomation(
-      "join existing SV collective", {
-        val svcConnection = new SvcConnection(
-          config.svcClient.clientAdminApi,
-          coinAppParameters.processingTimeouts,
-          loggerFactory,
-        )
-        svcConnection
-          .joinCollective(svPartyId)
-          .andThen(_ => svcConnection.close())
-      },
-      logger,
-    )
   }
 
   private def uploadDars(

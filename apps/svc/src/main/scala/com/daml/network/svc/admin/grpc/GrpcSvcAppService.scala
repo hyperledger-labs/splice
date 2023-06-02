@@ -4,7 +4,6 @@ import com.daml.ledger.api.v1.value.Record.toJavaProto
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.store.CNNodeAppStoreWithIngestion
-import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
@@ -16,7 +15,6 @@ import com.daml.network.svc.v0
 import com.daml.network.svc.v0.{
   GrantFeaturedAppRightRequest,
   GrantFeaturedAppRightResponse,
-  JoinCollectiveRequest,
   SetConfigScheduleRequest,
   SvcServiceGrpc,
   WithdrawFeaturedAppRightRequest,
@@ -110,41 +108,6 @@ class GrpcSvcAppService(
               update = c.contractId.exerciseFeaturedAppRight_Withdraw(request.reason),
               domainId = globalDomain,
             )
-        }
-      } yield Empty()
-    }
-
-  // TODO(#4367) only needed for mock SVC bootstrap; remove after we have proper SVC bootstrap
-  override def joinCollective(request: JoinCollectiveRequest): Future[Empty] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      logger.info(s"Party ${request.svParty} wants to join the SV collective")
-      for {
-        _ <- svcStore.lookupSvcRules().flatMap {
-          case None => {
-            logger.info("SvcRules doesn't exist yet, waiting for the founding SV app to create it")
-            throw new StatusRuntimeException(
-              Status.FAILED_PRECONDITION.withDescription(
-                s"Cannot join collective for party ${request.svParty}, as its `SvcRules` don't exist yet."
-              )
-            )
-          }
-          case Some(svcRules) =>
-            if (svcRules.payload.members.keySet.contains(request.svParty)) {
-              logger.info("SvcRules exist and party is member; doing nothing")
-              Future.successful(())
-            } else {
-              logger.info("SvcRules exist; adding party as member")
-              svcStoreWithIngestion.connection.submitWithResultNoDedup(
-                actAs = Seq(svcStore.svcParty),
-                readAs = Seq.empty,
-                update = svcRules.contractId.exerciseSvcRules_AddMember(
-                  request.svParty,
-                  s"mockName:${request.svParty}",
-                  new Round(1),
-                ),
-                domainId = globalDomain,
-              )
-            }
         }
       } yield Empty()
     }

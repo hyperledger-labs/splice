@@ -451,8 +451,6 @@ object CNNodeConfig {
     implicit val svOnboardingFoundCollectiveReader
         : ConfigReader[SvOnboardingConfig.FoundCollective] =
       deriveReader[SvOnboardingConfig.FoundCollective]
-    implicit val svOnboardingJoinViaSvcAppReader: ConfigReader[SvOnboardingConfig.JoinViaSvcApp] =
-      deriveReader[SvOnboardingConfig.JoinViaSvcApp]
     implicit val svOnboardingJoinWithKeyReader: ConfigReader[SvOnboardingConfig.JoinWithKey] =
       deriveReader[SvOnboardingConfig.JoinWithKey]
     implicit val svOnboardingConfigReader: ConfigReader[SvOnboardingConfig] =
@@ -592,8 +590,6 @@ object CNNodeConfig {
     implicit val svOnboardingFoundCollectiveWriter
         : ConfigWriter[SvOnboardingConfig.FoundCollective] =
       deriveWriter[SvOnboardingConfig.FoundCollective]
-    implicit val svOnboardingJoinViaSvcAppWriter: ConfigWriter[SvOnboardingConfig.JoinViaSvcApp] =
-      deriveWriter[SvOnboardingConfig.JoinViaSvcApp]
     implicit val svOnboardingJoinWithKeyWriter: ConfigWriter[SvOnboardingConfig.JoinWithKey] =
       deriveWriter[SvOnboardingConfig.JoinWithKey]
     implicit val svOnboardingConfigWriter: ConfigWriter[SvOnboardingConfig] =
