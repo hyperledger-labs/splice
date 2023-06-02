@@ -12,7 +12,7 @@ if [ -n "${CNCLUSTER_STATIC_DIRTY_VERSION}" ]; then
         >&2 echo "CNCLUSTER_STATIC_DIRTY_VERSION and CI must not be set together"
         exit 1
     fi
-    echo "$prefix${USER}-dirty"
+    echo "$prefix-${USER}-dirty"
     exit 0
 fi
 
