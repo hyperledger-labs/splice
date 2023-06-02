@@ -578,53 +578,50 @@ class CNLedgerConnection(
   def listPackages(): Future[Set[String]] =
     client.listPackages().map(_.toSet)
 
-  private def uploadDarFileInternal(packageId: String, darFile: => ByteString)(implicit
-      traceContext: TraceContext
+  private def uploadDarFileInternal(packageId: String, path: String, darFile: => ByteString)(
+      implicit traceContext: TraceContext
   ): Future[Unit] = {
     for {
       known <- client.listPackages()
       _ <- {
         if (known.contains(packageId)) {
-          logger.debug(s"Package of dar $packageId already exists")
+          logger.debug(
+            s"Skipping upload of dar file $path with package-id $packageId, as a package with that id has already been uploaded."
+          )
           Future.successful(())
         } else {
-          logger.debug(s"Uploading dar file ${packageId}")
+          logger.debug(s"Uploading dar file $path with package-id ${packageId}")
           client.uploadDarFile(darFile)
         }
       }
+      // TODO(tech-debt): The ledger API does not block until the package is vetted.
+      //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
+      _ = Threading.sleep(500)
+      _ = logger.info(
+        s"Dar file $path with package-id $packageId should now be uploaded"
+      )
     } yield ()
   }
 
   def uploadDarFile(
       pkg: UploadablePackage
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    for {
-      _ <- uploadDarFileInternal(
-        pkg.packageId,
-        ByteString.readFrom(pkg.inputStream()),
-      )
-      // TODO(tech-debt): The ledger API does not block until the package is vetted.
-      //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
-      _ = Threading.sleep(500)
-      _ = logger.info(s"Package ${pkg.packageId} is uploaded")
-    } yield ()
-  }
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    uploadDarFileInternal(
+      pkg.packageId,
+      pkg.resourcePath,
+      ByteString.readFrom(pkg.inputStream()),
+    )
 
   def uploadDarFile(
       path: Path
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       darFile <- Future {
         ByteString.readFrom(Files.newInputStream(path))
       }
       hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
-      _ <- uploadDarFileInternal(hash, darFile)
-      // TODO(tech-debt): The ledger API does not block until the package is vetted.
-      //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
-      _ = Threading.sleep(500)
-      _ = logger.info(s"DAR $path is uploaded")
+      _ <- uploadDarFileInternal(hash, path.toString, darFile)
     } yield ()
-  }
 
   def submitTransferAndWaitNoDedup(
       submitter: PartyId,
