@@ -48,7 +48,7 @@ MEDIATOR_INVALID_MESSAGE.* Received a mediator response .*with an unknown reques
 
 # TODO(#5307) Remove once Canton fixed their bug
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*request uuid.*must not be used until
-TransactionProcessor.*Submission timed out
+Submission timed out.*TransactionProcessor
 
 # TODO(#5308) Remove this once Canton fixes their bug
 Response message for request.+timed out at
