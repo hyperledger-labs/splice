@@ -33,7 +33,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}
 import com.google.protobuf.empty.Empty
-import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
+import io.grpc.{Channel, Deadline, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
@@ -63,9 +63,12 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     elc: ErrorLoggingContext,
 ) extends Closeable {
 
+  private def getReducedDeadline(): Deadline = Deadline.after(10, TimeUnit.SECONDS)
+
   import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest}
 
   private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
+    // TODO(#5319) remove deadline after Canton properly produces a response
     withCredentials(CommandServiceGrpc.newStub(channel), token)
   private val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
     withCredentials(TransactionServiceGrpc.newStub(channel), token)
@@ -217,9 +220,11 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       commands,
       disclosedContracts,
     )
-    wrapFuture(commandServiceStub.submitAndWaitForTransactionId(request, _)).map(response =>
-      response.getCompletionOffset
-    )
+    wrapFuture(
+      commandServiceStub
+        .withDeadline(getReducedDeadline())
+        .submitAndWaitForTransactionId(request, _)
+    ).map(response => response.getCompletionOffset)
   }
 
   def submitAndWaitForTransaction(
@@ -242,9 +247,9 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       commands,
       disclosedContracts,
     )
-    wrapFuture(commandServiceStub.submitAndWaitForTransaction(request, _)).map(response =>
-      Transaction.fromProto(response.getTransaction)
-    )
+    wrapFuture(
+      commandServiceStub.withDeadline(getReducedDeadline()).submitAndWaitForTransaction(request, _)
+    ).map(response => Transaction.fromProto(response.getTransaction))
   }
 
   def submitAndWaitForTransactionTree(
@@ -267,9 +272,11 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       commands,
       disclosedContracts,
     )
-    wrapFuture(commandServiceStub.submitAndWaitForTransactionTree(request, _)).map(response =>
-      TransactionTree.fromProto(response.getTransaction)
-    )
+    wrapFuture(
+      commandServiceStub
+        .withDeadline(getReducedDeadline())
+        .submitAndWaitForTransactionTree(request, _)
+    ).map(response => TransactionTree.fromProto(response.getTransaction))
   }
 
   def listPackages()(implicit ec: ExecutionContext): Future[Seq[String]] = {
@@ -310,7 +317,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     wrapFuture(
       partyManagementServiceStub
         // TODO(#5300) remove deadline after we don't want to retry this anymore
-        .withDeadlineAfter(10, TimeUnit.SECONDS)
+        .withDeadline(getReducedDeadline())
         .allocateParty(requestBuilder.build, _)
     )
       .map(_.getPartyDetails.getParty)
