@@ -61,12 +61,11 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchSinglePaymentInfo(id("confirm-payment").element)(
-                expectedBalance =
-                  "Total Available Balance: 4.4475 CC / 8.895 USD", // from the self-directory creation
+                expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedSendAmount = "1.5" -> Currency.CC,
                 expectedReceiver = expectedCns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
-                expectedTotalCC = "1.5",
+                expectedTotalCC = 1.5,
                 expectedComputeText = "3 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
@@ -133,12 +132,11 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchSinglePaymentInfo(id("confirm-payment").element)(
-                expectedBalance =
-                  "Total Available Balance: 4.4475 CC / 8.895 USD", // from the self-directory creation
+                expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedSendAmount = "5.5" -> Currency.USD,
                 expectedReceiver = expectedCns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
-                expectedTotalCC = "2.75",
+                expectedTotalCC = 2.75,
                 expectedComputeText = "5.5 USD @ 2 USD/CC",
                 expectedDescription = description,
               )
@@ -210,14 +208,13 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
-                expectedBalance =
-                  "Total Available Balance: 4.4475 CC / 8.895 USD", // from the self-directory creation
+                expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedReceivers = Seq(
                   (aliceUserParty, aliceEntryName, "1.5 CC", "3 USD"),
                   (charlieUserParty, charlieEntryName, "2.5 CC", "5 USD"),
                 ),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
-                expectedTotalCC = "4",
+                expectedTotalCC = 4.0,
                 expectedComputeText = "8 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
@@ -285,14 +282,13 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
-                expectedBalance =
-                  "Total Available Balance: 4.4475 CC / 8.895 USD", // from the self-directory creation
+                expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedReceivers = Seq(
                   (aliceUserParty, aliceEntryName, "1.5 USD", "0.75 CC"),
                   (charlieUserParty, charlieEntryName, "2.5 USD", "1.25 CC"),
                 ),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
-                expectedTotalCC = "2",
+                expectedTotalCC = 2.0,
                 expectedComputeText = "4 USD @ 2 USD/CC",
                 expectedDescription = description,
               )
@@ -360,14 +356,13 @@ class WalletPaymentFrontendIntegrationTest
             "Alice sees the payment information",
             _ => {
               matchMultipleRecipientPaymentInfo(id("confirm-payment").element)(
-                expectedBalance =
-                  "Total Available Balance: 4.4475 CC / 8.895 USD", // from the self-directory creation
+                expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedReceivers = Seq(
                   (aliceUserParty, aliceEntryName, "1.5 CC", "3 USD"),
                   (charlieUserParty, charlieEntryName, "2.5 USD", "1.25 CC"),
                 ),
                 expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
-                expectedTotalCC = "2.75",
+                expectedTotalCC = 2.75,
                 expectedComputeText = "5.5 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
@@ -427,11 +422,11 @@ class WalletPaymentFrontendIntegrationTest
   }
 
   private def matchSinglePaymentInfo(element: Element)(
-      expectedBalance: String,
+      expectedBalance: (BigDecimal, BigDecimal),
       expectedSendAmount: (String, Currency),
       expectedReceiver: String,
       expectedProvider: String,
-      expectedTotalCC: String,
+      expectedTotalCC: BigDecimal,
       expectedComputeText: String,
       expectedDescription: String,
   ) = {
@@ -451,10 +446,10 @@ class WalletPaymentFrontendIntegrationTest
   }
 
   private def matchMultipleRecipientPaymentInfo(element: Element)(
-      expectedBalance: String,
+      expectedBalance: (BigDecimal, BigDecimal),
       expectedReceivers: Seq[(PartyId, String, String, String)],
       expectedProvider: String,
-      expectedTotalCC: String,
+      expectedTotalCC: BigDecimal,
       expectedComputeText: String,
       expectedDescription: String,
   ): Unit = {
@@ -480,14 +475,15 @@ class WalletPaymentFrontendIntegrationTest
   }
 
   private def matchPaymentCommon(element: Element)(
-      expectedBalance: String,
+      expectedBalance: (BigDecimal, BigDecimal),
       expectedProvider: String,
-      expectedTotalCC: String,
+      expectedTotalCC: BigDecimal,
       expectedComputeText: String,
       expectedDescription: String,
   ) = {
     element.childElement(className("available-balance")).text should matchTextMixedWithNumbers(
-      expectedBalance,
+      raw"Total Available Balance: ([0-9.,]+) CC / ([0-9.,]+) USD".r,
+      Seq(expectedBalance._1, expectedBalance._2),
       tolerance,
     )
 
@@ -495,7 +491,8 @@ class WalletPaymentFrontendIntegrationTest
 
     // TODO (#3492): test with fee
     element.childElement(className("payment-total-cc")).text should matchTextMixedWithNumbers(
-      s"$expectedTotalCC CC",
+      raw"([0-9.,]+) CC".r,
+      Seq(expectedTotalCC),
       tolerance,
     )
 
