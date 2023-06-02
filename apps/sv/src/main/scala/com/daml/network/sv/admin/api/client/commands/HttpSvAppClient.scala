@@ -14,7 +14,6 @@ import com.google.protobuf.ByteString
 import com.digitalasset.canton.domain.sequencing.sequencer.{
   SequencerSnapshot as CantonSequencerSnapshot
 }
-import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.protocol.v0
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
@@ -220,7 +219,6 @@ object HttpSvAppClient {
   case class SequencerSnapshot(
       topologySnapshot: GenericStoredTopologyTransactionsX,
       sequencerSnapshot: CantonSequencerSnapshot,
-      staticDomainParameters: StaticDomainParameters,
   )
 
   case class OnboardSvPartyMigrationAuthorizeResponse(
@@ -276,10 +274,7 @@ object HttpSvAppClient {
                   )
                 sequencerSnapshot <- CantonSequencerSnapshot
                   .fromByteArray(Base64.getDecoder().decode(snapshot.sequencerSnapshot))
-                staticDomainParameters <- StaticDomainParameters.fromByteArray(
-                  Base64.getDecoder().decode(snapshot.staticDomainParameters)
-                )
-              } yield SequencerSnapshot(topologySnapshot, sequencerSnapshot, staticDomainParameters)
+              } yield SequencerSnapshot(topologySnapshot, sequencerSnapshot)
             }
             .left
             .map(_.message)

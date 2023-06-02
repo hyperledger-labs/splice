@@ -176,7 +176,7 @@ class SvcPartyHosting(
               _ <- localDomainNodeConnections.sequencerAdminConnection
                 .assignFromSnapshot(
                   snapshot.topologySnapshot,
-                  snapshot.staticDomainParameters,
+                  localDomainNodeConnections.staticDomainParameters,
                   snapshot.sequencerSnapshot,
                 )
               _ = logger.info("Sequencer bootstrapping complete")
@@ -188,7 +188,7 @@ class SvcPartyHosting(
               _ = logger.info(s"Initializing mediator")
               _ <- localDomainNodeConnections.mediatorAdminConnection.initialize(
                 domainId,
-                snapshot.staticDomainParameters,
+                localDomainNodeConnections.staticDomainParameters,
                 new GrpcSequencerConnection(
                   toEndpoints(publicConfig),
                   transportSecurity = publicConfig.tls.isDefined,

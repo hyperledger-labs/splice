@@ -10,6 +10,8 @@ import com.daml.network.config.{
 }
 import com.daml.network.svc.config.SvcAppClientConfig
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
 case class ExpectedValidatorOnboardingConfig(
     secret: String,
@@ -118,4 +120,9 @@ final case class SvXNodesConfig(
 final case class SvXNodesDomainConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
+    parameters: DomainParametersConfig = DomainParametersConfig(
+      protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
+      devVersionSupport = true,
+      uniqueContractKeys = false,
+    ),
 )

@@ -703,13 +703,10 @@ components:
       required:
         - topology_snapshot
         - sequencer_snapshot
-        - static_domain_parameters
       properties:
         topology_snapshot:
           type: string
         sequencer_snapshot:
-          type: string
-        static_domain_parameters:
           type: string
 
     GetSvcInfoResponse:

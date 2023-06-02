@@ -5,6 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
 import cats.implicits.catsSyntaxTuple2Semigroupal
+import cats.syntax.either.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -51,7 +52,11 @@ import com.daml.network.util.CNNodeUtil.{
 import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.{
+  CommunityCryptoConfig,
+  NonNegativeFiniteDuration,
+  ProcessingTimeout,
+}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -67,6 +72,7 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
   TracedLogger,
 }
+import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -88,6 +94,7 @@ import scala.jdk.OptionConverters.*
 final case class LocalDomainNodeConnections(
     sequencerAdminConnection: SequencerAdminConnection,
     mediatorAdminConnection: MediatorAdminConnection,
+    staticDomainParameters: StaticDomainParameters,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
 ) extends FlagCloseable
@@ -144,6 +151,11 @@ class SvApp(
             timeouts,
             loggerFactory,
           ),
+          config.parameters
+            .toStaticDomainParameters(CommunityCryptoConfig())
+            .valueOr(err =>
+              throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
+            ),
           timeouts,
           loggerFactory,
         )

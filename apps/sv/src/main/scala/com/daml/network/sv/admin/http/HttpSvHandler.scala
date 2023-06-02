@@ -1,7 +1,6 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
-import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.http.HttpErrorHandler
@@ -24,14 +23,12 @@ import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{Codec, Contract}
-import com.digitalasset.canton.config.{CommunityCryptoConfig, NonNegativeFiniteDuration}
-import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -63,16 +60,6 @@ class HttpSvHandler(
   private val svcStore = svcStoreWithIngestion.store
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
-
-  // TODO(#5091) Stop hardcoding domain parameters
-  private val staticDomainParameters = DomainParametersConfig(
-    protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
-    devVersionSupport = true,
-    uniqueContractKeys = false,
-  ).toStaticDomainParameters(CommunityCryptoConfig())
-    .valueOr(err =>
-      throw new IllegalArgumentException(s"Static domain parameters are invalid: $err")
-    )
 
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
@@ -459,7 +446,6 @@ class HttpSvHandler(
     } yield definitions.SequencerSnapshot(
       topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV0.toByteArray),
       sequencerSnapshot = Base64.getEncoder.encodeToString(sequencerSnapshot.toByteArray),
-      staticDomainParameters = Base64.getEncoder.encodeToString(staticDomainParameters.toByteArray),
     )
   }
 
