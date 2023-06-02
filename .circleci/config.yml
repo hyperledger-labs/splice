@@ -593,7 +593,7 @@ commands:
           name: Splitting tests
           command: |
             echo "[fix negative test times]"
-            # scalatest actually reported occassionally test times with negative numbers
+            # scalatest actually reported occasionally test times with negative numbers
             # this confused the circleci test runner. the easiest fix (suggested by circleci)
             # is to use sed to adapt any such time and set it to 0
             TIMING_DATA_FILE="$CIRCLE_INTERNAL_TASK_DATA/circle-test-results/results.json"
@@ -1280,6 +1280,7 @@ jobs:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
+    parallelism: 3
     steps:
       - checkout
       - record_job_start_time
@@ -1314,6 +1315,8 @@ jobs:
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
+      - split_tests_for_parallel_run:
+          test_names_file: "test-full-class-names-preflight.log"
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
@@ -1322,13 +1325,12 @@ jobs:
             scripts/start-postgres-for-preflight.sh || true
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -p
-          cmd: "\"apps-app/testOnly *PreflightIntegrationTest\""
+          cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep SV_WEB_UI_PASSWORD"
           extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
           extra_parameters: -DAUTH0_TENANT=dev
-          # TODO(#5097) Reduce this again once we parallelize tests.
-          timeout: "20m"
+          timeout: "15m"
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job

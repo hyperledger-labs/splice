@@ -1001,7 +1001,7 @@ lazy val `apps-app` =
 // https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
 // also used by Canton team
 lazy val printTests = taskKey[Unit](
-  "write full class names of `apps-app` tests to separted files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend; used for CI test splitting"
+  "write full class names of `apps-app` tests to separted files depending on whether the test is for Wall clock time vs Simulated time, Backend vs frontend, preflight; used for CI test splitting"
 )
 printTests := {
   import java.io._
@@ -1011,6 +1011,9 @@ printTests := {
   val pwFrontEnd = new PrintWriter(new FileWriter(s"test-full-class-names-frontend.log", true))
   val pwFrontEndSimTime =
     new PrintWriter(new FileWriter(s"test-full-class-names-frontend-sim-time.log", true))
+  val pwPreflight = new PrintWriter(new FileWriter(s"test-full-class-names-preflight.log", true))
+  val pwPreflightSv =
+    new PrintWriter(new FileWriter(s"test-full-class-names-preflight-sv.log", true))
   val pwXNode = new PrintWriter(new FileWriter(s"test-full-class-names-xnode.log", true))
   val pwXNodeSimTime =
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-sim-time.log", true))
@@ -1021,8 +1024,9 @@ printTests := {
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
   def isXNodeTest(name: String): Boolean = name.contains("XNode")
   def isDistributedDomainTest(name: String): Boolean = name.contains("DistributedDomain")
-  def isPreflightIntegrationTest(name: String): Boolean =
-    name.contains("PreflightIntegrationTest") || name.contains("PreflightSvIntegrationTest")
+  def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
+  def isPreflightSvIntegrationTest(name: String): Boolean =
+    name.contains("PreflightSvIntegrationTest")
   def printTestNames(
       testSet: String,
       testNames: Seq[String],
@@ -1048,7 +1052,9 @@ printTests := {
       "tests with wall clock time",
       pw,
       (t: String) =>
-        !isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(t) && !isXNodeTest(
+        !isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(
+          t
+        ) && !isPreflightSvIntegrationTest(t) && !isXNodeTest(
           t
         ),
     ),
@@ -1056,7 +1062,9 @@ printTests := {
       "tests with simulated time",
       pwSimTime,
       (t: String) =>
-        isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(t) && !isXNodeTest(
+        isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(
+          t
+        ) && !isPreflightSvIntegrationTest(t) && !isXNodeTest(
           t
         ),
     ),
@@ -1064,7 +1072,9 @@ printTests := {
       "Frontend tests with wall clock time",
       pwFrontEnd,
       (t: String) =>
-        !isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(t) && !isXNodeTest(
+        !isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(
+          t
+        ) && !isPreflightSvIntegrationTest(t) && !isXNodeTest(
           t
         ),
     ),
@@ -1072,9 +1082,21 @@ printTests := {
       "Frontend tests with simulated time",
       pwFrontEndSimTime,
       (t: String) =>
-        isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(t) && !isXNodeTest(
+        isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(
+          t
+        ) && !isPreflightSvIntegrationTest(t) && !isXNodeTest(
           t
         ),
+    ),
+    (
+      "Preflight tests",
+      pwPreflight,
+      (t: String) => isPreflightIntegrationTest(t),
+    ),
+    (
+      "Preflight SV tests",
+      pwPreflightSv,
+      (t: String) => isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode tests with wall clock time",
@@ -1099,6 +1121,8 @@ printTests := {
   pwSimTime.close()
   pwFrontEnd.close()
   pwFrontEndSimTime.close()
+  pwPreflight.close()
+  pwPreflightSv.close()
   pwXNode.close()
   pwXNodeSimTime.close()
   pwXNodeDistributedDomain.close()
