@@ -177,7 +177,7 @@ class SvApp(
         localDomainNode,
       )
       cometBftClient = newCometBftClient
-      (svcStore, svcAutomation) <- ensureOnboarded(
+      (svcStore, svcAutomation, svcRulesLock) <- ensureOnboarded(
         svAutomation,
         ledgerClient,
         participantAdminConnection,
@@ -337,7 +337,7 @@ class SvApp(
       svcPartyHosting: SvcPartyHosting,
       globalDomain: DomainId,
       cometBftClient: Option[CometBftClient],
-  ): Future[(SvSvcStore, SvSvcAutomationService)] = {
+  ): Future[(SvSvcStore, SvSvcAutomationService, SvcRulesLock)] = {
     val svStore = svStoreWithIngestion.store
     val cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
       new CometBftNode(client, config, loggerFactory)
@@ -398,14 +398,21 @@ class SvApp(
           )
         }
       _ <- waitForSvcMembership(svcStore)
-      _ <- onboardMediatorIfRequired(globalDomain, participantAdminConnection, localDomainNode)
-    } yield (svcStore, svcAutomation)
+      svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
+      _ <- onboardMediatorIfRequired(
+        globalDomain,
+        participantAdminConnection,
+        localDomainNode,
+        svcRulesLock,
+      )
+    } yield (svcStore, svcAutomation, svcRulesLock)
   }
 
   private def onboardMediatorIfRequired(
       domainId: DomainId,
       participantAdminConnection: ParticipantAdminConnection,
       localDomainNodeO: Option[LocalDomainNode],
+      svcRulesLock: SvcRulesLock,
   )(implicit traceContext: TraceContext): Future[Unit] =
     (for {
       localDomainNode <- localDomainNodeO
@@ -421,7 +428,7 @@ class SvApp(
         loggerFactory,
       ).flatMap { svConnection =>
         localDomainNode
-          .onboardLocalMediator(domainId, participantAdminConnection, svConnection)
+          .onboardLocalMediator(domainId, participantAdminConnection, svConnection, svcRulesLock)
           .andThen(_ => svConnection.close())
       }
     }

@@ -45,6 +45,7 @@ final class LocalDomainNode(
       domainId: DomainId,
       participantAdminConnection: ParticipantAdminConnection,
       svConnection: SvConnection,
+      svcRulesLock: SvcRulesLock,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info("Adding mediator identity transactions")
     for {
@@ -64,10 +65,13 @@ final class LocalDomainNode(
         },
         logger,
       )
+      // We need to lock between the topology transaction and the mediator initializing. Otherwise things blow up with
+      // "Unable to find mediator group"
+      _ <- svcRulesLock.lock()
       _ = logger.info(s"Onboarding mediator $mediatorId through sponsoring SV")
       _ <- svConnection.onboardSvMediator(mediatorId)
       _ = logger.info(s"Onboarded mediator $mediatorId")
-      _ = logger.info(s"Initializationg mediator $mediatorId")
+      _ = logger.info(s"Initializating mediator $mediatorId")
       _ <- mediatorAdminConnection.initialize(
         domainId,
         staticDomainParameters,
@@ -78,6 +82,21 @@ final class LocalDomainNode(
           SequencerAlias.Default,
         ),
       )
+      _ = logger.info("Watiing for mediator to observe itself as onboarded")
+      _ <- retryProvider.retryForAutomation(
+        "Mediator observers itself as onboarded",
+        mediatorAdminConnection.getMediatorState(domainId).map { state =>
+          if (!state.active.contains(mediatorId)) {
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Mediator $mediatorId not in active mediators ${state.active.forgetNE}"
+              )
+              .asRuntimeException()
+          }
+        },
+        logger,
+      )
+      _ <- svcRulesLock.unlock()
     } yield ()
   }
 
