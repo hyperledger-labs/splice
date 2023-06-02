@@ -356,14 +356,14 @@ class SvTimeBasedIntegrationTest
         sv3Validator,
       )
       startAllSync(nodes)
-      getSvcRules().data.members should have size 3
+      sv1.getSvcInfo().svcRules.payload.members should have size 3
     }
     clue(
       "Add a phantom SV and stop SV3 so that SV4 can't gather enough confirmations just yet"
     ) {
       addPhantomSv()
       sv3.stop()
-      getSvcRules().data.members should have size 4
+      eventually() { sv1.getSvcInfo().svcRules.payload.members should have size 4 }
       // We now need 3 confirmations to execute an action, but only sv1 and sv2 are active.
     }
     clue("SV4 starts") {
@@ -398,7 +398,7 @@ class SvTimeBasedIntegrationTest
         sv3Validator,
       )
       startAllSync(nodes)
-      getSvcRules().data.members should have size 3
+      sv1.getSvcInfo().svcRules.payload.members should have size 3
     }
     val svXParty = allocateRandomSvParty("svX")
     actAndCheck(
@@ -406,7 +406,10 @@ class SvTimeBasedIntegrationTest
       svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(svcParty),
         optTimeout = None,
-        commands = getSvcRules().id
+        commands = sv1
+          .getSvcInfo()
+          .svcRules
+          .contractId
           .exerciseSvcRules_ConfirmSvOnboarding(
             svXParty.toProtoPrimitive,
             "new random party",
@@ -486,7 +489,7 @@ class SvTimeBasedIntegrationTest
         sv4Validator,
       )
       startAllSync(nodes)
-      getSvcRules().data.members should have size 4
+      sv1.getSvcInfo().svcRules.payload.members should have size 4
     }
     clue(
       "Stop three SVs so that actions can't gather enough confirmations"
@@ -494,7 +497,7 @@ class SvTimeBasedIntegrationTest
       sv2.stop()
       sv3.stop()
       sv4.stop()
-      getSvcRules().data.members should have size 4
+      sv1.getSvcInfo().svcRules.payload.members should have size 4
       // We now need 3 confirmations to execute an action, but only sv1 is active.
     }
 
@@ -570,8 +573,11 @@ class SvTimeBasedIntegrationTest
         sv4Validator,
       )
       startAllSync(nodes)
-      val svcRulesBeforeElection = getSvcRules()
-      svcRulesBeforeElection.data.members should have size 4
+      val svcRulesBeforeElection = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+        .head
+        .data
+      svcRulesBeforeElection.members should have size 4
       svcRulesBeforeElection
     }
 
@@ -622,9 +628,12 @@ class SvTimeBasedIntegrationTest
 
       advanceTime(effectiveTimeout.plus(bufferDuration))
       eventually() {
-        val svcRulesAfterElection = getSvcRules()
-        svcRulesAfterElection.data.epoch shouldBe svcRulesBeforeElection.data.epoch + 1
-        svcRulesAfterElection.data.leader should not be svcRulesBeforeElection.data.leader
+        val svcRulesAfterElection = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+          .head
+          .data
+        svcRulesAfterElection.epoch shouldBe svcRulesBeforeElection.epoch + 1
+        svcRulesAfterElection.leader should not be svcRulesBeforeElection.leader
       }
 
       eventually() {

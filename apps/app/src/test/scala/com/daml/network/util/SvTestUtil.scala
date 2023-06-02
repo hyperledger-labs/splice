@@ -14,14 +14,6 @@ import scala.jdk.CollectionConverters.*
 trait SvTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences =>
 
-  def getSvcRules()(implicit env: CNNodeTestConsoleEnvironment) =
-    clue("There is exactly one SvcRules contract") {
-      val foundSvcRules = svc.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
-      foundSvcRules should have length 1
-      foundSvcRules.head
-    }
-
   def allocateRandomSvParty(name: String)(implicit env: CNNodeTestConsoleEnvironment) = {
     val id = (new scala.util.Random).nextInt().toHexString
     svc.participantClient.ledger_api.parties.allocate(s"$name-$id", name).party
@@ -46,7 +38,10 @@ trait SvTestUtil extends CNNodeTestCommon {
       svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(svcParty),
         optTimeout = None,
-        commands = getSvcRules().id
+        commands = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+          .head
+          .id
           .exerciseSvcRules_AddMember(
             svParty.toProtoPrimitive,
             svName,
@@ -58,7 +53,12 @@ trait SvTestUtil extends CNNodeTestCommon {
       ),
     )(
       s"$svName is a member of the SvcRules",
-      _ => getSvcRules().data.members should contain key svParty.toProtoPrimitive,
+      _ =>
+        svc.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+          .head
+          .data
+          .members should contain key svParty.toProtoPrimitive,
     )
   }
 

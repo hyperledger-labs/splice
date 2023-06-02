@@ -103,15 +103,15 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   "The SVC is bootstrapped correctly" in { implicit env =>
     initSvc()
-    val svcRules = clue("An SvcRules contract exists") { getSvcRules() }
+    val svcRules = clue("An SvcRules contract exists") { sv1.getSvcInfo() }
     val svParties = clue("We have four sv parties and their apps are online") {
       svs.map(_.getSvcInfo().svParty.toProtoPrimitive)
     }
     clue("The four sv apps are all svc members and there are no other svc members") {
-      svcRules.data.members.keySet should equal(svParties.toSet.asJava)
+      sv1.getSvcInfo().svcRules.payload.members.keySet() should equal(svParties.toSet.asJava)
     }
     clue("The founding SV app (sv1) is the first leader") {
-      getSvcRules().data.leader should equal(sv1.getSvcInfo().svParty.toProtoPrimitive)
+      sv1.getSvcInfo().svcRules.payload.leader should equal(svcRules.svParty.toProtoPrimitive)
     }
     clue("initial open mining rounds are created") {
       eventually() {
@@ -414,7 +414,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         sv3Validator,
       )
       startAllSync(nodes)
-      getSvcRules().data.members should have size 3
+      sv1.getSvcInfo().svcRules.payload.members should have size 3
     }
     clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
       inside(
@@ -508,7 +508,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             case _ => false
           }) should have length 1
       }
-      getSvcRules().data.members.keySet should not contain sv4Party.toProtoPrimitive
+      sv1.getSvcInfo().svcRules.payload.members.keySet should not contain sv4Party.toProtoPrimitive
     }
     clue("SV4's onboarding status is reported correctly.") {
       eventually()(inside(sv1.getSvOnboardingStatus(sv4Party)) {
@@ -528,14 +528,14 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       { _ =>
         svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty
-        getSvcRules().data.members.keySet should contain(sv4Party.toProtoPrimitive)
+        sv1.getSvcInfo().svcRules.payload.members.keySet should contain(sv4Party.toProtoPrimitive)
       },
     )
     clue("SV4's onboarding status is reported as completed.") {
       eventually()(inside(sv1.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Completed => {
           status.name shouldBe "Canton-Foundation-4"
-          status.svcRulesCid shouldBe getSvcRules().id
+          status.svcRulesCid shouldBe sv1.getSvcInfo().svcRules.contractId
           sv1.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1.getSvOnboardingStatus(
             sv4Party
           )
@@ -551,7 +551,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       clue("Initialize SVC with 1 SV") {
         val nodes = Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1)
         startAllSync(nodes)
-        getSvcRules().data.members should have size 1
+        sv1.getSvcInfo().svcRules.payload.members should have size 1
       }
       // We are not using sv2.getSvcInfo() to get sv2's party id because we
       // don't want SV2 to actually start and get onboarded for this test
@@ -575,7 +575,10 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             userId = "svc",
             actAs = Seq(svcParty),
             readAs = Seq(),
-            update = getSvcRules().id
+            update = sv1
+              .getSvcInfo()
+              .svcRules
+              .contractId
               .exerciseSvcRules_ConfirmSvOnboarding(
                 sv2Party.toProtoPrimitive,
                 "Canton-Foundation-2",
@@ -612,7 +615,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           sv3Validator,
         )
         startAllSync(nodes)
-        getSvcRules().data.members should have size 3
+        sv1.getSvcInfo().svcRules.payload.members should have size 3
       }
 
       val fakeSv4Party = allocateRandomSvParty("sv4")
@@ -622,19 +625,24 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             svc.config.ledgerApiUser,
             actAs = Seq(svcParty),
             readAs = Seq.empty,
-            update = getSvcRules().id.exerciseSvcRules_AddMember(
-              fakeSv4Party.toProtoPrimitive,
-              "Canton-Foundation-4",
-              new Round(3),
-            ),
+            update = sv1
+              .getSvcInfo()
+              .svcRules
+              .contractId
+              .exerciseSvcRules_AddMember(
+                fakeSv4Party.toProtoPrimitive,
+                "Canton-Foundation-4",
+                new Round(3),
+              ),
           )
         },
       )(
         "sv4 is added as an SVC member with the fake party Id",
         _ =>
-          inside(getSvcRules().data.members.asScala.get(fakeSv4Party.toProtoPrimitive)) {
-            case Some(memberInfo) =>
-              memberInfo.name shouldBe "Canton-Foundation-4"
+          inside(
+            sv1.getSvcInfo().svcRules.payload.members.asScala.get(fakeSv4Party.toProtoPrimitive)
+          ) { case Some(memberInfo) =>
+            memberInfo.name shouldBe "Canton-Foundation-4"
           },
       )
 
@@ -647,7 +655,13 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         "existing member sv4 is overwritten with different party id",
         _ => {
           inside(
-            getSvcRules().data.members.asScala.get(sv4.getSvcInfo().svParty.toProtoPrimitive)
+            sv1
+              .getSvcInfo()
+              .svcRules
+              .payload
+              .members
+              .asScala
+              .get(sv4.getSvcInfo().svParty.toProtoPrimitive)
           ) { case Some(memberInfo) =>
             memberInfo.name shouldBe "Canton-Foundation-4"
           }
@@ -659,7 +673,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("Initialize SVC with 4 SVs") {
       initSvc()
       eventually() {
-        getSvcRules().data.members should have size 4
+        sv1.getSvcInfo().svcRules.payload.members should have size 4
       }
     }
 
@@ -674,13 +688,15 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )(
       "There should be 7 SVC members in total now",
       _ => {
-        getSvcRules().data.members should have size 7
+        sv1.getSvcInfo().svcRules.payload.members should have size 7
       },
     )
 
     actAndCheck(
       "SV1 to SV4 create confirmation to Confirm SVX", {
-        val svcRules = getSvcRules()
+        val svcRules = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+          .head
         val newMemberName = "Canton-Foundation-X"
         val newMemberPartyId = allocateRandomSvParty(newMemberName)
         createSvOnboardingConfirmation(svcRules, sv1, newMemberPartyId, newMemberName)
@@ -937,9 +953,13 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
           svc.config.ledgerApiUser,
           actAs = Seq(svcParty),
           readAs = Seq.empty,
-          update = getSvcRules().id.exerciseSvcRules_RemoveMember(
-            svParties("sv3").toProtoPrimitive
-          ),
+          update = sv1
+            .getSvcInfo()
+            .svcRules
+            .contractId
+            .exerciseSvcRules_RemoveMember(
+              svParties("sv3").toProtoPrimitive
+            ),
         )
       },
     )(
@@ -957,7 +977,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("Initialize SVC with 4 SVs") {
       initSvc()
       eventually() {
-        getSvcRules().data.members should have size 4
+        sv1.getSvcInfo().svcRules.payload.members should have size 4
       }
     }
 
@@ -971,7 +991,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )(
       "There should be 5 SVC members in total now",
       _ => {
-        getSvcRules().data.members should have size 5
+        sv1.getSvcInfo().svcRules.payload.members should have size 5
       },
     )
 
@@ -1006,7 +1026,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )(
       "The majority did not vote yet, thus the trigger should not remove sv5",
       _ => {
-        getSvcRules().data.members should have size 5
+        sv2.getSvcInfo().svcRules.payload.members should have size 5
       },
     )
 
@@ -1017,7 +1037,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )(
       "The majority has voted but without an acceptance majority, the trigger should not remove sv5",
       _ => {
-        getSvcRules().data.members should have size 5
+        sv3.getSvcInfo().svcRules.payload.members should have size 5
       },
     )
 
@@ -1028,7 +1048,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     )(
       "The majority accepts, the trigger should remove sv5",
       _ => {
-        getSvcRules().data.members should have size 4
+        sv4.getSvcInfo().svcRules.payload.members should have size 4
       },
     )
 
