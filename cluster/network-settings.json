@@ -36,29 +36,26 @@
 
     // DA Clusters
     // da-cn-scratchnet gcp project
-    // 1. scratchnet
-    "35.188.147.4/32",
+    // scratchneta
+    "34.28.102.64/32",
 
-    // 2. scratchnetb
-    "34.70.206.199/32",
+    // scratchnetb
+    "34.71.129.232/32",
 
-    // 3. scratchnetc
-    "35.224.88.220/32",
+    // scratchnetc
+    "34.70.160.201/32",
 
-    // 4. sqlscratch
-    "104.198.152.233/32",
+    // staging
+    "34.171.136.234/32",
 
-    // 5. staging
-    "34.69.77.22/32",
-
-    // 6. SV
-    "104.154.35.222/32",
+    // stagingb
+    "34.173.176.161/32",
 
     // da-cn-devnet gcp project
-    // 1. devnet
-    "35.239.94.218/32",
-    // 2. testnet
-    "35.232.124.246/32",
+    // devnet
+    "104.198.172.213/32",
+    // testnet
+    "34.70.176.204/32",
 
     // Daml Finance CN Test App
     "20.250.62.34/32",
