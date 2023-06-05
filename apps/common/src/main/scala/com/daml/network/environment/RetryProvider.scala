@@ -348,7 +348,13 @@ object RetryProvider {
                   // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
                   statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
                     "An error occurred. Please contact the operator and inquire about the request"
-                  )
+                  ) ||
+                    // CANCELLED can also be a deliberate cancellation from the client
+                    // so we only retry if we observe RST_STREAM which we sometimes see
+                    // around Canton restarts.
+                    (statusCode == Status.Code.CANCELLED && description.contains(
+                      "RST_STREAM closed stream"
+                    ))
                 ) =>
             val msg = Seq(
               s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): ${ex.getMessage}",

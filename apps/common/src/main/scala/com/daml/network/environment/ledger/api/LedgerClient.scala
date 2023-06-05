@@ -316,8 +316,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     displayName.foreach(requestBuilder.setDisplayName(_))
     wrapFuture(
       partyManagementServiceStub
-        // TODO(#5300) remove deadline after we don't want to retry this anymore
-        .withDeadline(getReducedDeadline())
         .allocateParty(requestBuilder.build, _)
     )
       .map(_.getPartyDetails.getParty)
@@ -391,7 +389,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       applicationId: String,
       parties: Seq[PartyId],
       begin: Option[LedgerOffset],
-      domain: DomainId,
   ): Source[CompletionStreamResponse, NotUsed] =
     ClientAdapter.serverStreaming(
       multidomain.CompletionStreamRequest(
@@ -399,7 +396,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
         applicationId = applicationId,
         parties = parties.map(_.toProtoPrimitive),
         offset = begin map (lo => ledger_offset.LedgerOffset.fromJavaProto(lo.toProto)),
-        domainId = domain.toProtoPrimitive,
       ),
       multidomainCompletionServiceStub.completionStream,
     ) map CompletionStreamResponse.fromProto
@@ -447,7 +443,6 @@ object LedgerClient {
       begin: LedgerOffset,
       end: Option[LedgerOffset],
       party: PartyId,
-      domainId: DomainId,
   ) {
 
     import com.daml.ledger.api.v1.ledger_offset as sclo
@@ -458,30 +453,31 @@ object LedgerClient {
         begin = Some(sclo.LedgerOffset.fromJavaProto(begin.toProto)),
         end = end.map(lc => sclo.LedgerOffset.fromJavaProto(lc.toProto)),
         party = party.toLf,
-        domainId = domainId.unwrap.toProtoPrimitive,
       )
   }
 
   final case class GetTreeUpdatesResponse(
-      updates: Seq[TreeUpdate]
+      update: TreeUpdate,
+      domainId: DomainId,
   )
 
   object GetTreeUpdatesResponse {
 
-    import multidomain.TreeUpdate.TreeUpdate as TU
+    import multidomain.GetTreeUpdatesResponse.Update as TU
 
     private[LedgerClient] def fromProto(
         proto: multidomain.GetTreeUpdatesResponse
     ): GetTreeUpdatesResponse =
-      GetTreeUpdatesResponse(proto.updates map {
-        _.treeUpdate match {
+      GetTreeUpdatesResponse(
+        proto.update match {
           case TU.TransactionTree(tree) =>
             TransactionTreeUpdate(TransactionTree fromProto scalapbToJava(tree)(_.companion))
           case TU.Transfer(x) =>
             TransferUpdate(Transfer.fromProto(x))
           case TU.Empty => sys.error("uninitialized update service result")
-        }
-      })
+        },
+        DomainId.tryFromString(proto.domainId),
+      )
   }
 
   sealed abstract class TransferCommand extends Product with Serializable
@@ -540,7 +536,7 @@ object LedgerClient {
     }
   }
 
-  final case class CompletionStreamResponse(laterOffset: LedgerOffset, completions: Seq[Completion])
+  final case class CompletionStreamResponse(laterOffset: LedgerOffset, completion: Completion)
 
   object CompletionStreamResponse {
     def fromProto(spb: multidomain.CompletionStreamResponse): CompletionStreamResponse = {
@@ -552,7 +548,7 @@ object LedgerClient {
       // ignoring checkpoint.record_time
       CompletionStreamResponse(
         LedgerOffset fromProto scalapbToJava(offset)(_.companion),
-        spb.completions map Completion.fromProto,
+        Completion.fromProto(spb.getCompletion),
       )
     }
   }

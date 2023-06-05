@@ -365,6 +365,8 @@ class CNLedgerConnection(
   def getConnectedDomains(party: PartyId): Future[Map[DomainAlias, DomainId]] =
     client.getConnectedDomains(party)
 
+  // TODO(#5349) Switch update ingestion to merged streams and remove
+  // domain filter here.
   def updates(
       beginOffset: LedgerOffset,
       endOffset: LedgerOffset,
@@ -372,65 +374,11 @@ class CNLedgerConnection(
       domain: DomainId,
   ): Source[TreeUpdate, NotUsed] =
     client
-      .updates(LedgerClient.GetUpdatesRequest(beginOffset, Some(endOffset), party, domain))
-      .mapConcat(_.updates)
-
-  // TODO (#2706)
-  // This is a hacked up wrapper that transforms transaction trees into flat transactions.
-  // This is required because the update service initially only exposes transaction trees.
-  //
-  // It is limited in a quite a few ways:
-  // 1. It only does party filtering.
-  // 2. It does not filter out transient contracts.
-  // 3. It does not filter out creates and archives the
-  //    subscribing parties are witnesses but not stakeholders on.
-  // 4. It does not support interfaces.
-  //
-  // All those limitations are acceptable perform additional filters
-  // on contracts which include those filters and for the PoC
-  // we can assume that we know the templates that implement a given interface.
-  private def subscription(
-      clientName: String,
-      baseLoggerFactory: NamedLoggerFactory,
-      beginOffset: LedgerOffset,
-      endOffset: Option[LedgerOffset],
-      party: PartyId,
-      domain: DomainId,
-      retryProvider: RetryProvider,
-  )(mapOperator: Flow[TreeUpdate, Any, _]): CNLedgerSubscription[?] = {
-    new CNLedgerSubscription(
-      client.updates(
-        LedgerClient.GetUpdatesRequest(beginOffset, endOffset, party, domain)
-      ),
-      Flow[LedgerClient.GetTreeUpdatesResponse].mapConcat(_.updates).via(mapOperator),
-      retryProvider,
-      timeouts,
-      baseLoggerFactory.append("subsClient", clientName),
-    )
-  }
-
-  // TODO (#2706)
-  // See `subscribe` for limitations of this method.
-  def subscribeAsync(
-      clientName: String,
-      baseLoggerFactory: NamedLoggerFactory,
-      beginOffset: LedgerOffset,
-      endOffset: Option[LedgerOffset] = None,
-      filter: PartyId,
-      domain: DomainId,
-      retryProvider: RetryProvider,
-  )(f: TreeUpdate => Future[Unit]): CNLedgerSubscription[?] =
-    subscription(
-      clientName,
-      baseLoggerFactory,
-      beginOffset,
-      endOffset,
-      filter,
-      domain,
-      retryProvider,
-    )({
-      Flow[TreeUpdate].mapAsync(1)(f)
-    })
+      .updates(LedgerClient.GetUpdatesRequest(beginOffset, Some(endOffset), party))
+      .collect {
+        case LedgerClient.GetTreeUpdatesResponse(update, updateDomain) if updateDomain == domain =>
+          update
+      }
 
   def tryGetTransactionTreeById(
       parties: Seq[PartyId],
@@ -476,22 +424,14 @@ class CNLedgerConnection(
   private def createPartyAndUser(
       user: String,
       userRights: Seq[User.Right],
-  )(implicit traceContext: TraceContext): Future[PartyId] = {
-    @SuppressWarnings(Array("org.wartremover.warts.Var"))
-    var suffix: Option[Int] = None
+  ): Future[PartyId] =
     for {
-      party <- retryProvider.retryForClientCalls(
-        // TODO(#5300) consider removing these retries once Canton X party allocation is more stable
-        "Allocate party via Ledger API",
-        allocatePartyViaLedgerApi(
-          Some(sanitizeUserIdToPartyString(user) + suffix.fold("")(i => s"_$i")),
-          Some(user),
-        ).andThen(_ => { suffix = Some(suffix.getOrElse(0) + 1) }),
-        logger,
+      party <- allocatePartyViaLedgerApi(
+        Some(sanitizeUserIdToPartyString(user)),
+        Some(user),
       )
       partyId <- createUserWithPrimaryParty(user, party, userRights)
     } yield partyId
-  }
 
   def createUserWithPrimaryParty(
       user: String,
@@ -515,7 +455,7 @@ class CNLedgerConnection(
   def getOrAllocateParty(
       username: String,
       userRights: Seq[User.Right] = Seq.empty,
-  )(implicit traceContext: TraceContext): Future[PartyId] = {
+  ): Future[PartyId] = {
     for {
       existingPartyId <- getOptionalPrimaryParty(username).recover {
         case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
@@ -636,7 +576,7 @@ class CNLedgerConnection(
 
     val (ks, completion) = cancelIfFailed(
       client
-        .completions(applicationId, Seq(submitter), begin = None, listenDomain)
+        .completions(applicationId, Seq(submitter), begin = None)
         .wireTap(csr => logger.trace(s"completions while awaiting transfer $commandId: $csr"))
     )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
       // We call the callbacks for handling stale contract errors here, but wait for the offset
@@ -702,14 +642,11 @@ class CNLedgerConnection(
           .augmentDescription(s"timeout while awaiting completion of transfer $commandId")
           .asRuntimeException()
       }
-      .collect(
-        Function unlift { case LedgerClient.CompletionStreamResponse(laterOffset, completions) =>
-          // TODO(tech-debt) don't parse completions that don't match
-          completions
-            .find(_.matchesSubmission(applicationId, commandId, commandId))
-            .map((laterOffset, _))
-        }
-      )
+      .collect {
+        case LedgerClient.CompletionStreamResponse(laterOffset, completion)
+            if completion.matchesSubmission(applicationId, commandId, commandId) =>
+          (laterOffset, completion)
+      }
       .take(1)
       .wireTap(cpl => logger.debug(s"selected completion for $commandId: $cpl"))
       .toMat(
