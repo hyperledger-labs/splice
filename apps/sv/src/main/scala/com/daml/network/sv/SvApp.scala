@@ -375,7 +375,6 @@ class SvApp(
               } else {
                 logger.info("Starting onboarding (without SVC party migration).")
                 startOnboardingWithSvcPartyHosted(
-                  svStoreWithIngestion,
                   svcAutomation,
                   globalDomain,
                   cometBftNode,
@@ -461,7 +460,8 @@ class SvApp(
                 svStore.key.svcParty,
                 privateKey_,
               )
-              svOnboardingConfirmed <- waitForSvOnboardingConfirmed(svStore)
+              // Wait on the SV store because the SVC party is not yet onboarded.
+              _ <- waitForSvOnboardingConfirmed(svStore)
               _ <- startHostingSvcPartyInParticipant(
                 globalDomain,
                 participantId,
@@ -481,10 +481,9 @@ class SvApp(
                 cometBftNode,
               )
               _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
-              _ <- addMemberToSvc(
+              _ <- addConfirmedMemberToSvc(
                 svcAutomation,
                 globalDomain,
-                svOnboardingConfirmed,
               )
             } yield (svcStore, svcAutomation)
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
@@ -494,7 +493,6 @@ class SvApp(
   }
 
   private def startOnboardingWithSvcPartyHosted(
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
       cometBftNode: Option[CometBftNode],
@@ -515,11 +513,9 @@ class SvApp(
                 svcStore.key.svcParty,
                 privateKey_,
               )
-              svOnboardingConfirmed <- waitForSvOnboardingConfirmed(svStoreWithIngestion.store)
-              _ <- addMemberToSvc(
+              _ <- addConfirmedMemberToSvc(
                 svcStoreWithIngestion,
                 globalDomain,
-                svOnboardingConfirmed,
               )
             } yield ()
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
@@ -637,33 +633,60 @@ class SvApp(
       )
   }
 
-  private def addMemberToSvc(
+  private def addConfirmedMemberToSvc(
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       domainId: DomainId,
-      svOnboardingConfirmed: Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed],
   ): Future[Unit] = {
     val svcStore = svcStoreWithIngestion.store
-    retryProvider.retryForAutomation(
-      "add member to Svc",
-      for {
-        svcRules <- svcStore.getSvcRules()
-        openMiningRounds <- svcStore.getOpenMiningRoundTriple()
-        cmd = svcRules.contractId.exerciseSvcRules_AddConfirmedMember(
-          svcStore.key.svParty.toProtoPrimitive,
-          svOnboardingConfirmed.contractId,
-          openMiningRounds.oldest.contractId,
-          openMiningRounds.middle.contractId,
-          openMiningRounds.newest.contractId,
-        )
-        _ <- svcStoreWithIngestion.connection.submitCommandsNoDedup(
-          Seq(svcStore.key.svParty),
-          Seq(svcStore.key.svcParty),
-          commands = cmd.commands.asScala.toSeq,
-          domainId = domainId,
-        )
-      } yield (),
-      logger,
-    )
+    for {
+      // Wait on the SVC store to make sure that we atomically see either the SvOnboardingConfirmed contract
+      // or the SvcRules contract.
+      _ <- waitForSvOnboardingConfirmed(svcStore)
+      _ <- retryProvider.retryForAutomation(
+        "add member to Svc",
+        for {
+          svcRules <- svcStore.getSvcRules()
+          openMiningRounds <- svcStore.getOpenMiningRoundTriple()
+          svOnboardingConfirmedOpt <- svcStore.lookupSvOnboardingConfirmedByParty(
+            svcStore.key.svParty
+          )
+          svIsSvcMember = svcRules.payload.members.asScala
+            .contains(svcStore.key.svParty.toProtoPrimitive)
+          _ <- svOnboardingConfirmedOpt match {
+            case None =>
+              if (svIsSvcMember) {
+                logger.info(s"SV is already a member of the SVC")
+                Future.unit
+              } else {
+                val msg =
+                  "SV is not a member of the SVC but there is also no confirmed onboarding, giving up"
+                logger.error(msg)
+                Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+              }
+            case Some(confirmed) =>
+              if (svIsSvcMember) {
+                logger.info("SvOnboardingConfirmed exists but SV is already a member of the SVC")
+                Future.unit
+              } else {
+                val cmd = svcRules.contractId.exerciseSvcRules_AddConfirmedMember(
+                  svcStore.key.svParty.toProtoPrimitive,
+                  confirmed.contractId,
+                  openMiningRounds.oldest.contractId,
+                  openMiningRounds.middle.contractId,
+                  openMiningRounds.newest.contractId,
+                )
+                svcStoreWithIngestion.connection.submitCommandsNoDedup(
+                  Seq(svcStore.key.svParty),
+                  Seq(svcStore.key.svcParty),
+                  commands = cmd.commands.asScala.toSeq,
+                  domainId = domainId,
+                )
+              }
+          }
+        } yield (),
+        logger,
+      )
+    } yield ()
   }
 
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
@@ -686,14 +709,28 @@ class SvApp(
 
   private def waitForSvOnboardingConfirmed(
       svStore: SvSvStore
+  ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] =
+    waitForSvOnboardingConfirmed(() => svStore.lookupSvOnboardingConfirmed())
+
+  private def waitForSvOnboardingConfirmed(
+      svcStore: SvSvcStore
+  ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] =
+    waitForSvOnboardingConfirmed(() =>
+      svcStore.lookupSvOnboardingConfirmedByParty(svcStore.key.svParty)
+    )
+
+  private def waitForSvOnboardingConfirmed(
+      lookupSvOnboardingConfirmed: () => Future[
+        Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]
+      ]
   ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] = {
     logger.info(
-      s"Waiting for SvOnboardingConfirmed contract to be created for ${svStore.key.svParty}"
+      s"Waiting for SvOnboardingConfirmed contract to be created"
     )
     retryProvider.retryForAutomation(
       "Wait for SVC SvOnboardingConfirmed contract",
       for {
-        svOnboardingConfirmedOpt <- svStore.lookupSvOnboardingConfirmed()
+        svOnboardingConfirmedOpt <- lookupSvOnboardingConfirmed()
         svOnboardingConfirmed <- svOnboardingConfirmedOpt match {
           case Some(sc) =>
             logger.info("svOnboardingConfirmed found, done waiting")
