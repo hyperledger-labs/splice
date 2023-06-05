@@ -14,13 +14,13 @@ import com.daml.network.util.WalletTestUtil
 
 import scala.util.Using
 
-class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
+class XNodeDuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   private val darPath = "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
 
   override def environmentDefinition =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withManualStart
       .withAdditionalSetup(implicit env => {
         aliceValidator.participantClient.upload_dar_unless_exists(darPath)
@@ -71,49 +71,59 @@ class DuplicateTransferTest extends CNNodeIntegrationTest with WalletTestUtil {
         aliceValidator.participantClientWithAdminToken.domains.id_of(splitwellDomain)
 
       // We do the setup through console commands which are a bit simpler to use.
-      val cid = aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
-        .submitWithResult(
-          aliceWallet.config.ledgerApiUser,
-          actAs = Seq(alice),
-          readAs = Seq.empty,
-          update = new ValidatorRight(
-            alice.toProtoPrimitive,
-            alice.toProtoPrimitive,
-            alice.toProtoPrimitive,
-          ).create,
-        )
-        .contractId
-      val outId = aliceValidator.participantClientWithAdminToken.transfer.out(
-        alice,
-        cid,
-        globalDomain,
-        splitwellDomain,
-      )
+      val outId = eventuallySucceeds() {
+        val cid = clue("Create a contract") {
+          aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              aliceWallet.config.ledgerApiUser,
+              actAs = Seq(alice),
+              readAs = Seq.empty,
+              update = new ValidatorRight(
+                alice.toProtoPrimitive,
+                alice.toProtoPrimitive,
+                alice.toProtoPrimitive,
+              ).create,
+            )
+            .contractId
+        }
+        clue("Transfer out contract") {
+          aliceValidator.participantClientWithAdminToken.transfer.out(
+            alice,
+            cid,
+            globalDomain,
+            splitwellDomain,
+          )
+        }
+      }
 
-      connection
-        .submitTransferAndWaitNoDedup(
-          alice,
-          TransferCommand.In(
-            transferOutId = toApiTransferId(outId.transferOutTimestamp.toLf),
-            source = globalDomainId,
-            target = splitwellDomainId,
-          ),
-        )
-        .futureValue
+      clue("Transfer in contract (first time; should succeed)") {
+        connection
+          .submitTransferAndWaitNoDedup(
+            alice,
+            TransferCommand.In(
+              transferOutId = toApiTransferId(outId.transferOutTimestamp.toLf),
+              source = globalDomainId,
+              target = splitwellDomainId,
+            ),
+          )
+          .futureValue
+      }
 
-      val ex = connection
-        .submitTransferAndWaitNoDedup(
-          alice,
-          TransferCommand.In(
-            transferOutId = toApiTransferId(outId.transferOutTimestamp.toLf),
-            source = globalDomainId,
-            target = splitwellDomainId,
-          ),
-        )
-        .failed
-        .futureValue
+      clue("Transfer in contract (second time; should fail)") {
+        val ex = connection
+          .submitTransferAndWaitNoDedup(
+            alice,
+            TransferCommand.In(
+              transferOutId = toApiTransferId(outId.transferOutTimestamp.toLf),
+              source = globalDomainId,
+              target = splitwellDomainId,
+            ),
+          )
+          .failed
+          .futureValue
 
-      ex should matchPattern { case TransferInTrigger.TransferCompletedException(_) => }
+        ex should matchPattern { case TransferInTrigger.TransferCompletedException(_) => }
+      }
     }
   }
 }
