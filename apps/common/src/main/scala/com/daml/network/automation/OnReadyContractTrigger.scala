@@ -26,7 +26,9 @@ abstract class OnReadyContractTrigger[C, TCid <: ContractId[_], T](
     companionClass: MultiDomainAcsStore.ContractCompanion[C, TCid, T],
 ) extends SourceBasedTrigger[ReadyContract[TCid, T]] {
 
-  override protected val source: Source[ReadyContract[TCid, T], NotUsed] =
+  override protected def source(implicit
+      traceContext: TraceContext
+  ): Source[ReadyContract[TCid, T], NotUsed] =
     store.multiDomainAcsStore.streamReadyContracts(companion)
 
   override final def isStaleTask(

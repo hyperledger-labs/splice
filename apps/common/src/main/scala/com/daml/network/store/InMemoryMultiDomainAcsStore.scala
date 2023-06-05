@@ -175,7 +175,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       companion: C,
       limit: Limit,
   )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ) = {
     filterContracts(companion, _ => true, limit)
   }
@@ -187,7 +188,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       filter: Contract[TCid, T] => Boolean,
       limit: Limit = DefaultLimit,
   )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]] = {
     requireInScope(companion)
     Future {
@@ -202,7 +204,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
               (parsedEv, state)
             }
           }),
-      )(noTracingLogger)
+      )
         .filter { case (ev, _) => filter(ev) }
         .toSeq
         .map { case (contract, state) =>
@@ -216,7 +218,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       domainId: DomainId,
       limit: Limit,
   )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]] =
     filterContractsOnDomain(companion, domainId, _ => true, limit)
 
@@ -226,7 +229,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       filter: Contract[TCid, T] => Boolean,
       limit: Limit = DefaultLimit,
   )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]] =
     filterContracts(companion, filter, limit).map { contracts =>
       contracts.collect {
@@ -238,7 +242,10 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   override def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit,
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] = {
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[ReadyContract[TCid, T]]] = {
     filterReadyContracts(companion, _ => true, limit)
   }
 
@@ -246,9 +253,12 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       companion: C,
       filter: Contract[TCid, T] => Boolean,
       limit: Limit = DefaultLimit,
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] =
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[ReadyContract[TCid, T]]] =
     for {
-      contracts <- filterContracts(companion, filter, limit)(companionClass)
+      contracts <- filterContracts(companion, filter, limit)
     } yield contracts.view.collect(Function.unlift(_.toReadyContract)).toSeq
 
   override private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[
@@ -257,7 +267,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       expiresAt: T => Instant
   )(implicit companionClass: ContractCompanion[C, TCid, T]): ListExpiredContracts[TCid, T] =
     (now, limit) =>
-      _ =>
+      implicit traceContext =>
         filterReadyContracts(
           companion = companion,
           filter = co => now.toInstant isAfter expiresAt(co.payload),
@@ -285,7 +295,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   override def lookupContractById[C, TCid <: ContractId[_], T](
       companion: C
   )(id: ContractId[_])(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]] = {
     requireInScope(companion)
     lookupContractById(companionClass.fromCreatedEvent(companion)(contractFilter, _))(id)
@@ -426,7 +437,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   override def streamReadyContracts[C, TCid <: ContractId[_], T](
       companion: C
   )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Source[ReadyContract[TCid, T], NotUsed] = {
     requireInScope(companion)
     streamReadyContracts(companionClass.fromCreatedEvent(companion)(contractFilter, _)).map {

@@ -161,7 +161,7 @@ trait UserWalletStore
     subsCodegen.SubscriptionIdleState.ContractId,
     subsCodegen.SubscriptionIdleState,
   ] = (now: CantonTimestamp, limit: Int) =>
-    _ => {
+    implicit traceContext => {
       def isReadyForPayment(state: subsCodegen.SubscriptionIdleState): Boolean =
         now.toInstant.isAfter(
           state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))

@@ -549,6 +549,8 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       validator: PartyId,
       domainId: DomainId,
       limit: Int,
+  )(implicit
+      traceContext: TraceContext
   ): Future[Option[SvSvcStore.DuplicateValidatorTrafficContracts]] = {
     multiDomainAcsStore
       .filterContractsOnDomain(

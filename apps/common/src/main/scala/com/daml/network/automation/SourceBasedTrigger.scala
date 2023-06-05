@@ -22,7 +22,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     with FlagCloseableAsync {
 
   /** The source from which to consume tasks. */
-  protected def source: Source[T, NotUsed]
+  protected def source(implicit traceContext: TraceContext): Source[T, NotUsed]
 
   private implicit val elc: ErrorLoggingContext =
     ErrorLoggingContext(logger, Map.empty, TraceContext.empty)

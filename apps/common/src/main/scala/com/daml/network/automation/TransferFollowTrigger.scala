@@ -33,7 +33,7 @@ class TransferFollowTrigger[
     partyId: PartyId,
     leaderCompanion: LeaderC,
     followerCompanion: FollowerC,
-    retrieve: () => Future[
+    retrieve: TraceContext => Future[
       Seq[TransferFollowTrigger.Task[LeaderTCid, LeaderT, FollowerTCid, FollowerT]]
     ],
 )(implicit
@@ -49,7 +49,7 @@ class TransferFollowTrigger[
       TransferFollowTrigger.Task[LeaderTCid, LeaderT, FollowerTCid, FollowerT]
     ] {
 
-  override def retrieveTasks()(implicit tc: TraceContext) = retrieve()
+  override def retrieveTasks()(implicit tc: TraceContext) = retrieve(tc)
 
   override protected def completeTask(
       task: TransferFollowTrigger.Task[LeaderTCid, LeaderT, FollowerTCid, FollowerT]

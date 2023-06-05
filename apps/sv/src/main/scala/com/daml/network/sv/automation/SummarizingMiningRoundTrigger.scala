@@ -140,7 +140,8 @@ class SummarizingMiningRoundTrigger(
     * for a SummarizingMiningRound.
     */
   private def queryRewards(round: Long, domain: DomainId)(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      traceContext: TraceContext,
   ): Future[RoundRewards] = {
     for {
       appRewardCoupons <- store.multiDomainAcsStore.filterContractsOnDomain(

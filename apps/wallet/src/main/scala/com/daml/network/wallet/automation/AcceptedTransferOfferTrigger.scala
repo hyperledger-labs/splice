@@ -44,7 +44,7 @@ class AcceptedTransferOfferTrigger(
     ) {
 
   // Override the default source, as we can only auto-complete accepted offers if we are the sender
-  override protected val source: Source[ReadyContract[
+  override protected def source(implicit traceContext: TraceContext): Source[ReadyContract[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ], NotUsed] =

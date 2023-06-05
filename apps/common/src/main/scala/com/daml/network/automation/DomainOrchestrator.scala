@@ -84,7 +84,9 @@ final class DomainOrchestrator private (
         }
     })
 
-  override protected val source: Source[DomainStore.DomainConnectionEvent, NotUsed] =
+  override protected def source(implicit
+      traceContext: TraceContext
+  ): Source[DomainStore.DomainConnectionEvent, NotUsed] =
     domainStore.streamEvents()
 
   override def completeTask(

@@ -84,7 +84,7 @@ class SplitwellAutomationService(
       store.providerParty,
       splitwellCodegen.Group.COMPANION,
       splitwellCodegen.BalanceUpdate.COMPANION,
-      () => store.listLaggingBalanceUpdates(),
+      implicit tc => store.listLaggingBalanceUpdates(),
     )
   )
 
@@ -96,7 +96,7 @@ class SplitwellAutomationService(
       store.providerParty,
       splitwellCodegen.Group.COMPANION,
       splitwellCodegen.GroupInvite.COMPANION,
-      () => store.listLaggingGroupInvites(),
+      implicit tc => store.listLaggingGroupInvites(),
     )
   )
 
@@ -108,7 +108,7 @@ class SplitwellAutomationService(
       store.providerParty,
       splitwellCodegen.Group.COMPANION,
       splitwellCodegen.AcceptedGroupInvite.COMPANION,
-      () => store.listLaggingAcceptedGroupInvites(),
+      implicit tc => store.listLaggingAcceptedGroupInvites(),
     )
   )
 }

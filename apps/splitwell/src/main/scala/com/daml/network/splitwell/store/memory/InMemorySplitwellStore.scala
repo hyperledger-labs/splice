@@ -73,6 +73,7 @@ class InMemorySplitwellStore(
   )(implicit
       leaderCompanionClass: ContractCompanion[LeaderC, LeaderTCid, LeaderT],
       followerCompanionClass: ContractCompanion[FollowerC, FollowerTCid, FollowerT],
+      traceContext: TraceContext,
   ) =
     for {
       followerContracts <- multiDomainAcsStore.listReadyContracts(
@@ -93,7 +94,9 @@ class InMemorySplitwellStore(
       })
     }
 
-  override def listLaggingBalanceUpdates(): Future[Seq[TransferFollowTrigger.Task[
+  override def listLaggingBalanceUpdates()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TransferFollowTrigger.Task[
     splitwellCodegen.Group.ContractId,
     splitwellCodegen.Group,
     splitwellCodegen.BalanceUpdate.ContractId,
@@ -106,7 +109,9 @@ class InMemorySplitwellStore(
       _.group.id,
     )
 
-  override def listLaggingGroupInvites(): Future[Seq[TransferFollowTrigger.Task[
+  override def listLaggingGroupInvites()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TransferFollowTrigger.Task[
     splitwellCodegen.Group.ContractId,
     splitwellCodegen.Group,
     splitwellCodegen.GroupInvite.ContractId,
@@ -118,7 +123,9 @@ class InMemorySplitwellStore(
     _.group.id,
   )
 
-  override def listLaggingAcceptedGroupInvites(): Future[Seq[TransferFollowTrigger.Task[
+  override def listLaggingAcceptedGroupInvites()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TransferFollowTrigger.Task[
     splitwellCodegen.Group.ContractId,
     splitwellCodegen.Group,
     splitwellCodegen.AcceptedGroupInvite.ContractId,

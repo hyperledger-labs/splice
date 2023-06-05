@@ -18,7 +18,9 @@ abstract class OnReadyForTransferInTrigger(
     tracer: Tracer,
 ) extends SourceBasedTrigger[TransferEvent.Out] {
 
-  override protected val source: Source[TransferEvent.Out, NotUsed] =
+  override protected def source(implicit
+      traceContext: TraceContext
+  ): Source[TransferEvent.Out, NotUsed] =
     store.multiDomainAcsStore.streamReadyForTransferIn()
 
   override final protected def isStaleTask(

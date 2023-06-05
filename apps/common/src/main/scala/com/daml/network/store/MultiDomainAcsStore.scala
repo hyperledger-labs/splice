@@ -29,13 +29,13 @@ import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf
 import com.google.protobuf.ByteString
-import com.typesafe.scalalogging.Logger
 import io.circe.Json
 import io.grpc.Status
 
@@ -44,7 +44,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-trait MultiDomainAcsStore extends AutoCloseable {
+trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 
   import MultiDomainAcsStore.*
 
@@ -53,7 +53,8 @@ trait MultiDomainAcsStore extends AutoCloseable {
   def lookupContractById[C, TCid <: ContractId[_], T](
       companion: C
   )(id: ContractId[_])(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]]
 
   /** Get a contract by id.
@@ -65,6 +66,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
   )(id: ContractId[_])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[ContractWithState[TCid, T]] =
     lookupContractById(companion)(id).map(result =>
       result.getOrElse(
@@ -83,6 +85,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
   )(domain: DomainId, id: ContractId[_])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Option[Contract[TCid, T]]] = lookupContractById(companion)(id).map(_.flatMap { c =>
     if (c.state == ContractState.Assigned(domain)) {
       Some(c.contract)
@@ -100,6 +103,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
   )(domain: DomainId, id: ContractId[_])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Option[Contract[TCid, T]]] =
     lookupContractById(companion)(id).map(_.map { c =>
       if (c.state == ContractState.Assigned(domain)) {
@@ -120,6 +124,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
   )(domain: DomainId, id: ContractId[_])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Contract[TCid, T]] =
     lookupContractByIdOnDomain(companion)(domain, id).map(result =>
       result.getOrElse(
@@ -134,12 +139,18 @@ trait MultiDomainAcsStore extends AutoCloseable {
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit = DefaultLimit,
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ContractWithState[TCid, T]]]
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[ContractWithState[TCid, T]]]
 
   def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit = DefaultLimit,
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]]
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[ReadyContract[TCid, T]]]
 
   /** Only contracts with state ContractState.Assigned(domain) are considered
     * so contracts are omitted if they have been transferred or are in-flight.
@@ -151,19 +162,24 @@ trait MultiDomainAcsStore extends AutoCloseable {
       companion: C,
       domain: DomainId,
       limit: Limit = DefaultLimit,
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[Contract[TCid, T]]]
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[Contract[TCid, T]]]
 
   private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
       companion: C
   )(
       expiresAt: T => java.time.Instant
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): ListExpiredContracts[TCid, T]
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): ListExpiredContracts[TCid, T]
 
   protected def applyLimit[T, S[A] <: scala.collection.IterableOps[A, S, S[A]]](
       limit: Limit,
       result: S[T],
   )(implicit
-      logger: Logger
+      traceContext: TraceContext
   ): S[T] = {
     limit match {
       case PageLimit(limit) =>
@@ -189,7 +205,10 @@ trait MultiDomainAcsStore extends AutoCloseable {
     */
   def streamReadyContracts[C, TCid <: ContractId[_], T](
       companion: C
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Source[ReadyContract[TCid, T], NotUsed]
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Source[ReadyContract[TCid, T], NotUsed]
 
   /** Stream all transfer out events that are ready for transfer in.
     * The only guarantee provided is that a transfer out that does not get transferred in

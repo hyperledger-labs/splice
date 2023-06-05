@@ -61,13 +61,15 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
 
   def listGroups(
       user: PartyId
+  )(implicit
+      traceContext: TraceContext
   ): Future[Seq[ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]] =
     multiDomainAcsStore.filterContracts(
       splitwellCodegen.Group.COMPANION,
       c => groupMembers(c.payload).contains(user.toProtoPrimitive),
     )
 
-  def listGroupInvites(owner: PartyId): Future[
+  def listGroupInvites(owner: PartyId)(implicit traceContext: TraceContext): Future[
     Seq[ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]]
   ] =
     multiDomainAcsStore.filterContracts(
@@ -75,7 +77,9 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
       c => c.payload.group.owner == owner.toProtoPrimitive,
     )
 
-  def listAcceptedGroupInvites(owner: PartyId, groupId: String): Future[Seq[ContractWithState[
+  def listAcceptedGroupInvites(owner: PartyId, groupId: String)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[ContractWithState[
     splitwellCodegen.AcceptedGroupInvite.ContractId,
     splitwellCodegen.AcceptedGroupInvite,
   ]]] =
@@ -86,7 +90,9 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
           c.payload.groupKey == groupKey(owner, groupId),
     )
 
-  def listBalanceUpdates(user: PartyId, key: splitwellCodegen.GroupKey): Future[Seq[
+  def listBalanceUpdates(user: PartyId, key: splitwellCodegen.GroupKey)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[
     ContractWithState[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
   ]] =
     multiDomainAcsStore.filterContracts(
@@ -109,7 +115,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
       tc: TraceContext
   ): Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]]
 
-  def listSplitwellInstalls(user: PartyId): Future[Seq[
+  def listSplitwellInstalls(user: PartyId)(implicit traceContext: TraceContext): Future[Seq[
     ReadyContract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
   ]] =
     multiDomainAcsStore.filterReadyContracts(
@@ -120,7 +126,9 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   /** List balance updates that are lagging behind the corresponding group contract meaning the
     * have not yet transferred to the same domain.
     */
-  def listLaggingBalanceUpdates(): Future[Seq[TransferFollowTrigger.Task[
+  def listLaggingBalanceUpdates()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TransferFollowTrigger.Task[
     splitwellCodegen.Group.ContractId,
     splitwellCodegen.Group,
     splitwellCodegen.BalanceUpdate.ContractId,
@@ -130,7 +138,9 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   /** List group invites that are lagging behind the corresponding group contract meaning the
     * have not yet transferred to the same domain.
     */
-  def listLaggingGroupInvites(): Future[Seq[TransferFollowTrigger.Task[
+  def listLaggingGroupInvites()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TransferFollowTrigger.Task[
     splitwellCodegen.Group.ContractId,
     splitwellCodegen.Group,
     splitwellCodegen.GroupInvite.ContractId,
@@ -140,7 +150,9 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   /** List accepted group invites that are lagging behind the corresponding group contract meaning the
     * have not yet transferred to the same domain.
     */
-  def listLaggingAcceptedGroupInvites(): Future[Seq[TransferFollowTrigger.Task[
+  def listLaggingAcceptedGroupInvites()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TransferFollowTrigger.Task[
     splitwellCodegen.Group.ContractId,
     splitwellCodegen.Group,
     splitwellCodegen.AcceptedGroupInvite.ContractId,

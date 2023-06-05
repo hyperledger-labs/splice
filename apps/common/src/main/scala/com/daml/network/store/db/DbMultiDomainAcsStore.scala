@@ -34,7 +34,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
-    traceContext: TraceContext,
     closeContext: CloseContext,
 ) extends MultiDomainAcsStore
     with AcsTables
@@ -47,7 +46,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   val storeId: Int = 1
 
   @unused
-  private def minimumLastOffset(): Future[Option[String]] = {
+  private def minimumLastOffset()(implicit traceContext: TraceContext): Future[Option[String]] = {
     storage
       .querySingle(
         sql"""
@@ -61,7 +60,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   }
 
   override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
-      implicit companionClass: ContractCompanion[C, TCid, T]
+      implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]] = {
     storage
       .querySingle( // index: acs_store_template_sid_cid
@@ -80,7 +81,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       companion: C,
       limit: Limit,
   )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]] = {
     val templateId = companionClass.typeId(companion)
     for {
@@ -94,7 +96,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
            """.as[AcsStoreRowTemplate],
         "listContracts",
       )
-      limited = applyLimit(limit, result)(noTracingLogger)
+      limited = applyLimit(limit, result)
       withState <- limited.traverse(contractWithStateFromRow(companion)(_))
     } yield withState
   }
@@ -102,7 +104,10 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit,
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] = {
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[ReadyContract[TCid, T]]] = {
     // TODO (#5314): do a query instead of in-memory filtering via toReadyContract
     listContracts(companion, limit).map(_.flatMap(_.toReadyContract))
   }
@@ -118,7 +123,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     val templateId = companionClass.typeId(companion)
     for {
       result <- storage
-        .query( // index: acs_store_template_sid_ce, except it's missing template_id and event_number
+        .query( // index: acs_store_template_sid_tid_ce
           sql"""
           #$selectFromAcsTable
           where store_id = $storeId
@@ -129,7 +134,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
            """.as[AcsStoreRowTemplate],
           "listExpiredFromPayloadExpiry",
         )
-      limited = applyLimit(limit, result)(noTracingLogger)
+      limited = applyLimit(limit, result)
       withState <- limited.traverse(contractWithStateFromRow(companion)(_))
       // TODO (#5314): adjust the query instead of in-memory filtering via toReadyContract
     } yield withState.flatMap(_.toReadyContract)
@@ -139,7 +144,10 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       companion: C,
       domain: DomainId,
       limit: Limit,
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[Contract[TCid, T]]] = {
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[Contract[TCid, T]]] = {
     // TODO (#5314): the DbMultiDomainAcsStore is currently tied to a single domain,
     //  so this method doesn't make that much sense atm
     resolveDomainId.flatMap { thisDomain =>
@@ -157,7 +165,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   }
 
   override def streamReadyContracts[C, TCid <: ContractId[_], T](companion: C)(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Source[ReadyContract[TCid, T], NotUsed] = {
     streamReadyContracts(companion, PageLimit(100L))
   }
@@ -166,7 +175,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       companion: C,
       pageSize: PageLimit,
   )(implicit
-      companionClass: ContractCompanion[C, TCid, T]
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
   ): Source[ReadyContract[TCid, T], NotUsed] = {
     val templateId = companionClass.typeId(companion)
     Source
