@@ -1,6 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 
-import { installCNHelmChart } from './helm';
+import { installCNSVHelmChart } from './helm';
 import { ExactNamespace } from './utils';
 
 // TODO(#4584): stop copying code around.
@@ -50,7 +50,7 @@ export function installLoopback(
     }
   );
 
-  return installCNHelmChart(
+  return installCNSVHelmChart(
     namespace,
     'loopback',
     'cn-cluster-loopback-gateway',

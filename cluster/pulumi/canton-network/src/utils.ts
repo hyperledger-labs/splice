@@ -130,15 +130,12 @@ export function installCNHelmChartByNamespaceName(
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
-  const versionNumber = config.require('VERSION_NUMBER');
-
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
     {
       name,
       namespace: nsName,
-      chart:
-        process.env.REPO_ROOT + '/cluster/helm/target/' + chartName + '-' + versionNumber + '.tgz',
+      chart: process.env.REPO_ROOT + '/cluster/helm/' + chartName + '/',
       values: cnChartValues(chartName, values),
       timeout: GLOBAL_TIMEOUT_SEC,
     },
@@ -155,18 +152,13 @@ export function installCNHelmChart(
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
-  return new k8s.helm.v3.Release(
-    `helm-${xns.logicalName}-${name}`,
-    {
-      name,
-      namespace: xns.ns.metadata.name,
-      chart: process.env.REPO_ROOT + '/cluster/helm/' + chartName + '/',
-      values: cnChartValues(chartName, values),
-      timeout: GLOBAL_TIMEOUT_SEC,
-    },
-    {
-      dependsOn: dependsOn.concat([xns.ns]),
-    }
+  return installCNHelmChartByNamespaceName(
+    xns.logicalName,
+    xns.ns.metadata.name,
+    name,
+    chartName,
+    values,
+    dependsOn.concat([xns.ns])
   );
 }
 

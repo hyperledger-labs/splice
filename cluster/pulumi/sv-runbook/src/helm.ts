@@ -3,7 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 
 import { ChartValues, ExactNamespace, requiredEnv } from './utils';
 
-export function installCNHelmChartByNamespaceName(
+export function installCNSVHelmChartByNamespaceName(
   ns: pulumi.Output<string> | string,
   name: string,
   chartName: string,
@@ -42,7 +42,7 @@ export function installCNHelmChartByNamespaceName(
   );
 }
 
-export function installCNHelmChart(
+export function installCNSVHelmChart(
   ns: ExactNamespace,
   name: string,
   chartName: string,
@@ -51,7 +51,7 @@ export function installCNHelmChart(
   version = '',
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
-  return installCNHelmChartByNamespaceName(
+  return installCNSVHelmChartByNamespaceName(
     ns.ns.metadata.name,
     name,
     chartName,

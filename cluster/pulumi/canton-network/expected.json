@@ -886,7 +886,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/target/cn-cluster-ingress-full-0.0.1.tgz",
+      "chart": "/cluster/helm/cn-cluster-ingress-full/",
       "compat": "true",
       "name": "cluster-ingress",
       "namespace": "cn-namespace",

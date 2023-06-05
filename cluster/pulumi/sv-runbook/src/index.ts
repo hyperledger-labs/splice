@@ -1,6 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 
-import { installCNHelmChart, installCNHelmChartByNamespaceName } from './helm';
+import { installCNSVHelmChart, installCNSVHelmChartByNamespaceName } from './helm';
 import { installLoopback } from './loopback';
 import {
   /*configureSecrets, */
@@ -57,7 +57,7 @@ const loopback = installLoopback(svNamespace, CLUSTER_BASENAME, localCharts, ver
 
 const svImagePullDeps = localCharts ? [] : imagePullSecret(svNamespace);
 
-const postgres = installCNHelmChart(
+const postgres = installCNSVHelmChart(
   svNamespace,
   'postgres',
   'cn-postgres',
@@ -74,7 +74,7 @@ const participantValues = loadYamlFromFile(
   }
 );
 
-const participant = installCNHelmChart(
+const participant = installCNSVHelmChart(
   svNamespace,
   'participant',
   'cn-participant',
@@ -102,7 +102,7 @@ const validatorValues = loadYamlFromFile(
   }
 );
 
-const validator = installCNHelmChart(
+const validator = installCNSVHelmChart(
   svNamespace,
   'validator',
   'cn-validator',
@@ -121,7 +121,7 @@ const svValues = loadYamlFromFile(
   }
 );
 
-const sv = installCNHelmChart(
+const sv = installCNSVHelmChart(
   svNamespace,
   'sv-1',
   'cn-sv-node',
@@ -134,7 +134,7 @@ const sv = installCNHelmChart(
 const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);
 
 const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
-installCNHelmChartByNamespaceName(
+installCNSVHelmChartByNamespaceName(
   infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
   'cluster-ingress-sv',
   'cn-cluster-ingress-sv',
