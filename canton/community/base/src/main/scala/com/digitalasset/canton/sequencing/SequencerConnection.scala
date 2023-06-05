@@ -30,19 +30,19 @@ sealed trait SequencerConnection extends PrettyPrinting {
 
   def toProtoV0: v0.SequencerConnection
 
-  def addConnection(
+  def addEndpoints(
       connection: String,
       additionalConnections: String*
   ): SequencerConnection =
-    addConnection(new URI(connection), additionalConnections.map(new URI(_)): _*)
+    addEndpoints(new URI(connection), additionalConnections.map(new URI(_)): _*)
 
   // TODO(i9014) change this to Either
-  def addConnection(
+  def addEndpoints(
       connection: URI,
       additionalConnections: URI*
   ): SequencerConnection
 
-  def addConnection(
+  def addEndpoints(
       connection: SequencerConnection,
       additionalConnections: SequencerConnection*
   ): SequencerConnection
@@ -88,7 +88,7 @@ final case class GrpcSequencerConnection(
       param("customTrustCertificates", _.customTrustCertificates),
     )
 
-  override def addConnection(
+  override def addEndpoints(
       connection: URI,
       additionalConnections: URI*
   ): SequencerConnection =
@@ -99,7 +99,7 @@ final case class GrpcSequencerConnection(
       throw new IllegalArgumentException(err)
     )
 
-  override def addConnection(
+  override def addEndpoints(
       connection: SequencerConnection,
       additionalConnections: SequencerConnection*
   ): SequencerConnection =

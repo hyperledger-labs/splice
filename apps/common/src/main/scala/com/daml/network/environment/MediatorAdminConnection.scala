@@ -7,9 +7,9 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.health.admin.data.{NodeStatus, MediatorNodeStatus}
+import com.digitalasset.canton.health.admin.data.{MediatorNodeStatus, NodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.sequencing.SequencerConnection
+import com.digitalasset.canton.sequencing.{SequencerConnection, SequencerConnections}
 import com.digitalasset.canton.topology.{DomainId, MediatorId}
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.TimeQueryX
@@ -115,7 +115,7 @@ class MediatorAdminConnection(
       EnterpriseMediatorAdministrationCommands.InitializeX(
         domainId,
         domainParameters,
-        sequencerConnection,
+        SequencerConnections.default(sequencerConnection),
       )
     )
 }

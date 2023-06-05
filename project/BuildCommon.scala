@@ -656,6 +656,7 @@ object BuildCommon {
       .enablePlugins(BuildInfoPlugin, DamlPlugin)
       .dependsOn(
         `canton-blake2b`,
+        `canton-akka-fork` % "compile->compile;test->test",
         `canton-community-base`,
         `canton-slick-fork`,
         `canton-wartremover-extension` % "compile->compile;test->test",
@@ -829,6 +830,7 @@ object BuildCommon {
           daml_lf_archive_reader,
           daml_lf_dev_archive_java_proto,
           daml_lf_engine,
+          daml_ledger_api_proto % "protobuf",
           logback_classic % Runtime,
           logback_core % Runtime,
           akka_stream,
@@ -956,7 +958,7 @@ object BuildCommon {
   lazy val `canton-akka-fork` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-akka-fork", file("community/lib/akka"))
+      .apply("canton-akka-fork", file("canton/community/lib/akka"))
       .disablePlugins(ScalafixPlugin, ScalafmtPlugin, WartRemover)
       .settings(
         sharedSettings,

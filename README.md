@@ -458,7 +458,7 @@ file along with your dar changes.
 
 ### Bumping Our Canton fork
 
-Current Canton commit: `022d684b73c25e754eb30919e4ac67ae9f4eaac9`
+Current Canton commit: `6529da97040ba8fbb3d639fdc5fd9c06abc2b315`
 
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)

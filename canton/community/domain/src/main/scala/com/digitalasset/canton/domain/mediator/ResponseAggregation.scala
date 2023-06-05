@@ -81,6 +81,7 @@ private[mediator] object ResponseAggregation {
       request: MediatorRequest,
       protocolVersion: ProtocolVersion,
       topologySnapshot: TopologySnapshot,
+      sendVerdict: Boolean,
   )(loggerFactory: NamedLoggerFactory)(implicit
       requestTraceContext: TraceContext,
       ec: ExecutionContext,
@@ -107,7 +108,7 @@ private[mediator] object ResponseAggregation {
     for {
       initialState <- initialStateF
     } yield {
-      ResponseAggregation(requestId, request, requestId.unwrap, Right(initialState))(
+      ResponseAggregation(requestId, request, requestId.unwrap, Right(initialState), sendVerdict)(
         protocolVersion = protocolVersion,
         requestTraceContext = requestTraceContext,
       )(loggerFactory)
@@ -121,10 +122,11 @@ private[mediator] object ResponseAggregation {
       request: MediatorRequest,
       verdict: Verdict,
       protocolVersion: ProtocolVersion,
+      sendVerdict: Boolean,
   )(
       loggerFactory: NamedLoggerFactory
   )(implicit requestTraceContext: TraceContext): ResponseAggregation =
-    ResponseAggregation(requestId, request, requestId.unwrap, Left(verdict))(
+    ResponseAggregation(requestId, request, requestId.unwrap, Left(verdict), sendVerdict)(
       protocolVersion,
       requestTraceContext,
     )(loggerFactory)
@@ -135,6 +137,8 @@ private[mediator] object ResponseAggregation {
   * @param state     If the [[com.digitalasset.canton.protocol.messages.InformeeMessage]] has been finalized,
   *                  this will be a `Left`
   *                  otherwise  a `Right` which shows which transaction view hashes are not confirmed yet.
+  * @param sendVerdict  A flag whether to send out the verdict. This is used for "passive" mediator that performs
+  *                     response aggregation for debugging without sending out messages
   * @param requestTraceContext we retain the original trace context from the initial confirmation request
   *                            for raising timeouts to help with debugging. this ideally would be the same trace
   *                            context throughout all responses could not be in a distributed setup so this is not
@@ -146,6 +150,7 @@ private[mediator] final case class ResponseAggregation(
     request: MediatorRequest,
     version: CantonTimestamp,
     state: Either[Verdict, Map[ViewHash, ViewState]],
+    sendVerdict: Boolean,
 )(protocolVersion: ProtocolVersion, val requestTraceContext: TraceContext)(
     protected val loggerFactory: NamedLoggerFactory
 ) extends NamedLogging
@@ -172,11 +177,10 @@ private[mediator] final case class ResponseAggregation(
       _domainId,
     ) =
       response
-    val requiredTrustLevel = request.confirmationPolicy.requiredTrustLevel
 
     def authorizedPartiesOfSender(
         viewHash: ViewHash,
-        declaredConfirmingParties: Set[LfPartyId],
+        declaredConfirmingParties: Set[ConfirmingParty],
     ): OptionT[Future, Set[LfPartyId]] =
       localVerdict match {
         case malformed: Malformed =>
@@ -185,18 +189,19 @@ private[mediator] final case class ResponseAggregation(
           )
           val hostedConfirmingPartiesF =
             declaredConfirmingParties.toList
-              .parFilterA(p => topologySnapshot.canConfirm(sender, p, requiredTrustLevel))
+              .parFilterA(p => topologySnapshot.canConfirm(sender, p.party, p.requiredTrustLevel))
               .map(_.toSet)
           val res = hostedConfirmingPartiesF.map { hostedConfirmingParties =>
             logger.debug(
               show"Malformed response $responseTimestamp for $viewHash considered as a rejection on behalf of $hostedConfirmingParties"
             )
-            Some(hostedConfirmingParties): Option[Set[LfPartyId]]
+            Some(hostedConfirmingParties.map(_.party)): Option[Set[LfPartyId]]
           }
           OptionT(res)
 
         case _: LocalApprove | _: LocalReject =>
-          val unexpectedConfirmingParties = confirmingParties -- declaredConfirmingParties
+          val unexpectedConfirmingParties =
+            confirmingParties -- declaredConfirmingParties.map(_.party)
           for {
             _ <-
               if (unexpectedConfirmingParties.isEmpty) OptionT.some[Future](())
@@ -210,11 +215,14 @@ private[mediator] final case class ResponseAggregation(
                 OptionT.none[Future, Unit]
               }
 
+            expectedConfirmingParties =
+              declaredConfirmingParties.filter(p => confirmingParties.contains(p.party))
             unauthorizedConfirmingParties <- OptionT.liftF(
-              confirmingParties.toList
-                .parFilterA(p =>
-                  topologySnapshot.canConfirm(sender, p, requiredTrustLevel).map(x => !x)
-                )
+              expectedConfirmingParties.toList
+                .parFilterA { p =>
+                  topologySnapshot.canConfirm(sender, p.party, p.requiredTrustLevel).map(x => !x)
+                }
+                .map(_.map(_.party))
                 .map(_.toSet)
             )
             _ <-
@@ -267,8 +275,9 @@ private[mediator] final case class ResponseAggregation(
               newlyResponded.foldLeft(consortiumVoting)((votes, confirmingParty) => {
                 votes + (confirmingParty.party -> votes(confirmingParty.party).approveBy(sender))
               })
-            val newlyRespondedFullVotes = newlyResponded.filter { case ConfirmingParty(party, _) =>
-              consortiumVotingUpdated(party).isApproved
+            val newlyRespondedFullVotes = newlyResponded.filter {
+              case ConfirmingParty(party, _, _) =>
+                consortiumVotingUpdated(party).isApproved
             }
             logger.debug(
               show"$requestId(view hash $viewHash): Received an approval (or reached consortium thresholds) for parties: $newlyRespondedFullVotes"
@@ -373,7 +382,7 @@ private[mediator] final case class ResponseAggregation(
             val ret = informeesByView.toList
               .parTraverseFilter { case (viewHash, (informees, _threshold)) =>
                 val hostedConfirmingPartiesF = informees.toList.parTraverseFilter {
-                  case ConfirmingParty(party, _) =>
+                  case ConfirmingParty(party, _, requiredTrustLevel) =>
                     topologySnapshot
                       .canConfirm(sender, party, requiredTrustLevel)
                       .map(x => if (x) Some(party) else None)
@@ -407,9 +416,7 @@ private[mediator] final case class ResponseAggregation(
                   }
               )
               (informees, _) = informeesAndThreshold
-              declaredConfirmingParties = informees.collect { case ConfirmingParty(party, _) =>
-                party
-              }
+              declaredConfirmingParties = informees.collect { case p: ConfirmingParty => p }
               authorizedConfirmingParties <- authorizedPartiesOfSender(
                 viewHash,
                 declaredConfirmingParties,
@@ -437,7 +444,8 @@ private[mediator] final case class ResponseAggregation(
       request: MediatorRequest = request,
       version: CantonTimestamp = version,
       state: Either[Verdict, Map[ViewHash, ViewState]] = state,
-  ): ResponseAggregation = ResponseAggregation(requestId, request, version, state)(
+      sendVerdict: Boolean = sendVerdict,
+  ): ResponseAggregation = ResponseAggregation(requestId, request, version, state, sendVerdict)(
     protocolVersion,
     requestTraceContext,
   )(loggerFactory)
@@ -448,6 +456,7 @@ private[mediator] final case class ResponseAggregation(
       this.request,
       version,
       Left(MediatorError.Timeout.Reject.create(protocolVersion)),
+      this.sendVerdict,
     )(this.protocolVersion, requestTraceContext)(loggerFactory)
 
   override def pretty: Pretty[ResponseAggregation] = prettyOfClass(
@@ -455,5 +464,6 @@ private[mediator] final case class ResponseAggregation(
     param("request", _.request),
     param("version", _.version),
     param("state", _.state),
+    param("sendVerdict", _.sendVerdict),
   )
 }

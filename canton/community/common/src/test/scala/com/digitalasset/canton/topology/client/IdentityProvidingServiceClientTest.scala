@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.topology.client
 
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.{
@@ -68,6 +69,21 @@ class PartyTopologySnapshotClientTest extends AsyncWordSpec with BaseTest {
             party -> topology.getOrElse(party, Map.empty)
           }.toMap
         )
+
+      /** Returns the Authority-Of delegations for consortium parties. Non-consortium parties delegate to themselves
+        * with threshold one
+        */
+      override def authorityOf(
+          parties: Set[LfPartyId]
+      ): Future[PartyTopologySnapshotClient.AuthorityOfResponse] =
+        Future.successful(PartyTopologySnapshotClient.AuthorityOfResponse(Map.empty))
+
+      override def partiesWithGroupAddressing(parties: Seq[LfPartyId]): Future[Set[LfPartyId]] =
+        ???
+
+      override def consortiumThresholds(
+          parties: Set[LfPartyId]
+      ): Future[Map[LfPartyId, PositiveInt]] = ???
     }
 
     "allHaveActiveParticipants should yield correct results" in {

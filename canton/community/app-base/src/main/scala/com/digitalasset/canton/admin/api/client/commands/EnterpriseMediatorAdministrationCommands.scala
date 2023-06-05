@@ -22,7 +22,7 @@ import com.digitalasset.canton.domain.mediator.admin.gprc.{
 }
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.pruning.admin.v0.LocatePruningTimestamp
-import com.digitalasset.canton.sequencing.SequencerConnection
+import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.topology.{DomainId, MediatorId}
@@ -63,7 +63,7 @@ object EnterpriseMediatorAdministrationCommands {
       mediatorId: MediatorId,
       topologyState: Option[StoredTopologyTransactions[TopologyChangeOp.Positive]],
       domainParameters: StaticDomainParameters,
-      sequencerConnection: SequencerConnection,
+      sequencerConnections: SequencerConnections,
   ) extends BaseMediatorInitializationCommand[
         v0.InitializeMediatorRequest,
         v0.InitializeMediatorResponse,
@@ -76,7 +76,7 @@ object EnterpriseMediatorAdministrationCommands {
           mediatorId,
           topologyState,
           domainParameters,
-          sequencerConnection,
+          sequencerConnections,
         ).toProtoV0
       )
 
@@ -97,7 +97,7 @@ object EnterpriseMediatorAdministrationCommands {
   final case class InitializeX(
       domainId: DomainId,
       domainParameters: StaticDomainParameters,
-      sequencerConnection: SequencerConnection,
+      sequencerConnections: SequencerConnections,
   ) extends BaseMediatorXInitializationCommand[
         v2.InitializeMediatorRequest,
         v2.InitializeMediatorResponse,
@@ -108,7 +108,7 @@ object EnterpriseMediatorAdministrationCommands {
         InitializeMediatorRequestX(
           domainId,
           domainParameters,
-          sequencerConnection,
+          sequencerConnections,
         ).toProtoV2
       )
 

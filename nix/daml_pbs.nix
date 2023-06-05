@@ -5,7 +5,7 @@ in stdenv.mkDerivation rec {
   sdk_version = sources.daml_version;
   src = fetchzip {
     url = "https://github.com/digital-asset/daml/releases/download/v${sdk_version}/protobufs-${sdk_version}.zip";
-    sha256 = "sha256-4d8/gtrbBU7tzm0NgSdPiJV6pV6g0iUHW1eRlhoO1fg=";
+    sha256 = "sha256-iNGQCVjnm5PUR5N8/K1nrfTPI7jkWUpswQ2pb2UZI2c=";
   };
   installPhase = ''
     mkdir -p $out/protos-${sdk_version}

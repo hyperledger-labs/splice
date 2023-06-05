@@ -9,7 +9,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   TopologyAdminCommandsX,
 }
 import com.digitalasset.canton.admin.api.client.data.topologyx.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
 import com.digitalasset.canton.console.{
   CommandErrors,
   ConsoleCommandResult,
@@ -492,6 +492,64 @@ class TopologyAdministrationGroupX(
     }
   }
 
+  @Help.Summary("Manage traffic control")
+  @Help.Group("Member traffic control")
+  object traffic_control {
+    @Help.Summary("List traffic control topology transactions.")
+    def list(
+        filterMember: String = instance.id.filterString,
+        filterStore: String = "",
+        includeProposals: Boolean = false,
+        timeQuery: TimeQueryX = TimeQueryX.HeadState,
+        operation: Option[TopologyChangeOpX] = None,
+        filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
+    ): Seq[ListTrafficStateResult] = consoleEnvironment.run {
+      adminCommand(
+        TopologyAdminCommandsX.Read.ListTrafficControlState(
+          BaseQueryX(
+            filterStore,
+            includeProposals,
+            timeQuery,
+            operation,
+            filterSigningKey,
+            protocolVersion.map(ProtocolVersion.tryCreate),
+          ),
+          filterMember = filterMember,
+        )
+      )
+    }
+
+    @Help.Summary("Top up traffic for this node")
+    @Help.Description(
+      """Use this command to update the new total traffic limit for the node.
+         The top up will have to be authorized by the domain to be accepted.
+         The newTotalTrafficAmount must be strictly increasing top up after top up."""
+    )
+    def top_up(
+        domainId: DomainId,
+        newTotalTrafficAmount: PositiveLong,
+        member: Member = instance.id.member,
+        serial: Option[PositiveInt] = None,
+        signedBy: Option[Fingerprint] = Some(instance.id.uid.namespace.fingerprint),
+    ): SignedTopologyTransactionX[TopologyChangeOpX, TrafficControlStateX] = {
+      consoleEnvironment.run {
+        adminCommand(
+          TopologyAdminCommandsX.Write.Propose(
+            TrafficControlStateX
+              .create(
+                domainId,
+                member,
+                newTotalTrafficAmount,
+              ),
+            signedBy = signedBy.toList,
+            serial,
+          )
+        )
+      }
+    }
+  }
+
   @Help.Summary("Manage party hosting limits")
   @Help.Group("Party hosting limits")
   object party_hosting_limits extends Helpful {
@@ -555,7 +613,30 @@ class TopologyAdministrationGroupX(
   @Help.Summary("Manage authority-of mappings")
   @Help.Group("Authority-of mappings")
   object authority_of extends Helpful {
-    // TODO(#11255): implement write service
+    def propose(
+        partyId: PartyId,
+        threshold: Int,
+        parties: Seq[PartyId],
+        domainId: Option[DomainId] = None,
+        // TODO(#11255) don't use the instance's root namespace key by default.
+        //  let the grpc service figure out the right key to use, once that's implemented
+        signedBy: Option[Fingerprint] = Some(instance.id.uid.namespace.fingerprint),
+        serial: Option[PositiveInt] = None,
+    ): SignedTopologyTransactionX[TopologyChangeOpX, AuthorityOfX] =
+      consoleEnvironment.run {
+        adminCommand(
+          TopologyAdminCommandsX.Write.Propose(
+            AuthorityOfX(
+              partyId,
+              domainId,
+              PositiveInt.tryCreate(threshold),
+              parties,
+            ),
+            signedBy = signedBy.toList,
+            serial,
+          )
+        )
+      }
 
     def list(
         filterStore: String = "",

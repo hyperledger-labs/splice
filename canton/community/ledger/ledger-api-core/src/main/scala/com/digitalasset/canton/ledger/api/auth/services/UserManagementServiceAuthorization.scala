@@ -126,6 +126,16 @@ final class UserManagementServiceAuthorization(
         authorizer.requireIdpAdminClaims(service.updateUser)(request)
     }
 
+  override def updateUserIdentityProviderId(
+      request: UpdateUserIdentityProviderRequest
+  ): Future[UpdateUserIdentityProviderResponse] = {
+    authorizer.requireAdminClaims(
+      call = service.updateUserIdentityProviderId
+    )(
+      request
+    )
+  }
+
   override def bindService(): ServerServiceDefinition =
     UserManagementServiceGrpc.bindService(this, executionContext)
 
@@ -147,4 +157,5 @@ final class UserManagementServiceAuthorization(
         )
       case _ => Success(None)
     }
+
 }

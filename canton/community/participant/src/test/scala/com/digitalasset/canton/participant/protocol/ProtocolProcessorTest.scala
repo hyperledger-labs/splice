@@ -37,6 +37,7 @@ import com.digitalasset.canton.participant.store.{
   ParticipantNodePersistentState,
   SyncDomainEphemeralState,
   SyncDomainPersistentState,
+  TransferStore,
 }
 import com.digitalasset.canton.participant.sync.{
   ParticipantEventPublisher,
@@ -58,7 +59,7 @@ import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
 import com.digitalasset.canton.store.{CursorPrehead, IndexedDomain}
 import com.digitalasset.canton.time.{DomainTimeTracker, NonNegativeFiniteDuration, WallClock}
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import com.digitalasset.canton.topology.transaction.{ParticipantPermission, TrustLevel}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, RequestCounter, SequencerCounter}
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
@@ -206,6 +207,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       nodePersistentState.participantEventLog,
       clock,
       timeouts,
+      TransferStore.transferStoreFor(syncDomainPersistentStates),
       indexedStringStore,
       ParticipantTestMetrics,
       futureSupervisor,
@@ -254,7 +256,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     val steps = new TestProcessingSteps(
       pendingSubmissionMap = pendingSubmissionMap,
       overrideConstructedPendingRequestData,
-      informeesOfView = _ => Set(ConfirmingParty(party.toLf, 1)),
+      informeesOfView = _ => Set(ConfirmingParty(party.toLf, 1, TrustLevel.Ordinary)),
     )
 
     val sut: ProtocolProcessor[
@@ -310,7 +312,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
   lazy val someRequestBatch = RequestAndRootHashMessage(
     NonEmpty(Seq, OpenEnvelope(viewMessage, someRecipients)(testedProtocolVersion)),
     rootHashMessage,
-    DefaultTestIdentities.mediator,
+    MediatorRef(DefaultTestIdentities.mediator),
   )
 
   "submit" should {
@@ -404,7 +406,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         rc,
         requestSc,
         Set.empty,
-        MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+        MediatorRef(MediatorId(UniqueIdentifier.tryCreate("another", "mediator"))),
       )
       val (sut, _persistent, ephemeral) =
         testProcessingSteps(overrideConstructedPendingRequestData = Some(pd))
@@ -425,7 +427,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         rc,
         requestSc,
         Set.empty,
-        MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+        MediatorRef(MediatorId(UniqueIdentifier.tryCreate("another", "mediator"))),
       )
       val (sut, _persistent, ephemeral) =
         testProcessingSteps(
@@ -459,7 +461,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         rc,
         requestSc,
         Set.empty,
-        MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+        MediatorRef(MediatorId(UniqueIdentifier.tryCreate("another", "mediator"))),
       )
       val (sut, _persistent, ephemeral) =
         testProcessingSteps(overrideConstructedPendingRequestData = Some(pd))
@@ -516,7 +518,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
           OpenEnvelope(viewMessageWrongRH, someRecipients)(testedProtocolVersion),
         ),
         rootHashMessage,
-        DefaultTestIdentities.mediator,
+        MediatorRef(DefaultTestIdentities.mediator),
       )
 
       val (sut, _persistent, _ephemeral) = testProcessingSteps()
@@ -548,7 +550,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
           OpenEnvelope(viewMessageDecryptError, someRecipients)(testedProtocolVersion),
         ),
         rootHashMessage,
-        DefaultTestIdentities.mediator,
+        MediatorRef(DefaultTestIdentities.mediator),
       )
 
       val (sut, _persistent, _ephemeral) = testProcessingSteps()
@@ -571,7 +573,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       val requestBatch = RequestAndRootHashMessage(
         NonEmpty(Seq, OpenEnvelope(viewMessage, someRecipients)(testedProtocolVersion)),
         rootHashMessage,
-        otherMediatorId,
+        MediatorRef(otherMediatorId),
       )
 
       val (sut, _persistent, _ephemeral) = testProcessingSteps()
@@ -631,7 +633,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
                 rc,
                 requestSc,
                 Set.empty,
-                MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+                MediatorRef(MediatorId(UniqueIdentifier.tryCreate("another", "mediator"))),
               )
             )
           )
@@ -750,7 +752,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
               rc,
               requestSc,
               Set.empty,
-              MediatorId(UniqueIdentifier.tryCreate("another", "mediator")),
+              MediatorRef(MediatorId(UniqueIdentifier.tryCreate("another", "mediator"))),
             )
           )
         )

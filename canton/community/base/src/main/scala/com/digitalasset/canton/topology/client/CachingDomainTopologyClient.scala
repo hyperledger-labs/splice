@@ -6,7 +6,6 @@ package com.digitalasset.canton.topology.client
 import cats.data.EitherT
 import cats.syntax.parallel.*
 import com.daml.lf.data.Ref.PackageId
-import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{CachingConfigs, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SigningPublicKey
@@ -16,6 +15,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.DynamicDomainParametersWithValidity
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.PartyInfo
 import com.digitalasset.canton.topology.processing.*
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId, TopologyStoreX}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
@@ -24,6 +24,7 @@ import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.{LfPartyId, SequencerCounter}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.Duration
@@ -334,7 +335,7 @@ private class ForwardingTopologySnapshotClient(
   override private[client] def loadActiveParticipantsOf(
       party: PartyId,
       participantStates: Seq[ParticipantId] => Future[Map[ParticipantId, ParticipantAttributes]],
-  ): Future[Map[ParticipantId, ParticipantAttributes]] =
+  ): Future[PartyInfo] =
     parent.loadActiveParticipantsOf(party, participantStates)
   override def findParticipantCertificate(participantId: ParticipantId)(implicit
       traceContext: TraceContext
@@ -387,6 +388,18 @@ private class ForwardingTopologySnapshotClient(
       parties: Seq[PartyId],
       loadParticipantStates: Seq[ParticipantId] => Future[Map[ParticipantId, ParticipantAttributes]],
   ) = parent.loadBatchActiveParticipantsOf(parties, loadParticipantStates)
+
+  override def trafficControlStatus(
+      members: Seq[Member]
+  ): Future[Map[Member, Option[MemberTrafficControlState]]] =
+    parent.trafficControlStatus(members)
+
+  /** Returns the Authority-Of delegations for consortium parties. Non-consortium parties delegate to themselves
+    * with threshold one
+    */
+  override def authorityOf(
+      parties: Set[LfPartyId]
+  ): Future[PartyTopologySnapshotClient.AuthorityOfResponse] = parent.authorityOf(parties)
 }
 
 class CachingTopologySnapshot(
@@ -403,7 +416,7 @@ class CachingTopologySnapshot(
 
   private val partyCache = cachingConfigs.partyCache
     .buildScaffeine()
-    .buildAsyncFuture[PartyId, Map[ParticipantId, ParticipantAttributes]](
+    .buildAsyncFuture[PartyId, PartyInfo](
       loader = party => parent.loadActiveParticipantsOf(party, loadParticipantStates),
       allLoader =
         Some(parties => parent.loadBatchActiveParticipantsOf(parties.toSeq, loadParticipantStates)),
@@ -436,6 +449,22 @@ class CachingTopologySnapshot(
       Option[Future[Seq[DynamicDomainParametersWithValidity]]]
     ](None)
 
+  private val domainTrafficControlStateCache = cachingConfigs.trafficStatusCache
+    .buildScaffeine()
+    .buildAsyncFuture[Member, Option[MemberTrafficControlState]](
+      loader = member =>
+        parent
+          .trafficControlStatus(Seq(member))
+          .map(_.get(member).flatten),
+      allLoader = Some(members => parent.trafficControlStatus(members.toSeq)),
+    )
+
+  private val authorityOfCache = cachingConfigs.partyCache
+    .buildScaffeine()
+    .buildAsyncFuture[Set[LfPartyId], PartyTopologySnapshotClient.AuthorityOfResponse](
+      loader = party => parent.authorityOf(party)
+    )
+
   override def participants(): Future[Seq[(ParticipantId, ParticipantPermission)]] =
     parent.participants()
 
@@ -449,7 +478,7 @@ class CachingTopologySnapshot(
   override def loadActiveParticipantsOf(
       party: PartyId,
       participantStates: Seq[ParticipantId] => Future[Map[ParticipantId, ParticipantAttributes]],
-  ): Future[Map[ParticipantId, ParticipantAttributes]] =
+  ): Future[PartyInfo] =
     partyCache.get(party)
 
   override private[client] def loadBatchActiveParticipantsOf(
@@ -532,4 +561,18 @@ class CachingTopologySnapshot(
       traceContext: TraceContext
   ): Future[Seq[DynamicDomainParametersWithValidity]] =
     getAndCache(domainParametersChangesCache, parent.listDynamicDomainParametersChanges())
+
+  /** Returns the Authority-Of delegations for consortium parties. Non-consortium parties delegate to themselves
+    * with threshold one
+    */
+  override def authorityOf(
+      parties: Set[LfPartyId]
+  ): Future[PartyTopologySnapshotClient.AuthorityOfResponse] =
+    authorityOfCache.get(parties)
+
+  override def trafficControlStatus(
+      members: Seq[Member]
+  ): Future[Map[Member, Option[MemberTrafficControlState]]] = {
+    domainTrafficControlStateCache.getAll(members)
+  }
 }

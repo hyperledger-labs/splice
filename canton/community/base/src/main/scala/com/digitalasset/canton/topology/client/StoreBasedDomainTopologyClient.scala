@@ -19,6 +19,10 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.DynamicDomainParametersWithValidity
 import com.digitalasset.canton.time.{Clock, TimeAwaiter}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.{
+  PartyInfo,
+  nonConsortiumPartyDelegation,
+}
 import com.digitalasset.canton.topology.processing.{ApproximateTime, EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactions,
@@ -31,11 +35,11 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{DiscardOps, SequencerCounter}
+import com.digitalasset.canton.{DiscardOps, LfPartyId, SequencerCounter}
 
 import java.time.Duration as JDuration
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
-import scala.collection.compat.immutable.ArraySeq
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Success
@@ -441,9 +445,9 @@ class StoreBasedTopologySnapshot(
       fetchParticipantStates: Seq[ParticipantId] => Future[
         Map[ParticipantId, ParticipantAttributes]
       ],
-  ): Future[Map[ParticipantId, ParticipantAttributes]] =
+  ): Future[PartyInfo] =
     loadBatchActiveParticipantsOf(Seq(party), fetchParticipantStates).map(
-      _.getOrElse(party, Map.empty)
+      _.getOrElse(party, PartyInfo(false, PositiveInt.one, Map.empty))
     )
 
   override private[client] def loadBatchActiveParticipantsOf(
@@ -451,7 +455,7 @@ class StoreBasedTopologySnapshot(
       fetchParticipantStates: Seq[ParticipantId] => Future[
         Map[ParticipantId, ParticipantAttributes]
       ],
-  ): Future[Map[PartyId, Map[ParticipantId, ParticipantAttributes]]] = {
+  ): Future[Map[PartyId, PartyInfo]] = {
     def update(
         party: PartyId,
         mp: Map[PartyId, PartyAggregation],
@@ -513,7 +517,11 @@ class StoreBasedTopologySnapshot(
       val partyToParticipantAttributes = allAggregated.fmap(v => capped(v))
       // for each party we should return a result
       parties.map { party =>
-        party -> partyToParticipantAttributes.getOrElse(party, Map.empty)
+        party -> PartyInfo(
+          groupAddressing = false,
+          threshold = PositiveInt.one,
+          partyToParticipantAttributes.getOrElse(party, Map.empty),
+        )
       }.toMap
     }
   }
@@ -745,7 +753,10 @@ class StoreBasedTopologySnapshot(
 
   }
 
-  /** returns the list of currently known mediators */
+  /** returns the list of currently known mediators
+    * for singular mediators each one must be wrapped into its own group with threshold = 1
+    * group index in 2.0 topology management is not used and the order of output does not need to be stable
+    */
   override def mediatorGroups(): Future[Seq[MediatorGroup]] = findTransactions(
     asOfInclusive = false,
     includeSecondary = false,
@@ -753,27 +764,29 @@ class StoreBasedTopologySnapshot(
     filterUid = None,
     filterNamespace = None,
   ).map { res =>
-    val activeMediators = ArraySeq.from(
-      res.toTopologyState
-        .foldLeft(Map.empty[MediatorId, (Boolean, Boolean)]) {
-          case (acc, TopologyStateUpdateElement(_, MediatorDomainState(side, _, mediator))) =>
-            acc + (mediator -> RequestSide
-              .accumulateSide(acc.getOrElse(mediator, (false, false)), side))
-          case (acc, _) => acc
-        }
-        .filter { case (_, (lft, rght)) =>
-          lft && rght
-        }
-        .keys
-    )
-    Seq(
-      MediatorGroup(
-        index = NonNegativeInt.zero,
-        activeMediators,
-        Seq.empty,
-        threshold = PositiveInt.one,
+    ArraySeq
+      .from(
+        res.toTopologyState
+          .foldLeft(Map.empty[MediatorId, (Boolean, Boolean)]) {
+            case (acc, TopologyStateUpdateElement(_, MediatorDomainState(side, _, mediator))) =>
+              acc + (mediator -> RequestSide
+                .accumulateSide(acc.getOrElse(mediator, (false, false)), side))
+            case (acc, _) => acc
+          }
+          .filter { case (_, (lft, rght)) =>
+            lft && rght
+          }
+          .keys
       )
-    )
+      .zipWithIndex
+      .map { case (id, index) =>
+        MediatorGroup(
+          index = NonNegativeInt.tryCreate(index),
+          Seq(id),
+          Seq.empty,
+          threshold = PositiveInt.one,
+        )
+      }
   }
 
   /** returns the current sequencer group if known
@@ -856,4 +869,24 @@ class StoreBasedTopologySnapshot(
             DynamicDomainParametersWithValidity(domainParameters, validFrom, validUntil, domainId)
         }
     }
+
+  override def trafficControlStatus(
+      members: Seq[Member]
+  ): Future[Map[Member, Option[MemberTrafficControlState]]] = {
+    // Non-X topology management does not support traffic control transactions
+    Future.successful(members.map(_ -> None).toMap)
+  }
+
+  /*
+  This client does not support consortium parties, i.e. for all requested
+  parties it delegates to themself with threshold 1
+   */
+  override def authorityOf(
+      parties: Set[LfPartyId]
+  ): Future[PartyTopologySnapshotClient.AuthorityOfResponse] =
+    Future.successful(
+      PartyTopologySnapshotClient.AuthorityOfResponse(
+        parties.map(partyId => partyId -> nonConsortiumPartyDelegation(partyId)).toMap
+      )
+    )
 }

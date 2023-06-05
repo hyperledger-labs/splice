@@ -38,21 +38,45 @@ class XNodeDistributedDomainIntegrationTest
     }
 
     clue("SV participants are connected to their own sequencers") {
-      inside(sv1.participantClient.domains.config(globalDomain).value.sequencerConnection) {
-        case GrpcSequencerConnection(endpoints, _, _, _) =>
-          endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5008)))
+      inside(
+        sv1.participantClient.domains
+          .config(globalDomain)
+          .value
+          .sequencerConnections
+          .connections
+          .forgetNE
+      ) { case Seq(GrpcSequencerConnection(endpoints, _, _, _)) =>
+        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5008)))
       }
-      inside(sv2.participantClient.domains.config(globalDomain).value.sequencerConnection) {
-        case GrpcSequencerConnection(endpoints, _, _, _) =>
-          endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5608)))
+      inside(
+        sv2.participantClient.domains
+          .config(globalDomain)
+          .value
+          .sequencerConnections
+          .connections
+          .forgetNE
+      ) { case Seq(GrpcSequencerConnection(endpoints, _, _, _)) =>
+        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5608)))
       }
-      inside(sv3.participantClient.domains.config(globalDomain).value.sequencerConnection) {
-        case GrpcSequencerConnection(endpoints, _, _, _) =>
-          endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5708)))
+      inside(
+        sv3.participantClient.domains
+          .config(globalDomain)
+          .value
+          .sequencerConnections
+          .connections
+          .forgetNE
+      ) { case Seq(GrpcSequencerConnection(endpoints, _, _, _)) =>
+        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5708)))
       }
-      inside(sv4.participantClient.domains.config(globalDomain).value.sequencerConnection) {
-        case GrpcSequencerConnection(endpoints, _, _, _) =>
-          endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5808)))
+      inside(
+        sv4.participantClient.domains
+          .config(globalDomain)
+          .value
+          .sequencerConnections
+          .connections
+          .forgetNE
+      ) { case Seq(GrpcSequencerConnection(endpoints, _, _, _)) =>
+        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5808)))
       }
     }
 

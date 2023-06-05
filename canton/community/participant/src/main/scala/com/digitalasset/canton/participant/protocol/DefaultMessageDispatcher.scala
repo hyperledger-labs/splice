@@ -182,13 +182,13 @@ class DefaultMessageDispatcher(
         // Ordinary events
         case Left(Traced(e @ EventWithErrors(_content, _openingErrors, /* isIgnored */ false))) =>
           processOrdinary(Left(e))
-        case Right(OrdinarySequencedEvent(signedEvent)) =>
+        case Right(OrdinarySequencedEvent(signedEvent, _)) =>
           processOrdinary(Right(signedEvent))
 
         // Ignored events
         case Left(Traced(EventWithErrors(content, _openingErrors, /* isIgnored */ true))) =>
           tickTrackers(content.counter, content.timestamp, triggerAcsChangePublication = false)
-        case Right(IgnoredSequencedEvent(ts, sc, _)) =>
+        case Right(IgnoredSequencedEvent(ts, sc, _, _)) =>
           tickTrackers(sc, ts, triggerAcsChangePublication = false)
       }
 

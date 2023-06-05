@@ -124,7 +124,7 @@ class ParticipantAdminConnection(
         mapping = PartyToParticipantX(
           party,
           None,
-          1, // Increase this to switch to a real consortium party
+          PositiveInt.tryCreate(1), // Increase this to switch to a real consortium party
           (newParticipant +: existingParticipants).map(
             HostingParticipant(
               _,

@@ -195,7 +195,7 @@ abstract class CantonNodeBootstrapBase[
   def runOnSkippedInitialization: EitherT[Future, String, Unit] = EitherT.pure[Future, String](())
 
   /** Attempt to start the node with this identity. */
-  protected def initialize(uid: NodeId): EitherT[Future, String, Unit]
+  protected def initialize(uid: NodeId): EitherT[FutureUnlessShutdown, String, Unit]
 
   /** Generate an identity for the node. */
   protected def autoInitializeIdentity(
@@ -241,28 +241,28 @@ abstract class CantonNodeBootstrapBase[
     }
 
     initQueue
-      .executeE(
+      .executeEUS(
         for {
           // if we're a passive replica but the node is set to auto-initialize, wait here until the node has established an id
           id <-
-            if (!storage.isActive && initConfig.autoInit) waitForActiveId().map(Some(_))
-            else
-              EitherT.right[String](
-                initializationStore.id
-              ) // otherwise just fetch what's that immediately
+            performUnlessClosingEitherU("waitOrFetchActiveId") {
+              if (!storage.isActive && initConfig.autoInit) waitForActiveId().map(Some(_))
+              else
+                EitherT.right[String](
+                  initializationStore.id
+                ) // otherwise just fetch what's that immediately
+            }
           _ <- id.fold(
             if (initConfig.autoInit) {
               logger.info(
                 "Node is not initialized yet. Performing automated default initialization."
               )
-              autoInitializeIdentity(initConfig).onShutdown(
-                Left("Node was shutdown during initialization")
-              )
+              autoInitializeIdentity(initConfig)
             } else {
               logger.info(
                 "Node is not initialized yet. You have opted for manual configuration by yourself."
               )
-              runOnSkippedInitialization
+              performUnlessClosingEitherU("runOnSkippedInitialization")(runOnSkippedInitialization)
             }
           )(startWithStoredNodeId)
         } yield (),
@@ -283,11 +283,10 @@ abstract class CantonNodeBootstrapBase[
           val initializationWatcher = new InitializationWatcher(initializationStore, loggerFactory)
           initializationWatcher.watch(nodeId =>
             initQueue
-              .executeE(
+              .executeEUS(
                 startWithStoredNodeId(nodeId),
                 "waitForReplicaInitializationStartWithStoredNodeId",
               )
-              .onShutdown(Left("Aborted due to shutdown"))
           )
           initializationWatcherRef.set(initializationWatcher.some)
         }
@@ -295,7 +294,7 @@ abstract class CantonNodeBootstrapBase[
     }
   }
 
-  protected def startWithStoredNodeId(id: NodeId): EitherT[Future, String, Unit] =
+  protected def startWithStoredNodeId(id: NodeId): EitherT[FutureUnlessShutdown, String, Unit] =
     if (nodeId.compareAndSet(None, Some(id))) {
       logger.info(s"Resuming as existing instance with uid=${id}")
       initialize(id).leftMap { err =>
@@ -304,39 +303,31 @@ abstract class CantonNodeBootstrapBase[
         err
       }
     } else {
-      EitherT.leftT[Future, Unit]("Node identity has already been initialized")
+      EitherT.leftT[FutureUnlessShutdown, Unit]("Node identity has already been initialized")
     }
 
   def getId: Option[NodeId] = nodeId.get()
 
-  protected def startInstanceUS(
-      instanceET: => EitherT[FutureUnlessShutdown, String, T]
-  ): EitherT[Future, String, Unit] = startInstanceUnlessClosing(
-    instanceET.onShutdown(Left("Aborting startup due to shutdown"))
-  )
-
   /** kick off initialisation during startup */
   protected def startInstanceUnlessClosing(
-      instanceET: => EitherT[Future, String, T]
-  ): EitherT[Future, String, Unit] = {
+      instanceET: => EitherT[FutureUnlessShutdown, String, T]
+  ): EitherT[FutureUnlessShutdown, String, Unit] = {
     if (isInitialized) {
       logger.warn("Will not start instance again as it is already initialised")
-      EitherT.pure[Future, String](())
+      EitherT.pure[FutureUnlessShutdown, String](())
     } else {
-      performUnlessClosingEitherT(functionFullName, "Aborting startup due to shutdown") {
-        if (starting.compareAndSet(false, true))
-          instanceET.map { instance =>
-            val previous = ref.getAndSet(Some(instance))
-            // potentially over-defensive, but ensures a runner will not be set twice.
-            // if called twice it indicates a bug in initialization.
-            previous.foreach { shouldNotBeThere =>
-              logger.error(s"Runner has already been set: $shouldNotBeThere")
-            }
+      if (starting.compareAndSet(false, true))
+        instanceET.map { instance =>
+          val previous = ref.getAndSet(Some(instance))
+          // potentially over-defensive, but ensures a runner will not be set twice.
+          // if called twice it indicates a bug in initialization.
+          previous.foreach { shouldNotBeThere =>
+            logger.error(s"Runner has already been set: $shouldNotBeThere")
           }
-        else {
-          logger.warn("Will not start instance again as it is already starting up")
-          EitherT.pure[Future, String](())
         }
+      else {
+        logger.warn("Will not start instance again as it is already starting up")
+        EitherT.pure[FutureUnlessShutdown, String](())
       }
     }
   }
@@ -346,10 +337,10 @@ abstract class CantonNodeBootstrapBase[
 
   /** Initialize the node with an externally provided identity. */
   def initializeWithProvidedId(nodeId: NodeId): EitherT[Future, String, Unit] = initQueue
-    .executeE(
+    .executeEUS(
       {
         for {
-          _ <- storeId(nodeId)
+          _ <- performUnlessClosingEitherU("storeNodeId")(storeId(nodeId))
           _ <- initialize(nodeId)
         } yield ()
       },
@@ -461,7 +452,7 @@ abstract class CantonNodeBootstrapBase[
     override protected def timeouts: ProcessingTimeout =
       arguments.parameterConfig.processingTimeouts
     def watch(
-        startWithStoredNodeId: NodeId => EitherT[Future, String, Unit]
+        startWithStoredNodeId: NodeId => EitherT[FutureUnlessShutdown, String, Unit]
     )(implicit traceContext: TraceContext): Unit = {
       logger.debug(s"Waiting for a node id to be stored to start this node instance")
       // we try forever - 1 to avoid logging every attempt at warning
@@ -480,7 +471,7 @@ abstract class CantonNodeBootstrapBase[
             logger.debug("A stored id has been found but the id has already been set so ignoring")
           } else {
             logger.info("Starting node as we have found a stored id")
-            startWithStoredNodeId(id).value.foreach {
+            startWithStoredNodeId(id).onShutdown(Right(())).value.foreach {
               case Left(error) =>
                 // if we are already successfully initialized likely this was just called twice due to a race between
                 // the waiting and an initialize call

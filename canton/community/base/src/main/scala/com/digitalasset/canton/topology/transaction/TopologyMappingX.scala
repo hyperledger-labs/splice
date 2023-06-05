@@ -10,10 +10,10 @@ import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError.{
   FieldNotSet,
+  InvariantViolation,
   UnrecognizedEnum,
-  ValueConversionError,
 }
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -23,13 +23,7 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX.Replace
-import com.digitalasset.canton.topology.transaction.TopologyMappingX.RequiredAuthX.{
-  And,
-  EmptyAuthorization,
-  Or,
-  RequiredNamespaces,
-  RequiredUids,
-}
+import com.digitalasset.canton.topology.transaction.TopologyMappingX.RequiredAuthX.*
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.{
   Code,
   MappingHash,
@@ -88,6 +82,7 @@ sealed trait TopologyMappingX extends Product with Serializable with PrettyPrint
       M: ClassTag[TargetMapping]
   ): Option[TargetMapping] = M.unapply(this)
 
+  /** Returns a hash builder based on the values of the topology mapping that needs to be unique */
   protected def addUniqueKeyToBuilder(builder: HashBuilder): HashBuilder
 
 }
@@ -119,6 +114,7 @@ object TopologyMappingX {
     object OffboardParticipantX extends Code(14, "ofp")
 
     object PurgeTopologyTransactionX extends Code(15, "ptt")
+    object TrafficControlStateX extends Code(16, "tcs")
 
     lazy val all = Seq(
       NamespaceDelegationX,
@@ -241,6 +237,7 @@ object TopologyMappingX {
       case Mapping.MediatorDomainState(value) => MediatorDomainStateX.fromProtoV2(value)
       case Mapping.SequencerDomainState(value) => SequencerDomainStateX.fromProtoV2(value)
       case Mapping.PurgeTopologyTxs(value) => PurgeTopologyTransactionX.fromProtoV2(value)
+      case Mapping.TrafficControlState(value) => TrafficControlStateX.fromProtoV2(value)
     }
 
   private[transaction] def addDomainId(
@@ -935,7 +932,7 @@ object HostingParticipant {
 final case class PartyToParticipantX(
     partyId: PartyId,
     domainId: Option[DomainId],
-    threshold: Int,
+    threshold: PositiveInt,
     participants: Seq[HostingParticipant],
     groupAddressing: Boolean,
 ) extends TopologyMappingX {
@@ -943,7 +940,7 @@ final case class PartyToParticipantX(
   def toProto: v2.PartyToParticipantX =
     v2.PartyToParticipantX(
       party = partyId.toProtoPrimitive,
-      threshold = threshold,
+      threshold = threshold.value,
       participants = participants.map(_.toProto),
       groupAddressing = groupAddressing,
       domain = domainId.fold("")(_.toProtoPrimitive),
@@ -988,7 +985,7 @@ object PartyToParticipantX {
   ): ParsingResult[PartyToParticipantX] =
     for {
       partyId <- PartyId.fromProtoPrimitive(value.party, "party")
-      threshold = value.threshold
+      threshold <- ProtoConverter.parsePositiveInt(value.threshold)
       participants <- value.participants.traverse(HostingParticipant.fromProtoV2)
       groupAddressing = value.groupAddressing
       domainId <-
@@ -1050,14 +1047,7 @@ object AuthorityOfX {
   ): ParsingResult[AuthorityOfX] =
     for {
       partyId <- PartyId.fromProtoPrimitive(value.party, "party")
-      threshold <- PositiveInt
-        .create(value.threshold)
-        .leftMap(_ =>
-          ValueConversionError(
-            "threshold",
-            s"threshold needs to be positive and not ${value.threshold}",
-          )
-        )
+      threshold <- ProtoConverter.parsePositiveInt(value.threshold)
       parties <- value.parties.traverse(PartyId.fromProtoPrimitive(_, "parties"))
       domainId <-
         if (value.domain.nonEmpty)
@@ -1098,7 +1088,6 @@ final case class DomainParametersStateX(domain: DomainId, parameters: DynamicDom
   override def requiredAuth(
       previous: Option[TopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]
   ): RequiredAuthX = RequiredUids(Set(domain.uid))
-
 }
 
 object DomainParametersStateX {
@@ -1215,7 +1204,6 @@ final case class MediatorDomainStateX private (
       // TODO(#11255): proper error or ignore
       sys.error(s"unexpected transaction data: $previous")
   }
-
 }
 
 object MediatorDomainStateX {
@@ -1410,4 +1398,70 @@ object PurgeTopologyTransactionX {
     } yield result
   }
 
+}
+
+// Traffic control state topology transactions
+final case class TrafficControlStateX private (
+    domain: DomainId,
+    member: Member,
+    totalExtraTrafficLimit: PositiveLong,
+) extends TopologyMappingX {
+
+  override protected def addUniqueKeyToBuilder(builder: HashBuilder): HashBuilder =
+    builder.add(domain.uid.toProtoPrimitive).add(member.uid.toProtoPrimitive)
+
+  def toProto: v2.TrafficControlStateX = {
+    v2.TrafficControlStateX(
+      domain = domain.toProtoPrimitive,
+      member = member.toProtoPrimitive,
+      totalExtraTrafficLimit = totalExtraTrafficLimit.value,
+    )
+  }
+
+  def toProtoV2: v2.TopologyMappingX =
+    v2.TopologyMappingX(
+      v2.TopologyMappingX.Mapping.TrafficControlState(
+        toProto
+      )
+    )
+
+  def code: TopologyMappingX.Code = Code.TrafficControlStateX
+
+  override def namespace: Namespace = member.uid.namespace
+  override def maybeUid: Option[UniqueIdentifier] = Some(member.uid)
+
+  override def requiredAuth(
+      previous: Option[TopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]
+  ): RequiredAuthX = RequiredUids(Set(domain.uid))
+
+  override def restrictedToDomain: Option[DomainId] = Some(domain)
+}
+
+object TrafficControlStateX {
+
+  def code: TopologyMappingX.Code = Code.TrafficControlStateX
+
+  def create(
+      domain: DomainId,
+      member: Member,
+      totalExtraTrafficLimit: PositiveLong,
+  ): Either[String, TrafficControlStateX] =
+    Right(TrafficControlStateX(domain, member, totalExtraTrafficLimit))
+
+  def fromProtoV2(
+      value: v2.TrafficControlStateX
+  ): ParsingResult[TrafficControlStateX] = {
+    val v2.TrafficControlStateX(domainIdP, memberP, totalExtraTrafficLimitP) =
+      value
+    for {
+      domainId <- DomainId.fromProtoPrimitive(domainIdP, "domain")
+      member <- Member.fromProtoPrimitive(memberP, "member")
+      totalExtraTrafficLimit <- PositiveLong
+        .create(totalExtraTrafficLimitP)
+        .leftMap(e => InvariantViolation(e.message))
+      result <- create(domainId, member, totalExtraTrafficLimit).leftMap(
+        ProtoDeserializationError.OtherError
+      )
+    } yield result
+  }
 }

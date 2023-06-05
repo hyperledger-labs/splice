@@ -8,11 +8,12 @@ import cats.data.EitherT
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
+import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.{DomainId, Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.api.trace.Tracer
@@ -22,14 +23,17 @@ import scala.concurrent.{ExecutionContext, Future}
 trait SequencerFactory extends AutoCloseable {
 
   def initialize(
-      initialState: SequencerInitialState
+      initialState: SequencerInitialState,
+      sequencerId: SequencerId,
   )(implicit ex: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Unit]
 
   def create(
       domainId: DomainId,
+      sequencerId: SequencerId,
       clock: Clock,
       domainSyncCryptoApi: DomainSyncCryptoClient,
       futureSupervisor: FutureSupervisor,
+      rateLimitManager: Option[SequencerRateLimitManager],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -41,7 +45,8 @@ trait SequencerFactory extends AutoCloseable {
 abstract class DatabaseSequencerFactory extends SequencerFactory {
 
   override def initialize(
-      initialState: SequencerInitialState
+      initialState: SequencerInitialState,
+      sequencerId: SequencerId,
   )(implicit ex: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Unit] =
     EitherT.leftT(
       "Database sequencer does not support dynamically bootstrapping from a snapshot. " +
@@ -62,9 +67,11 @@ class CommunityDatabaseSequencerFactory(
 
   override def create(
       domainId: DomainId,
+      sequencerId: SequencerId,
       clock: Clock,
       domainSyncCryptoApi: DomainSyncCryptoClient,
       futureSupervisor: FutureSupervisor,
+      rateLimitManager: Option[SequencerRateLimitManager],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,

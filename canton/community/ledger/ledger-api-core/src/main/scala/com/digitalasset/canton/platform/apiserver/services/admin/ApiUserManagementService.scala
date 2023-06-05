@@ -7,6 +7,8 @@ import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v1.admin.user_management_service.{
   CreateUserResponse,
   GetUserResponse,
+  UpdateUserIdentityProviderRequest,
+  UpdateUserIdentityProviderResponse,
   UpdateUserRequest,
   UpdateUserResponse,
 }
@@ -377,6 +379,37 @@ private[apiserver] final class ApiUserManagementService(
         .map(proto.ListUserRightsResponse(_))
     }
 
+  override def updateUserIdentityProviderId(
+      request: UpdateUserIdentityProviderRequest
+  ): Future[UpdateUserIdentityProviderResponse] = {
+    withValidation {
+      for {
+        userId <- requireUserId(request.userId, "user_id")
+        sourceIdentityProviderId <- optionalIdentityProviderId(
+          request.sourceIdentityProviderId,
+          "source_identity_provider_id",
+        )
+        targetIdentityProviderId <- optionalIdentityProviderId(
+          request.targetIdentityProviderId,
+          "target_identity_provider_id",
+        )
+      } yield (userId, sourceIdentityProviderId, targetIdentityProviderId)
+    } { case (userId, sourceIdentityProviderId, targetIdentityProviderId) =>
+      for {
+        _ <- identityProviderExistsOrError(sourceIdentityProviderId)
+        _ <- identityProviderExistsOrError(targetIdentityProviderId)
+        result <- userManagementStore
+          .updateUserIdp(
+            sourceIdp = sourceIdentityProviderId,
+            targetIdp = targetIdentityProviderId,
+            id = userId,
+          )
+          .flatMap(handleResult("update user identity provider"))
+          .map(_ => proto.UpdateUserIdentityProviderResponse())
+      } yield result
+    }
+  }
+
   private def handleUpdatePathResult[T](userId: Ref.UserId, result: update.Result[T]): Future[T] =
     result match {
       case Left(e: update.UpdatePathError) =>
@@ -542,6 +575,7 @@ private[apiserver] final class ApiUserManagementService(
       f: LoggingContext => A
   )(implicit loggingContext: LoggingContext): A =
     withEnrichedLoggingContext("submissionId" -> submissionIdGenerator.generate())(f)
+
 }
 
 object ApiUserManagementService {

@@ -163,11 +163,14 @@ object LocalDomainNode {
       endpoint: ClientConfig
   ): DomainConnectionConfig => DomainConnectionConfig = conf =>
     conf.copy(
-      sequencerConnection = conf.sequencerConnection match {
-        case con: GrpcSequencerConnection =>
-          con.copy(endpoints = toEndpoints(endpoint))
-        case con =>
-          throw new IllegalArgumentException(s"Expected GrpcSequencerConnection but got $con")
-      }
+      sequencerConnections = conf.sequencerConnections.modify(
+        SequencerAlias.Default,
+        {
+          case con: GrpcSequencerConnection =>
+            con.copy(endpoints = toEndpoints(endpoint))
+          case con =>
+            throw new IllegalArgumentException(s"Expected GrpcSequencerConnection but got $con")
+        },
+      )
     )
 }

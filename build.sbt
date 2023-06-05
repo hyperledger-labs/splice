@@ -279,6 +279,7 @@ lazy val `apps-common` =
   project
     .in(file("apps/common"))
     .dependsOn(
+      `canton-research-services`,
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",
@@ -798,12 +799,26 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
           "Log4j2Plugins.dat",
         ) =>
       MergeStrategy.first
+    case (PathList("akka", "stream", "scaladsl", broadcasthub, _*))
+        if broadcasthub.startsWith("BroadcastHub") =>
+      MergeStrategy.first
     case "META-INF/versions/9/module-info.class" => MergeStrategy.discard
     case path if path.contains("module-info.class") => MergeStrategy.discard
     case PathList("org", "jline", _ @_*) => MergeStrategy.first
     // Dedup between ledger-api-java-proto (pulled in via Scala bindings)
     // and the copy of that inlined into bindings-java.
     case PathList("com", "daml", "ledger", "api", "v1", _*) => MergeStrategy.first
+    case PathList(
+          "com",
+          "digitalasset",
+          "canton",
+          "participant",
+          "protocol",
+          "v0",
+          "multidomain",
+          _*,
+        ) =>
+      MergeStrategy.first
     case x => oldStrategy(x)
   }
 }
