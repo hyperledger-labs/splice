@@ -123,16 +123,31 @@ class XNodeSplitwellUpgradeFrontendIntegrationTest
         }
 
         withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
-          click on className("add-user-link") withClue "alice accepts bob's request"
+          val groupsBefore = eventually() {
+            val groupsBefore = getGroupContractIds()
+            groupsBefore should have size 2
+            groupsBefore
+          }
+          actAndCheck(
+            "Alice accepts bob's request",
+            click on className("add-user-link") withClue "alice accepts bob's request",
+          )(
+            "Group contract id changes",
+            _ => {
+              val groupsAfter = getGroupContractIds()
+              groupsAfter should have size 2
+              groupsAfter should not equal groupsBefore
+            },
+          )
 
           enterPayment(abGroupName, "42.42", "the answer") withClue "Alice enters a payment"
         }
 
+        bobWallet.tap(BigDecimal("100"))
         val (_, bobWalletResume) = withFrontEnd(bobSplitwellFE) { implicit webDriver =>
-          actAndCheck("bob taps", bobWallet.tap(BigDecimal("100")))(
-            "bob observers updated balance",
-            _ => checkSoleBalance("-21.2100000000"),
-          )
+          eventually() {
+            checkSoleBalance("-21.2100000000")
+          }
 
           // we want to create the AppPaymentRequest and DeliveryOffer *before*
           // installing on the upgrade domain, but we don't want to complete
