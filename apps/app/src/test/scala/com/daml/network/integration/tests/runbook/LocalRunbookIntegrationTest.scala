@@ -16,7 +16,7 @@ import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
 
 /** Runs through runbook but does so while spinning up a local SVC. */
-class LocalRunbookIntegrationTest
+class XNodeLocalRunbookIntegrationTest
     extends CNNodeIntegrationTest
     with HasConsoleScriptRunner
     with ProcessTestUtil {
@@ -53,6 +53,29 @@ class LocalRunbookIntegrationTest
     val validatorBootstrapContent: String =
       (validatorPath / "validator-participant.sc").contentAsString
     bootstrapFile.overwrite("""
+      |println("Bootstrapping domain")
+      |import com.digitalasset.canton.console.LocalInstanceReferenceX
+      |import com.digitalasset.canton.domain.config.DomainParametersConfig
+      |import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
+      |val domainParametersConfig = DomainParametersConfig(
+      |  protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
+      |  devVersionSupport = true,
+      |  uniqueContractKeys = false,
+      |)
+      |
+      |def staticParameters(sequencer: LocalInstanceReferenceX) =
+      |  domainParametersConfig
+      |    .toStaticDomainParameters(sequencer.config.crypto)
+      |    .flatMap(StaticDomainParameters(_).left.map(_.toString))
+      |    .getOrElse(sys.error("whatever"))
+      |
+      |svc_sequencer.domain.bootstrap(
+      |  "global-domain",
+      |  staticParameters(svc_sequencer),
+      |  domainOwners = Seq(svc_sequencer, svc_mediator),
+      |  sequencers = Seq(svc_sequencer),
+      |  mediators = Seq(svc_mediator),
+      |)
       |println("Connecting svc participant to domain")
       |svc_participant.domains.connect("global", "http://localhost:9008")
       |val svcUserName = "svc"
@@ -95,15 +118,15 @@ class LocalRunbookIntegrationTest
     val process = startCanton(
       Seq(
         "-c",
-        (validatorPath / "validator-participant.conf").toString,
+        (validatorPath / "validator-participant-x.conf").toString,
         "-c",
         (svcParticipantPath / "canton.conf").toString,
         "-c",
         (svcDomainPath / "canton.conf").toString,
         "-C",
-        "canton.participants.validatorParticipant.ledger-api.port=7001",
+        "canton.participants-x.validatorParticipant.ledger-api.port=7001",
         "-C",
-        "canton.participants.validatorParticipant.admin-api.port=7002",
+        "canton.participants-x.validatorParticipant.admin-api.port=7002",
         "--bootstrap",
         bootstrapFile.toString,
       ),
