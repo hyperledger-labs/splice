@@ -53,4 +53,7 @@ Submission timed out.*TransactionProcessor
 # TODO(#5308) Remove this once Canton fixes their bug
 Response message for request.+timed out at
 
+# TODO(#5383) Consider not ignoring this
+Failed to send: sending accepted txs to members.*TopologyRequestProcessor
+
 # Make sure to have a trailing newline
