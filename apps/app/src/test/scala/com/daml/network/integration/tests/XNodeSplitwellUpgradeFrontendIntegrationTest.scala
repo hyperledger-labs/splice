@@ -15,9 +15,9 @@ import com.daml.network.util.{
   WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import SplitwellUpgradeFrontendIntegrationTest.*
+import XNodeSplitwellUpgradeFrontendIntegrationTest.*
 
-class SplitwellUpgradeFrontendIntegrationTest
+class XNodeSplitwellUpgradeFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment(aliceSplitwellFE, bobSplitwellFE)
     with FrontendLoginUtil
     with MultiDomainTestUtil
@@ -30,7 +30,7 @@ class SplitwellUpgradeFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
         CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
@@ -128,10 +128,11 @@ class SplitwellUpgradeFrontendIntegrationTest
           enterPayment(abGroupName, "42.42", "the answer") withClue "Alice enters a payment"
         }
 
-        bobWallet.tap(BigDecimal("100"))
-
         val (_, bobWalletResume) = withFrontEnd(bobSplitwellFE) { implicit webDriver =>
-          checkSoleBalance("-21.2100000000")
+          actAndCheck("bob taps", bobWallet.tap(BigDecimal("100")))(
+            "bob observers updated balance",
+            _ => checkSoleBalance("-21.2100000000"),
+          )
 
           // we want to create the AppPaymentRequest and DeliveryOffer *before*
           // installing on the upgrade domain, but we don't want to complete
@@ -281,7 +282,7 @@ class SplitwellUpgradeFrontendIntegrationTest
   }
 }
 
-object SplitwellUpgradeFrontendIntegrationTest {
+object XNodeSplitwellUpgradeFrontendIntegrationTest {
   private val aliceSplitwellFE = "aliceSplitwell"
   private val bobSplitwellFE = "bobSplitwell"
 }

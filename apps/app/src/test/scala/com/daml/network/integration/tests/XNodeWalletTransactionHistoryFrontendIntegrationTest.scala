@@ -10,7 +10,7 @@ import org.scalatest.Assertion
 
 import scala.collection.parallel.immutable.ParVector
 
-class WalletTransactionHistoryFrontendIntegrationTest
+class XNodeWalletTransactionHistoryFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with WalletTxLogTestUtil
@@ -22,7 +22,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withCoinPrice(coinPrice)
 

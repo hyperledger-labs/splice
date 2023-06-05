@@ -9,7 +9,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.{Duration, LocalDate}
 
-class WalletSubscriptionsFrontendIntegrationTest
+class XNodeWalletSubscriptionsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with FrontendLoginUtil
@@ -18,7 +18,7 @@ class WalletSubscriptionsFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withCoinPrice(2)
 
   "A wallet UI" should {

@@ -12,7 +12,7 @@ import java.time.temporal.ChronoUnit
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import java.util.UUID
 
-class WalletTransfersFrontendIntegrationTest
+class XNodeWalletTransfersFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
     with WalletTestUtil
     with WalletFrontendTestUtil
@@ -22,7 +22,7 @@ class WalletTransfersFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withCoinPrice(coinPrice)
 
   "A wallet UI" should {

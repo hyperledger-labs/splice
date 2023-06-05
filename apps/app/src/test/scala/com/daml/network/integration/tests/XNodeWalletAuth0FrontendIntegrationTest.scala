@@ -11,7 +11,7 @@ import monocle.macros.syntax.lens.*
 
 import java.net.URL
 
-class WalletAuth0FrontendIntegrationTest
+class XNodeWalletAuth0FrontendIntegrationTest
     extends FrontendIntegrationTest("randomUser")
     with FrontendLoginUtil
     with WalletTestUtil
@@ -19,7 +19,7 @@ class WalletAuth0FrontendIntegrationTest
 
   override def environmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1

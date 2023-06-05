@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter
 import java.time.{Duration, LocalDateTime}
 import scala.concurrent.duration.DurationInt
 
-class DirectoryFrontendIntegrationTest
+class XNodeDirectoryFrontendIntegrationTest
     extends FrontendIntegrationTest("alice")
     with WalletTestUtil
     with FrontendLoginUtil {
@@ -19,7 +19,7 @@ class DirectoryFrontendIntegrationTest
 
   override def environmentDefinition =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1

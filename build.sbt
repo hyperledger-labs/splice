@@ -1008,7 +1008,6 @@ printTests := {
   println("Appending full class names of tests.")
   val pw = new PrintWriter(new FileWriter(s"test-full-class-names.log", true))
   val pwSimTime = new PrintWriter(new FileWriter(s"test-full-class-names-sim-time.log", true))
-  val pwFrontEnd = new PrintWriter(new FileWriter(s"test-full-class-names-frontend.log", true))
   val pwFrontEndSimTime =
     new PrintWriter(new FileWriter(s"test-full-class-names-frontend-sim-time.log", true))
   val pwPreflight = new PrintWriter(new FileWriter(s"test-full-class-names-preflight.log", true))
@@ -1017,6 +1016,8 @@ printTests := {
   val pwXNode = new PrintWriter(new FileWriter(s"test-full-class-names-xnode.log", true))
   val pwXNodeSimTime =
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-sim-time.log", true))
+  val pwXNodeFrontEnd =
+    new PrintWriter(new FileWriter(s"test-full-class-names-xnode-frontend.log", true))
   val pwXNodeDistributedDomain =
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-distributed-domain.log", true))
 
@@ -1069,16 +1070,6 @@ printTests := {
         ),
     ),
     (
-      "Frontend tests with wall clock time",
-      pwFrontEnd,
-      (t: String) =>
-        !isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(
-          t
-        ) && !isPreflightSvIntegrationTest(t) && !isXNodeTest(
-          t
-        ),
-    ),
-    (
       "Frontend tests with simulated time",
       pwFrontEndSimTime,
       (t: String) =>
@@ -1101,12 +1092,22 @@ printTests := {
     (
       "XNode tests with wall clock time",
       pwXNode,
-      (t: String) => isXNodeTest(t) && !isTimeBasedTest(t) && !isDistributedDomainTest(t),
+      (t: String) =>
+        isXNodeTest(t) && !isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(t),
     ),
     (
       "XNode tests with simulated time",
       pwXNodeSimTime,
-      (t: String) => isXNodeTest(t) && isTimeBasedTest(t) && !isDistributedDomainTest(t),
+      (t: String) =>
+        isXNodeTest(t) && isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(t),
+    ),
+    (
+      "XNode frontend tests with wall clock time",
+      pwXNodeFrontEnd,
+      (t: String) =>
+        // All frontend tests are migrated to X nodes so we explicitly don't exclude non-xnode
+        // tests here to make sure that we don't introduce any new ones.
+        !isTimeBasedTest(t) && isFrontEndTest(t) && !isDistributedDomainTest(t),
     ),
     (
       "XNode tests with a distributed domain and wall clock time",
@@ -1119,12 +1120,12 @@ printTests := {
 
   pw.close()
   pwSimTime.close()
-  pwFrontEnd.close()
   pwFrontEndSimTime.close()
   pwPreflight.close()
   pwPreflightSv.close()
   pwXNode.close()
   pwXNodeSimTime.close()
+  pwXNodeFrontEnd.close()
   pwXNodeDistributedDomain.close()
 }
 

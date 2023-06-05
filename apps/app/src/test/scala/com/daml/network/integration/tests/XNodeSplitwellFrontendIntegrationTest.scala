@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.duration.DurationInt
 
-class SplitwellFrontendIntegrationTest
+class XNodeSplitwellFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment(
       "aliceSplitwell",
       "bobSplitwell",
@@ -32,7 +32,7 @@ class SplitwellFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
         Seq(splitwellDarPath, directoryDarPath).foreach { path =>

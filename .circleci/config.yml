@@ -1715,19 +1715,6 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-        name: "scala_test frontend wall clock time"
-        test_names_file: "test-full-class-names-frontend.log"
-        start_canton_options: "-d -p external -w"
-        extra_pre_sbt_cmd: "&& ./start-frontends.sh -d -e -s"
-        extra_post_sbt_cmd: "&& ./stop-frontends.sh"
-        resource_class: "2xlarge+"
-        parallelism: 4
-    - scala_test:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - datadog
-          - slack-context
         name: "scala_test frontend sim time"
         test_names_file: "test-full-class-names-frontend-sim-time.log"
         start_canton_options: "-d -p external -s"
@@ -1757,6 +1744,19 @@ workflows:
         start_canton_options: "-d -p external -x -s"
         resource_class: "2xlarge"
         parallelism: 1
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test x nodes frontend wall clock time"
+        test_names_file: "test-full-class-names-xnode-frontend.log"
+        start_canton_options: "-d -p external -w -x -w"
+        extra_pre_sbt_cmd: "&& ./start-frontends.sh -d -e -s"
+        extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        resource_class: "2xlarge+"
+        parallelism: 4
     - scala_test:
         <<: *notify-fail
         context:

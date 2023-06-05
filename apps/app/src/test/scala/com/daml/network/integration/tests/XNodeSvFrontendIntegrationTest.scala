@@ -9,7 +9,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 
-class SvFrontendIntegrationTest
+class XNodeSvFrontendIntegrationTest
     extends FrontendIntegrationTest("sv1", "sv2")
     with SvTestUtil
     with FrontendLoginUtil {
@@ -17,7 +17,7 @@ class SvFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
 
   "SV UIs" should {
     val sv1Port = 3010
