@@ -777,6 +777,45 @@ lazy val pulumi =
       },
     )
 
+// TODO(#5178) Remove this once we no longer have a copy of the protobufs.
+val multiDomainsMergeStrategy = new MergeStrategy {
+  // Copied from SBT because they forgot to make it public
+  // https://github.com/sbt/sbt-assembly/issues/435
+  val PathRE = "([^/]+)/(.*)".r
+
+  def sourceOfFileForMerge(tempDir: File, f: File): (File, File, String, Boolean) = {
+    val baseURI = tempDir.getCanonicalFile.toURI
+    val otherURI = f.getCanonicalFile.toURI
+    val relative = baseURI.relativize(otherURI)
+    val PathRE(head, tail) = relative.getPath
+    val base = tempDir / head
+
+    if ((tempDir / (head + ".jarName")) exists) {
+      val jarName = IO.read(tempDir / (head + ".jarName"), IO.utf8)
+      (new File(jarName), base, tail, true)
+    } else {
+      val dirName = IO.read(tempDir / (head + ".dir"), IO.utf8)
+      (new File(dirName), base, tail, false)
+    } // if-else
+  }
+
+  val name = "multi-domains strat"
+
+  def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
+    val result =
+      if (files.size == 1)
+        files.headOption
+      else
+        files.collectFirst {
+          case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("research") => f
+        }
+    result match {
+      case None => Left(s"None of the multi-domains files originate from research: ${files}")
+      case Some(f) => Right(Seq((f, path)))
+    }
+  }
+}
+
 // Copied from Canton. Can probably be removed once we use Canton as a library.
 def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy = {
   {
@@ -818,7 +857,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
           "multidomain",
           _*,
         ) =>
-      MergeStrategy.first
+      multiDomainsMergeStrategy
     case x => oldStrategy(x)
   }
 }
