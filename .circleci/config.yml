@@ -2063,7 +2063,7 @@ workflows:
            - docker_images_push
            - wait_for_previous_pipeline
     - deploy_sv_runbook:
-        <<: *main-branch-never
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
@@ -2084,7 +2084,7 @@ workflows:
           - docker_images_push
           - deploy_cluster
     - preflight_sv_check:
-        <<: *main-branch-never
+        <<: *main-branch-only
         cluster: staging
         context:
           - artifactory
