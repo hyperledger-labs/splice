@@ -324,7 +324,8 @@ class XNodeDomainFeesTimeBasedIntegrationTest
                 },
                 t => {
                   t.validator shouldBe sv1Validator.getValidatorPartyId()
-                  t.numPurchases shouldBe 1
+                  // TODO(#4914): use command-dedup to guarantee that exactly one purchase happens
+                  t.numPurchases should be >= 1L
                   t.totalTrafficPurchased shouldBe getTopupParameters(sv1Validator).topupAmount
                 },
               ),
