@@ -16,6 +16,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 class XNodeSplitwellIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -91,21 +92,22 @@ class XNodeSplitwellIntegrationTest
       val installs = aliceSplitwell.listSplitwellInstalls()
       installs.keySet.map(_.uid.id) shouldBe Set("splitwell")
 
-      val (_, paymentRequest) = actAndCheck(
-        "alice initiates transfer on splitwell domain",
-        aliceSplitwell.initiateTransfer(
-          key,
-          Seq(
-            new walletCodegen.ReceiverCCAmount(
-              bobUserParty.toProtoPrimitive,
-              BigDecimal(42.0).bigDecimal,
-            )
+      val (_, paymentRequest) =
+        actAndCheck(timeUntilSuccess = 40.seconds, maxPollInterval = 1.second)(
+          "alice initiates transfer on splitwell domain",
+          aliceSplitwell.initiateTransfer(
+            key,
+            Seq(
+              new walletCodegen.ReceiverCCAmount(
+                bobUserParty.toProtoPrimitive,
+                BigDecimal(42.0).bigDecimal,
+              )
+            ),
           ),
-        ),
-      )(
-        "alice sees payment request on global domain",
-        _ => aliceWallet.listAppPaymentRequests().headOption.value,
-      )
+        )(
+          "alice sees payment request on global domain",
+          _ => aliceWallet.listAppPaymentRequests().headOption.value,
+        )
 
       actAndCheck(
         "alice initiates payment accept request on global domain",
