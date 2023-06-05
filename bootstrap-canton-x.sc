@@ -3,12 +3,11 @@ import scala.collection.mutable.ListBuffer
 import cats.syntax.either._
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
-import com.digitalasset.canton.console.ParticipantReference
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.domain.config.DomainParametersConfig
-import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
-import com.digitalasset.canton.console.LocalInstanceReferenceX
+import com.digitalasset.canton.console.{LocalInstanceReferenceX, LocalParticipantReferenceX}
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
 println("Running canton bootstrap script...")
 
@@ -60,6 +59,52 @@ println("Connecting splitwell to upgraded domain...")
 splitwellParticipant.domains.connect_local(
   splitwellUpgradeSequencer,
   alias = Some(DomainAlias.tryCreate("splitwellUpgrade")),
+)
+
+println(s"Allocating users for local testing...")
+// These users are created for BootstrapTest and start-backends-for-local-frontend-testing.sh to work.
+def createUser(
+    participant: LocalParticipantReferenceX,
+    user: String,
+    additionalActAsParties: Set[PartyId] = Set(),
+    readAsParties: Set[PartyId] = Set(),
+) = {
+  val party = participant.ledger_api.parties.allocate(user, user).party
+  participant.ledger_api.users.create(
+    id = user,
+    actAs = Set(party) ++ additionalActAsParties,
+    primaryParty = Some(party),
+    readAs = readAsParties,
+    participantAdmin = true,
+  )
+  party
+}
+
+Seq(
+  (aliceParticipant, "alice_validator_user"),
+  (splitwellParticipant, "splitwell_validator_user"),
+  (splitwellParticipant, "splitwell_provider"),
+).foreach { case (participant, user) =>
+  createUser(participant, user)
+}
+
+val svcParty = createUser(sv1Participant, "svc_shared_service_user")
+
+val sv1Party = createUser(sv1Participant, "sv1_validator_user")
+sv1Participant.ledger_api.users.create(
+  id = "sv1",
+  primaryParty = Some(sv1Party),
+  actAs = Set(sv1Party, svcParty),
+  readAs = Set.empty,
+  participantAdmin = true,
+)
+
+sv1Participant.ledger_api.users.create(
+  id = "directory_provider",
+  actAs = Set(svcParty),
+  primaryParty = Some(svcParty),
+  readAs = Set(),
+  participantAdmin = false,
 )
 
 println(s"Collecting admin tokens...")

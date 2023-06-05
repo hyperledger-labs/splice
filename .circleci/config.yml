@@ -1697,7 +1697,7 @@ workflows:
         test_names_file: "test-full-class-names.log"
         start_canton_options: "-d -p external -w"
         resource_class: "2xlarge"
-        parallelism: 8
+        parallelism: 4
     - scala_test:
         <<: *notify-fail
         context:

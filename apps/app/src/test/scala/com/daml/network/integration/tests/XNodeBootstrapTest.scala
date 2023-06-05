@@ -13,13 +13,16 @@ import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
+class XNodeBootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       // we want a network in the same state that we would get when running `start-backends-for-local-frontend-testing.sh`
-      .fromResource("simple-topology.conf", this.getClass.getSimpleName)
+      .fromResources(
+        Seq("minimal-topology.conf", "x-node-overrides-minimal.conf"),
+        this.getClass.getSimpleName,
+      )
       .clearConfigTransforms()
       .addConfigTransform((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
 
@@ -28,10 +31,10 @@ class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       {
         clue("It should pass one time...") {
-          runScript(File("apps/splitwell/frontend/bootstrap.sc"))(env.environment)
+          runScript(File("apps/splitwell/frontend/bootstrap-minimal.sc"))(env.environment)
         }
         clue("And it should pass a second time...") {
-          runScript(File("apps/splitwell/frontend/bootstrap.sc"))(env.environment)
+          runScript(File("apps/splitwell/frontend/bootstrap-minimal.sc"))(env.environment)
         }
       },
       lines => {
