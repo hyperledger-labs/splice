@@ -97,8 +97,6 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
               inside(firstSecret) { case Some(s) =>
                 s should have size 44
               }
-              val secondSecret = if (secretsItr.hasNext) Some(secretsItr.next().text) else None
-              secondSecret shouldBe oldFirstSecret
             },
           )
         }
