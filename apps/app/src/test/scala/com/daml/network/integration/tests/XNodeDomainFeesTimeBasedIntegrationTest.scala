@@ -4,6 +4,7 @@ import cats.syntax.traverse.*
 import com.daml.network.codegen.java.da.types as daTypes
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.globaldomain.{BaseRateTrafficLimits, ValidatorTraffic}
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs
 import com.daml.network.console.{ValidatorAppBackendReference, WalletAppClientReference}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -30,7 +31,7 @@ import scala.math.BigDecimal.RoundingMode
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class DomainFeesTimeBasedIntegrationTest
+class XNodeDomainFeesTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
@@ -38,9 +39,11 @@ class DomainFeesTimeBasedIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withHttpSettingsForHigherThroughput
+      // TODO(#5372): remove this or add an explicit test for domain fees on a decentralized domain
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .addConfigTransform((_, cnNodeConfig) =>
         updateAllValidatorConfigs { case (name, validatorConfig) =>
           val domainFeesEnabledConfig = validatorConfig

@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests.connectivity
 
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
@@ -10,16 +11,18 @@ import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
-class DomainFeesTimeBasedConnectivityIntegrationTest
+class XNodeDomainFeesTimeBasedConnectivityIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil {
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withHttpSettingsForHigherThroughput
+      // TODO(#5372): remove this or add an explicit test for domain fees on a decentralized domain
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .addConfigTransform((_, cnNodeConfig) =>
         updateAllValidatorConfigs_(validatorConfig =>
           validatorConfig

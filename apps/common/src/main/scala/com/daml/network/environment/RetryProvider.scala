@@ -354,6 +354,11 @@ object RetryProvider {
                     // around Canton restarts.
                     (statusCode == Status.Code.CANCELLED && description.contains(
                       "RST_STREAM closed stream"
+                    )) ||
+                    // UNKNOWN channel closed can be reported by java-grpc when the connection gets torn forcefully
+                    // by toxiproxy (or a like network condition). See #4256 for details.
+                    (statusCode == Status.Code.UNKNOWN && description.contains(
+                      "channel closed"
                     ))
                 ) =>
             val msg = Seq(

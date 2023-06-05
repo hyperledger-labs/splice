@@ -8,7 +8,14 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig, SvXNodesConfig}
+import com.daml.network.sv.config.{
+  SvAppBackendConfig,
+  SvMediatorConfig,
+  SvOnboardingConfig,
+  SvSequencerConfig,
+  SvXNodesConfig,
+  SvXNodesDomainConfig,
+}
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.daml.network.wallet.config.WalletAppClientConfig
@@ -303,7 +310,12 @@ object CNNodeConfigTransforms {
 
     val transforms = Seq(
       updateSvcAppConfig(_.focus(_.participantClient).modify(portTransform(bump, _))),
-      updateAllSvAppConfigs_(_.focus(_.participantClient).modify(portTransform(bump, _))),
+      updateAllSvAppConfigs_(
+        _.focus(_.participantClient)
+          .modify(portTransform(bump, _))
+          .focus(_.xNodes)
+          .modify(_.map(portTransform(bump, _)))
+      ),
       updateScanAppConfig(_.focus(_.participantClient).modify(portTransform(bump, _))),
       updateAllValidatorConfigs_(
         _.focus(_.participantClient).modify(portTransform(bump, _))
@@ -356,6 +368,30 @@ object CNNodeConfigTransforms {
     c.focus(_.adminApi)
       .modify(portTransform(bump, _))
       .focus(_.ledgerApi)
+      .modify(portTransform(bump, _))
+
+  private def portTransform(bump: Int, c: SvSequencerConfig): SvSequencerConfig =
+    c.focus(_.adminApi)
+      .modify(portTransform(bump, _))
+      .focus(_.publicApi)
+      .modify(portTransform(bump, _))
+
+  private def portTransform(bump: Int, c: SvMediatorConfig): SvMediatorConfig =
+    c.focus(_.adminApi).modify(portTransform(bump, _))
+
+  private def portTransform(
+      bump: Int,
+      c: SvXNodesConfig,
+  ): SvXNodesConfig =
+    c.focus(_.domain).modify(_.map(portTransform(bump, _)))
+
+  private def portTransform(
+      bump: Int,
+      c: SvXNodesDomainConfig,
+  ): SvXNodesDomainConfig =
+    c.focus(_.sequencer)
+      .modify(portTransform(bump, _))
+      .focus(_.mediator)
       .modify(portTransform(bump, _))
 
   /** Auth-enabled CN apps use self-signed tokens with the given secret for their ledger API connections.

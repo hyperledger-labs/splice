@@ -47,7 +47,7 @@ trait CNNodeAppReference extends InstanceReference {
   implicit val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment
 
   override protected val loggerFactory: NamedLoggerFactory =
-    consoleEnvironment.environment.loggerFactory.append("Wallet", name)
+    consoleEnvironment.environment.loggerFactory.append("app", name)
 
   override type Status = SimpleStatus
 
