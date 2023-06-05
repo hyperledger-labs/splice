@@ -399,13 +399,13 @@ class SvApp(
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
-          _ <- localDomainNode.onboardLocalSequencer(
+          _ <- localDomainNode.onboardLocalSequencerIfRequired(
             config.domains.global.alias,
             globalDomain,
             participantAdminConnection,
             svConnection,
           )
-          _ <- localDomainNode.onboardLocalMediator(
+          _ <- localDomainNode.onboardLocalMediatorIfRequired(
             globalDomain,
             participantAdminConnection,
             svConnection,

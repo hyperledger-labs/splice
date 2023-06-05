@@ -332,12 +332,19 @@ class ParticipantAdminConnection(
 
   def modifyDomainConnectionConfig(
       domain: DomainAlias,
-      f: DomainConnectionConfig => DomainConnectionConfig,
+      f: DomainConnectionConfig => Option[DomainConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       oldConfig <- getDomainConnectionConfig(domain)
       newConfig = f(oldConfig)
-      _ <- setDomainConnectionConfig(newConfig)
+      _ <- newConfig match {
+        case None =>
+          logger.info("No update to domain connection config required")
+          Future.unit
+        case Some(config) =>
+          logger.info("Updating to new domain connection config")
+          setDomainConnectionConfig(config)
+      }
     } yield ()
 
   def getIdentityTransactions(

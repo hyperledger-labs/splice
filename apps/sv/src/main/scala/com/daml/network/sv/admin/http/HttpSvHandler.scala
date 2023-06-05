@@ -380,44 +380,56 @@ class HttpSvHandler(
     )
   }
 
-  // TODO(#5092) Make sequencer onboarding idempotent
-  private def onboardSequencer(
+  private def addSequencerToTopologyState(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[definitions.SequencerSnapshot] = {
-    logger.info("Querying sequencer domain state")
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.info("Proposing new sequencer")
     for {
       sequencerState <- participantAdminConnection.latestSequencerDomainStateX(globalDomain)
       ourParticipant <- participantAdminConnection.getParticipantId(true)
-      _ = logger.info("Proposing new sequencer")
-      _ <- participantAdminConnection.proposeSequencers(
-        globalDomain,
-        sequencerState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
-        sequencerState.active :+ sequencerId,
-        sequencerState.observers,
-        Some(ourParticipant.uid.namespace.fingerprint),
-      )
-      msg = "Waiting to observe new sequencer proposal"
-      _ = logger.info(msg)
-      _ <- retryProvider.retryForClientCalls(
-        msg,
-        for {
-          state <- sequencerAdminConnection.getSequencerState(globalDomain)
-        } yield {
-          if (!state.item.active.forgetNE.contains(sequencerId)) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription(
-                s"Sequencer $sequencerId was not a member of ${state.item.active.forgetNE}"
-              )
-              .asRuntimeException()
-          } else {
-            state.item
-          }
-        },
-        logger,
-      )
-      // TODO(#5094) We need to generate a dummy transaction before generating the export
-      // to make sure that the new sequencer gets a sequencer counter that is included in the snapshot.
+      _ <-
+        if (sequencerState.active.contains(sequencerId)) {
+          logger.info(s"Sequencer has already been added to topology state")
+          Future.unit
+        } else {
+          logger.info("Proposing new sequencer")
+          for {
+            _ <- participantAdminConnection.proposeSequencers(
+              globalDomain,
+              sequencerState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
+              sequencerId +: sequencerState.active,
+              sequencerState.observers,
+              Some(ourParticipant.uid.namespace.fingerprint),
+            )
+            msg = "Waiting to observe new sequencer proposal"
+            _ = logger.info(msg)
+            _ <- retryProvider.retryForClientCalls(
+              msg,
+              for {
+                state <- sequencerAdminConnection.getSequencerState(globalDomain)
+              } yield {
+                if (!state.item.active.forgetNE.contains(sequencerId)) {
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription(
+                      s"Sequencer $sequencerId was not a member of ${state.item.active.forgetNE}"
+                    )
+                    .asRuntimeException()
+                } else {
+                  state.item
+                }
+              },
+              logger,
+            )
+          } yield ()
+        }
+    } yield ()
+  }
+
+  private def dummyTopologyTransaction(
+      sequencerAdminConnection: SequencerAdminConnection
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    for {
       party <- svcStoreWithIngestion.connection.allocatePartyViaLedgerApi(
         hint = None,
         displayName = None,
@@ -439,7 +451,24 @@ class HttpSvHandler(
         },
         logger,
       )
+    } yield ()
+  }
+
+  private def onboardSequencer(
+      sequencerAdminConnection: SequencerAdminConnection,
+      sequencerId: SequencerId,
+  )(implicit traceContext: TraceContext): Future[definitions.SequencerSnapshot] = {
+    logger.info("Querying sequencer domain state")
+    for {
+      _ <- addSequencerToTopologyState(sequencerAdminConnection, sequencerId)
+      // TODO(#5094) We need to generate a dummy transaction before generating the export
+      // to make sure that the new sequencer gets a sequencer counter that is included in the snapshot.
+      // Note that for now we do the dummy transaction here independent of whether the sequencer has already been onboarded
+      // in the topology state or not. We could crash after the topology update but before this and there doesn't seem to be a good way
+      // to test for this.
+      _ <- dummyTopologyTransaction(sequencerAdminConnection)
       _ = logger.info(s"Downloading toplogy and sequencer snapshot")
+      // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
       topologySnapshot <- sequencerAdminConnection.getTopologySnapshot(globalDomain)
       sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(
         topologySnapshot.lastChangeTimestamp.getOrElse(
@@ -452,7 +481,53 @@ class HttpSvHandler(
     )
   }
 
-  // TODO(#5105) Make mediator onboarding idempotent
+  private def addMediatorToTopologyState(
+      mediatorAdminConnection: MediatorAdminConnection,
+      mediatorId: MediatorId,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.info("Querying mediator domain state")
+    for {
+      mediatorState <- mediatorAdminConnection.getMediatorState(globalDomain)
+      ourParticipant <- participantAdminConnection.getParticipantId(true)
+      _ <-
+        if (mediatorState.active.contains(mediatorId)) {
+          logger.info(s"Mediator has already been added to topology state")
+          Future.unit
+        } else {
+          logger.info("Proposing new mediator")
+          for {
+            _ <- participantAdminConnection.proposeMediators(
+              globalDomain,
+              mediatorState.group, // Put all mediators in the same group. Within a group we get BFT guarantees, different groups are for load balancing.
+              mediatorState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
+              mediatorId +: mediatorState.active,
+              mediatorState.observers,
+              Some(ourParticipant.uid.namespace.fingerprint),
+            )
+            msg = "Waiting to observe new mediator proposal"
+            _ = logger.info(msg)
+            _ <- retryProvider.retryForClientCalls(
+              msg,
+              for {
+                state <- mediatorAdminConnection.getMediatorState(globalDomain)
+              } yield {
+                if (!state.active.forgetNE.contains(mediatorId)) {
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription(
+                      s"Mediator $mediatorId was not a member of ${state.active.forgetNE}"
+                    )
+                    .asRuntimeException()
+                } else {
+                  state
+                }
+              },
+              logger,
+            )
+          } yield ()
+        }
+    } yield ()
+  }
+
   // TODO(#5095) Replace this in favor of a Daml based flow. Note that for now
   // there is no authorization check here. The daml flow will naturally give us one
   // so implementing it here seems like wasted effort.
@@ -460,36 +535,8 @@ class HttpSvHandler(
       mediatorAdminConnection: MediatorAdminConnection,
       mediatorId: MediatorId,
   )(implicit traceContext: TraceContext) = {
-    logger.info("Querying mediator domain state")
     for {
-      mediatorState <- mediatorAdminConnection.getMediatorState(globalDomain)
-      ourParticipant <- participantAdminConnection.getParticipantId(true)
-      _ = logger.info("Proposing new mediator")
-      _ <- participantAdminConnection.proposeMediators(
-        globalDomain,
-        mediatorState.group,
-        mediatorState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
-        mediatorId +: mediatorState.active,
-        mediatorState.observers,
-        Some(ourParticipant.uid.namespace.fingerprint),
-      )
-      msg = "Waiting to observe new mediator proposal"
-      _ = logger.info(msg)
-      _ <- retryProvider.retryForClientCalls(
-        msg,
-        for {
-          state <- mediatorAdminConnection.getMediatorState(globalDomain)
-        } yield {
-          if (!state.active.forgetNE.contains(mediatorId)) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription(
-                s"Mediator $mediatorId was not a member of ${state.active.forgetNE}"
-              )
-              .asRuntimeException()
-          }
-        },
-        logger,
-      )
+      _ <- addMediatorToTopologyState(mediatorAdminConnection, mediatorId)
     } yield ()
   }
 

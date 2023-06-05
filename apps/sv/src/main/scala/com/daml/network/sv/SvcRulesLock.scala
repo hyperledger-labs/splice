@@ -21,7 +21,7 @@ class SvcRulesLock(
   private val svcParty = svcStore.key.svcParty
 
   def lock()(implicit tc: TraceContext) =
-    retryProvider.retryForClientCalls(
+    retryProvider.retryForAutomation(
       "locking SvcRules and CoinRules contracts",
       for {
         svcRules <- svcStore.getSvcRules()
@@ -37,7 +37,7 @@ class SvcRulesLock(
     )
 
   def unlock()(implicit tc: TraceContext) =
-    retryProvider.retryForClientCalls(
+    retryProvider.retryForAutomation(
       "unlocking SvcRules and CoinRules contracts",
       for {
         svcRules <- svcStore.getSvcRules()

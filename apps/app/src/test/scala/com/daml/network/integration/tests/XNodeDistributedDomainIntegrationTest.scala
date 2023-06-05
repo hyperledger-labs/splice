@@ -113,4 +113,8 @@ class XNodeDistributedDomainIntegrationTest
         },
     )
   }
+
+  "SVs can be onboarded a second time" in { implicit env =>
+    initSvc()
+  }
 }
