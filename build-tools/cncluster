@@ -141,6 +141,12 @@ function _cluster_papply() {
         args+=(-c "FIXED_TOKENS=0")
     fi
 
+    if [ -n "${CNCLUSTER_X_NODES:-}" ]; then
+        args+=(-c "X_NODES=${CNCLUSTER_X_NODES}")
+    else
+        args+=(-c "X_NODES=0")
+    fi
+
     _cluster_install_network_gateway
 
     _info "Applying Pulumi Stack"
@@ -1303,6 +1309,12 @@ function subcmd_papply() {
         args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
     else
         args+=(-c "FIXED_TOKENS=0")
+    fi
+
+    if [ -n "${CNCLUSTER_X_NODES:-}" ]; then
+        args+=(-c "X_NODES=${CNCLUSTER_X_NODES}")
+    else
+        args+=(-c "X_NODES=0")
     fi
 
     _cluster_install_network_gateway

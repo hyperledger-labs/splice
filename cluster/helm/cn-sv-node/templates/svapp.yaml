@@ -70,6 +70,12 @@ spec:
                   name: "cn-app-sv-key"
                   optional: false
             {{- end }}
+            {{- if .Values.xNodes }}
+            - name: ADDITIONAL_CONFIG_SV_XNODE
+              value: |
+                canton.sv-apps.sv.x-nodes {
+                }
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

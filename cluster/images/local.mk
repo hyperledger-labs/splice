@@ -1,7 +1,9 @@
 images := \
 	canton \
 	canton-participant \
+	canton-participant-x \
 	canton-domain \
+	canton-domain-x \
 	\
 	cn-app \
 	sv-app \

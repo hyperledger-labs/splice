@@ -1,5 +1,6 @@
 import cats.syntax.functor._
-import com.digitalasset.canton.console.ParticipantReference
+import com.digitalasset.canton.console.ParticipantReferenceCommon
+import com.digitalasset.canton.console.commands.ParticipantHealthAdministrationCommon
 import com.digitalasset.canton.admin.api.client.data.User
 import io.circe._
 import io.circe.generic.auto._
@@ -19,23 +20,34 @@ case class DomainDef(
     url: String,
 )
 
-def connectDomain(p: ParticipantReference, domain: DomainDef) {
+def connectDomain(
+    p: ParticipantReferenceCommon,
+    pHealth: ParticipantHealthAdministrationCommon,
+    domain: DomainDef,
+) {
   logger.info(s"Ensuring connection to ${domain.alias} domain. (url: ${domain.url})")
   p.domains.connect(domain.alias, domain.url)
   utils.retry_until_true(p.domains.active(domain.alias))
 
   logger.info(s"Executing self ping to verify connection to ${domain.alias} domain...")
-  p.health.ping(p)
+  pHealth.ping(p.id)
 }
 
-def connectGlobalDomain(p: ParticipantReference) {
+def connectGlobalDomain(
+    p: ParticipantReferenceCommon,
+    pHealth: ParticipantHealthAdministrationCommon,
+) {
   val domainAlias = sys.env.get("GLOBAL_DOMAIN_ALIAS").getOrElse("global")
   val domainUrl = sys.env.get("GLOBAL_DOMAIN_URL").getOrElse("http://global-domain.svc:5008")
 
-  connectDomain(p, DomainDef(domainAlias, domainUrl))
+  connectDomain(p, pHealth, DomainDef(domainAlias, domainUrl))
 }
 
-def ensureParticipantUser(p: ParticipantReference, userName: String, createUser: => User): User = {
+def ensureParticipantUser(
+    p: ParticipantReferenceCommon,
+    userName: String,
+    createUser: => User,
+): User = {
   // TODO(#4176) refactor to avoid logging `NOT_FOUND/USER_NOT_FOUND` error
   val user = Try(p.ledger_api.users.get(userName)).toOption.getOrElse({
     logger.info(s"User missing, creating now: ${userName}")
@@ -112,19 +124,19 @@ final case class UserDef(
 def resolveEnv(env: EnvSubst): String =
   sys.env(env.env)
 
-def resolvePrimaryParty(p: ParticipantReference, primaryParty: PrimaryParty) =
+def resolvePrimaryParty(p: ParticipantReferenceCommon, primaryParty: PrimaryParty) =
   primaryParty match {
     case AllocateParty(allocate) => p.ledger_api.parties.allocate(allocate, allocate).party
     case PartyFromUser(env) => p.ledger_api.users.get(resolveEnv(env)).primaryParty.get
   }
 
-def resolvePartyRef(p: ParticipantReference, self: PartyId, ref: PartyRef) =
+def resolvePartyRef(p: ParticipantReferenceCommon, self: PartyId, ref: PartyRef) =
   ref match {
     case PartyFromSelf(_) => self
     case PartyFromOther(env) => p.ledger_api.users.get(resolveEnv(env)).primaryParty.get
   }
 
-def createUser(p: ParticipantReference, user: UserDef) = {
+def createUser(p: ParticipantReferenceCommon, user: UserDef) = {
   val userId = resolveEnv(user.name)
   ensureParticipantUser(
     p,

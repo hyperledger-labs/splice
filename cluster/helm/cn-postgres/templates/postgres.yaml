@@ -33,6 +33,7 @@ spec:
       - name: {{ .Release.Name }}
         image: postgres:14
         imagePullPolicy: IfNotPresent
+        args: ["-c", "max_connections=300"]
         envFrom:
         - configMapRef:
             name: "{{ .Release.Name }}-configuration"

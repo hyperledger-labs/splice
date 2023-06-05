@@ -74,6 +74,7 @@ class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
 async function main() {
   pulumi.runtime.setConfig('test-project:CLUSTER_BASENAME', 'mock');
   pulumi.runtime.setConfig('test-project:FIXED_TOKENS', '0');
+  pulumi.runtime.setConfig('test-project:X_NODES', '0');
   pulumi.runtime.setConfig('test-project:VERSION_NUMBER', '0.0.1');
   pulumi.runtime.setConfig('test-project:IMAGE_TAG', '0.0.1-deadbeef');
 
@@ -84,9 +85,9 @@ async function main() {
   const secrets = new SecretsFixtureMap();
 
   installCluster.installCluster({
-      getSecrets: () => Promise.resolve(secrets),
-      getClientAccessToken: (clientId: string, clientSecret: string) =>
-          Promise.resolve('access_token'),
+    getSecrets: () => Promise.resolve(secrets),
+    getClientAccessToken: (clientId: string, clientSecret: string) =>
+      Promise.resolve('access_token'),
   });
 }
 

@@ -17,7 +17,11 @@ spec:
     spec:
       containers:
       - name: {{ .Release.Name }}
+        {{- if .Values.xNodes }}
+        image: "{{ .Values.imageRepo }}/canton-participant-x:{{ .Values.cluster.imageTag }}"
+        {{- else }}
         image: "{{ .Values.imageRepo }}/canton-participant:{{ .Values.cluster.imageTag }}"
+        {{- end }}
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS

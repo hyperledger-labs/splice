@@ -19,7 +19,11 @@ spec:
     spec:
       containers:
       - name: {{ .Release.Name }}
-        image: "{{ .Values.imageRepo }}/canton-domain:{{ (.Values.cluster).imageTag }}"
+        {{- if .Values.xNodes }}
+        image: "{{ .Values.imageRepo }}/canton-domain-x:{{ .Values.cluster.imageTag }}"
+        {{- else}}
+        image: "{{ .Values.imageRepo }}/canton-domain:{{ .Values.cluster.imageTag }}"
+        {{- end }}
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
@@ -77,6 +81,11 @@ spec:
   - name: cd-adm-api
     port: 5009
     protocol: TCP
+  {{- if .Values.xNodes }}
+  - name: cm-adm-api
+    port: 5007
+    protocol: TCP
+  {{- end }}
   - name: cd-metrics
     port: 10013
     protocol: TCP

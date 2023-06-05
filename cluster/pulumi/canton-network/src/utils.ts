@@ -77,6 +77,10 @@ export function fixedTokens(): boolean {
   return config.require('FIXED_TOKENS') !== '0';
 }
 
+export function xNodes(): boolean {
+  return config.require('X_NODES') !== '0';
+}
+
 export function cnChartValues(chartPath: string, overrideValues: ChartValues = {}): ChartValues {
   const networkSettings = loadJsonFromFile(
     process.env.REPO_ROOT + '/cluster/network-settings.json'
@@ -93,6 +97,7 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
     chartDefaultValues,
     {
       imageRepo: 'us-central1-docker.pkg.dev/da-cn-images/cn-images',
+      xNodes: xNodes(),
       cluster: {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
