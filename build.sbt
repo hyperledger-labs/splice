@@ -19,7 +19,7 @@ lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
 lazy val `canton-community-participant` = BuildCommon.`canton-community-participant`
 lazy val `canton-community-integration-testing` = BuildCommon.`canton-community-integration-testing`
 lazy val `canton-community-testing` = BuildCommon.`canton-community-testing`
-lazy val `canton-research-services` = BuildCommon.`canton-research-services`
+lazy val `aaa-canton-research-services` = BuildCommon.`aaa-canton-research-services`
 lazy val `canton-blake2b` = BuildCommon.`canton-blake2b`
 lazy val `canton-slick-fork` = BuildCommon.`canton-slick-fork`
 lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extension`
@@ -73,7 +73,7 @@ lazy val root = (project in file("."))
     `canton-community-common`,
     `canton-community-integration-testing`,
     `canton-community-testing`,
-    `canton-research-services`,
+    `aaa-canton-research-services`,
     `canton-blake2b`,
     `canton-slick-fork`,
     `canton-wartremover-extension`,
@@ -279,14 +279,14 @@ lazy val `apps-common` =
   project
     .in(file("apps/common"))
     .dependsOn(
-      `canton-research-services`,
+      `aaa-canton-research-services`,
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",
       `canton-coin-daml`,
       `canton-coin-v1test-daml`,
       `canton-coin-v2test-daml`,
-      `canton-research-services`,
+      `aaa-canton-research-services`,
       `wallet-daml` % "test",
       `wallet-v1test-daml` % "test",
       `splitwell-daml` % "test",
@@ -638,7 +638,7 @@ lazy val `apps-common-frontend-protobuf` = {
     .settings(
       Compile / sourceGenerators += Def.task {
         val log = streams.value.log
-        (`canton-research-services` / Compile / compile).value
+        (`aaa-canton-research-services` / Compile / compile).value
         runCommand(Seq(s"${baseDirectory.value}/gen-ledger-api-proto.sh"), log)
         Seq()
       }.taskValue,
