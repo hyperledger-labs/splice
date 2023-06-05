@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
 import better.files.*
-import com.daml.network.LiveDevNetTest
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -54,7 +53,7 @@ class SvOnboardingPreflightIntegrationTest
       // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
 
-  "run through sv onboarding runbook" taggedAs LiveDevNetTest in { implicit env =>
+  "run through sv onboarding runbook" in { implicit env =>
     // TODO(M3-53) Consider running this test more than once per deployment once we can offboard SVs
     // and/or remove the SVC party from their participants.
     sv1Client.getSvOnboardingStatus("DA-Test-Node") match {

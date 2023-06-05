@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.LiveDevNetTest
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -89,7 +88,7 @@ class Validator1PreflightIntegrationTest
   // when running locally, these tests may fail if the CC DAR deployed to DevNet
   // differs from the latest one on your branch
 
-  "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { _ =>
+  "run through runbook against cluster validator1" in { _ =>
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
 
     val aliceUser = auth0Users.get("alice-validator1").value
@@ -166,7 +165,7 @@ class Validator1PreflightIntegrationTest
   }
 
   // test is similar to 'settle debts with a single party' in SplitwellFrontendIntegrationTest
-  "test splitwell group creation and payment against validator1" taggedAs LiveDevNetTest in { _ =>
+  "test splitwell group creation and payment against validator1" in { _ =>
     var aliceUserPartyId = ""
     var bobUserPartyId = ""
 
@@ -245,7 +244,7 @@ class Validator1PreflightIntegrationTest
 
   }
 
-  "test a directory entry allocation against validator1" taggedAs LiveDevNetTest in { _ =>
+  "test a directory entry allocation against validator1" in { _ =>
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val directoryUiUrl =
       s"https://directory.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";

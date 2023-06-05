@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
 import better.files.*
-import com.daml.network.LiveDevNetTest
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -67,7 +66,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       // Replace the path to the splitwell dar file.
       .addConfigTransforms((_, conf) => replaceDarFilePath(conf))
 
-  "run through runbook with self-hosted splitwell" taggedAs LiveDevNetTest in { implicit env =>
+  "run through runbook with self-hosted splitwell" in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
     val bootstrapFile: File = Files.createTempFile("validator-and-splitwell-bootstrap", "scala")

@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
 import better.files.*
-import com.daml.network.LiveDevNetTest
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -60,7 +59,7 @@ class SelfHostedPreflightIntegrationTest
       // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
 
-  "run through runbook with self-hosted validator" taggedAs LiveDevNetTest in { implicit env =>
+  "run through runbook with self-hosted validator" in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
 

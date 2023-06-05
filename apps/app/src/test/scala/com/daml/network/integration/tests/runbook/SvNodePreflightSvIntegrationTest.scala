@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.LiveDevNetTest
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -19,7 +18,7 @@ class SvNodePreflightSvIntegrationTest
       this.getClass.getSimpleName()
     )
 
-  "The SV UI of the node is working as expected" taggedAs LiveDevNetTest in { _ =>
+  "The SV UI of the node is working as expected" in { _ =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val svUsername = s"admin@sv.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
@@ -32,7 +31,7 @@ class SvNodePreflightSvIntegrationTest
     }
   }
 
-  "The SV can log in to their wallet" taggedAs LiveDevNetTest in { _ =>
+  "The SV can log in to their wallet" in { _ =>
     val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
     val svUsername = s"admin@sv.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");

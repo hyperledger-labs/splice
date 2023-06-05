@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.LiveDevNetTest
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -19,16 +18,15 @@ class SvcPreflightIntegrationTest
       this.getClass.getSimpleName()
     )
 
-  "SVs 1-4 are online and reachable via their public HTTP API" taggedAs LiveDevNetTest in {
-    implicit env =>
-      env.svs.remote.foreach(sv =>
-        clue(s"Checking SV at ${sv.httpClientConfig.url}") {
-          sv.getSvcInfo()
-        }
-      )
+  "SVs 1-4 are online and reachable via their public HTTP API" in { implicit env =>
+    env.svs.remote.foreach(sv =>
+      clue(s"Checking SV at ${sv.httpClientConfig.url}") {
+        sv.getSvcInfo()
+      }
+    )
   }
 
-  "The Web UIs of SVs 1-4 are reachable and working as expected" taggedAs LiveDevNetTest in { env =>
+  "The Web UIs of SVs 1-4 are reachable and working as expected" in { env =>
     // we put many checks in one test case to reduce testing time (logging in is slow)
     for (i <- (1 to 4)) {
       val svUiUrl = s"https://sv.sv-$i.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
