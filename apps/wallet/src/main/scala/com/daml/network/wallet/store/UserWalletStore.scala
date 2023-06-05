@@ -167,7 +167,7 @@ trait UserWalletStore
           state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))
         )
 
-      multiDomainAcsStore.listReadyContracts(
+      multiDomainAcsStore.filterReadyContracts(
         subsCodegen.SubscriptionIdleState.COMPANION,
         (c: Contract[
           subsCodegen.SubscriptionIdleState.ContractId,

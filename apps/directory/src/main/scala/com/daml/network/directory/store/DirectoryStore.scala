@@ -111,7 +111,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
     for {
       domainId <- defaultAcsDomainIdF
       // TODO (#5162): This belongs to in-memory implementation, DB should do a directory-specific query
-      list <- multiDomainAcsStore.listContractsOnDomain(
+      list <- multiDomainAcsStore.filterContractsOnDomain(
         directoryCodegen.DirectoryEntry.COMPANION,
         domainId,
         (entry: Contract[
@@ -138,7 +138,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
     for {
       domainId <- defaultAcsDomainIdF
       // TODO (#5162): This belongs to in-memory implementation, DB should do a directory-specific query
-      dueSubscriptions <- multiDomainAcsStore.listContractsOnDomain(
+      dueSubscriptions <- multiDomainAcsStore.filterContractsOnDomain(
         subsCodegen.SubscriptionIdleState.COMPANION,
         domainId,
         filter = { e: Contract[?, subsCodegen.SubscriptionIdleState] =>

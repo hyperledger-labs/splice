@@ -2,8 +2,9 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
   InFlightTransferOutEvent,
@@ -23,6 +24,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
+import java.time.Instant
 import scala.collection.immutable.{Queue, SortedMap}
 import scala.concurrent.*
 
@@ -169,65 +171,100 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       s"template ${companionClass.typeId(companion)} is part of the contract filter",
     )
 
-  private def listContracts[T](
-      fromCreatedEvent: CreatedEvent => Option[T],
-      filter: T => Boolean,
-      limit: Limit,
-  ): Future[Seq[(T, ContractState)]] = Future {
-    val st = stateVar
-    applyLimit(
-      limit,
-      st.createEvents.values
-        .collect(Function.unlift { ev =>
-          fromCreatedEvent(ev).map { parsedEv =>
-            val state = st
-              .getContractState(new ContractId(ev.getContractId))
-            (parsedEv, state)
-          }
-        }),
-    ).filter { case (ev, _) => filter(ev) }.toSeq
-  }
-
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
-      filter: Contract[TCid, T] => Boolean,
       limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ) = {
+    filterContracts(companion, _ => true, limit)
+  }
+
+  /** Find all contract that satisfy a predicate up to `limit`.
+    */
+  def filterContracts[C, TCid <: ContractId[_], T](
+      companion: C,
+      filter: Contract[TCid, T] => Boolean,
+      limit: Limit = DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Seq[ContractWithState[TCid, T]]] = {
     requireInScope(companion)
-    listContracts(
-      fromCreatedEvent = companionClass.fromCreatedEvent(companion)(contractFilter, _),
-      filter = filter,
-      limit = limit,
-    ).map(_.map { case (contract, state) =>
-      ContractWithState(contract, state)
-    })
+    Future {
+      val st = stateVar
+      applyLimit(
+        limit,
+        st.createEvents.values
+          .collect(Function.unlift { ev =>
+            companionClass.fromCreatedEvent(companion)(contractFilter, ev).map { parsedEv =>
+              val state = st
+                .getContractState(new ContractId(ev.getContractId))
+              (parsedEv, state)
+            }
+          }),
+      )(noTracingLogger)
+        .filter { case (ev, _) => filter(ev) }
+        .toSeq
+        .map { case (contract, state) =>
+          ContractWithState(contract, state)
+        }
+    }
   }
 
   override def listContractsOnDomain[C, TCid <: ContractId[_], T](
       companion: C,
       domainId: DomainId,
-      filter: Contract[TCid, T] => Boolean,
       limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): Future[Seq[Contract[TCid, T]]] =
-    listContracts(companion, filter, limit).map { contracts =>
+    filterContractsOnDomain(companion, domainId, _ => true, limit)
+
+  def filterContractsOnDomain[C, TCid <: ContractId[_], T](
+      companion: C,
+      domainId: DomainId,
+      filter: Contract[TCid, T] => Boolean,
+      limit: Limit = DefaultLimit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[Seq[Contract[TCid, T]]] =
+    filterContracts(companion, filter, limit).map { contracts =>
       contracts.collect {
         case ContractWithState(contract, ContractState.Assigned(domain)) if domain == domainId =>
           contract
       }
     }
 
-  def listReadyContracts[C, TCid <: ContractId[_], T](
+  override def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
-      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
       limit: Limit,
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] = {
+    filterReadyContracts(companion, _ => true, limit)
+  }
+
+  def filterReadyContracts[C, TCid <: ContractId[_], T](
+      companion: C,
+      filter: Contract[TCid, T] => Boolean,
+      limit: Limit = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]] =
     for {
-      contracts <- listContracts(companion, filter, limit)(companionClass)
+      contracts <- filterContracts(companion, filter, limit)(companionClass)
     } yield contracts.view.collect(Function.unlift(_.toReadyContract)).toSeq
+
+  override private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[
+    T
+  ], T <: Template](companion: C)(
+      expiresAt: T => Instant
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): ListExpiredContracts[TCid, T] =
+    (now, limit) =>
+      _ =>
+        filterReadyContracts(
+          companion = companion,
+          filter = co => now.toInstant isAfter expiresAt(co.payload),
+          limit = PageLimit( // this is called until the result size is 0, effectively paginating
+            limit.toLong
+          ),
+        )
 
   private def lookupContractById[T](
       fromCreatedEvent: CreatedEvent => Option[T]
@@ -394,25 +431,6 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     requireInScope(companion)
     streamReadyContracts(companionClass.fromCreatedEvent(companion)(contractFilter, _)).map {
       case (contract, domain) => ReadyContract(contract, domain)
-    }
-  }
-
-  private def applyLimit[T](limit: Limit, result: Iterable[T]): Iterable[T] = {
-    limit match {
-      case PageLimit(limit) =>
-        result.take(limit.intValue())
-      case HardLimit(limit) =>
-        val resultSize = result.size
-        if (resultSize > limit) {
-          noTracingLogger.warn(
-            "Size of the result exceeded the limit. Result size: {}. Limit: {}",
-            resultSize.toLong,
-            limit,
-          )
-          result.take(limit.intValue())
-        } else {
-          result
-        }
     }
   }
 

@@ -47,7 +47,7 @@ class InMemorySplitwellStore(
     preferredId <- domains.signalWhenConnected(domainConfig.splitwell.preferred.alias)
     // find members of 'othersGroups' with install contracts on 'preferred'
     preferredInstalledMembers <- multiDomainAcsStore
-      .listContractsOnDomain(
+      .filterContractsOnDomain(
         splitwellCodegen.SplitwellInstall.COMPANION,
         preferredId,
         { co: Contract[?, splitwellCodegen.SplitwellInstall] =>

@@ -1,14 +1,16 @@
 package com.daml.network.store.db
 
+import com.daml.ledger.javaapi.data
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Ref.*
 import com.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.config.CantonRequireTypes.String2066
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import slick.ast.FieldSymbol
-import slick.jdbc.{GetResult, JdbcType}
+import slick.jdbc.{GetResult, JdbcType, PositionedParameters, SetParameter}
 
 import java.sql.{PreparedStatement, ResultSet}
 
@@ -40,6 +42,24 @@ trait AcsJdbcTypes {
       _.toHexString,
       s => Offset.fromHexString(HexString.assertFromString(s)),
     )
+
+  protected implicit lazy val identifierSetParameter: SetParameter[Identifier] =
+    (v1: Identifier, v2: PositionedParameters) =>
+      implicitly[SetParameter[String2066]].apply(lengthLimited(v1.toString()), v2)
+
+  protected implicit lazy val javaIdentifierSetParameter
+      : SetParameter[com.daml.ledger.javaapi.data.Identifier] =
+    (v1: data.Identifier, v2: PositionedParameters) =>
+      identifierSetParameter.apply(
+        Identifier(
+          PackageId.assertFromString(v1.getPackageId),
+          QualifiedName(
+            ModuleName.assertFromString(v1.getModuleName),
+            DottedName.assertFromString(v1.getEntityName),
+          ),
+        ),
+        v2,
+      )
 
   protected implicit lazy val templateIdJdbcType: JdbcType[TemplateId] =
     MappedColumnType.base[TemplateId, String](
@@ -111,5 +131,10 @@ trait AcsJdbcTypes {
         .parse(value)
         .getOrElse(throw new IllegalStateException("JSONB column didn't contain valid JSON."))
   }
+
+  /** The DB may truncate strings of unbounded length, so it's advised to use a LengthLimitedString instead.
+    * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
+    */
+  protected def lengthLimited(s: String): String2066 = String2066.tryCreate(s)
 
 }

@@ -211,7 +211,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       tc: TraceContext
   ): Future[Seq[Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]]] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(
+      multiDomainAcsStore.filterContractsOnDomain(
         cc.coin.AppRewardCoupon.COMPANION,
         _,
         (co: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
@@ -246,7 +246,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
     Seq[Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]]
   ] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(
+      multiDomainAcsStore.filterContractsOnDomain(
         cc.coin.ValidatorRewardCoupon.COMPANION,
         _,
         (co: Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]) =>
@@ -428,7 +428,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   ): Future[Seq[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]] =
     for {
       domain <- defaultAcsDomainIdF
-      svOnboardings <- multiDomainAcsStore.listContractsOnDomain(
+      svOnboardings <- multiDomainAcsStore.filterContractsOnDomain(
         so.SvOnboardingRequest.COMPANION,
         domain,
         (co: Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]) =>
@@ -450,7 +450,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
           for {
             domainId <- defaultAcsDomainIdF
             allExpired <- multiDomainAcsStore
-              .listContractsOnDomain(
+              .filterContractsOnDomain(
                 companion,
                 domainId,
                 (e: Contract[Id, T]) =>
@@ -469,7 +469,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]] =
     for {
       domain <- defaultAcsDomainIdF
-      svOnboardings <- multiDomainAcsStore.listContractsOnDomain(
+      svOnboardings <- multiDomainAcsStore.filterContractsOnDomain(
         cc.coin.UnclaimedReward.COMPANION,
         domain,
         (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
@@ -551,7 +551,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
       limit: Int,
   ): Future[Option[SvSvcStore.DuplicateValidatorTrafficContracts]] = {
     multiDomainAcsStore
-      .listContractsOnDomain(
+      .filterContractsOnDomain(
         cc.globaldomain.ValidatorTraffic.COMPANION,
         domainId,
         (vt: SvSvcStore.ValidatorTrafficContract) =>
@@ -601,7 +601,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   ] = {
     val cidSet = voteRequestCids.toSet
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(
+      multiDomainAcsStore.filterContractsOnDomain(
         cn.svcrules.Vote.COMPANION,
         _,
         co => cidSet.contains(co.payload.requestCid),
@@ -711,7 +711,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
   ] =
     defaultAcsDomainIdF
       .flatMap(
-        multiDomainAcsStore.listContractsOnDomain(
+        multiDomainAcsStore.filterContractsOnDomain(
           cn.svcrules.ElectionRequest.COMPANION,
           _,
           {

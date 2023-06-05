@@ -19,6 +19,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
+import com.daml.lf.data.Numeric
 
 import java.time.Instant
 import scala.jdk.CollectionConverters.*
@@ -46,7 +47,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
         featured,
-        BigDecimal(1.0).bigDecimal,
+        Numeric.assertFromBigDecimal(Numeric.Scale.assertFromInt(10), BigDecimal(1.0)),
         new apiCodegen.v1.round.Round(round),
       ),
       metadata = ContractMetadata.Empty(),

@@ -3,7 +3,7 @@ package com.daml.network.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import cats.syntax.traverse.*
-import com.daml.ledger.api.v1.{transaction_filter as scalaFilter}
+import com.daml.ledger.api.v1.transaction_filter as scalaFilter
 import com.daml.ledger.javaapi.data.{
   ContractMetadata,
   CreatedEvent,
@@ -35,6 +35,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf
 import com.google.protobuf.ByteString
+import com.typesafe.scalalogging.Logger
 import io.circe.Json
 import io.grpc.Status
 
@@ -47,7 +48,7 @@ trait MultiDomainAcsStore extends AutoCloseable {
 
   import MultiDomainAcsStore.*
 
-  private val DefaultLimit: Limit = HardLimit(1000L)
+  protected val DefaultLimit: Limit = HardLimit(1000L)
 
   def lookupContractById[C, TCid <: ContractId[_], T](
       companion: C
@@ -132,13 +133,11 @@ trait MultiDomainAcsStore extends AutoCloseable {
 
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
-      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
       limit: Limit = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ContractWithState[TCid, T]]]
 
   def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
-      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
       limit: Limit = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[ReadyContract[TCid, T]]]
 
@@ -151,7 +150,6 @@ trait MultiDomainAcsStore extends AutoCloseable {
   def listContractsOnDomain[C, TCid <: ContractId[_], T](
       companion: C,
       domain: DomainId,
-      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
       limit: Limit = DefaultLimit,
   )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[Seq[Contract[TCid, T]]]
 
@@ -159,16 +157,31 @@ trait MultiDomainAcsStore extends AutoCloseable {
       companion: C
   )(
       expiresAt: T => java.time.Instant
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): ListExpiredContracts[TCid, T] =
-    (now, limit) =>
-      _ =>
-        listReadyContracts(
-          companion = companion,
-          filter = co => now.toInstant isAfter expiresAt(co.payload),
-          limit = PageLimit( // this is called until the result size is 0, effectively paginating
-            limit.toLong
-          ),
-        )
+  )(implicit companionClass: ContractCompanion[C, TCid, T]): ListExpiredContracts[TCid, T]
+
+  protected def applyLimit[T, S[A] <: scala.collection.IterableOps[A, S, S[A]]](
+      limit: Limit,
+      result: S[T],
+  )(implicit
+      logger: Logger
+  ): S[T] = {
+    limit match {
+      case PageLimit(limit) =>
+        result.take(limit.intValue())
+      case HardLimit(limit) =>
+        val resultSize = result.size
+        if (resultSize > limit) {
+          logger.warn(
+            "Size of the result exceeded the limit. Result size: {}. Limit: {}",
+            resultSize.toLong,
+            limit,
+          )
+          result.take(limit.intValue())
+        } else {
+          result
+        }
+    }
+  }
 
   /** Stream all ready contracts that can be acted upon.
     * Note that the same contract can be returned multiple

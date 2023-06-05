@@ -143,13 +143,13 @@ class SummarizingMiningRoundTrigger(
       ec: ExecutionContext
   ): Future[RoundRewards] = {
     for {
-      appRewardCoupons <- store.multiDomainAcsStore.listContractsOnDomain(
+      appRewardCoupons <- store.multiDomainAcsStore.filterContractsOnDomain(
         cc.coin.AppRewardCoupon.COMPANION,
         domain,
         (c: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
           c.payload.round.number == round,
       )
-      validatorRewardCoupons <- store.multiDomainAcsStore.listContractsOnDomain(
+      validatorRewardCoupons <- store.multiDomainAcsStore.filterContractsOnDomain(
         cc.coin.ValidatorRewardCoupon.COMPANION,
         domain,
         (c: Contract[

@@ -62,7 +62,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   def listGroups(
       user: PartyId
   ): Future[Seq[ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]] =
-    multiDomainAcsStore.listContracts(
+    multiDomainAcsStore.filterContracts(
       splitwellCodegen.Group.COMPANION,
       c => groupMembers(c.payload).contains(user.toProtoPrimitive),
     )
@@ -70,7 +70,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   def listGroupInvites(owner: PartyId): Future[
     Seq[ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]]
   ] =
-    multiDomainAcsStore.listContracts(
+    multiDomainAcsStore.filterContracts(
       splitwellCodegen.GroupInvite.COMPANION,
       c => c.payload.group.owner == owner.toProtoPrimitive,
     )
@@ -79,7 +79,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
     splitwellCodegen.AcceptedGroupInvite.ContractId,
     splitwellCodegen.AcceptedGroupInvite,
   ]]] =
-    multiDomainAcsStore.listContracts(
+    multiDomainAcsStore.filterContracts(
       splitwellCodegen.AcceptedGroupInvite.COMPANION,
       c =>
         c.payload.groupKey.owner == owner.toProtoPrimitive &&
@@ -89,7 +89,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   def listBalanceUpdates(user: PartyId, key: splitwellCodegen.GroupKey): Future[Seq[
     ContractWithState[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
   ]] =
-    multiDomainAcsStore.listContracts(
+    multiDomainAcsStore.filterContracts(
       splitwellCodegen.BalanceUpdate.COMPANION,
       c =>
         groupMembers(c.payload.group).contains(user.toProtoPrimitive) &&
@@ -112,7 +112,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   def listSplitwellInstalls(user: PartyId): Future[Seq[
     ReadyContract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
   ]] =
-    multiDomainAcsStore.listReadyContracts(
+    multiDomainAcsStore.filterReadyContracts(
       splitwellCodegen.SplitwellInstall.COMPANION,
       c => c.payload.user == user.toProtoPrimitive,
     )
