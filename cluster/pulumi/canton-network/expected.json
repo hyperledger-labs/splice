@@ -1319,17 +1319,17 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1536Mi"
+            "cpu": 1,
+            "memory": "4096Mi"
           }
         },
         "xNodes": false
@@ -1394,7 +1394,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingName": "Canton-Foundation-1",
@@ -1402,11 +1402,11 @@
         "participantAddress": "participant.svc",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           }
         },
         "xNodes": false
@@ -1473,17 +1473,17 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant.svc",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1536Mi"
+            "cpu": 1,
+            "memory": "4096Mi"
           }
         },
         "validatorWalletUser": "auth0|64529b128448ded6aa68048f",
@@ -1652,7 +1652,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
@@ -1664,11 +1664,11 @@
         "participantAddress": "participant",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           }
         },
         "xNodes": false
@@ -1735,17 +1735,17 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1536Mi"
+            "cpu": 1,
+            "memory": "4096Mi"
           }
         },
         "validatorWalletUser": "auth0|64529b6852dd694167351045",
@@ -1914,7 +1914,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
@@ -1926,11 +1926,11 @@
         "participantAddress": "participant",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           }
         },
         "xNodes": false
@@ -1997,17 +1997,17 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1536Mi"
+            "cpu": 1,
+            "memory": "4096Mi"
           }
         },
         "validatorWalletUser": "auth0|64529bb10c1aee4f2c819218",
@@ -2176,7 +2176,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms512M -Xmx512M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
@@ -2188,11 +2188,11 @@
         "participantAddress": "participant",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           }
         },
         "xNodes": false
@@ -2259,17 +2259,17 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1536Mi"
+            "cpu": 1,
+            "memory": "4096Mi"
           }
         },
         "validatorWalletUser": "auth0|64529bc58d30358eacae5611",
@@ -2617,17 +2617,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "resources": {
-          "limits": {
-            "memory": "1536Mi"
-          },
-          "requests": {
-            "cpu": "1",
-            "memory": "1536Mi"
-          }
-        },
         "xNodes": false
       }
     },
@@ -2861,18 +2851,18 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant.svc",
         "postgres": "postgres.validator1.svc.cluster.local",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
+            "memory": "4096Mi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1536Mi"
+            "cpu": 1,
+            "memory": "4096Mi"
           }
         },
         "xNodes": false

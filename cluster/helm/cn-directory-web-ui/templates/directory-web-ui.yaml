@@ -22,8 +22,6 @@ spec:
         image: "{{ .Values.imageRepo }}/directory-web-ui:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
-        - name: JAVA_TOOL_OPTIONS
-          value: {{ .Values.defaultJvmOptions }}
         - name: CN_APP_DIRECTORY_UI_AUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:
@@ -40,9 +38,12 @@ spec:
         - containerPort: 80
           name: http
           protocol: TCP
-        {{- with .Values.resources }}
-        resources: {{- toYaml . | nindent 10 }}
-        {{- end }}
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: 500m
+            memory: 1536Mi
 ---
 apiVersion: v1
 kind: Service

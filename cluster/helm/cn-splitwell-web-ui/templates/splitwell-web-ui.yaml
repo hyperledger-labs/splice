@@ -22,8 +22,6 @@ spec:
         image: "{{ .Values.imageRepo }}/splitwell-web-ui:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
-        - name: JAVA_TOOL_OPTIONS
-          value: {{ .Values.defaultJvmOptions }}
         - name: CN_APP_SPLITWELL_UI_AUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:
