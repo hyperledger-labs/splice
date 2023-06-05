@@ -9,7 +9,6 @@ import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelCo
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
@@ -66,7 +65,7 @@ class CNLedgerClient(
   def connection(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,
-      completionOffsetCallback: (DomainId, String) => Future[Unit] = (_, _) => Future.unit,
+      completionOffsetCallback: String => Future[Unit] = _ => Future.unit,
   ): CNLedgerConnection =
     new CNLedgerConnection(
       this.client,

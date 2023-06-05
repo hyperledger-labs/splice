@@ -53,7 +53,6 @@ class UserWalletService(
       // The store needs its own connection to expand tx-history entries
       ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
       retryProvider,
-      walletManager.store.offset,
     )
 
   val treasury: TreasuryService = new TreasuryService(

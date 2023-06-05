@@ -121,11 +121,11 @@ class SubscriptionInitialPaymentTrigger(
                 transferContext,
                 disclosedContracts,
               )
-            case result @ QueryResult(_, None) =>
+            case QueryResult(offset, None) =>
               // collect the payment and create the entry
               collectPayment(
                 entryName,
-                result.deduplicationOffset,
+                offset,
                 transferContext,
                 disclosedContracts,
               )

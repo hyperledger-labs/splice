@@ -6,7 +6,6 @@ import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryPr
 import com.daml.network.store.{CNNodeAppStore, CNNodeAppStoreWithIngestion}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.{Clock, WallClock}
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -21,7 +20,6 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
     override val store: Store,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
-    enableOffsetIngestionService: Boolean = true,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -32,24 +30,19 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
   override val connection: CNLedgerConnection =
     ledgerClient.connection(this.getClass.getSimpleName, loggerFactory, completionOffsetCallback)
 
-  private def completionOffsetCallback(domainId: DomainId, offset: String): Future[Unit] =
-    store.multiDomainAcsStore.signalWhenIngestedOrShutdown(domainId, offset)(TraceContext.empty)
+  private def completionOffsetCallback(offset: String): Future[Unit] =
+    store.multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)(TraceContext.empty)
 
-  private def newUpdateIngestionService(
-      store: CNNodeAppStore[?, ?],
-      domain: DomainId,
-      perDomainTriggerContext: TriggerContext,
-  ) =
+  registerService(
     new UpdateIngestionService(
       store.getClass.getSimpleName,
       store.multiDomainAcsStore.ingestionSink,
-      store.offset,
-      domain,
       connection,
-      perDomainTriggerContext.retryProvider,
-      perDomainTriggerContext.loggerFactory,
-      perDomainTriggerContext.timeouts,
+      triggerContext.retryProvider,
+      triggerContext.loggerFactory,
+      triggerContext.timeouts,
     )
+  )
 
   registerTrigger(
     new DomainIngestionService(
@@ -66,35 +59,6 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
           triggerContext.loggerFactory,
         ),
       ),
-    )
-  )
-
-  // We allow disabling this because the offsets are shared across users and the polling can get pretty expensive
-  // so we want to make a reasonable effort at avoiding unnecessary polling.
-  if (enableOffsetIngestionService) {
-    registerTrigger(
-      new OffsetIngestionService(
-        store.offset.ingestionSink,
-        connection,
-        // We want to always poll periodically and quickly even in simtime mode so we overwrite
-        // the polling interval and the clock.
-        triggerContext.copy(
-          config = triggerContext.config.copy(
-            pollingInterval = NonNegativeFiniteDuration.ofMillis(100)
-          ),
-          clock = new WallClock(
-            triggerContext.timeouts,
-            triggerContext.loggerFactory,
-          ),
-        ),
-      )
-    )
-  }
-  registerTrigger(
-    DomainOrchestrator(
-      triggerContext,
-      store.domains,
-      (da, triggerContext) => newUpdateIngestionService(store, da.domainId, triggerContext),
     )
   )
 }

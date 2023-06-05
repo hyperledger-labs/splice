@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
-import com.daml.network.store.{DomainStore, MultiDomainAcsStore}
+import com.daml.network.store.DomainStore
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -166,16 +166,6 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     store.signalWhenConnected(domain).map { r =>
       logger.info(show"Connection to domain $domain has been established")
       r
-    }
-  }
-
-  protected def waitForAcsIngestion(
-      store: MultiDomainAcsStore,
-      domain: DomainId,
-  ): Future[Unit] = {
-    logger.info(show"Waiting for ACS ingestion of domain $domain")
-    store.signalWhenAcsCompletedOrShutdown(domain).map { _ =>
-      logger.info(show"ACS ingestion for domain $domain has been completed")
     }
   }
 

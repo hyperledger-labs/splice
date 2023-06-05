@@ -1,15 +1,15 @@
 package com.daml.network.automation
 
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Source}
+import akka.stream.scaladsl.Flow
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
-import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TransferUpdate, TreeUpdate}
-import com.daml.network.store.{MultiDomainAcsStore, OffsetStore}
+import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TransferUpdate}
+import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -25,8 +25,6 @@ import scala.concurrent.{ExecutionContext, Future}
 class UpdateIngestionService(
     ingestionTargetName: String,
     ingestionSink: MultiDomainAcsStore.IngestionSink,
-    offsetStore: OffsetStore,
-    domain: DomainId,
     connection: CNLedgerConnection,
     override protected val retryProvider: RetryProvider,
     baseLoggerFactory: NamedLoggerFactory,
@@ -46,7 +44,7 @@ class UpdateIngestionService(
       traceContext: TraceContext
   ): Future[CNLedgerSubscription[?]] =
     for {
-      lastIngestedOffset <- ingestionSink.getLastIngestedOffset(domain)
+      lastIngestedOffset <- ingestionSink.getLastIngestedOffset()
       subscribeFrom <- lastIngestedOffset match {
         case None =>
           for {
@@ -55,61 +53,31 @@ class UpdateIngestionService(
           } yield offset
         case Some(offset) => Future.successful(offset)
       }
-    } yield
-    // We want to ensure that we can advance the offset of a
-    // domain in our stores even if there are no new events on
-    // that domain (but events on other domains). To achieve that
-    // we exploit the fact that the offsets are participant
-    // offsets so we can compare offsets across domains. We can
-    // then poll for the ledger end and consume all events on the
-    // domain until that offset. At the end, we advance the offset
-    // in our stores and poll for the next offset.
-    new CNLedgerSubscription(
+    } yield new CNLedgerSubscription(
       source = updateSource(subscribeFrom),
-      mapOperator = Flow[Either[TreeUpdate, LedgerOffset.Absolute]].mapAsync(1)(process),
+      mapOperator = Flow[GetTreeUpdatesResponse].mapAsync(1)(process),
       retryProvider = retryProvider,
       timeouts = timeouts,
       loggerFactory = baseLoggerFactory.append("subsClient", this.getClass.getSimpleName),
     )
 
   private def process(
-      msg: Either[TreeUpdate, LedgerOffset.Absolute]
-  )(implicit traceContext: TraceContext) =
-    msg match {
-      case Left(update) =>
-        for {
-          _ <- update match {
-            case TransactionTreeUpdate(tree) =>
-              waitForOffset(new LedgerOffset.Absolute(tree.getOffset))
-            case TransferUpdate(_) =>
-              // Transfers don't reliably advance the offset in the participant, so we don't synchronize on those.
-              Future.unit
-          }
-          _ <- ingestionSink.ingestUpdate(domain, update)
-        } yield ()
-      case Right(offset) =>
-        ingestionSink.ingestOffset(domain, offset.getOffset)
-    }
-
-  private def updateSource(subscribeFrom: String) = {
-    val javaOffset = new LedgerOffset.Absolute(subscribeFrom)
-    offsetStore
-      .streamOffsets(javaOffset)
-      .statefulMapConcat(() => {
-        @SuppressWarnings(Array("org.wartremover.warts.Var"))
-        var prev = javaOffset
-        cur =>
-          val result = Seq((prev, cur))
-          prev = cur
-          result
-      })
-      .flatMapConcat { case (prev, cur) =>
-        connection
-          .updates(prev, cur, filter.primaryParty, domain)
-          .map(Left(_))
-          .concat(Source.single(Right(cur)))
+      msg: GetTreeUpdatesResponse
+  )(implicit traceContext: TraceContext) = {
+    for {
+      _ <- msg.update match {
+        case TransactionTreeUpdate(tree) =>
+          waitForOffset(new LedgerOffset.Absolute(tree.getOffset))
+        case TransferUpdate(_) =>
+          // Transfers don't reliably advance the offset in the participant, so we don't synchronize on those.
+          Future.unit
       }
+      _ <- ingestionSink.ingestUpdate(msg.domainId, msg.update)
+    } yield ()
   }
+
+  private def updateSource(subscribeFrom: String) =
+    connection.updates(new LedgerOffset.Absolute(subscribeFrom), filter.primaryParty)
 
   private def ingestAcsAndInFlight(
       offset: String
@@ -117,11 +85,9 @@ class UpdateIngestionService(
     val javaOffset = new LedgerOffset.Absolute(offset)
     for {
       // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
-      (evs, tfs) <- connection.activeContracts(domain, filter, javaOffset)
-      _ <- ingestionSink.ingestAcsAndTransferOuts(domain, evs, tfs)
-      // Note that we cannot wait for the offset here since it may be an offset from a transfer
-      // which does not advance the participant offset.
-      _ <- ingestionSink.switchToIngestingUpdates(domain, offset)
+      (evs, tfs) <- connection.activeContracts(filter, javaOffset)
+      _ <- ingestionSink.ingestAcsAndTransferOuts(evs, tfs)
+      _ <- ingestionSink.switchToIngestingUpdates(offset)
     } yield ()
   }
 

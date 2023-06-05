@@ -683,7 +683,7 @@ class HttpSvHandler(
           case QueryResult(_, Some(_)) =>
             logger.info("An SV onboarding contract for this token already exists.")
             Future.successful(Right(()))
-          case result @ QueryResult(_, None) => {
+          case QueryResult(offset, None) => {
             if (SvApp.isSvcMemberParty(candidateParty, svcRules)) {
               Future.successful(
                 Left("An SV with that party ID already exists.")
@@ -714,7 +714,7 @@ class HttpSvHandler(
                     Seq(svParty),
                     s"$token",
                   ),
-                  deduplicationOffset = result.deduplicationOffset,
+                  deduplicationOffset = offset,
                   domainId = globalDomain,
                 )
                 .map { _ => Right(()) }

@@ -12,8 +12,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
-import org.slf4j.event.Level
 
 import scala.concurrent.Future
 import scala.concurrent.duration.*
@@ -138,16 +136,8 @@ class XNodeSplitwellIntegrationTest
         _ => aliceSplitwell.listGroups() should have size 1,
       )
       try {
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-          providerSplitwellBackend.participantClient.domains
-            .disconnect(DomainAlias.tryCreate("splitwell")),
-          logs =>
-            logs.filter(
-              _.message.contains(
-                "Completed processing with outcome: Stopped service for splitwell::"
-              )
-            ) should have size 4,
-        )
+        providerSplitwellBackend.participantClient.domains
+          .disconnect(DomainAlias.tryCreate("splitwell"))
       } finally {
         providerSplitwellBackend.participantClient.domains.reconnect(
           DomainAlias.tryCreate("splitwell")

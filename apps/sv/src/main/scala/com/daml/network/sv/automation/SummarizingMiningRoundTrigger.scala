@@ -89,7 +89,7 @@ class SummarizingMiningRoundTrigger(
               s"skipping as confirmation from ${svParty} is already created for such action"
             )
           )
-        case result @ QueryResult(_, None) =>
+        case QueryResult(offset, None) =>
           connection
             .submitCommands(
               actAs = Seq(svParty),
@@ -100,7 +100,7 @@ class SummarizingMiningRoundTrigger(
                 Seq(svParty, svcParty),
                 summarizingRound.contract.contractId.contractId,
               ),
-              deduplicationOffset = result.deduplicationOffset,
+              deduplicationOffset = offset,
               domainId = summarizingRound.domain,
             )
             .map { _ =>

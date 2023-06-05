@@ -38,7 +38,7 @@ private[validator] object ValidatorUtil {
       _ <- retryProvider.retryForAutomation(
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
-          case result @ QueryResult(_, None) =>
+          case QueryResult(offset, None) =>
             storeWithIngestion.connection
               .submitCommands(
                 actAs = Seq(validatorServiceParty, endUserParty),
@@ -55,7 +55,7 @@ private[validator] object ValidatorUtil {
                     Seq(validatorServiceParty),
                     CNLedgerConnection.sanitizeUserIdToPartyString(endUserName),
                   ),
-                deduplicationOffset = result.deduplicationOffset,
+                deduplicationOffset = offset,
                 domainId = domainId,
               )
           case QueryResult(_, Some(_)) =>

@@ -63,7 +63,7 @@ class GrpcSvcAppService(
       val providerParty = PartyId.tryFromProtoPrimitive(request.appProvider)
       for {
         result <- svcStore.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
-          case result @ QueryResult(_, None) =>
+          case QueryResult(offset, None) =>
             svcStoreWithIngestion.connection.submitWithResult(
               actAs = Seq(svcParty),
               readAs = Seq.empty,
@@ -75,7 +75,7 @@ class GrpcSvcAppService(
                 "com.daml.network.svc.grantFeaturedAppRight",
                 Seq(svcParty, providerParty),
               ),
-              deduplicationConfig = DedupOffset(result.deduplicationOffset),
+              deduplicationConfig = DedupOffset(offset),
               domainId = globalDomain,
             )
           case QueryResult(_, Some(_)) =>

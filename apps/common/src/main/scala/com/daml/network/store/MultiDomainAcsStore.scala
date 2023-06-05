@@ -22,7 +22,12 @@ import com.daml.ledger.javaapi.data.codegen.{
   InterfaceCompanion as JavaInterfaceCompanion,
 }
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.environment.ledger.api.{InFlightTransferOutEvent, TransferEvent, TreeUpdate}
+import com.daml.network.environment.ledger.api.{
+  ActiveContract,
+  InFlightTransferOutEvent,
+  TransferEvent,
+  TreeUpdate,
+}
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.Contract.Companion.Interface
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
@@ -221,17 +226,10 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
     */
   def isReadyForTransferIn(out: TransferId): Future[Boolean]
 
-  /** Signal when the store has finished ingesting ledger data from the given offset for the given domain
+  /** Signal when the store has finished ingesting ledger data from the given offset
     * or a larger one or node-level shutdown was initiated
     */
-  def signalWhenIngestedOrShutdown(domainId: DomainId, offset: String)(implicit
-      tc: TraceContext
-  ): Future[Unit]
-
-  /** Signal when the store has finished ingesting ledger data for the ACS of the given domain
-    * or node-level shutdown was initiated
-    */
-  def signalWhenAcsCompletedOrShutdown(domainId: DomainId)(implicit
+  def signalWhenIngestedOrShutdown(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit]
 
@@ -422,27 +420,16 @@ object MultiDomainAcsStore {
   }
 
   /** A query result computed as-of a specific set of per-domain ledger API offset. */
-  case class QueryResult[A](
-      offsets: Map[DomainId, String],
+  final case class QueryResult[A](
+      offset: String,
       value: A,
-  ) {
-    // TODO(M3-19) Remove client-side minimum once the dedup APIs
-    // allow passing in multiple offsets.
-    def deduplicationOffset: String =
-      // Throwing here will result in automation retrying which is exactly
-      // what we want.
-      offsets.values.minOption.getOrElse(
-        throw Status.FAILED_PRECONDITION
-          .withDescription("No data for any domain has been ingested")
-          .asRuntimeException()
-      )
-  }
+  )
 
   object QueryResult {
     implicit def prettyQueryResult[T <: PrettyPrinting]: Pretty[QueryResult[T]] = {
       import com.digitalasset.canton.logging.pretty.PrettyUtil.*
       prettyOfClass(
-        param("offsets", _.offsets.map({ case (k, v) => k -> v.unquoted })),
+        param("offset", _.offset.unquoted),
         param("value", _.value),
       )
     }
@@ -654,30 +641,17 @@ object MultiDomainAcsStore {
     def ingestionFilter: IngestionFilter
 
     def ingestAcsAndTransferOuts(
-        domain: DomainId,
-        acs: Seq[CreatedEvent],
+        acs: Seq[ActiveContract],
         inFlight: Seq[InFlightTransferOutEvent],
     )(implicit traceContext: TraceContext): Future[Unit]
 
-    def ingestOffset(domain: DomainId, offset: String)(implicit
-        traceContext: TraceContext
-    ): Future[Unit]
-
     def switchToIngestingUpdates(
-        domain: DomainId,
-        offset: String,
+        offset: String
     )(implicit traceContext: TraceContext): Future[Unit]
 
-    def getLastIngestedOffset(domain: DomainId): Future[Option[String]]
+    def getLastIngestedOffset(): Future[Option[String]]
 
     def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
-        traceContext: TraceContext
-    ): Future[Unit]
-
-    /** Called by automation if the transfer in fails because it has already been completed.
-      * See docs on InMemoryMultiDomainAcsStore.State for details on bootstrapping.
-      */
-    def removeTransferOutIfBootstrap(cid: ContractId[_], transferId: TransferId)(implicit
         traceContext: TraceContext
     ): Future[Unit]
   }

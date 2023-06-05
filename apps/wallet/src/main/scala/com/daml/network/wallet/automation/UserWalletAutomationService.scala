@@ -39,7 +39,6 @@ class UserWalletAutomationService(
       store,
       ledgerClient,
       retryProvider,
-      enableOffsetIngestionService = false,
     ) {
 
   registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))

@@ -55,7 +55,7 @@ class GroupRequestTrigger(
             .submitWithResultNoDedup(Seq(provider), Seq(), cmd, req.domain)
             .map(_ => TaskSuccess("rejected request for already existing group."))
 
-        case result @ QueryResult(_, None) =>
+        case QueryResult(offset, None) =>
           val acceptCmd =
             req.contract.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
           connection
@@ -68,7 +68,7 @@ class GroupRequestTrigger(
                 Seq(provider, user),
                 groupId.unpack,
               ),
-              deduplicationOffset = result.deduplicationOffset,
+              deduplicationOffset = offset,
               domainId = req.domain,
             )
             .map(_ => TaskSuccess("accepted group request."))

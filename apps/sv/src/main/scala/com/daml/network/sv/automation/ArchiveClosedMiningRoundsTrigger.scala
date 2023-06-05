@@ -98,7 +98,7 @@ class ArchiveClosedMiningRoundsTrigger(
             Seq(svParty, svcParty),
             closedRound.contractId.contractId,
           ),
-          deduplicationConfig = DedupOffset(task.deduplicationOffset),
+          deduplicationConfig = DedupOffset(task.offset),
           domainId = domainId,
         )
     } yield {

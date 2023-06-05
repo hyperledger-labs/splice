@@ -330,7 +330,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
               appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty &&
               // ... and a confirmation to archive is not already created by this SV
               confirmationQueryResult.value.isEmpty
-            ) Some(QueryResult(confirmationQueryResult.offsets, round))
+            ) Some(QueryResult(confirmationQueryResult.offset, round))
             else None
           )
         }

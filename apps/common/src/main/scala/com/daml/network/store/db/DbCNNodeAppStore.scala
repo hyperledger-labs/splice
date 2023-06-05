@@ -5,7 +5,6 @@ import com.daml.network.store.{
   CNNodeAppStore,
   InMemoryDomainStore,
   InMemoryMultiDomainAcsStore,
-  OffsetStore,
   TxLogStore,
 }
 import com.daml.network.util.TemplateJsonDecoder
@@ -54,8 +53,6 @@ abstract class DbCNNodeAppStore[
       futureSupervisor,
       retryProvider,
     )
-
-  override val offset: OffsetStore = new OffsetStore(loggerFactory)
 
   override def close(): Unit = ()
 }

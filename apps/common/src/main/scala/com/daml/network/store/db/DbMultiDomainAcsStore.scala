@@ -232,11 +232,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
   override def isReadyForTransferIn(out: TransferId): Future[Boolean] = ???
 
-  override def signalWhenIngestedOrShutdown(domainId: DomainId, offset: String)(implicit
-      tc: TraceContext
-  ): Future[Unit] = ???
-
-  override def signalWhenAcsCompletedOrShutdown(domainId: DomainId)(implicit
+  override def signalWhenIngestedOrShutdown(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit] = ???
 

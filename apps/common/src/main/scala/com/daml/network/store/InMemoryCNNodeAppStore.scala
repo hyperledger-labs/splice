@@ -35,8 +35,6 @@ abstract class InMemoryCNNodeAppStore[
       retryProvider,
     )
 
-  override val offset: OffsetStore = new OffsetStore(loggerFactory)
-
   override def close(): Unit = ()
 }
 

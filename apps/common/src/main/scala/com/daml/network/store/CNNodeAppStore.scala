@@ -32,8 +32,6 @@ trait CNNodeAppStore[
 
   def txLog: TxLogStore[TXI, TXE]
 
-  def offset: OffsetStore
-
   protected def txLogParser: TxLogStore.Parser[TXI, TXE]
 }
 

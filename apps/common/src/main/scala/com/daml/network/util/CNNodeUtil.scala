@@ -79,7 +79,7 @@ object CNNodeUtil {
     retryProvider.retryForClientCalls(
       "createValidatorRight",
       lookupValidatorRightByParty(user).flatMap {
-        case result @ QueryResult(_, None) =>
+        case QueryResult(offset, None) =>
           connection
             .submitCommands(
               actAs = Seq(validator, user),
@@ -87,7 +87,7 @@ object CNNodeUtil {
               commands = createValidatorRightCommand(svc, validator, user),
               commandId = CNLedgerConnection
                 .CommandId("com.daml.network.validator.createValidatorRight", Seq(user)),
-              deduplicationOffset = result.deduplicationOffset,
+              deduplicationOffset = offset,
               domainId = domainId,
             )
             .map(_ => ())

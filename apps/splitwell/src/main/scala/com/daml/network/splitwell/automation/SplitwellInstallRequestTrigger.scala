@@ -52,7 +52,7 @@ class SplitwellInstallRequestTrigger(
             .submitWithResultNoDedup(Seq(provider), Seq(), cmd, req.domain)
             .map(_ => TaskSuccess("rejected request for already existing installation."))
 
-        case result @ QueryResult(_, None) =>
+        case QueryResult(offset, None) =>
           val acceptCmd =
             req.contract.contractId.exerciseSplitwellInstallRequest_Accept().commands.asScala.toSeq
           connection
@@ -65,7 +65,7 @@ class SplitwellInstallRequestTrigger(
                 Seq(provider, user),
                 req.domain.toProtoPrimitive,
               ),
-              deduplicationOffset = result.deduplicationOffset,
+              deduplicationOffset = offset,
               domainId = req.domain,
             )
             .map(_ => TaskSuccess("accepted install request."))

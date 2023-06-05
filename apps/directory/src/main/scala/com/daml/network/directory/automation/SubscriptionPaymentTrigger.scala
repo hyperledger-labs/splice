@@ -121,11 +121,11 @@ class SubscriptionPaymentTrigger(
           val entryName = directoryEntryContext.payload.name
           // check whether the entry exists
           store.lookupEntryByNameWithOffset(entryName).flatMap {
-            case result @ QueryResult(_, Some(entry)) =>
+            case QueryResult(offset, Some(entry)) =>
               // collect the payment and renew the entry
               collectPayment(
                 entry,
-                result.deduplicationOffset,
+                offset,
                 transferContext,
                 disclosedContracts,
               )

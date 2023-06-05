@@ -170,7 +170,6 @@ class SvApp(
         ledgerClient,
       )
       globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global.alias)
-      _ <- waitForAcsIngestion(svStore.multiDomainAcsStore, globalDomain)
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
         participantAdminConnection,
@@ -363,8 +362,7 @@ class SvApp(
             svcStore = newSvcStore(svStore.key)
             svcAutomation =
               newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
-            domainId <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
-            _ <- waitForAcsIngestion(svcStore.multiDomainAcsStore, domainId)
+            _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
             onboarded <- isOnboarded(svcStore)
             _ <-
               if (onboarded) {
@@ -827,7 +825,7 @@ class SvApp(
         .getFounderDomainNodeConfig(cometBftNode)
         .fold(error => sys.error(s"Failed to initialize the domain nodes: $error"), identity)
       _ <- svStore.lookupSvcRulesWithOffset().flatMap {
-        case result @ QueryResult(_, None) => {
+        case QueryResult(offset, None) => {
           coinRules match {
             case Some(coinRules) =>
               sys.error(
@@ -861,7 +859,7 @@ class SvApp(
                     .toSeq,
                   commandId = CNLedgerConnection
                     .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
-                  deduplicationOffset = result.deduplicationOffset,
+                  deduplicationOffset = offset,
                   domainId = domainId,
                 )
           }
@@ -917,7 +915,7 @@ class SvApp(
     val svcParty = store.key.svcParty
     for {
       _ <- store.lookupCoinRulesV1TestWithOffset().flatMap {
-        case result @ QueryResult(_, None) =>
+        case QueryResult(offset, None) =>
           svStoreWithIngestion.connection.submitWithResult(
             actAs = Seq(svcParty),
             readAs = Seq.empty,
@@ -936,7 +934,7 @@ class SvApp(
               "com.daml.network.svc.initiateCoinRulesUpgrade",
               Seq(svcParty),
             ),
-            deduplicationConfig = DedupOffset(result.deduplicationOffset),
+            deduplicationConfig = DedupOffset(offset),
             domainId = domainId,
           )
         case QueryResult(_, Some(_)) =>
@@ -1159,7 +1157,7 @@ object SvApp {
             Left(s"This secret has already been used before, for onboarding validator $validator")
           )
         }
-        case result @ QueryResult(_, None) => {
+        case QueryResult(offset, None) => {
           svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
             case QueryResult(_, Some(_)) => {
               Future.successful(
@@ -1178,7 +1176,7 @@ object SvApp {
                       Seq(svParty),
                       secret, // not a leak as this gets hashed before it's used
                     ),
-                  deduplicationOffset = result.deduplicationOffset,
+                  deduplicationOffset = offset,
                   domainId = globalDomain,
                 )
                 .map(_ => {
@@ -1259,7 +1257,7 @@ object SvApp {
             Future.successful(
               Left(s"This vote request has already been created ${vote.contractId}.")
             )
-          case result @ QueryResult(_, None) =>
+          case QueryResult(offset, None) =>
             for {
               svcRules <- svcStoreWithIngestion.store.getSvcRules()
               reason = new Reason(reasonUrl, reasonDescription)
@@ -1277,7 +1275,7 @@ object SvApp {
                   ),
                   action.toString,
                 ),
-                deduplicationOffset = result.deduplicationOffset,
+                deduplicationOffset = offset,
                 domainId = globalDomain,
               )
             } yield Right(())
@@ -1303,7 +1301,7 @@ object SvApp {
           Future.successful(
             Left(s"This vote has already been created for vote request $voteRequestCid.")
           )
-        case result @ QueryResult(_, None) =>
+        case QueryResult(offset, None) =>
           for {
             svcRules <- svcStoreWithIngestion.store.getSvcRules()
             reason = new Reason(reasonUrl, reasonDescription)
@@ -1327,7 +1325,7 @@ object SvApp {
                 voteRequestCid.contractId,
               ),
               deduplicationConfig = DedupOffset(
-                offset = result.deduplicationOffset
+                offset = offset
               ),
               domainId = globalDomain,
             )
@@ -1405,7 +1403,7 @@ object SvApp {
                 })
               )
             }
-            case result @ QueryResult(_, None) =>
+            case QueryResult(offset, None) =>
               for {
                 _ <- svStoreWithIngestion.connection
                   .submitCommandsTransaction(
@@ -1418,7 +1416,7 @@ object SvApp {
                         Seq(svParty),
                         s"$key",
                       ),
-                    deduplicationOffset = result.deduplicationOffset,
+                    deduplicationOffset = offset,
                     domainId = globalDomain,
                   )
               } yield {

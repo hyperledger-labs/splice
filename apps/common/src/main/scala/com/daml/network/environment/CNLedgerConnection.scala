@@ -19,12 +19,12 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, Update}
 import com.daml.network.environment.ledger.api.{
+  ActiveContract,
   DedupConfig,
   DedupOffset,
   InFlightTransferOutEvent,
   LedgerClient,
   NoDedup,
-  TreeUpdate,
 }
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.{UploadablePackage, DisclosedContracts}
@@ -65,7 +65,7 @@ class CNLedgerConnection(
     protected val timeouts: ProcessingTimeout,
     retryProvider: RetryProvider,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
-    completionOffsetCallback: (DomainId, String) => Future[Unit],
+    completionOffsetCallback: String => Future[Unit],
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends NamedLogging {
 
@@ -77,7 +77,7 @@ class CNLedgerConnection(
 
   private def callCallbacksOnCompletion[T, U](
       result: Future[T]
-  )(getOffsetAndResult: T => (Option[(DomainId, String)], U)): Future[U] = {
+  )(getOffsetAndResult: T => (Option[String], U)): Future[U] = {
     import TraceContext.Implicits.Empty.*
     def callCallbacksInternal(result: Try[T]): Unit =
       LoggerUtil.logOnThrow { // in case the callbacks throw.
@@ -101,16 +101,16 @@ class CNLedgerConnection(
       val (optOffset, result) = getOffsetAndResult(x)
       optOffset match {
         case None => Future.successful(result)
-        case Some((domainId, offset)) =>
+        case Some(offset) =>
           // Wait for the completion offset to have been processed.
-          completionOffsetCallback(domainId, offset).map(_ => result)
+          completionOffsetCallback(offset).map(_ => result)
       }
     })
   }
 
   private def callCallbacksOnCompletionAndWaitForOffset[T, U](
       result: Future[T]
-  )(getOffsetAndResult: T => ((DomainId, String), U)): Future[U] =
+  )(getOffsetAndResult: T => (String, U)): Future[U] =
     callCallbacksOnCompletion(result)(x => {
       val (offset, result) = getOffsetAndResult(x)
       (Some(offset), result)
@@ -150,7 +150,7 @@ class CNLedgerConnection(
           deduplicationConfig = NoDedup,
           disclosedContracts = disclosedContracts,
         )
-    )(offset => ((domainId, offset), ()))
+    )(offset => (offset, ()))
   }
 
   // When using submitAndWaitForTransaction with a command whose resulting transaction is
@@ -175,7 +175,7 @@ class CNLedgerConnection(
           deduplicationConfig = NoDedup,
           disclosedContracts = disclosedContracts,
         )
-    )(tx => ((domainId, tx.getOffset), tx))
+    )(tx => (tx.getOffset, tx))
   }
 
   def submitCommands(
@@ -201,7 +201,7 @@ class CNLedgerConnection(
           commands = commands,
           disclosedContracts = disclosedContracts,
         )
-    )(offset => ((domainId, offset), ()))
+    )(offset => (offset, ()))
   }
 
   def submitCommandsTransaction(
@@ -227,7 +227,7 @@ class CNLedgerConnection(
           commands = commands,
           disclosedContracts = disclosedContracts,
         )
-    )(tx => ((domainId, tx.getOffset), tx))
+    )(tx => (tx.getOffset, tx))
   }
 
   def submitWithResultNoDedup[T](
@@ -322,7 +322,7 @@ class CNLedgerConnection(
             deduplicationConfig = dedup,
             disclosedContracts = disclosedContracts,
           )
-      )(tx => ((domainId, tx.getOffset), tx))
+      )(tx => (tx.getOffset, tx))
     } yield (
       tree.getOffset,
       decodeExerciseResult(
@@ -333,10 +333,9 @@ class CNLedgerConnection(
   }
 
   def activeContracts(
-      domain: DomainId,
       filter: IngestionFilter,
       offset: LedgerOffset.Absolute,
-  ): Future[(Seq[CreatedEvent], Seq[InFlightTransferOutEvent])] = {
+  ): Future[(Seq[ActiveContract], Seq[InFlightTransferOutEvent])] = {
     val activeContractsRequest = client.activeContracts(
       multidomain.GetActiveContractsRequest(
         validAtOffset = offset.getOffset,
@@ -349,14 +348,12 @@ class CNLedgerConnection(
         .flatMap(_.contractStateComponents)
         .map(_.contractStateComponent)
       active = contractStateComponents.collect {
-        case multidomain.ContractStateComponent.ContractStateComponent.ActiveContract(contract)
-            if contract.domainId == domain.toProtoPrimitive =>
-          val ev = contract.getCreatedEvent
-          CreatedEvent.fromProto(ev.companion.toJavaProto(ev))
+        case multidomain.ContractStateComponent.ContractStateComponent.ActiveContract(contract) =>
+          ActiveContract.fromProto(contract)
       }
       inFlight = contractStateComponents.collect {
-        case multidomain.ContractStateComponent.ContractStateComponent.IncompleteTransferredOut(ev)
-            if ev.getTransferredOutEvent.source == domain.toProtoPrimitive =>
+        case multidomain.ContractStateComponent.ContractStateComponent
+              .IncompleteTransferredOut(ev) =>
           InFlightTransferOutEvent.fromProto(ev)
       }
     } yield (active, inFlight)
@@ -365,20 +362,12 @@ class CNLedgerConnection(
   def getConnectedDomains(party: PartyId): Future[Map[DomainAlias, DomainId]] =
     client.getConnectedDomains(party)
 
-  // TODO(#5349) Switch update ingestion to merged streams and remove
-  // domain filter here.
   def updates(
       beginOffset: LedgerOffset,
-      endOffset: LedgerOffset,
       party: PartyId,
-      domain: DomainId,
-  ): Source[TreeUpdate, NotUsed] =
+  ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
-      .updates(LedgerClient.GetUpdatesRequest(beginOffset, Some(endOffset), party))
-      .collect {
-        case LedgerClient.GetTreeUpdatesResponse(update, updateDomain) if updateDomain == domain =>
-          update
-      }
+      .updates(LedgerClient.GetUpdatesRequest(beginOffset, None, party))
 
   def tryGetTransactionTreeById(
       parties: Seq[PartyId],
@@ -568,10 +557,6 @@ class CNLedgerConnection(
       command: LedgerClient.TransferCommand,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val commandId = UUID.randomUUID().toString()
-    val listenDomain = command match {
-      case in: LedgerClient.TransferCommand.In => in.target
-      case out: LedgerClient.TransferCommand.Out => out.source
-    }
     logger.debug(s"transfer $commandId is for $command")
 
     val (ks, completion) = cancelIfFailed(
@@ -605,7 +590,7 @@ class CNLedgerConnection(
       .flatMap { case ((offset, _), ()) =>
         FutureUnlessShutdown.outcomeF(offset match {
           case absolute: LedgerOffset.Absolute =>
-            completionOffsetCallback(listenDomain, absolute.getOffset).map(_ => ())
+            completionOffsetCallback(absolute.getOffset).map(_ => ())
           case other =>
             logger.warn(s"Encountered unexpected non-absolute ledger offset $other")
             Future.unit

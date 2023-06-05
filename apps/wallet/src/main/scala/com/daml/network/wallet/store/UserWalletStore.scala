@@ -20,12 +20,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.{
-  CNNodeAppStoreWithHistory,
-  InMemoryMultiDomainAcsStore,
-  OffsetStore,
-  PageLimit,
-}
+import com.daml.network.store.{CNNodeAppStoreWithHistory, InMemoryMultiDomainAcsStore, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.UserWalletStore.{
@@ -86,7 +81,7 @@ trait UserWalletStore
   )
 
   def signalWhenIngestedOrShutdown(offset: String)(implicit tc: TraceContext): Future[Unit] =
-    defaultAcsDomainIdF.flatMap(multiDomainAcsStore.signalWhenIngestedOrShutdown(_, offset))
+    multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)
 
   import MultiDomainExpiredContractTrigger.ListExpiredContracts
 
@@ -468,7 +463,6 @@ object UserWalletStore {
       futureSupervisor: FutureSupervisor,
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
-      offsetStore: OffsetStore,
   )(implicit
       ec: ExecutionContext
   ): UserWalletStore =
@@ -481,7 +475,6 @@ object UserWalletStore {
           futureSupervisor,
           connection,
           retryProvider,
-          offsetStore,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }

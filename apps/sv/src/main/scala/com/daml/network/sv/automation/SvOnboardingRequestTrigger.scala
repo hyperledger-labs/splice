@@ -167,7 +167,7 @@ class SvOnboardingRequestTrigger(
               s"skipping as confirmation from ${svParty} is already created for such action"
             )
           )
-        case result @ QueryResult(_, None) =>
+        case QueryResult(offset, None) =>
           connection
             .submitWithResult(
               actAs = Seq(svParty),
@@ -178,9 +178,7 @@ class SvOnboardingRequestTrigger(
                 Seq(svParty, svcParty),
                 party.toProtoPrimitive,
               ),
-              deduplicationConfig = DedupOffset(
-                offset = result.deduplicationOffset
-              ),
+              deduplicationConfig = DedupOffset(offset),
               domainId = domainId,
             )
             .map { _ =>

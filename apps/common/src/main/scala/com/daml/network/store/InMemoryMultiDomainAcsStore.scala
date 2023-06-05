@@ -7,6 +7,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
+  ActiveContract,
   InFlightTransferOutEvent,
   TransactionTreeUpdate,
   Transfer,
@@ -42,11 +43,13 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   import MultiDomainAcsStore.*
 
+  private val finishedAcsIngestion: Promise[Unit] = Promise()
+
   @volatile
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var stateVar: InMemoryMultiDomainAcsStore.State[TXI, TXE] =
     InMemoryMultiDomainAcsStore.State(
-      offsets = Map.empty,
+      offset = None,
       nextCreateEventNumber = 0,
       createEvents = SortedMap.empty,
       createEventsById = Map.empty,
@@ -58,10 +61,9 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       transferOutEventsById = Map.empty,
       earlyTransferIns = Set.empty,
       pendingTransfersById = Map.empty,
-      bootstrapTransferOutIds = Set.empty,
       archivedTombstones = Set.empty,
       offsetChanged = Promise(),
-      offsetIngestionsToSignal = Map.empty,
+      offsetIngestionsToSignal = SortedMap.empty,
       txLog = Queue.empty,
     )
 
@@ -86,16 +88,16 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
     override def ingestionFilter = contractFilter.ingestionFilter
 
-    override def getLastIngestedOffset(domain: DomainId): Future[Option[String]] =
-      Future.successful(stateVar.offsets.get(domain))
+    override def getLastIngestedOffset(): Future[Option[String]] = Future {
+      stateVar.offset
+    }
 
     override def ingestAcsAndTransferOuts(
-        domain: DomainId,
-        acs: Seq[CreatedEvent],
+        acs: Seq[ActiveContract],
         transferOuts: Seq[InFlightTransferOutEvent],
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
-        _.ingestAcsAndTransferOuts(domain, acs, transferOuts, contractFilter.contains)
+        _.ingestAcsAndTransferOuts(acs, transferOuts, contractFilter.contains)
       ).map { summary =>
         logger.debug(
           show"Ingested ACS and in-flight update: $summary"
@@ -103,30 +105,19 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       }
 
     override def switchToIngestingUpdates(
-        domain: DomainId,
-        offset: String,
+        offset: String
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
-        _.switchToIngestingUpdates(domain, offset)
+        _.switchToIngestingUpdates(offset)
       ).map {
         case (offsetChanged, offsetIngestionsToSignal) => {
           logger.debug(
-            show"Ingested complete ACS and in-flight transfers for domain $domain at offset ${offset}"
+            show"Ingested complete ACS and in-flight transfers at offset ${offset}"
           )
           offsetIngestionsToSignal.foreach(_.success(()))
           offsetChanged.success(())
+          finishedAcsIngestion.success(())
         }
-      }
-
-    override def ingestOffset(domain: DomainId, offset: String)(implicit
-        traceContext: TraceContext
-    ): Future[Unit] =
-      updateState(
-        _.ingestOffset(domain, offset)
-      ).map { case (offsetChanged, offsetIngestionsToSignal) =>
-        logger.debug(show"Advanced offset for domain $domain to offset $offset")
-        offsetIngestionsToSignal.foreach(_.success(()))
-        offsetChanged.success(())
       }
 
     override def ingestUpdate(
@@ -144,22 +135,12 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
           }
         case TransferUpdate(transfer) =>
           updateState(
-            _.ingestTransfer(domain, transfer, contractFilter.contains)
+            _.ingestTransfer(transfer, contractFilter.contains)
           ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
             logger.debug(show"Ingested transfer $summary")
             offsetIngestionsToSignal.foreach(_.success(()))
             offsetChanged.success(())
           }
-      }
-
-    override def removeTransferOutIfBootstrap(
-        cid: ContractId[_],
-        transferId: TransferId,
-    )(implicit traceContext: TraceContext): Future[Unit] =
-      updateState(
-        _.removeTransferOutIfBootstrap(cid, transferId)
-      ).map { summary =>
-        logger.debug(show"Ingested removeTransferOutIfBootstrap: $summary")
       }
   }
 
@@ -192,8 +173,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]] = {
     requireInScope(companion)
-    Future {
-      val st = stateVar
+    offsetAndStateAfterIngestingAcs().map { case (_, st) =>
       applyLimit(
         limit,
         st.createEvents.values
@@ -278,16 +258,17 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   private def lookupContractById[T](
       fromCreatedEvent: CreatedEvent => Option[T]
-  )(id: ContractId[_]): Future[Option[(T, ContractState)]] = Future {
-    val st = stateVar
-    st.createEventsById.get(id).flatMap { evRev =>
-      for {
-        ev <- st.createEvents.get(evRev)
-        parsedEv <- fromCreatedEvent(ev)
-      } yield {
-        val state = st
-          .getContractState(new ContractId(ev.getContractId))
-        (parsedEv, state)
+  )(id: ContractId[_]): Future[Option[(T, ContractState)]] = {
+    offsetAndStateAfterIngestingAcs().map { case (_, st) =>
+      st.createEventsById.get(id).flatMap { evRev =>
+        for {
+          ev <- st.createEvents.get(evRev)
+          parsedEv <- fromCreatedEvent(ev)
+        } yield {
+          val state = st
+            .getContractState(new ContractId(ev.getContractId))
+          (parsedEv, state)
+        }
       }
     }
   }
@@ -316,24 +297,25 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       p: Contract[TCid, T] => Boolean = (_: Any) => true
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
-  ): Future[QueryResult[Option[ContractWithState[TCid, T]]]] = Future {
+  ): Future[QueryResult[Option[ContractWithState[TCid, T]]]] = {
     requireInScope(companion)
-    val st = stateVar
-    val optEntry = st.createEvents.values.collectFirst(
-      Function.unlift(ev =>
-        for {
-          contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
-          if p(contract)
-        } yield contract
+    offsetAndStateAfterIngestingAcs().map { case (offset, st) =>
+      val optEntry = st.createEvents.values.collectFirst(
+        Function.unlift(ev =>
+          for {
+            contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
+            if p(contract)
+          } yield contract
+        )
       )
-    )
-    QueryResult(
-      st.offsets,
-      optEntry.map { contract =>
-        val state = st.getContractState(contract.contractId)
-        ContractWithState(contract, state)
-      },
-    )
+      QueryResult(
+        offset,
+        optEntry.map { contract =>
+          val state = st.getContractState(contract.contractId)
+          ContractWithState(contract, state)
+        },
+      )
+    }
   }
 
   /** Find a contract that satisfies a predicate on the given domain.
@@ -350,23 +332,24 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       companion: C
   )(domain: DomainId, p: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true)(implicit
       companionClass: ContractCompanion[C, TCid, T]
-  ): Future[QueryResult[Option[Contract[TCid, T]]]] = Future {
+  ): Future[QueryResult[Option[Contract[TCid, T]]]] = {
     requireInScope(companion)
-    val st = stateVar
-    val optEntry = st.createEvents.values.collectFirst(
-      Function.unlift(ev =>
-        for {
-          contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
-          if p(contract)
-          state = st.getContractState(contract.contractId)
-          if state == ContractState.Assigned(domain)
-        } yield contract
+    offsetAndStateAfterIngestingAcs().map { case (offset, st) =>
+      val optEntry = st.createEvents.values.collectFirst(
+        Function.unlift(ev =>
+          for {
+            contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
+            if p(contract)
+            state = st.getContractState(contract.contractId)
+            if state == ContractState.Assigned(domain)
+          } yield contract
+        )
       )
-    )
-    QueryResult(
-      st.offsets.filter({ case (k, _) => k == domain }),
-      optEntry,
-    )
+      QueryResult(
+        offset,
+        optEntry,
+      )
+    }
   }
 
   def findContractOnDomain[C, TCid <: ContractId[_], T](
@@ -397,9 +380,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   }
 
   override def isReadyForTransferIn(transfer: TransferId): Future[Boolean] =
-    Future {
-      val state = stateVar
-      state.transferOutEventsById.contains(transfer)
+    offsetAndStateAfterIngestingAcs().map { case (_, st) =>
+      st.transferOutEventsById.contains(transfer)
     }
 
   private def nextReadyContract[T](
@@ -488,33 +470,28 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   ): Future[Seq[TXI]] =
     Future.successful(stateVar.txLog.view.map(_.payload).filter(filter).toSeq)
 
-  override def signalWhenIngestedOrShutdown(domainId: DomainId, offset: String)(implicit
-      tc: TraceContext
-  ): Future[Unit] =
-    signalWhenIngestedOrShutdown(domainId, InMemoryMultiDomainAcsStore.OffsetSignal.Offset(offset))
+  private def offsetAndStateAfterIngestingAcs()
+      : Future[(String, InMemoryMultiDomainAcsStore.State[TXI, TXE])] =
+    finishedAcsIngestion.future
+      .map(_ => {
+        val st = stateVar
+        (
+          st.offset.getOrElse(sys.error("Offset must be defined, as the ACS was ingested")),
+          st,
+        )
+      })
 
-  def signalWhenAcsCompletedOrShutdown(domainId: DomainId)(implicit
-      tc: TraceContext
-  ): Future[Unit] =
-    signalWhenIngestedOrShutdown(domainId, InMemoryMultiDomainAcsStore.OffsetSignal.Acs)
-
-  private def signalWhenIngestedOrShutdown(
-      domainId: DomainId,
-      offset: InMemoryMultiDomainAcsStore.OffsetSignal,
-  )(implicit
+  override def signalWhenIngestedOrShutdown(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit] =
     updateState[Future[Unit]](state =>
       if (
-        state.offsets
-          .get(domainId)
-          .exists(actualOffset =>
-            InMemoryMultiDomainAcsStore.OffsetSignal.Offset(actualOffset) >= offset
-          )
+        state.offset
+          .exists(actualOffset => actualOffset >= offset)
       ) {
         (state, Future.unit)
       } else {
-        val (newState, offsetIngested) = state.addOffsetToSignal(domainId, offset)
+        val (newState, offsetIngested) = state.addOffsetToSignal(offset)
         val name = s"signalWhenIngested($offset)"
         val ingestedOrShutdown = retryProvider
           .waitUnlessShutdown(offsetIngested)
@@ -535,8 +512,6 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     Future.successful(stateVar.archivedTombstones)
   private[store] def pendingTransfersById: Future[Map[ContractId[_], NonEmpty[Set[TransferId]]]] =
     Future.successful(stateVar.pendingTransfersById)
-  private[store] def bootstrapTransferOutIds: Future[Set[TransferId]] =
-    Future.successful(stateVar.bootstrapTransferOutIds)
 
   override def close(): Unit = ()
 }
@@ -544,21 +519,6 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 object InMemoryMultiDomainAcsStore {
 
   import MultiDomainAcsStore.{ContractState, TransferId}
-
-  private sealed abstract class OffsetSignal extends Ordered[OffsetSignal] {
-    override def compare(that: OffsetSignal) =
-      (this, that) match {
-        case (OffsetSignal.Acs, OffsetSignal.Acs) => 0
-        case (OffsetSignal.Acs, OffsetSignal.Offset(_)) => -1
-        case (OffsetSignal.Offset(_), OffsetSignal.Acs) => 1
-        case (OffsetSignal.Offset(thisO), OffsetSignal.Offset(thatO)) => thisO.compare(thatO)
-      }
-  }
-
-  private object OffsetSignal {
-    final case object Acs extends OffsetSignal
-    final case class Offset(offset: String) extends OffsetSignal
-  }
 
   private case class ContractLocation(
       contractId: ContractId[_],
@@ -601,14 +561,10 @@ object InMemoryMultiDomainAcsStore {
     *     have the transfer id in earlyTransferIns.
     *   - added on initial bootstrapping on in-flight transfer outs independent of filter
     *   - removed on matching transferIn
-    *   - removed on removeTransferOutIfBootstrap if transfer in bootstrapTransferOutIds
     * - earlyTransferIns
     *   - added on transfer in if it matches our filter and we do not yet have the transfer id in earlyTransferIns
     *   - removed on matching transfer out
     * - pendingTransfersById: index on top of transferOutEvents/earlyTransferIns, always updated together
-    * - bootstrapTransferOutIds
-    *   - added: transfer outs ingested as part of initial bootstrapping
-    *   - removed: transfer in or removeTransferOutIfBootstrap
     * - archivedTombstones
     *   - added: archive if there are still pending transfers
     *   - removed: when the last pending transfer is removed.
@@ -620,14 +576,9 @@ object InMemoryMultiDomainAcsStore {
     * that allows us to resolve those cases faster.
     *
     * TODO(#3596) These edge cases should go away with transfer counters.
-    * Bootstrapping: When bootstrapping from the ACS and in-flight contracts we end up with two
+    * Bootstrapping: When bootstrapping from the ACS and in-flight contracts we end up with one
     * edge cases:
-    * 1. We see the in-flight transfer out on the source domain
-    *    but we start streaming on the target domain after the transfer in.
-    *    Our automation will detect the failed attempt to submit the transfer in and remove
-    *    the transfer out through `removeTransferOutIfBootstrap`. Note that if automation
-    *    calls this before we see the transfer in, this will result in situation 2.
-    * 2. We see the transfer in on the target domain but we don't see an in-flight transfer out
+    * 1. We see the transfer in on the target domain but we don't see an in-flight transfer out
     *    when bootstrapping on the source domain (because the participant has
     *    already processed the transfer in). In this case, the transfer in will forever
     *    remain in `earyTransferIns` and therefore if we ever archive it it will also remain in
@@ -636,7 +587,7 @@ object InMemoryMultiDomainAcsStore {
     *    we accept this for now.
     */
   private case class State[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
-      offsets: Map[DomainId, String],
+      offset: Option[String],
       nextCreateEventNumber: Long,
       // All active contracts across all domains that match our contract filter. Contracts are inserted
       // when we see the first create or transfer in and removed on archive.
@@ -661,10 +612,6 @@ object InMemoryMultiDomainAcsStore {
       // In-flight transfers that are either in transferOutEvents or
       // earlyTransferIns for the given contract id.
       pendingTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]],
-      // Transfer ids that we added during bootstrapping. This is used
-      // to make sure that we only limit the problematic cases described under
-      // "Bootstrapping" to really only the contracts ingested during bootstrapping.
-      bootstrapTransferOutIds: Set[TransferId],
 
       // Contracts that have already been archived but
       // there are still in-flight requests we might receive.
@@ -675,27 +622,19 @@ object InMemoryMultiDomainAcsStore {
       // for the contract.
       archivedTombstones: Set[ContractId[_]],
       offsetChanged: Promise[Unit],
-      offsetIngestionsToSignal: Map[DomainId, SortedMap[OffsetSignal, Promise[Unit]]],
+      offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
       txLog: Queue[IndexRecordWithDomain[TXI]],
   ) {
 
     private def removeOffsetSignalsBefore(
-        domainId: DomainId,
-        offset: OffsetSignal,
-    ): (State[TXI, TXE], Map[OffsetSignal, Promise[Unit]]) = {
+        offset: String
+    ): (State[TXI, TXE], Map[String, Promise[Unit]]) = {
       // because we use a SortedMap, we can use takeWhile.
       val offsetsToRemove = offsetIngestionsToSignal
-        .getOrElse(domainId, SortedMap.empty[OffsetSignal, Promise[Unit]])
         .takeWhile(_._1 <= offset)
       (
         copy(
-          offsetIngestionsToSignal = offsetIngestionsToSignal.updatedWith(domainId)(prev =>
-            Some(
-              prev
-                .getOrElse(SortedMap.empty[OffsetSignal, Promise[Unit]])
-                .removedAll(offsetsToRemove.keys)
-            )
-          )
+          offsetIngestionsToSignal = offsetIngestionsToSignal.removedAll(offsetsToRemove.keys)
         ),
         offsetsToRemove,
       )
@@ -719,38 +658,28 @@ object InMemoryMultiDomainAcsStore {
       )
 
     def ingestAcsAndTransferOuts(
-        domain: DomainId,
-        evs: Seq[CreatedEvent],
+        evs: Seq[ActiveContract],
         transferOuts: Seq[InFlightTransferOutEvent],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
-      assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
-      val (stAcs, summaryAcs) = ingestCreatedEvents(domain, evs, p)
+      assert(offset.isEmpty, "state was not switched to update ingestion yet")
+      val (stAcs, summaryAcs) = ingestActiveContracts(evs, p)
       val (stInFlight, summaryTransferOut) = stAcs.ingestTransferOuts(transferOuts, summaryAcs, p)
       (
         stInFlight,
         summaryTransferOut.copy(
-          domain = Some(domain),
-          newAcsSize = stInFlight.createEvents.size,
+          newAcsSize = stInFlight.createEvents.size
         ),
       )
     }
 
     def switchToIngestingUpdates(
-        domain: DomainId,
-        offset: String,
+        acsOffset: String
     ): (State[TXI, TXE], (Promise[Unit], Iterable[Promise[Unit]])) = {
-      assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
-      ingestOffset(domain, offset)
-    }
-
-    def ingestOffset(
-        domain: DomainId,
-        offset: String,
-    ): (State[TXI, TXE], (Promise[Unit], Iterable[Promise[Unit]])) = {
-      val (newSt, offsetsToRemove) = removeOffsetSignalsBefore(domain, OffsetSignal.Offset(offset))
+      assert(offset.isEmpty, "state was not switched to update ingestion yet")
+      val (newSt, offsetsToRemove) = removeOffsetSignalsBefore(acsOffset)
       (
-        newSt.copy(offsets = offsets + (domain -> offset), offsetChanged = Promise()),
+        newSt.copy(offset = Some(acsOffset), offsetChanged = Promise()),
         (offsetChanged, offsetsToRemove.values),
       )
     }
@@ -765,7 +694,7 @@ object InMemoryMultiDomainAcsStore {
     )(implicit
         traceContext: TraceContext
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
-      assert(offsets.contains(domain), "state was switched to update ingestion")
+      assert(offset.isDefined, "state was switched to update ingestion")
 
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var numFilteredCreatedEvents = 0
@@ -826,7 +755,6 @@ object InMemoryMultiDomainAcsStore {
       val summary = IngestionSummary.empty.copy(
         txId = Some(tx.getTransactionId),
         offset = Some(newOffset),
-        domain = Some(domain),
         newAcsSize = stNew.createEvents.size,
         ingestedCreatedEvents = ingestedCreatedEvents.result(),
         ingestedArchivedEvents = ingestedArchivedEvents.result(),
@@ -839,11 +767,11 @@ object InMemoryMultiDomainAcsStore {
       )
 
       val (stNewWithoutOffsets, offsetsToRemove) =
-        stNew.removeOffsetSignalsBefore(domain, OffsetSignal.Offset(newOffset))
+        stNew.removeOffsetSignalsBefore(newOffset)
 
       (
         stNewWithoutOffsets.copy(
-          offsets = offsets + (domain -> newOffset),
+          offset = Some(newOffset),
           offsetChanged = Promise(),
           txLog = stNew.txLog.prependedAll(
             ingestedTxLogEntries.reverse.map(entry =>
@@ -856,60 +784,28 @@ object InMemoryMultiDomainAcsStore {
     }
 
     def ingestTransfer(
-        domain: DomainId,
         transfer: Transfer[TransferEvent],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
-      assert(offsets.contains(domain), "state was switched to update ingestion")
+      assert(offset.isDefined, "state was switched to update ingestion")
       val (newSt, summary) = ingestTransferEvent(transfer.event, p)
       val newOffset = transfer.offset.getOffset
       val (newStWithoutOffsets, offsetsToRemove) =
-        newSt.removeOffsetSignalsBefore(domain, OffsetSignal.Offset(newOffset))
+        newSt.removeOffsetSignalsBefore(newOffset)
       (
         newStWithoutOffsets.copy(
-          offsets = offsets + (domain -> newOffset),
+          offset = Some(newOffset),
           offsetChanged = Promise(),
         ),
         (
           summary.copy(
             offset = Some(newOffset),
-            domain = Some(domain),
             newAcsSize = newSt.createEvents.size,
           ),
           newSt.offsetChanged,
           offsetsToRemove.values,
         ),
       )
-    }
-
-    def removeTransferOutIfBootstrap(
-        cid: ContractId[_],
-        transferId: TransferId,
-    ): (State[TXI, TXE], IngestionSummary[TXE]) = {
-      if (bootstrapTransferOutIds.contains(transferId)) {
-        transferOutEventsById.get(transferId) match {
-          case None =>
-            throw new IllegalStateException(
-              s"Found $transferId in bootstrapInFlight but not in $transferOutEventsById"
-            )
-          case Some(id) =>
-            (
-              copy(
-                bootstrapTransferOutIds = bootstrapTransferOutIds - transferId,
-                transferOutEvents = transferOutEvents - id,
-                transferOutEventsById = transferOutEventsById - transferId,
-                pendingTransfersById = pendingTransfersById.updatedWith(cid)(
-                  _.flatMap(prev => NonEmpty.from(prev - transferId))
-                ),
-              ),
-              IngestionSummary
-                .empty[TXE]
-                .copy(removedBootstrapTransferOutIds = Seq((cid, transferId))),
-            )
-        }
-      } else {
-        (this, IngestionSummary.empty[TXE])
-      }
     }
 
     private def updateContractStateEvent(
@@ -940,21 +836,21 @@ object InMemoryMultiDomainAcsStore {
       )
     }
 
-    private def ingestCreatedEvents(
-        domain: DomainId,
-        evs: Seq[CreatedEvent],
+    private def ingestActiveContracts(
+        contracts: Seq[ActiveContract],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
-      assert(!offsets.contains(domain), "state was not switched to update ingestion yet")
+      assert(offset.isEmpty, "state was not switched to update ingestion yet")
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
       var numFilteredCreatedEvents = 0
       val ingestedCreatedEvents = Seq.newBuilder[CreatedEvent]
       val addedContractLocations = Seq.newBuilder[ContractLocation]
-      val stNew = evs.foldLeft(this)((st, ev) =>
+      val stNew = contracts.foldLeft(this)((st, contract) => {
+        val ev = contract.createdEvent
         if (p(ev)) {
           val (stNew, summary) = st.ingestCreatedEvent(
             ev,
-            ContractLocation(new ContractId(ev.getContractId), domain),
+            ContractLocation(new ContractId(ev.getContractId), contract.domainId),
           )
           summary match {
             case CreatedEventSummary.SkippedTombstone =>
@@ -969,7 +865,7 @@ object InMemoryMultiDomainAcsStore {
           numFilteredCreatedEvents += 1
           st
         }
-      )
+      })
       (
         stNew,
         IngestionSummary
@@ -1019,14 +915,10 @@ object InMemoryMultiDomainAcsStore {
             st
           }
         })
-        .copy(
-          bootstrapTransferOutIds = bootstrapTransferOutIds ++ addedTransferOuts.result().map(_._2)
-        )
       (
         stNew,
         summary.copy(
           addedTransferOutEvents = addedTransferOuts.result(),
-          addedBootstrapTransferOutIds = addedTransferOuts.result(),
           removedTransferInEvents = removedTransferIns.result(),
           removedArchivedTombstones = removedArchivedTombstones.result(),
         ),
@@ -1150,15 +1042,11 @@ object InMemoryMultiDomainAcsStore {
                   addedTransferInEvents = Seq((cid, tfid))
                 )
               case TransferInEventSummary.RemovedTransferOut(
-                    removedTombstone,
-                    removedBootstrapTransferOut,
+                    removedTombstone
                   ) =>
                 summary.copy(
                   removedArchivedTombstones = if (removedTombstone) Seq(cid) else Seq.empty,
                   removedTransferOutEvents = Seq((cid, tfid)),
-                  removedBootstrapTransferOutIds =
-                    if (removedBootstrapTransferOut) Seq((cid, tfid))
-                    else Seq.empty,
                 )
             }
             (
@@ -1215,12 +1103,10 @@ object InMemoryMultiDomainAcsStore {
               pendingTransfersById = newPendingTransfersById,
               archivedTombstones =
                 if (removeTombstone) archivedTombstones - cid else archivedTombstones,
-              bootstrapTransferOutIds = bootstrapTransferOutIds - transferId,
             ),
             createSummary,
             TransferInEventSummary.RemovedTransferOut(
-              removedTombstone = removeTombstone,
-              removedBootstrapTransferOut = bootstrapTransferOutIds.contains(transferId),
+              removedTombstone = removeTombstone
             ),
           )
       }
@@ -1294,17 +1180,13 @@ object InMemoryMultiDomainAcsStore {
       * offset has already been requested, don't change the state.
       */
     def addOffsetToSignal(
-        domainId: DomainId,
-        offset: OffsetSignal,
+        offset: String
     ): (State[TXI, TXE], Future[Unit]) = {
-      val perDomainOffsets =
-        offsetIngestionsToSignal.getOrElse(domainId, SortedMap.empty[OffsetSignal, Promise[Unit]])
-      perDomainOffsets.get(offset) match {
+      offsetIngestionsToSignal.get(offset) match {
         case None =>
           val p = Promise[Unit]()
           val newSt: State[TXI, TXE] = copy(
-            offsetIngestionsToSignal =
-              offsetIngestionsToSignal + (domainId -> (perDomainOffsets + (offset -> p)))
+            offsetIngestionsToSignal = offsetIngestionsToSignal + (offset -> p)
           )
           (newSt, p.future)
         case Some(existingP) => (this, existingP.future)
@@ -1337,14 +1219,12 @@ object InMemoryMultiDomainAcsStore {
   private sealed abstract class TransferInEventSummary extends Product with Serializable
   private object TransferInEventSummary {
     case object AddedTransferIn extends TransferInEventSummary
-    case class RemovedTransferOut(removedTombstone: Boolean, removedBootstrapTransferOut: Boolean)
-        extends TransferInEventSummary
+    case class RemovedTransferOut(removedTombstone: Boolean) extends TransferInEventSummary
   }
 
   private case class IngestionSummary[TXE <: TxLogStore.Entry[_]](
       txId: Option[String],
       offset: Option[String],
-      domain: Option[DomainId],
       newAcsSize: Int,
       ingestedCreatedEvents: Seq[CreatedEvent],
       numFilteredCreatedEvents: Int,
@@ -1358,8 +1238,6 @@ object InMemoryMultiDomainAcsStore {
       addedTransferOutEvents: Seq[(ContractId[_], TransferId)],
       numFilteredTransferOutEvents: Int,
       removedTransferOutEvents: Seq[(ContractId[_], TransferId)],
-      addedBootstrapTransferOutIds: Seq[(ContractId[_], TransferId)],
-      removedBootstrapTransferOutIds: Seq[(ContractId[_], TransferId)],
       addedArchivedTombstones: Seq[ContractId[_]],
       removedArchivedTombstones: Seq[ContractId[_]],
       ingestedTxLogEntries: Seq[TXE],
@@ -1389,7 +1267,6 @@ object InMemoryMultiDomainAcsStore {
         "", // intentionally left empty, as that worked better in the log messages above
         paramIfDefined("txId", _.txId.map(_.unquoted)),
         paramIfDefined("offset", _.offset.map(_.unquoted)),
-        paramIfDefined("domain", _.domain),
         param("newAcsSize", _.newAcsSize),
         paramIfNonEmpty("ingestedCreatedEvents", _.ingestedCreatedEvents),
         paramIfNonZero("numFilteredCreatedEvents", _.numFilteredCreatedEvents),
@@ -1403,11 +1280,6 @@ object InMemoryMultiDomainAcsStore {
         paramIfNonEmpty("addedTransferOutEvents", _.addedTransferOutEvents),
         paramIfNonZero("numFilteredTransferOutEvents", _.numFilteredTransferOutEvents),
         paramIfNonEmpty("removedTransferOutEvents", _.removedTransferOutEvents),
-        paramIfNonEmpty("addedBootstrapTransferOutEvents", _.addedBootstrapTransferOutIds),
-        paramIfNonEmpty(
-          "removedBootstrapTransferOutEvents",
-          _.removedBootstrapTransferOutIds,
-        ),
         paramIfNonEmpty("addedArchivedTombstones", _.addedArchivedTombstones),
         paramIfNonEmpty("removedArchivedTombstones", _.removedArchivedTombstones),
         paramIfNonEmpty(
@@ -1422,7 +1294,6 @@ object InMemoryMultiDomainAcsStore {
     def empty[TXE <: TxLogStore.Entry[_]]: IngestionSummary[TXE] = IngestionSummary(
       txId = None,
       offset = None,
-      domain = None,
       newAcsSize = 0,
       ingestedCreatedEvents = Seq.empty,
       numFilteredCreatedEvents = 0,
@@ -1436,8 +1307,6 @@ object InMemoryMultiDomainAcsStore {
       addedTransferOutEvents = Seq.empty,
       numFilteredTransferOutEvents = 0,
       removedTransferOutEvents = Seq.empty,
-      addedBootstrapTransferOutIds = Seq.empty,
-      removedBootstrapTransferOutIds = Seq.empty,
       addedArchivedTombstones = Seq.empty,
       removedArchivedTombstones = Seq.empty,
       ingestedTxLogEntries = Seq.empty,

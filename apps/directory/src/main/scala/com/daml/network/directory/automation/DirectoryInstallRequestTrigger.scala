@@ -65,7 +65,7 @@ class DirectoryInstallRequestTrigger(
             .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq, domainId)
             .map(_ => TaskSuccess("rejected request for already existing installation."))
 
-        case result @ QueryResult(_, None) =>
+        case QueryResult(offset, None) =>
           val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
             store.svcParty.toProtoPrimitive,
             entryFee.bigDecimal,
@@ -83,7 +83,7 @@ class DirectoryInstallRequestTrigger(
                 "com.daml.network.directory.createDirectoryInstall",
                 Seq(provider, user),
               ),
-              deduplicationOffset = result.deduplicationOffset,
+              deduplicationOffset = offset,
               domainId = domainId,
             )
             .map(_ => TaskSuccess("accepted install request."))
