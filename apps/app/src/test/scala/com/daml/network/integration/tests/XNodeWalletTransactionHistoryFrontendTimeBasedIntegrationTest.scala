@@ -10,7 +10,7 @@ import org.scalatest.OptionValues
 
 import java.time.Duration
 
-class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
+class XNodeWalletTransactionHistoryFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "sv1")
     with WalletTestUtil
     with WalletTxLogTestUtil
@@ -23,7 +23,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withCoinPrice(coinPrice)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)

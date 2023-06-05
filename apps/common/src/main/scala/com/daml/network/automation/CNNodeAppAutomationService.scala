@@ -55,7 +55,17 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
     new DomainIngestionService(
       store.domains.ingestionSink,
       connection,
-      triggerContext,
+      // We want to always poll periodically and quickly even in simtime mode so we overwrite
+      // the polling interval and the clock.
+      triggerContext.copy(
+        config = triggerContext.config.copy(
+          pollingInterval = NonNegativeFiniteDuration.ofSeconds(1)
+        ),
+        clock = new WallClock(
+          triggerContext.timeouts,
+          triggerContext.loggerFactory,
+        ),
+      ),
     )
   )
 

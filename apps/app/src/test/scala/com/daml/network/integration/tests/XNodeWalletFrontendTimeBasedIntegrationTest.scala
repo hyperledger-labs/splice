@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -14,7 +15,7 @@ import org.openqa.selenium.StaleElementReferenceException
 
 import java.time.Duration
 
-class WalletFrontendTimeBasedIntegrationTest
+class XNodeWalletFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
@@ -25,8 +26,9 @@ class WalletFrontendTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
       .withCoinPrice(coinPrice)
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
 
   "A wallet UI" should {
 
