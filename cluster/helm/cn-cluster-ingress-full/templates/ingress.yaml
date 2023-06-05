@@ -13,19 +13,19 @@ spec:
   - name: https
     port: 443
     protocol: TCP
-  - name: cd-pub-api
+  - name: grpc-cd-pub-api
     port: 5008
     protocol: TCP
-  - name: cd-adm-api
+  - name: grpc-cd-adm-api
     port: 5009
     protocol: TCP
   - name: cd-metrics
     port: 10313
     protocol: TCP
-  - name: svcp-adm-api
+  - name: grpc-svcp-adm
     port: 5002
     protocol: TCP
-  - name: svcp-lg-api
+  - name: grpc-svcp-lg
     port: 5001
     protocol: TCP
   - name: svcp-metrics
@@ -34,16 +34,16 @@ spec:
   - name: dir-api
     port: 5010
     protocol: TCP
-  - name: svc-app-adm-api
+  - name: grpc-svc-adm
     port: 5005
     protocol: TCP
   - name: scan-api
     port: 5012
     protocol: TCP
-  - name: val1-adm-api
+  - name: grpc-val1-adm
     port: 5102
     protocol: TCP
-  - name: val1-lg-api
+  - name: grpc-val1-lg
     port: 5101
     protocol: TCP
   - name: val1-metrics
@@ -55,19 +55,19 @@ spec:
   - name: val1-lg-api-gw
     port: 6101
     protocol: TCP
-  - name: swd-pub-api
+  - name: grpc-swd-pub
     port: 5108
     protocol: TCP
-  - name: swd-adm-api
+  - name: grpc-swd-adm
     port: 5109
     protocol: TCP
   - name: swd-metrics
     port: 10413
     protocol: TCP
-  - name: sw-adm-api
+  - name: grpc-sw-adm
     port: 5202
     protocol: TCP
-  - name: sw-lg-api
+  - name: grpc-sw-lg
     port: 5201
     protocol: TCP
   - name: sw-metrics
@@ -76,7 +76,7 @@ spec:
   - name: sw-lg-api-gw
     port: 6201
     protocol: TCP
-  - name: sw-api
+  - name: grpc-sw-api
     port: 5213
     protocol: TCP
   - name: sw-api-gw
@@ -123,19 +123,19 @@ spec:
           name: https
           protocol: TCP
         - containerPort: 5008
-          name: cd-pub-api
+          name: grpc-cd-pub-api
           protocol: TCP
         - containerPort: 5009
-          name: cd-adm-api
+          name: grpc-cd-adm-api
           protocol: TCP
         - containerPort: 10313
           name: cd-metrics
           protocol: TCP
         - containerPort: 5002
-          name: svcp-adm-api
+          name: grpc-svcp-adm
           protocol: TCP
         - containerPort: 5001
-          name: svcp-lg-api
+          name: grpc-svcp-lg
           protocol: TCP
         - containerPort: 10013
           name: svcp-metrics
@@ -144,16 +144,16 @@ spec:
           name: dir-api
           protocol: TCP
         - containerPort: 5005
-          name: svc-app-adm-api
+          name: grpc-svc-adm
           protocol: TCP
         - containerPort: 5012
           name: scan-api
           protocol: TCP
         - containerPort: 5102
-          name: val1-adm-api
+          name: grpc-val1-adm
           protocol: TCP
         - containerPort: 5101
-          name: val1-lg-api
+          name: grpc-val1-lg
           protocol: TCP
         - containerPort: 10113
           name: val1-metrics
@@ -162,10 +162,10 @@ spec:
           name: val1-lg-api-gw
           protocol: TCP
         - containerPort: 5108
-          name: swd-pub-api
+          name: grpc-swd-pub
           protocol: TCP
         - containerPort: 5109
-          name: swd-adm-api
+          name: grpc-swd-adm
           protocol: TCP
         - containerPort: 10413
           name: swd-metrics

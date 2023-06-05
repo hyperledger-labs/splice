@@ -1343,7 +1343,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb"]
       channel_notify:
         type: string
         # #team-canton-network-internal
@@ -2130,6 +2130,15 @@ workflows:
            - deployment_test
            - docker_images_push
            - wait_for_previous_pipeline
+    - deploy_sv_runbook:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "stagingb"
+        requires:
+          - deploy_cluster_pulumi
     - preflight_check:
         cluster: stagingb
         <<: *main-branch-only
@@ -2137,11 +2146,28 @@ workflows:
           - artifactory
           - canton-network-vpn
           - datadog
-          - slack-context
+          # TODO(#5417) - Re-enable slack notifications
+          # Temporarily remove to avoid notifications for preflights
+          # we suspect will fail.
+          # - slack-context
         requires:
           - deployment_test
           - docker_images_push
           - deploy_cluster_pulumi
+          - deploy_sv_runbook
+    - preflight_sv_check:
+        <<: *main-branch-only
+        cluster: "stagingb"
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          # TODO(#5417) - Re-enable slack notifications
+          # Temporarily remove to avoid notifications for preflights
+          # we suspect will fail.
+          # - slack-context
+        requires:
+          - deploy_sv_runbook
 
   deploy_devnet:
     when:
