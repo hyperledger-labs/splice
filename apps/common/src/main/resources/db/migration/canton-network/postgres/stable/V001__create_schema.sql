@@ -62,8 +62,8 @@ create index acs_store_template_sid_cid
 create index acs_store_template_sid_tid_en
     on acs_store_template (store_id, template_id, event_number);
 
-create index acs_store_template_sid_ce
-    on acs_store_template (store_id, contract_expires_at)
+create index acs_store_template_sid_tid_ce
+    on acs_store_template (store_id, template_id, contract_expires_at)
     where contract_expires_at is not null;
 
 
