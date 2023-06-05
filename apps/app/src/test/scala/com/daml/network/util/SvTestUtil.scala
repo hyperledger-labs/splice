@@ -30,7 +30,7 @@ trait SvTestUtil extends CNNodeTestCommon {
       svName: String,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val nextMiningRound = clue("Getting next open round") {
-      val (openRounds, _) = scan.getOpenAndIssuingMiningRounds()
+      val (openRounds, _) = sv1Scan.getOpenAndIssuingMiningRounds()
       new Round(openRounds.map(_.payload.round.number).max + 1)
     }
     actAndCheck(

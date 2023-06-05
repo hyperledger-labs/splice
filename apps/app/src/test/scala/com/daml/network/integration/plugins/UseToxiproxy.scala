@@ -98,13 +98,15 @@ case class UseToxiproxy(
     val scanLedgerApiConf =
       if (createScanLedgerApiProxy)
         scanAppConf
-          .focus(_.scanApp)
+          .focus(_.scanApps)
           .modify(
-            _.map(c =>
-              c.copy(
-                participantClient = addLedgerApiProxy("scan-app", c.participantClient, 0)
-              )
-            )
+            _.toSeq
+              .sortBy(_._1.unwrap)
+              .zipWithIndex // for adapting the port bump
+              .map { case ((n, c), i) =>
+                (n, c.copy(participantClient = addLedgerApiProxy(n.unwrap, c.participantClient, i)))
+              }
+              .toMap
           )
       else scanAppConf
 
@@ -138,5 +140,4 @@ case class UseToxiproxy(
 object UseToxiproxy {
   def ledgerApiProxyName(forInstance: String): String = s"$forInstance-ledger-api"
   def scanHttpApiProxyName(forInstance: String): String = s"$forInstance-scan-api"
-  lazy val scanLedgerApiProxyName = "scan-app-ledger-api"
 }

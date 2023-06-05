@@ -63,7 +63,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
         clue("wait for the system to quiet down after a round change") {
           eventually() {
             svc.participantClient.ledger_api_extensions.acs
-              .filterJava(SvcReward.COMPANION)(scan.getSvcPartyId()) shouldBe empty
+              .filterJava(SvcReward.COMPANION)(sv1Scan.getSvcPartyId()) shouldBe empty
           }
           // We additionally sleep 1.5s to give some extra time for activity to quiesce.
           Threading.sleep(1500)
@@ -194,9 +194,9 @@ trait TimeTestUtil extends CNNodeTestCommon {
       outputs: Seq[v1.coin.TransferOutput],
       domainId: Option[DomainId] = None,
   )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment) = {
-    val coinRules = scan.getCoinRules()
-    val transferContext = scan.getUnfeaturedAppTransferContext(getLedgerTime)
-    val openRound = scan.getLatestOpenMiningRound(getLedgerTime)
+    val coinRules = sv1Scan.getCoinRules()
+    val transferContext = sv1Scan.getUnfeaturedAppTransferContext(getLedgerTime)
+    val openRound = sv1Scan.getLatestOpenMiningRound(getLedgerTime)
 
     val authorizers =
       Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
@@ -256,7 +256,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   def advanceTimeAndWaitForRoundAutomation(
       duration: Duration
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val (previousOpenRounds, previousIssuingRounds) = scan.getOpenAndIssuingMiningRounds()
+    val (previousOpenRounds, previousIssuingRounds) = sv1Scan.getOpenAndIssuingMiningRounds()
     val Seq(lowestOpen, middleOpen, highestOpen) = previousOpenRounds.map(_.payload.round.number)
 
     // not exactly 150s because of the skew parameter.
@@ -266,7 +266,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
         eventually() {
 
           val (newOpenRounds, newIssuingRounds) =
-            scan.getOpenAndIssuingMiningRounds()
+            sv1Scan.getOpenAndIssuingMiningRounds()
 
           val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) =
             newOpenRounds.map(_.payload.round.number)
@@ -306,7 +306,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
     */
   def advanceTimeToRoundOpen(implicit env: CNNodeTestConsoleEnvironment) = {
     val now = svc.participantClient.ledger_api.time.get().toInstant
-    val (openRounds, _) = scan.getOpenAndIssuingMiningRounds()
+    val (openRounds, _) = sv1Scan.getOpenAndIssuingMiningRounds()
     val earliestOpen = openRounds
       .filter(round => now.isBefore(round.payload.targetClosesAt))
       .map(_.payload.opensAt)
@@ -336,7 +336,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   ) = {
     val now = sv1.participantClient.ledger_api.time.get()
     val validatorTopupParameters = ExtraTrafficTopupParameters(
-      scan.getCoinConfigAsOf(now).globalDomain.fees,
+      sv1Scan.getCoinConfigAsOf(now).globalDomain.fees,
       validatorAppRef.config.domains.global.buyExtraTraffic,
       validatorAppRef.config.automation.pollingInterval,
     )

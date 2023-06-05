@@ -43,7 +43,7 @@ class XNodeDomainFeesTimeBasedConnectivityIntegrationTest
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
         clue("Disconnect scan app from the ledger")(
-          toxiproxy.disableConnectionViaProxy(UseToxiproxy.scanLedgerApiProxyName)
+          toxiproxy.disableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1Scan.name))
         ),
         entries => {
           // Check that the scan app's ledger connection is disabled
@@ -54,7 +54,7 @@ class XNodeDomainFeesTimeBasedConnectivityIntegrationTest
       )
 
       clue("Verify that the scan app API is still up")(
-        scan
+        sv1Scan
           .getValidatorTrafficBalance(aliceValidator.getValidatorPartyId())
           .totalPurchased shouldBe 0
       )

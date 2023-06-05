@@ -29,8 +29,8 @@ class XNodeScanIntegrationTest
       )
 
   "restart cleanly" in { implicit env =>
-    scan.stop()
-    scan.startSync()
+    sv1Scan.stop()
+    sv1Scan.startSync()
   }
 
   "list total coin balances" in { implicit env =>
@@ -38,7 +38,7 @@ class XNodeScanIntegrationTest
     aliceWallet.tap(100.0)
     bobWallet.tap(150.0)
     eventually() {
-      val balances = scan.getTotalCoinBalance()
+      val balances = sv1Scan.getTotalCoinBalance()
       balances.totalUnlocked should be(250.0)
       balances.totalLocked should be(0.0)
     }
@@ -82,7 +82,7 @@ class XNodeScanIntegrationTest
       }
     }
     eventually() {
-      val balances = scan.getTotalCoinBalance()
+      val balances = sv1Scan.getTotalCoinBalance()
       assertInRange(balances.totalUnlocked, (239.5, 240.0))
       assertInRange(balances.totalLocked, (10.0, 10.5))
     }

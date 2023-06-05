@@ -29,9 +29,10 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
           c.copy(enableCoinRulesUpgrade = true)
         )(config)
       )
-      // Upgrade scan to support exposing both coinRules versions
+      // Upgrade all other scan app to support exposing both coinRules versions
       .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateScanAppConfig(_.copy(enableCoinRulesUpgrade = true))(config)
+        CNNodeConfigTransforms
+          .updateAllScanAppConfigs_(_.copy(enableCoinRulesUpgrade = true))(config)
       )
       // Upgrade validators for Alice, Bob and Splitwell Provider
       .addConfigTransform((_, config) =>
@@ -50,8 +51,8 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
 
   "App transfers through upgraded coinRules" in { implicit env =>
     clue("Query both coinRules from scan") {
-      scan.getCoinRules()
-      scan.getCoinRulesV1Test()
+      sv1Scan.getCoinRules()
+      sv1Scan.getCoinRulesV1Test()
     }
 
     val (alice, bob, _, splitwellProvider, key, _) = initSplitwellTest()

@@ -57,8 +57,8 @@ case class CNNodeConfig(
     svcAppClient: Option[SvcAppClientConfig] = None,
     svApps: Map[InstanceName, SvAppBackendConfig] = Map.empty,
     svAppClients: Map[InstanceName, SvAppClientConfig] = Map.empty,
-    scanApp: Option[ScanAppBackendConfig] = None,
-    ScanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
+    scanApps: Map[InstanceName, ScanAppBackendConfig] = Map.empty,
+    scanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
     directoryApp: Option[DirectoryAppBackendConfig] = None,
     directoryAppClients: Map[InstanceName, DirectoryAppClientConfig] = Map.empty,
@@ -209,12 +209,6 @@ case class CNNodeConfig(
     n.unwrap -> c
   }
 
-  // The config contains one optional unnamed Scan app (because in M1, there can only be one)
-  // Since the rest of the code generally expects a map of nodes, we'll create one.
-  private lazy val scanAppName = "scan-app"
-  private lazy val scanApps =
-    scanApp.toList.map(config => InstanceName.tryCreate(scanAppName) -> config).toMap
-
   private lazy val scanAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     scanApps.fmap { scanConfig =>
       SharedCNNodeAppParameters(
@@ -239,7 +233,7 @@ case class CNNodeConfig(
   private[network] def scanAppParameters(
       appName: InstanceName
   ): SharedCNNodeAppParameters =
-    nodeParametersFor(scanAppParameters_, scanAppName, appName)
+    nodeParametersFor(scanAppParameters_, "scan-app", appName)
 
   /** Use `scanAppParameters` instead!
     */

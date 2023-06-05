@@ -69,7 +69,7 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorParty,
         aliceWallet.list().coins,
         25,
-        scan,
+        sv1Scan,
         Duration.ofDays(10),
       )
 
@@ -123,7 +123,7 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorParty,
         aliceWallet.list().coins,
         lockedQty,
-        scan,
+        sv1Scan,
         Duration.ofDays(10),
       )
 
@@ -338,7 +338,7 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorParty,
         aliceWallet.list().coins,
         0.000005,
-        scan,
+        sv1Scan,
         Duration.ofMinutes(1),
       )
 
@@ -518,7 +518,7 @@ class WalletTimeBasedIntegrationTest
         splitwellProviderWallet.cancelFeaturedAppRight(),
       )(
         "Splitwell is no longer featured",
-        _ => scan.lookupFeaturedAppRight(splitwellProviderParty) should be(None),
+        _ => sv1Scan.lookupFeaturedAppRight(splitwellProviderParty) should be(None),
       )
 
       transferAndCheckRewards((0.5, 0.6))

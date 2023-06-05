@@ -473,6 +473,7 @@ class SvApp(
                 Seq.empty,
                 Seq(svStore.key.svcParty),
               )
+              _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for svcParty")
               svcStore = newSvcStore(svStore.key)
               svcAutomation = newSvSvcAutomationService(
                 svStore,

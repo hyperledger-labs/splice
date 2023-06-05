@@ -125,14 +125,14 @@ class CNNodeConsoleEnvironment(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
       svcOpt.toList,
       svs.local.filter(sv => sv.name == "sv1"),
-      scans.local,
+      scans.local.filter(sv => sv.name == "sv1Scan"),
       directories.local,
     ),
     mergeRemoteCNNodeInstances(
       // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
       svcClientOpt.toList,
       svs.remote.filter(sv => sv.name == "sv1"),
-      scans.remote,
+      scans.remote.filter(sv => sv.name == "sv1Scan"),
       directories.remote,
     ),
   )
@@ -168,7 +168,7 @@ class CNNodeConsoleEnvironment(
       : NodeReferences[ScanAppReference, ScanAppClientReference, ScanAppBackendReference] =
     NodeReferences(
       environment.config.scansByString.keys.map(createScanReference).toSeq,
-      environment.config.ScanAppClients.toSeq.map(createRemoteScanReference),
+      environment.config.scanAppClients.toSeq.map(createRemoteScanReference),
     )
 
   lazy val svcOpt: Option[SvcAppBackendReference] =

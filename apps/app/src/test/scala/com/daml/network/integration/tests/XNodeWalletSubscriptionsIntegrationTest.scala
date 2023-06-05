@@ -79,7 +79,7 @@ class XNodeWalletSubscriptionsIntegrationTest
     "allow a user to list and accept subscription requests, " +
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
-        val transferContext = scan.getTransferContextWithInstances(CantonTimestamp.now())
+        val transferContext = sv1Scan.getTransferContextWithInstances(CantonTimestamp.now())
         val appTransferContext = transferContext.toUnfeaturedAppTransferContext()
         val openRound = transferContext.latestOpenMiningRound
         val coinRules = transferContext.coinRules

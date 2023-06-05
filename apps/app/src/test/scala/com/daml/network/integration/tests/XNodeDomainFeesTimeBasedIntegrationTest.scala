@@ -304,9 +304,9 @@ class XNodeDomainFeesTimeBasedIntegrationTest
         clue("Scan reports validator traffic purchases correctly")(
           eventually() {
             advanceTime(tickDurationWithBuffer)
-            val roundOfLatestData = scan.getRoundOfLatestData()._1
+            val roundOfLatestData = sv1Scan.getRoundOfLatestData()._1
             roundOfLatestData should be >= 3L
-            val validatorsByPurchasedTraffic = scan.getTopValidatorsByPurchasedTraffic(
+            val validatorsByPurchasedTraffic = sv1Scan.getTopValidatorsByPurchasedTraffic(
               roundOfLatestData,
               10,
             )
@@ -337,7 +337,7 @@ class XNodeDomainFeesTimeBasedIntegrationTest
 
   "SV automation" should {
     "archive duplicate validator traffic contracts" in { implicit env =>
-      val minTopupAmount = scan.getCoinConfigAsOf(getLedgerTime).globalDomain.fees.minTopupAmount
+      val minTopupAmount = sv1Scan.getCoinConfigAsOf(getLedgerTime).globalDomain.fees.minTopupAmount
       actAndCheck(
         "Purchase initial traffic with varying amounts", {
           buyInitialExtraTraffic(bobValidator, bobValidatorWallet, minTopupAmount)
@@ -362,8 +362,8 @@ class XNodeDomainFeesTimeBasedIntegrationTest
       validatorWallet: WalletAppClientReference,
       amount: Long,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val transferContext = scan.getTransferContextWithInstances(getLedgerTime)
-    val coinRules = scan.getCoinRules()
+    val transferContext = sv1Scan.getTransferContextWithInstances(getLedgerTime)
+    val coinRules = sv1Scan.getCoinRules()
     val coin = validatorWallet.tap(100)
     val update = transferContext.coinRules.contract.contractId.exerciseCoinRules_BuyExtraTraffic(
       Seq[v1.coin.TransferInput](
@@ -383,7 +383,7 @@ class XNodeDomainFeesTimeBasedIntegrationTest
       ),
       validatorApp.getValidatorPartyId().toProtoPrimitive,
       new daTypes.either.Left(
-        scan.getCoinConfigAsOf(getLedgerTime).globalDomain.activeDomain
+        sv1Scan.getCoinConfigAsOf(getLedgerTime).globalDomain.activeDomain
       ),
       amount,
     )
@@ -413,7 +413,7 @@ class XNodeDomainFeesTimeBasedIntegrationTest
 
   private def baseRateLimits(implicit env: CNNodeTestConsoleEnvironment): BaseRateTrafficLimits = {
     val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
-    scan.getCoinConfigAsOf(now).globalDomain.fees.baseRateTrafficLimits
+    sv1Scan.getCoinConfigAsOf(now).globalDomain.fees.baseRateTrafficLimits
   }
 
   private def maxBaseRateTrafficBalance(implicit env: CNNodeTestConsoleEnvironment): BigDecimal = {
@@ -430,14 +430,14 @@ class XNodeDomainFeesTimeBasedIntegrationTest
   private def purchasedTrafficBalance(validatorApp: ValidatorAppBackendReference)(implicit
       env: CNNodeTestConsoleEnvironment
   ) =
-    scan.getValidatorTrafficBalance(validatorApp.getValidatorPartyId()).remainingBalance
+    sv1Scan.getValidatorTrafficBalance(validatorApp.getValidatorPartyId()).remainingBalance
 
   private def getTopupParameters(
       validatorApp: ValidatorAppBackendReference
   )(implicit env: CNNodeTestConsoleEnvironment): ExtraTrafficTopupParameters = {
     val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
     ExtraTrafficTopupParameters(
-      scan.getCoinConfigAsOf(now).globalDomain.fees,
+      sv1Scan.getCoinConfigAsOf(now).globalDomain.fees,
       validatorApp.config.domains.global.buyExtraTraffic,
       validatorApp.config.automation.pollingInterval,
     )

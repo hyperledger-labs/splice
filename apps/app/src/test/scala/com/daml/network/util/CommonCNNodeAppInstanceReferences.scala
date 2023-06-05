@@ -21,7 +21,7 @@ import com.daml.network.console.ValidatorAppClientReference
 // however, this is likely only possible once we depend on Canton as a library
 trait CommonCNNodeAppInstanceReferences {
 
-  def svcParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = scan.getSvcPartyId()
+  def svcParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = sv1Scan.getSvcPartyId()
 
   def svc(implicit env: CNNodeTestConsoleEnvironment): SvcAppBackendReference =
     env.svcOpt.getOrElse(
@@ -48,12 +48,13 @@ trait CommonCNNodeAppInstanceReferences {
 
   def sv1Client(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = svcl("sv1")
 
-  def scan(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference =
-    env.scans.local.headOption.getOrElse(
-      sys.error(
-        "Tried to access the Scan app but it isn't defined in the test's configuration file"
-      )
-    )
+  def sv1Scan(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference = scanb(
+    "sv1Scan"
+  )
+
+  def sv2Scan(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference = scanb(
+    "sv2Scan"
+  )
 
   def aliceWallet(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"
@@ -228,4 +229,11 @@ trait CommonCNNodeAppInstanceReferences {
     env.splitwells.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"remote splitwell [$name] not configured"))
+
+  def scanb(
+      name: String
+  )(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference =
+    env.scans.local
+      .find(_.name == name)
+      .getOrElse(sys.error(s"scan app [$name] not configured"))
 }

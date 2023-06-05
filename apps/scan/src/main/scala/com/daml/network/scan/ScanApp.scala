@@ -9,7 +9,7 @@ import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.admin.http.HttpScanHandler
@@ -52,7 +52,7 @@ class ScanApp(
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
 ) extends CNNode[ScanApp.State](
-      config.svcUser,
+      config.svUser,
       config.participantClient,
       coinAppParameters,
       loggerFactory,
@@ -61,9 +61,13 @@ class ScanApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      svcParty: PartyId,
+      // we don't care this party for now as we will get it from either
+      // primary party of svc User
+      // or readAs party from sv User
+      serviceUserPrimaryParty: PartyId,
   ): Future[ScanApp.State] = {
     for {
+      svcParty <- getSvcParty(ledgerClient.connection(this.getClass.getSimpleName, loggerFactory))
       store <- Future.successful(
         ScanStore(
           svcParty,
@@ -152,6 +156,28 @@ class ScanApp(
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   override lazy val requiredTemplates = Set(coinCodegen.Coin.TEMPLATE_ID)
+
+  private def getSvcParty(connection: CNLedgerConnection) = retryProvider.retryForAutomation(
+    "Querying svcParty from readAs party of sv user",
+    getReadAsParty(connection, config.svUser),
+    logger,
+  )
+
+  private def getReadAsParty(connection: CNLedgerConnection, user: String) =
+    connection
+      .getUserReadAs(user)
+      .map(_.toList match {
+        case List() =>
+          throw Status.FAILED_PRECONDITION
+            .withDescription(s"No readAs party found for user $user")
+            .asRuntimeException()
+        case List(party) =>
+          party
+        case _ =>
+          throw new IllegalArgumentException(
+            "more than 1 readAs party from svUser is not expected"
+          )
+      })
 }
 
 object ScanApp {

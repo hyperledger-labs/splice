@@ -17,6 +17,7 @@ import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSvOn
 import com.daml.network.console.{
   CNNodeAppBackendReference,
   CNParticipantClientReference,
+  ScanAppBackendReference,
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
@@ -86,17 +87,25 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("Starting SVC app and SV1 app") {
       // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
       val nodes =
-        Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1Validator, sv1)
+        Seq(svc: CNNodeAppBackendReference, sv1Scan: CNNodeAppBackendReference, sv1Validator, sv1)
       startAllSync(nodes)
     }
-    def startSv(number: Int, sv: SvAppBackendReference, validator: ValidatorAppBackendReference) =
+    def startSv(
+        number: Int,
+        sv: SvAppBackendReference,
+        validator: ValidatorAppBackendReference,
+        scanApp: Option[ScanAppBackendReference] = None,
+    ) =
       clue(s"Starting SV$number app") {
         validator.start()
         sv.start()
+        scanApp.foreach(_.start())
         validator.waitForInitialization()
         sv.waitForInitialization()
+        scanApp.foreach(_.waitForInitialization())
       }
-    startSv(2, sv2, sv2Validator)
+
+    startSv(2, sv2, sv2Validator, Some(sv2Scan))
     startSv(3, sv3, sv3Validator)
     startSv(4, sv4, sv4Validator)
   }
@@ -116,6 +125,8 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("initial open mining rounds are created") {
       eventually() {
         sv1.listOpenMiningRounds() should have size 3
+        sv1Scan.getOpenAndIssuingMiningRounds()._1 should have size 3
+        sv2Scan.getOpenAndIssuingMiningRounds()._1 should have size 3
       }
     }
   }
@@ -405,7 +416,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     clue("Initialize SVC with 3 SVs") {
       val nodes = Seq(
         svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
+        sv1Scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -549,7 +560,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     implicit env =>
       // only 1 SV => slightly faster test
       clue("Initialize SVC with 1 SV") {
-        val nodes = Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1)
+        val nodes = Seq(svc: CNNodeAppBackendReference, sv1Scan: CNNodeAppBackendReference, sv1)
         startAllSync(nodes)
         sv1.getSvcInfo().svcRules.payload.members should have size 1
       }
@@ -606,7 +617,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       clue("Initialize SVC with 3 SVs") {
         val nodes = Seq(
           svc: CNNodeAppBackendReference,
-          scan: CNNodeAppBackendReference,
+          sv1Scan: CNNodeAppBackendReference,
           sv1,
           sv2,
           sv3,
@@ -720,7 +731,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     implicit env =>
       clue("Starting SVC app and SV1 app") {
         // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
-        val nodes = Seq(svc: CNNodeAppBackendReference, scan: CNNodeAppBackendReference, sv1)
+        val nodes = Seq(svc: CNNodeAppBackendReference, sv1Scan: CNNodeAppBackendReference, sv1)
         startAllSync(nodes)
       }
 

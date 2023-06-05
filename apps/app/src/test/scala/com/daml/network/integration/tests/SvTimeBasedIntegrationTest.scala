@@ -272,7 +272,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     val nodes = Seq(aliceValidator, bobValidator)
     startAllSync(nodes)
 
-    val round = scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
+    val round = sv1Scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
     // There may be rewards left over from other tests, so we first check the
     // contract IDs of existing ones, and compare to that below
     val leftoverRewardIds = getRewardCoupons(round).view.map(_.id).toSet
@@ -307,7 +307,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
       _ => {
         advanceTimeByPollingInterval(sv1)
         getRewardCoupons(round) shouldBe empty
-        scan
+        sv1Scan
           .getClosedRounds()
           .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
       },
@@ -318,7 +318,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     clue("Initialize SVC with 3 SVs") {
       val nodes = Seq(
         svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
+        sv1Scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -360,7 +360,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     clue("Initialize SVC with 3 SVs") {
       val nodes = Seq(
         svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
+        sv1Scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -449,7 +449,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     clue("Initialize SVC with 4 SVs") {
       val nodes = Seq(
         svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
+        sv1Scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,
@@ -533,7 +533,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     val svcRulesBeforeElection = clue("Initialize SVC with 4 SVs") {
       val nodes = Seq(
         svc: CNNodeAppBackendReference,
-        scan: CNNodeAppBackendReference,
+        sv1Scan: CNNodeAppBackendReference,
         sv1,
         sv2,
         sv3,

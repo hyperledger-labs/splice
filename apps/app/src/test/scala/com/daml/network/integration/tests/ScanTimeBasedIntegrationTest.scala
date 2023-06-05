@@ -36,10 +36,10 @@ class ScanTimeBasedIntegrationTest
       .withoutAutomaticRewardsCollectionAndCoinMerging
 
   "report correct reference data" in { implicit env =>
-    scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number shouldBe 1
+    sv1Scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number shouldBe 1
 
     advanceRoundsByOneTick
-    scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number shouldBe 2
+    sv1Scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number shouldBe 2
   }
 
   "return correct coin configs" in { implicit env =>
@@ -52,7 +52,7 @@ class ScanTimeBasedIntegrationTest
 
     clue("Get config for round 3") {
       val cfg = eventuallySucceeds() {
-        scan.getCoinConfigForRound(3)
+        sv1Scan.getCoinConfigForRound(3)
       }
       cfg.coinCreateFee.bigDecimal.setScale(10) should be(
         CNNodeUtil.defaultCreateFee.fee.setScale(10)
@@ -75,14 +75,14 @@ class ScanTimeBasedIntegrationTest
 
     clue("Try to get config for round 4 which does not yet exist") {
       assertThrowsAndLogsCommandFailures(
-        scan.getCoinConfigForRound(4),
+        sv1Scan.getCoinConfigForRound(4),
         _.errorMessage should include("Round 4 not found"),
       )
     }
 
     val newHoldingFee = 0.1
     clue("schedule a config change, and advance time for it to take effect") {
-      val currentConfigSchedule = scan.getCoinRules().contract.payload.configSchedule
+      val currentConfigSchedule = sv1Scan.getCoinRules().contract.payload.configSchedule
       val configSchedule =
         createConfigSchedule(
           currentConfigSchedule,
@@ -100,7 +100,7 @@ class ScanTimeBasedIntegrationTest
     }
     clue("Round 4 should now be open, and have the new configuration") {
       eventuallySucceeds() {
-        scan.getCoinConfigForRound(4).holdingFee should be(newHoldingFee)
+        sv1Scan.getCoinConfigForRound(4).holdingFee should be(newHoldingFee)
       }
     }
   }
@@ -139,7 +139,7 @@ class ScanTimeBasedIntegrationTest
     })
     clue("No aggregate round data should be available yet")({
       assertThrowsAndLogsCommandFailures(
-        scan.getRoundOfLatestData(),
+        sv1Scan.getRoundOfLatestData(),
         _.errorMessage should include("No data has been made available yet"),
       )
     })
@@ -149,7 +149,7 @@ class ScanTimeBasedIntegrationTest
         val ledgerTime = getLedgerTime.toInstant
         advanceTime(Duration.ofMillis(1))
         eventuallySucceeds() {
-          scan.getRoundOfLatestData() should be(
+          sv1Scan.getRoundOfLatestData() should be(
             (0, ledgerTime)
           )
         }
@@ -162,11 +162,11 @@ class ScanTimeBasedIntegrationTest
 
     clue("Data for a later round does not yet exist")({
       assertThrowsAndLogsCommandFailures(
-        scan.getTopProvidersByAppRewards(4, 10),
+        sv1Scan.getTopProvidersByAppRewards(4, 10),
         _.errorMessage should include("Data for round 4 not yet computed"),
       )
       assertThrowsAndLogsCommandFailures(
-        scan.getTopValidatorsByValidatorRewards(4, 10),
+        sv1Scan.getTopValidatorsByValidatorRewards(4, 10),
         _.errorMessage should include("Data for round 4 not yet computed"),
       )
     })
@@ -188,35 +188,35 @@ class ScanTimeBasedIntegrationTest
         val ledgerTime = getLedgerTime.toInstant
         advanceTime(Duration.ofMillis(1))
         eventually() {
-          scan.getRoundOfLatestData() should be(
+          sv1Scan.getRoundOfLatestData() should be(
             (5, ledgerTime)
           )
         }
 
         // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
         compareLeaderboard(
-          scan.getTopProvidersByAppRewards(4, 10),
+          sv1Scan.getTopProvidersByAppRewards(4, 10),
           Seq(
             (bobValidatorWallet, BigDecimal(0.6180000000)),
             (aliceValidatorWallet, BigDecimal(0.2580000000)),
           ),
         )
         compareLeaderboard(
-          scan.getTopValidatorsByValidatorRewards(4, 10),
+          sv1Scan.getTopValidatorsByValidatorRewards(4, 10),
           Seq(
             (bobValidatorWallet, BigDecimal(0.2060000000)),
             (aliceValidatorWallet, BigDecimal(0.0860000000)),
           ),
         )
         compareLeaderboard(
-          scan.getTopProvidersByAppRewards(5, 10),
+          sv1Scan.getTopProvidersByAppRewards(5, 10),
           Seq(
             (aliceValidatorWallet, BigDecimal(44.2580000000)),
             (bobValidatorWallet, BigDecimal(1.2366000000)),
           ),
         )
         compareLeaderboard(
-          scan.getTopValidatorsByValidatorRewards(5, 10),
+          sv1Scan.getTopValidatorsByValidatorRewards(5, 10),
           Seq(
             (bobValidatorWallet, BigDecimal(0.4122000000)),
             (aliceValidatorWallet, BigDecimal(0.1740000000)),

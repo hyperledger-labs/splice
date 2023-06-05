@@ -35,9 +35,7 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
     config.directoryApp.foreach(directory =>
       waitForPort(InstanceName.tryCreate("Directory"), directory.adminApi.port.unwrap)
     )
-    config.scanApp.foreach(scan =>
-      waitForPort(InstanceName.tryCreate("Scan"), scan.adminApi.port.unwrap)
-    )
+    config.scanApps.foreach(scan => waitForPort(scan._1, scan._2.adminApi.port.unwrap))
     extraPortsToWaitFor.foreach(p => waitForPort(InstanceName.tryCreate(p._1), p._2))
     config
   }

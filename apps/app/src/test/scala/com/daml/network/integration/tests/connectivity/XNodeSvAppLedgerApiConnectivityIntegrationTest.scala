@@ -26,7 +26,7 @@ class XNodeSvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTe
     implicit env =>
       svc.startSync()
       sv1.startSync()
-      scan.startSync()
+      sv1Scan.startSync()
 
       clue("svc app should report as active")(svc.health.active shouldBe true)
 

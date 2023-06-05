@@ -31,7 +31,7 @@ class XNodeLocalRunbookIntegrationTest
   val svcDomainPath: File = svNodePath / "canton-domain"
   val svcAppPath: File = svNodePath / "svc-app"
   val svAppsPath: File = svNodePath / "sv-apps"
-  val scanAppPath: File = svNodePath / "scan-app"
+  val scanAppPath: File = svNodePath / "scan-apps"
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
     ("ParticipantLedgerApi", 7001),

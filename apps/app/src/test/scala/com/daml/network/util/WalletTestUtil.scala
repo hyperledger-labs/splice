@@ -238,7 +238,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
@@ -264,7 +264,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
@@ -289,7 +289,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ) = {
     val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands
@@ -316,7 +316,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
@@ -343,7 +343,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
@@ -368,7 +368,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
@@ -471,7 +471,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       description: String = "description",
   )(implicit env: CNNodeTestConsoleEnvironment): testWalletCodegen.TestDeliveryOffer.ContractId = {
     val deliveryOffer = new testWalletCodegen.TestDeliveryOffer(
-      scan.getSvcPartyId().toProtoPrimitive,
+      sv1Scan.getSvcPartyId().toProtoPrimitive,
       userParty.toProtoPrimitive,
       description,
     )
@@ -609,7 +609,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ): testSubsCodegen.TestSubscriptionContext.ContractId = {
     val context = new testSubsCodegen.TestSubscriptionContext(
-      scan.getSvcPartyId().toProtoPrimitive,
+      sv1Scan.getSvcPartyId().toProtoPrimitive,
       userParty.toProtoPrimitive,
       serviceParty.toProtoPrimitive,
       description,
@@ -832,7 +832,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       _ => {
         // Featured app rights are looked up either through scan (for 3rd party app transfers), and in the wallet
         // store (to attach to wallet batch operations). We therefore wait for both to be ingested here.
-        scan.lookupFeaturedAppRight(party).value
+        sv1Scan.lookupFeaturedAppRight(party).value
         wallet.userStatus().hasFeaturedAppRight shouldBe true
       },
     )
@@ -848,7 +848,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
-    val tc = scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now)
 
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = aliceWallet.config.ledgerApiUser,
@@ -928,7 +928,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) = {
-    val issuanceConfig = scan
+    val issuanceConfig = sv1Scan
       .getOpenAndIssuingMiningRounds()
       ._2
       .lastOption

@@ -66,17 +66,17 @@ class ScanTimeBasedIntegrationTestWithAutomation
 
     // This is the round where the rewards for the first transfer are collected.
     val rewardCollectionRoundForFirstTransfer =
-      scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number
+      sv1Scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number
 
     val rewardsCollectedForFirstTransfer =
       clue("correct rewards are returned for the round and for the total") {
         eventually() {
-          val rewardsCollectedForFirstTransfer = scan.getRewardsCollectedInRound(
+          val rewardsCollectedForFirstTransfer = sv1Scan.getRewardsCollectedInRound(
             rewardCollectionRoundForFirstTransfer
           )
           rewardsCollectedForFirstTransfer should beWithin(BigDecimal(0.3), BigDecimal(0.4))
 
-          scan.getTotalRewardsCollectedEver() should equal(rewardsCollectedForFirstTransfer)
+          sv1Scan.getTotalRewardsCollectedEver() should equal(rewardsCollectedForFirstTransfer)
           rewardsCollectedForFirstTransfer
         }
       }
@@ -87,22 +87,22 @@ class ScanTimeBasedIntegrationTestWithAutomation
 
     // This is the round where the rewards for the second transfer are collected.
     val rewardCollectionRoundForSecondTransfer =
-      scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number
+      sv1Scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number
 
     clue("correct rewards are returned for the old round, the new round and for the total") {
       eventually() {
-        val rewardsCollectedForFirstTransferComputedAgain = scan.getRewardsCollectedInRound(
+        val rewardsCollectedForFirstTransferComputedAgain = sv1Scan.getRewardsCollectedInRound(
           rewardCollectionRoundForFirstTransfer
         )
 
         rewardsCollectedForFirstTransferComputedAgain should equal(rewardsCollectedForFirstTransfer)
 
-        val rewardsCollectedForSecondTransfer = scan.getRewardsCollectedInRound(
+        val rewardsCollectedForSecondTransfer = sv1Scan.getRewardsCollectedInRound(
           rewardCollectionRoundForSecondTransfer
         )
         rewardsCollectedForSecondTransfer should beWithin(BigDecimal(0.1), BigDecimal(0.15))
 
-        scan.getTotalRewardsCollectedEver() should equal(
+        sv1Scan.getTotalRewardsCollectedEver() should equal(
           rewardsCollectedForSecondTransfer + rewardsCollectedForFirstTransfer
         )
       }

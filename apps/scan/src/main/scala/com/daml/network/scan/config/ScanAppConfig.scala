@@ -14,7 +14,7 @@ trait BaseScanAppConfig {}
 case class ScanAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    svcUser: String,
+    svUser: String,
     override val participantClient: CNParticipantClientConfig,
     domains: ScanDomainConfig,
     override val automation: AutomationConfig = AutomationConfig(),

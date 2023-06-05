@@ -31,7 +31,7 @@ class XNodeSvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil 
   "manage featured app rights" in { implicit env =>
     onboardWalletUser(splitwellProviderWallet, splitwellValidator)
 
-    scan.listFeaturedAppRights() should be(empty)
+    sv1Scan.listFeaturedAppRights() should be(empty)
     splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
 
     val splitwellProvider = providerSplitwellBackend.getProviderPartyId()
@@ -42,7 +42,7 @@ class XNodeSvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil 
     )(
       "splitwell provider is featured",
       { _ =>
-        inside(scan.listFeaturedAppRights()) { case Seq(r) =>
+        inside(sv1Scan.listFeaturedAppRights()) { case Seq(r) =>
           r.payload.provider shouldBe splitwellProvider.toProtoPrimitive
         }
         splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
@@ -56,7 +56,7 @@ class XNodeSvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil 
     )(
       "svc is also featured",
       { _ =>
-        inside(scan.listFeaturedAppRights()) { case Seq(r1, r2) =>
+        inside(sv1Scan.listFeaturedAppRights()) { case Seq(r1, r2) =>
           r1.payload.provider should (be(splitwellProvider.toProtoPrimitive) or be(
             svcParty.toProtoPrimitive
           ))
@@ -83,7 +83,7 @@ class XNodeSvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil 
     )(
       "splitwell is no longer featured",
       { _ =>
-        inside(scan.listFeaturedAppRights()) { case Seq(r) =>
+        inside(sv1Scan.listFeaturedAppRights()) { case Seq(r) =>
           r.payload.provider should not be (splitwellProvider.toProtoPrimitive)
         }
       },

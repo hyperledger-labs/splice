@@ -63,7 +63,7 @@ object CNNodeConfigTransforms {
     val transforms = Seq(
       updateSvcAppConfig(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
       updateAllSvAppConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
-      updateScanAppConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix")),
+      updateAllScanAppConfigs_(c => c.copy(svUser = s"${c.svUser}-$suffix")),
       updateAllValidatorConfigs_(c =>
         c.copy(
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
@@ -98,7 +98,7 @@ object CNNodeConfigTransforms {
       val transforms = Seq(
         updateSvcAppConfig(c => c.focus(_.automation).modify(transform)),
         updateAllSvAppConfigs_(c => c.focus(_.automation).modify(transform)),
-        updateScanAppConfig(c => c.focus(_.automation).modify(transform)),
+        updateAllScanAppConfigs_(c => c.focus(_.automation).modify(transform)),
         updateAllValidatorConfigs_(c => c.focus(_.automation).modify(transform)),
         updateDirectoryAppConfig(c => c.focus(_.automation).modify(transform)),
         updateAllSplitwellAppConfigs_(c => c.focus(_.automation).modify(transform)),
@@ -140,6 +140,7 @@ object CNNodeConfigTransforms {
         validatorApps = c.validatorApps.filter { case (name, _) =>
           !name.toProtoPrimitive.startsWith("sv") || name == InstanceName.tryCreate("sv1Validator")
         },
+        scanApps = c.scanApps.filter(_._1 == InstanceName.tryCreate("sv1Scan")),
       )
 
   /** Default transforms to apply to tests using a [[CNNodeEnvironmentDefinition]].
@@ -198,14 +199,18 @@ object CNNodeConfigTransforms {
       (name, update(config))
     })
 
-  def updateScanAppConfig(update: ScanAppTransform): CNNodeConfigTransform =
+  def updateAllScanAppConfigs_(
+      update: ScanAppBackendConfig => ScanAppBackendConfig
+  ): CNNodeConfigTransform =
+    updateAllScanAppConfigs((_, config) => update(config))
+
+  def updateAllScanAppConfigs(
+      update: (String, ScanAppBackendConfig) => ScanAppBackendConfig
+  ): CNNodeConfigTransform =
     cantonConfig =>
       cantonConfig
-        .focus(_.scanApp)
-        .replace(cantonConfig.scanApp match {
-          case None => None
-          case Some(scan) => Some(update(scan))
-        })
+        .focus(_.scanApps)
+        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
 
   def updateSvcAppConfig(update: SvcAppTransform): CNNodeConfigTransform =
     cantonConfig =>
@@ -316,7 +321,7 @@ object CNNodeConfigTransforms {
           .focus(_.xNodes)
           .modify(_.map(portTransform(bump, _)))
       ),
-      updateScanAppConfig(_.focus(_.participantClient).modify(portTransform(bump, _))),
+      updateAllScanAppConfigs_(_.focus(_.participantClient).modify(portTransform(bump, _))),
       updateAllValidatorConfigs_(
         _.focus(_.participantClient).modify(portTransform(bump, _))
       ),
@@ -416,8 +421,8 @@ object CNNodeConfigTransforms {
       updateAllSvAppConfigs_(c => {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
-      updateScanAppConfig(c => {
-        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svcUser, _))
+      updateAllScanAppConfigs_(c => {
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
       }),
       updateDirectoryAppConfig(c => {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))

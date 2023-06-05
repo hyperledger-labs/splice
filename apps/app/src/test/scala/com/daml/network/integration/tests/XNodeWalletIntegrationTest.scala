@@ -310,7 +310,7 @@ class XNodeWalletIntegrationTest
 
       clue("splitwell provider is featured") {
         eventually() {
-          inside(scan.listFeaturedAppRights()) { case Seq(r) =>
+          inside(sv1Scan.listFeaturedAppRights()) { case Seq(r) =>
             r.payload.provider shouldBe splitwellProvider.toProtoPrimitive
           }
           splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
@@ -323,7 +323,7 @@ class XNodeWalletIntegrationTest
       )(
         "splitwell provider is no longer featured",
         { _ =>
-          scan.listFeaturedAppRights() shouldBe empty
+          sv1Scan.listFeaturedAppRights() shouldBe empty
           splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
         },
       )
@@ -337,7 +337,7 @@ class XNodeWalletIntegrationTest
         "splitwell provider is featured",
         { featuredAppRight =>
           {
-            inside(scan.listFeaturedAppRights()) { case Seq(r) =>
+            inside(sv1Scan.listFeaturedAppRights()) { case Seq(r) =>
               r.contractId shouldBe featuredAppRight
             }
             splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe true

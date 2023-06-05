@@ -40,7 +40,7 @@ class SvcTimeBasedIntegrationTest
     val (_, _) = onboardAliceAndBob()
     // tap once so the CoinRules are cached...
     aliceWallet.tap(5)
-    val currentConfigSchedule = scan.getCoinRules().contract.payload.configSchedule
+    val currentConfigSchedule = sv1Scan.getCoinRules().contract.payload.configSchedule
     clue("schedule a config change, so the coinrules change, invalidating the cache.") {
       val configSchedule =
         createConfigSchedule(

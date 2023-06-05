@@ -212,7 +212,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // current config: maxNumInputs = 4
     // We then schedule a reduction of maxNumInputs to 3
     val now = svc.participantClientWithAdminToken.ledger_api.time.get()
-    val currentConfigSchedule = scan.getCoinRules().contract.payload.configSchedule
+    val currentConfigSchedule = sv1Scan.getCoinRules().contract.payload.configSchedule
     val configSchedule = new cc.schedule.Schedule(
       mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 4),
       List(
@@ -448,7 +448,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
       }
 
-      val Seq(_, issuingRound1) = scan.getOpenAndIssuingMiningRounds()._2
+      val Seq(_, issuingRound1) = sv1Scan.getOpenAndIssuingMiningRounds()._2
 
       clue("create issuing round 2") {
         advanceRoundsByOneTick

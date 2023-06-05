@@ -123,7 +123,7 @@ class XNodeWalletFrontendTimeBasedIntegrationTest
         aliceValidator.getValidatorPartyId(),
         aliceWallet.list().coins,
         BigDecimal(1),
-        scan,
+        sv1Scan,
         Duration.ofDays(1),
       )
 
