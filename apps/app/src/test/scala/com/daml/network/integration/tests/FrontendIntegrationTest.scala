@@ -173,17 +173,15 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     }
     val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
     logger.info(s"Starting web-frontend")
-    val browserLogFile =
-      Paths
-        .get(
-          "log",
-          s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}.log",
-        )
-        .toFile
+    val logFileName =
+      s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}"
 
+    var attempt = 0
     val (webDriver, biDi) = eventually(timeUntilSuccess = 40.seconds) {
+      attempt += 1
       logger.info(s"Attempting to start FirefoxDriver for $name...")
 
+      val browserLogFile = Paths.get("log", s"$logFileName.$attempt.log").toFile
       val driver =
         Try {
           val builder = new GeckoDriverService.Builder().withLogFile(browserLogFile)
