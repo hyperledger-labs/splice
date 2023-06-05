@@ -34,7 +34,8 @@ private[validator] object ValidatorUtil {
       s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
     )
     for {
-      _ <- retryProvider.retryForClientCalls(
+      // TODO (#5366) use `retryForClientCalls` here again once Canton X submissions work more robustly
+      _ <- retryProvider.retryForAutomation(
         "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case result @ QueryResult(_, None) =>
