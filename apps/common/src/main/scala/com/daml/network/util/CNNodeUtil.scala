@@ -47,6 +47,22 @@ object CNNodeUtil {
         )
       )
 
+  def selectSpecificOpenMiningRound(
+      now: CantonTimestamp,
+      openMiningRounds: Seq[
+        Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]
+      ],
+      specifiedRound: Round,
+  ): Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound] =
+    openMiningRounds
+      .filter(c => c.payload.opensAt.compareTo(now.toInstant) <= 0)
+      .find(_.payload.round == specifiedRound)
+      .getOrElse(
+        throw new IllegalStateException(
+          s"tried to select the specific open mining round $specifiedRound from $openMiningRounds but none of the rounds match the specified round. "
+        )
+      )
+
   def templateId[T](id: binding.Primitive.TemplateId[T]): TemplateId =
     TemplateId(ApiTypes.TemplateId.unwrap(id))
 

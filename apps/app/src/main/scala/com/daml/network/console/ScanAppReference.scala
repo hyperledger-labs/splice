@@ -2,6 +2,7 @@ package com.daml.network.console
 
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
@@ -37,11 +38,17 @@ abstract class ScanAppReference(
     "Returns contracts required as inputs for a transfer."
   )
   def getTransferContextWithInstances(
-      now: CantonTimestamp
+      now: CantonTimestamp,
+      specificRound: Option[Round] = None,
   ): HttpScanAppClient.TransferContextWithInstances = {
     val openAndIssuingRounds = getOpenAndIssuingMiningRounds()
     val openRounds = openAndIssuingRounds._1
-    val latestOpenMiningRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
+    val latestOpenMiningRound = specificRound match {
+      case Some(specifiedRound) =>
+        CNNodeUtil.selectSpecificOpenMiningRound(now, openRounds, specifiedRound)
+      case None =>
+        CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
+    }
     val coinRules = getCoinRules()
     TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
   }

@@ -115,12 +115,15 @@ class XNodeWalletTxLogIntegrationTest
         _ => aliceWallet.listAppPaymentRequests() should not be empty,
       )
 
-      val (acceptedPaymentCid, _) = actAndCheck(
+      val (_, acceptedPayment) = actAndCheck(
         "Alice accepts the self-payment request",
         aliceWallet.acceptAppPaymentRequest(reqCid),
       )(
         "Payment request disappears from list",
-        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+        acceptedPaymentCid => {
+          aliceWallet.listAppPaymentRequests() shouldBe empty
+          aliceWallet.listAcceptedAppPayments().find(_.contractId == acceptedPaymentCid).value
+        },
       )
 
       actAndCheck(
@@ -129,7 +132,7 @@ class XNodeWalletTxLogIntegrationTest
           aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           Seq(aliceUserParty),
-          acceptedPaymentCid,
+          acceptedPayment,
         ),
       )(
         "Accepted app payment disappears",
@@ -295,12 +298,15 @@ class XNodeWalletTxLogIntegrationTest
         _ => aliceWallet.listAppPaymentRequests() should not be empty,
       )
 
-      val (acceptedPaymentCid, _) = actAndCheck(
+      val (_, acceptedPayment) = actAndCheck(
         "Alice accepts the payment request",
         aliceWallet.acceptAppPaymentRequest(reqCid),
       )(
         "Payment request disappears from list",
-        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+        acceptedPaymentCid => {
+          aliceWallet.listAppPaymentRequests() shouldBe empty
+          aliceWallet.listAcceptedAppPayments().find(_.contractId == acceptedPaymentCid).value
+        },
       )
 
       actAndCheck(
@@ -309,7 +315,7 @@ class XNodeWalletTxLogIntegrationTest
           aliceValidator.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           Seq(aliceUserParty, charlieUserParty, aliceValidatorUserParty),
-          acceptedPaymentCid,
+          acceptedPayment,
         ),
       )(
         "Accepted app payment disappears",
@@ -578,13 +584,14 @@ class XNodeWalletTxLogIntegrationTest
         _ => aliceWallet.listSubscriptionRequests().headOption.value,
       )
 
-      val (initialPaymentCid, _) = actAndCheck(
+      val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
         aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
-        _ => {
+        initPaymentCid => {
           aliceWallet.listSubscriptionRequests() shouldBe empty
+          aliceWallet.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid).value
         },
       )
 
@@ -595,7 +602,7 @@ class XNodeWalletTxLogIntegrationTest
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
-          initialPaymentCid,
+          initialPayment,
         ),
       )(
         "Charlie's balance reflects the collected payment",
@@ -829,13 +836,14 @@ class XNodeWalletTxLogIntegrationTest
         _ => aliceWallet.listSubscriptionRequests().headOption.value,
       )
 
-      val (initialPaymentCid, _) = actAndCheck(
+      val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
         aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
-        _ => {
+        initPaymentCid => {
           aliceWallet.listSubscriptionRequests() shouldBe empty
+          aliceWallet.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid).value
         },
       )
 
@@ -846,7 +854,7 @@ class XNodeWalletTxLogIntegrationTest
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
-          initialPaymentCid,
+          initialPayment,
         ),
       )(
         "Charlie's balance reflects the collected payment",
@@ -1092,13 +1100,18 @@ class XNodeWalletTxLogIntegrationTest
         _ => aliceWallet.listSubscriptionRequests().headOption.value,
       )
 
-      val (initialPaymentCid, _) = actAndCheck(
+      val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
         aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
-        _ => {
+        initPaymentCid => {
           aliceWallet.listSubscriptionRequests() shouldBe empty
+          inside(
+            aliceWallet.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid)
+          ) { case Some(initPayment) =>
+            initPayment
+          }
         },
       )
 
@@ -1116,7 +1129,7 @@ class XNodeWalletTxLogIntegrationTest
               charlieUserId,
               charlieUserParty,
               aliceUserParty,
-              initialPaymentCid,
+              initialPayment,
             ),
           )(
             "Charlie's balance reflects the collected payment",

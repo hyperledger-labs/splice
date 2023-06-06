@@ -232,20 +232,23 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       participantClient: CNParticipantClientReference,
       userId: String,
       signatories: Seq[PartyId],
-      acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
+      acceptedPayment: Contract[
+        paymentCodegen.AcceptedAppPayment.ContractId,
+        paymentCodegen.AcceptedAppPayment,
+      ],
       domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
-    val tc = sv1Scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now, Some(acceptedPayment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = signatories,
       readAs = Seq(),
-      update = acceptedPayment.exerciseAcceptedAppPayment_Collect(
+      update = acceptedPayment.contractId.exerciseAcceptedAppPayment_Collect(
         appTc
       ),
       domainId = disclosure inferDomain domainId,
@@ -283,13 +286,16 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId: String,
       userParty: PartyId,
       sender: PartyId,
-      acceptedPayment: subsCodegen.SubscriptionInitialPayment.ContractId,
+      acceptedPayment: Contract[
+        subsCodegen.SubscriptionInitialPayment.ContractId,
+        subsCodegen.SubscriptionInitialPayment,
+      ],
       domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
     val now = env.environment.clock.now
-    val tc = sv1Scan.getTransferContextWithInstances(now)
+    val tc = sv1Scan.getTransferContextWithInstances(now, Some(acceptedPayment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands
@@ -297,7 +303,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         userId = userId,
         actAs = Seq(userParty, sender),
         readAs = Seq(),
-        update = acceptedPayment.exerciseSubscriptionInitialPayment_Collect(
+        update = acceptedPayment.contractId.exerciseSubscriptionInitialPayment_Collect(
           appTc
         ),
         domainId = disclosure inferDomain domainId,

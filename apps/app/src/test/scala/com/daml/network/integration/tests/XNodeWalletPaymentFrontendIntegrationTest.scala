@@ -80,7 +80,7 @@ class XNodeWalletPaymentFrontendIntegrationTest
                 aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
-                acceptedPayment.contractId,
+                acceptedPayment,
               )
               go to s"http://localhost:3000"
             },
@@ -151,7 +151,7 @@ class XNodeWalletPaymentFrontendIntegrationTest
                 aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
-                acceptedPayment.contractId,
+                acceptedPayment,
               )
               go to s"http://localhost:3000"
             },
@@ -229,7 +229,7 @@ class XNodeWalletPaymentFrontendIntegrationTest
                 aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
-                acceptedPayment.contractId,
+                acceptedPayment,
               )
               go to s"http://localhost:3000"
             },
@@ -303,7 +303,7 @@ class XNodeWalletPaymentFrontendIntegrationTest
                 aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
-                acceptedPayment.contractId,
+                acceptedPayment,
               )
               go to s"http://localhost:3000"
             },
@@ -377,7 +377,7 @@ class XNodeWalletPaymentFrontendIntegrationTest
                 aliceValidator.participantClientWithAdminToken,
                 aliceDamlUser,
                 Seq(aliceUserParty, charlieUserParty),
-                acceptedPayment.contractId,
+                acceptedPayment,
               )
               go to s"http://localhost:3000"
             },
