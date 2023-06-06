@@ -2148,10 +2148,7 @@ workflows:
           - artifactory
           - canton-network-vpn
           - datadog
-          # TODO(#5417) - Re-enable slack notifications
-          # Temporarily remove to avoid notifications for preflights
-          # we suspect will fail.
-          # - slack-context
+          - slack-context
         cluster: "stagingb"
         requires:
           - deployment_test
@@ -2164,10 +2161,7 @@ workflows:
           - artifactory
           - canton-network-vpn
           - datadog
-          # TODO(#5417) - Re-enable slack notifications
-          # Temporarily remove to avoid notifications for preflights
-          # we suspect will fail.
-          # - slack-context
+          - slack-context
         cluster: "stagingb"
         requires:
           - deploy_sv_runbook
