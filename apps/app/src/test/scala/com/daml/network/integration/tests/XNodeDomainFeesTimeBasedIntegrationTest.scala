@@ -314,19 +314,19 @@ class XNodeDomainFeesTimeBasedIntegrationTest
             // - Alice validator purchases the most traffic (3 times)
             // - SV1 validator purchases traffic once initially and never after that since no traffic goes through it
             // - All the other validators have target throughput set to 0 and never purchase extra traffic at all.
+            // TODO(#4914): use command-dedup to guarantee the exact number of purchases as specified above
             checkValidatorsByPurchasedTraffic(
               validatorsByPurchasedTraffic,
               Seq(
                 t => {
                   t.validator shouldBe aliceValidator.getValidatorPartyId()
-                  t.numPurchases shouldBe 3
-                  t.totalTrafficPurchased shouldBe topupParameters.topupAmount * 3
+                  t.numPurchases should be >= 3L
+                  t.totalTrafficPurchased should be >= topupParameters.topupAmount * 3
                 },
                 t => {
                   t.validator shouldBe sv1Validator.getValidatorPartyId()
-                  // TODO(#4914): use command-dedup to guarantee that exactly one purchase happens
                   t.numPurchases should be >= 1L
-                  t.totalTrafficPurchased shouldBe getTopupParameters(sv1Validator).topupAmount
+                  t.totalTrafficPurchased should be >= getTopupParameters(sv1Validator).topupAmount
                 },
               ),
             )

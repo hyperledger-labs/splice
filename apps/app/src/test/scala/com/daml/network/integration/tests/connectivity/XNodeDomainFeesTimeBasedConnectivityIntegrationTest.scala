@@ -76,11 +76,14 @@ class XNodeDomainFeesTimeBasedConnectivityIntegrationTest
         // Scan is also used to mock the validator traffic related endpoints for the Domain Fees PoC
         "Top-up happens at most once even though scan app reports that we should top-up",
         _ => {
-          val validatorTraffic =
+          val validatorTrafficContracts =
             aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(ValidatorTraffic.COMPANION)(aliceValidator.getValidatorPartyId())
-              .head
-          validatorTraffic.data.numPurchases.longValue() should be <= 1L
+          inside(validatorTrafficContracts) {
+            case Seq(validatorTraffic) =>
+              validatorTraffic.data.numPurchases shouldBe 1L
+            case Seq() =>
+          }
         },
       )
     }
