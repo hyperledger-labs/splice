@@ -163,6 +163,22 @@ final class LocalDomainNode(
         logger,
       )
       _ = logger.info(s"Onboarded mediator $mediatorId")
+      _ <- retryProvider.waitUntil(
+        "local sequencer observes mediator as onboarded",
+        // Otherwise we might fail with `PERMISSION_DENIED` during initialization
+        sequencerAdminConnection
+          .getMediatorState(domainId)
+          .map { state =>
+            if (!state.active.contains(mediatorId)) {
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Mediator $mediatorId not in active mediators ${state.active.forgetNE}"
+                )
+                .asRuntimeException()
+            }
+          },
+        logger,
+      )
       _ = logger.info(s"Initializing mediator $mediatorId")
       _ <- retryProvider.retryForAutomation(
         "Initializing mediator",

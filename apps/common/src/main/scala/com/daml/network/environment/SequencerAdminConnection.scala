@@ -104,6 +104,29 @@ class SequencerAdminConnection(
         )
     }
 
+  def getMediatorState(domainId: DomainId)(implicit traceContext: TraceContext) =
+    runCmd(
+      TopologyAdminCommandsX.Read.MediatorDomainState(
+        BaseQueryX(
+          filterStore = domainId.filterString,
+          proposals = false,
+          timeQuery = TimeQueryX.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterDomain = "",
+      )
+    ).map { txs =>
+      txs.headOption
+        .getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(s"No mediator state for domain $domainId")
+            .asRuntimeException()
+        )
+        .item
+    }
+
   def getPartyToParticipantState(
       partyId: PartyId
   )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResult]] =
