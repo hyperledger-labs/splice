@@ -1511,6 +1511,48 @@ function subcmd_unlock_force() {
     fi
 }
 
+###
+
+subcommand_whitelist[kill_sv_app]='Spin down sv-app to zero replicas for the specified namespace'
+
+function subcmd_kill_sv_app() {
+    _cluster_must_exist
+
+    _assert_lock
+
+    if lockholder=$(_current_lockholder); then
+        if [ "${lockholder}" = "$(whoami)" ]; then
+            _info "Killing sv-app for $1"
+            kubectl patch deployment sv-app --namespace "$1" -p '{"spec":{"replicas":0}}'
+        else
+            _error "You cannot edit a cluster locked by: ${lockholder}"
+        fi
+    else
+        _error "Cluster not locked."
+    fi
+}
+
+###
+
+subcommand_whitelist[revive_sv_app]='Spin up sv-app to one replica for the specified namespace'
+
+function subcmd_revive_sv_app() {
+    _cluster_must_exist
+
+    _assert_lock
+
+    if lockholder=$(_current_lockholder); then
+        if [ "${lockholder}" = "$(whoami)" ]; then
+            _info "Reviving sv-app for $1"
+            kubectl patch deployment sv-app --namespace "$1" -p '{"spec":{"replicas":1}}'
+        else
+            _error "You cannot edit a cluster locked by: ${lockholder}"
+        fi
+    else
+        _error "Cluster not locked."
+    fi
+}
+
 ################################
 ### Main
 ################################
