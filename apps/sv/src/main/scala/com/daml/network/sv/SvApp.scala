@@ -42,14 +42,10 @@ import com.daml.network.sv.cometbft.{
   CometBftNode,
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.init.FoundingNodeInitializer
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.svc.admin.api.client.SvcConnection
-import com.daml.network.util.CNNodeUtil.{
-  defaultCoinConfig,
-  defaultCoinConfigSchedule,
-  defaultEnabledChoices,
-}
 import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -71,7 +67,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
@@ -211,8 +206,6 @@ class SvApp(
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
-
-      svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
 
       handler = new HttpSvHandler(
         globalDomain,
@@ -499,7 +492,19 @@ class SvApp(
     val svcStore = svcStoreWithIngestion.store
     config.onboarding match {
       case foundingConfig: SvOnboardingConfig.FoundCollective =>
-        foundCollective(foundingConfig, svcStoreWithIngestion, globalDomain, cometBftNode)
+        val initializer = new FoundingNodeInitializer(
+          svcStoreWithIngestion,
+          config,
+          foundingConfig,
+          globalDomain,
+          cometBftNode,
+          loggerFactory,
+          retryProvider,
+        )
+        for {
+          _ <- uploadDars(svcStoreWithIngestion.connection)
+          _ <- initializer.foundCollective()
+        } yield ()
       case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
@@ -774,25 +779,6 @@ class SvApp(
     )
   }
 
-  private def foundCollective(
-      foundingConfig: SvOnboardingConfig.FoundCollective,
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      globalDomain: DomainId,
-      cometBftNode: Option[CometBftNode],
-  ): Future[Unit] = {
-    val svcStore = svcStoreWithIngestion.store
-    for {
-      _ <- uploadDars(svcStoreWithIngestion.connection)
-      _ <- retryProvider.retryForAutomation(
-        "bootstrapping SVC",
-        bootstrapSvc(foundingConfig, svcStoreWithIngestion, globalDomain, cometBftNode),
-        logger,
-      )
-      // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
-      _ <- waiveSvcRights(svcStore.key.svcParty, svcStoreWithIngestion.connection)
-    } yield ()
-  }
-
   private def uploadDars(
       ledgerConnection: CNLedgerConnection
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
@@ -808,150 +794,6 @@ class SvApp(
           Future.successful(())
     } yield ()
   }
-
-  // Create SvcRules and CoinRules and open the first mining round
-  private def bootstrapSvc(
-      foundingConfig: SvOnboardingConfig.FoundCollective,
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      domainId: DomainId,
-      cometBftNode: Option[CometBftNode],
-  ): Future[Unit] = {
-    val svStore = svStoreWithIngestion.store
-    val svcParty = svStore.key.svcParty
-    val svParty = svStore.key.svParty
-    for {
-      coinRules <- svStore.lookupCoinRules()
-      founderDomainNodes <- SvUtil
-        .getFounderDomainNodeConfig(cometBftNode)
-        .fold(error => sys.error(s"Failed to initialize the domain nodes: $error"), identity)
-      _ <- svStore.lookupSvcRulesWithOffset().flatMap {
-        case QueryResult(offset, None) => {
-          coinRules match {
-            case Some(coinRules) =>
-              sys.error(
-                "A CoinRules contract was found but no SvcRules contract exists. " +
-                  show"This should never happen.\nCoinRules: $coinRules"
-              )
-            case None =>
-              logger.info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
-              svStoreWithIngestion.connection
-                .submitCommands(
-                  actAs = Seq(svcParty),
-                  readAs = Seq.empty,
-                  commands = new cn.svcbootstrap.SvcBootstrap(
-                    svcParty.toProtoPrimitive,
-                    svParty.toProtoPrimitive,
-                    foundingConfig.name,
-                    founderDomainNodes,
-                    defaultCoinConfig(
-                      foundingConfig.initialTickDuration,
-                      foundingConfig.initialMaxNumInputs,
-                      domainId,
-                    ),
-                    foundingConfig.initialCoinPrice.bigDecimal,
-                    SvUtil.defaultSvcRulesConfig(),
-                    defaultEnabledChoices,
-                    config.isDevNet,
-                  ).createAnd
-                    .exerciseSvcBootstrap_Bootstrap()
-                    .commands
-                    .asScala
-                    .toSeq,
-                  commandId = CNLedgerConnection
-                    .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
-                  deduplicationOffset = offset,
-                  domainId = domainId,
-                )
-          }
-        }
-        case QueryResult(_, Some(svcRules)) =>
-          coinRules match {
-            case Some(coinRules) => {
-              if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
-                logger.info(
-                  "CoinRules and SvcRules already exist and founding party is an SVC member; doing nothing." +
-                    show"\nCoinRules: $coinRules\nSvcRules: $svcRules"
-                )
-                Future.successful(())
-              } else {
-                sys.error(
-                  "CoinRules and SvcRules already exist but party tasked with founding the SVC isn't member." +
-                    "Is more than one SV app configured to `found-collective`?" +
-                    show"\nCoinRules: $coinRules\nSvcRules: $svcRules"
-                )
-              }
-            }
-            case None =>
-              sys.error(
-                "An SvcRules contract was found but no CoinRules contract exists. " +
-                  show"This should never happen.\nSvcRules: $svcRules"
-              )
-          }
-      }
-      _ <- createUpgradedCoinRulesIfEnabled(svStoreWithIngestion, foundingConfig, domainId)
-    } yield ()
-  }
-
-  private def createUpgradedCoinRulesIfEnabled(
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      foundingConfig: SvOnboardingConfig.FoundCollective,
-      domainId: DomainId,
-  ): Future[Unit] =
-    for {
-      _ <-
-        if (config.enableCoinRulesUpgrade) {
-          createUpgradedCoinRules(svStoreWithIngestion, foundingConfig, domainId)
-        } else {
-          Future.successful(())
-        }
-    } yield ()
-
-  private def createUpgradedCoinRules(
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      foundingConfig: SvOnboardingConfig.FoundCollective,
-      domainId: DomainId,
-  ): Future[Unit] = {
-    val store = svStoreWithIngestion.store
-    val svcParty = store.key.svcParty
-    for {
-      _ <- store.lookupCoinRulesV1TestWithOffset().flatMap {
-        case QueryResult(offset, None) =>
-          svStoreWithIngestion.connection.submitWithResult(
-            actAs = Seq(svcParty),
-            readAs = Seq.empty,
-            update = new ccV1Test.coin.CoinRulesV1Test(
-              svcParty.toProtoPrimitive,
-              defaultCoinConfigSchedule(
-                foundingConfig.initialTickDuration,
-                foundingConfig.initialMaxNumInputs,
-                domainId,
-              ),
-              defaultEnabledChoices,
-              config.isDevNet,
-              false,
-            ).create(),
-            commandId = CNLedgerConnection.CommandId(
-              "com.daml.network.svc.initiateCoinRulesUpgrade",
-              Seq(svcParty),
-            ),
-            deduplicationConfig = DedupOffset(offset),
-            domainId = domainId,
-          )
-        case QueryResult(_, Some(_)) =>
-          logger.info("Upgraded CoinRules (V1Test) contract already exists")
-          Future.successful(())
-      }
-    } yield logger.debug("Created an upgraded CoinRules (V1Test) contract")
-  }
-
-  private def waiveSvcRights(
-      svcParty: PartyId,
-      ledgerConnection: CNLedgerConnection,
-  ): Future[Unit] =
-    for {
-      _ <- ledgerConnection.grantUserRights(config.ledgerApiUser, Seq.empty, Seq(svcParty))
-      _ <- ledgerConnection.revokeUserRights(config.ledgerApiUser, Seq(svcParty), Seq.empty)
-    } yield ()
 
   private def requestOnboarding(
       sponsorConfig: NetworkAppClientConfig,

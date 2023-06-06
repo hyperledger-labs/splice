@@ -26,8 +26,8 @@ trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with Time
     val (actual, toCompare) = eventually() {
       val actual = wallet.listTransactions(None, pageSize = 100000)
       val toCompare = actual
-        .filter(!ignore(_))
         .takeWhile(e => !previousEventId.contains(e.indexRecord.eventId))
+        .filter(!ignore(_))
 
       toCompare should have length expected.size.toLong
       (actual, toCompare)

@@ -149,14 +149,14 @@ class SvcPartyHosting(
     )
   }
 
-  def listActiveSvcPartyMappings(
+  private def listActiveSvcPartyMappings(
       domain: DomainId,
       participantId: ParticipantId,
       side: Option[RequestSide],
   )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResult]] =
     listActivePartyToParticipantMappings(svcParty, domain, participantId, side)
 
-  def listActivePartyToParticipantMappings(
+  private def listActivePartyToParticipantMappings(
       party: PartyId,
       domain: DomainId,
       participantId: ParticipantId,
@@ -171,7 +171,7 @@ class SvcPartyHosting(
         filterRequestSide = side,
       )
 
-  def listActiveSvcPartyMappingsX(
+  private def listActiveSvcPartyMappingsX(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResultX]] =
@@ -180,7 +180,7 @@ class SvcPartyHosting(
   /** Return the transaction that first added the participant to PartyToParticipant
     * if the participant is still included in the latest state.
     */
-  def getSvcPartyToParticipantTransactionX(
+  private def getSvcPartyToParticipantTransactionX(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Option[ListPartyToParticipantResultX]] =
@@ -210,7 +210,7 @@ class SvcPartyHosting(
       }
     }
 
-  def listActivePartyToParticipantMappingsX(
+  private def listActivePartyToParticipantMappingsX(
       party: PartyId,
       domain: DomainId,
       participantId: Option[ParticipantId],
