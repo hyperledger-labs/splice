@@ -1266,31 +1266,36 @@ function subcmd_pulumi() {
 
 ###
 
-subcommand_whitelist[papply]="Apply the current Pulumi configuration"
+subcommand_whitelist[papply]="Apply the current Pulumi configuration (--preview to preview only)"
 
 function subcmd_papply() {
     _production_gate
-    _prompt_to_confirm
     _cluster_must_exist
+
+    POSITIONAL_ARGS=()
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --preview)
+                preview="yes"
+                shift
+                ;;
+            -*)
+                _error "Unknown option $1"
+                ;;
+            *)
+                POSITIONAL_ARGS+=("$1")
+                shift
+                ;;
+        esac
+    done
+    set -- "${POSITIONAL_ARGS[@]}"
 
     VERSION_NUMBER=$(get-snapshot-version)
 
-    if [ -z "${1-}" ]; then
-        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
-            _docker_must_be_running
-            if ! make -C "${REPO_ROOT}" docker-check -j; then
-                _error "Images missing from artifact registry, cannot apply."
-                exit 1
-            fi
-        else
-            _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
-        fi
-    else
+    if [ -n "${1-}" ]; then
         IMAGE_TAG=$1
-        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
+        _warning "Overriding image tag: ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
     fi
-
-    make -C "${REPO_ROOT}" cluster/build -j
 
     args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
           -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
@@ -1311,51 +1316,28 @@ function subcmd_papply() {
         args+=(-c "X_NODES=0")
     fi
 
-    _cluster_install_network_gateway
+    if [ -n "${preview:-}" ]; then
+        _info "Previewing apply."
+        make -C "${REPO_ROOT}" cluster/helm/build -j
+        subcmd_pulumi canton-network preview --show-sames --json "${args[@]}"
+    else
+        _prompt_to_confirm
+        make -C "${REPO_ROOT}" cluster/build -j
 
-    subcmd_pulumi canton-network up --yes --show-sames "${args[@]}"
-}
-###
-
-subcommand_whitelist[ppreview]="Preview applying the current Pulumi configuration"
-
-function subcmd_ppreview() {
-    _production_gate
-    _cluster_must_exist
-
-    VERSION_NUMBER=$(get-snapshot-version)
-
-    if [ -z "${1-}" ]; then
-        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
-            _docker_must_be_running
-            if ! make -C "${REPO_ROOT}" docker-check -j; then
-                _error "Images missing from artifact registry, cannot apply."
+        if [ -z "${IMAGE_TAG:-}" ]; then
+            if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
+                _docker_must_be_running
+                if ! make -C "${REPO_ROOT}" docker-check -j; then
+                    _error "Images missing from artifact registry, cannot apply."
+                fi
+            else
+                _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
             fi
-        else
-            _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
         fi
-    else
-        IMAGE_TAG=$1
-        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
+
+        _cluster_install_network_gateway
+        subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
     fi
-
-    make -C "${REPO_ROOT}" cluster/build
-
-    args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
-          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
-
-    if [ -n "${IMAGE_TAG:-}" ]; then
-        args+=(-c "IMAGE_TAG=${IMAGE_TAG}")
-    fi
-
-    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
-        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
-    else
-        args+=(-c "FIXED_TOKENS=0")
-    fi
-
-    subcmd_pulumi canton-network preview --show-sames "${args[@]}"
-    subcmd_pulumi canton-network preview --show-sames --json
 }
 
 ###
