@@ -1215,11 +1215,14 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET  --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
             set -eou pipefail
             cncluster activate
+            export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
+            export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
+            export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
             cncluster ci_papply
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
@@ -2094,7 +2097,7 @@ workflows:
         requires:
           - deploy_sv_runbook
 
-  deploy_stagingb:
+  deploy_staging_B:
     when:
       equal: [ deploy-staging-b, << pipeline.parameters.run-job >> ]
     jobs:
@@ -2118,7 +2121,7 @@ workflows:
         context:
           - artifactory
           - slack-context
-        workflow_names: "deploy_stagingb"
+        workflow_names: "deploy_staging_B"
     - deploy_cluster_pulumi:
         <<: *main-branch-only
         context:
@@ -2140,7 +2143,6 @@ workflows:
         requires:
           - deploy_cluster_pulumi
     - preflight_check:
-        cluster: stagingb
         <<: *main-branch-only
         context:
           - artifactory
@@ -2150,6 +2152,7 @@ workflows:
           # Temporarily remove to avoid notifications for preflights
           # we suspect will fail.
           # - slack-context
+        cluster: "stagingb"
         requires:
           - deployment_test
           - docker_images_push
@@ -2157,7 +2160,6 @@ workflows:
           - deploy_sv_runbook
     - preflight_sv_check:
         <<: *main-branch-only
-        cluster: "stagingb"
         context:
           - artifactory
           - canton-network-vpn
@@ -2166,6 +2168,7 @@ workflows:
           # Temporarily remove to avoid notifications for preflights
           # we suspect will fail.
           # - slack-context
+        cluster: "stagingb"
         requires:
           - deploy_sv_runbook
 

@@ -163,7 +163,6 @@ function _cluster_update_module() {
 
     if [ ! -f "${pushStateFile}" ]; then
         _error "Module not available for deployment (failure during either push or build): $1"
-        exit 1
     fi
 
     imageTag=$(gawk -F '::' '{ print $2; }' < "${pushStateFile}")
@@ -321,7 +320,6 @@ function subcmd_apply() {
             _docker_must_be_running
             if ! make -C "${REPO_ROOT}" docker-check -j; then
                 _error "Images missing from artifact registry, cannot apply."
-                exit 1
             fi
         else
             _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
@@ -737,7 +735,6 @@ function subcmd_ci_papply() {
 
     if [ -z "${CI-}" ]; then
         _error "This subcommand is available to CI jobs only."
-        exit 1
     fi
 
     _cluster_show
@@ -761,7 +758,6 @@ function subcmd_ci_apply() {
 
     if [ -z "${CI-}" ]; then
         _error "This subcommand is available to CI jobs only."
-        exit 1
     fi
 
     _cluster_show
@@ -804,7 +800,6 @@ function subcmd_ci_reset_unlock() {
 
     if [ -z "${CI-}" ]; then
         _error "This subcommand is available to CI jobs only."
-        exit 1
     fi
 
     if [ -z "${SHARED_CLUSTER:-}" ]; then
@@ -1256,8 +1251,7 @@ function subcmd_pulumi() {
     pulumi_project="${1-}"
     pulumi_cmd="${2-}"
     if [ -z "${pulumi_cmd}" ] || [ -z "${pulumi_project}" ]; then
-        _info "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
-        exit 1
+        _error "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
     fi
 
     shift 2
@@ -1336,7 +1330,6 @@ function subcmd_ppreview() {
             _docker_must_be_running
             if ! make -C "${REPO_ROOT}" docker-check -j; then
                 _error "Images missing from artifact registry, cannot apply."
-                exit 1
             fi
         else
             _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
@@ -1394,15 +1387,14 @@ function subcmd_prefresh() {
 subcommand_whitelist[papply_sv]="Apply the sv-runbook Pulumi stack"
 
 function subcmd_papply_sv(){
+    local -x TARGET_CLUSTER="${1-}"
+    if [ -z "$TARGET_CLUSTER" ]; then
+        _error "Usage: $SCRIPTNAME papply_sv <target-domain-cluster> [<charts-version>]"
+    fi
+
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
-
-    local -x TARGET_CLUSTER="${1-}"
-    if [ -z "$TARGET_CLUSTER" ]; then
-        _info "Usage: $SCRIPTNAME papply_sv <target-cluster> [<charts-version>]"
-        exit 1
-    fi
 
     local -x CHARTS_VERSION="${2-}"
 
@@ -1422,7 +1414,6 @@ function subcmd_ci_papply_sv() {
 
     if [ -z "${CI-}" ]; then
         _error "This subcommand is available to CI jobs only."
-        exit 1
     fi
 
     _cluster_show
