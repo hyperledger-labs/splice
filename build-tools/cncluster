@@ -563,7 +563,7 @@ function subcmd_set_machine_type() {
 subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
 
 function subcmd_get_dns01_key_id() {
-    subcmd_infra_pulumi stack output --show-secrets dnsPrivateKey | base64 -d | jq -r '.private_key_id'
+    subcmd_pulumi infra stack output --show-secrets dnsPrivateKey | base64 -d | jq -r '.private_key_id'
 }
 
 subcommand_whitelist[update_dns01_secret]='Update the gcloud service account key used for letsencrypt dns challenges.'
@@ -572,7 +572,7 @@ function subcmd_update_dns01_secret() {
     if kubectl get secret "$GCP_DNS_SA_SECRET" > /dev/null 2>&1; then
       kubectl delete secret "$GCP_DNS_SA_SECRET"
     fi
-    subcmd_infra_pulumi stack output --show-secrets dnsPrivateKey | base64 --decode > /tmp/key.json
+    subcmd_pulumi infra stack output --show-secrets dnsPrivateKey | base64 --decode > /tmp/key.json
     kubectl create secret generic "$GCP_DNS_SA_SECRET" \
             --from-file=key.json=/tmp/key.json
     rm /tmp/key.json
@@ -629,7 +629,7 @@ function subcmd_create() {
     gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
 
     _log "Activating infrastructure Pulumi stack"
-    subcmd_infra_pulumi up --yes
+    subcmd_pulumi infra up --yes
 
     _log "Updating DNS01 secret"
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
@@ -825,7 +825,7 @@ function subcmd_delete() {
     _cluster_must_exist
 
     _info "Taking down pulumi infrastructure stack."
-    subcmd_infra_pulumi down --yes
+    subcmd_pulumi infra down --yes
 
     _info "Deleting GKE cluster."
     gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
@@ -1433,23 +1433,6 @@ function subcmd_pdown_sv(){
     _cluster_must_exist
 
     subcmd_pulumi sv-runbook down --yes
-}
-
-###
-
-subcommand_whitelist[infra_pulumi]="Run pulumi for the infrastructure project"
-
-function subcmd_infra_pulumi() {
-  # TODO(#4560): Use an empty passphrase until we manage secrets
-  local -x PULUMI_CONFIG_PASSPHRASE=''
-  local -a args=( --cwd "${REPO_ROOT}/cluster/pulumi/infrastructure" )
-
-  # some pulumi commands / sub-commands do not support the --stack flag
-  if [[ "$1" != stack || "$2" != export ]]; then
-    args+=( --stack "infra.${GCP_CLUSTER_BASENAME}" )
-  fi
-
-  _pulumi "${args[@]}" "$@"
 }
 
 ###
