@@ -132,7 +132,7 @@ components:
     # As with MaybeCachedContract, but additionally with a "state", which is either
     # a domain indicating the contract is on that domain or nothing for an in-flight
     # contract.  With an unmatching contract-id, this response will include both a
-    # contract-id and a state.  However, the domain will always reflect the contract's
+    # contract and a state.  However, the domain will always reflect the contract's
     # current state, even if the contract-id matches; either the domain echoed back if
     # it has not changed, or missing if it is in-flight.
     MaybeCachedContractWithState:
@@ -150,6 +150,12 @@ components:
       type: object
       additionalProperties:
         $ref: "#/components/schemas/MaybeCachedContract"
+    # As with 'MaybeCachedContractMap', but include the current domain state for every
+    # mining round that shouldn't be removed, whether cached or not.
+    MaybeCachedContractWithStateMap:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/MaybeCachedContractWithState"
     # Status definition for health endpoint
     Status:
       type: object

@@ -58,7 +58,7 @@ abstract class ScanAppReference(
   )
   def getLatestOpenMiningRound(
       now: CantonTimestamp
-  ): Contract[OpenMiningRound.ContractId, OpenMiningRound] = {
+  ): ContractWithState[OpenMiningRound.ContractId, OpenMiningRound] = {
 
     val (openRounds, _) = getOpenAndIssuingMiningRounds()
     CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
@@ -107,15 +107,15 @@ abstract class ScanAppReference(
     "List the latest open mining round and all issuing mining rounds."
   )
   def getOpenAndIssuingMiningRounds(): (
-      Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-      Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+      Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
+      Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
   ) = {
     val result = consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetSortedOpenAndIssuingMiningRounds(Seq(), Seq()))
     }
     (
-      result._1.sortBy(_.payload.round.number),
-      result._2.sortBy(_.payload.round.number),
+      result._1.sortBy(_.contract.payload.round.number),
+      result._2.sortBy(_.contract.payload.round.number),
     )
   }
 

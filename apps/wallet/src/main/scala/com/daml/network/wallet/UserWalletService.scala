@@ -58,7 +58,6 @@ class UserWalletService(
   val treasury: TreasuryService = new TreasuryService(
     // The treasury gets its own connection, and is required to manage waiting for the store on its own.
     ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
-    globalDomain,
     treasuryConfig,
     clock,
     store,

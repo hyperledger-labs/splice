@@ -31,7 +31,7 @@ trait SvTestUtil extends CNNodeTestCommon {
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val nextMiningRound = clue("Getting next open round") {
       val (openRounds, _) = sv1Scan.getOpenAndIssuingMiningRounds()
-      new Round(openRounds.map(_.payload.round.number).max + 1)
+      new Round(openRounds.map(_.contract.payload.round.number).max + 1)
     }
     actAndCheck(
       s"Add the phantom SV \"$svName\"",

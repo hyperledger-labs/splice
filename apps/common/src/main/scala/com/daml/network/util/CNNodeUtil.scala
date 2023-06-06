@@ -1,8 +1,5 @@
 package com.daml.network.util
 
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.refinements.ApiTypes.TemplateId
-import com.daml.ledger.client.binding
 import com.daml.ledger.javaapi.data.{Command, Unit as DamlUnit}
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc
@@ -19,7 +16,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.da.set.types.{Set as DamlSet}
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.{ContractWithState, QueryResult}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
@@ -34,37 +31,36 @@ import scala.jdk.CollectionConverters.*
 
 object CNNodeUtil {
 
-  def selectLatestOpenMiningRound(
+  def selectLatestOpenMiningRound[Ct <: ContractWithState[?, cc.round.OpenMiningRound]](
       now: CantonTimestamp,
-      openMiningRounds: Seq[Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]],
-  ): Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound] =
-    openMiningRounds
-      .filter(c => c.payload.opensAt.compareTo(now.toInstant) <= 0)
-      .maxByOption(_.payload.round.number)
+      openMiningRounds: Seq[Ct],
+  ): Ct = {
+    import math.Ordering.Implicits.*
+    openMiningRounds.view
+      .filter(c => c.contract.payload.opensAt <= now.toInstant)
+      .maxByOption(c => c.contract.payload.round.number)
       .getOrElse(
         throw new IllegalStateException(
           s"tried to select the latest open mining round from $openMiningRounds but none of the rounds are open. "
         )
       )
+  }
 
-  def selectSpecificOpenMiningRound(
+  def selectSpecificOpenMiningRound[Ct <: ContractWithState[?, cc.round.OpenMiningRound]](
       now: CantonTimestamp,
-      openMiningRounds: Seq[
-        Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]
-      ],
+      openMiningRounds: Seq[Ct],
       specifiedRound: Round,
-  ): Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound] =
-    openMiningRounds
-      .filter(c => c.payload.opensAt.compareTo(now.toInstant) <= 0)
-      .find(_.payload.round == specifiedRound)
+  ): Ct = {
+    import math.Ordering.Implicits.*
+    openMiningRounds.view
+      .filter(c => c.contract.payload.opensAt <= now.toInstant)
+      .find(_.contract.payload.round == specifiedRound)
       .getOrElse(
         throw new IllegalStateException(
           s"tried to select the specific open mining round $specifiedRound from $openMiningRounds but none of the rounds match the specified round. "
         )
       )
-
-  def templateId[T](id: binding.Primitive.TemplateId[T]): TemplateId =
-    TemplateId(ApiTypes.TemplateId.unwrap(id))
+  }
 
   /** Creates a contract that gives the given validator the right to claim coin issuances for the given user's burns. */
   private def createValidatorRightCommand(

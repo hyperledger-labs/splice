@@ -726,10 +726,12 @@ class HttpWalletHandler(
     val userStore = userWallet.store
     val userParty = userStore.key.endUserParty
     for {
-      // TODO (#4906) pick install & domainId based on disclosed contracts' domain IDs
+      // TODO (#4906) pick install based on disclosed contracts' domain IDs
       install <- userStore.getInstall()
       update <- getUpdate(install.contractId, userStore)
-      domainId <- store.domains.getDomainId(walletManager.globalDomain)
+      domainId <- dislosedContracts
+        .inferDomain(None)
+        .fold { store.domains.getDomainId(walletManager.globalDomain) }(Future.successful)
       result <- dedup match {
         case None =>
           getUserWallet(user).connection.submitWithResultNoDedup(

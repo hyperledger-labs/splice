@@ -54,7 +54,7 @@ class AcceptedAppPaymentRequestsTrigger(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
         domainId: DomainId,
-        disclosedContracts: DisclosedContracts,
+        disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting accepted app payment: $reason")
       val cmd = payment.contract.contractId.exerciseAcceptedAppPayment_Reject(transferContext)

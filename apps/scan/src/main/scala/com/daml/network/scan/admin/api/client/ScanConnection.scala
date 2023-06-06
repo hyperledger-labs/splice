@@ -170,7 +170,7 @@ final class ScanConnection private (
       (openRounds, _) <- getOpenAndIssuingMiningRounds()
       now = clock.now
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
-    } yield openRound
+    } yield openRound.contract
   }
 
   def getOpenAndIssuingMiningRounds()(implicit
@@ -179,8 +179,8 @@ final class ScanConnection private (
       tc: TraceContext,
   ): Future[
     (
-        Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-        Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+        Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
+        Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
     )
   ] = {
     val now = clock.now
@@ -189,7 +189,8 @@ final class ScanConnection private (
       val rounds = cache.getRoundTuple
       logger.info(
         s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load following issuing rounds: ${rounds._1
-            .map(_.payload.round.number)}, and following open rounds: ${rounds._2.map(_.payload.round.number)}."
+            .map(_.contract.payload.round.number)}, and following open rounds: ${rounds._2
+            .map(_.contract.payload.round.number)}."
       )
       Future.successful(rounds)
     } else {
@@ -252,7 +253,7 @@ final class ScanConnection private (
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[(coinCodegen.AppTransferContext, DisclosedContracts)] = {
+  ): Future[(coinCodegen.AppTransferContext, DisclosedContracts.NE)] = {
     for {
       context <- getTransferContextWithInstances()
       featured <- lookupFeaturedAppRight(providerPartyId)
@@ -262,10 +263,9 @@ final class ScanConnection private (
       (
         new coinCodegen.AppTransferContext(
           coinRules.contract.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
-          openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
+          openMiningRound.contract.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
           featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
         ),
-        // TODO (#5229) assuming same state for round as rules
         DisclosedContracts(coinRules, openMiningRound),
       )
     }
@@ -276,25 +276,25 @@ final class ScanConnection private (
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[
-    Either[String, (coinCodegen.AppTransferContext, DisclosedContracts)]
+    Either[String, (coinCodegen.AppTransferContext, DisclosedContracts.NE)]
   ] = {
     for {
       context <- getTransferContextWithInstances()
       featured <- lookupFeaturedAppRight(providerPartyId)
     } yield {
       val coinRules = context.coinRules
-      context.openMiningRounds.find(_.payload.round == round) match {
+      context.openMiningRounds.find(_.contract.payload.round == round) match {
         case Some(openMiningRound) =>
           Right(
             (
               new coinCodegen.AppTransferContext(
                 coinRules.contract.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
-                openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
+                openMiningRound.contract.contractId
+                  .toInterface(roundCodegen.OpenMiningRound.INTERFACE),
                 featured
                   .map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE))
                   .toJava,
               ),
-              // TODO (#5229) assuming same state for round as rules
               DisclosedContracts(coinRules, openMiningRound),
             )
           )
@@ -331,13 +331,15 @@ object ScanConnection {
 
   private case class CachedMiningRounds(
       cacheValidUntil: Option[CantonTimestamp] = None,
-      sortedOpenMiningRounds: Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]] = Seq(),
-      sortedIssuingMiningRounds: Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]] =
+      sortedOpenMiningRounds: Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]] =
         Seq(),
+      sortedIssuingMiningRounds: Seq[
+        ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]
+      ] = Seq(),
   ) {
     def getRoundTuple: (
-        Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-        Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+        Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
+        Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
     ) =
       (sortedOpenMiningRounds, sortedIssuingMiningRounds)
   }

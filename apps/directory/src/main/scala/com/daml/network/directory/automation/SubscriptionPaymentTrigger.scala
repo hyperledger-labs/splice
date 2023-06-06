@@ -53,7 +53,7 @@ class SubscriptionPaymentTrigger(
     def rejectPayment(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
-        disclosedContracts: DisclosedContracts,
+        disclosedContracts: DisclosedContracts.NE,
         log: String => Unit = logger.warn(_),
     ) = {
       log(s"rejecting subscription payment: $reason")
@@ -64,7 +64,7 @@ class SubscriptionPaymentTrigger(
           Seq(),
           cmd.asScala.toSeq,
           domainId,
-          disclosedContracts,
+          disclosedContracts assertOnDomain domainId,
         )
         .map(_ => TaskSuccess(s"rejected subscription payment: $reason"))
     }
@@ -75,7 +75,7 @@ class SubscriptionPaymentTrigger(
         ],
         deduplicationOffset: String,
         transferContext: v1.coin.AppTransferContext,
-        disclosedContracts: DisclosedContracts,
+        disclosedContracts: DisclosedContracts.NE,
     ) = {
       val cmd =
         contextId
@@ -94,7 +94,7 @@ class SubscriptionPaymentTrigger(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(provider, entry.payload.name),
             deduplicationOffset = deduplicationOffset,
             domainId = domainId,
-            disclosedContracts = disclosedContracts,
+            disclosedContracts = disclosedContracts assertOnDomain domainId,
           )
       } yield TaskSuccess("renewed directory entry.")
     }

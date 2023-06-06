@@ -17,7 +17,7 @@ import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
 import java.time.{Duration, Instant}
@@ -192,7 +192,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
       validatorParty: PartyId,
       coin: HttpWalletAppClient.CoinPosition,
       outputs: Seq[v1.coin.TransferOutput],
-      domainId: Option[DomainId] = None,
   )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment) = {
     val coinRules = sv1Scan.getCoinRules()
     val transferContext = sv1Scan.getUnfeaturedAppTransferContext(getLedgerTime)
@@ -227,7 +226,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
             None.toJava,
           ),
         ),
-      domainId = disclosure inferDomain domainId,
+      domainId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -257,7 +256,8 @@ trait TimeTestUtil extends CNNodeTestCommon {
       duration: Duration
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val (previousOpenRounds, previousIssuingRounds) = sv1Scan.getOpenAndIssuingMiningRounds()
-    val Seq(lowestOpen, middleOpen, highestOpen) = previousOpenRounds.map(_.payload.round.number)
+    val Seq(lowestOpen, middleOpen, highestOpen) =
+      previousOpenRounds.map(_.contract.payload.round.number)
 
     // not exactly 150s because of the skew parameter.
     actAndCheck("advancing time", advanceTime(duration))(
@@ -269,7 +269,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
             sv1Scan.getOpenAndIssuingMiningRounds()
 
           val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) =
-            newOpenRounds.map(_.payload.round.number)
+            newOpenRounds.map(_.contract.payload.round.number)
 
           (
             newLowestOpen,
@@ -283,13 +283,15 @@ trait TimeTestUtil extends CNNodeTestCommon {
             // or if we advance for more than one tick which will result in potentially
             // all old issuing rounds being archived and only one new round being created
             // for the open round that we just archived.
-            forExactly(1, newIssuingRounds)(round => round.payload.round.number shouldBe lowestOpen)
+            forExactly(1, newIssuingRounds)(round =>
+              round.contract.payload.round.number shouldBe lowestOpen
+            )
           } else {
             val Seq(lowestIssuing, middleIssuing, highestIssuing) =
-              previousIssuingRounds.map(_.payload.round.number)
+              previousIssuingRounds.map(_.contract.payload.round.number)
             newIssuingRounds should have size 3
             val Seq(newLowestIssuing, newMiddleIssuing, newHighestIssuing) =
-              newIssuingRounds.map(_.payload.round.number)
+              newIssuingRounds.map(_.contract.payload.round.number)
 
             newLowestIssuing shouldBe lowestIssuing + 1
             newLowestIssuing shouldBe middleIssuing
@@ -308,8 +310,8 @@ trait TimeTestUtil extends CNNodeTestCommon {
     val now = svc.participantClient.ledger_api.time.get().toInstant
     val (openRounds, _) = sv1Scan.getOpenAndIssuingMiningRounds()
     val earliestOpen = openRounds
-      .filter(round => now.isBefore(round.payload.targetClosesAt))
-      .map(_.payload.opensAt)
+      .filter(round => now.isBefore(round.contract.payload.targetClosesAt))
+      .map(_.contract.payload.opensAt)
       .min
     if (now.isBefore(earliestOpen)) {
       advanceTime(Duration.between(now, earliestOpen))

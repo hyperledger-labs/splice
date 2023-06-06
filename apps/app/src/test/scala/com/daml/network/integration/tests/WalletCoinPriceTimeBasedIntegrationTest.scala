@@ -29,6 +29,7 @@ class WalletCoinPriceTimeBasedIntegrationTest
         sv1Scan
           .getTransferContextWithInstances(CantonTimestamp.now())
           .latestOpenMiningRound
+          .contract
           .payload
           .coinPrice shouldBe BigDecimal(
           2

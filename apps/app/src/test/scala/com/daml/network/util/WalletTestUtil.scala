@@ -236,7 +236,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         paymentCodegen.AcceptedAppPayment.ContractId,
         paymentCodegen.AcceptedAppPayment,
       ],
-      domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
@@ -251,7 +250,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = acceptedPayment.contractId.exerciseAcceptedAppPayment_Collect(
         appTc
       ),
-      domainId = disclosure inferDomain domainId,
+      domainId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -262,7 +261,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId: String,
       userParty: PartyId,
       acceptedPayment: paymentCodegen.AcceptedAppPayment.ContractId,
-      domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
@@ -275,7 +273,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       actAs = Seq(userParty),
       readAs = Seq(),
       update = acceptedPayment.exerciseAcceptedAppPayment_Reject(appTc),
-      domainId = disclosure inferDomain domainId,
+      domainId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -290,7 +288,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         subsCodegen.SubscriptionInitialPayment.ContractId,
         subsCodegen.SubscriptionInitialPayment,
       ],
-      domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
@@ -306,7 +303,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         update = acceptedPayment.contractId.exerciseSubscriptionInitialPayment_Collect(
           appTc
         ),
-        domainId = disclosure inferDomain domainId,
+        domainId = Some(disclosure.assignedDomain),
         disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
       )
       .exerciseResult
@@ -317,7 +314,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId: String,
       userParty: PartyId,
       acceptedPayment: subsCodegen.SubscriptionInitialPayment.ContractId,
-      domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
@@ -332,7 +328,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = acceptedPayment.exerciseSubscriptionInitialPayment_Reject(
         appTc
       ),
-      domainId = disclosure inferDomain domainId,
+      domainId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -344,7 +340,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userParty: PartyId,
       senderParty: PartyId,
       payment: subsCodegen.SubscriptionPayment.ContractId,
-      domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
@@ -359,7 +354,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = payment.exerciseSubscriptionPayment_Collect(
         appTc
       ),
-      domainId = disclosure inferDomain domainId,
+      domainId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -369,7 +364,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId: String,
       userParty: PartyId,
       payment: subsCodegen.SubscriptionPayment.ContractId,
-      domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
@@ -384,7 +378,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = payment.exerciseSubscriptionPayment_Reject(
         appTc
       ),
-      domainId = disclosure inferDomain domainId,
+      domainId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
     )
   }
@@ -863,7 +857,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       update = tc.coinRules.contract.contractId.exerciseCoinRules_Mint(
         receiver.toLf,
         amount.bigDecimal,
-        tc.latestOpenMiningRound.contractId,
+        tc.latestOpenMiningRound.contract.contractId,
       ),
       domainId = domainId orElse (tc.coinRules.state match {
         case ContractState.InFlight => None
@@ -945,6 +939,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       ._2
       .lastOption
       .getOrElse(throw new RuntimeException("No issuing round found"))
+      .contract
       .payload
 
     val issuancePerARC = if (featured) {

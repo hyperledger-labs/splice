@@ -58,19 +58,19 @@ object HttpScanAppClient {
     */
   case class TransferContextWithInstances(
       coinRules: ContractWithState[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
-      latestOpenMiningRound: Contract[
+      latestOpenMiningRound: ContractWithState[
         roundCodegen.OpenMiningRound.ContractId,
         roundCodegen.OpenMiningRound,
       ],
       openMiningRounds: Seq[
-        Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]
+        ContractWithState[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]
       ],
   ) {
     def toUnfeaturedAppTransferContext() = {
       val openMiningRound = latestOpenMiningRound
       new v1.coin.AppTransferContext(
         coinRules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
-        openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
+        openMiningRound.contract.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
         None.toJava,
       )
     }
@@ -78,20 +78,21 @@ object HttpScanAppClient {
 
   /** Rounds are sorted in ascending order according to their round number. */
   case class GetSortedOpenAndIssuingMiningRounds(
-      cachedOpenRounds: Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-      cachedIssuingRounds: Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+      cachedOpenRounds: Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
+      cachedIssuingRounds: Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
   ) extends BaseCommand[
         http.GetOpenAndIssuingMiningRoundsResponse,
         (
-            Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-            Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+            Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
+            Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
             BigInt,
         ),
       ] {
 
-    private val cachedOpenRoundsMap = cachedOpenRounds.map(r => (r.contractId.contractId, r)).toMap
+    private val cachedOpenRoundsMap =
+      cachedOpenRounds.map(r => (r.contract.contractId.contractId, r)).toMap
     private val cachedIssuingRoundsMap =
-      cachedIssuingRounds.map(r => (r.contractId.contractId, r)).toMap
+      cachedIssuingRounds.map(r => (r.contract.contractId.contractId, r)).toMap
 
     override def submitRequest(
         client: Client,
@@ -102,8 +103,8 @@ object HttpScanAppClient {
     ], http.GetOpenAndIssuingMiningRoundsResponse] =
       client.getOpenAndIssuingMiningRounds(
         definitions.GetOpenAndIssuingMiningRoundsRequest(
-          cachedOpenRounds.map(_.contractId.contractId).toVector,
-          cachedIssuingRounds.map(_.contractId.contractId).toVector,
+          cachedOpenRounds.map(_.contract.contractId.contractId).toVector,
+          cachedIssuingRounds.map(_.contract.contractId.contractId).toVector,
         ),
         headers,
       )
@@ -113,21 +114,21 @@ object HttpScanAppClient {
         for {
           issuingMiningRounds <- response.issuingMiningRounds.toSeq.traverse {
             case (contractId, maybeIssuingRound) =>
-              Contract.handleMaybeCachedContract(roundCodegen.IssuingMiningRound.COMPANION)(
+              ContractWithState.handleMaybeCached(roundCodegen.IssuingMiningRound.COMPANION)(
                 cachedIssuingRoundsMap.get(contractId),
                 maybeIssuingRound,
               )
           }
           openMiningRounds <- response.openMiningRounds.toSeq.traverse {
             case (contractId, maybeOpenRound) =>
-              Contract.handleMaybeCachedContract(roundCodegen.OpenMiningRound.COMPANION)(
+              ContractWithState.handleMaybeCached(roundCodegen.OpenMiningRound.COMPANION)(
                 cachedOpenRoundsMap.get(contractId),
                 maybeOpenRound,
               )
           }
         } yield (
-          openMiningRounds.sortBy(_.payload.round.number),
-          issuingMiningRounds.sortBy(_.payload.round.number),
+          openMiningRounds.sortBy(_.contract.payload.round.number),
+          issuingMiningRounds.sortBy(_.contract.payload.round.number),
           response.timeToLiveInMicroseconds,
         )
     }

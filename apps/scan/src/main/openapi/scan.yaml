@@ -357,9 +357,9 @@ components:
         time_to_live_in_microseconds:
           type: integer
         open_mining_rounds:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractMap"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractWithStateMap"
         issuing_mining_rounds:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractMap"
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractWithStateMap"
     GetCoinRulesRequest:
       type: object
       properties:

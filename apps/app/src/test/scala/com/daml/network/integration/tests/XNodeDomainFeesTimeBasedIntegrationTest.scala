@@ -375,7 +375,7 @@ class XNodeDomainFeesTimeBasedIntegrationTest
       new v1.coin.PaymentTransferContext(
         coinRules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
         new v1.coin.TransferContext(
-          transferContext.latestOpenMiningRound.contractId
+          transferContext.latestOpenMiningRound.contract.contractId
             .toInterface(v1.round.OpenMiningRound.INTERFACE),
           Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
           Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,

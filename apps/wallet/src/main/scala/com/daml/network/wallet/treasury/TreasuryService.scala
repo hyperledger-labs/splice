@@ -40,7 +40,6 @@ import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService.*
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
@@ -75,7 +74,6 @@ import scala.util.{Failure, Success}
   */
 class TreasuryService(
     connection: CNLedgerConnection,
-    globalDomain: DomainAlias,
     treasuryConfig: TreasuryConfig,
     clock: Clock,
     userStore: UserWalletStore,
@@ -362,19 +360,18 @@ class TreasuryService(
       inputs: Seq[TransferInput],
       batch: CoinOperationBatch,
       readAs: Set[PartyId],
-      disclosedContracts: DisclosedContracts,
+      disclosedContracts: DisclosedContracts.NE,
   )(implicit tc: TraceContext): Future[Done] = {
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
     logger.debug(s"executing batch $batch with inputs $inputs")
     for {
-      domainId <- userStore.domains.getDomainId(globalDomain)
       (offset, result) <- connection
         // The only operation that is not self-conflicting is Tap, therefore batch execution w/o command dedup is safe.
         .submitWithResultAndOffsetNoDedup(
           Seq(walletManager.store.walletKey.validatorParty),
           userStore.key.endUserParty +: readAs.toSeq,
           cmd,
-          domainId,
+          disclosedContracts.assignedDomain,
           disclosedContracts,
         )
 
@@ -460,7 +457,7 @@ class TreasuryService(
         Seq[v1.coin.TransferInput],
         Set[PartyId],
         v1.coin.PaymentTransferContext,
-        DisclosedContracts,
+        DisclosedContracts.NE,
     )
   ]] = {
     for {
@@ -471,12 +468,15 @@ class TreasuryService(
           scanConnection.approveTaps(userStore.key.validatorParty, numTapOperations)
         } else { Future.successful(true) }
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
-      configUsd = openRound.payload.transferConfigUsd
+      configUsd = openRound.contract.payload.transferConfigUsd
       maxNumInputs = configUsd.maxNumInputs.intValue()
-      openIssuingRounds = issuingMiningRounds.filter(c => c.payload.opensAt.isBefore(now.toInstant))
-      issuingRoundsMap = openIssuingRounds
-        .map(r => (r.payload.round, r.payload))
-        .toMap
+      openIssuingRounds = issuingMiningRounds.filter(c =>
+        c.contract.payload.opensAt.isBefore(now.toInstant)
+      )
+      issuingRoundsMap = openIssuingRounds.view.map { r =>
+        val imr = r.contract.payload
+        (imr.round, imr)
+      }.toMap
       domainId <- walletManager.store.domains.signalWhenConnected(
         walletManager.store.defaultAcsDomain
       )
@@ -484,7 +484,7 @@ class TreasuryService(
         .listContractsOnDomain(coinCodegen.ValidatorRight.COMPANION, domainId)
       coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
         maxNumInputs,
-        openRound.payload.round.number,
+        openRound.contract.payload.round.number,
       )
       (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs) <-
         getValidatorRewardsAndQuantity(
@@ -524,13 +524,16 @@ class TreasuryService(
         val rewardInputRounds =
           appRewardInputs.map(_._1).toSet ++ validatorRewardInputs.map(_._1).toSet
         val transferContext = new TransferContext(
-          openRound.contractId
+          openRound.contract.contractId
             .toInterface(v1.round.OpenMiningRound.INTERFACE),
-          openIssuingRounds
+          openIssuingRounds.view
             // only provide rounds that are actually used in transfer context to avoid unnecessary fetching.
-            .filter(r => rewardInputRounds.contains(r.payload.round))
+            .filter(r => rewardInputRounds.contains(r.contract.payload.round))
             .map(r =>
-              (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
+              (
+                r.contract.payload.round,
+                r.contract.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE),
+              )
             )
             .toMap[roundApi.Round, roundApi.IssuingMiningRound.ContractId]
             .asJava,
@@ -552,7 +555,7 @@ class TreasuryService(
           DisclosedContracts(
             disclosedCoinRules,
             openRound,
-          ) ++ DisclosedContracts(openIssuingRounds.map(r => r: DisclosedContracts.Arg): _*)
+          ) addAll openIssuingRounds
         Some(
           (
             inputs,

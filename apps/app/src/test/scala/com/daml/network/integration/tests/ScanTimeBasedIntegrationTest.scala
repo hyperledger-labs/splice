@@ -36,10 +36,11 @@ class ScanTimeBasedIntegrationTest
       .withoutAutomaticRewardsCollectionAndCoinMerging
 
   "report correct reference data" in { implicit env =>
-    sv1Scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number shouldBe 1
+    def roundNum() = sv1Scan.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
+    roundNum() shouldBe 1
 
     advanceRoundsByOneTick
-    sv1Scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number shouldBe 2
+    roundNum() shouldBe 2
   }
 
   "return correct coin configs" in { implicit env =>

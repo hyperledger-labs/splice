@@ -52,7 +52,7 @@ class SubscriptionInitialPaymentTrigger(
     def rejectPayment(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
-        disclosedContracts: DisclosedContracts,
+        disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting initial subscription payment: $reason")
       val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject(transferContext)
@@ -62,7 +62,7 @@ class SubscriptionInitialPaymentTrigger(
           Seq(),
           cmd,
           domainId,
-          disclosedContracts = disclosedContracts,
+          disclosedContracts = disclosedContracts assertOnDomain domainId,
         )
         .map(_ => TaskSuccess(s"rejected initial subscription payment: $reason"))
     }
@@ -70,7 +70,7 @@ class SubscriptionInitialPaymentTrigger(
         entryName: String,
         deduplicationOffset: String,
         transferContext: v1.coin.AppTransferContext,
-        disclosedContracts: DisclosedContracts,
+        disclosedContracts: DisclosedContracts.NE,
     ) = {
       val cmd =
         contextId
@@ -88,7 +88,7 @@ class SubscriptionInitialPaymentTrigger(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(store.providerParty, entryName),
             deduplicationOffset = deduplicationOffset,
             domainId = domainId,
-            disclosedContracts = disclosedContracts,
+            disclosedContracts = disclosedContracts assertOnDomain domainId,
           )
       } yield TaskSuccess("created directory entry.")
     }

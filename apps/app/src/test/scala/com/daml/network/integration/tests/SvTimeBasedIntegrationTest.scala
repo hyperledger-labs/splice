@@ -272,7 +272,8 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     val nodes = Seq(aliceValidator, bobValidator)
     startAllSync(nodes)
 
-    val round = sv1Scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound
+    val round =
+      sv1Scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound.contract
     // There may be rewards left over from other tests, so we first check the
     // contract IDs of existing ones, and compare to that below
     val leftoverRewardIds = getRewardCoupons(round).view.map(_.id).toSet

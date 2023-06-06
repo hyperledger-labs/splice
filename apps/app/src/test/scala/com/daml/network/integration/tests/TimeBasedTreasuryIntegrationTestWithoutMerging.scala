@@ -466,7 +466,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
               entries,
             )(
               _.message should include(
-                show"Not sending ${PrettyContractId(issuingRound1)}"
+                show"Not sending ${PrettyContractId(issuingRound1.contract)}"
               )
             )
             forAtLeast(

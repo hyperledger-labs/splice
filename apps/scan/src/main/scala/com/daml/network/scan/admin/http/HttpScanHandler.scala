@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cc.round.{
   SummarizingMiningRound,
 }
 import com.daml.network.http.v0.{definitions, scan as v0}
-import com.daml.network.http.v0.definitions.{MaybeCachedContract, MaybeCachedContractWithState}
+import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
@@ -27,7 +27,7 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveNumeric}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
@@ -86,10 +86,12 @@ class HttpScanHandler(
         issuingRoundsResponseMap = selectRoundsToRespondWith(
           issuingRounds,
           issuingRoundsCachedByClient,
+          domainId,
         )
         openRoundsResponseMap = selectRoundsToRespondWith(
           openRounds,
           openRoundsCachedByClient,
+          domainId,
         )
         ttl = tryComputeTimeToLive(openRounds, summarizingRounds, issuingRounds)
       } yield {
@@ -125,22 +127,25 @@ class HttpScanHandler(
   private def selectRoundsToRespondWith[TCid, T](
       rounds: Seq[Contract[TCid, T]],
       cachedRounds: Set[String],
-  )(implicit tc: TraceContext): Map[String, MaybeCachedContract] = {
-    rounds
-      .map(round => {
-        val roundIsAlreadyCached =
-          cachedRounds.contains(round.contractId.contractId)
-        (
-          round.contractId.contractId,
+      onlyDomainId: DomainId,
+  )(implicit tc: TraceContext): Map[String, MaybeCachedContractWithState] = {
+    val constDomain = Some(onlyDomainId.toProtoPrimitive)
+    rounds.map { round =>
+      val roundIsAlreadyCached =
+        cachedRounds.contains(round.contractId.contractId)
+      (
+        round.contractId.contractId,
+        MaybeCachedContractWithState(
           if (roundIsAlreadyCached) {
             logger.debug(
               show"Not sending ${PrettyContractId(round)}, as it is cached by the client."
             )
-            MaybeCachedContract(None)
-          } else MaybeCachedContract(Some(round.toJson)),
-        )
-      })
-      .toMap
+            None
+          } else Some(round.toJson),
+          constDomain,
+        ),
+      )
+    }.toMap
   }
 
   def getCoinRules(

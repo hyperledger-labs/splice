@@ -66,7 +66,7 @@ class ScanTimeBasedIntegrationTestWithAutomation
 
     // This is the round where the rewards for the first transfer are collected.
     val rewardCollectionRoundForFirstTransfer =
-      sv1Scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number
+      sv1Scan.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
 
     val rewardsCollectedForFirstTransfer =
       clue("correct rewards are returned for the round and for the total") {
@@ -87,7 +87,7 @@ class ScanTimeBasedIntegrationTestWithAutomation
 
     // This is the round where the rewards for the second transfer are collected.
     val rewardCollectionRoundForSecondTransfer =
-      sv1Scan.getLatestOpenMiningRound(getLedgerTime).payload.round.number
+      sv1Scan.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
 
     clue("correct rewards are returned for the old round, the new round and for the total") {
       eventually() {

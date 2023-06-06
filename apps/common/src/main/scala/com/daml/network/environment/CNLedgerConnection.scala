@@ -148,7 +148,7 @@ class CNLedgerConnection(
           commands = commands,
           commandId = uniqueId,
           deduplicationConfig = NoDedup,
-          disclosedContracts = disclosedContracts,
+          disclosedContracts = disclosedContracts assertOnDomain domainId,
         )
     )(offset => (offset, ()))
   }
@@ -173,7 +173,7 @@ class CNLedgerConnection(
           commands = commands,
           commandId = uniqueId,
           deduplicationConfig = NoDedup,
-          disclosedContracts = disclosedContracts,
+          disclosedContracts = disclosedContracts assertOnDomain domainId,
         )
     )(tx => (tx.getOffset, tx))
   }
@@ -199,7 +199,7 @@ class CNLedgerConnection(
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
           commands = commands,
-          disclosedContracts = disclosedContracts,
+          disclosedContracts = disclosedContracts assertOnDomain domainId,
         )
     )(offset => (offset, ()))
   }
@@ -225,7 +225,7 @@ class CNLedgerConnection(
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
           commands = commands,
-          disclosedContracts = disclosedContracts,
+          disclosedContracts = disclosedContracts assertOnDomain domainId,
         )
     )(tx => (tx.getOffset, tx))
   }
@@ -320,7 +320,7 @@ class CNLedgerConnection(
             readAs = readAs.map(_.toProtoPrimitive),
             commands = update.commands.asScala.toSeq,
             deduplicationConfig = dedup,
-            disclosedContracts = disclosedContracts,
+            disclosedContracts = disclosedContracts assertOnDomain domainId,
           )
       )(tx => (tx.getOffset, tx))
     } yield (
