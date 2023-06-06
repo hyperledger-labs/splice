@@ -16,13 +16,8 @@ create table store_descriptors (
 );
 
 create table store_ingestion_states(
-    primary key (store_id, domain_id),
-
     -- the store for which this ingestion state is tracking the offset
-    store_id int not null references store_descriptors(id),
-
-    -- domain tracked by this ingestion state
-    domain_id text not null,
+    store_id int not null references store_descriptors(id) primary key,
 
     -- the last ingested offset; if the ingestion was not yet started then no ingestion state is present
     last_ingested_offset text not null

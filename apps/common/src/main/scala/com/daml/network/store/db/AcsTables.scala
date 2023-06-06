@@ -4,7 +4,6 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.topology.DomainId
 import io.circe.Json
 import shapeless.HNil
 import slick.jdbc.{GetResult, PostgresProfile}
@@ -33,13 +32,12 @@ trait AcsTables extends AcsJdbcTypes {
   case class StoreIngestionStatesRow(
       id: Int,
       storeId: Int,
-      domainId: DomainId,
       lastIngestedOffset: Offset,
   )
 
   class StoreIngestionStates(_tableTag: Tag)
       extends profile.api.Table[StoreIngestionStatesRow](_tableTag, "store_ingestion_states") {
-    def * = (id, storeId, domainId, lastIngestedOffset).<>(
+    def * = (id, storeId, lastIngestedOffset).<>(
       StoreIngestionStatesRow.tupled,
       StoreIngestionStatesRow.unapply,
     )
@@ -47,8 +45,6 @@ trait AcsTables extends AcsJdbcTypes {
     val id: Rep[Int] = column[Int]("id", O.AutoInc, O.PrimaryKey)
 
     val storeId: Rep[Int] = column[Int]("store_id")
-
-    val domainId: Rep[DomainId] = column[DomainId]("domain_id")
 
     val lastIngestedOffset: Rep[Offset] = column[Offset]("last_ingested_offset")
   }

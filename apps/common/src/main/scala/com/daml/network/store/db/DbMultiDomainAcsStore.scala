@@ -46,15 +46,15 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   val storeId: Int = 1
 
   @unused
-  private def minimumLastOffset()(implicit traceContext: TraceContext): Future[Option[String]] = {
+  private def lastIngestedOffset()(implicit traceContext: TraceContext): Future[Option[String]] = {
     storage
       .querySingle(
         sql"""
-        select min(last_ingested_offset)
+        select last_ingested_offset
         from store_ingestion_states
         where store_id = $storeId
          """.as[String].headOption,
-        "minimumLastOffset",
+        "lastIngestedOffset",
       )
       .value
   }
