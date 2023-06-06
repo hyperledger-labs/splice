@@ -6,6 +6,8 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithS
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level
 
 import java.time.Duration
 
@@ -333,8 +335,76 @@ class WalletTxLogTimeBasedIntegrationTest
           },
         ),
       )
+    }
 
+    // Time based to avoid SV reward collection kicking in.
+    "handle unexpected events" in { implicit env =>
+      val sv1UserId = sv1Wallet.config.ledgerApiUser
+      val sv1UserParty = onboardWalletUser(sv1Wallet, sv1Validator)
+
+      // Note: SV1 is reused between tests, ignore TxLog entries created by previous tests
+      val previousEventId = sv1Wallet
+        .listTransactions(None, 10000)
+        .headOption
+        .map(_.indexRecord.eventId)
+
+      // Note: the SVC already some coins obtained from elsewhere.
+      // This test uses a huge coin in order to determine whether the coin has been ingested.
+      val coinAmount = BigDecimal(10e6)
+
+      val coin = loggerFactory.assertLogs(
+        {
+          actAndCheck(
+            "Create a bare coin",
+            createCoin(
+              sv1Validator.participantClientWithAdminToken,
+              sv1UserId,
+              sv1UserParty,
+              amount = coinAmount,
+            ),
+          )(
+            "Coin appears in the wallet",
+            _ => sv1Wallet.balance().unlockedQty should be > (coinAmount * 0.9),
+          )
+          sv1Wallet.list().coins.last.contract
+        },
+        _.errorMessage should include(
+          "Unexpected coin create event"
+        ),
+      )
+
+      loggerFactory.assertLogs(
+        {
+          actAndCheck(
+            "Directly archive the coin",
+            archiveCoin(sv1Validator.participantClientWithAdminToken, sv1UserId, coin),
+          )(
+            "Coin disappears from the wallet",
+            _ => sv1Wallet.balance().unlockedQty should be < (coinAmount * 0.9),
+          )
+        },
+        _.errorMessage should include(
+          "Unexpected coin archive event"
+        ),
+      )
+
+      // The two above operations (bare create and bare archive of a coin) will not happen in practice.
+      // The user wallet tx log parser should throw an exception when encountering these unexpected events,
+      // which should:
+      // - Log errors while ingesting the transactions above
+      // - Generate "Unknown" log entries in the TxLog
+      // - Log errors while reading the TxLog below (recovering the full entry from the index record also involves parsing)
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+        checkTxHistory(
+          sv1Wallet,
+          Seq(
+            { case _: walletLogEntry.Unknown => succeed },
+            { case _: walletLogEntry.Unknown => succeed },
+          ),
+          previousEventId,
+        ),
+        entries => forAll(entries)(_.errorMessage should include("Failed to parse transaction")),
+      )
     }
   }
-
 }
