@@ -20,11 +20,13 @@ trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with Time
       wallet: WalletAppClientReference,
       expected: Seq[CheckTxHistoryFn],
       previousEventId: Option[String] = None,
+      ignore: UserWalletTxLogParser.TxLogEntry => Boolean = _ => false,
   ): Unit = {
 
     val (actual, toCompare) = eventually() {
       val actual = wallet.listTransactions(None, pageSize = 100000)
       val toCompare = actual
+        .filter(!ignore(_))
         .takeWhile(e => !previousEventId.contains(e.indexRecord.eventId))
 
       toCompare should have length expected.size.toLong
