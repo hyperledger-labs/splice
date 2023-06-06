@@ -5,67 +5,28 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CloseRounded, DoneRounded } from '@mui/icons-material';
 import { Button, Stack, Typography } from '@mui/material';
 
-import { useLookupEntryByName, usePrimaryParty } from '../hooks';
+import { useLookupEntryByName } from '../hooks';
+import { LookupEntryByNameError } from '../hooks/queries/useLookupEntryByName';
 
 export const PostPayment: React.FC = () => {
   const [searchParams] = useSearchParams();
   const entryName = searchParams.get('entryName') || undefined;
 
-  const {
-    data: primaryPartyId,
-    isLoading: primaryPartyIdIsLoading,
-    isError: primaryPartyIdIsError,
-    error: primaryPartyIdError,
-  } = usePrimaryParty();
-  const {
-    data: directoryEntry,
-    isLoading: directoryEntryIsLoading,
-    isError: directoryEntryIsError,
-    error: directoryEntryError,
-  } = useLookupEntryByName(entryName);
+  const directoryStatus = useLookupEntryByName(entryName);
 
   if (!entryName) {
     console.error('PostPayment rendered without entryName.');
     return <></>;
   }
 
-  if (primaryPartyIdIsLoading || directoryEntryIsLoading) {
-    return <DirectoryLoading entryName={entryName} />;
+  switch (directoryStatus.status) {
+    case 'loading':
+      return <DirectoryLoading entryName={entryName} />;
+    case 'error':
+      return <DirectoryFailed entryName={entryName} error={directoryStatus.error} />;
+    case 'success':
+      return <DirectoryReady entryName={entryName} />;
   }
-
-  if (primaryPartyIdIsError) {
-    return (
-      <DirectoryFailed
-        errorMessage={`Could not retrieve primary party.`}
-        errorDetails={
-          primaryPartyIdError instanceof Error ? primaryPartyIdError.message : undefined
-        }
-      />
-    );
-  }
-
-  if (primaryPartyIdIsError || directoryEntryIsError) {
-    return (
-      <DirectoryFailed
-        errorMessage={`${entryName} was not registered. Something went wrong.`}
-        errorDetails={
-          directoryEntryError instanceof Error ? directoryEntryError.message : undefined
-        }
-      />
-    );
-  }
-
-  const directoryEntryOwner = directoryEntry.entryContract?.payload.user;
-
-  if (primaryPartyId !== directoryEntryOwner) {
-    return (
-      <DirectoryFailed
-        errorMessage={`${entryName} was not registered. It was claimed by someone else.`}
-      />
-    );
-  }
-
-  return <DirectoryReady entryName={entryName} />;
 };
 
 interface DirectoryProps {
@@ -91,10 +52,35 @@ const DirectoryLoading: React.FC<DirectoryProps> = ({ entryName }) => {
   );
 };
 
-const DirectoryFailed: React.FC<{ errorMessage: string; errorDetails?: string }> = ({
-  errorMessage,
-  errorDetails,
+const DirectoryFailed: React.FC<DirectoryProps & { error: LookupEntryByNameError }> = ({
+  entryName,
+  error,
 }) => {
+  let errorComponent;
+  switch (error.type) {
+    case 'assigned_to_other':
+      errorComponent = (
+        <Typography variant="h5">
+          {entryName} was not registered. It was claimed by someone else.
+          <br />
+          Please try again, or search for a different name.
+        </Typography>
+      );
+      break;
+    case 'unknown':
+      errorComponent = (
+        <Stack spacing={5}>
+          <Typography variant="h5">
+            {entryName} was not registered. Something went wrong.
+            <br />
+            Please try again, or search for a different name.
+          </Typography>
+          <Typography variant="body2">{error.message}</Typography>
+        </Stack>
+      );
+      break;
+  }
+
   return (
     <Stack
       alignItems="center"
@@ -105,14 +91,7 @@ const DirectoryFailed: React.FC<{ errorMessage: string; errorDetails?: string }>
     >
       <CloseRounded color="error" style={statusIconStyle} />
       <Typography variant="h5">Payment Failed</Typography>
-      <Stack spacing={5}>
-        <Typography variant="h5">
-          {errorMessage}
-          <br />
-          Please try again, or search for a different name.
-        </Typography>
-        {errorDetails && <Typography variant="body2">{errorDetails}</Typography>}
-      </Stack>
+      {errorComponent}
       <YourDirectoryEntriesButton />
     </Stack>
   );

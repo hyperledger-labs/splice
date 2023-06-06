@@ -2,44 +2,36 @@ import * as React from 'react';
 import BigNumber from 'bignumber.js';
 
 type AmountDisplayProps = {
-  amount?: number | string | BigNumber;
+  amount?: BigNumber;
   currency: Currency;
   convert?: Conversion;
   coinPrice?: number | BigNumber;
 };
 
 const AmountDisplay: React.FC<AmountDisplayProps> = props => {
-  var _amount: BigNumber,
-    _currency: Currency = props.currency;
+  var { amount, currency } = props;
 
-  if (props.amount === undefined) {
-    return <>--.-- {props.currency}</>;
-  }
-
-  if (typeof props.amount === 'number' || typeof props.amount === 'string') {
-    _amount = BigNumber(props.amount);
-  } else {
-    _amount = props.amount;
+  if (!amount) {
+    return <>--.-- {currency}</>;
   }
 
   if (props.convert && props.coinPrice) {
     switch (true) {
-      case props.currency === 'CC' && props.convert === 'CCtoUSD':
-        _amount = _amount.multipliedBy(props.coinPrice);
-        _currency = 'USD';
+      case currency === 'CC' && props.convert === 'CCtoUSD':
+        amount = amount.multipliedBy(props.coinPrice);
+        currency = 'USD';
         break;
-      case props.currency === 'USD' && props.convert === 'USDtoCC':
-        _amount = _amount.div(props.coinPrice);
-        _currency = 'CC';
+      case currency === 'USD' && props.convert === 'USDtoCC':
+        amount = amount.div(props.coinPrice);
+        currency = 'CC';
         break;
       default:
         throw Error('Conversion ' + props.convert + ' not properly defined.');
     }
   }
-
   return (
     <>
-      {_amount.toString()} {_currency}
+      {amount.toString()} {currency}
     </>
   );
 };

@@ -7,7 +7,6 @@ import {
   IntervalDisplay,
 } from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
-import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
@@ -123,13 +122,11 @@ const SubscriptionContainer: React.FC<{ subscription: SubscriptionRequestWithCon
 const ConfirmSubscriptionButton: React.FC<{ cid: ContractId<damlSubscriptionRequest> }> = ({
   cid,
 }) => {
-  const [clicked, setClicked] = useState(false);
   const { acceptSubscriptionRequest } = useWalletClient();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
 
   const onAccept = async () => {
-    setClicked(true);
     await acceptSubscriptionRequest(cid);
     if (redirect) {
       window.location.assign(redirect);
@@ -137,13 +134,7 @@ const ConfirmSubscriptionButton: React.FC<{ cid: ContractId<damlSubscriptionRequ
   };
 
   return (
-    <Button
-      variant="pill"
-      size="large"
-      onClick={onAccept}
-      disabled={clicked}
-      className="sub-request-accept-button"
-    >
+    <Button variant="pill" size="large" onClick={onAccept} className="sub-request-accept-button">
       Confirm Subscription
     </Button>
   );

@@ -21,10 +21,6 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
     click on "entry-name-field"
     textField("entry-name-field").value = entryName
 
-    waitForQuery(id("search-entry-button"))
-    click on "search-entry-button"
-
-    waitForQuery(id("request-entry-with-sub-button"))
     click on "request-entry-with-sub-button"
   }
 

@@ -5,11 +5,18 @@ import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 import { usePrimaryParty } from '..';
 
-type LookupEntryResponse = {
-  entryContract?: Contract<DirectoryEntry>;
-};
+export class LookupEntryByNameError extends Error {
+  type: 'assigned_to_other' | 'unknown';
 
-const useLookupEntryByName = (name?: string): UseQueryResult<LookupEntryResponse> => {
+  constructor(message: string, type: 'assigned_to_other' | 'unknown') {
+    super(`LookupEntryByNameError (${type}): ${message}`);
+    this.type = type;
+  }
+}
+
+const useLookupEntryByName = (
+  name?: string
+): UseQueryResult<Contract<DirectoryEntry>, LookupEntryByNameError> => {
   const directoryClient = useDirectoryClient();
   const { data: primaryPartyId } = usePrimaryParty();
 
@@ -18,17 +25,23 @@ const useLookupEntryByName = (name?: string): UseQueryResult<LookupEntryResponse
     queryFn: async () => {
       return directoryClient
         .lookupEntryByName(name!)
-        .then(response => ({
-          entryContract: response,
-        }))
-        .catch(err => {
-          if (err?.code === 404) {
-            console.info(`Contract for directory entry ${name} does not exist`);
-            return { entryContract: undefined };
+        .then(response => {
+          if (response.payload.user !== primaryPartyId) {
+            throw new LookupEntryByNameError('CNS name already taken', 'assigned_to_other');
           } else {
-            throw err;
+            return response;
           }
+        })
+        .catch(err => {
+          throw new LookupEntryByNameError(JSON.stringify(err), 'unknown');
         });
+    },
+    retry: (failureCount: number, error: LookupEntryByNameError) => {
+      if (error.type === 'assigned_to_other') {
+        return false; // no point in retrying if we know the name is taken
+      } else {
+        return failureCount <= 3; // 3 retries is the react-query default
+      }
     },
     enabled: !!primaryPartyId && !!name,
   });
