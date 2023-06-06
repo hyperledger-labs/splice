@@ -21,9 +21,8 @@ import com.daml.network.codegen.java.cn.svcrules.{
   SvcRules_RemoveMember,
   SvcRules_RequestVote,
 }
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
@@ -42,9 +41,9 @@ import com.daml.network.sv.cometbft.{
   CometBftNode,
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
-import com.daml.network.sv.init.FoundingNodeInitializer
+import com.daml.network.sv.setup.{FoundingNodeInitializer, JoiningNodeInitializer, SvcPartyHosting}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -71,7 +70,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -321,6 +319,19 @@ class SvApp(
            else Set.empty)
     }
 
+  private val darFilesToUploadDuringInit: Seq[UploadablePackage] =
+    Seq(
+      SvApp.coinPackage,
+      SvApp.svcGovernancePackage,
+      SvApp.validatorLifecyclePackage,
+      SvApp.directoryPackage,
+    ).prependedAll(
+      if (config.enableCoinRulesUpgrade)
+        Seq(SvApp.coinV1TestPackage)
+      else
+        Seq.empty
+    )
+
   private def ensureOnboarded(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       ledgerClient: CNLedgerClient,
@@ -367,9 +378,13 @@ class SvApp(
               } else {
                 logger.info("Starting onboarding (without SVC party migration).")
                 startOnboardingWithSvcPartyHosted(
+                  svStoreWithIngestion,
                   svcAutomation,
+                  participantId,
+                  svcPartyHosting,
                   globalDomain,
                   cometBftNode,
+                  ledgerClient,
                 )
               }
           } yield (svcStore, svcAutomation)
@@ -378,14 +393,27 @@ class SvApp(
             "The SVC party is not authorized to our participant. " +
               "Starting onboarding with SVC party migration."
           )
-          startOnboardingWithSvcPartyMigration(
-            svStoreWithIngestion,
-            participantId,
-            globalDomain,
-            ledgerClient,
-            svcPartyHosting,
-            cometBftNode,
-          )
+          config.onboarding match {
+            case joiningConfig: SvOnboardingConfig.JoinWithKey =>
+              val initializer = new JoiningNodeInitializer(
+                svStoreWithIngestion,
+                svcPartyHosting,
+                config,
+                joiningConfig,
+                globalDomain,
+                participantId,
+                cometBftNode,
+                ledgerClient,
+                darFilesToUploadDuringInit,
+                loggerFactory,
+                clock,
+                retryProvider,
+                storage,
+                futureSupervisor,
+              )
+              initializer.startOnboardingWithSvcPartyMigration()
+            case _ => sys.error(s"only JoinWithKey is expected")
+          }
         }
       _ <- waitForSvcMembership(svcStore)
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
@@ -428,69 +456,15 @@ class SvApp(
       }
     }
 
-  private def startOnboardingWithSvcPartyMigration(
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      participantId: ParticipantId,
-      globalDomain: DomainId,
-      ledgerClient: CNLedgerClient,
-      svcPartyHosting: SvcPartyHosting,
-      cometBftNode: Option[CometBftNode],
-  ): Future[(SvSvcStore, SvSvcAutomationService)] = {
-    val svStore = svStoreWithIngestion.store
-    config.onboarding match {
-      case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
-        SvUtil.keyPairMatches(publicKey, privateKey) match {
-          case Right(privateKey_) =>
-            for {
-              _ <- uploadDars(svStoreWithIngestion.connection)
-              _ <- waitForValidatorLicense(svStore)
-              _ <- requestOnboarding(
-                svClient.adminApi,
-                name,
-                svStore.key.svParty,
-                publicKey,
-                svStore.key.svcParty,
-                privateKey_,
-              )
-              // Wait on the SV store because the SVC party is not yet onboarded.
-              _ <- waitForSvOnboardingConfirmed(svStore)
-              _ <- startHostingSvcPartyInParticipant(
-                globalDomain,
-                participantId,
-                svcPartyHosting,
-                svStore.key.svParty,
-              )
-              _ <- svStoreWithIngestion.connection.grantUserRights(
-                config.ledgerApiUser,
-                Seq.empty,
-                Seq(svStore.key.svcParty),
-              )
-              _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for svcParty")
-              svcStore = newSvcStore(svStore.key)
-              svcAutomation = newSvSvcAutomationService(
-                svStore,
-                svcStore,
-                ledgerClient,
-                cometBftNode,
-              )
-              _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
-              _ <- addConfirmedMemberToSvc(
-                svcAutomation,
-                globalDomain,
-              )
-            } yield (svcStore, svcAutomation)
-          case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
-        }
-      case _ => sys.error(s"only JoinWithKey is expected")
-    }
-  }
-
   private def startOnboardingWithSvcPartyHosted(
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      participantId: ParticipantId,
+      svcPartyHosting: SvcPartyHosting,
       globalDomain: DomainId,
       cometBftNode: Option[CometBftNode],
+      ledgerClient: CNLedgerClient,
   ): Future[Unit] = {
-    val svcStore = svcStoreWithIngestion.store
     config.onboarding match {
       case foundingConfig: SvOnboardingConfig.FoundCollective =>
         val initializer = new FoundingNodeInitializer(
@@ -499,48 +473,30 @@ class SvApp(
           foundingConfig,
           globalDomain,
           cometBftNode,
+          darFilesToUploadDuringInit,
           loggerFactory,
           retryProvider,
         )
-        for {
-          _ <- uploadDars(svcStoreWithIngestion.connection)
-          _ <- initializer.foundCollective()
-        } yield ()
-      case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
-        SvUtil.keyPairMatches(publicKey, privateKey) match {
-          case Right(privateKey_) =>
-            for {
-              _ <- requestOnboarding(
-                svClient.adminApi,
-                name,
-                svcStore.key.svParty,
-                publicKey,
-                svcStore.key.svcParty,
-                privateKey_,
-              )
-              _ <- addConfirmedMemberToSvc(
-                svcStoreWithIngestion,
-                globalDomain,
-              )
-            } yield ()
-          case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
-        }
-    }
-  }
-
-  private def startHostingSvcPartyInParticipant(
-      domainId: DomainId,
-      participantId: ParticipantId,
-      svcPartyHosting: SvcPartyHosting,
-      svParty: PartyId,
-  ): Future[Unit] = {
-    svcPartyHosting
-      .start(domainId, participantId, svParty)
-      .map(
-        _.getOrElse(
-          sys.error(s"Failed to host svc party on participant $participantId")
+        initializer.foundCollective()
+      case joiningConfig: SvOnboardingConfig.JoinWithKey =>
+        val initializer = new JoiningNodeInitializer(
+          svStoreWithIngestion,
+          svcPartyHosting,
+          config,
+          joiningConfig,
+          globalDomain,
+          participantId,
+          cometBftNode,
+          ledgerClient,
+          darFilesToUploadDuringInit,
+          loggerFactory,
+          clock,
+          retryProvider,
+          storage,
+          futureSupervisor,
         )
-      )
+        initializer.startOnboardingWithSvcPartyHosted(svcStoreWithIngestion)
+    }
   }
 
   private def getSvcPartyId: Future[PartyId] = {
@@ -638,111 +594,9 @@ class SvApp(
       )
   }
 
-  private def addConfirmedMemberToSvc(
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      domainId: DomainId,
-  ): Future[Unit] = {
-    val svcStore = svcStoreWithIngestion.store
-    for {
-      // Wait on the SVC store to make sure that we atomically see either the SvOnboardingConfirmed contract
-      // or the SvcRules contract.
-      _ <- waitForSvOnboardingConfirmed(svcStore)
-      _ <- retryProvider.retryForAutomation(
-        "add member to Svc",
-        for {
-          svcRules <- svcStore.getSvcRules()
-          openMiningRounds <- svcStore.getOpenMiningRoundTriple()
-          svOnboardingConfirmedOpt <- svcStore.lookupSvOnboardingConfirmedByParty(
-            svcStore.key.svParty
-          )
-          svIsSvcMember = svcRules.payload.members.asScala
-            .contains(svcStore.key.svParty.toProtoPrimitive)
-          _ <- svOnboardingConfirmedOpt match {
-            case None =>
-              if (svIsSvcMember) {
-                logger.info(s"SV is already a member of the SVC")
-                Future.unit
-              } else {
-                val msg =
-                  "SV is not a member of the SVC but there is also no confirmed onboarding, giving up"
-                logger.error(msg)
-                Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-              }
-            case Some(confirmed) =>
-              if (svIsSvcMember) {
-                logger.info("SvOnboardingConfirmed exists but SV is already a member of the SVC")
-                Future.unit
-              } else {
-                val cmd = svcRules.contractId.exerciseSvcRules_AddConfirmedMember(
-                  svcStore.key.svParty.toProtoPrimitive,
-                  confirmed.contractId,
-                  openMiningRounds.oldest.contractId,
-                  openMiningRounds.middle.contractId,
-                  openMiningRounds.newest.contractId,
-                )
-                svcStoreWithIngestion.connection.submitCommandsNoDedup(
-                  Seq(svcStore.key.svParty),
-                  Seq(svcStore.key.svcParty),
-                  commands = cmd.commands.asScala.toSeq,
-                  domainId = domainId,
-                )
-              }
-          }
-        } yield (),
-        logger,
-      )
-    } yield ()
-  }
-
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()
   } yield svcRules.exists(_.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive))
-
-  private def waitForValidatorLicense(svStore: SvSvStore): Future[
-    Contract[cc.validatorlicense.ValidatorLicense.ContractId, cc.validatorlicense.ValidatorLicense]
-  ] =
-    // If the validator license contract gets created after we disconnected from the domain, Canton blows up during the SVC party migration
-    // because the contract gets added both via the party migration and through the regular event stream for the SV party which is an observer.
-    // Therefore, we let the validator app do its thing first.
-    retryProvider.getValueWithRetries(
-      show"ValidatorLicense contract for ${svStore.key.svParty}",
-      svStore.getValidatorLicense(),
-      logger,
-    )
-
-  private def waitForSvOnboardingConfirmed(
-      svStore: SvSvStore
-  ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] =
-    waitForSvOnboardingConfirmed(svStore.key.svParty, () => svStore.lookupSvOnboardingConfirmed())
-
-  private def waitForSvOnboardingConfirmed(
-      svcStore: SvSvcStore
-  ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] =
-    waitForSvOnboardingConfirmed(
-      svcStore.key.svParty,
-      () => svcStore.lookupSvOnboardingConfirmedByParty(svcStore.key.svParty),
-    )
-
-  private def waitForSvOnboardingConfirmed(
-      svParty: PartyId,
-      lookupSvOnboardingConfirmed: () => Future[
-        Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]
-      ],
-  ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] = {
-    val description = show"SvOnboardingConfirmed contract for $svParty"
-    retryProvider.getValueWithRetries(
-      description,
-      for {
-        svOnboardingConfirmedOpt <- lookupSvOnboardingConfirmed()
-        svOnboardingConfirmed <- svOnboardingConfirmedOpt match {
-          case Some(sc) => Future.successful(sc)
-          case None =>
-            throw new StatusRuntimeException(Status.NOT_FOUND.withDescription(description))
-        }
-      } yield svOnboardingConfirmed,
-      logger,
-    )
-  }
 
   private def waitForSvcMembership(svcStore: SvSvcStore): Future[Unit] = {
     val svParty = svcStore.key.svParty
@@ -769,56 +623,6 @@ class SvApp(
       } yield (),
       logger,
     )
-  }
-
-  private def uploadDars(
-      ledgerConnection: CNLedgerConnection
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    for {
-      _ <- ledgerConnection.uploadDarFile(SvApp.coinPackage)
-      _ <- ledgerConnection.uploadDarFile(SvApp.svcGovernancePackage)
-      _ <- ledgerConnection.uploadDarFile(SvApp.validatorLifecyclePackage)
-      _ <- ledgerConnection.uploadDarFile(SvApp.directoryPackage)
-      _ <-
-        if (config.enableCoinRulesUpgrade)
-          ledgerConnection.uploadDarFile(SvApp.coinV1TestPackage)
-        else
-          Future.successful(())
-    } yield ()
-  }
-
-  private def requestOnboarding(
-      sponsorConfig: NetworkAppClientConfig,
-      name: String,
-      partyId: PartyId,
-      publicKey: String,
-      svcPartyId: PartyId,
-      privateKey: ECPrivateKey,
-  ): Future[Unit] = {
-    SvOnboardingToken(name, publicKey, partyId, svcPartyId).signAndEncode(privateKey) match {
-      case Right(token) =>
-        logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
-        retryProvider.retryForAutomation(
-          "request onboarding",
-          SvConnection(
-            sponsorConfig,
-            retryProvider,
-            coinAppParameters.processingTimeouts,
-            loggerFactory,
-          ).flatMap { svConnection =>
-            svConnection
-              .startSvOnboarding(token)
-              .andThen(_ => svConnection.close())
-          },
-          logger,
-        )
-      case Left(error) =>
-        Future.failed(
-          Status.INTERNAL
-            .withDescription(s"Could not create onboarding token: $error")
-            .asRuntimeException()
-        )
-    }
   }
 
   private def expectConfiguredValidatorOnboardings(

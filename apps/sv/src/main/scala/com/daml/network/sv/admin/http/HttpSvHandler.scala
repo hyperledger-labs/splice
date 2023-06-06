@@ -17,9 +17,10 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.{LocalDomainNode, SvApp, SvcPartyHosting, SvcRulesLock}
+import com.daml.network.sv.setup.SvcPartyHosting
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration

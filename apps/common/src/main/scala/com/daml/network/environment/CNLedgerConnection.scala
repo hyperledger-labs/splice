@@ -532,6 +532,12 @@ class CNLedgerConnection(
     } yield ()
   }
 
+  def uploadDarFiles(pkgs: Seq[UploadablePackage])(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
+    pkgs.foldLeft(Future.unit)((previous, dar) => previous.flatMap(_ => uploadDarFile(dar)))
+
   def uploadDarFile(
       pkg: UploadablePackage
   )(implicit traceContext: TraceContext): Future[Unit] =

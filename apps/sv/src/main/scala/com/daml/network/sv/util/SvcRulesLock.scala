@@ -1,9 +1,9 @@
-package com.daml.network.sv
+package com.daml.network.sv.util
 
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.store.SvSvcStore
-import com.digitalasset.canton.logging.{NamedLogging, NamedLoggerFactory}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 

@@ -11,7 +11,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.ExecutionContext
 
 class SvSvcAutomationService(
     clock: Clock,
@@ -24,7 +24,7 @@ class SvSvcAutomationService(
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit
-    ec: ExecutionContextExecutor,
+    ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
 ) extends CNNodeAppAutomationService(

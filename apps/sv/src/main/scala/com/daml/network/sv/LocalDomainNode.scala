@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.environment.*
 import com.daml.network.sv.admin.api.client.SvConnection
+import com.daml.network.sv.util.SvcRulesLock
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}

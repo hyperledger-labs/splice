@@ -1,4 +1,4 @@
-package com.daml.network.sv
+package com.daml.network.sv.setup
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
@@ -9,9 +9,7 @@ import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
-import com.digitalasset.canton.admin.api.client.data.topologyx.{
-  ListPartyToParticipantResult as ListPartyToParticipantResultX
-}
+import com.digitalasset.canton.admin.api.client.data.topologyx.ListPartyToParticipantResult as ListPartyToParticipantResultX
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.store.TimeQueryX
 import com.digitalasset.canton.topology.transaction.{
@@ -27,7 +25,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-/** Class used to orchester the flow of SVC Party hosting on SV dedicated participant.
+/** Class used to orchestrate the flow of SVC Party hosting on SV dedicated participant.
   */
 class SvcPartyHosting(
     onboardingConfig: SvOnboardingConfig,

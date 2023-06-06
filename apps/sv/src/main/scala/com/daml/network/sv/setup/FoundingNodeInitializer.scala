@@ -1,4 +1,4 @@
-package com.daml.network.sv.init
+package com.daml.network.sv.setup
 
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn
@@ -15,6 +15,7 @@ import com.daml.network.util.CNNodeUtil.{
   defaultCoinConfigSchedule,
   defaultEnabledChoices,
 }
+import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -30,6 +31,7 @@ class FoundingNodeInitializer(
     foundingConfig: SvOnboardingConfig.FoundCollective,
     domainId: DomainId,
     cometBftNode: Option[CometBftNode],
+    requiredDars: Seq[UploadablePackage],
     override protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
 )(implicit ec: ExecutionContext, tc: TraceContext)
@@ -42,6 +44,7 @@ class FoundingNodeInitializer(
   /** The one and only entry-point: found a fresh collective, given a properly allocated SVC party */
   def foundCollective(): Future[Unit] = {
     for {
+      _ <- svcStoreWithIngestion.connection.uploadDarFiles(requiredDars)
       _ <- retryProvider.retryForAutomation(
         "bootstrapping SVC",
         bootstrapSvc(),
