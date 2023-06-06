@@ -178,7 +178,7 @@ local deployments(num, svConfig, config) =
           timeoutSeconds: 10,
         },
         extraEnvVars=
-        c.appUserNameEnvBindings(["sv"]) + c.appUserNameEnvBindings(["validator"]) + [
+        c.appUserNameEnvBindings(["sv", "validator"]) + c.appUserNameEnvBinding("sv", "scan") + [
           { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
           { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: participantPostgresSchema },
           { name: "CANTON_PARTICIPANT_USERS", json: [
@@ -199,6 +199,16 @@ local deployments(num, svConfig, config) =
           ] },
         ]
       ),
+    ] else []
+  ) + (
+    if num == 2 then [
+      c.deployment(config, "scan-app", [
+        {
+          name: "scan-api",
+          port: 5012,
+          internalOnly: true,
+        },
+      ], namespace=namespace, extraEnvVars=c.appAuthEnvBinding(config, "sv", "scan")),
     ] else []
   );
 

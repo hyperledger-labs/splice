@@ -2279,6 +2279,16 @@
                               }
                            },
                            {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
                               "value": "postgres"
                            },
@@ -2375,6 +2385,139 @@
             ],
             "selector": {
                "app": "participant"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "scan-app",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "scan-app"
+            },
+            "name": "scan-app",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "scan-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "scan-app",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "scan-app"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/scan-app:tag",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": null,
+                        "name": "scan-app",
+                        "ports": [
+                           {
+                              "containerPort": 5012,
+                              "name": "scan-api"
+                           }
+                        ],
+                        "readinessProbe": null,
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "scan-app",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "scan-api",
+                  "port": 5012,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "scan-app"
             }
          }
       },
@@ -3156,6 +3299,16 @@
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
                                     "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -4038,6 +4191,16 @@
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
                                     "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }

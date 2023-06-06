@@ -61,7 +61,8 @@ class ScanApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      // we don't care this party for now as we will get it from either
+      // we don't care about the primary party in scan as that points to the SV party while we need the svc party
+      // which we read below.
       // primary party of svc User
       // or readAs party from sv User
       serviceUserPrimaryParty: PartyId,
@@ -158,7 +159,7 @@ class ScanApp(
 
   private def getSvcParty(connection: CNLedgerConnection) =
     retryProvider.getValueWithRetries(
-      s"svcParty from readAs rights of sv user $config.svUser",
+      s"svcParty from readAs rights of sv user ${config.svUser}",
       getReadAsParty(connection, config.svUser),
       logger,
     )
