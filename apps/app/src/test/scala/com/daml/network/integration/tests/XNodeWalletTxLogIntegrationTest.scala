@@ -1219,44 +1219,33 @@ class XNodeWalletTxLogIntegrationTest
         .headOption
         .map(_.indexRecord.eventId)
 
-      // Note: the SVC already some coins obtained from elsewhere.
-      // This test uses a huge coin in order to determine whether the coin has been ingested.
-      val coinAmount = BigDecimal(10e6)
+      val coinAmount = BigDecimal(42)
 
-      val coin = loggerFactory.assertLogs(
+      val coin = loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
-          actAndCheck(
-            "Create a bare coin",
-            createCoin(
-              sv1Validator.participantClientWithAdminToken,
-              sv1UserId,
-              sv1UserParty,
-              amount = coinAmount,
-            ),
-          )(
-            "Coin appears in the wallet",
-            _ => sv1Wallet.balance().unlockedQty should be > (coinAmount * 0.9),
+          createCoin(
+            sv1Validator.participantClientWithAdminToken,
+            sv1UserId,
+            sv1UserParty,
+            amount = coinAmount,
           )
-          sv1Wallet.list().coins.last.contract
         },
-        _.errorMessage should include(
-          "Unexpected coin create event"
-        ),
+        logs =>
+          inside(logs) { case Seq(log) =>
+            log.errorMessage should include("Unexpected coin create event")
+          },
       )
 
-      loggerFactory.assertLogs(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
-          actAndCheck(
-            "Directly archive the coin",
-            archiveCoin(sv1Validator.participantClientWithAdminToken, sv1UserId, coin),
-          )(
-            "Coin disappears from the wallet",
-            _ => sv1Wallet.balance().unlockedQty should be < (coinAmount * 0.9),
-          )
+          archiveCoin(sv1Validator.participantClientWithAdminToken, sv1UserId, sv1UserParty, coin)
         },
-        _.errorMessage should include(
-          "Unexpected coin archive event"
-        ),
+        logs =>
+          inside(logs) { case Seq(log) =>
+            log.errorMessage should include(
+              "Unexpected coin archive event"
+            )
+          },
       )
 
       // The two above operations (bare create and bare archive of a coin) will not happen in practice.

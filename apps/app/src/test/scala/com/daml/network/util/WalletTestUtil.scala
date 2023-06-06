@@ -883,7 +883,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
-  ): Unit = {
+  ): coinCodegen.Coin.ContractId = {
     val coin = new coinCodegen.Coin(
       svcParty.toProtoPrimitive,
       owner.toProtoPrimitive,
@@ -893,12 +893,17 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         new feesCodegen.RatePerRound(holdingFee.bigDecimal),
       ),
     )
-    participantClient.ledger_api_extensions.commands.submitWithResult(
-      userId = userId,
-      actAs = Seq(svcParty, owner),
-      readAs = Seq.empty,
-      update = coin.create(),
-      domainId = domainId,
+    new coinCodegen.Coin.ContractId(
+      participantClient.ledger_api_extensions.commands
+        .submitWithResult(
+          userId = userId,
+          actAs = Seq(svcParty, owner),
+          readAs = Seq.empty,
+          update = coin.create(),
+          domainId = domainId,
+        )
+        .contractId
+        .contractId
     )
   }
 
@@ -906,16 +911,17 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   def archiveCoin(
       participantClient: CNParticipantClientReference,
       userId: String,
-      coin: Contract[coinCodegen.Coin.ContractId, coinCodegen.Coin],
+      owner: PartyId,
+      coin: coinCodegen.Coin.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
-      actAs = Seq(svcParty, PartyId.tryFromProtoPrimitive(coin.payload.owner)),
+      actAs = Seq(svcParty, owner),
       readAs = Seq.empty,
-      update = coin.contractId.exerciseArchive(
+      update = coin.exerciseArchive(
         new com.daml.network.codegen.java.da.internal.template.Archive()
       ),
       domainId = domainId,
