@@ -1,7 +1,7 @@
 package com.daml.network
 
 import com.daml.network.config.CNNodeConfig
-import com.daml.network.environment.{CNNodeEnvironmentFactory, CNNodeEnvironmentImpl}
+import com.daml.network.environment.{BuildInfo, CNNodeEnvironmentFactory, CNNodeEnvironmentImpl}
 import com.digitalasset.canton.CantonAppDriver
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.environment.EnvironmentFactory
@@ -9,6 +9,10 @@ import com.typesafe.config.Config
 
 // TODO(#736): generalize. e.g. custom Cli class for Canton Network Node for the console
 object CNNodeApp extends CantonAppDriver[CNNodeEnvironmentImpl] {
+  override protected def printVersion(): Unit = {
+    Console.out.println(s"Canton Network: ${BuildInfo.compiledVersion}")
+    super.printVersion()
+  }
 
   override def loadConfig(config: Config): Either[CantonConfigError, CNNodeConfig] =
     CNNodeConfig.load(config)
