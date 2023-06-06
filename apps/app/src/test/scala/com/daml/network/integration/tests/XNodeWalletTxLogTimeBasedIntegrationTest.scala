@@ -9,7 +9,7 @@ import com.digitalasset.canton.HasExecutionContext
 
 import java.time.Duration
 
-class WalletTxLogTimeBasedIntegrationTest
+class XNodeWalletTxLogTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
@@ -20,7 +20,8 @@ class WalletTxLogTimeBasedIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging

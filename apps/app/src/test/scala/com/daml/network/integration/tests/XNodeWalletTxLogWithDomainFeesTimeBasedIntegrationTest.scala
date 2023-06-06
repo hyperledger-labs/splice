@@ -9,7 +9,7 @@ import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletL
 import com.digitalasset.canton.HasExecutionContext
 import monocle.Monocle.toAppliedFocusOps
 
-class WalletTxLogWithDomainFeesTimeBasedIntegrationTest
+class XNodeWalletTxLogWithDomainFeesTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
@@ -19,7 +19,8 @@ class WalletTxLogWithDomainFeesTimeBasedIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       .addConfigTransform((_, cnNodeConfig) =>

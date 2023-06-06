@@ -7,7 +7,7 @@ import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
 
-class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
+class XNodeWalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
@@ -18,7 +18,8 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
   }
