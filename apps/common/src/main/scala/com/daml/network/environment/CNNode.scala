@@ -81,7 +81,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
       val pathLimited = request.uri.path.toString
         .limit(maxMethodLength)
       def msg(message: String): String =
-        s"HTTP client ${request.method.name} ${pathLimited}): ${message}"
+        s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
 
       if (logPayload) {
         request.entity match {

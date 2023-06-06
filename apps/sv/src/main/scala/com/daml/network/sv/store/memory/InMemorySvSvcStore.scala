@@ -12,7 +12,7 @@ import scala.concurrent.*
 class InMemorySvSvcStore(
     override val key: SvStore.Key,
     override protected[this] val appConfig: SvAppBackendConfig,
-    override protected val loggerFactory: NamedLoggerFactory,
+    outerLoggerFactory: NamedLoggerFactory,
     override protected val futureSupervisor: FutureSupervisor,
     override protected val retryProvider: RetryProvider,
 )(implicit
@@ -20,6 +20,9 @@ class InMemorySvSvcStore(
     ec: ExecutionContext
 ) extends InMemoryCNNodeAppStoreWithoutHistory
     with SvSvcStore {
+
+  override protected lazy val loggerFactory: NamedLoggerFactory =
+    outerLoggerFactory.append("store", "svcParty")
 
   override lazy val acsContractFilter =
     SvSvcStore.contractFilter(key.svcParty, key.svParty, appConfig)
