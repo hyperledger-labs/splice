@@ -1,15 +1,26 @@
-import { SubscriptionButton } from 'common-frontend';
+import { AmountDisplay, IntervalDisplay, SubscriptionButton } from 'common-frontend';
 import React, { useState } from 'react';
 
-import { Stack, Typography } from '@mui/material';
+import { CheckCircleOutline, ErrorOutline } from '@mui/icons-material';
+import { Box, Button, Stack, Typography, styled } from '@mui/material';
 
 import Searchbar from '../components/Searchbar';
-import { useRequestEntry } from '../hooks';
+import { useDirectoryInstall, useLookupEntryByName, useRequestEntry } from '../hooks';
 import { config } from '../utils';
+
+type NameLookupStatus = 'available' | 'taken' | 'loading';
 
 const RequestDirectoryEntry: React.FC = () => {
   const [entryName, setEntryName] = useState<string>('');
-  const { mutateAsync: requestEntry } = useRequestEntry();
+
+  const [displaySearchResult, setDisplaySearchResult] = useState(false);
+  const { data: entryLookupResult, isLoading } = useLookupEntryByName(entryName);
+
+  const nameLookupStatus: NameLookupStatus = isLoading
+    ? 'loading'
+    : entryLookupResult?.entryContract === undefined
+    ? 'available'
+    : 'taken';
 
   return (
     <Stack justifyContent="center" mt={2} spacing={2}>
@@ -19,20 +30,97 @@ const RequestDirectoryEntry: React.FC = () => {
         <Searchbar
           sx={{ flexGrow: '1' }}
           value={entryName}
+          onKeyDown={event => {
+            setDisplaySearchResult(event.key === 'Enter');
+          }}
           onChange={event => setEntryName(event.target.value)}
           id="entry-name-field"
         />
+        <Button
+          variant="pill"
+          id="search-entry-button"
+          disabled={nameLookupStatus === 'loading'}
+          onClick={() => setDisplaySearchResult(true)}
+        >
+          Search
+        </Button>
+      </Stack>
+      {displaySearchResult && (
+        <SubscriptionBar entryName={entryName} nameLookupStatus={nameLookupStatus} />
+      )}
+    </Stack>
+  );
+};
+
+const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLookupStatus }> = ({
+  entryName,
+  nameLookupStatus,
+}) => {
+  const { mutateAsync: requestEntry } = useRequestEntry();
+  const { data: directoryInstall } = useDirectoryInstall();
+
+  if (nameLookupStatus === 'loading' || !directoryInstall) {
+    return <></>;
+  }
+
+  var message, icon, additionalContent;
+
+  const entryFee = directoryInstall.payload.entryFee;
+  const entryInterval = directoryInstall.payload.entryLifetime.microseconds;
+
+  if (nameLookupStatus === 'available') {
+    message = 'is available!';
+    icon = <CheckCircleOutline color="success" />;
+    additionalContent = (
+      <Stack direction="row" alignItems="center">
+        <Typography display="inline" fontWeight="bold">
+          <AmountDisplay amount={entryFee} currency="USD" />
+        </Typography>
+        &nbsp;
+        <Typography display="inline">
+          every <IntervalDisplay microseconds={entryInterval} />
+        </Typography>
         <SubscriptionButton
+          sx={{ marginLeft: 4 }}
           variant="pill"
           id="request-entry-with-sub-button"
-          text="Search"
+          text="Subscribe Now"
           createPaymentRequest={() => requestEntry(entryName)}
           redirectPath={`/post-payment?entryName=${encodeURIComponent(entryName)}`}
           walletPath={config.services.wallet.uiUrl}
         />
       </Stack>
-    </Stack>
+    );
+  }
+
+  if (nameLookupStatus === 'taken') {
+    message = 'is not available. Please try a different name.';
+    icon = <ErrorOutline id="unavailable-icon" color="error" />;
+  }
+
+  return (
+    <SubscriptionBarStyled direction="row">
+      <Stack direction="row" alignItems="center">
+        <Box display="flex" marginRight={1} alignItems="center">
+          {icon}
+        </Box>
+        <Typography display="inline" fontWeight="bold">
+          {entryName}
+        </Typography>
+        &nbsp;
+        <Typography display="inline"> {message}</Typography>
+      </Stack>
+      {additionalContent}
+    </SubscriptionBarStyled>
   );
 };
+
+const SubscriptionBarStyled = styled(Stack)(({ theme }) => ({
+  border: `2px solid ${theme.palette.colors.neutral[30]}`,
+  borderRadius: '4px',
+  padding: theme.spacing(2),
+  alignItems: 'center',
+  justifyContent: 'space-between',
+}));
 
 export default RequestDirectoryEntry;

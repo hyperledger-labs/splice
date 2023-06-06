@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { Button, ButtonProps, Typography } from '@mui/material';
 
 import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment/module';
@@ -13,8 +15,10 @@ interface Props<T> extends ButtonProps {
 
 const WalletButton = <T,>(props: Props<T>, walletPage: string) => {
   const { text, createPaymentRequest, walletPath, redirectPath, ...buttonProps } = props;
+  const [clicked, setClicked] = useState(false);
 
   const onClick = async () => {
+    setClicked(true);
     const cid = await createPaymentRequest();
     const here = window.location.origin.toString();
     const redirectTo = encodeURIComponent(here + (redirectPath || ''));
@@ -22,7 +26,7 @@ const WalletButton = <T,>(props: Props<T>, walletPage: string) => {
   };
 
   return (
-    <Button {...buttonProps} onClick={onClick}>
+    <Button {...buttonProps} onClick={onClick} disabled={clicked}>
       <Typography variant="body1" textTransform="none">
         {text}
       </Typography>

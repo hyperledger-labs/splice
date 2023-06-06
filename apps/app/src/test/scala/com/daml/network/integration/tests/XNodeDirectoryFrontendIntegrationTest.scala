@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.LocalAuth0Test
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.util.{FrontendLoginUtil, WalletTestUtil}
+import com.daml.network.util.{FrontendLoginUtil, DirectoryFrontendTestUtil, WalletTestUtil}
 
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, LocalDateTime}
@@ -12,6 +12,7 @@ import scala.concurrent.duration.DurationInt
 class XNodeDirectoryFrontendIntegrationTest
     extends FrontendIntegrationTest("alice")
     with WalletTestUtil
+    with DirectoryFrontendTestUtil
     with FrontendLoginUtil {
 
   private val directoryDarPath =
@@ -40,12 +41,7 @@ class XNodeDirectoryFrontendIntegrationTest
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
       withFrontEnd("alice") { implicit webDriver =>
-        login(3004, aliceDamlUser)
-        eventually(scaled(10 seconds)) {
-          click on "entry-name-field"
-        }
-        textField("entry-name-field").value = entryName
-        click on "request-entry-with-sub-button"
+        allocateDirectoryEntry(() => login(3004, aliceDamlUser), entryName)
 
         // Alice is redirected to wallet...
         loginOnCurrentPage(3000, aliceDamlUser)
@@ -81,6 +77,16 @@ class XNodeDirectoryFrontendIntegrationTest
               .ofPattern("MM/dd/yyyy")
               .format(expiry)
           expiresAt should startWith(expectedExpiry)
+        }
+
+        clue("requesting an existing name to check the already taken message") {
+          waitForQuery(id("entry-name-field"))
+          click on "entry-name-field"
+          textField("entry-name-field").value = entryName
+
+          waitForQuery(id("search-entry-button"))
+          click on "search-entry-button"
+          waitForQuery(id("unavailable-icon"))
         }
       }
     }
