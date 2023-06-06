@@ -76,11 +76,7 @@ class DirectoryApp(
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )
-      svcParty <- retryProvider.retryForAutomation(
-        "getSvcPartyId",
-        scanConnection.getSvcPartyId(),
-        logger,
-      )
+      svcParty <- scanConnection.getSvcPartyIdWithRetries()
       store = DirectoryStore(
         providerParty = providerPartyId,
         svcParty = svcParty,

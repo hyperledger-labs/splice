@@ -22,6 +22,7 @@ import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   OwnerToKeyMappingX,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -84,13 +85,13 @@ final class LocalDomainNode(
       uid: UniqueIdentifier,
       participantAdminConnection: ParticipantAdminConnection,
   )(implicit traceContext: TraceContext) =
-    retryProvider.retryForAutomation(
-      "Wait to observe uploaded identity transactions",
+    retryProvider.waitUntil(
+      show"the identity transactions for $uid are visible",
       participantAdminConnection.getIdentityTransactions(domainId, uid).map { txs =>
         if (!containsIdentityTransactions(uid, txs)) {
-          throw Status.FAILED_PRECONDITION
+          throw Status.NOT_FOUND
             .withDescription(
-              s"Identity transactions for $uid are not available"
+              show"identity transactions for $uid"
             )
             .asRuntimeException()
         }
@@ -118,8 +119,8 @@ final class LocalDomainNode(
       svcRulesLock: SvcRulesLock,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider
-      .retryForAutomation(
-        "Get mediator status",
+      .getValueWithRetries(
+        "mediator status",
         mediatorAdminConnection.getStatus.map(statusToEither(_)),
         logger,
       )
@@ -162,7 +163,7 @@ final class LocalDomainNode(
         logger,
       )
       _ = logger.info(s"Onboarded mediator $mediatorId")
-      _ = logger.info(s"Initializating mediator $mediatorId")
+      _ = logger.info(s"Initializing mediator $mediatorId")
       _ <- retryProvider.retryForAutomation(
         "Initializing mediator",
         mediatorAdminConnection.getStatus.flatMap {
@@ -189,9 +190,8 @@ final class LocalDomainNode(
         },
         logger,
       )
-      _ = logger.info("Watiing for mediator to observe itself as onboarded")
-      _ <- retryProvider.retryForAutomation(
-        "Mediator observers itself as onboarded",
+      _ <- retryProvider.waitUntil(
+        "mediator observes itself as onboarded",
         mediatorAdminConnection.getMediatorState(domainId).map { state =>
           if (!state.active.contains(mediatorId)) {
             throw Status.FAILED_PRECONDITION
@@ -216,8 +216,8 @@ final class LocalDomainNode(
       svConnection: SvConnection,
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
-      .retryForAutomation(
-        "Get sequencer status",
+      .getValueWithRetries(
+        "sequencer status",
         sequencerAdminConnection.getStatus.map(statusToEither(_)),
         logger,
       )

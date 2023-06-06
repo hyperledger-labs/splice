@@ -90,14 +90,14 @@ class ScanApp(
         store,
       )
       _ <- waitForDomainConnection(store.domains, config.domains.global.alias)
-      _ <- retryProvider.retryForAutomation(
-        "wait for open mining round",
+      _ <- retryProvider.waitUntil(
+        "there is an OpenMiningRound contract",
         store.multiDomainAcsStore
           .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = PageLimit(1))
           .map { cs =>
             if (cs.isEmpty) {
-              throw Status.FAILED_PRECONDITION
-                .withDescription("No active open mining round")
+              throw Status.NOT_FOUND
+                .withDescription("OpenMiningRound contract")
                 .asRuntimeException()
             }
           },
@@ -156,11 +156,12 @@ class ScanApp(
 
   override lazy val requiredTemplates = Set(coinCodegen.Coin.TEMPLATE_ID)
 
-  private def getSvcParty(connection: CNLedgerConnection) = retryProvider.retryForAutomation(
-    "Querying svcParty from readAs party of sv user",
-    getReadAsParty(connection, config.svUser),
-    logger,
-  )
+  private def getSvcParty(connection: CNLedgerConnection) =
+    retryProvider.getValueWithRetries(
+      s"svcParty from readAs rights of sv user $config.svUser",
+      getReadAsParty(connection, config.svUser),
+      logger,
+    )
 
   private def getReadAsParty(connection: CNLedgerConnection, user: String) =
     connection

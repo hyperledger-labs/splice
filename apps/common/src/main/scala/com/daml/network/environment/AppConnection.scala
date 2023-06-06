@@ -10,6 +10,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
+import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
@@ -163,13 +164,16 @@ abstract class HttpAppConnection(
     with FlagCloseableAsync
     with NamedLogging {
 
-  private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] = {
-    retryProvider.retryForAutomation(
-      "get version",
+  @SuppressWarnings(Array("org.wartremover.warts.Product"))
+  implicit private val versionInfoPretty: Pretty[HttpAdminAppClient.VersionInfo] =
+    Pretty.adHocPrettyInstance
+
+  private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] =
+    retryProvider.getValueWithRetries(
+      s"app version of $url",
       runHttpCmd(url, HttpAdminAppClient.GetVersion(), List()),
       logger,
     )
-  }
 
   override def checkVersionCompatibility(): Future[Unit] = {
     for {

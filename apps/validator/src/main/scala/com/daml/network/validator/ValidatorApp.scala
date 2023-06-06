@@ -76,14 +76,6 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  private def getSvcPartyId(scanConnection: ScanConnection): Future[PartyId] =
-    retryProvider
-      .retryForAutomation(
-        "getSvcPartyId",
-        scanConnection.getSvcPartyId(),
-        logger,
-      )
-
   private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
     for {
@@ -169,18 +161,17 @@ class ValidatorApp(
   private def waitForValidatorLicense(
       store: ValidatorStore
   ): Future[Unit] = {
-    logger.info("Waiting for ValidatorLicense contract to become visible")
-    retryProvider.retryForAutomation(
-      "Wait for ValidatorLicense",
+    retryProvider.waitUntil(
+      show"ValidatorLicense for ${store.key.validatorParty} is visible",
       for {
         validatorLicenseResult <- store.lookupValidatorLicenseWithOffset()
         _ <- validatorLicenseResult match {
-          case QueryResult(_, Some(_)) =>
-            logger.info("ValidatorLicense found, done waiting")
-            Future.successful(())
+          case QueryResult(_, Some(_)) => Future.successful(())
           case _ =>
             throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(s"ValidatorLicense contract not found yet")
+              Status.NOT_FOUND.withDescription(
+                show"ValidatorLicense for ${store.key.validatorParty}"
+              )
             )
         }
       } yield (),
@@ -223,7 +214,7 @@ class ValidatorApp(
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )
-      svcParty <- getSvcPartyId(scanConnection)
+      svcParty <- scanConnection.getSvcPartyIdWithRetries()
       _ <- setupWalletDars(ledgerClient.connection(this.getClass.getSimpleName, loggerFactory))
       key = ValidatorStore.Key(
         validatorParty = validatorParty,

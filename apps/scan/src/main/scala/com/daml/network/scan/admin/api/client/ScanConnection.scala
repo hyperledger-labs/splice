@@ -78,7 +78,8 @@ final class ScanConnection private (
   /** Query for the SVC party id. This caches the result internally so
     * clients can call this repeatedly without having to implement caching themselves.
     */
-  def getSvcPartyId()(implicit mat: Materializer): Future[PartyId] = {
+  // NOTE: made private as there does not seem to be another use of calling this w/o retries right now.
+  private def getSvcPartyId(): Future[PartyId] = {
     val prev = svcRef.get()
     prev match {
       case Some(partyId) => Future.successful(partyId)
@@ -92,6 +93,13 @@ final class ScanConnection private (
         }
     }
   }
+
+  /** Query for the SVC party id, retrying until it succeeds.
+    *
+    * Intended to be used for app init.
+    */
+  def getSvcPartyIdWithRetries(): Future[PartyId] =
+    retryProvider.getValueWithRetries("SVC party ID from scan", getSvcPartyId(), logger)
 
   def getTransferContextWithInstances()(implicit
       ec: ExecutionContext,

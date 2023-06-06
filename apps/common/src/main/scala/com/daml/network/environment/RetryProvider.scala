@@ -15,6 +15,7 @@ import com.digitalasset.canton.lifecycle.{
   RunOnShutdown,
   UnlessShutdown,
 }
+import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -122,6 +123,84 @@ class RetryProvider(
     FutureUnlessShutdown(
       waitUnlessShutdown(waitForSignal.unwrap).onShutdown(UnlessShutdown.AbortedDueToShutdown)
     )
+
+  /** Wait for a condition to become true with proper logging.
+    *
+    * Intended to be used for one-time waits during app init or like processes.
+    */
+  def waitUntil(
+      conditionDescription: String,
+      checkCondition: => Future[Unit],
+      logger: TracedLogger,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit ec: ExecutionContext): Future[Unit] =
+    TraceContext.withNewTraceContext(tc0 => {
+      implicit val tc: TraceContext = tc0;
+      logger.info(s"Waiting until $conditionDescription")
+      retryForAutomation(
+        s"Check whether $conditionDescription",
+        checkCondition,
+        logger,
+        additionalCodes,
+      )
+        .transform(
+          result => {
+            logger.info(s"Success: $conditionDescription")
+            result
+          },
+          exception => {
+            if (isClosing)
+              logger.info(s"Gave up waiting until $conditionDescription, as we are shutting down")
+            else
+              logger.error(s"Gave up waiting until $conditionDescription", exception)
+            exception
+          },
+        )
+    })
+
+  /** Retry getting a value and print it on success.
+    *
+    * Intended to be used for one-time value retrievals during app init or like processes.
+    */
+  def getValueWithRetriesNoPretty[T](
+      valueDescription: String,
+      getValue: => Future[T],
+      logger: TracedLogger,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit ec: ExecutionContext): Future[T] = {
+    implicit val adHocPretty: Pretty[T] = Pretty.prettyOfString(_.toString)
+    getValueWithRetries(valueDescription, getValue, logger, additionalCodes)
+  }
+
+  /** Retry getting a value and print it on success.
+    *
+    * Intended to be used for one-time value retrievals during app init or like processes.
+    */
+  def getValueWithRetries[T](
+      valueDescription: String,
+      getValue: => Future[T],
+      logger: TracedLogger,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit ec: ExecutionContext, pp: Pretty[T]): Future[T] =
+    TraceContext.withNewTraceContext(tc0 => {
+      implicit val tc: TraceContext = tc0;
+      val valueDescQuoted = s"'$valueDescription'"
+      logger.info(s"Attempting to get $valueDescQuoted")
+      retryForAutomation(s"Get $valueDescription", getValue, logger, additionalCodes)
+        .transform(
+          value => {
+            logger.info(show"Got ${valueDescQuoted.unquoted}: $value")
+            value
+          },
+          exception => {
+            if (isClosing)
+              logger.info(s"Gave up waiting to get $valueDescQuoted, as we are shutting down")
+            else
+              logger.error(s"Gave up getting $valueDescQuoted", exception)
+            exception
+          },
+        )
+    })
 
   import RetryProvider.{AutomationRetryConfig, RetryConfig}
 

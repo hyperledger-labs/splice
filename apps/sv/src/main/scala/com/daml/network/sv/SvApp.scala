@@ -67,6 +67,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
@@ -157,7 +158,7 @@ class SvApp(
       // reconnect all domains at the beginning of SV initialization just in case.
       _ <- participantAdminConnection.reconnectAllDomains()
       // TODO(#3856): find a better way to get the SVC party ID
-      svcPartyId <- retryProvider.retryForAutomation("get SVC party ID", getSvcPartyId, logger)
+      svcPartyId <- retryProvider.getValueWithRetries("SVC party ID", getSvcPartyId, logger)
       storeKey = SvStore.Key(svPartyId, svcPartyId)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -185,7 +186,7 @@ class SvApp(
         clock,
       )
       _ <- approveConfiguredSvIdentities(svAutomation, globalDomain)
-      isDevNet <- retryProvider.retryForAutomation(
+      isDevNet <- retryProvider.getValueWithRetriesNoPretty(
         "get CoinRules to determine if we are in a DevNet",
         svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
         logger,
@@ -334,8 +335,8 @@ class SvApp(
       new CometBftNode(client, config, loggerFactory)
     )
     for {
-      participantId <- retryProvider.retryForAutomation(
-        "get Participant ID",
+      participantId <- retryProvider.getValueWithRetries(
+        "Participant ID",
         getParticipantId(participantAdminConnection),
         logger,
       )
@@ -699,52 +700,44 @@ class SvApp(
 
   private def waitForValidatorLicense(svStore: SvSvStore): Future[
     Contract[cc.validatorlicense.ValidatorLicense.ContractId, cc.validatorlicense.ValidatorLicense]
-  ] = {
-    logger.info(s"Waiting for ValidatorLicense contract to be created for ${svStore.key.svParty}")
+  ] =
     // If the validator license contract gets created after we disconnected from the domain, Canton blows up during the SVC party migration
     // because the contract gets added both via the party migration and through the regular event stream for the SV party which is an observer.
     // Therefore, we let the validator app do its thing first.
-    retryProvider.retryForAutomation(
-      "Wait for ValidatorLicense contract",
+    retryProvider.getValueWithRetries(
+      show"ValidatorLicense contract for ${svStore.key.svParty}",
       svStore.getValidatorLicense(),
       logger,
     )
-  }
 
   private def waitForSvOnboardingConfirmed(
       svStore: SvSvStore
   ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] =
-    waitForSvOnboardingConfirmed(() => svStore.lookupSvOnboardingConfirmed())
+    waitForSvOnboardingConfirmed(svStore.key.svParty, () => svStore.lookupSvOnboardingConfirmed())
 
   private def waitForSvOnboardingConfirmed(
       svcStore: SvSvcStore
   ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] =
-    waitForSvOnboardingConfirmed(() =>
-      svcStore.lookupSvOnboardingConfirmedByParty(svcStore.key.svParty)
+    waitForSvOnboardingConfirmed(
+      svcStore.key.svParty,
+      () => svcStore.lookupSvOnboardingConfirmedByParty(svcStore.key.svParty),
     )
 
   private def waitForSvOnboardingConfirmed(
+      svParty: PartyId,
       lookupSvOnboardingConfirmed: () => Future[
         Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]
-      ]
+      ],
   ): Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] = {
-    logger.info(
-      s"Waiting for SvOnboardingConfirmed contract to be created"
-    )
-    retryProvider.retryForAutomation(
-      "Wait for SVC SvOnboardingConfirmed contract",
+    val description = show"SvOnboardingConfirmed contract for $svParty"
+    retryProvider.getValueWithRetries(
+      description,
       for {
         svOnboardingConfirmedOpt <- lookupSvOnboardingConfirmed()
         svOnboardingConfirmed <- svOnboardingConfirmedOpt match {
-          case Some(sc) =>
-            logger.info("svOnboardingConfirmed found, done waiting")
-            Future.successful(sc)
+          case Some(sc) => Future.successful(sc)
           case None =>
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(
-                s"SvOnboardingConfirmed contract not found yet"
-              )
-            )
+            throw new StatusRuntimeException(Status.NOT_FOUND.withDescription(description))
         }
       } yield svOnboardingConfirmed,
       logger,
@@ -752,26 +745,25 @@ class SvApp(
   }
 
   private def waitForSvcMembership(svcStore: SvSvcStore): Future[Unit] = {
-    logger.info("Waiting for SvcRules to become visible and list us as a member")
-    retryProvider.retryForAutomation(
-      "Wait for SVC membership",
+    val svParty = svcStore.key.svParty
+    retryProvider.waitUntil(
+      show"SvcRules are visible and list $svParty as a member",
       for {
         svcRules <- svcStore.lookupSvcRules()
         _ <- svcRules match {
           case Some(c) =>
             if (SvApp.isSvcMemberParty(svcStore.key.svParty, c)) {
-              logger.info("SvcRules found and we are member, done waiting")
               Future.successful(())
             } else {
               throw new StatusRuntimeException(
                 Status.FAILED_PRECONDITION.withDescription(
-                  s"SvcRules found but ${svcStore.key.svParty} is not a member"
+                  show"SvcRules found but $svParty is not a member"
                 )
               )
             }
           case None =>
             throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(s"SvcRules contract not found yet")
+              Status.NOT_FOUND.withDescription(show"SvcRules contract not found")
             )
         }
       } yield (),

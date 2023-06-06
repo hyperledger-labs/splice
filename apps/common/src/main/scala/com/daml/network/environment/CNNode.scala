@@ -189,24 +189,28 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   ): Future[State]
 
   private def waitForPackages(connection: CNLedgerConnection): Future[Unit] = {
-    val requiredPackageIds: Set[String] = requiredTemplates.map(t => t.getPackageId)
+    import com.daml.network.util.PrettyInstances.*
 
-    def query(): Future[Unit] = for {
-      packages <- (connection.listPackages(): Future[Set[String]])
-    } yield {
-      val actual = packages
-      val missing = requiredPackageIds -- actual
-      if (missing.isEmpty) {
-        ()
-      } else {
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription(s"Missing packages $missing, got $actual")
-        )
-      }
-    }
-
-    retryProvider.retryForAutomation("Wait for packages", query(), logger)
-
+    if (requiredTemplates.isEmpty) {
+      logger.debug("Skipping waiting for required packages to be uploaded, as there are none.")
+      Future.unit
+    } else
+      retryProvider.waitUntil(
+        show"packages for $requiredTemplates are uploaded",
+        for {
+          actual <- (connection.listPackages(): Future[Set[String]])
+        } yield {
+          val missing = requiredTemplates.filter(t => !actual.contains(t.getPackageId))
+          if (missing.isEmpty) {
+            ()
+          } else {
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(show"packages for $missing")
+            )
+          }
+        },
+        logger,
+      )
   }
 
   private def createLedgerClient(): Future[CNLedgerClient] = for {
@@ -246,10 +250,9 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
     initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-    _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
-      retryProvider.retryForAutomation(
-        "Querying primary party of user",
+      retryProvider.getValueWithRetries[PartyId](
+        s"primary party of service user $serviceUser",
         initConnection.getPrimaryParty(serviceUser),
         logger,
         // Note: In general, app service users are allocated by the validator app.
@@ -258,7 +261,6 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
         // Since this is the first ledger API call in the app, we additionally retry on auth errors here.
         additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
-    _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
     _ <- waitForPackages(initConnection)
     _ = logger.info(s"Packages available, running app-specific init")
