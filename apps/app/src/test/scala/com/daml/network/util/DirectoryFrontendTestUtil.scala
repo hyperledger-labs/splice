@@ -3,6 +3,7 @@ package com.daml.network.util
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import scala.concurrent.duration.*
+import org.openqa.selenium.support.ui.ExpectedConditions
 
 trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
@@ -21,6 +22,10 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
     click on "entry-name-field"
     textField("entry-name-field").value = entryName
 
+    waitForCondition(id("search-entry-button")) { ExpectedConditions.elementToBeClickable(_) }
+    click on "search-entry-button"
+
+    waitForQuery(id("request-entry-with-sub-button"))
     click on "request-entry-with-sub-button"
   }
 

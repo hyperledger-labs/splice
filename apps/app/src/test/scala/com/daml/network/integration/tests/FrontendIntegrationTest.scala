@@ -20,9 +20,11 @@ import org.openqa.selenium.{
   StaleElementReferenceException,
   TakesScreenshot,
   WebDriver,
+  WebElement,
 }
 import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
+import org.openqa.selenium.support.ui.{ExpectedCondition, WebDriverWait}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
@@ -40,6 +42,7 @@ import scala.concurrent.blocking
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.DurationConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -334,7 +337,22 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
           find(query).valueOrFail(s"Could not find $query")
         }
     }
+  }
 
+  protected def waitForCondition(
+      query: Query,
+      timeUntilSuccess: Option[FiniteDuration] = None,
+  )(condition: By => ExpectedCondition[WebElement])(implicit
+      webDriver: WebDriver
+  ): Unit = {
+    waitForQuery(query, timeUntilSuccess)
+
+    val waitDuration = timeUntilSuccess.getOrElse(20.seconds)
+    val wait = new WebDriverWait(webDriver, waitDuration.toJava);
+
+    eventually(waitDuration) {
+      wait.until(condition(query.by))
+    }
   }
 
   protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {

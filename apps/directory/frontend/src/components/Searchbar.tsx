@@ -15,7 +15,7 @@ const Searchbar: React.FC<InputBaseProps> = props => (
   <SearchbarStyled
     startAdornment={
       <InputAdornment position="start">
-        <Search />
+        <Search color="secondary" />
       </InputAdornment>
     }
     {...props}
