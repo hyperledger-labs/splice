@@ -30,7 +30,7 @@ spec:
         - name: CN_APP_DARS
           value: {{ .Values.appDars | toJson | quote }}
         {{ end }}
-        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "validator" "keyName" "validator" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         {{- range $ii, $user := .Values.additionalUsers }}
         - name: {{ $user.name }}
           {{ if $user.value }}

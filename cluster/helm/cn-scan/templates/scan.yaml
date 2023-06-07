@@ -1,33 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    app: svc-app
-  name: svc-app
+  name: scan-app
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: scan-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: svc-app
+      app: scan-app
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: svc-app
+        app: scan-app
     spec:
       containers:
-      - name: svc-app
-        image: "{{ .Values.imageRepo }}/svc-app:{{ (.Values.cluster).imageTag }}"
-        imagePullPolicy: Always
+      - name: scan-app
+        image: "{{ .Values.imageRepo }}/scan-app:{{ (.Values.cluster).imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "svc" "keyName" "svc" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        imagePullPolicy: Always
         ports:
-        - containerPort: 5005
-          name: svc-app-adm-api
+        - containerPort: 5012
+          name: scan-api
           protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
@@ -36,12 +36,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: svc-app
+  name: scan-app
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: svc-app
+    app: scan-app
   ports:
-  - name: svc-app-adm-api
-    port: 5005
+  - name: scan-api
+    port: 5012
     protocol: TCP

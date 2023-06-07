@@ -180,7 +180,17 @@ export async function installSvNode(
   );
 
   if (nodename !== 'sv-1') {
-    installSvParticipant(xns, svc, nodename, onboardingName);
+    const participant = installSvParticipant(xns, svc, nodename, onboardingName);
+
+    if (nodename === 'sv-2') {
+      installCNHelmChart(
+        xns,
+        'scan' + xns.logicalName,
+        'cn-scan',
+        {},
+        dependsOn.concat([participant])
+      );
+    }
   }
 
   const participantAddress = nodename === 'sv-1' ? 'participant.svc' : 'participant';
