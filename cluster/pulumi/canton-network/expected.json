@@ -2860,7 +2860,7 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantAddress": "participant.svc",
+        "participantAddress": "participant",
         "postgres": "postgres.validator1.svc.cluster.local",
         "resources": {
           "limits": {

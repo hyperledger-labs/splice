@@ -39,6 +39,7 @@ export async function installValidator(
   installCNHelmChart(xns, 'directory-web-ui', 'cn-directory-web-ui', {}, [
     await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
   ]);
+
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [
     await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
@@ -59,7 +60,7 @@ export async function installValidator(
     'validator-' + xns.logicalName,
     'cn-validator',
     {
-      participantAddress: 'participant.svc',
+      participantAddress: 'participant',
       postgres: postgresDb,
       additionalUsers: [],
       appDars: [
