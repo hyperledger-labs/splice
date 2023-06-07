@@ -12,7 +12,7 @@ import org.slf4j.event.Level
 
 import java.time.Duration
 
-class TimeBasedTreasuryIntegrationTest
+class XNodeTimeBasedTreasuryIntegrationTest
     extends CNNodeIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
@@ -20,7 +20,7 @@ class TimeBasedTreasuryIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1

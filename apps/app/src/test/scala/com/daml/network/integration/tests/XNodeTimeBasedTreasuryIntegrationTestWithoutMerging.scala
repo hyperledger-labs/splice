@@ -23,7 +23,7 @@ import scala.jdk.CollectionConverters.*
 import scala.annotation.nowarn
 
 @nowarn("msg=match may not be exhaustive")
-class TimeBasedTreasuryIntegrationTestWithoutMerging
+class XNodeTimeBasedTreasuryIntegrationTestWithoutMerging
     extends CNNodeIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
@@ -31,7 +31,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
