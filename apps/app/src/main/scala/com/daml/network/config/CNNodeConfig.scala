@@ -46,6 +46,10 @@ import scala.annotation.nowarn
 import scala.util.Try
 import scala.util.control.NoStackTrace
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path}
+import com.digitalasset.canton.DiscardOps
+
 case class CNNodeConfig(
     override val name: Option[String] = None,
     validatorApps: Map[InstanceName, ValidatorAppBackendConfig] = Map.empty,
@@ -674,6 +678,21 @@ object CNNodeConfig {
 
   lazy val defaultConfigRenderer =
     ConfigRenderOptions.defaults().setOriginComments(false).setComments(false).setJson(false)
+
+  // Used in scripts/transform-config.sc when spinning up nodes for UI development
+  def writeToFile(config: CNNodeConfig, path: Path, confidential: Boolean = true): Unit = {
+    val writers = new CNNodeConfig.ConfigWriters(confidential)
+    import writers.*
+    val renderer = ConfigRenderOptions
+      .defaults()
+      .setOriginComments(false)
+      .setComments(false)
+      .setJson(false)
+    val content = "canton { " + ConfigWriter[CNNodeConfig]
+      .to(config)
+      .render(renderer) + "}"
+    Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
+  }
 }
 
 object CNNodeConfigException {
