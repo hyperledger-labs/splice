@@ -359,6 +359,7 @@
           "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
+        "enableHealthProbes": true,
         "globalDomain": {
           "alias": "global",
           "url": "http://svrun.network.com.network.canton.global:5008"

@@ -10,6 +10,7 @@ Release Notes
 
   * Fixed missing ``service`` level indentation in sample istio-gateway helm chart values in the ingress installation instructions
 
+  * Added `enableHealthProbes` to the participant Helm chart to allow operation on versions of Kubernetes <1.24 that do not support gRPC readiness and liveness probes.
 
 2023-06-04
 ----------

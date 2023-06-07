@@ -59,6 +59,7 @@ spec:
         - containerPort: 10013
           name: metrics-api
           protocol: TCP
+        {{- if .Values.enableHealthProbes }}
         livenessProbe:
           grpc:
             port: 5061
@@ -74,6 +75,7 @@ spec:
           periodSeconds: 10
           failureThreshold: 3
           timeoutSeconds: 10
+        {{- end }}
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}

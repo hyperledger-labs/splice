@@ -7,3 +7,4 @@ auth:
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
   targetAudience: "https://canton.network.global"
+enableHealthProbes: true

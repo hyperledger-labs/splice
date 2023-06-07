@@ -2,6 +2,8 @@ cluster:
   imageTag: IMAGE_TAG
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 
+enableHealthProbes: true
+
 defaultJvmOptions: -Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4
 resources:
   limits:
