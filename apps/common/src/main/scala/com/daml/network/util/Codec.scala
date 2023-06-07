@@ -3,8 +3,6 @@
 
 package com.daml.network.util
 
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId as JavaContractId}
 import com.daml.lf.data.{Decimal, Numeric}
 import com.digitalasset.canton.{topology, LfTimestamp}
@@ -39,11 +37,6 @@ object Codec {
     companion.instance.decode(e)
   def tryDecode[Dec](companion: CodecCompanion[Dec])(e: companion.Enc): Dec =
     decode(companion)(e).fold(err => failedToDecode(err), identity)
-  // Convenience wrapper because we can’t have a generic companion.
-  def decodeContractId[T](e: String): Either[String, Primitive.ContractId[T]] =
-    contractIdValue[T].decode(e)
-  def tryDecodeContractId[T](e: String): Primitive.ContractId[T] =
-    decodeContractId[T](e).fold(err => failedToDecode(err), identity)
 
   def decodeJavaContractId[TC, TCid, T](companion: ContractCompanion[TC, TCid, T])(
       e: String
@@ -118,23 +111,6 @@ object Codec {
     type Enc = String
     def instance = mediatorValue
   }
-
-  implicit val codegenPartyValue: Codec[ApiTypes.Party, String] =
-    new Codec[ApiTypes.Party, String] {
-      def encode(d: ApiTypes.Party) = ApiTypes.Party.unwrap(d)
-      def decode(e: String) = Right(ApiTypes.Party(e))
-    }
-
-  object CodegenParty extends CodecCompanion[ApiTypes.Party] {
-    type Enc = String
-    def instance = codegenPartyValue
-  }
-
-  implicit def contractIdValue[T]: Codec[Primitive.ContractId[T], String] =
-    new Codec[Primitive.ContractId[T], String] {
-      def encode(d: Primitive.ContractId[T]) = ApiTypes.ContractId.unwrap(d)
-      def decode(e: String) = Right(Primitive.ContractId(e))
-    }
 
   implicit val timestampValue: Codec[CantonTimestamp, Long] =
     new Codec[CantonTimestamp, Long] {

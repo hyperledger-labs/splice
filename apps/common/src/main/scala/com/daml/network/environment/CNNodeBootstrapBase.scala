@@ -95,12 +95,10 @@ abstract class CNNodeBootstrapBase[
     with NoTracing {
 
   protected val adminApiConfig = config.adminApi
-  protected val initConfig = config.init
   protected val tracerProvider = TracerProvider.Factory(configuredOpenTelemetry, name.unwrap)
   implicit val tracer: Tracer = tracerProvider.tracer
 
   private val isRunningVar = new AtomicBoolean(true)
-  protected def isRunning: Boolean = isRunningVar.get()
   protected val dbStorageMetrics = nodeMetrics.dbStorage
   protected val storage =
     storageFactory

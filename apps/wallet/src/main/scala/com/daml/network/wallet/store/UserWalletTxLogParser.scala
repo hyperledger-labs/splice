@@ -4,7 +4,7 @@ import cats.{Eval, Monoid}
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.*
-import com.daml.ledger.javaapi.data.codegen.{Choice, ContractId, DamlRecord}
+import com.daml.ledger.javaapi.data.codegen.Choice
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.CoinCreateSummary
 import com.daml.network.codegen.java.cc.coin.InvalidTransferReason
@@ -40,7 +40,7 @@ import com.daml.network.history.{
 }
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.store.TxLogStore
-import com.daml.network.util.{Codec, Contract, ExerciseNode, ExerciseNodeCompanion}
+import com.daml.network.util.{Codec, ExerciseNode, ExerciseNodeCompanion}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.Notification.NotificationTransactionSubtype
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.Transfer.TransferTransactionSubtype
@@ -1124,56 +1124,6 @@ object UserWalletTxLogParser {
         entries = immutable.Queue(newEntry)
       )
     }
-  }
-
-  // Helper for parsing exercise nodes into TxLogEntries
-  def mkExerciseParse(companion: ExerciseNodeCompanion)(
-      parse: (
-          TransactionTree,
-          ExercisedEvent,
-          companion.Arg,
-          companion.Res,
-          State,
-          Seq[TreeEvent],
-          TraceContext,
-      ) => State
-  )(
-      tree: TransactionTree,
-      event: ExercisedEvent,
-      parseState: State,
-      path: Seq[TreeEvent],
-      tc: TraceContext,
-      ec: ErrorLoggingContext,
-  ): State = {
-    ExerciseNode
-      .decodeExerciseEvent(companion)(event)(ec)
-      .fold(parseState)(node =>
-        parse(tree, event, node.argument.value, node.result.value, parseState, path, tc)
-      )
-  }
-
-  // Helper for parsing create nodes into TxLogEntries
-  def mkCreateParse[TCid <: ContractId[T], T <: Template](
-      companion: Contract.Companion.Template[TCid, T]
-  )(
-      parse: (
-          TransactionTree,
-          CreatedEvent,
-          T with DamlRecord[_],
-          State,
-          Seq[TreeEvent],
-          TraceContext,
-      ) => State
-  )(
-      tree: TransactionTree,
-      event: CreatedEvent,
-      parseState: State,
-      path: Seq[TreeEvent],
-      tc: TraceContext,
-  ): State = {
-    Contract
-      .fromCreatedEvent(companion)(event)
-      .fold(parseState)(contract => parse(tree, event, contract.payload, parseState, path, tc))
   }
 
   private def parseSender(

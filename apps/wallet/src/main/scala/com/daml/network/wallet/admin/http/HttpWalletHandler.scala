@@ -39,7 +39,6 @@ import com.digitalasset.canton.logging.{
   TracedLogger,
 }
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
@@ -63,7 +62,6 @@ import scala.util.{Failure, Success, Try}
 
 class HttpWalletHandler(
     walletManager: UserWalletManager,
-    clock: Clock,
     scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
@@ -472,7 +470,6 @@ class HttpWalletHandler(
         lockedCoins <- userStore.multiDomainAcsStore.listContracts(
           coinCodegen.LockedCoin.COMPANION
         )
-        now = clock.now
         currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
       } yield {
         val unlockedHoldingFees =

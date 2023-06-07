@@ -46,9 +46,6 @@ object HttpErrorHandler {
   // 404
   def notFound(message: String) = HttpErrorWithHttpCode(StatusCodes.NotFound, message);
 
-  // 409
-  def conflict(message: String) = HttpErrorWithHttpCode(StatusCodes.Conflict, message);
-
   // 500
   def internalServerError(message: String) =
     HttpErrorWithHttpCode(StatusCodes.InternalServerError, message);

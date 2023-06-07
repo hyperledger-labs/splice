@@ -79,15 +79,6 @@ trait SvcStore extends CNNodeAppStoreWithoutHistory {
 
 object SvcStore {
 
-  case class RoundTotals(
-      transferFees: BigDecimal = 0.0,
-      adminFees: BigDecimal = 0.0,
-      holdingFees: BigDecimal = 0.0,
-      transferInputs: BigDecimal = 0.0,
-      nonSelfTransferOutputs: BigDecimal = 0.0,
-      selfTransferOutputs: BigDecimal = 0.0,
-  )
-
   def apply(
       svcParty: PartyId,
       storage: Storage,

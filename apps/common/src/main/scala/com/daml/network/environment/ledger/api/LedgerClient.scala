@@ -129,22 +129,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     ClientAdapter
       .serverStreaming(request, stateServiceStub.getActiveContracts)
 
-  def tryGetTransactionTreeById(
-      parties: Seq[String],
-      id: String,
-  ): Future[TransactionTree] = {
-    val req = TransactionServiceOuterClass.GetTransactionByIdRequest.newBuilder
-      .setTransactionId(id)
-      .addAllRequestingParties(parties.asJava)
-      .build()
-    wrapFuture(
-      transactionServiceStub
-        .getTransactionById(req, _)
-    ).map { resp =>
-      TransactionTree.fromProto(resp.getTransaction)
-    }
-  }
-
   def tryGetTransactionTreeByEventId(
       parties: Seq[String],
       id: String,

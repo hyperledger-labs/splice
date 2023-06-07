@@ -11,7 +11,6 @@ import com.daml.ledger.javaapi.data.{
   FiltersByParty,
   Identifier,
   InclusiveFilter,
-  NoFilter,
   Template,
   TransactionFilter,
 }
@@ -61,27 +60,6 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]]
-
-  /** Get a contract by id.
-    *
-    * Throws [[Status.NOT_FOUND]] if no such contract exists.
-    */
-  def getContractById[C, TCid <: ContractId[_], T](
-      companion: C
-  )(id: ContractId[_])(implicit
-      ec: ExecutionContext,
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[ContractWithState[TCid, T]] =
-    lookupContractById(companion)(id).map(result =>
-      result.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(
-            show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), id)}"
-          )
-          .asRuntimeException
-      )
-    )
 
   /** Check if the contract is active on the current domain.
     */
@@ -405,14 +383,7 @@ object MultiDomainAcsStore {
     }
 
     // TODO (#3956) callers should use `toTransactionFilter` instead when
-    // snapshotsvc supports real filters
-    def toTransactionFilterAllContracts: TransactionFilter = {
-      val partyString: String = primaryParty.toProtoPrimitive
-      new FiltersByParty(Map[String, Filter](partyString -> NoFilter.instance).asJava)
-    }
-
-    // TODO (#3956) callers should use `toTransactionFilter` instead when
-    // snapshotsvc supports real filters
+    // state service supports real filters
     def toTransactionFilterAllContractsScala: scalaFilter.TransactionFilter =
       scalaFilter.TransactionFilter(
         Map(primaryParty.toProtoPrimitive -> scalaFilter.Filters())

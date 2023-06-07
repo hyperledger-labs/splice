@@ -306,7 +306,6 @@ class ValidatorApp(
 
       walletHandler = new HttpWalletHandler(
         walletManager,
-        clock,
         scanConnection,
         loggerFactory,
         retryProvider,

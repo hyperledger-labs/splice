@@ -282,30 +282,6 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class IsAuthorized() extends BaseCommand[http.IsAuthorizedResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.IsAuthorizedResponse] =
-      client.isAuthorized(
-        headers = headers
-      )
-
-    override def handleResponse(response: http.IsAuthorizedResponse)(implicit
-        decoder: TemplateJsonDecoder
-    ): Either[String, Unit] = response match {
-      case http.IsAuthorizedResponse.OK => Right(())
-      case http.IsAuthorizedResponse.Forbidden(e) => Left(e.error)
-    }
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.IsAuthorizedResponse.OK =>
-      Right(())
-    }
-  }
-
   case class GetCometBftNodeStatus()
       extends BaseCommand[
         http.GetCometBftNodeStatusResponse,

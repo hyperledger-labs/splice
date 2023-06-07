@@ -40,14 +40,6 @@ abstract class AutomationService(
     ()
   }
 
-  private[this] val resources: AtomicReference[Seq[AutoCloseable]] = new AtomicReference(Seq.empty)
-
-  /** Register a resource that should be promptly closed when closing the automation service. */
-  final protected def registerResource[T <: AutoCloseable](resource: T): T = {
-    val _ = resources.getAndUpdate(_.prepended(resource))
-    resource
-  }
-
   final protected def registerTrigger(trigger: Trigger): Unit = {
     registerService(trigger)
     trigger.run()
@@ -58,10 +50,6 @@ abstract class AutomationService(
       SyncCloseable(
         "Orchestrated services",
         Lifecycle.close(backgroundServices.get(): _*)(logger),
-      ),
-      SyncCloseable(
-        "Managed resources",
-        Lifecycle.close(resources.get(): _*)(logger),
-      ),
+      )
     )
 }

@@ -12,15 +12,6 @@ object Trees {
 
   type StackElement = (TreeEvent, Seq[TreeEvent])
 
-  def traverseTree(
-      tree: TransactionTree,
-      onCreate: (CreatedEvent, Seq[TreeEvent]) => Unit,
-      onExercise: (ExercisedEvent, Seq[TreeEvent]) => Unit,
-  ): Unit = foldTree(tree, ())(
-    (_, e, p) => onCreate(e, p),
-    (_, e, p) => onExercise(e, p),
-  )
-
   @SuppressWarnings(Array("org.wartremover.warts.While", "org.wartremover.warts.Var"))
   def foldTree[State](
       tree: TransactionTree,

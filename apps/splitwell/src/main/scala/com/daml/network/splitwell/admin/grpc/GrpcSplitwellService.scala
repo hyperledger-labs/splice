@@ -1,6 +1,5 @@
 package com.daml.network.splitwell.admin.grpc
 
-import com.daml.ledger.javaapi.data.codegen.Contract as CodegenContract
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.store.SplitwellStore
@@ -197,13 +196,6 @@ class GrpcSplitwellService(
 }
 
 object GrpcSplitwellService {
-  implicit class ContractSyntax(private val contract: CodegenContract[_, _]) extends AnyVal {
-    def hasStakeholder(party: PartyId): Boolean = {
-      val p = party.toProtoPrimitive
-      contract.signatories.contains(p) || contract.observers.contains(p)
-    }
-  }
-
   private def encodeContractWithState(cws: ContractWithState[?, ?]): cnv0.ContractWithState = {
     import ContractState.*
     cnv0.ContractWithState(

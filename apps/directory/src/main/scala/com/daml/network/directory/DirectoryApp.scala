@@ -2,12 +2,9 @@ package com.daml.network.directory
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
 import akka.stream.Materializer
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
-import ch.megard.akka.http.cors.scaladsl.model.{HttpHeaderRange, HttpOriginMatcher}
-import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
@@ -97,20 +94,6 @@ class DirectoryApp(
         timeouts,
       )
       _ <- waitForDomainConnection(store.domains, config.domains.global.alias)
-      // TODO(#2024) Validate that this is secure.
-      settings = CorsSettings.defaultSettings
-        .withAllowGenericHttpRequests(true)
-        .withAllowedOrigins(HttpOriginMatcher.`*`)
-        .withAllowedMethods(
-          Seq(
-            HttpMethods.GET,
-            HttpMethods.PUT,
-            HttpMethods.DELETE,
-            HttpMethods.POST,
-            HttpMethods.OPTIONS,
-          )
-        )
-        .withAllowedHeaders(HttpHeaderRange.`*`)
       handler = new HttpDirectoryHandler(
         store,
         loggerFactory,

@@ -17,7 +17,7 @@ import com.daml.network.sv.config.{
   SvXNodesDomainConfig,
 }
 import com.daml.network.svc.config.SvcAppBackendConfig
-import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
+import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
@@ -258,19 +258,6 @@ object CNNodeConfigTransforms {
   ): CNNodeConfigTransform =
     updateAllValidatorConfigs((_, config) => update(config))
 
-  def updateAllValidatorClientConfigs(
-      update: (String, ValidatorAppClientConfig) => ValidatorAppClientConfig
-  ): CNNodeConfigTransform =
-    cantonConfig =>
-      cantonConfig
-        .focus(_.validatorAppClients)
-        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
-
-  def updateAllValidatorClientConfigs_(
-      update: ValidatorAppClientConfig => ValidatorAppClientConfig
-  ): CNNodeConfigTransform =
-    updateAllValidatorClientConfigs((_, config) => update(config))
-
   def updateAllSplitwellAppConfigs_(
       update: SplitwellAppTransform
   ): CNNodeConfigTransform =
@@ -292,16 +279,6 @@ object CNNodeConfigTransforms {
       cantonConfig
         .focus(_.domains)
         .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
-
-  def updateAllDomainConfigs_(
-      update: CommunityDomainConfig => CommunityDomainConfig
-  ): CNNodeConfigTransform =
-    updateAllDomainConfigs((_, config) => update(config))
-
-  def updateRemoteParticipantConfigs_(
-      update: RemoteParticipantConfig => RemoteParticipantConfig
-  ): CNNodeConfigTransform =
-    updateRemoteParticipantConfigs((_, config) => update(config))
 
   def updateRemoteParticipantConfigs(
       update: (String, RemoteParticipantConfig) => RemoteParticipantConfig
@@ -497,10 +474,6 @@ object CNNodeConfigTransforms {
     tokenDataSource.close
 
     tokens.toMap
-  }
-
-  def getAdminToken(clockConfig: ClockConfig, config: CNParticipantClientConfig): String = {
-    getAdminToken(clockConfig, config.ledgerApi.clientConfig)
   }
 
   def getAdminToken(clockConfig: ClockConfig, ledgerApi: ClientConfig): String = {

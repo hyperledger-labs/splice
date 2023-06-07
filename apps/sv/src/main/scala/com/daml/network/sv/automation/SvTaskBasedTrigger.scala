@@ -11,11 +11,11 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
-trait SvTaskBasedTrigger[T] {
+trait SvTaskBasedTrigger[T] { this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
   protected def svTaskContext: SvTaskBasedTrigger.Context
 
-  final protected def completeTask(
+  final protected override def completeTask(
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     svTaskContext.svcStore

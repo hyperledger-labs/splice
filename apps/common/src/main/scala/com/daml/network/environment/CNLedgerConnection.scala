@@ -11,7 +11,6 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
   ExercisedEvent,
-  Identifier,
   LedgerOffset,
   Transaction,
   TransactionTree,
@@ -156,27 +155,6 @@ class CNLedgerConnection(
   // When using submitAndWaitForTransaction with a command whose resulting transaction is
   // not visible to the submitting parties, one receives `TRANSACTION_NOT_FOUND`. In case, you run into this consider using
   // one of the other methods in this class that rely on submitAndWaitForTransactionTree instead.
-  def submitCommandsNoDedupTransaction(
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      commands: Seq[Command],
-      domainId: DomainId,
-      disclosedContracts: DisclosedContracts = DisclosedContracts(),
-  ): Future[Transaction] = {
-    callCallbacksOnCompletionAndWaitForOffset(
-      client
-        .submitAndWaitForTransaction(
-          workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = applicationId,
-          actAs = actAs.map(_.toProtoPrimitive),
-          readAs = readAs.map(_.toProtoPrimitive),
-          commands = commands,
-          commandId = uniqueId,
-          deduplicationConfig = NoDedup,
-          disclosedContracts = disclosedContracts assertOnDomain domainId,
-        )
-    )(tx => (tx.getOffset, tx))
-  }
 
   def submitCommands(
       actAs: Seq[PartyId],
@@ -240,28 +218,6 @@ class CNLedgerConnection(
     submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId, disclosedContracts).map(
       _._2
     )
-
-  def submitWithResultAndOffset[T](
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      update: Update[T],
-      commandId: CommandId,
-      deduplicationOffset: String,
-      domainId: DomainId,
-      disclosedContracts: DisclosedContracts = DisclosedContracts(),
-  ): Future[(String, T)] = {
-    doSubmitWithResultAndOffset(
-      actAs,
-      readAs,
-      update,
-      commandId.commandIdForSubmission,
-      DedupOffset(
-        offset = deduplicationOffset
-      ),
-      domainId,
-      disclosedContracts,
-    )
-  }
 
   def submitWithResultAndOffsetNoDedup[T](
       actAs: Seq[PartyId],
@@ -368,12 +324,6 @@ class CNLedgerConnection(
   ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
       .updates(LedgerClient.GetUpdatesRequest(beginOffset, None, party))
-
-  def tryGetTransactionTreeById(
-      parties: Seq[PartyId],
-      id: String,
-  ): Future[TransactionTree] =
-    client.tryGetTransactionTreeById(parties.map(_.toProtoPrimitive), id)
 
   def tryGetTransactionTreeByEventId(
       parties: Seq[PartyId],
@@ -821,9 +771,6 @@ object CNLedgerConnection {
         '_' +: "%04x".format(c.toInt)
     }.mkString
   }
-
-  def transactionFilterByParty(partyId: PartyId, templateId: Identifier): IngestionFilter =
-    IngestionFilter(partyId, templateIds = Set(templateId), interfaceIds = Set.empty)
 
   def uniqueId: String = UUID.randomUUID.toString
 }

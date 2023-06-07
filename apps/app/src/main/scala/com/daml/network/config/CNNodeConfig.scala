@@ -23,7 +23,6 @@ import com.daml.network.wallet.config.{
   WalletValidatorAppClientConfig,
 }
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
@@ -43,8 +42,6 @@ import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
 
 import java.io.File
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
 import scala.annotation.nowarn
 import scala.util.Try
 import scala.util.control.NoStackTrace
@@ -673,20 +670,6 @@ object CNNodeConfig {
     CantonConfig
       .loadAndValidate[CNNodeConfig](config)
       .valueOr(error => throw CNNodeConfigException(error))
-  }
-
-  def writeToFile(config: CNNodeConfig, path: Path, confidential: Boolean = true): Unit = {
-    val writers = new CNNodeConfig.ConfigWriters(confidential)
-    import writers.*
-    val renderer = ConfigRenderOptions
-      .defaults()
-      .setOriginComments(false)
-      .setComments(false)
-      .setJson(false)
-    val content = "canton { " + ConfigWriter[CNNodeConfig]
-      .to(config)
-      .render(renderer) + "}"
-    Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
   }
 
   lazy val defaultConfigRenderer =

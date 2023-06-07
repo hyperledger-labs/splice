@@ -111,23 +111,6 @@ case class CNNodeMetricsFactory(
     )
   }
 
-  def forWallet(name: String): WalletAppMetrics = {
-    wallets.getOrElseUpdate(
-      name, {
-        val metricName = deduplicateName(name, "Wallet", wallets)
-        val metricsContext = MetricsContext("wallet" -> name, "component" -> "wallet")
-        val labeledMetricsFactory =
-          createLabeledMetricsFactory(metricsContext)
-        new WalletAppMetrics(
-          MetricsFactory.prefix,
-          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(labeledMetricsFactory, "Wallet"),
-          new DMHealth(labeledMetricsFactory),
-        )
-      },
-    )
-  }
-
   def forDirectory(name: String): DirectoryAppMetrics = {
     directories.getOrElseUpdate(
       name, {
