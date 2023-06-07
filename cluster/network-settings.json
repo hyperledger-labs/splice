@@ -70,7 +70,7 @@
     "52.210.114.82/32",
 
     // Daml Hub
-    "34.27.240.103/32"
+    "34.102.206.16/32"
   ],
   "tls": {
     "issuerName": "letsencrypt-production",
