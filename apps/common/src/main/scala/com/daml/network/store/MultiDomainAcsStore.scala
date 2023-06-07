@@ -640,16 +640,15 @@ object MultiDomainAcsStore {
 
     def ingestionFilter: IngestionFilter
 
-    def ingestAcsAndTransferOuts(
+    def initialize()(implicit traceContext: TraceContext): Future[Unit]
+
+    def ingestAcs(
+        offset: String,
         acs: Seq[ActiveContract],
         inFlight: Seq[InFlightTransferOutEvent],
     )(implicit traceContext: TraceContext): Future[Unit]
 
-    def switchToIngestingUpdates(
-        offset: String
-    )(implicit traceContext: TraceContext): Future[Unit]
-
-    def getLastIngestedOffset(): Future[Option[String]]
+    def getLastIngestedOffset()(implicit traceContext: TraceContext): Future[Option[String]]
 
     def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
         traceContext: TraceContext

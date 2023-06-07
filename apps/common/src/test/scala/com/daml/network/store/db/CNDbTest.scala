@@ -3,6 +3,7 @@ package com.daml.network.store.db
 import com.daml.network.config.CNDbConfig
 import com.digitalasset.canton.config.DbParametersConfig
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.store.db.{DbStorageSetup, DbTest}
 import com.digitalasset.canton.tracing.TraceContext
@@ -11,7 +12,7 @@ import slick.dbio.SuccessAction
 import slick.lifted.{Rep, TableQuery}
 
 import java.util.concurrent.Semaphore
-import scala.concurrent.blocking
+import scala.concurrent.{Future, blocking}
 
 trait CNDbTest extends DbTest { this: Suite =>
 
@@ -34,6 +35,19 @@ trait CNDbTest extends DbTest { this: Suite =>
       _ <-
         if (!exists) { table += row }
         else SuccessAction(())
+    } yield ()
+  }
+
+  protected def resetAllCnAppTables(
+      storage: DbStorage
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    import storage.api.jdbcProfile.api.*
+    logger.info("Resetting all CN app database tables")
+    for {
+      _ <- storage.update(
+        sql"TRUNCATE user_wallet_acs_store, acs_store_template, store_descriptors RESTART IDENTITY CASCADE".asUpdate,
+        "resetAllCnAppTables",
+      )
     } yield ()
   }
 }

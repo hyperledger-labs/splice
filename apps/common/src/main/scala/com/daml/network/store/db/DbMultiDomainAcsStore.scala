@@ -29,6 +29,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     tableName: String,
     resolveDomainId: => Future[DomainId], // no support for multi-domain yet
     override protected val loggerFactory: NamedLoggerFactory,
+    override val txLogParser: TxLogStore.Parser[TXI, TXE],
     @unused futureSupervisor: FutureSupervisor,
     @unused retryProvider: RetryProvider,
 )(implicit
@@ -36,6 +37,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
 ) extends MultiDomainAcsStore
+    with TxLogStore[TXI, TXE]
     with AcsTables
     with NamedLogging {
 
@@ -289,4 +291,16 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       case PageLimit(limit) => limit
     }
   }
+
+  override def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit ec: ExecutionContext) = ???
+
+  override def getLatestTxLogIndex(query: TXI => Boolean)(implicit ec: ExecutionContext) = ???
+
+  override def getTxLogIndicesAfterEventId(
+      domainId: DomainId,
+      beginAfterEventId: String,
+      limit: Int,
+  )(implicit ec: ExecutionContext) = ???
+
+  override def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit ec: ExecutionContext) = ???
 }

@@ -88,36 +88,33 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
     override def ingestionFilter = contractFilter.ingestionFilter
 
-    override def getLastIngestedOffset(): Future[Option[String]] = Future {
+    override def initialize()(implicit traceContext: TraceContext): Future[Unit] = Future.unit
+
+    override def getLastIngestedOffset()(implicit
+        traceContext: TraceContext
+    ): Future[Option[String]] = Future {
       stateVar.offset
     }
 
-    override def ingestAcsAndTransferOuts(
+    override def ingestAcs(
+        offset: String,
         acs: Seq[ActiveContract],
         transferOuts: Seq[InFlightTransferOutEvent],
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
-        _.ingestAcsAndTransferOuts(acs, transferOuts, contractFilter.contains)
-      ).map { summary =>
-        logger.debug(
-          show"Ingested ACS and in-flight update: $summary"
+        _.ingestAcs(
+          acs,
+          transferOuts,
+          offset,
+          contractFilter.contains,
         )
-      }
-
-    override def switchToIngestingUpdates(
-        offset: String
-    )(implicit traceContext: TraceContext): Future[Unit] =
-      updateState(
-        _.switchToIngestingUpdates(offset)
-      ).map {
-        case (offsetChanged, offsetIngestionsToSignal) => {
-          logger.debug(
-            show"Ingested complete ACS and in-flight transfers at offset ${offset}"
-          )
-          offsetIngestionsToSignal.foreach(_.success(()))
-          offsetChanged.success(())
-          finishedAcsIngestion.success(())
-        }
+      ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
+        logger.debug(
+          show"Ingested complete ACS and in-flight transfers at offset $offset: $summary"
+        )
+        offsetIngestionsToSignal.foreach(_.success(()))
+        offsetChanged.success(())
+        finishedAcsIngestion.success(())
       }
 
     override def ingestUpdate(
@@ -657,30 +654,25 @@ object InMemoryMultiDomainAcsStore {
         throw new IllegalStateException(s"Failed to find contract state for $cid")
       )
 
-    def ingestAcsAndTransferOuts(
+    def ingestAcs(
         evs: Seq[ActiveContract],
         transferOuts: Seq[InFlightTransferOutEvent],
+        acsOffset: String,
         p: CreatedEvent => Boolean,
-    ): (State[TXI, TXE], IngestionSummary[TXE]) = {
+    ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
       val (stAcs, summaryAcs) = ingestActiveContracts(evs, p)
       val (stInFlight, summaryTransferOut) = stAcs.ingestTransferOuts(transferOuts, summaryAcs, p)
+      val (stFinal, offsetsToRemove) = stInFlight.removeOffsetSignalsBefore(acsOffset)
       (
-        stInFlight,
-        summaryTransferOut.copy(
-          newAcsSize = stInFlight.createEvents.size
+        stFinal.copy(offset = Some(acsOffset), offsetChanged = Promise()),
+        (
+          summaryTransferOut.copy(
+            newAcsSize = stFinal.createEvents.size
+          ),
+          offsetChanged,
+          offsetsToRemove.values,
         ),
-      )
-    }
-
-    def switchToIngestingUpdates(
-        acsOffset: String
-    ): (State[TXI, TXE], (Promise[Unit], Iterable[Promise[Unit]])) = {
-      assert(offset.isEmpty, "state was not switched to update ingestion yet")
-      val (newSt, offsetsToRemove) = removeOffsetSignalsBefore(acsOffset)
-      (
-        newSt.copy(offset = Some(acsOffset), offsetChanged = Promise()),
-        (offsetChanged, offsetsToRemove.values),
       )
     }
 

@@ -44,6 +44,7 @@ class UpdateIngestionService(
       traceContext: TraceContext
   ): Future[CNLedgerSubscription[?]] =
     for {
+      _ <- ingestionSink.initialize()
       lastIngestedOffset <- ingestionSink.getLastIngestedOffset()
       subscribeFrom <- lastIngestedOffset match {
         case None =>
@@ -51,7 +52,8 @@ class UpdateIngestionService(
             offset <- connection.ledgerEnd().map(_.getOffset)
             _ <- ingestAcsAndInFlight(offset)
           } yield offset
-        case Some(offset) => Future.successful(offset)
+        case Some(offset) =>
+          Future.successful(offset)
       }
     } yield new CNLedgerSubscription(
       source = updateSource(subscribeFrom),
@@ -86,8 +88,11 @@ class UpdateIngestionService(
     for {
       // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
       (evs, tfs) <- connection.activeContracts(filter, javaOffset)
-      _ <- ingestionSink.ingestAcsAndTransferOuts(evs, tfs)
-      _ <- ingestionSink.switchToIngestingUpdates(offset)
+      _ <- ingestionSink.ingestAcs(
+        offset,
+        evs,
+        tfs,
+      )
     } yield ()
   }
 

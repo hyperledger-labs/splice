@@ -5,6 +5,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.StoreTest.TestTxLogStoreParser
 import com.daml.network.store.db.AcsTables.*
 import com.daml.network.store.{PageLimit, StoreTest}
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -63,6 +64,7 @@ class DbMultiDomainAcsStoreTest
       "acs_store_template",
       Future.successful(DomainId.tryFromString("domain1::domain")),
       loggerFactory,
+      TestTxLogStoreParser,
       FutureSupervisor.Noop,
       RetryProvider(loggerFactory, timeouts),
     )
@@ -113,10 +115,7 @@ class DbMultiDomainAcsStoreTest
 
   override protected def cleanDb(storage: DbStorage): Future[?] = {
     for {
-      _ <- storage.queryAndUpdate(
-        sql"TRUNCATE acs_store_template".asUpdate,
-        "truncate acs_store_template",
-      )
+      _ <- resetAllCnAppTables(storage)
     } yield ()
   }
 }

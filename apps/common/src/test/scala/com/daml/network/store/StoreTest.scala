@@ -222,6 +222,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       event = event,
     )
 
+}
+
+object StoreTest {
   case class TestTxLogIndexRecord(
       offset: String,
       eventId: String,

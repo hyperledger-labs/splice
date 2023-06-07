@@ -15,19 +15,24 @@ import com.daml.network.environment.ledger.api.{
   TransferUpdate,
   TransactionTreeUpdate,
 }
-import com.daml.network.environment.RetryProvider
+import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.google.protobuf
+import org.scalatest.Assertion
+
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
-
 import scala.jdk.CollectionConverters.*
 
-class InMemoryMultiDomainAcsStoreTest extends StoreTest {
+abstract class MultiDomainAcsStoreTest[
+    S <: MultiDomainAcsStore with TxLogStore[
+      TestTxLogIndexRecord,
+      TestTxLogEntry,
+    ]
+] extends StoreTest {
 
   implicit val actorSystem: ActorSystem = ActorSystem("InMemoryMultiDomainAcsStoreTest")
 
@@ -49,7 +54,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     id
   }
 
-  private val txFilter: MultiDomainAcsStore.ContractFilter = {
+  protected val txFilter: MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(
@@ -85,25 +90,21 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     )
   }
 
-  private def mkStore(): Store =
-    new InMemoryMultiDomainAcsStore(
-      loggerFactory,
-      txFilter,
-      TestTxLogStoreParser,
-      FutureSupervisor.Noop,
-      RetryProvider(loggerFactory, timeouts),
-    )(actorSystem.dispatcher)
+  protected def mkStore(): Store
 
   private def mkCreateTx[TCid <: ContractId[T], T](
       offset: String,
       createRequests: Seq[Contract[TCid, T]],
   ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent))
 
-  private def acsAndTransferOuts[TCid <: ContractId[T], T](
+  private def acs[TCid <: ContractId[T], T](
       acs: Seq[(Contract[TCid, T], DomainId)] = Seq.empty,
       transferOuts: Seq[(Contract[TCid, T], DomainId, DomainId, String)] = Seq.empty,
-  )(implicit store: MultiDomainAcsStore) =
-    store.ingestionSink.ingestAcsAndTransferOuts(
+      acsOffset: String = nextOffset,
+  )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
+    _ <- store.ingestionSink.initialize()
+    _ <- store.ingestionSink.ingestAcs(
+      acsOffset,
       acs.map { case (contract, domain) => ActiveContract(domain, toCreatedEvent(contract)) },
       transferOuts.map { case (c, sourceDomain, targetDomain, tfid) =>
         toInFlightTransferOutEvent(
@@ -114,9 +115,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
         )
       },
     )
-
-  private def switchToUpdates(offset: String = nextOffset)(implicit store: MultiDomainAcsStore) =
-    store.ingestionSink.switchToIngestingUpdates(offset)
+  } yield ()
 
   // Convenient syntax to make the tests easy to read.
   private implicit class DomainSyntax(private val domain: DomainId) {
@@ -183,9 +182,15 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       )
   }
 
-  private type Store = InMemoryMultiDomainAcsStore[TestTxLogIndexRecord, TestTxLogEntry]
+  protected type Store = S
   private type C = Contract[AppRewardCoupon.ContractId, AppRewardCoupon]
   private type CReady = ReadyContract[AppRewardCoupon.ContractId, AppRewardCoupon]
+
+  protected def assertTestState(
+      contractStateEventsById: Map[ContractId[_], Long] = Map.empty,
+      archivedTombstones: Set[ContractId[_]] = Set.empty,
+      pendingTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
+  )(implicit store: Store): Future[Assertion]
 
   private def assertList(expected: (C, Option[DomainId])*)(implicit store: MultiDomainAcsStore) = {
     val expected_ = expected.map {
@@ -214,27 +219,6 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
   ) =
     store.isReadyForTransferIn(transferId).map {
       _ shouldBe expected
-    }
-
-  private def assertTestState(
-      contractStateEventsById: Map[ContractId[_], Long] = Map.empty,
-      archivedTombstones: Set[ContractId[_]] = Set.empty,
-      pendingTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
-  )(implicit store: Store) =
-    for {
-      actualContractStateEventsById <- store.contractStateEventsById
-      actualArchivedTombstones <- store.archivedTombstones
-      actualPendingTransfersById <- store.pendingTransfersById
-    } yield {
-      clue("contractStateEventsById") {
-        actualContractStateEventsById shouldBe contractStateEventsById
-      }
-      clue("archivedTombstones") {
-        actualArchivedTombstones shouldBe archivedTombstones
-      }
-      clue("pendingTransfersById") {
-        actualPendingTransfersById shouldBe pendingTransfersById
-      }
     }
 
   private def c(i: Int): C = appRewardCoupon(i, svcParty)
@@ -298,10 +282,24 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
   private val d3: DomainId = DomainId.tryFromString("domain3::domain")
 
   "InMemoryMultiDomainAcsStore" should {
+    "ingestion initialization is idempotent" in {
+      implicit val store = mkStore()
+      for {
+        _ <- store.ingestionSink.initialize()
+        _ <- store.ingestionSink.initialize()
+      } yield succeed
+    }
+    "initial store is empty" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs()
+        _ <- assertList()
+      } yield succeed
+    }
     "single domain creates and archives" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- assertList()
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
@@ -319,7 +317,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "respect the limit and log a warning for HardLimit" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- d1.create(c(1))
         _ <- d1.create(c(2))
         resultHard <- loggerFactory.assertLogs(
@@ -337,10 +335,9 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "single domain acs" in {
       implicit val store = mkStore()
       for {
-        _ <- acsAndTransferOuts(
+        _ <- acs(
           acs = Seq((c(1), d1))
         )
-        _ <- switchToUpdates()
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
         _ <- assertLookupNone(c(1))
@@ -351,7 +348,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "transfer out before transfer in" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- assertList()
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
@@ -369,7 +366,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "transfer in before transfer out" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- assertList()
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
@@ -392,7 +389,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "transfer in and archive before transfer out" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- assertList()
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
@@ -410,7 +407,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "transfer in before create" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- assertList()
         tf0 = nextTransferId
         _ <- d2.transferIn(c(1) -> d1, tf0)
@@ -433,7 +430,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "multiple early transfer ins" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- assertList()
         tf0 = nextTransferId
         tf1 = nextTransferId
@@ -461,7 +458,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "archive before create" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- assertList()
         tf0 = nextTransferId
         _ <- d2.transferIn(c(1) -> d1, tf0)
@@ -479,7 +476,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "archive before transfer in" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- assertList()
         tf0 = nextTransferId
         tf1 = nextTransferId
@@ -502,12 +499,11 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       implicit val store = mkStore()
       val tf0 = nextTransferId
       for {
-        _ <- acsAndTransferOuts(
+        _ <- acs(
           transferOuts = Seq(
             (c(1), d1, d2, tf0)
           )
         )
-        _ <- switchToUpdates()
         _ <- assertList(c(1) -> None)
         _ <- d2.transferIn(c(1) -> d1, tf0)
         _ <- assertList(c(1) -> Some(d2))
@@ -519,7 +515,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "no in-flight transfer out, transfer in" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         tf0 = nextTransferId
         _ <- d2.transferIn(c(1) -> d1, tf0)
         _ <- assertList(c(1) -> Some(d2))
@@ -537,10 +533,9 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "filtering of acs" in {
       implicit val store = mkStore()
       for {
-        _ <- acsAndTransferOuts(
+        _ <- acs(
           Seq((c(1), d1), (cFeatured(2), d1))
         )
-        _ <- switchToUpdates()
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
         _ <- assertTestState()
@@ -550,7 +545,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "filtering of create" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- d1.create(c(1))
         _ <- d1.create(cFeatured(2))
         _ <- assertList(c(1) -> Some(d1))
@@ -563,7 +558,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       val tf0 = nextTransferId
       val tf1 = nextTransferId
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- d1.transferIn(c(1) -> d2, tf0)
         _ <- d1.transferIn(cFeatured(2) -> d2, tf1)
         _ <- assertList(c(1) -> Some(d1))
@@ -579,7 +574,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       implicit val store = mkStore()
       val tf0 = nextTransferId
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- d1.create(cFeatured(1))
         _ <- d1.transferOut(c(1) -> d2, tf0)
         _ <- assertTestState()
@@ -589,10 +584,9 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       implicit val store = mkStore()
       val tf0 = nextTransferId
       for {
-        _ <- acsAndTransferOuts(
+        _ <- acs(
           transferOuts = Seq((cFeatured(1), d1, d2, tf0))
         )
-        _ <- switchToUpdates()
         _ <- assertTestState(
         )
       } yield succeed
@@ -612,12 +606,11 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       val tf2Id = TransferId(d1, tf2)
       for {
         // in-flight transfer out
-        _ <- acsAndTransferOuts(
+        _ <- acs(
           transferOuts = Seq(
             (c(1), d1, d2, tf0)
           )
         )
-        _ <- switchToUpdates()
         _ = eventually()(transfers.get should have length 1)
         _ <- assertReadyForTransferIn(tf0Id, true)
         _ <- d2.transferIn(c(1) -> d1, tf0)
@@ -649,11 +642,10 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       val tf1 = nextTransferId
       val tf2 = nextTransferId
       for {
-        _ <- acsAndTransferOuts(
+        _ <- acs(
           acs = Seq((c(1), d1)),
           transferOuts = Seq((c(2), d1, d2, tf2)),
         )
-        _ <- switchToUpdates()
         _ = eventually()(readyContracts.get() should have size 1)
         // transfer out before transfer in
         _ <- d1.transferOut(c(1) -> d2, tf0)
@@ -682,7 +674,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
     "interfaces" in {
       implicit val store = mkStore()
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- d1.create(transferInProgress(1))
         _ <- d1.create(testDeliveryOffer(2))
         cs <- store.listContracts(DeliveryOffer.INTERFACE, limit = HardLimit(2L))
@@ -738,7 +730,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       val initialEventIdD1 = tx2.getRootEventIds.asScala.headOption.value
       val initialEventIdD2 = tx3.getRootEventIds.asScala.headOption.value
       for {
-        _ <- switchToUpdates()
+        _ <- acs()
         _ <- store.ingestionSink.ingestUpdate(d1, TransactionTreeUpdate(tx1))
         _ <- store.ingestionSink.ingestUpdate(d1, TransactionTreeUpdate(tx2))
         _ <- store.ingestionSink.ingestUpdate(d2, TransactionTreeUpdate(tx3))
@@ -796,7 +788,7 @@ class InMemoryMultiDomainAcsStoreTest extends StoreTest {
       )
 
       for {
-        _ <- switchToUpdates(acsOffset)
+        _ <- acs(acsOffset = acsOffset)
         _ <- signal_010
         _ = notCompleted(signal_011, signal_012)
         _ <- d1.create(c(1), tx1Offset)

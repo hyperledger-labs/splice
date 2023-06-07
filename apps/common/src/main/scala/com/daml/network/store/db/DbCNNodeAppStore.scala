@@ -34,6 +34,7 @@ abstract class DbCNNodeAppStore[
       tableName,
       defaultAcsDomainIdF,
       loggerFactory,
+      txLogParser,
       futureSupervisor,
       retryProvider,
     )
