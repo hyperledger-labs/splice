@@ -18,7 +18,7 @@ import monocle.macros.syntax.lens.*
 import java.time.Duration
 import java.util.UUID
 
-class WalletTimeBasedIntegrationTest
+class XNodeWalletTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
@@ -32,7 +32,8 @@ class WalletTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .addConfigTransform((_, config) => {
         // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.
         // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators

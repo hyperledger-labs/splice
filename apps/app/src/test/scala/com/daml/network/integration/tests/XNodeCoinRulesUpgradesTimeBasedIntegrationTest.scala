@@ -12,7 +12,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import monocle.macros.syntax.lens.*
 
-class CoinRulesUpgradesTimeBasedIntegrationTest
+class XNodeCoinRulesUpgradesTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
     with WalletTestUtil
     with TimeTestUtil
@@ -23,7 +23,8 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .addConfigTransform(CNNodeConfigTransforms.onlySv1)
       .addConfigTransform((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppConfigs((_, c) =>
           c.copy(enableCoinRulesUpgrade = true)

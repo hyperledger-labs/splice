@@ -11,7 +11,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-class SplitwellTimeBasedIntegrationTest
+class XNodeSplitwellTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
     with WalletTestUtil
     with TimeTestUtil
@@ -22,7 +22,7 @@ class SplitwellTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
