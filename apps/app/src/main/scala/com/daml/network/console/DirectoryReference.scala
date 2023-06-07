@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import akka.actor.ActorSystem
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.config.NetworkAppClientConfig
@@ -57,7 +58,8 @@ abstract class DirectoryAppReference(
 class DirectoryAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends DirectoryAppReference(consoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends DirectoryAppReference(consoleEnvironment, name)
     with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 
@@ -94,7 +96,8 @@ class DirectoryAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     val config: DirectoryAppClientConfig, // adding this explicitly for easier overriding
-) extends DirectoryAppReference(consoleEnvironment, name) {
+)(implicit actorSystem: ActorSystem)
+    extends DirectoryAppReference(consoleEnvironment, name) {
 
   import LedgerApiExtensions.*
 

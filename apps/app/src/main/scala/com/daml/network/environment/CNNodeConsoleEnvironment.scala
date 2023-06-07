@@ -45,6 +45,7 @@ class CNNodeConsoleEnvironment(
       "dar/svc-governance-0.1.0.dar",
     )
   )
+  implicit val actorSystem = environment.actorSystem
   val templateDecoder = new ResourceTemplateDecoder(packageSignatures, environment.loggerFactory)
 
   lazy val httpCommandRunner: ConsoleHttpCommandRunner = new ConsoleHttpCommandRunner(

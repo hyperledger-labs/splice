@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import akka.actor.ActorSystem
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.round as cr
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
@@ -91,7 +92,8 @@ class SvAppClientReference(
 class SvAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-) extends SvAppReference(consoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends SvAppReference(consoleEnvironment, name)
     with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 

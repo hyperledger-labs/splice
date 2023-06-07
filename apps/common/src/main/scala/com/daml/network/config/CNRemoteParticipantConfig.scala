@@ -1,5 +1,6 @@
 package com.daml.network.config
 
+import akka.actor.ActorSystem
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.participant.config.{BaseParticipantConfig, RemoteParticipantConfig}
 
@@ -15,7 +16,7 @@ case class CNParticipantClientConfig(
   override def clientAdminApi: ClientConfig = adminApi
   override def clientLedgerApi: ClientConfig = ledgerApi.clientConfig
 
-  def getParticipantClientConfig(): RemoteParticipantConfig = {
+  def getParticipantClientConfig()(implicit actorSystem: ActorSystem): RemoteParticipantConfig = {
     val token = ledgerApi.getToken()
     RemoteParticipantConfig(adminApi, ledgerApi.clientConfig, token)
   }

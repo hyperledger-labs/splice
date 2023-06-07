@@ -24,7 +24,7 @@ trait TestEnvironment[+E <: Environment]
 
   implicit val executionContext: ExecutionContextIdlenessExecutorService =
     environment.executionContext
-  implicit val actorSystem: ActorSystem = environment.actorSystem
+  implicit def actorSystem: ActorSystem = environment.actorSystem
   implicit val executionSequencerFactory: ExecutionSequencerFactory =
     environment.executionSequencerFactory
 }

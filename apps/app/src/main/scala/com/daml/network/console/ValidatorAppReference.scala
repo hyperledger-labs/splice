@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import akka.actor.ActorSystem
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -86,7 +87,8 @@ abstract class ValidatorAppReference(
 final class ValidatorAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-) extends ValidatorAppReference(consoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends ValidatorAppReference(consoleEnvironment, name)
     with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 

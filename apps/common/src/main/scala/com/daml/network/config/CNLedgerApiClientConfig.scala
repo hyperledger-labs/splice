@@ -19,8 +19,7 @@ case class CNLedgerApiClientConfig(
   // Note: Some places, e.g., Cantons RemoteParticipantConfig expects a static token,
   // CNLedgerApiClientConfig contains information for how to acquire tokens.
   // We need to perform some blocking IO to generate the token here.
-  def getToken(): Option[String] = {
-    implicit val actorSystem = ActorSystem("CNLedgerApiClientConfig")
+  def getToken()(implicit actorSystem: ActorSystem): Option[String] = {
     implicit val executionContext = actorSystem.dispatcher
     implicit val traceContext = TraceContext.empty
     val loggerFactory = NamedLoggerFactory.root

@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import akka.actor.ActorSystem
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
@@ -219,7 +220,8 @@ abstract class ScanAppReference(
 final class ScanAppBackendReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-) extends ScanAppReference(cnNodeConsoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends ScanAppReference(cnNodeConsoleEnvironment, name)
     with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 

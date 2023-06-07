@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import akka.actor.ActorSystem
 import com.digitalasset.canton.protocol.LfContractId
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.auth0.exception.Auth0Exception
@@ -116,12 +117,12 @@ object CNNodeTests {
     // make `aliceDirectory` etc. use updated usernames
     override def rdp(name: String)(implicit
         env: CNNodeTestConsoleEnvironment
-    ): DirectoryAppClientReference = extendLedgerApiUserWithCaseId(super.rdp(name))
+    ): DirectoryAppClientReference = extendLedgerApiUserWithCaseId(super.rdp(name))(env.actorSystem)
 
     // make `aliceSplitwell` etc. use updated usernames
     override def rsw(name: String)(implicit
         env: CNNodeTestConsoleEnvironment
-    ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))
+    ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))(env.actorSystem)
 
     override def perTestCaseName(name: String) = s"${name}_tc$testCaseId"
 
@@ -138,7 +139,7 @@ object CNNodeTests {
 
     private def extendLedgerApiUserWithCaseId(
         ref: DirectoryAppClientReference
-    ): DirectoryAppClientReference = {
+    )(implicit actorSystem: ActorSystem): DirectoryAppClientReference = {
       val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.ledgerApi
         .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newLedgerApiUser))
@@ -151,7 +152,7 @@ object CNNodeTests {
 
     private def extendLedgerApiUserWithCaseId(
         ref: SplitwellAppClientReference
-    ): SplitwellAppClientReference = {
+    )(implicit actorSystem: ActorSystem): SplitwellAppClientReference = {
       val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.participantClient.ledgerApi
         .copy(authConfig =

@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import akka.actor.ActorSystem
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
@@ -61,7 +62,8 @@ class SvcAppClientReference(
 class SvcAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-) extends SvcAppReference(consoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends SvcAppReference(consoleEnvironment, name)
     with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 

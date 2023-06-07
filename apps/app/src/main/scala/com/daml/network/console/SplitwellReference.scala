@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import akka.actor.ActorSystem
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
@@ -68,7 +69,8 @@ final class SplitwellAppClientReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     val config: SplitwellAppClientConfig, // adding this explicitly for easier overriding
-) extends SplitwellAppReference(cnNodeConsoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends SplitwellAppReference(cnNodeConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
   private val acceptDuration = new RelTime(
@@ -442,7 +444,8 @@ final class SplitwellAppClientReference(
 final class SplitwellAppBackendReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
-) extends SplitwellAppReference(consoleEnvironment, name)
+)(implicit actorSystem: ActorSystem)
+    extends SplitwellAppReference(consoleEnvironment, name)
     with CNNodeAppBackendReference
     with BaseInspection[ParticipantNode] {
 
