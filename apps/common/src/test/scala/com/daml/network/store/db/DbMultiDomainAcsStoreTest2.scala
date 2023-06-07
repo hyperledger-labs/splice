@@ -13,7 +13,7 @@ import org.scalatest.DoNotDiscover
 
 import scala.concurrent.Future
 
-/** Note: this test is currently not passing, as DbMultiDomainAcsStore is not fully implemented.
+/** TODO(#5483): this test is currently not passing, as DbMultiDomainAcsStore is not fully implemented.
   * Once DbMultiDomainAcsStore is fully implemented, remove the [[DoNotDiscover]] annotation,
   * and merge this test with [[DbMultiDomainAcsStoreTest]].
   */
