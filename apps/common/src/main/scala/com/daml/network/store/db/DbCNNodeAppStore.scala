@@ -5,6 +5,7 @@ import com.daml.network.store.{
   CNNodeAppStore,
   InMemoryDomainStore,
   InMemoryMultiDomainAcsStore,
+  MultiDomainAcsStore,
   TxLogStore,
 }
 import com.daml.network.util.TemplateJsonDecoder
@@ -18,7 +19,12 @@ import scala.concurrent.ExecutionContext
 abstract class DbCNNodeAppStore[
     TXI <: TxLogStore.IndexRecord,
     TXE <: TxLogStore.Entry[TXI],
-](storage: DbStorage, tableName: String)(implicit
+](
+    storage: DbStorage,
+    tableName: String,
+    storeDescriptor: io.circe.Json,
+    contractFilter: MultiDomainAcsStore.ContractFilter,
+)(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     traceContext: TraceContext,
@@ -32,8 +38,10 @@ abstract class DbCNNodeAppStore[
     new DbMultiDomainAcsStore(
       storage,
       tableName,
+      storeDescriptor,
       defaultAcsDomainIdF,
       loggerFactory,
+      contractFilter,
       txLogParser,
       futureSupervisor,
       retryProvider,

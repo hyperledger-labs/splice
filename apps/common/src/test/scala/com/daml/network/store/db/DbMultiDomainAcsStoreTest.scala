@@ -7,13 +7,13 @@ import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.StoreTest.TestTxLogStoreParser
 import com.daml.network.store.db.AcsTables.*
-import com.daml.network.store.{PageLimit, StoreTest}
+import com.daml.network.store.{MultiDomainAcsStore, PageLimit, StoreTest}
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import slick.jdbc.JdbcProfile
 import slick.lifted.ProvenShape
 
@@ -36,11 +36,13 @@ class DbMultiDomainAcsStoreTest
       val coupons = (1 to 3).map(n => appRewardCoupon(n, svcParty))
       val seenCoupons =
         new AtomicReference(Seq.empty[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]])
-      val done = store
-        .streamReadyContracts(AppRewardCoupon.COMPANION, pageSize = PageLimit(1))
-        .take(3)
-        .runForeach(coupon => seenCoupons.updateAndGet(x => x.appended(coupon.contract)))
       for {
+        _ <- store.ingestionSink.initialize()
+        // TODO(#5425): move the stream definition up, once queries are blocking until store is initialized
+        done = store
+          .streamReadyContracts(AppRewardCoupon.COMPANION, pageSize = PageLimit(1))
+          .take(3)
+          .runForeach(coupon => seenCoupons.updateAndGet(x => x.appended(coupon.contract)))
         _ <- create(store.storeId, coupons.head)
         _ = eventually()(seenCoupons.get() should be(Seq(coupons.head)))
         _ <- create(store.storeId, coupons(1))
@@ -54,16 +56,27 @@ class DbMultiDomainAcsStoreTest
 
   }
 
+  private val storeDescriptor =
+    io.circe.parser
+      .parse(raw"""{"test": "DbMultiDomainAcsStoreTest"}""")
+      .getOrElse(sys.error("Why is it so hard to define a JSON literal"))
+
   private def mkStore() = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResource("dar/canton-coin-0.1.0.dar")
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
+
+    val unusedTxFilter = MultiDomainAcsStore
+      .SimpleContractFilter(PartyId.tryFromProtoPrimitive("aaaa::bbbb"), Map.empty, Map.empty)
+
     new DbMultiDomainAcsStore(
       storage,
       "acs_store_template",
+      storeDescriptor,
       Future.successful(DomainId.tryFromString("domain1::domain")),
       loggerFactory,
+      unusedTxFilter,
       TestTxLogStoreParser,
       FutureSupervisor.Noop,
       RetryProvider(loggerFactory, timeouts),

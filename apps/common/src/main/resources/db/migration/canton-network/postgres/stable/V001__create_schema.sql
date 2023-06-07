@@ -12,15 +12,10 @@ create table store_descriptors (
 
     -- A JSON object serving as the specification of the concrete ingestion pipeline used by the store.
     -- Used to by the apps to lookup the DB internal 'id' for their specific ingestion pipeline.
-    descriptor jsonb not null unique
-);
+    descriptor jsonb not null unique,
 
-create table store_ingestion_states(
-    -- the store for which this ingestion state is tracking the offset
-    store_id int not null references store_descriptors(id) primary key,
-
-    -- the last ingested offset; if the ingestion was not yet started then no ingestion state is present
-    last_ingested_offset text not null
+    -- the last ingested offset, if any
+    last_ingested_offset text
 );
 
 -- Templates for create event tables

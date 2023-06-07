@@ -8,11 +8,17 @@ import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
-import com.daml.network.environment.ledger.api.TransferEvent
+import com.daml.network.environment.ledger.api.{
+  ActiveContract,
+  InFlightTransferOutEvent,
+  TransferEvent,
+  TreeUpdate,
+}
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.*
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -20,6 +26,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
@@ -27,8 +34,10 @@ import scala.concurrent.duration.DurationInt
 class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     storage: DbStorage,
     tableName: String,
+    storeDescriptor: io.circe.Json,
     resolveDomainId: => Future[DomainId], // no support for multi-domain yet
     override protected val loggerFactory: NamedLoggerFactory,
+    contractFilter: MultiDomainAcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     @unused futureSupervisor: FutureSupervisor,
     @unused retryProvider: RetryProvider,
@@ -44,22 +53,12 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   import MultiDomainAcsStore.*
   import profile.api.*
 
-  // TODO (#5247): resolve/compute from ingestion filters
-  val storeId: Int = 1
-
-  @unused
-  private def lastIngestedOffset()(implicit traceContext: TraceContext): Future[Option[String]] = {
-    storage
-      .querySingle(
-        sql"""
-        select last_ingested_offset
-        from store_ingestion_states
-        where store_id = $storeId
-         """.as[String].headOption,
-        "lastIngestedOffset",
-      )
-      .value
-  }
+  // storeId is the primary keys of rows in the store_descriptors table.
+  // This ID is immutable and used in many queries, that's why it is cached here.
+  private val storeIdA: AtomicReference[Option[Int]] = new AtomicReference(None)
+  def storeId: Int = storeIdA
+    .get()
+    .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
   override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
       implicit
@@ -238,7 +237,97 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       tc: TraceContext
   ): Future[Unit] = ???
 
-  override def ingestionSink: IngestionSink = ???
+  override def ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
+    override def ingestionFilter: IngestionFilter = contractFilter.ingestionFilter
+
+    override def initialize()(implicit traceContext: TraceContext): Future[Unit] = {
+      // Notes:
+      // - Postgres JSONB does not preserve white space, does not preserve the order of object keys, and does not keep duplicate object keys
+      // - Postgres JSONB columns have a maximum size of 255MB
+      // - We are using noSpacesSortKeys to insert a canonical serialization of the JSON object, even though this is not necessary for Postgres
+      // - 'ON CONFLICT DO NOTHING RETURNING ...' does not return anything if the row already exists, that's why we are using two separate queries
+      val descriptorStr = String256M.tryCreate(storeDescriptor.noSpacesSortKeys)
+      for {
+        _ <- storage
+          .update(
+            sql"""
+            insert into store_descriptors (descriptor)
+            values (${descriptorStr}::jsonb)
+            on conflict do nothing
+           """.asUpdate,
+            "initialize.1",
+          )
+        storeIdResult <- storage
+          .querySingle(
+            sql"""
+             select id
+             from store_descriptors
+             where descriptor = ${descriptorStr}::jsonb
+             """.as[Int].headOption,
+            "initialize.2",
+          )
+          .value
+      } yield {
+        assert(storeIdResult.isDefined, s"No row for $storeDescriptor found")
+        storeIdA.set(storeIdResult)
+        logger.info(s"Store $storeDescriptor initialized with storeId $storeId")
+      }
+    }
+
+    // Note: returns a DBIOAction, as updating the offset needs to happen in the same SQL transaction
+    // that modifies the ACS/TxLog.
+    private def updateOffset(offset: String): DBIOAction[Unit, NoStream, Effect.Write] =
+      sql"""
+            update store_descriptors
+            set last_ingested_offset = ${lengthLimited(offset)}
+            where id = $storeId
+           """.asUpdate.map(_ => ())
+
+    override def ingestAcs(
+        offset: String,
+        acs: Seq[ActiveContract],
+        inFlight: Seq[InFlightTransferOutEvent],
+    )(implicit traceContext: TraceContext): Future[Unit] = for {
+      previousOffset <- getLastIngestedOffset()
+      _ = assert(
+        previousOffset.isEmpty,
+        s"last_ingested_offset already exists for store $storeId",
+      )
+
+      // TODO(#5481): Insert ACS data here, in the same SQL transaction as updating the offset.
+      //  Don't insert TxLog data, the TxLog starts after the initial ACS ingestion.
+      _ <- storage.update(updateOffset(offset), "ingestAcs.updateOffset")
+    } yield {
+      logger.info(
+        s"Store $storeId ingested the ACS and switched to ingesting updates at $offset"
+      )
+    }
+
+    override def getLastIngestedOffset()(implicit
+        traceContext: TraceContext
+    ): Future[Option[String]] =
+      storage
+        .querySingle(
+          sql"""
+          select last_ingested_offset from store_descriptors
+          where id=$storeId
+           """.as[Option[String]].headOption,
+          "getLastIngestedOffset",
+        )
+        .value
+        .map(
+          _.getOrElse(
+            throw new RuntimeException(
+              s"getLastIngestedOffset did not find any row for store id $storeId. Make sure to call initialize() first."
+            )
+          )
+        )
+
+    // TODO(#5481): Implement ingesting ACS/TxLog data.
+    override def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
+        traceContext: TraceContext
+    ): Future[Unit] = ???
+  }
 
   override def close(): Unit = ()
 

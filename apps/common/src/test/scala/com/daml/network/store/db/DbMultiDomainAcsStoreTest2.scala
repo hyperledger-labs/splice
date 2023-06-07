@@ -25,6 +25,11 @@ class DbMultiDomainAcsStoreTest2
     with CNPostgresTest {
   import MultiDomainAcsStore.*
 
+  private val storeDescriptor =
+    io.circe.parser
+      .parse(raw"""{"test": "DbMultiDomainAcsStoreTest2"}""")
+      .getOrElse(sys.error("Why is it so hard to define a JSON literal"))
+
   override def mkStore(): Store = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResource("dar/canton-coin-0.1.0.dar")
@@ -35,8 +40,10 @@ class DbMultiDomainAcsStoreTest2
     new DbMultiDomainAcsStore(
       storage,
       "acs_store_template",
+      storeDescriptor,
       resolveDomainId = Future.successful(domainId),
       loggerFactory,
+      txFilter,
       TestTxLogStoreParser,
       FutureSupervisor.Noop,
       RetryProvider(loggerFactory, timeouts),
