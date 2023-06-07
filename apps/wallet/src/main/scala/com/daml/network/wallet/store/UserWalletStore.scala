@@ -20,7 +20,12 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.{CNNodeAppStoreWithHistory, InMemoryMultiDomainAcsStore, PageLimit}
+import com.daml.network.store.{
+  CNNodeAppStoreWithHistory,
+  InMemoryMultiDomainAcsStore,
+  PageLimit,
+  ConfiguredDefaultDomain,
+}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.UserWalletStore.{
@@ -52,6 +57,7 @@ trait UserWalletStore
       UserWalletTxLogParser.TxLogIndexRecord,
       UserWalletTxLogParser.TxLogEntry,
     ]
+    with ConfiguredDefaultDomain
     with NamedLogging {
 
   /** The key identifying the parties considered by this store. */

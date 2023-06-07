@@ -10,6 +10,7 @@ import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
+  ConfiguredDefaultDomain,
   TxLogStore,
 }
 import com.daml.network.util.Contract
@@ -23,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import MultiDomainAcsStore.ReadyContract
 
-trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
+trait SplitwellStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
   import MultiDomainAcsStore.{ContractWithState, QueryResult}
 
   def providerParty: PartyId

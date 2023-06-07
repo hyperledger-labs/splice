@@ -8,6 +8,7 @@ import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
   TxLogStore,
+  ConfiguredDefaultDomain,
 }
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.pretty.*
@@ -19,7 +20,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
   */
-trait WalletStore extends CNNodeAppStoreWithoutHistory {
+trait WalletStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
 
   protected implicit val ec: ExecutionContext
 

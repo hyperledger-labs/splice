@@ -1,12 +1,9 @@
 package com.daml.network.store
 
 import com.daml.network.environment.CNLedgerConnection
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** Store setup shared by all of our apps
   */
@@ -21,14 +18,9 @@ trait CNNodeAppStore[
   /** Defines which create events are to be ingested into the store. */
   protected def acsContractFilter: MultiDomainAcsStore.ContractFilter
 
-  def defaultAcsDomain: DomainAlias
-
   def domains: DomainStore
 
   def multiDomainAcsStore: MultiDomainAcsStore
-
-  def defaultAcsDomainIdF(implicit tc: TraceContext): Future[DomainId] =
-    domains.signalWhenConnected(defaultAcsDomain)
 
   def txLog: TxLogStore[TXI, TXE]
 

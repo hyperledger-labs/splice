@@ -3,6 +3,7 @@ package com.daml.network.store.db
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   CNNodeAppStore,
+  ConfiguredDefaultDomain,
   InMemoryDomainStore,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
@@ -29,7 +30,7 @@ abstract class DbCNNodeAppStore[
     templateJsonDecoder: TemplateJsonDecoder,
     traceContext: TraceContext,
     closeContext: CloseContext,
-) extends CNNodeAppStore[TXI, TXE] {
+) extends CNNodeAppStore[TXI, TXE] { this: ConfiguredDefaultDomain =>
   protected def futureSupervisor: FutureSupervisor
 
   protected def retryProvider: RetryProvider

@@ -7,6 +7,7 @@ import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
+  ConfiguredDefaultDomain,
   TxLogStore,
 }
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -22,7 +23,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import scala.concurrent.{ExecutionContext, Future}
 
 /* Store used by the SV app for filtering contracts visible to the SV party. */
-trait SvSvStore extends CNNodeAppStoreWithoutHistory {
+trait SvSvStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
 
   protected[this] def domainConfig: SvDomainConfig
 

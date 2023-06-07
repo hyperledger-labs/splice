@@ -12,6 +12,7 @@ import com.daml.network.store.{
   CNNodeAppStoreWithHistory,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
+  ConfiguredDefaultDomain,
 }
 import MultiDomainAcsStore.ReadyContract
 import com.daml.network.util.{CoinConfigSchedule, Contract}
@@ -31,7 +32,8 @@ trait ScanStore
     extends CNNodeAppStoreWithHistory[
       ScanTxLogParser.TxLogIndexRecord,
       ScanTxLogParser.TxLogEntry,
-    ] {
+    ]
+    with ConfiguredDefaultDomain {
 
   override protected def txLogParser = new ScanTxLogParser(loggerFactory)
 

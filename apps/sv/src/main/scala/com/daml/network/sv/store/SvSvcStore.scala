@@ -26,6 +26,7 @@ import com.daml.network.store.{
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
   PageLimit,
+  ConfiguredDefaultDomain,
   TxLogStore,
 }
 import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
@@ -47,7 +48,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
-trait SvSvcStore extends CNNodeAppStoreWithoutHistory {
+trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
 
   def key: SvStore.Key
 

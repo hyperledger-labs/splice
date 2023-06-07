@@ -10,6 +10,7 @@ import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
+  ConfiguredDefaultDomain,
   TxLogStore,
 }
 import com.daml.network.util.Contract
@@ -29,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * to simplify implementing the store. They are all made overridable so that a DB backed store can use
   * custom indices to ensure the scalability of these queries.
   */
-trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
+trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
 
   import MultiDomainAcsStore.QueryResult
 

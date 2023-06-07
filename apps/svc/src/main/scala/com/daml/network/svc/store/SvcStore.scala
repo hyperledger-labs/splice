@@ -7,6 +7,7 @@ import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
+  ConfiguredDefaultDomain,
   TxLogStore,
 }
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -23,7 +24,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
-trait SvcStore extends CNNodeAppStoreWithoutHistory {
+trait SvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
