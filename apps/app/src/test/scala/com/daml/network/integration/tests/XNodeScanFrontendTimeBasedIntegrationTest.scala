@@ -21,6 +21,19 @@ class XNodeScanFrontendTimeBasedIntegrationTest
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withCoinPrice(coinPrice)
 
+  def compareLeaderboardTable(
+      resultRowClassName: String,
+      expected: Seq[(String, String)],
+  )(implicit webDriver: WebDriverType) = {
+    findAll(className(resultRowClassName)).toSeq.map(row => {
+      val children = row.findAllChildElements(tagName("td"))
+      children.map(c => c.text).toList match {
+        case List(a, b) => (a, b)
+        case _ => fail("Expected a list of 2 elements")
+      }
+    }) shouldBe expected
+  }
+
   "A scan UI" should {
     "see app provider leaderboard by rewards" in { implicit env =>
       val (_, bobUserParty) = onboardAliceAndBob()
@@ -60,22 +73,30 @@ class XNodeScanFrontendTimeBasedIntegrationTest
           },
         )
 
-        def compareLeaderboardTable(
-            resultRowClassName: String,
-            expected: Seq[(String, String, String)],
-        ) = {
-          findAll(className(resultRowClassName)).toSeq.map(row => {
-            val children = row.findAllChildElements(tagName("td"))
-            children.map(c => c.text).toList match {
-              case List(a, b, c) => (a, b, c)
-              case _ => fail("Expected a list of 3 elements")
-            }
-          }) shouldBe expected
-        }
-
         compareLeaderboardTable(
           "app-leaderboard-row",
-          Seq((aliceValidatorWalletParty, "--.-- CC", "41.5 CC")),
+          Seq((aliceValidatorWalletParty, "41.5 CC")),
+        )
+      }
+    }
+
+    "see validator leaderboard by rewards" in { implicit env =>
+      val aliceValidatorWalletParty = aliceValidatorWallet.userStatus().party
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to validator leaderboard page in scan UI",
+          go to "http://localhost:3006/validator-leaderboard",
+        )(
+          "Check validator leaderboard table and see entry",
+          _ => {
+            findAll(className("validator-leaderboard-row")).toSeq should have length 1
+          },
+        )
+
+        compareLeaderboardTable(
+          "validator-leaderboard-row",
+          Seq((aliceValidatorWalletParty, "0.083 CC")),
         )
       }
     }

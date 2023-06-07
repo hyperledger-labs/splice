@@ -3,6 +3,7 @@ import useCoinPrice from './useCoinPrice';
 import useGetCoinRules from './useGetCoinRules';
 import useGetRoundOfLatestData from './useGetRoundOfLatestData';
 import useGetSvcPartyId from './useGetSvcPartyId';
+import useGetTopValidatorsByValidatorRewards from './useGetTopValidatorsByValidatorRewards';
 import useLookupFeaturedAppRight from './useLookupFeaturedAppRight';
 import useTopAppProviders from './useTopAppProviders';
 
@@ -12,6 +13,7 @@ export {
   useGetCoinRules,
   useGetRoundOfLatestData,
   useGetSvcPartyId,
+  useGetTopValidatorsByValidatorRewards,
   useLookupFeaturedAppRight,
   useTopAppProviders,
 };

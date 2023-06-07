@@ -1,49 +1,60 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, TitledTable } from 'common-frontend';
+import { AmountDisplay, ErrorDisplay, Loading, TitledTable } from 'common-frontend';
+import { useGetTopValidatorsByValidatorRewards } from 'common-frontend/scan-api';
 
-import { TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
 export const ValidatorLeaderboardTable: React.FC = () => {
-  const validators = new Array(20).fill(1).map((_, i) => {
-    return {
-      name: 'SVS.cns',
-      totalTransfers: BigNumber(12345.12345),
-      totalRewards: BigNumber(12345.12345),
-    };
-  });
-  return (
-    <TitledTable title="Validator Leaderboard">
-      <TableHead>
-        <TableRow>
-          <TableCell>Name</TableCell>
-          <TableCell align="right">Total Transfers</TableCell>
-          <TableCell align="right">Total Rewards</TableCell>
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {validators.map((app, index) => {
-          return <ValidatorRow key={'app-' + index} app={app} />;
-        })}
-      </TableBody>
-    </TitledTable>
-  );
+  const topValidatorsQuery = useGetTopValidatorsByValidatorRewards();
+
+  switch (topValidatorsQuery.status) {
+    case 'loading':
+      return <Loading />;
+    case 'error':
+      return <ErrorDisplay message={'Could not retrieve validator leaderboard'} />;
+    case 'success':
+      const topValidators = topValidatorsQuery.data.validatorsAndRewards.map(validator => ({
+        name: validator.provider,
+        // TODO(#5280) - add transfer totals to API response
+        totalRewards: BigNumber(validator.rewards),
+      }));
+
+      return topValidators.length === 0 ? (
+        <Stack spacing={0} alignItems={'center'} marginTop={3}>
+          <Typography variant="h6" fontWeight="bold">
+            No Validator Activity Yet
+          </Typography>
+        </Stack>
+      ) : (
+        <TitledTable title="Validator Leaderboard">
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell align="right">Total Rewards</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {topValidators.map(validator => {
+              return <ValidatorRow key={validator.name} {...validator} />;
+            })}
+          </TableBody>
+        </TitledTable>
+      );
+  }
 };
 
 export default ValidatorLeaderboardTable;
 
 const ValidatorRow: React.FC<{
-  app: { name: string; totalTransfers: BigNumber; totalRewards: BigNumber };
-}> = ({ app }) => {
-  const { name, totalRewards, totalTransfers } = app;
+  name: string;
+  totalRewards: BigNumber;
+}> = ({ name, totalRewards }) => {
   return (
-    <TableRow>
+    <TableRow className="validator-leaderboard-row">
       <TableCell>{name}</TableCell>
       <TableCell align="right">
         <AmountDisplay amount={totalRewards} currency="CC" />
-      </TableCell>
-      <TableCell align="right">
-        <AmountDisplay amount={totalTransfers} currency="CC" />
       </TableCell>
     </TableRow>
   );

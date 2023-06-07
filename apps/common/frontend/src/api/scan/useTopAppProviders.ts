@@ -11,7 +11,7 @@ const useTopAppProviders = (): UseQueryResult<GetTopProvidersByAppRewardsRespons
 
   return useQuery({
     queryKey: ['scan-api', 'getTopProvidersByAppRewards', latestRoundNumber],
-    queryFn: async () => scanClient.getTopProvidersByAppRewards(+latestRoundNumber!, 10),
+    queryFn: async () => scanClient.getTopProvidersByAppRewards(latestRoundNumber!, 10),
     enabled: latestRoundNumber !== undefined, // include round 0 as valid
   });
 };

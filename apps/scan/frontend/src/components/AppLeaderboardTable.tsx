@@ -16,7 +16,7 @@ export const AppLeaderboardTable: React.FC = () => {
     case 'success':
       const appProviders = topAppProvidersQuery.data.providersAndRewards.map(provider => ({
         name: provider.provider,
-        totalTransfers: undefined, // TODO(#5280) - add transfer totals to API response
+        // TODO(#5280) - add transfer totals to API response
         totalRewards: BigNumber(provider.rewards),
       }));
 
@@ -31,13 +31,12 @@ export const AppLeaderboardTable: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
-              <TableCell align="right">Total Transfers</TableCell>
               <TableCell align="right">Total Rewards</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {appProviders.map((app, index) => {
-              return <AppRow key={'app-' + index} {...app} />;
+            {appProviders.map(app => {
+              return <AppRow key={app.name} {...app} />;
             })}
           </TableBody>
         </TitledTable>
@@ -49,15 +48,11 @@ export default AppLeaderboardTable;
 
 const AppRow: React.FC<{
   name: string;
-  totalTransfers?: BigNumber;
   totalRewards: BigNumber;
-}> = ({ name, totalRewards, totalTransfers }) => {
+}> = ({ name, totalRewards }) => {
   return (
     <TableRow className="app-leaderboard-row">
       <TableCell>{name}</TableCell>
-      <TableCell align="right">
-        <AmountDisplay amount={totalTransfers} currency="CC" />
-      </TableCell>
       <TableCell align="right">
         <AmountDisplay amount={totalRewards} currency="CC" />
       </TableCell>
