@@ -1118,7 +1118,6 @@ function subcmd_update_secrets() {
       [splitwell_validator]='hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW'
       [sv1]='OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn'
       [sv2]='rv4bllgKWAiW9tBtdvURMdHW42MAXghz'
-      [sv2_scan]='mbJgozCmp9ZKNmxfZB2Yf6X3IDacWlHO'
       [sv3]='SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk'
       [sv4]='CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN'
       [sv1_validator]='7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov'
@@ -1143,7 +1142,6 @@ function subcmd_update_secrets() {
     "cn-app-validator-ledger-api-auth sv1_validator sv-1" \
     "cn-app-sv-ledger-api-auth sv2 sv-2" \
     "cn-app-validator-ledger-api-auth sv2_validator sv-2" \
-    "cn-app-scan-ledger-api-auth sv2_scan sv-2" \
     "cn-app-sv-ledger-api-auth sv3 sv-3" \
     "cn-app-validator-ledger-api-auth sv3_validator sv-3" \
     "cn-app-sv-ledger-api-auth sv4 sv-4" \
