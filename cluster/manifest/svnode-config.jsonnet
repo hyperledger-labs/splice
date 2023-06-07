@@ -178,7 +178,9 @@ local deployments(num, svConfig, config) =
           timeoutSeconds: 10,
         },
         extraEnvVars=
-        c.appUserNameEnvBindings(["sv", "validator"]) + c.appUserNameEnvBinding("sv", "scan") + [
+        c.appUserNameEnvBindings(["sv", "validator"]) +
+        (if num == 2 then c.appUserNameEnvBinding("scan", "scan") else []) +
+        [
           { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
           { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: participantPostgresSchema },
           { name: "CANTON_PARTICIPANT_USERS", json: [
@@ -196,8 +198,16 @@ local deployments(num, svConfig, config) =
               readAs: [],
               admin: true,
             },
-          ] },
-        ]
+          ] + (if num == 2 then [
+                 {
+                   name: { env: "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME" },
+                   primaryParty: { fromUser: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" } },
+                   actAs: [],
+                   readAs: [{ fromUser: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" } }],
+                   admin: false,
+                 },
+               ] else []) },
+        ],
       ),
     ] else []
   ) + (
