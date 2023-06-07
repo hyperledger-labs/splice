@@ -202,6 +202,56 @@ class RetryProvider(
         )
     })
 
+  /** Ensure that a particular condition holds as part of an init-like process.
+    *
+    * Checks the condition and establishes it, if it does not. Also double-checks
+    * that the condition holds after establishing it.
+    */
+  def ensureThat(
+      conditionDesc: String,
+      check: => Future[Boolean],
+      establish: => Future[Unit],
+      logger: TracedLogger,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit ec: ExecutionContext) = TraceContext.withNewTraceContext(tc0 => {
+    implicit val tc: TraceContext = tc0;
+    logger.info(s"Ensuring that $conditionDesc")
+    retryForAutomation(
+      s"Check that $conditionDesc, and establish it if not", {
+        logger.debug(s"Checking whether $conditionDesc")
+        check.flatMap(conditionHolds =>
+          if (conditionHolds) Future.unit
+          else {
+            logger.debug(s"Attempting to establish that $conditionDesc")
+            establish.flatMap(_ => {
+              logger.debug(s"Established that $conditionDesc, checking that it holds")
+              check.flatMap(conditionNowHolds =>
+                if (conditionNowHolds) Future.unit
+                else {
+                  val msg =
+                    s"Post-condition violation: expected that $conditionDesc, but it does not"
+                  logger.error(msg)
+                  Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+                }
+              )
+            })
+          }
+        )
+      },
+      logger,
+      additionalCodes,
+    ).transform(
+      _ => logger.info(s"Success: $conditionDesc"),
+      exception => {
+        if (isClosing)
+          logger.info(s"Gave up ensuring $conditionDesc, as we are shutting down")
+        else
+          logger.error(s"Gave up ensuring $conditionDesc", exception)
+        exception
+      },
+    )
+  })
+
   import RetryProvider.{AutomationRetryConfig, RetryConfig}
 
   private val retryForAutomationConfig =

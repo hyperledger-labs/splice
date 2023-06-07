@@ -351,7 +351,7 @@ class SvApp(
         getParticipantId(participantAdminConnection),
         logger,
       )
-      svcPartyIsAuthorized <- svcPartyHosting.svcPartyIsAuthorized(
+      svcPartyIsAuthorized <- svcPartyHosting.isSvcPartyAuthorizedOn(
         globalDomain,
         participantId,
       )
@@ -368,25 +368,20 @@ class SvApp(
             svcAutomation =
               newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
             _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
-            onboarded <- isOnboarded(svcStore)
-            _ <-
-              if (onboarded) {
-                logger.info(
-                  "We can see the SvcRules and are listed as an SVC member => already onboarded."
-                )
-                Future.successful(())
-              } else {
-                logger.info("Starting onboarding (without SVC party migration).")
-                startOnboardingWithSvcPartyHosted(
-                  svStoreWithIngestion,
-                  svcAutomation,
-                  participantId,
-                  svcPartyHosting,
-                  globalDomain,
-                  cometBftNode,
-                  ledgerClient,
-                )
-              }
+            _ <- retryProvider.ensureThat(
+              show"the SvcRules list the SV party ${svcStore.key.svParty} as a member",
+              isOnboarded(svcStore),
+              startOnboardingWithSvcPartyHosted(
+                svStoreWithIngestion,
+                svcAutomation,
+                participantId,
+                svcPartyHosting,
+                globalDomain,
+                cometBftNode,
+                ledgerClient,
+              ),
+              logger,
+            )
           } yield (svcStore, svcAutomation)
         } else {
           logger.info(

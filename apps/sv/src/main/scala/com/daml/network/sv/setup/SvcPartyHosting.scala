@@ -42,7 +42,7 @@ class SvcPartyHosting(
     mat: Materializer,
 ) extends NamedLogging {
 
-  def svcPartyIsAuthorized(
+  def isSvcPartyAuthorizedOn(
       domainId: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Boolean] =
