@@ -1,15 +1,21 @@
 import scala.collection.mutable.ListBuffer
 
 import cats.syntax.either._
+import cats.syntax.functorFilter._
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
 import com.digitalasset.canton.console.{LocalInstanceReferenceX, LocalParticipantReferenceX}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
 println("Running canton bootstrap script...")
+
+println("Bootstrapping global domain")
 
 val domainParametersConfig = DomainParametersConfig(
   protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
@@ -23,14 +29,90 @@ def staticParameters(sequencer: LocalInstanceReferenceX) =
     .flatMap(StaticDomainParameters(_).leftMap(_.toString))
     .getOrElse(sys.error("whatever"))
 
-val globalDomainId = globalSequencerSv1.domain.bootstrap(
-  "global-domain",
-  staticParameters(globalSequencerSv1),
-  // TODO(#5087) Make this a union space
-  domainOwners = Seq(sv1Participant, globalSequencerSv1, globalMediatorSv1),
-  sequencers = Seq(globalSequencerSv1),
-  mediators = Seq(globalMediatorSv1),
+def identityTransactions(node: LocalInstanceReferenceX): Seq[GenericSignedTopologyTransactionX] = {
+  val codes = Set(NamespaceDelegationX.code, OwnerToKeyMappingX.code)
+  node.topology.transactions
+    .list(filterAuthorizedKey = Some(node.id.uid.namespace.fingerprint))
+    .result
+    .map(_.transaction)
+    .filter(x => codes.contains(x.transaction.mapping.code))
+}
+
+// The identity transactions for the 3 nodes that are part of the bootstrap transactions.
+val identityTxs: Seq[GenericSignedTopologyTransactionX] =
+  Seq(sv1Participant, globalSequencerSv1, globalMediatorSv1).flatMap(identityTransactions(_))
+
+// The unionspace definition containing sv1Participant as the only member.
+val unionspace = sv1Participant.topology.unionspaces.propose(
+  Set(sv1Participant.id.uid.namespace.fingerprint),
+  threshold = PositiveInt.one,
+  signedBy = Some(sv1Participant.id.uid.namespace.fingerprint),
 )
+
+val globalDomainId = DomainId(
+  UniqueIdentifier(
+    Identifier.tryCreate("global-domain"),
+    unionspace.transaction.mapping.unionspace,
+  )
+)
+
+val domainParameterState = sv1Participant.topology.domain_parameters.propose(
+  globalDomainId,
+  DynamicDomainParameters.initialXValues(consoleEnvironment.environment.clock, ProtocolVersion.dev),
+  signedBy = Some(sv1Participant.id.uid.namespace.fingerprint),
+)
+
+// The mediator state signed by both the unionspace owner, sv1Participant and the mediator. Note
+// that due to lack of validation in Canton nothing breaks if we only use one of the two.
+val mediatorState = {
+  val txs = Seq(sv1Participant, globalMediatorSv1).map(node =>
+    node.topology.mediators.propose(
+      globalDomainId,
+      threshold = PositiveInt.one,
+      active = Seq(globalMediatorSv1.id),
+      signedBy = Some(node.id.uid.namespace.fingerprint),
+    )
+  )
+  txs.reduce[GenericSignedTopologyTransactionX] { case (a, b) =>
+    a.addSignatures(b.signatures.toSeq)
+  }
+}
+
+// The sequencer state signed by both the unionspace owner, sv1Participant and the mediator. Note
+// that due to lack of validation in Canton nothing breaks if we only use one of the two.
+val sequencerState = {
+  val txs = Seq(sv1Participant, globalSequencerSv1).map(node =>
+    node.topology.sequencers.propose(
+      globalDomainId,
+      threshold = PositiveInt.one,
+      active = Seq(globalSequencerSv1.id),
+      signedBy = Some(node.id.uid.namespace.fingerprint),
+    )
+  )
+  txs.reduce[GenericSignedTopologyTransactionX] { case (a, b) =>
+    a.addSignatures(b.signatures.toSeq)
+  }
+}
+
+// The transactions required for bootstrapping
+val bootstrapTransactions =
+  (identityTxs ++ Seq(domainParameterState, mediatorState, sequencerState): Seq[
+    GenericSignedTopologyTransactionX
+  ]).mapFilter(_.selectOp[TopologyChangeOpX.Replace])
+
+globalSequencerSv1.setup.assign_from_beginning(
+  bootstrapTransactions,
+  staticParameters(globalSequencerSv1),
+)
+
+globalMediatorSv1.setup.assign(
+  globalDomainId,
+  staticParameters(globalSequencerSv1),
+  globalSequencerSv1.id,
+  SequencerConnections.single(globalSequencerSv1.sequencerConnection),
+)
+
+println("Bootstrapped global domain")
 
 Seq(
   ("splitwell", splitwellSequencer, splitwellMediator),
