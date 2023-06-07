@@ -2099,7 +2099,7 @@ workflows:
 
   deploy_staging_B:
     when:
-      equal: [ deploy-staging-b, << pipeline.parameters.run-job >> ]
+      equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
     - docker_images_push:
         <<: *notify-fail
