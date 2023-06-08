@@ -66,10 +66,19 @@ def ensureDirectoryEntry(
       wallet.waitForInitialization()
       println("Wallet initialization complete, tapping coin")
       wallet.tap(5.0)
+      println("Waiting for submission request")
       utils.retry_until_true { wallet.listSubscriptionRequests().length == 1 }
+      println("Accepting submission request")
       wallet.acceptSubscriptionRequest(
         wallet.listSubscriptionRequests()(0).subscriptionRequest.contractId
       )
+      println("Waiting for CNS entry allocation")
+      utils.retry_until_true {
+        scala.util
+          .Try(directory.lookupEntryByName(name).payload.user)
+          .toOption
+          .exists(_ == user.toProtoPrimitive)
+      }
     }
   }
 }
