@@ -33,7 +33,9 @@ class XNodeSplitwellUpgradeFrontendIntegrationTest
       .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
-        CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
+        CNNodeEnvironmentDefinition
+          .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+          .setup(env)
         for {
           validator <- Seq(aliceValidator, bobValidator)
         } validator.participantClient.upload_dar_unless_exists(darPath)

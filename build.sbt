@@ -1104,16 +1104,6 @@ printTests := {
 
   Seq(
     (
-      "tests with wall clock time",
-      pw,
-      (t: String) =>
-        !isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(
-          t
-        ) && !isPreflightSvIntegrationTest(t) && !isXNodeTest(
-          t
-        ),
-    ),
-    (
       "tests with simulated time",
       pwSimTime,
       (t: String) =>
@@ -1137,13 +1127,19 @@ printTests := {
       "XNode tests with wall clock time",
       pwXNode,
       (t: String) =>
-        isXNodeTest(t) && !isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(t),
+        // All wallclock tests are migrated to X nodes so we explicitly don't exclude non-xnode
+        // tests here to make sure that we don't introduce any new ones.
+        !isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(
+          t
+        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode tests with simulated time",
       pwXNodeSimTime,
       (t: String) =>
-        isXNodeTest(t) && isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(t),
+        isXNodeTest(t) && isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(
+          t
+        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode frontend tests with wall clock time",
@@ -1151,7 +1147,9 @@ printTests := {
       (t: String) =>
         // All frontend tests are migrated to X nodes so we explicitly don't exclude non-xnode
         // tests here to make sure that we don't introduce any new ones.
-        !isTimeBasedTest(t) && isFrontEndTest(t) && !isDistributedDomainTest(t),
+        !isTimeBasedTest(t) && isFrontEndTest(t) && !isDistributedDomainTest(
+          t
+        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode frontend tests with simulated time",
@@ -1159,12 +1157,17 @@ printTests := {
       (t: String) =>
         // All frontend tests are migrated to X nodes so we explicitly don't exclude non-xnode
         // tests here to make sure that we don't introduce any new ones.
-        isTimeBasedTest(t) && isFrontEndTest(t) && !isDistributedDomainTest(t),
+        isTimeBasedTest(t) && isFrontEndTest(t) && !isDistributedDomainTest(
+          t
+        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode tests with a distributed domain and wall clock time",
       pwXNodeDistributedDomain,
-      (t: String) => isXNodeTest(t) && !isTimeBasedTest(t) && isDistributedDomainTest(t),
+      (t: String) =>
+        isXNodeTest(t) && !isTimeBasedTest(t) && isDistributedDomainTest(
+          t
+        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
   ).foreach { case (testSet, pw, predicate) =>
     printTestNames(testSet, allTestNames, pw, predicate)

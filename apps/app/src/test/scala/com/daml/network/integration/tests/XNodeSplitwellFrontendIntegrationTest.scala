@@ -34,7 +34,9 @@ class XNodeSplitwellFrontendIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
-        CNNodeEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
+        CNNodeEnvironmentDefinition
+          .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+          .setup(env)
         Seq(splitwellDarPath, directoryDarPath).foreach { path =>
           aliceValidator.participantClient.upload_dar_unless_exists(path)
           bobValidator.participantClient.upload_dar_unless_exists(path)

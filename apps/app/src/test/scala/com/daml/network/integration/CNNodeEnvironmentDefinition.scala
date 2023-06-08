@@ -230,7 +230,7 @@ case class CNNodeEnvironmentDefinition(
 }
 
 object CNNodeEnvironmentDefinition {
-  def simpleTopology(testName: String): CNNodeEnvironmentDefinition =
+  private def simpleTopology(testName: String): CNNodeEnvironmentDefinition =
     fromResource("simple-topology.conf", testName)
       .withAllocatedValidatorUsers()
       .withAllocatedSvcAndSvUsers()
