@@ -35,7 +35,7 @@ class XNodeScanFrontendTimeBasedIntegrationTest
   }
 
   "A scan UI" should {
-    "see app provider leaderboard by rewards" in { implicit env =>
+    "see expected rewards leaderboards" in { implicit env =>
       val (_, bobUserParty) = onboardAliceAndBob()
 
       waitForWalletUser(aliceValidatorWallet)
@@ -73,17 +73,14 @@ class XNodeScanFrontendTimeBasedIntegrationTest
           },
         )
 
-        compareLeaderboardTable(
-          "app-leaderboard-row",
-          Seq((aliceValidatorWalletParty, "41.5 CC")),
-        )
-      }
-    }
+        // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
+        clue("Compare app leaderboard values") {
+          compareLeaderboardTable(
+            "app-leaderboard-row",
+            Seq((aliceValidatorWalletParty, "41.5 CC")),
+          )
+        }
 
-    "see validator leaderboard by rewards" in { implicit env =>
-      val aliceValidatorWalletParty = aliceValidatorWallet.userStatus().party
-
-      withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
           "Go to validator leaderboard page in scan UI",
           go to "http://localhost:3006/validator-leaderboard",
@@ -94,10 +91,12 @@ class XNodeScanFrontendTimeBasedIntegrationTest
           },
         )
 
-        compareLeaderboardTable(
-          "validator-leaderboard-row",
-          Seq((aliceValidatorWalletParty, "0.083 CC")),
-        )
+        clue("Compare validator leaderboard values") {
+          compareLeaderboardTable(
+            "validator-leaderboard-row",
+            Seq((aliceValidatorWalletParty, "0.083 CC")),
+          )
+        }
       }
     }
   }
