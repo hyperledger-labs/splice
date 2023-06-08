@@ -127,6 +127,7 @@ if [ $wallclocktime -eq 1 ] && [ $x -eq 1 ]; then
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_x"
   ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell_x"
+  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "self_hosted_participant"
 fi
 
 
