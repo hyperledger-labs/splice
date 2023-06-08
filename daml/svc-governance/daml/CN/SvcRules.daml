@@ -12,7 +12,7 @@ import DA.Time
 import CC.Coin
 import CC.Round
 import CC.Util
-import CC.API.V1.Coin (CoinCreateSummary(..))
+import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
 import CC.GlobalDomain (ValidatorTraffic)
@@ -785,7 +785,7 @@ template SvcRules with
     -- Coin management driven directly by the leader
     --------------------------------------------------
 
-    nonconsuming choice SvcRules_Coin_Expire : Party
+    nonconsuming choice SvcRules_Coin_Expire : CoinExpireSummary
       with
         cid : ContractId Coin
         choiceArg : Coin_Expire
@@ -794,7 +794,7 @@ template SvcRules with
         requireUnlocked lock
         exercise cid choiceArg
 
-    nonconsuming choice SvcRules_LockedCoin_ExpireCoin : Party
+    nonconsuming choice SvcRules_LockedCoin_ExpireCoin : CoinExpireSummary
       with
         cid : ContractId LockedCoin
         choiceArg : LockedCoin_ExpireCoin

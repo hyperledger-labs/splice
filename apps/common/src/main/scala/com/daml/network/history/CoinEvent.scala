@@ -110,7 +110,7 @@ object LockedCoinOwnerExpireLock extends ExerciseNodeCompanion {
 object LockedCoinExpireCoin extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.LockedCoin
   override type Arg = coinCodegen.LockedCoin_ExpireCoin
-  override type Res = String
+  override type Res = v1.coin.CoinExpireSummary
 
   override val templateOrInterface = Left(coinCodegen.LockedCoin.COMPANION)
   override val choice = coinCodegen.LockedCoin.CHOICE_LockedCoin_ExpireCoin
@@ -118,8 +118,8 @@ object LockedCoinExpireCoin extends ExerciseNodeCompanion {
   override val argDecoder = coinCodegen.LockedCoin_ExpireCoin.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder = _.asParty().get().getValue
-  override def resToValue(res: Res) = new com.daml.ledger.javaapi.data.Party(res)
+  override val resDecoder = v1.coin.CoinExpireSummary.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
 }
 
 object CoinRules_BuyExtraTraffic extends ExerciseNodeCompanion {
@@ -170,7 +170,7 @@ object CoinCreate {
 object CoinExpire extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.Coin
   override type Arg = coinCodegen.Coin_Expire
-  override type Res = String
+  override type Res = v1.coin.CoinExpireSummary
 
   override val templateOrInterface = Left(coinCodegen.Coin.COMPANION)
   override val choice = coinCodegen.Coin.CHOICE_Coin_Expire
@@ -178,8 +178,8 @@ object CoinExpire extends ExerciseNodeCompanion {
   override val argDecoder = coinCodegen.Coin_Expire.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder = _.asParty().get().getValue
-  override def resToValue(res: Res) = new com.daml.ledger.javaapi.data.Party(res)
+  override val resDecoder = v1.coin.CoinExpireSummary.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
 }
 
 // TODO(#2930): This is not really a Coin event - consider either renaming the file, or splitting it into different ones based on event "types"

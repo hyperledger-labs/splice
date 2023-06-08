@@ -184,6 +184,15 @@ data CoinCreateSummary coinCointractId = CoinCreateSummary with
     coinPrice : Decimal -- ^ The coin price at the round the coin was created
   deriving (Eq, Show)
 
+data CoinExpireSummary = CoinExpireSummary with
+    owner : Party
+    changeToInitialAmountAsOfRoundZero : Decimal
+    -- The change to the total balance introduced by a coin expiry, normalized to round zero, i.e., 
+    -- a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
+    changeToHoldingFeesRate : Decimal
+    -- ^ The change of total holding fees introduced by a coin expiry.
+  deriving (Eq, Show)
+
 data CreatedCoin
   = TransferResultCoin (ContractId Coin)
   | TransferResultLockedCoin (ContractId LockedCoin)

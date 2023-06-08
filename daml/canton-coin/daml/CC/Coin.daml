@@ -44,7 +44,7 @@ template Coin
     interface instance API.Coin for Coin where
       view = API.CoinView with ..
 
-    choice Coin_Expire : Party
+    choice Coin_Expire : API.CoinExpireSummary
       with
         roundCid : ContractId OpenMiningRound
         coinRulesCid : ContractId API.CoinRules
@@ -55,7 +55,10 @@ template Coin
          requireUnlocked coinRules.lock
          requireChoiceIsEnabled "Coin_Expire" (\c -> c.enable_Coin_Expire) coinRules
          requireCoinExpiredForAllOpenRounds roundCid this
-         return owner
+         return API.CoinExpireSummary with
+           owner = owner
+           changeToInitialAmountAsOfRoundZero = - getValueAsOfRound0 amount
+           changeToHoldingFeesRate = - (amount.ratePerRound.rate)
 
 template LockedCoin
   with
@@ -92,7 +95,7 @@ template LockedCoin
           coin = coinCid
           coinPrice = openMiningRound.coinPrice
 
-    choice LockedCoin_ExpireCoin : Party
+    choice LockedCoin_ExpireCoin : API.CoinExpireSummary
       with
         roundCid : ContractId OpenMiningRound
         coinRulesCid : ContractId API.CoinRules
@@ -106,7 +109,10 @@ template LockedCoin
          t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
          requireCoinExpiredForAllOpenRounds roundCid coin
-         return coin.owner
+         return API.CoinExpireSummary with
+           owner = coin.owner
+           changeToInitialAmountAsOfRoundZero = -(getValueAsOfRound0 coin.amount)
+           changeToHoldingFeesRate = - (coin.amount.ratePerRound.rate)
 
 -- Contracts to implement reward issuance
 -- ======================================
@@ -774,6 +780,7 @@ data TransferInputsSummary = TransferInputsSummary with
     totalValidatorRewardAmount : Decimal
     totalHoldingFees : Decimal
     amountArchivedAsOfRoundZero : Decimal
+    changeToHoldingFeesRate : Decimal
   deriving (Eq, Show)
 
 type TransferOutputsSummary = [PreprocessedTransferOutput]
@@ -848,6 +855,7 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
       totalValidatorRewardAmount = 0.0
       totalHoldingFees = 0.0
       amountArchivedAsOfRoundZero = 0.0
+      changeToHoldingFeesRate = 0.0
 
     summarizeAndConsumeInput round s (API.InputCoin coinCid) = do
       -- fetch and archive
@@ -864,8 +872,8 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees + holdingFee
-        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
-          + coin.amount.initialAmount + coin.amount.ratePerRound.rate * intToDecimal coin.amount.createdAt.number
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero + getValueAsOfRound0 coin.amount
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate - coin.amount.ratePerRound.rate
 
     summarizeAndConsumeInput _round s (API.InputAppRewardCoupon couponCid) = do
       -- fetch and archive
@@ -885,6 +893,7 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
     summarizeAndConsumeInput _round s (API.InputValidatorRewardCoupon couponCid) = do
       -- fetch and archive
@@ -906,6 +915,7 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         totalValidatorRewardAmount = s.totalValidatorRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
 preprocessOutputs : TransferConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
 preprocessOutputs transferConfigCC sender outs =
@@ -968,8 +978,7 @@ summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
         + senderChangeAmount
         + intToDecimal openRound.round.number *  numOutputs * transferConfigCC.holdingFee.rate
         - inp.amountArchivedAsOfRoundZero
-      changeToHoldingFeesRate = numOutputs * transferConfigCC.holdingFee.rate - inp.totalHoldingFees
-
+      changeToHoldingFeesRate = numOutputs * transferConfigCC.holdingFee.rate + inp.changeToHoldingFeesRate
 
 issueRewards : TransferContextSummary -> Party -> Party -> API.TransferSummary -> Update ()
 issueRewards csum sender provider summary

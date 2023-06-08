@@ -115,3 +115,6 @@ actualAmount t e
 expiringAmount : RatePerRound -> Decimal -> Round -> ExpiringAmount
 expiringAmount ratePerRound initialAmount createdAt =
   ExpiringAmount with initialAmount; createdAt; ratePerRound
+
+getValueAsOfRound0 : ExpiringAmount -> Decimal
+getValueAsOfRound0 e = e.initialAmount + e.ratePerRound.rate * intToDecimal e.createdAt.number

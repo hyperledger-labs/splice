@@ -406,7 +406,7 @@ class UserWalletTxLogParser(
               State.fromCoinExpire(
                 tree,
                 exercised,
-                node.result.value,
+                node.result.value.owner,
                 TxLogEntry.BalanceChange.CoinExpired,
               )
             )
@@ -416,7 +416,7 @@ class UserWalletTxLogParser(
               State.fromCoinExpire(
                 tree,
                 exercised,
-                node.result.value,
+                node.result.value.owner,
                 TxLogEntry.BalanceChange.LockedCoinExpired,
               )
             )
