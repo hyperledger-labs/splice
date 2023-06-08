@@ -35,6 +35,7 @@ class DirectoryPersistenceTest
         descriptor = Json.obj(
           "name" -> Json.fromString("DirectoryPersistenceTest")
         ),
+        lastIngestedOffset = None,
       )
       for {
         _ <- storage.queryAndUpdate(

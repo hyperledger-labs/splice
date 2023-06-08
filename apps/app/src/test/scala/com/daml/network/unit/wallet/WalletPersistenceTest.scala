@@ -35,6 +35,7 @@ class WalletPersistenceTest
         descriptor = Json.obj(
           "name" -> Json.fromString("WalletPersistenceTest")
         ),
+        lastIngestedOffset = None,
       )
       for {
         _ <- storage.queryAndUpdate(

@@ -14,42 +14,25 @@ trait AcsTables extends AcsJdbcTypes {
   import profile.api.*
 
   lazy val acsBaseSchema: profile.SchemaDescription =
-    StoreDescriptors.schema ++ StoreIngestionStates.schema
+    StoreDescriptors.schema
 
-  case class StoreDescriptorsRow(id: Int, descriptor: Json)
+  case class StoreDescriptorsRow(id: Int, descriptor: Json, lastIngestedOffset: Option[Offset])
 
   class StoreDescriptors(_tableTag: Tag)
       extends profile.api.Table[StoreDescriptorsRow](_tableTag, "store_descriptors") {
-    def * = (id, descriptor).<>(StoreDescriptorsRow.tupled, StoreDescriptorsRow.unapply)
-
-    val id: Rep[Int] = column[Int]("id", O.AutoInc, O.PrimaryKey)
-
-    val descriptor: Rep[Json] = column[Json]("descriptor")
-  }
-
-  lazy val StoreDescriptors = new TableQuery(tag => new StoreDescriptors(tag))
-
-  case class StoreIngestionStatesRow(
-      id: Int,
-      storeId: Int,
-      lastIngestedOffset: Offset,
-  )
-
-  class StoreIngestionStates(_tableTag: Tag)
-      extends profile.api.Table[StoreIngestionStatesRow](_tableTag, "store_ingestion_states") {
-    def * = (id, storeId, lastIngestedOffset).<>(
-      StoreIngestionStatesRow.tupled,
-      StoreIngestionStatesRow.unapply,
+    def * = (id, descriptor, lastIngestedOffset).<>(
+      StoreDescriptorsRow.tupled,
+      StoreDescriptorsRow.unapply,
     )
 
     val id: Rep[Int] = column[Int]("id", O.AutoInc, O.PrimaryKey)
 
-    val storeId: Rep[Int] = column[Int]("store_id")
+    val descriptor: Rep[Json] = column[Json]("descriptor")
 
-    val lastIngestedOffset: Rep[Offset] = column[Offset]("last_ingested_offset")
+    val lastIngestedOffset: Rep[Option[Offset]] = column[Option[Offset]]("last_ingested_offset")
   }
 
-  lazy val StoreIngestionStates = new TableQuery(tag => new StoreIngestionStates(tag))
+  lazy val StoreDescriptors = new TableQuery(tag => new StoreDescriptors(tag))
 
 }
 
