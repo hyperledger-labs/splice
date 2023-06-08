@@ -88,13 +88,10 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
     override def ingestionFilter = contractFilter.ingestionFilter
 
-    override def initialize()(implicit traceContext: TraceContext): Future[Unit] = Future.unit
-
-    override def getLastIngestedOffset()(implicit
-        traceContext: TraceContext
-    ): Future[Option[String]] = Future {
-      stateVar.offset
-    }
+    override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] =
+      Future {
+        stateVar.offset
+      }
 
     override def ingestAcs(
         offset: String,

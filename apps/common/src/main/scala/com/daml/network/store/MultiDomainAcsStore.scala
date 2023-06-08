@@ -611,15 +611,14 @@ object MultiDomainAcsStore {
 
     def ingestionFilter: IngestionFilter
 
-    def initialize()(implicit traceContext: TraceContext): Future[Unit]
+    /** Must be the first method called. Returns the last ingested offset, if any. */
+    def initialize()(implicit traceContext: TraceContext): Future[Option[String]]
 
     def ingestAcs(
         offset: String,
         acs: Seq[ActiveContract],
         inFlight: Seq[InFlightTransferOutEvent],
     )(implicit traceContext: TraceContext): Future[Unit]
-
-    def getLastIngestedOffset()(implicit traceContext: TraceContext): Future[Option[String]]
 
     def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
         traceContext: TraceContext

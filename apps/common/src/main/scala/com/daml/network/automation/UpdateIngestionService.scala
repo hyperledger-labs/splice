@@ -44,8 +44,7 @@ class UpdateIngestionService(
       traceContext: TraceContext
   ): Future[CNLedgerSubscription[?]] =
     for {
-      _ <- ingestionSink.initialize()
-      lastIngestedOffset <- ingestionSink.getLastIngestedOffset()
+      lastIngestedOffset <- ingestionSink.initialize()
       subscribeFrom <- lastIngestedOffset match {
         case None =>
           for {
@@ -86,7 +85,7 @@ class UpdateIngestionService(
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val javaOffset = new LedgerOffset.Absolute(offset)
     for {
-      // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
+      // TODO(#5534): stream contracts instead of ingesting them as a single Seq
       (evs, tfs) <- connection.activeContracts(filter, javaOffset)
       _ <- ingestionSink.ingestAcs(
         offset,

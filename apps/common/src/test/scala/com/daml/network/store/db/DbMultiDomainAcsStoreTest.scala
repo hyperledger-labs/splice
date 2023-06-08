@@ -36,13 +36,13 @@ class DbMultiDomainAcsStoreTest
       val coupons = (1 to 3).map(n => appRewardCoupon(n, svcParty))
       val seenCoupons =
         new AtomicReference(Seq.empty[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]])
+      val done = store
+        .streamReadyContracts(AppRewardCoupon.COMPANION, pageSize = PageLimit(1))
+        .take(3)
+        .runForeach(coupon => seenCoupons.updateAndGet(x => x.appended(coupon.contract)))
       for {
         _ <- store.ingestionSink.initialize()
-        // TODO(#5425): move the stream definition up, once queries are blocking until store is initialized
-        done = store
-          .streamReadyContracts(AppRewardCoupon.COMPANION, pageSize = PageLimit(1))
-          .take(3)
-          .runForeach(coupon => seenCoupons.updateAndGet(x => x.appended(coupon.contract)))
+        _ <- store.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty)
         _ <- create(store.storeId, coupons.head)
         _ = eventually()(seenCoupons.get() should be(Seq(coupons.head)))
         _ <- create(store.storeId, coupons(1))

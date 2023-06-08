@@ -28,7 +28,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.unused
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.DurationInt
 
 class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
@@ -60,11 +60,19 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     .get()
     .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
+  // Some callers depend on all queries always returning sensible data, but may perform queries
+  // before the ACS is fully ingested. We therefore delay all queries until the ACS is ingested.
+  private val finishedAcsIngestion: Promise[Unit] = Promise()
+  private def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
+    finishedAcsIngestion.future.flatMap(_ => f)
+  private def waitUntilAcsIngested(): Future[Unit] =
+    finishedAcsIngestion.future
+
   override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
       implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Future[Option[ContractWithState[TCid, T]]] = {
+  ): Future[Option[ContractWithState[TCid, T]]] = waitUntilAcsIngested {
     storage
       .querySingle( // index: acs_store_template_sid_cid
         sql"""
@@ -84,7 +92,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Future[Seq[ContractWithState[TCid, T]]] = {
+  ): Future[Seq[ContractWithState[TCid, T]]] = waitUntilAcsIngested {
     val templateId = companionClass.typeId(companion)
     for {
       result <- storage.query( // index: acs_store_template_sid_tid_en
@@ -108,7 +116,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Future[Seq[ReadyContract[TCid, T]]] = {
+  ): Future[Seq[ReadyContract[TCid, T]]] = waitUntilAcsIngested {
     // TODO (#5314): do a query instead of in-memory filtering via toReadyContract
     listContracts(companion, limit).map(_.flatMap(_.toReadyContract))
   }
@@ -123,6 +131,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     val limit = PageLimit(rawLimit.toLong)
     val templateId = companionClass.typeId(companion)
     for {
+      _ <- waitUntilAcsIngested()
       result <- storage
         .query( // index: acs_store_template_sid_tid_ce
           sql"""
@@ -148,7 +157,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Future[Seq[Contract[TCid, T]]] = {
+  ): Future[Seq[Contract[TCid, T]]] = waitUntilAcsIngested {
     // TODO (#5314): the DbMultiDomainAcsStore is currently tied to a single domain,
     //  so this method doesn't make that much sense atm
     resolveDomainId.flatMap { thisDomain =>
@@ -181,7 +190,12 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   ): Source[ReadyContract[TCid, T], NotUsed] = {
     val templateId = companionClass.typeId(companion)
     Source
-      .future(resolveDomainId) // TODO (#5314): this probably won't apply anymore
+      .future(
+        // TODO(#5534): this is currently waiting until the whole ACS has been ingested.
+        //  After switching to streaming ACS ingestion, we could start streaming contracts while
+        //  the ACS is being ingested.
+        waitUntilAcsIngested(resolveDomainId)
+      ) // TODO (#5314): this probably won't apply anymore
       .flatMapConcat { domainId =>
         Source
           .unfoldAsync(0L) { fromEventNumber =>
@@ -240,7 +254,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
     override def ingestionFilter: IngestionFilter = contractFilter.ingestionFilter
 
-    override def initialize()(implicit traceContext: TraceContext): Future[Unit] = {
+    override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] = {
       // Notes:
       // - Postgres JSONB does not preserve white space, does not preserve the order of object keys, and does not keep duplicate object keys
       // - Postgres JSONB columns have a maximum size of 255MB
@@ -257,20 +271,29 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
            """.asUpdate,
             "initialize.1",
           )
-        storeIdResult <- storage
+        descriptorResult <- storage
           .querySingle(
             sql"""
-             select id
+             select id, last_ingested_offset
              from store_descriptors
              where descriptor = ${descriptorStr}::jsonb
-             """.as[Int].headOption,
+             """.as[(Int, Option[String])].headOption,
             "initialize.2",
           )
           .value
       } yield {
-        assert(storeIdResult.isDefined, s"No row for $storeDescriptor found")
-        storeIdA.set(storeIdResult)
+        val (newStoreId, lastIngestedOffset) = descriptorResult.getOrElse(
+          throw new RuntimeException(s"No row for $storeDescriptor found")
+        )
+
+        storeIdA.set(Some(newStoreId))
         logger.info(s"Store $storeDescriptor initialized with storeId $storeId")
+
+        if (lastIngestedOffset.isDefined) {
+          finishedAcsIngestion.success(())
+        }
+
+        lastIngestedOffset
       }
     }
 
@@ -287,41 +310,23 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         offset: String,
         acs: Seq[ActiveContract],
         inFlight: Seq[InFlightTransferOutEvent],
-    )(implicit traceContext: TraceContext): Future[Unit] = for {
-      previousOffset <- getLastIngestedOffset()
-      _ = assert(
-        previousOffset.isEmpty,
-        s"last_ingested_offset already exists for store $storeId",
+    )(implicit traceContext: TraceContext): Future[Unit] = {
+      assert(
+        finishedAcsIngestion.isCompleted == false,
+        s"ACS was already ingested for store $storeId",
       )
+      for {
 
-      // TODO(#5481): Insert ACS data here, in the same SQL transaction as updating the offset.
-      //  Don't insert TxLog data, the TxLog starts after the initial ACS ingestion.
-      _ <- storage.update(updateOffset(offset), "ingestAcs.updateOffset")
-    } yield {
-      logger.info(
-        s"Store $storeId ingested the ACS and switched to ingesting updates at $offset"
-      )
+        // TODO(#5481): Insert ACS data here, in the same SQL transaction as updating the offset.
+        //  Don't insert TxLog data, the TxLog starts after the initial ACS ingestion.
+        _ <- storage.update(updateOffset(offset), "ingestAcs.updateOffset")
+      } yield {
+        finishedAcsIngestion.success(())
+        logger.info(
+          s"Store $storeId ingested the ACS and switched to ingesting updates at $offset"
+        )
+      }
     }
-
-    override def getLastIngestedOffset()(implicit
-        traceContext: TraceContext
-    ): Future[Option[String]] =
-      storage
-        .querySingle(
-          sql"""
-          select last_ingested_offset from store_descriptors
-          where id=$storeId
-           """.as[Option[String]].headOption,
-          "getLastIngestedOffset",
-        )
-        .value
-        .map(
-          _.getOrElse(
-            throw new RuntimeException(
-              s"getLastIngestedOffset did not find any row for store id $storeId. Make sure to call initialize() first."
-            )
-          )
-        )
 
     // TODO(#5481): Implement ingesting ACS/TxLog data.
     override def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
