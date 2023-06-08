@@ -81,7 +81,8 @@ class ValidatorApp(
   // For regular validators, this allocates a new user.
   override def ensureUserPrimaryParty(connection: CNLedgerConnection) =
     allocateUserPrimaryPartyIfNeeded(
-      connection
+      connection,
+      config.validatorPartyHint,
     ).map(_ => ())
 
   private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {

@@ -2944,6 +2944,7 @@
             "memory": "4096Mi"
           }
         },
+        "validatorPartyHint": "validator1_validator_service_user",
         "xNodes": false
       }
     },

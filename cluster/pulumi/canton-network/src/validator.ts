@@ -60,6 +60,7 @@ export async function installValidator(
       participantAddress: 'participant',
       postgres: postgresDb,
       additionalUsers: [],
+      validatorPartyHint: `${name}_validator_service_user`,
       appDars: [
         'cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar',
         'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar',

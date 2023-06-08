@@ -60,6 +60,10 @@ spec:
         - name: CN_APP_VALIDATOR_WALLET_USER_NAME
           value: {{ .Values.validatorWalletUser }}
         {{ end }}
+        {{ if .Values.validatorPartyHint }}
+        - name: CN_APP_VALIDATOR_PARTY_HINT
+          value: {{ .Values.validatorPartyHint }}
+        {{ end }}
         {{ if (.Values.auth).audience }}
         - name: CN_APP_VALIDATOR_AUTH_AUDIENCE
           value: {{ .Values.auth.audience | quote }}
