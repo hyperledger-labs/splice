@@ -544,6 +544,13 @@ commands:
       - upload_test_reports
       - save_sbt_cache
       - save_compiled_classes
+      - run:
+          name: Convert time stamps in browser logs
+          when: always
+          command: |
+            if [[ -d log ]]; then
+              find log -type f -name "browser*.log" -print0 | xargs -r0 python3 scripts/convts.py
+            fi
       - run: # Pack logfiles to speedup downloads.
           name: Pack Logfiles
           when: always
