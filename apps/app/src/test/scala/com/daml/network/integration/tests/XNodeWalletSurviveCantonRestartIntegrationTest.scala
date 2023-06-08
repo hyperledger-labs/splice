@@ -51,11 +51,9 @@ class XNodeWalletSurviveCantonRestartIntegrationTest
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
+      .withPreSetup(_ => ())
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
-      )
-      .withPreSetup(implicit env =>
-        CNNodeEnvironmentDefinition.withAllocatedValidator(sv1Validator)
       )
       .withAllocatedSvcAndSvUsers()
       .withManualStart
