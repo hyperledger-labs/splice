@@ -33,11 +33,10 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}
 import com.google.protobuf.empty.Empty
-import io.grpc.{Channel, Deadline, StatusRuntimeException, Status as GrpcStatus}
+import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
-import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 
@@ -63,12 +62,9 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     elc: ErrorLoggingContext,
 ) extends Closeable {
 
-  private def getReducedDeadline(): Deadline = Deadline.after(10, TimeUnit.SECONDS)
-
   import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest}
 
   private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
-    // TODO(#5319) remove deadline after Canton properly produces a response
     withCredentials(CommandServiceGrpc.newStub(channel), token)
   private val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
     withCredentials(TransactionServiceGrpc.newStub(channel), token)
@@ -206,7 +202,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     )
     wrapFuture(
       commandServiceStub
-        .withDeadline(getReducedDeadline())
         .submitAndWaitForTransactionId(request, _)
     ).map(response => response.getCompletionOffset)
   }
@@ -232,7 +227,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       disclosedContracts,
     )
     wrapFuture(
-      commandServiceStub.withDeadline(getReducedDeadline()).submitAndWaitForTransaction(request, _)
+      commandServiceStub.submitAndWaitForTransaction(request, _)
     ).map(response => Transaction.fromProto(response.getTransaction))
   }
 
@@ -258,7 +253,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     )
     wrapFuture(
       commandServiceStub
-        .withDeadline(getReducedDeadline())
         .submitAndWaitForTransactionTree(request, _)
     ).map(response => TransactionTree.fromProto(response.getTransaction))
   }
@@ -355,7 +349,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       command: LedgerClient.TransferCommand,
   ): Future[Unit] =
     transferSubmissionServiceStub
-      .withDeadline(getReducedDeadline())
       .submit(
         LedgerClient
           .TransferSubmitRequest(

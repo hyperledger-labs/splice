@@ -195,12 +195,9 @@ class XNodeDirectoryTimeBasedIntegrationTest
         // Advance so we're within the renewalInterval + make sure that we have
         // an open round that we can use. We time the advances so that
         // automation doesn't trigger before payments can be made.
-        advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(3)))
+        advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(1)))
         advanceTimeToRoundOpen
         eventually() {
-          // TODO(#5319) Advance time to make sure the polling trigger kicks in again and
-          // if a submission ends up locking the payment contract it eventually reaches the timeout.
-          advanceTime(Duration.ofMinutes(1))
           aliceWallet
             .listSubscriptions()
             .headOption
