@@ -1022,7 +1022,7 @@ lazy val `apps-app` =
     )
     .settings(
       libraryDependencies += "org.scalatestplus" %% "selenium-4-9" % "3.2.16.0" % "test",
-      libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.9.1" % "test",
+      libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.10.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
       // Force SBT to use the right version of opentelemetry libs.

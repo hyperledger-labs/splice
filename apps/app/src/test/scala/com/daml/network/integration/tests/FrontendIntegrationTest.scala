@@ -210,21 +210,8 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
     registerWebDriver(name, webDriver)
 
-    // TODO(#4828): This works around an incompatibility between Selenium and Firefox.
-    //  Remove this hack once the incompatibility is fixed in Selenium.
-    val originalLogEvent = Log.entryAdded()
-    val fixedLogEvent = new Event[LogEntry](
-      originalLogEvent.getMethod,
-      params => {
-        // Firefox follows the new spec and thinks warnings are "WARN"
-        // Selenium hasn't caught up and thinks warnings are "WARNING"
-        params.replaceAll((k, v) => if (k == "level" && v == "warn") "warning" else v)
-        originalLogEvent.getMapper()(params)
-      },
-    )
-
     biDi.addListener[LogEntry](
-      fixedLogEvent,
+      Log.entryAdded(),
       logEntry => {
         logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
           val msg = consoleLogEntry.getText
