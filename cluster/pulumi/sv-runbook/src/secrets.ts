@@ -149,18 +149,23 @@ export function sv1UserValidatorParticipantSecret(ns: ExactNamespace): k8s.core.
   return participantSecret(ns, 'sv1-validator', validatorAuth0ClientId);
 }
 
-export function svValidatorSecrets(ns: ExactNamespace): k8s.core.v1.Secret[] {
-  return [
-    appSecret(ns, 'validator', validatorAuth0ClientId, validatorAuth0Secret),
-    uiSecret(ns, 'wallet-ui', walletUIClientId),
-  ];
+type AppAndUiSecrets = {
+  appSecret: k8s.core.v1.Secret;
+  uiSecret: k8s.core.v1.Secret;
+};
+
+export function createSvValidatorSecrets(ns: ExactNamespace): AppAndUiSecrets {
+  return {
+    appSecret: appSecret(ns, 'validator', validatorAuth0ClientId, validatorAuth0Secret),
+    uiSecret: uiSecret(ns, 'wallet-ui', walletUIClientId),
+  };
 }
 
-export function svAppSecrets(ns: ExactNamespace): k8s.core.v1.Secret[] {
-  return [
-    appSecret(ns, 'sv', sv1Auth0ClientId, sv1Auth0Secret),
-    uiSecret(ns, 'sv-ui', svUIClientId),
-  ];
+export function createSvAppSecrets(ns: ExactNamespace): AppAndUiSecrets {
+  return {
+    appSecret: appSecret(ns, 'sv', sv1Auth0ClientId, sv1Auth0Secret),
+    uiSecret: uiSecret(ns, 'sv-ui', svUIClientId),
+  };
 }
 
 // TODO(#4374): get rid of the dummy secrets

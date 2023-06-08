@@ -57,3 +57,33 @@ spec:
         port:
           number: 80
         host: sv-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: scan-sv-{{ (.Values.cluster).svNamespace }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+  - "scan.{{ (.Values.cluster).svNamespace }}.svc.{{ (.Values.cluster).hostname }}"
+  gateways:
+  - http-gateway
+  http:
+  - match:
+    - port: 443
+      uri:
+        prefix: "/api"
+    rewrite:
+      uri: "/api"
+    route:
+    - destination:
+        port:
+          number: 5012
+        host: scan-app.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+  - match:
+    - port: 443
+    route:
+    - destination:
+        port:
+          number: 80
+        host: scan-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local

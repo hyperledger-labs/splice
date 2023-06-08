@@ -3,6 +3,8 @@ import * as pulumi from '@pulumi/pulumi';
 import { installCNSVHelmChart, installCNSVHelmChartByNamespaceName } from './helm';
 import { installLoopback } from './loopback';
 import {
+  createSvAppSecrets,
+  createSvValidatorSecrets,
   /*configureSecrets, */
   directoryUserParticipantSecret,
   imagePullSecret,
@@ -10,9 +12,7 @@ import {
   scanUserParticipantSecret,
   sv1UserParticipantSecret,
   sv1UserValidatorParticipantSecret,
-  svAppSecrets,
   svKeySecret,
-  svValidatorSecrets,
   svcUserParticipantSecret,
 } from './secrets';
 import { exactNamespace, requiredEnv, loadYamlFromFile } from './utils';
@@ -102,6 +102,8 @@ const validatorValues = loadYamlFromFile(
   }
 );
 
+const svValidatorSecrets = createSvValidatorSecrets(svNamespace);
+
 const validator = installCNSVHelmChart(
   svNamespace,
   'validator',
@@ -109,7 +111,9 @@ const validator = installCNSVHelmChart(
   validatorValues,
   localCharts,
   version,
-  svImagePullDeps.concat([participant]).concat(svValidatorSecrets(svNamespace))
+  svImagePullDeps
+    .concat([participant])
+    .concat([svValidatorSecrets.appSecret, svValidatorSecrets.uiSecret])
 );
 
 const svValues = loadYamlFromFile(
@@ -121,6 +125,8 @@ const svValues = loadYamlFromFile(
   }
 );
 
+const svAppSecrets = createSvAppSecrets(svNamespace);
+
 const sv = installCNSVHelmChart(
   svNamespace,
   'sv-1',
@@ -128,7 +134,19 @@ const sv = installCNSVHelmChart(
   svValues,
   localCharts,
   version,
-  svImagePullDeps.concat([validator, participant]).concat(svAppSecrets(svNamespace))
+  svImagePullDeps
+    .concat([validator, participant])
+    .concat([svAppSecrets.appSecret, svAppSecrets.uiSecret])
+);
+
+installCNSVHelmChart(
+  svNamespace,
+  'scan',
+  'cn-scan',
+  {},
+  localCharts,
+  version,
+  svImagePullDeps.concat([participant]).concat(svAppSecrets.appSecret)
 );
 
 const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);

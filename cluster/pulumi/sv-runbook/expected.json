@@ -392,6 +392,22 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-scan/",
+      "compat": "true",
+      "name": "scan",
+      "namespace": "sv",
+      "values": {
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+      }
+    },
+    "name": "scan",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
       "name": "sv-1",
