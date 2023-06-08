@@ -43,16 +43,6 @@ MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for infor
 FAILED_PRECONDITION/DAML_INTERPRETATION_ERROR.+'Contract is not locked' was not met
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
 
-# TODO(#5250) Remove this once Canton fixes their bug
-MEDIATOR_INVALID_MESSAGE.* Received a mediator response .*with an unknown request id
-
-# TODO(#5307) Remove once Canton fixed their bug
-MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*request uuid.*must not be used until
-Submission timed out.*(TransactionProcessor|TransferInProcessor|TransferOutProcessor)
-
-# TODO(#5308) Remove this once Canton fixes their bug
-Response message for request.+timed out at
-
 # TODO(#5383) Consider not ignoring this
 Failed to send: sending accepted txs to members.*TopologyRequestProcessor
 
