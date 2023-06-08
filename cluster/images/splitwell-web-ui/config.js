@@ -32,7 +32,7 @@ window.canton_network_config = {
     },
     scan: {
       // URL of the scan app's HTTP API
-      url: `https://scan.${cluster}`,
+      url: `https://scan.sv-1.svc.${cluster}`,
     },
   },
 };
