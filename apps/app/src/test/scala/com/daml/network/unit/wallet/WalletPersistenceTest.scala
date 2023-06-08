@@ -109,9 +109,7 @@ class WalletPersistenceTest
 
   override protected def cleanDb(x: DbStorage): Future[?] = {
     for {
-      _ <- storage.queryAndUpdate(sql"DELETE FROM user_wallet_acs_store".asUpdate, "truncate1")
-      _ <- storage.queryAndUpdate(sql"DELETE FROM user_wallet_txlog_store".asUpdate, "truncate2")
-      _ <- storage.queryAndUpdate(sql"DELETE FROM store_descriptors".asUpdate, "truncate3")
+      _ <- resetAllCnAppTables(x)
     } yield ()
   }
 }

@@ -1,20 +1,22 @@
 package com.daml.network.store.db
 
 import com.daml.network.config.CNDbConfig
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.DbParametersConfig
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.store.db.{DbStorageSetup, DbTest}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.*
+import org.scalatest.exceptions.TestFailedException
 import slick.dbio.SuccessAction
 import slick.lifted.{Rep, TableQuery}
 
-import java.util.concurrent.Semaphore
-import scala.concurrent.{Future, blocking}
+import java.net.ServerSocket
+import scala.concurrent.Future
+import scala.util.Try
 
-trait CNDbTest extends DbTest { this: Suite =>
+trait CNDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
   // Inserts the given row into the given table, unless the row already exists.
   // Note: Update actions must be idempotent. To avoid manually constructing a 'INSERT ... ON UPDATE DO NOTHING' statement,
@@ -45,51 +47,51 @@ trait CNDbTest extends DbTest { this: Suite =>
     logger.info("Resetting all CN app database tables")
     for {
       _ <- storage.update(
-        sql"TRUNCATE user_wallet_acs_store, acs_store_template, store_descriptors RESTART IDENTITY CASCADE".asUpdate,
+        sql"""TRUNCATE
+                user_wallet_acs_store,
+                user_wallet_txlog_store,
+                directory_acs_store,
+                acs_store_template,
+                store_descriptors
+            RESTART IDENTITY CASCADE""".asUpdate,
         "resetAllCnAppTables",
       )
     } yield ()
   }
-}
 
-trait CNDbTestLock extends BeforeAndAfterAll with NamedLogging { this: Suite =>
+  private var dbLockSocket: Option[ServerSocket] = None
 
   // Note: all app stores in CN use the same `store_descriptors` table.
-  // Since test are running in parallel, we manually synchronize the tests to avoid conflicts
+  // Since test are running in parallel, we manually synchronize the tests to avoid conflicts.
+  // Since tests might be running in different JVM instances, we are using a socket for synchronization.
   override def beforeAll(): Unit = {
-    CNDbTestLock.acquireCNAppStoreLock(
-      ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
+    val dbLockPort: Int = 54321
+    implicit val tc: TraceContext = TraceContext.empty
+    logger.info("Acquiring CNDbTest lock")
+    dbLockSocket = BaseTest.eventually()(
+      Try(new ServerSocket(dbLockPort))
+        .fold(
+          e => {
+            logger.debug(s"Acquiring CNDbTest lock: port $dbLockPort is in use")
+            throw new TestFailedException("", e, 0)
+          },
+          Some(_),
+        )
     )
+    logger.info("CNDbTest lock acquired")
     super.beforeAll()
   }
 
   override def afterAll(): Unit = {
+    implicit val tc: TraceContext = TraceContext.empty
+    logger.info("Releasing CNDbTest lock")
+    dbLockSocket.foreach(_.close())
     super.afterAll()
-    CNDbTestLock.releaseCNAppStoreLock(
-      ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
-    )
-  }
-}
-
-object CNDbTestLock {
-
-  /** Synchronize access to the tables common to all CN app stores so that tests do not interfere */
-  private val accessCNAppStore: Semaphore = new Semaphore(1)
-
-  def acquireCNAppStoreLock(elc: ErrorLoggingContext): Unit = {
-    elc.logger.info(s"Acquiring CN app store test lock")(elc.traceContext)
-    blocking(accessCNAppStore.acquire())
-    elc.logger.info(s"CN app store test lock acquired")(elc.traceContext)
-  }
-
-  def releaseCNAppStoreLock(elc: ErrorLoggingContext): Unit = {
-    elc.logger.info(s"Releasing CN app store test lock")(elc.traceContext)
-    accessCNAppStore.release()
   }
 }
 
 /** Run db test for running against postgres */
-trait CNPostgresTest extends CNDbTest with CNDbTestLock { this: Suite =>
+trait CNPostgresTest extends CNDbTest { this: Suite =>
 
   override protected def mkDbConfig(basicConfig: DbBasicConfig): CNDbConfig.Postgres =
     CNDbConfig.Postgres(

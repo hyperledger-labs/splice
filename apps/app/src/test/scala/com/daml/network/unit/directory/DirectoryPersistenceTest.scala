@@ -95,8 +95,7 @@ class DirectoryPersistenceTest
 
   override protected def cleanDb(x: DbStorage): Future[?] = {
     for {
-      _ <- storage.queryAndUpdate(sql"DELETE FROM directory_acs_store".asUpdate, "truncate1")
-      _ <- storage.queryAndUpdate(sql"DELETE FROM store_descriptors".asUpdate, "truncate2")
+      _ <- resetAllCnAppTables(x)
     } yield ()
   }
 }
