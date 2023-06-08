@@ -13,6 +13,7 @@ spec:
   - "scan.sv-1.svc.{{ (.Values.cluster).basename }}.network.canton.global"
   - "sv.sv-1.svc.{{ (.Values.cluster).basename }}.network.canton.global"
   - "wallet.sv-1.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "scan.sv-2.svc.{{ (.Values.cluster).basename }}.network.canton.global"
   - "sv.sv-2.svc.{{ (.Values.cluster).basename }}.network.canton.global"
   - "wallet.sv-2.svc.{{ (.Values.cluster).basename }}.network.canton.global"
   - "sv.sv-3.svc.{{ (.Values.cluster).basename }}.network.canton.global"

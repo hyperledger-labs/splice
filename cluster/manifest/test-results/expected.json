@@ -2512,6 +2512,99 @@
          }
       },
       {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "scan-web-ui",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "scan-web-ui"
+            },
+            "name": "scan-web-ui",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "scan-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "scan-web-ui",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "scan-web-ui"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/scan-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": null,
+                        "name": "scan-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "scan-ui"
+                           }
+                        ],
+                        "readinessProbe": null,
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 0.5,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "scan-web-ui",
+            "namespace": "sv-2"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "scan-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "scan-web-ui"
+            }
+         }
+      },
+      {
          "apiVersion": "v1",
          "kind": "Namespace",
          "metadata": {

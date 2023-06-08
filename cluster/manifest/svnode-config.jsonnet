@@ -210,6 +210,15 @@ local deployments(num, svConfig, config) =
           internalOnly: true,
         },
       ], namespace=namespace, extraEnvVars=c.appAuthEnvBinding(config, "sv", "scan")),
+
+      c.deployment(config, "scan-web-ui", [
+        {
+          name: "scan-ui",
+          port: 80,
+          internalOnly: true,
+        },
+      ], image="scan-web-ui", namespace=namespace, cpuRequest=0.5),
+
     ] else []
   );
 

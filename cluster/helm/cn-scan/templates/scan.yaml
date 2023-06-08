@@ -45,3 +45,53 @@ spec:
   - name: scan-api
     port: 5012
     protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scan-web-ui
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: scan-web-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scan-web-ui
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: scan-web-ui
+    spec:
+      containers:
+      - env:
+        - name: JAVA_TOOL_OPTIONS
+          value: {{ .Values.defaultJvmOptions }}
+        image: "{{ .Values.imageRepo }}/scan-web-ui:{{ (.Values.cluster).imageTag }}"
+        imagePullPolicy: Always
+        name: scan-web-ui
+        ports:
+        - containerPort: 80
+          name: scan-ui
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: 500m
+            memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scan-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: scan-web-ui
+  ports:
+  - name: scan-ui
+    port: 80
+    protocol: TCP
