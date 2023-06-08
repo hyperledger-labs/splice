@@ -549,7 +549,8 @@ commands:
           when: always
           command: |
             if [[ -d log ]]; then
-              find log -type f -name "browser*.log" -print0 | xargs -r0 python3 scripts/convts.py
+              # find log -type f -name "browser*.log" -print0 | xargs -r0 python3 scripts/convts.py
+              echo "Converting time stamps is disabled"
             fi
       - run: # Pack logfiles to speedup downloads.
           name: Pack Logfiles
