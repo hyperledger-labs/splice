@@ -96,7 +96,9 @@ class XNodeWalletSurviveCantonRestartIntegrationTest
             }
           }
           clue("We can tap and list after Canton restart and domain reconnection") {
-            aliceWallet.tap(2)
+            eventuallySucceeds() {
+              aliceWallet.tap(2)
+            }
             aliceWallet.list()
           }
         }
