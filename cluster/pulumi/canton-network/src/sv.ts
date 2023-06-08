@@ -42,18 +42,7 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
       },
       {
         name: { env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME' },
-        primaryParty: { allocate: 'sv1' },
-        actAs: [
-          { fromUser: 'self' },
-          { fromUser: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' } },
-        ],
-        readAs: [],
-        admin: true,
-      },
-      {
-        name: { env: 'CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME' },
-        primaryParty: { fromUser: { env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME' } },
-        actAs: [{ fromUser: 'self' }],
+        actAs: [{ fromUser: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' } }],
         readAs: [],
         admin: true,
       },
@@ -88,12 +77,7 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
   );
 }
 
-function installSvParticipant(
-  xns: ExactNamespace,
-  svc: k8s.helm.v3.Release,
-  nodename: string,
-  onboardingName: string
-): k8s.helm.v3.Release {
+function installSvParticipant(xns: ExactNamespace): k8s.helm.v3.Release {
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
   return installParticipant(
@@ -103,26 +87,10 @@ function installSvParticipant(
     [],
     [
       {
-        actAs: [{ fromUser: 'self' }],
+        actAs: [],
         admin: true,
         name: {
           env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME',
-        },
-        primaryParty: {
-          allocate: onboardingName,
-        },
-        readAs: [],
-      },
-      {
-        actAs: [{ fromUser: 'self' }],
-        admin: true,
-        name: {
-          env: 'CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME',
-        },
-        primaryParty: {
-          fromUser: {
-            env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME',
-          },
         },
         readAs: [],
       },
@@ -180,7 +148,7 @@ export async function installSvNode(
   );
 
   if (nodename !== 'sv-1') {
-    const participant = installSvParticipant(xns, svc, nodename, onboardingName);
+    const participant = installSvParticipant(xns);
 
     if (nodename === 'sv-2') {
       installCNHelmChart(

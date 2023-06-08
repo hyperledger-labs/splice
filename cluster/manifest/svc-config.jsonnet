@@ -138,15 +138,7 @@ local deployments(config) = [
         },
         {
           name: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
-          primaryParty: { allocate: "Canton-Foundation-1" },
-          actAs: [{ fromUser: "self" }, { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-          readAs: [],
-          admin: true,
-        },
-        {
-          name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-          primaryParty: { fromUser: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" } },
-          actAs: [{ fromUser: "self" }],
+          actAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
           readAs: [],
           admin: true,
         },

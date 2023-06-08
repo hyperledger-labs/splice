@@ -25,7 +25,7 @@ local deployments(num, svConfig, config) =
         },
       ],
       image="sv-app",
-      extraEnvVars=c.appAuthEnvBinding(config, "sv") + [
+      extraEnvVars=c.appAuthEnvBinding(config, "sv") + c.appUserNameEnvBinding("validator") + [
         { name: "CN_APP_SV_IS_DEV_NET", value: "true" },
         { name: "CN_APP_SV_ONBOARDING_NAME", value: svName },
       ] + (
@@ -185,15 +185,7 @@ local deployments(num, svConfig, config) =
           { name: "CANTON_PARTICIPANT_USERS", json: [
             {
               name: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" },
-              primaryParty: { allocate: svName },
-              actAs: [{ fromUser: "self" }],
-              readAs: [],
-              admin: true,
-            },
-            {
-              name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-              primaryParty: { fromUser: { env: "CN_APP_SV_LEDGER_API_AUTH_USER_NAME" } },
-              actAs: [{ fromUser: "self" }],
+              actAs: [],
               readAs: [],
               admin: true,
             },

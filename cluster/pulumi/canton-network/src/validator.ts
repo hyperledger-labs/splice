@@ -22,13 +22,10 @@ export async function installValidator(
     [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     [
       {
-        actAs: [{ fromUser: 'self' }],
+        actAs: [],
         admin: true,
         name: {
           env: 'CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME',
-        },
-        primaryParty: {
-          allocate: 'validator1_validator_service_user',
         },
         readAs: [],
       },

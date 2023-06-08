@@ -597,7 +597,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}, {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"Canton-Foundation-1\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -1040,6 +1040,16 @@
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
                                     "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -1583,6 +1593,16 @@
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
                                     "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -2288,7 +2308,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"Canton-Foundation-2\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [ ], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -2691,6 +2711,16 @@
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
                                     "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -3396,7 +3426,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"Canton-Foundation-3\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [ ], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -3573,6 +3603,16 @@
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
                                     "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-validator-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -4278,7 +4318,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"Canton-Foundation-4\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [ ], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -4812,7 +4852,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"validator1_validator_service_user\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [ ], \"admin\": true, \"name\": {\"env\": \"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            },
                            {
                               "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",
@@ -5822,7 +5862,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"splitwell_validator_service_user\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [ ], \"admin\": true, \"name\": {\"env\": \"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            },
                            {
                               "name": "CANTON_PARTICIPANT_EXTRA_DOMAINS",

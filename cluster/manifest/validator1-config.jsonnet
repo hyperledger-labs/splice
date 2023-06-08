@@ -63,8 +63,7 @@ local deployments(config) = [
       { name: "CANTON_PARTICIPANT_USERS", json: [
         {
           name: { env: "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-          primaryParty: { allocate: "validator1_validator_service_user" },
-          actAs: [{ fromUser: "self" }],
+          actAs: [],
           readAs: [],
           admin: true,
         },

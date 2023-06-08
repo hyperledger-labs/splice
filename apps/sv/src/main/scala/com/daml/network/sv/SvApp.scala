@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AuthConfig, HMACVerifier, RSAVerifier}
@@ -93,6 +94,23 @@ class SvApp(
 
   private val cometBftConfig = config.cometBftConfig
     .filter(_.enabled)
+
+  override def ensureUserPrimaryParty(connection: CNLedgerConnection) =
+    for {
+      svParty <- allocateUserPrimaryPartyIfNeeded(
+        connection,
+        Some(config.svPartyHint.getOrElse(config.onboarding.name)),
+      )
+      // We share the SV party between the validator user and the SV user. Therefore, we allocate the validator user here with the SV
+      // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
+      // That ensures the validator app won't try to allocate its own primary party because it waits first for the user to be created
+      // and then checks if it has a primary party already.
+      _ <- connection.createUserWithPrimaryParty(
+        config.validatorLedgerApiUser,
+        svParty,
+        Seq(User.Right.ParticipantAdmin.INSTANCE),
+      )
+    } yield ()
 
   override def initialize(ledgerClient: CNLedgerClient, svPartyId: PartyId): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(

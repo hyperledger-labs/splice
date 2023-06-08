@@ -76,25 +76,14 @@ case class CNNodeEnvironmentDefinition(
           readAs = Set.empty,
           participantAdmin = true,
         )
-        val svUserRegex = raw"sv(\d+)-(.*)".r
         svs.local.foreach(sv => {
-          // We want to use the same party for the validator service party and the SV party. This is test only code
-          // so we just find the matching validator user by relying on a specific naming format.
-          val (svNumber, suffix) = sv.config.ledgerApiUser match {
-            case svUserRegex(number, suffix) => (number, suffix)
-            case user => fail(s"SV user name did not match expected format: $user")
-          }
-          val validatorUserName = s"sv${svNumber}_validator_user-$suffix"
-          val user = sv.participantClientWithAdminToken.ledger_api.users
-            .get(validatorUserName)
-          val svParty = user.primaryParty.value
           sv.participantClientWithAdminToken.ledger_api.users.create(
             id = sv.config.ledgerApiUser,
             actAs = sv.config.onboarding match {
-              case _: SvOnboardingConfig.FoundCollective => Set(svParty, svcParty)
-              case _ => Set(svParty)
+              case _: SvOnboardingConfig.FoundCollective => Set(svcParty)
+              case _ => Set.empty
             },
-            primaryParty = Some(svParty),
+            primaryParty = None,
             readAs = Set.empty,
             participantAdmin = true,
           )
@@ -114,7 +103,9 @@ case class CNNodeEnvironmentDefinition(
       import env.*
       this.preSetup(env)
       validators.local.foreach(validator => {
-        CNNodeEnvironmentDefinition.withAllocatedValidator(validator)
+        if (!validator.name.startsWith("sv")) {
+          CNNodeEnvironmentDefinition.withAllocatedValidator(validator)
+        }
       })
     })
 
@@ -302,14 +293,10 @@ object CNNodeEnvironmentDefinition {
     participant.ledger_api.parties.allocate(hint, hint).party
 
   def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {
-    val validatorParty = allocateParty(
-      validator.participantClientWithAdminToken,
-      validator.config.ledgerApiUser,
-    )
     validator.participantClientWithAdminToken.ledger_api.users.create(
       id = validator.config.ledgerApiUser,
-      actAs = Set(validatorParty),
-      primaryParty = Some(validatorParty),
+      actAs = Set.empty,
+      primaryParty = None,
       readAs = Set.empty,
       participantAdmin = true,
     )

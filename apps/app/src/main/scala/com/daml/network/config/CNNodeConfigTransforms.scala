@@ -62,7 +62,13 @@ object CNNodeConfigTransforms {
 
     val transforms = Seq(
       updateSvcAppConfig(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
-      updateAllSvAppConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
+      updateAllSvAppConfigs_(c =>
+        c.copy(
+          ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
+          validatorLedgerApiUser = s"${c.validatorLedgerApiUser}-$suffix",
+          svPartyHint = c.svPartyHint.map(sv => s"$sv-$suffix"),
+        )
+      ),
       updateAllScanAppConfigs_(c => c.copy(svUser = s"${c.svUser}-$suffix")),
       updateAllValidatorConfigs_(c =>
         c.copy(

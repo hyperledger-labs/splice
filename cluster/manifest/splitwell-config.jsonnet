@@ -107,8 +107,7 @@ local deployments(config) = [
       { name: "CANTON_PARTICIPANT_USERS", json: [
         {
           name: { env: "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME" },
-          primaryParty: { allocate: "splitwell_validator_service_user" },
-          actAs: [{ fromUser: "self" }],
+          actAs: [],
           readAs: [],
           admin: true,
         },

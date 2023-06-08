@@ -59,6 +59,8 @@ class ScanApp(
       tracerProvider,
     ) {
 
+  override def ensureUserPrimaryParty(connection: CNLedgerConnection) = Future.unit
+
   override def initialize(
       ledgerClient: CNLedgerClient,
       // we don't care about the primary party in scan as that points to the SV party while we need the svc party

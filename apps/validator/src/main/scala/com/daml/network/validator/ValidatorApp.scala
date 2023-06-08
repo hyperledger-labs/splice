@@ -76,6 +76,14 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
+  // Note that for the validator of an SV app, the user will be created by the SV app with a
+  // primary party set to the SV app already so this is a noop.
+  // For regular validators, this allocates a new user.
+  override def ensureUserPrimaryParty(connection: CNLedgerConnection) =
+    allocateUserPrimaryPartyIfNeeded(
+      connection
+    ).map(_ => ())
+
   private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
     for {

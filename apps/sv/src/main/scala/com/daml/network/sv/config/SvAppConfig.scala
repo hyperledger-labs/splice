@@ -66,6 +66,10 @@ case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     ledgerApiUser: String,
+    // The SV app shares the primary party with the validator app. To discover it we query the
+    // validator user. Additionally, the founding SV app is expected to create that user,
+    // so it needs to know the expected user name.
+    validatorLedgerApiUser: String,
     auth: AuthConfig,
     participantClient: CNParticipantClientConfig,
     // TODO(#3856): consider if we can remove this already
@@ -75,6 +79,9 @@ case class SvAppBackendConfig(
     isDevNet: Boolean = false,
     expectedValidatorOnboardings: List[ExpectedValidatorOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
+    // If not set the onboarding name is used. We set this in our tests
+    // because this one can be suffixed per test while we keep the onboarding name stable.
+    svPartyHint: Option[String] = None,
     // TODO(#5288) make this an `Option` with default `= None`
     onboarding: SvOnboardingConfig,
     initialCoinPriceVote: Option[BigDecimal] = None,

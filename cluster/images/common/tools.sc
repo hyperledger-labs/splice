@@ -115,7 +115,7 @@ object PrimaryParty {
 // Definition of a user that will be created by the bootstrap script.
 final case class UserDef(
     name: EnvSubst,
-    primaryParty: PrimaryParty,
+    primaryParty: Option[PrimaryParty],
     actAs: Seq[PartyRef],
     readAs: Seq[PartyRef],
     admin: Boolean,
@@ -130,10 +130,12 @@ def resolvePrimaryParty(p: ParticipantReferenceCommon, primaryParty: PrimaryPart
     case PartyFromUser(env) => p.ledger_api.users.get(resolveEnv(env)).primaryParty.get
   }
 
-def resolvePartyRef(p: ParticipantReferenceCommon, self: PartyId, ref: PartyRef) =
+def resolvePartyRef(p: ParticipantReferenceCommon, userId: String, self: Option[PartyId], ref: PartyRef) =
   ref match {
-    case PartyFromSelf(_) => self
-    case PartyFromOther(env) => p.ledger_api.users.get(resolveEnv(env)).primaryParty.get
+    case PartyFromSelf(_) => self.getOrElse(sys.error(s"User $userId has no primary party"))
+    case PartyFromOther(env) =>
+      val otherId = resolveEnv(env)
+      p.ledger_api.users.get(otherId).primaryParty.getOrElse(sys.error(s"User $otherId has no primary party"))
   }
 
 def createUser(p: ParticipantReferenceCommon, user: UserDef) = {
@@ -141,12 +143,12 @@ def createUser(p: ParticipantReferenceCommon, user: UserDef) = {
   ensureParticipantUser(
     p,
     userId, {
-      val party = resolvePrimaryParty(p, user.primaryParty)
+      val party = user.primaryParty.map(resolvePrimaryParty(p, _))
       p.ledger_api.users.create(
         id = userId,
-        primaryParty = Some(party),
-        actAs = user.actAs.map(resolvePartyRef(p, party, _)).toSet,
-        readAs = user.readAs.map(resolvePartyRef(p, party, _)).toSet,
+        primaryParty = party,
+        actAs = user.actAs.map(resolvePartyRef(p, userId, party, _)).toSet,
+        readAs = user.readAs.map(resolvePartyRef(p, userId, party, _)).toSet,
         participantAdmin = user.admin,
       )
     },

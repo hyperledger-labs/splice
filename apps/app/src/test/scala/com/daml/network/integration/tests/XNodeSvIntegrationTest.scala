@@ -46,12 +46,19 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   private val cantonCoinDarPath =
     "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
+  private val svcGovernanceDarPath =
+    "daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
       .withManualStart
+      .withAdditionalSetup(implicit env => {
+        // Some tests rely on those DARs being present without starting the SV/validator app which usually upload these.
+        sv2.participantClient.upload_dar_unless_exists(svcGovernanceDarPath)
+        bobValidator.participantClient.upload_dar_unless_exists(cantonCoinDarPath)
+      })
 
   "start and restart cleanly" in { implicit env =>
     initSvc()
@@ -253,9 +260,6 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
   "Non-leader SVs can onboard new validators" in { implicit env =>
     initSvc()
-    // Upload the DAR so validator onboarding can succeed. Usually this is done through the validator app
-    // but because here we don't start one, we need to perform this step manually.
-    bobValidator.participantClient.upload_dar_unless_exists(cantonCoinDarPath)
     val sv = sv4 // not a leader
     val svParty = sv.getSvcInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
@@ -459,10 +463,9 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     val sv1Party = sv1.getSvcInfo().svParty
     // We are not using sv4.getSvcInfo() to get sv4's party id
     // because the SvApp is not completely initialized yet and hence the http service is not available.
-    val sv4Party = sv4.participantClient.ledger_api.users
-      .get(sv4.config.ledgerApiUser)
-      .primaryParty
-      .value
+    val sv4Party = eventually() {
+      sv4.participantClient.ledger_api.users.get(sv4.config.ledgerApiUser).primaryParty.value
+    }
 
     val (token, svOnboardingRequestCid) =
       clue("Checking that SV4's `SvOnboarding` contract was created correctly by SV1") {
@@ -564,13 +567,18 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         startAllSync(nodes)
         sv1.getSvcInfo().svcRules.payload.members should have size 1
       }
-      // We are not using sv2.getSvcInfo() to get sv2's party id because we
-      // don't want SV2 to actually start and get onboarded for this test
-      // and hence the http service is not available.
-      val sv2Party = sv2.participantClient.ledger_api.users
-        .get(sv2.config.ledgerApiUser)
-        .primaryParty
-        .value
+      // SV two’s party hasn't been allocated at this point because the SV app isn't running so we allocate it here.
+      val (sv2Party, _) = actAndCheck(
+        "allocate sv2 party",
+        sv2.participantClientWithAdminToken.ledger_api.parties
+          .allocate(sv2.config.ledgerApiUser, sv2.config.ledgerApiUser)
+          .party,
+      )(
+        "sv1 sees sv2 party",
+        party =>
+          sv1.participantClientWithAdminToken.participantX.parties
+            .list(filterParty = party.toProtoPrimitive) should not be empty,
+      )
 
       clue("Unknown parties have unknown SV onboarding status") {
         inside(sv1.getSvOnboardingStatus(sv2Party)) { case SvOnboardingStatus.Unknown() =>

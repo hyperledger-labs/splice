@@ -40,7 +40,7 @@ export function installParticipant(
 export type ParticipantUser = {
   name: StringOrEnv;
   actAs: Party[];
-  primaryParty: Party;
+  primaryParty?: Party;
   readAs: Party[];
   admin: boolean;
 };

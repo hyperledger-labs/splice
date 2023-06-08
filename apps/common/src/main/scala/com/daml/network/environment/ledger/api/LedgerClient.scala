@@ -31,7 +31,7 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.participant.protocol.v0.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf.{ByteString, Duration}
+import com.google.protobuf.{ByteString, Duration, FieldMask}
 import com.google.protobuf.empty.Empty
 import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
@@ -271,10 +271,15 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     wrapFuture(packageManagementServiceStub.uploadDarFile(request, _)).map(_ => ())
   }
 
-  def getUser(userId: String)(implicit ec: ExecutionContext): Future[User] = {
+  def getUserProto(
+      userId: String
+  )(implicit ec: ExecutionContext): Future[UserManagementServiceOuterClass.User] = {
     val request = new GetUserRequest(userId).toProto
-    wrapFuture(userManagementServiceStub.getUser(request, _)).map(r => User.fromProto(r.getUser))
+    wrapFuture(userManagementServiceStub.getUser(request, _)).map(_.getUser)
   }
+
+  def getUser(userId: String)(implicit ec: ExecutionContext): Future[User] =
+    getUserProto(userId).map(User.fromProto(_))
 
   def getOrCreateUser(user: User, initialRights: Seq[User.Right])(implicit
       ec: ExecutionContext
@@ -310,6 +315,19 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     wrapFuture(userManagementServiceStub.createUser(request, _)).map(r =>
       CreateUserResponse.fromProto(r).getUser
     )
+  }
+
+  def setUserPrimaryParty(userId: String, primaryParty: PartyId)(implicit
+      ec: ExecutionContext
+  ): Future[Unit] = {
+    val requestBuilder = admin.UserManagementServiceOuterClass.UpdateUserRequest.newBuilder()
+    for {
+      user <- getUserProto(userId)
+      newUser = user.toBuilder.setPrimaryParty(primaryParty.toProtoPrimitive).build
+      _ = requestBuilder.setUser(newUser)
+      _ = requestBuilder.setUpdateMask(FieldMask.newBuilder.addPaths("primary_party").build)
+      _ <- wrapFuture(userManagementServiceStub.updateUser(requestBuilder.build, _))
+    } yield ()
   }
 
   def listUserRights(userId: String)(implicit

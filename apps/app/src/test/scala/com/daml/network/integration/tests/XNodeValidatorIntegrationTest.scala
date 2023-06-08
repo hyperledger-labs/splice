@@ -11,7 +11,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
-import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.environment.{CNLedgerConnection, CNNodeEnvironmentImpl}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
@@ -116,7 +116,9 @@ class XNodeValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTes
 
     partyIdFromTokenUser.toString
       .split("::")
-      .head should be(aliceValidator.config.ledgerApiUser)
+      .head should be(
+      CNLedgerConnection.sanitizeUserIdToPartyString(aliceValidator.config.ledgerApiUser)
+    )
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>

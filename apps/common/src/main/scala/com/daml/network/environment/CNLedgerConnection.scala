@@ -45,7 +45,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import com.google.protobuf.ByteString
-import io.grpc.StatusRuntimeException
+import io.grpc.{Status, StatusRuntimeException}
 
 import java.nio.file.{Files, Path}
 import java.security.MessageDigest
@@ -336,12 +336,7 @@ class CNLedgerConnection(
       user <- client
         .getUser(user)
         .map(Some(_))
-      partyId = user.map(u =>
-        PartyId.tryFromProtoPrimitive(
-          u.getPrimaryParty.toScala
-            .getOrElse(sys.error(s"user $user was allocated without primary party"))
-        )
-      )
+      partyId = user.flatMap(_.getPrimaryParty.toScala).map(PartyId.tryFromProtoPrimitive(_))
     } yield partyId
   }
 
@@ -349,7 +344,9 @@ class CNLedgerConnection(
     for {
       partyIdO <- getOptionalPrimaryParty(user)
       partyId = partyIdO.getOrElse(
-        sys.error(s"Unable to find party for user $user")
+        throw Status.FAILED_PRECONDITION
+          .withDescription(s"User $user has no primary party")
+          .asRuntimeException
       )
     } yield partyId
   }
@@ -359,6 +356,8 @@ class CNLedgerConnection(
       displayName: Option[String],
   ): Future[PartyId] =
     client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive)
+
+  def getUser(user: String): Future[User] = client.getUser(user)
 
   private def createPartyAndUser(
       user: String,
@@ -389,6 +388,9 @@ class CNLedgerConnection(
         )
     } yield partyId
   }
+
+  def setUserPrimaryParty(user: String, party: PartyId): Future[Unit] =
+    client.setUserPrimaryParty(user, party)
 
   // TODO(tech-debt): Factor out user/party allocation and make it robust (current implementation is racy)
   def getOrAllocateParty(

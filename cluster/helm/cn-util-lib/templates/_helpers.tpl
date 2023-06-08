@@ -43,3 +43,13 @@
       optional: false
 {{- end }}
 {{- end -}}
+{{- define "cn-util-lib.auth0-user-env-var" -}}
+{{- $app := .appName }}
+{{- $keyName := .keyName }}
+- name: "CN_APP_{{ $app | upper }}_LEDGER_API_AUTH_USER_NAME"
+  valueFrom:
+    secretKeyRef:
+      key: ledger-api-user
+      name: "cn-app-{{ $keyName }}-ledger-api-auth"
+      optional: false
+{{- end -}}

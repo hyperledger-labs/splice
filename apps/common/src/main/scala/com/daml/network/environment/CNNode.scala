@@ -244,12 +244,48 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     )
   }
 
+  protected def allocateUserPrimaryPartyIfNeeded(
+      connection: CNLedgerConnection,
+      partyHint: Option[String] = None,
+  ): Future[PartyId] = {
+    val hint = partyHint.getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(serviceUser))
+    for {
+      _ <- retryProvider.ensureThat(
+        s"User $serviceUser has primary party",
+        check = connection.getOptionalPrimaryParty(serviceUser).map(_.isDefined),
+        establish = for {
+          party <- connection.allocatePartyViaLedgerApi(
+            Some(hint),
+            Some(hint),
+          )
+          _ <- connection.setUserPrimaryParty(serviceUser, party)
+          _ <- connection
+            .grantUserRights(serviceUser, actAsParties = Seq(party), readAsParties = Seq.empty)
+        } yield (),
+        logger,
+      )
+      party <- connection.getPrimaryParty(serviceUser)
+    } yield party
+  }
+
+  private def waitForUser(connection: CNLedgerConnection): Future[Unit] =
+    retryProvider.getValueWithRetries(
+      s"user $serviceUser",
+      connection.getUser(serviceUser).map(_ => ()),
+      logger,
+      additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
+    )
+
+  protected def ensureUserPrimaryParty(connection: CNLedgerConnection): Future[Unit]
+
   private def initializeNode(
       ledgerClient: CNLedgerClient
   ) = for {
     _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
     initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+    _ <- waitForUser(initConnection)
+    _ <- ensureUserPrimaryParty(initConnection)
     serviceParty <-
       retryProvider.getValueWithRetries[PartyId](
         s"primary party of service user $serviceUser",
