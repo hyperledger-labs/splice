@@ -1,6 +1,5 @@
 package com.daml.network.directory.store
 
-import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.config.DirectoryDomainConfig
@@ -8,10 +7,8 @@ import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
-  InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
   ConfiguredDefaultDomain,
-  TxLogStore,
 }
 import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -39,6 +36,9 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
     */
   def providerParty: PartyId
 
+  lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter =
+    DirectoryStore.contractFilter(providerParty)
+
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
@@ -46,42 +46,19 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
 
   override final def defaultAcsDomain = domainConfig.global.alias
 
-  // TODO (#5162): Remove this override so that multiDomainAcsStore is just the generic MultiDomainAcsStore
-  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
-    TxLogStore.IndexRecord,
-    TxLogStore.Entry[TxLogStore.IndexRecord],
-  ]
-
   /** Lookup the directory install for a user */
   def lookupInstallByUserWithOffset(
       user: PartyId
   )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
-  ]]] = {
-    // TODO (#5162): Replace with call to directory-specific query
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore
-        .findContractOnDomainWithOffset(directoryCodegen.DirectoryInstall.COMPANION)(
-          _,
-          co => co.payload.user == user.toProtoPrimitive,
-        )
-    )
-  }
+  ]]]
 
   /** Lookup a directory entry by name. */
   def lookupEntryByNameWithOffset(
       name: String
   )(implicit tc: TraceContext): Future[QueryResult[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ]] = {
-    // TODO (#5162): Replace with call to directory-specific query
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(directoryCodegen.DirectoryEntry.COMPANION)(
-        _,
-        co => co.payload.name == name,
-      )
-    )
-  }
+  ]]
 
   def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
@@ -89,38 +66,20 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
     lookupEntryByNameWithOffset(name).map(_.value)
 
   /** Lookup a directory entry by party.
-    * If there are multiple candidate entries, then oldest one is returned.
+    * If there are multiple candidate entries, then the first one lexicographically is returned.
     */
   def lookupEntryByParty(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomain(directoryCodegen.DirectoryEntry.COMPANION)(
-        _,
-        co => co.payload.user == partyId.toProtoPrimitive,
-      )
-    )
+  ]
 
   /** List all directory entries that are active as of a specific revision, up to a certain number. */
   // TODO(#300): allow submitting the page token to receive the next page
   // TODO(#300): at the moment, trimming the list to the right size is performed here, that should be moved to the acsStore
   def listEntries(namePrefix: String, pageSize: Int)(implicit tc: TraceContext): Future[
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ] =
-    for {
-      domainId <- defaultAcsDomainIdF
-      // TODO (#5162): This belongs to in-memory implementation, DB should do a directory-specific query
-      list <- multiDomainAcsStore.filterContractsOnDomain(
-        directoryCodegen.DirectoryEntry.COMPANION,
-        domainId,
-        (entry: Contract[
-          directoryCodegen.DirectoryEntry.ContractId,
-          directoryCodegen.DirectoryEntry,
-        ]) => entry.payload.name.startsWith(namePrefix),
-      )
-    } yield list.take(pageSize)
+  ]
 
   import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 
@@ -135,38 +94,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
   def listExpiredDirectorySubscriptions(
       now: CantonTimestamp,
       limit: Int,
-  )(implicit tc: TraceContext): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
-    for {
-      domainId <- defaultAcsDomainIdF
-      // TODO (#5162): This belongs to in-memory implementation, DB should do a directory-specific query
-      dueSubscriptions <- multiDomainAcsStore.filterContractsOnDomain(
-        subsCodegen.SubscriptionIdleState.COMPANION,
-        domainId,
-        filter = { e: Contract[?, subsCodegen.SubscriptionIdleState] =>
-          now.toInstant.isAfter(e.payload.nextPaymentDueAt)
-        },
-      )
-      // Join with the DirectoryEntryContexts
-      subscriptionsWithContext <- dueSubscriptions.toList
-        .traverse { subscription =>
-          multiDomainAcsStore
-            .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
-              domainId,
-              directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
-                subscription.payload.subscriptionData.context
-              ),
-            )
-            .map(context => (subscription, context))
-        }
-      // Only deliver the ones referencing an active directory entry context
-      // TODO(tech-debt): consider whether this kind of join might be leading to stale subscriptions not being expired.
-      result = subscriptionsWithContext.iterator
-        .collect { case (subscription, Some(context)) =>
-          DirectoryStore.IdleDirectorySubscription(subscription, context)
-        }
-        .take(limit)
-        .toSeq
-    } yield result
+  )(implicit tc: TraceContext): Future[Seq[DirectoryStore.IdleDirectorySubscription]]
 }
 
 object DirectoryStore {

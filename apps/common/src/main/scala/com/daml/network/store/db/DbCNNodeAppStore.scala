@@ -6,14 +6,12 @@ import com.daml.network.store.{
   ConfiguredDefaultDomain,
   InMemoryDomainStore,
   InMemoryMultiDomainAcsStore,
-  MultiDomainAcsStore,
   TxLogStore,
 }
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.ExecutionContext
 
@@ -24,11 +22,9 @@ abstract class DbCNNodeAppStore[
     storage: DbStorage,
     tableName: String,
     storeDescriptor: io.circe.Json,
-    contractFilter: MultiDomainAcsStore.ContractFilter,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
-    traceContext: TraceContext,
     closeContext: CloseContext,
 ) extends CNNodeAppStore[TXI, TXE] { this: ConfiguredDefaultDomain =>
   protected def futureSupervisor: FutureSupervisor
@@ -40,9 +36,9 @@ abstract class DbCNNodeAppStore[
       storage,
       tableName,
       storeDescriptor,
-      defaultAcsDomainIdF,
+      tc => defaultAcsDomainIdF(tc),
       loggerFactory,
-      contractFilter,
+      acsContractFilter,
       txLogParser,
       futureSupervisor,
       retryProvider,
@@ -66,3 +62,17 @@ abstract class DbCNNodeAppStore[
 
   override def close(): Unit = ()
 }
+
+abstract class DbCNNodeAppStoreWithoutHistory(
+    storage: DbStorage,
+    tableName: String,
+    storeDescriptor: io.circe.Json,
+)(implicit
+    ec: ExecutionContext,
+    templateJsonDecoder: TemplateJsonDecoder,
+    closeContext: CloseContext,
+) extends DbCNNodeAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]](
+      storage,
+      tableName,
+      storeDescriptor,
+    ) { this: ConfiguredDefaultDomain => }

@@ -74,7 +74,7 @@ class DbMultiDomainAcsStoreTest
       storage,
       "acs_store_template",
       storeDescriptor,
-      Future.successful(DomainId.tryFromString("domain1::domain")),
+      _ => Future.successful(DomainId.tryFromString("domain1::domain")),
       loggerFactory,
       unusedTxFilter,
       TestTxLogStoreParser,

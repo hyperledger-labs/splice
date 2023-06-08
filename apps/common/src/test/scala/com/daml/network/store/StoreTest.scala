@@ -35,6 +35,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def providerParty(i: Int) = mkPartyId(s"provider-$i")
 
+  /** @param n must 0-9
+    * @param suffix must be a hex string
+    */
+  protected def validContractId(n: Int, suffix: String = "00"): String = "00" + s"0$n" * 31 + suffix
+
   protected def appRewardCoupon(
       round: Int,
       provider: PartyId,
@@ -47,12 +52,16 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
         featured,
-        Numeric.assertFromBigDecimal(Numeric.Scale.assertFromInt(10), BigDecimal(1.0)),
+        numeric(1.0),
         new apiCodegen.v1.round.Round(round),
       ),
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
+
+  protected def numeric(value: BigDecimal, scale: Int = 10) = {
+    Numeric.assertFromBigDecimal(Numeric.Scale.assertFromInt(scale), value)
+  }
 
   protected def validatorRewardCoupon(
       round: Int,

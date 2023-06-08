@@ -35,7 +35,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     storage: DbStorage,
     tableName: String,
     storeDescriptor: io.circe.Json,
-    resolveDomainId: => Future[DomainId], // no support for multi-domain yet
+    resolveDomainId: TraceContext => Future[DomainId], // no support for multi-domain yet
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
@@ -48,6 +48,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 ) extends MultiDomainAcsStore
     with TxLogStore[TXI, TXE]
     with AcsTables
+    with AcsQueries
     with NamedLogging {
 
   import MultiDomainAcsStore.*
@@ -63,10 +64,35 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   // Some callers depend on all queries always returning sensible data, but may perform queries
   // before the ACS is fully ingested. We therefore delay all queries until the ACS is ingested.
   private val finishedAcsIngestion: Promise[Unit] = Promise()
-  private def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
+  def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
     finishedAcsIngestion.future.flatMap(_ => f)
-  private def waitUntilAcsIngested(): Future[Unit] =
+  def waitUntilAcsIngested(): Future[Unit] =
     finishedAcsIngestion.future
+
+  def lastIngestedOffset(
+      storage: DbStorage,
+      storeId: Int,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+      closeContext: CloseContext,
+  ): Future[String] = waitUntilAcsIngested {
+    import storage.api.jdbcProfile.api.*
+    storage
+      .querySingle(
+        sql"""
+              select last_ingested_offset from store_descriptors
+              where id = $storeId
+           """.as[String].headOption,
+        "minimumLastOffset",
+      )
+      .value
+      .map(
+        _.getOrElse(
+          throw new IllegalStateException("Offset must be defined, as the ACS was ingested")
+        )
+      )
+  }
 
   override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
       implicit
@@ -76,7 +102,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     storage
       .querySingle( // index: acs_store_template_sid_cid
         sql"""
-          #$selectFromAcsTable
+          #${selectFromAcsTable(tableName)}
           where store_id = $storeId
             and contract_id = ${lengthLimited(id.contractId)}
            """.as[AcsStoreRowTemplate].headOption,
@@ -97,7 +123,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     for {
       result <- storage.query( // index: acs_store_template_sid_tid_en
         sql"""
-          #$selectFromAcsTable
+          #${selectFromAcsTable(tableName)}
           where store_id = $storeId
             and template_id = $templateId
           order by event_number
@@ -135,7 +161,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       result <- storage
         .query( // index: acs_store_template_sid_tid_ce
           sql"""
-          #$selectFromAcsTable
+          #${selectFromAcsTable(tableName)}
           where store_id = $storeId
             and template_id = $templateId
             and contract_expires_at < $now
@@ -160,7 +186,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   ): Future[Seq[Contract[TCid, T]]] = waitUntilAcsIngested {
     // TODO (#5314): the DbMultiDomainAcsStore is currently tied to a single domain,
     //  so this method doesn't make that much sense atm
-    resolveDomainId.flatMap { thisDomain =>
+    resolveDomainId(traceContext).flatMap { thisDomain =>
       if (thisDomain != domain) {
         logger.warn(
           "Tried to list contracts on domain {} but this DB ACS Store is for domain {}.",
@@ -194,7 +220,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         // TODO(#5534): this is currently waiting until the whole ACS has been ingested.
         //  After switching to streaming ACS ingestion, we could start streaming contracts while
         //  the ACS is being ingested.
-        waitUntilAcsIngested(resolveDomainId)
+        waitUntilAcsIngested(resolveDomainId(traceContext))
       ) // TODO (#5314): this probably won't apply anymore
       .flatMapConcat { domainId =>
         Source
@@ -202,7 +228,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             storage
               .query( // index: acs_store_template_sid_tid_en
                 sql"""
-                    #$selectFromAcsTable
+                    #${selectFromAcsTable(tableName)}
                     where store_id = $storeId
                       and template_id = $templateId
                       and event_number >= $fromEventNumber
@@ -336,53 +362,17 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
   override def close(): Unit = ()
 
-  private val selectFromAcsTable: String =
-    s"""
-      |select store_id,
-      |  event_number,
-      |  contract_id,
-      |  template_id,
-      |  create_arguments,
-      |  contract_metadata_created_at,
-      |  contract_metadata_contract_key_hash,
-      |  contract_metadata_driver_internal,
-      |  contract_expires_at
-      |from $tableName
-      |""".stripMargin
-
   private def contractWithStateFromRow[C, TCid <: ContractId[_], T](companion: C)(
       row: AcsStoreRowTemplate
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): Future[ContractWithState[TCid, T]] = {
-    resolveDomainId.map { domainId =>
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[ContractWithState[TCid, T]] = {
+    resolveDomainId(traceContext).map { domainId =>
       val contract = contractFromRow(companion)(row)
       // TODO (#5314): handle InFlight
       val state = ContractState.Assigned(domainId)
       ContractWithState(contract, state)
-    }
-  }
-
-  private def contractFromRow[C, TCId <: ContractId[_], T](companion: C)(
-      row: AcsStoreRowTemplate
-  )(implicit companionClass: ContractCompanion[C, TCId, T]): Contract[TCId, T] = {
-    companionClass
-      .fromJson(companion)(
-        row.templateId,
-        row.contractId.contractId,
-        row.createArguments,
-        row.contractMetadataCreatedAt.toInstant,
-        row.contractMetadataContractKeyHash,
-        row.contractMetadataDriverInternal,
-      )
-      .fold(
-        err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
-        identity,
-      )
-  }
-
-  private def sqlLimit(limit: Limit): Long = {
-    limit match {
-      case HardLimit(limit) => limit + 1
-      case PageLimit(limit) => limit
     }
   }
 
