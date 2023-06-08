@@ -108,7 +108,6 @@ globalSequencerSv1.setup.assign_from_beginning(
 globalMediatorSv1.setup.assign(
   globalDomainId,
   staticParameters(globalSequencerSv1),
-  globalSequencerSv1.id,
   SequencerConnections.single(globalSequencerSv1.sequencerConnection),
 )
 
