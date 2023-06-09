@@ -25,8 +25,8 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        // rounds update every 2.5 minutes, but polling every minute seems like a nice sweet spot
-        refetchInterval: 60 * 1000,
+        // rounds update every 2.5 minutes, but for testing it's better to refresh more often, e.g. every 5 seconds
+        refetchInterval: 5 * 1000,
       },
     },
   });
