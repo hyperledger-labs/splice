@@ -9,7 +9,7 @@
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
-        21
+        16
       ],
       "days-of-week": [
         "SUN"
