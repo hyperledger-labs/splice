@@ -34,9 +34,11 @@ const Header: React.FC = () => {
         Canton Coin Scan
       </Typography>
       <Stack direction="row" alignItems="center">
-        <Typography variant="body2">
-          The content on this page is computed as of round: {round}
-        </Typography>
+        <div id="as-of-round">
+          <Typography variant="body2">
+            The content on this page is computed as of round: {round}
+          </Typography>
+        </div>
       </Stack>
     </Stack>
   );

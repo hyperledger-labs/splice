@@ -7,6 +7,8 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.util.FrontendLoginUtil
 
+import scala.concurrent.duration.*
+
 class SvNodePreflightSvIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with SvUiIntegrationTestUtil
@@ -53,6 +55,20 @@ class SvNodePreflightSvIntegrationTest
         },
       )
     }
+  }
+
+  "The Scan UI is working" in { _ =>
+    val scanUrl = s"https://scan.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+
+    withFrontEnd("sv") { implicit webDriver =>
+      go to scanUrl
+      eventually(3.minutes) {
+        val asOfRound = find(id("as-of-round")).value.text
+        asOfRound should startWith("The content on this page is computed as of round: ")
+        asOfRound should not be "The content on this page is computed as of round: --"
+      }
+    }
+
   }
 
 }
