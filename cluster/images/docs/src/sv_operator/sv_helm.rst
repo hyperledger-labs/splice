@@ -360,6 +360,7 @@ reaches a stable state prior to moving on to the next step.
     helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
     helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml --wait
     helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml --wait
+    helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in each of the three new
@@ -370,6 +371,8 @@ namespaces. A typical query might look as follows:
     $ kubectl get pods --all-namespaces |grep -v kube-system
     NAMESPACE         NAME                                                       READY   STATUS    RESTARTS      AGE
     cluster-ingress   external-proxy-998cb664c-k7dfb                             1/1     Running   0             37m
+    sv                scan-app-5658d74b58-xvlmz                                  1/1     Running   0             14m
+    sv                scan-web-ui-7db66d9f9d-kl9kw                               1/1     Running   0             14m
     sv                sv-app-7658c9fdd4-58xm6                                    1/1     Running   0             91m
     sv                sv-web-ui-84b6d7994c-w67rp                                 1/1     Running   0             91m
     sv                validator-app-b7fd68479-w4992                              1/1     Running   0             43m
@@ -395,6 +398,8 @@ The following routes should be configured in your cluster ingress controller:
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5003 of pod ``validator-app`` in the ``sv`` namespace
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``sv-web-ui`` in the ``sv`` namespace
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5014 of pod ``sv-app`` in the ``sv`` namespace
+* ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``scan-web-ui`` in the ``sv`` namespace
+* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/*`` should be routed to prefix ``/api`` on port 5012 in pod ``scan-app`` in the ``sv`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have
@@ -518,3 +523,23 @@ Once logged in one should see a page with some SV collective information.
 .. image:: images/sv_home.png
   :width: 600
   :alt: After logged in into the sv UI
+
+.. _helm-scan-web-ui:
+
+Observing the Canton Coin Scan UI
+---------------------------------
+
+The Canton Coin Scan app is a public-facing application that provides summary information regarding Canton Coin activity on the network.
+A copy of it is hosted by each Super Validator. Open your browser at https://scan.sv.svc.YOUR_HOSTNAME to see your instance of it.
+
+Note that after spinning up the application, it may take several minutes before data is available (as it waits to see a mining round opening and closing).
+In the top-right corner of the screen, see the message starting with "The content on this page is computed as of round:".
+If you see a round number, then the data in your scan app is up-to-date.
+If, instead, you see "??", that means that the backend is working, but does not yet expose any useful information. It should turn into a round number within a few minutes.
+A "--" as a round number indicates a problem. It may be very temporary while the data is being fetched from the backend, but if it persists for more than that,
+please inspect the browser logs and reach out to Digital Asset support as needed.
+
+Note that as of now, each instance of the Scan app backend aggregates only Canton Coin activity occuring while the app is up and ingesting ledger updates.
+This will be changed in future updates, where the Scan app will guarantee correctness against all data since network start.
+At that point, data in different instances of the Scan app (hosted by different Super Validators) will always be consistent.
+This allows the public to inspect multiple Scan UIs and compare their data, so that they do not need to trust a single Super Validator.
