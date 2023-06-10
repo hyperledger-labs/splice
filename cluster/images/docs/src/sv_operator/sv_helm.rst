@@ -399,7 +399,7 @@ The following routes should be configured in your cluster ingress controller:
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``sv-web-ui`` in the ``sv`` namespace
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5014 of pod ``sv-app`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``scan-web-ui`` in the ``sv`` namespace
-* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/*`` should be routed to prefix ``/api`` on port 5012 in pod ``scan-app`` in the ``sv`` namespace
+* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/v0/scan/*`` should be routed to port 5012 in pod ``scan-app`` in the ``sv`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have

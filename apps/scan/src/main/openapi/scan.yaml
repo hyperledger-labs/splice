@@ -9,7 +9,7 @@ paths:
     $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
   /version:
     $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1version"
-  /api/v0/svc-party-id:
+  /svc-party-id:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -21,7 +21,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetSvcPartyIdResponse"
-  /api/v0/closed-rounds:
+  /closed-rounds:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -33,7 +33,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetClosedRoundsResponse"
-  /api/v0/open-and-issuing-mining-rounds:
+  /open-and-issuing-mining-rounds:
     post:
       tags: [scan]
       x-jvm-package: scan
@@ -51,7 +51,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsResponse"
-  /api/v0/coin-rules:
+  /coin-rules:
     post:
       tags: [scan]
       x-jvm-package: scan
@@ -87,7 +87,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetCoinRulesResponse"
-  /api/v0/featured-apps:
+  /featured-apps:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -99,7 +99,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
-  /api/v0/featured-apps/{provider_party_id}:
+  /featured-apps/{provider_party_id}:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -117,7 +117,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
-  /api/v0/total-coin-balance:
+  /total-coin-balance:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -129,7 +129,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetTotalCoinBalanceResponse"
-  /api/v0/coin-config-for-round:
+  /coin-config-for-round:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -150,7 +150,7 @@ paths:
                 "$ref": "#/components/schemas/GetCoinConfigForRoundResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/get-round-of-latest-data:
+  /get-round-of-latest-data:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -164,7 +164,7 @@ paths:
                 $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/get-rewards-collected:
+  /get-rewards-collected:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -185,7 +185,7 @@ paths:
                 $ref: "#/components/schemas/GetRewardsCollectedResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/top-providers-by-app-rewards:
+  /top-providers-by-app-rewards:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -214,7 +214,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/top-validators-by-validator-rewards:
+  /top-validators-by-validator-rewards:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -243,7 +243,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/top-validators-by-purchased-traffic:
+  /top-validators-by-purchased-traffic:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -272,7 +272,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/get-validator-traffic-balance:
+  /get-validator-traffic-balance:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -292,7 +292,7 @@ paths:
                 "$ref": "#/components/schemas/GetValidatorTrafficBalanceResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
-  /api/v0/check-and-update-validator-traffic-balance:
+  /check-and-update-validator-traffic-balance:
     get:
       tags: [scan]
       x-jvm-package: scan
