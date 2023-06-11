@@ -1,0 +1,21 @@
+{{ $_ := required ".Values.cluster.imageTag is required." (.Values.cluster).imageTag }}
+{{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
+{{ $_ := required ".Values.imageName is required." .Values.imageName }}
+
+{{ $_ := required ".Values.svNodeId is required." .Values.svNodeId }}
+{{ $_ := required ".Values.nodeName is required." .Values.svNodeId }}
+
+{{ $_ := required ".Values.founder.nodeId is required." (.Values.founder).nodeId }}
+{{ $_ := required ".Values.founder.publicKey is required." (.Values.founder).publicKey }}
+{{ $_ := required ".Values.founder.externalAddress is required." (.Values.founder).externalAddress }}
+
+{{ $_ := required ".Values.node.id is required." (.Values.node).id }}
+{{ $_ := required ".Values.node.p2pPort is required." (.Values.node).p2pPort }}
+{{ $_ := required ".Values.node.rpcPort is required." (.Values.node).rpcPort }}
+{{ $_ := required ".Values.node.externalAddress is required." (.Values.node).externalAddress }}
+{{ $_ := required ".Values.node.privateKey is required." (.Values.node).privateKey }}
+{{ $_ := required ".Values.node.validator.privateKey is required." ((.Values.node).validator).privateKey }}
+{{ $_ := required ".Values.node.validator.publicKey is required." ((.Values.node).validator).publicKey }}
+
+{{ $_ := required ".Values.genesis.chainId is required." (.Values.genesis).chainId }}
+{{ $_ := required ".Values.db.volumeSize is required." (.Values.db).volumeSize }}

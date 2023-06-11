@@ -1,0 +1,14 @@
+---
+{{- $fullName := include "prefix" (list .Values "cometbft") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullName }}
+  labels:
+    app: {{ $fullName }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ $.Values.db.volumeSize }}

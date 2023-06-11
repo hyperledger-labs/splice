@@ -1,0 +1,79 @@
+---
+{{- $fullName := include "prefix" (list .Values "cometbft") }}
+{{- with .Values.node }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullName }}
+  labels:
+    app: {{ $fullName }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $fullName }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ $fullName }}
+    spec:
+      containers:
+        - name: {{ $fullName }}
+          image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
+          ports:
+            - name: p2p
+              containerPort: {{ .p2pPort }}
+              protocol: TCP
+            - name: rpc
+              containerPort: {{ .rpcPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+          volumeMounts:
+            - mountPath: /cometbft/config
+              name: config
+            - mountPath: /cometbft/initial-data
+              name: initial-data
+            - mountPath: /cometbft/data
+              name: data
+            - mountPath: /tmp
+              name: state-sync
+          env:
+            - name: HOME
+              value: /cometbft
+          command:
+            - /bin/sh
+            - -c
+            - -x
+            - |
+              cp -n "${HOME}"/initial-data/* "${HOME}"/data
+              cometbft-canton-network start \
+              {{ include "cliArgs" (list $ .) | indent 14 | trim }}
+      volumes:
+        - name: config
+          projected:
+            sources:
+              - configMap:
+                  name: {{ include "prefix" (list $.Values "config-cometbft") }}
+              - secret:
+                  name: {{ include "prefix" (list $.Values "keys") }}
+        - name: initial-data
+          configMap:
+            name: {{ include "prefix" (list $.Values "initial-data") }}
+        - name: state-sync
+          emptyDir:
+            sizeLimit: {{ $.Values.db.volumeSize }}
+        - name: data
+          # It is fine to use a persistent volume claim with a deployment instead of a stateful set,
+          # since we are not going to scale this deployment.
+          persistentVolumeClaim:
+            claimName: {{ $fullName }}
+{{- end }}

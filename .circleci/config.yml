@@ -1519,6 +1519,7 @@ jobs:
          cmd_name: Build app
          cmd: make build -j
          cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
+      - docker_login_artifactory
       - docker_build
       - run_bash_command_in_nix:
          cmd_name: Push Docker images
@@ -1606,6 +1607,7 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Build app
          cmd: make build -j
+      - docker_login_artifactory
       - docker_build
       - cleanup_sbt_test_job
       - collect_test_timings_and_send_to_datadog

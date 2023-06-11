@@ -13,8 +13,9 @@
         "forceConsistentCasingInFileNames": true,
         "allowSyntheticDefaultImports": true,
         "lib": [
-          "es2021.string"
-        ],
+          "es2021.string",
+          "es2015.iterable"
+        ]
     },
     "include": [
         "src/**/*.ts"

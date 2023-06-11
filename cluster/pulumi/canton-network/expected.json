@@ -1344,6 +1344,94 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-cometbft/",
+      "compat": "true",
+      "name": "sv-1-cometbft",
+      "namespace": "sv-1",
+      "timeout": 300,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "34.70.160.201/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32",
+              "104.198.172.213/32",
+              "34.70.176.204/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.102.206.16/32"
+            ],
+            "jvmHeapMemoryFactor": 0.75,
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "db": {
+          "volumeSize": "10Gi"
+        },
+        "founder": {
+          "externalAddress": "sv-1.svc.mock.network.canton.global:26656",
+          "nodeId": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        },
+        "genesis": {
+          "chainId": "cn-mocknet"
+        },
+        "imageName": "cometbft",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "node": {
+          "externalAddress": "sv-1.svc.mock.network.canton.global:26656",
+          "id": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
+          "p2pPort": 26656,
+          "privateKey": "/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==",
+          "rpcPort": 26657,
+          "validator": {
+            "privateKey": "npgiYbG0Iaslb/JHzliAg5BkfYMOaK3tCdKWvvO4FjCCmTBzVYK20vxkBMEg9YgFEKtvR5XgnAwKeNFrnpEQ/A==",
+            "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+          }
+        },
+        "nodeName": "Canton-Foundation-1",
+        "svNodeId": "sv-1",
+        "xNodes": false
+      }
+    },
+    "name": "helm-sv-1-sv-1-cometbft",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
       "name": "sv-1-sv-app",

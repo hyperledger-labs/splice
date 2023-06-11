@@ -1,0 +1,37 @@
+---
+{{- $fullName := include "prefix" (list .Values "cometbft") }}
+{{- $fullP2pHostName := include "prefix" (list .Values "cometbft-p2p") }}
+{{- $fullRpcHostName := include "prefix" (list .Values "cometbft-rpc") }}
+{{- with .Values.node }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullP2pHostName }}
+  labels:
+    name: {{ $fullP2pHostName }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .p2pPort }}
+      targetPort: {{ .p2pPort }}
+      protocol: TCP
+      name: cometbft-p2p
+  selector:
+    app: {{ $fullName }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullRpcHostName }}
+  labels:
+    name: {{ $fullRpcHostName }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .rpcPort }}
+      targetPort: {{ .rpcPort }}
+      protocol: TCP
+      name: cometbft-rpc
+  selector:
+    app: {{ $fullName }}
+{{- end }}

@@ -24,7 +24,8 @@ images := \
 	external-proxy-sv \
 	gcs-proxy \
 	envoy-proxy \
-	json-api
+	json-api \
+	cometbft
 
 canton-image := cluster/images/canton
 cn-image := cluster/images/cn-app

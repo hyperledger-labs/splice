@@ -1,0 +1,38 @@
+imageRepo: digitalasset-canton-enterprise-docker.jfrog.io
+imageName: cometbft-canton-network
+cluster:
+  imageTag: IMAGE_TAG
+
+# The SV node id which will manage this CometBFT node
+svNodeId: ""
+# Node names use as a moniker to identify the node in the CometBFT network
+nodeName: ""
+
+founder:
+  # The CometBFT node ID of the founding node
+  nodeId:
+  # The public key of the CometBFT founding node
+  publicKey:
+  # External address, in the format <host>:<port> that can be used to access the p2p port of the founding node
+  externalAddress:
+node:
+  # The CometBFT node ID
+  id:
+  # The p2p port exposed by the CometBFT container
+  p2pPort: 26656
+  # The rpc port exposed by the CometBFT container
+  rpcPort: 26657
+  # URL that can be used by other nodes to access the p2p port of the node.
+  # Must be set in the format <host>:<port>
+  externalAddress: ""
+  # The node private key
+  privateKey: ""
+  validator:
+    privateKey: ""
+    publicKey: ""
+
+genesis:
+  chainId: ""
+
+db:
+  volumeSize: 10Gi

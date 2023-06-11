@@ -4,7 +4,14 @@ import * as postgres from './postgres';
 import { auth0UserNameEnvVar, installAuth0Secret, installAuth0UISecret } from './auth0';
 import type { Auth0Client } from './auth0types';
 import { installDomain, installParticipant } from './ledger';
-import { ChartValues, ExactNamespace, exactNamespace, installCNHelmChart } from './utils';
+import {
+  ChartValues,
+  CLUSTER_DNS_NAME,
+  CLUSTER_NAME,
+  ExactNamespace,
+  exactNamespace,
+  installCNHelmChart,
+} from './utils';
 
 export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.Release> {
   const xns = exactNamespace('svc');
@@ -147,7 +154,8 @@ export async function installSvNode(
     joinWithKey ? [installSvKeySecret(xns, joinWithKey.publicKey, joinWithKey.privateKey)] : []
   );
 
-  if (nodename !== 'sv-1') {
+  const isNodeSv1 = nodename === 'sv-1';
+  if (!isNodeSv1) {
     const participant = installSvParticipant(xns);
 
     if (nodename === 'sv-2') {
@@ -160,8 +168,35 @@ export async function installSvNode(
       );
     }
   }
+  if (isNodeSv1) {
+    const p2pExternalAddress = `${nodename}.svc.${CLUSTER_DNS_NAME}:26656`;
+    installCNHelmChart(xns, nodename + '-cometbft', 'cn-cometbft', {
+      svNodeId: nodename,
+      nodeName: onboardingName,
+      imageName: 'cometbft',
+      founder: {
+        nodeId: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
+        publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
+        externalAddress: p2pExternalAddress,
+      },
+      node: {
+        id: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
+        privateKey:
+          '/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==',
+        externalAddress: p2pExternalAddress,
+        validator: {
+          privateKey:
+            'npgiYbG0Iaslb/JHzliAg5BkfYMOaK3tCdKWvvO4FjCCmTBzVYK20vxkBMEg9YgFEKtvR5XgnAwKeNFrnpEQ/A==',
+          publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
+        },
+      },
+      genesis: {
+        chainId: CLUSTER_NAME,
+      },
+    });
+  }
 
-  const participantAddress = nodename === 'sv-1' ? 'participant.svc' : 'participant';
+  const participantAddress = isNodeSv1 ? 'participant.svc' : 'participant';
 
   const values = {
     participantAddress,
