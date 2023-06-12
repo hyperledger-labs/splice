@@ -387,7 +387,7 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info("Proposing new sequencer")
     for {
-      sequencerState <- participantAdminConnection.latestSequencerDomainStateX(globalDomain)
+      sequencerState <- participantAdminConnection.getSequencerState(globalDomain)
       ourParticipant <- participantAdminConnection.getParticipantId(true)
       _ <-
         if (sequencerState.active.contains(sequencerId)) {
@@ -410,14 +410,14 @@ class HttpSvHandler(
               for {
                 state <- sequencerAdminConnection.getSequencerState(globalDomain)
               } yield {
-                if (!state.item.active.forgetNE.contains(sequencerId)) {
+                if (!state.active.forgetNE.contains(sequencerId)) {
                   throw Status.FAILED_PRECONDITION
                     .withDescription(
-                      s"Sequencer $sequencerId was not a member of ${state.item.active.forgetNE}"
+                      s"Sequencer $sequencerId was not a member of ${state.active.forgetNE}"
                     )
                     .asRuntimeException()
                 } else {
-                  state.item
+                  state
                 }
               },
               logger,
@@ -440,7 +440,9 @@ class HttpSvHandler(
       _ <- retryProvider.retryForClientCalls(
         msg,
         for {
-          state <- sequencerAdminConnection.getPartyToParticipantState(party)
+          state <- sequencerAdminConnection.listPartyToParticipantMappingsX(filterParty =
+            party.filterString
+          )
         } yield {
           if (state.isEmpty) {
             throw Status.FAILED_PRECONDITION

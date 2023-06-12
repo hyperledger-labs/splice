@@ -68,7 +68,7 @@ final class LocalDomainNode(
   )(implicit traceContext: TraceContext) = {
     logger.info(s"Adding identity transactions for $node $uid")
     for {
-      txs <- participantAdminConnection.getIdentityTransactions(domainId, uid)
+      txs <- participantAdminConnection.getIdentityTransactions(uid, Some(domainId))
       _ <-
         if (containsIdentityTransactions(uid, txs)) {
           logger.info("Identity transactions have already been uploaded")
@@ -88,7 +88,7 @@ final class LocalDomainNode(
   )(implicit traceContext: TraceContext) =
     retryProvider.waitUntil(
       show"the identity transactions for $uid are visible",
-      participantAdminConnection.getIdentityTransactions(domainId, uid).map { txs =>
+      participantAdminConnection.getIdentityTransactions(uid, Some(domainId)).map { txs =>
         if (!containsIdentityTransactions(uid, txs)) {
           throw Status.NOT_FOUND
             .withDescription(
@@ -146,7 +146,7 @@ final class LocalDomainNode(
     logger.info("Adding mediator identity transactions")
     for {
       mediatorId <- mediatorAdminConnection.getMediatorId
-      identity <- mediatorAdminConnection.getMediatorIdentityTransactions(mediatorId)
+      identity <- mediatorAdminConnection.getIdentityTransactions(mediatorId.uid, domainId = None)
       _ <- addIdentityTransactions(
         "mediator",
         domainId,
@@ -256,7 +256,7 @@ final class LocalDomainNode(
     logger.info("Adding sequencer identity transactions")
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
-      identity <- sequencerAdminConnection.getSequencerIdentityTransactions(sequencerId)
+      identity <- sequencerAdminConnection.getIdentityTransactions(sequencerId.uid, domainId = None)
       _ <- addIdentityTransactions(
         "sequencer",
         domainId,
