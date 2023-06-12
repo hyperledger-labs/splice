@@ -6,30 +6,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ledger-api-auth",
-        "namespace": "splitwell"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs",
-          "client-secret": "***",
-          "ledger-api-user": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "auth0-secret-splitwell-directory",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
         "name": "cn-app-validator-ledger-api-auth",
         "namespace": "splitwell"
       },
@@ -294,30 +270,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ledger-api-auth",
-        "namespace": "svc"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs",
-          "client-secret": "***",
-          "ledger-api-user": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "auth0-secret-svc-directory",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
         "name": "cn-app-sv1-ledger-api-auth",
         "namespace": "svc"
       },
@@ -380,30 +332,6 @@
       }
     },
     "name": "auth0-secret-svc-validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-directory-ledger-api-auth",
-        "namespace": "validator1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs",
-          "client-secret": "***",
-          "ledger-api-user": "PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "auth0-secret-validator1-directory",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -2511,16 +2439,6 @@
         "extraDomains": "[]",
         "extraEnvVars": [
           {
-            "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-directory-ledger-api-auth",
-                "optional": false
-              }
-            }
-          },
-          {
             "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
             "valueFrom": {
               "secretKeyRef": {
@@ -2552,7 +2470,7 @@
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"name\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"svc_party\"},\"actAs\":[{\"fromUser\":\"self\"}],\"readAs\":[],\"admin\":true},{\"name\":{\"env\":\"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}},\"actAs\":[{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}],\"readAs\":[],\"admin\":true},{\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"actAs\":[{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}],\"readAs\":[],\"admin\":true}]",
+        "participantUsers": "[{\"name\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"svc_party\"},\"actAs\":[{\"fromUser\":\"self\"}],\"readAs\":[],\"admin\":true},{\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"actAs\":[{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}],\"readAs\":[],\"admin\":true}]",
         "postgres": "postgres.svc.svc.cluster.local",
         "postgresSchema": "svc_participant",
         "resources": {

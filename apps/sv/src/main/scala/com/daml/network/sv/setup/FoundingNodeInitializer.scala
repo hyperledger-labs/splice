@@ -116,15 +116,6 @@ class FoundingNodeInitializer(
         logger,
       )
 
-      // TODO(#5364): consider using 'ensureThat' or an appropriate variant
-      _ = logger.info(
-        show"Granting the user ${config.ledgerApiUser} readAs rights for SVC party $svcParty."
-      )
-      _ <- svAutomation.connection.grantUserRights(
-        config.ledgerApiUser,
-        Seq.empty,
-        Seq(svStore.key.svcParty),
-      )
       svcStore = newSvcStore(svStore.key)
       svcAutomation = newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
       _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
@@ -168,8 +159,6 @@ class FoundingNodeInitializer(
           bootstrapSvc(),
           logger,
         )
-        // make sure we can't act as the svc party anymore now that `SvcBootstrap` is done
-        _ <- waiveSvcRights()
       } yield ()
     }
 
@@ -285,15 +274,6 @@ class FoundingNodeInitializer(
             Future.successful(())
         }
       } yield logger.debug("Created an upgraded CoinRules (V1Test) contract")
-    }
-
-    private def waiveSvcRights(
-    ): Future[Unit] = {
-      val connection = svcStoreWithIngestion.connection
-      for {
-        _ <- connection.grantUserRights(config.ledgerApiUser, Seq.empty, Seq(svcParty))
-        _ <- connection.revokeUserRights(config.ledgerApiUser, Seq(svcParty), Seq.empty)
-      } yield ()
     }
   }
 

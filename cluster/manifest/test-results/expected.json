@@ -568,16 +568,6 @@
                               }
                            },
                            {
-                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "ledger-api-user",
-                                    "name": "cn-app-directory-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           },
-                           {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
                               "value": "postgres"
                            },
@@ -587,7 +577,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -674,139 +664,6 @@
             ],
             "selector": {
                "app": "participant"
-            }
-         }
-      },
-      {
-         "apiVersion": "apps/v1",
-         "kind": "Deployment",
-         "metadata": {
-            "labels": {
-               "app": "directory-app",
-               "clusterName": "cluster",
-               "cnjClusterName": "cluster",
-               "moduleName": "directory-app"
-            },
-            "name": "directory-app",
-            "namespace": "svc"
-         },
-         "spec": {
-            "replicas": 1,
-            "selector": {
-               "matchLabels": {
-                  "app": "directory-app"
-               }
-            },
-            "strategy": {
-               "type": "Recreate"
-            },
-            "template": {
-               "metadata": {
-                  "labels": {
-                     "app": "directory-app",
-                     "clusterName": "cluster",
-                     "cnjClusterName": "cluster",
-                     "moduleName": "directory-app"
-                  }
-               },
-               "spec": {
-                  "containers": [
-                     {
-                        "env": [
-                           {
-                              "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
-                           },
-                           {
-                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_URL",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "url",
-                                    "name": "cn-app-directory-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           },
-                           {
-                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_ID",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "client-id",
-                                    "name": "cn-app-directory-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           },
-                           {
-                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_SECRET",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "client-secret",
-                                    "name": "cn-app-directory-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           },
-                           {
-                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "ledger-api-user",
-                                    "name": "cn-app-directory-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/directory-app:tag",
-                        "imagePullPolicy": "Always",
-                        "livenessProbe": null,
-                        "name": "directory-app",
-                        "ports": [
-                           {
-                              "containerPort": 5010,
-                              "name": "dir-api"
-                           }
-                        ],
-                        "readinessProbe": null,
-                        "resources": {
-                           "limits": {
-                              "memory": "1536Mi"
-                           },
-                           "requests": {
-                              "cpu": 1,
-                              "memory": "1536Mi"
-                           }
-                        },
-                        "volumeMounts": [ ]
-                     }
-                  ],
-                  "volumes": [ ]
-               }
-            }
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "labels": {
-               "clusterName": "cluster",
-               "cnjClusterName": "cluster"
-            },
-            "name": "directory-app",
-            "namespace": "svc"
-         },
-         "spec": {
-            "ports": [
-               {
-                  "name": "dir-api",
-                  "port": 5010,
-                  "protocol": "TCP"
-               }
-            ],
-            "selector": {
-               "app": "directory-app"
             }
          }
       },
@@ -1493,6 +1350,143 @@
             ],
             "selector": {
                "app": "wallet-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "directory-app",
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster",
+               "moduleName": "directory-app"
+            },
+            "name": "directory-app",
+            "namespace": "sv-1"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "directory-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "directory-app",
+                     "clusterName": "cluster",
+                     "cnjClusterName": "cluster",
+                     "moduleName": "directory-app"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4"
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "ledger-api-user",
+                                    "name": "cn-app-sv-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_PARTICIPANT_ADDRESS",
+                              "value": "participant.svc"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/directory-app:tag",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": null,
+                        "name": "directory-app",
+                        "ports": [
+                           {
+                              "containerPort": 5010,
+                              "name": "dir-api"
+                           }
+                        ],
+                        "readinessProbe": null,
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "cpu": 1,
+                              "memory": "1536Mi"
+                           }
+                        },
+                        "volumeMounts": [ ]
+                     }
+                  ],
+                  "volumes": [ ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "labels": {
+               "clusterName": "cluster",
+               "cnjClusterName": "cluster"
+            },
+            "name": "directory-app",
+            "namespace": "sv-1"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "dir-api",
+                  "port": 5010,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "directory-app"
             }
          }
       },
@@ -6559,12 +6553,12 @@
                               "name": "svcp-metrics"
                            },
                            {
-                              "containerPort": 5010,
-                              "name": "dir-api"
-                           },
-                           {
                               "containerPort": 5005,
                               "name": "grpc-svc-adm"
+                           },
+                           {
+                              "containerPort": 5010,
+                              "name": "dir-api"
                            },
                            {
                               "containerPort": 5012,
@@ -6715,13 +6709,13 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "dir-api",
-                  "port": 5010,
+                  "name": "grpc-svc-adm",
+                  "port": 5005,
                   "protocol": "TCP"
                },
                {
-                  "name": "grpc-svc-adm",
-                  "port": 5005,
+                  "name": "dir-api",
+                  "port": 5010,
                   "protocol": "TCP"
                },
                {

@@ -53,7 +53,7 @@ class DirectoryApp(
     mat: Materializer,
     tracer: Tracer,
 ) extends CNNode[DirectoryApp.State](
-      config.ledgerApiUser,
+      config.svUser,
       config.participantClient,
       coinAppParameters,
       loggerFactory,
@@ -67,6 +67,10 @@ class DirectoryApp(
       providerPartyId: PartyId,
   ): Future[DirectoryApp.State] =
     for {
+      initConnection <- Future.successful(
+        ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+      )
+      svcParty <- initConnection.getSvcPartyFromUserMetadata(config.svUser)
       scanConnection <- ScanConnection(
         ledgerClient,
         config.scanClient,
@@ -75,7 +79,6 @@ class DirectoryApp(
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )
-      svcParty <- scanConnection.getSvcPartyIdWithRetries()
       store = DirectoryStore(
         providerParty = providerPartyId,
         svcParty = svcParty,

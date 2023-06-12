@@ -7,7 +7,7 @@ import com.digitalasset.canton.config.*
 case class DirectoryAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CNDbConfig,
-    ledgerApiUser: String,
+    svUser: String,
     override val participantClient: CNParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),

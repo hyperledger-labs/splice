@@ -37,7 +37,6 @@ function addTimeSeconds(t: Date, seconds: number): Date {
 const appToClientId = {
   validator: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
   svc: 'XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC',
-  directory: 'PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs',
   splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
   splitwell_validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
   'sv-1': 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn',

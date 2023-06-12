@@ -88,13 +88,6 @@ case class CNNodeEnvironmentDefinition(
             participantAdmin = true,
           )
         })
-        directories.local.foreach(directory =>
-          svc.participantClientWithAdminToken.ledger_api.users.create(
-            id = directory.config.ledgerApiUser,
-            actAs = Set(svcParty),
-            primaryParty = Some(svcParty),
-          )
-        )
       })
     })
 

@@ -85,7 +85,7 @@ object CNNodeConfigTransforms {
         )
       ),
       updateAllWalletAppClientConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
-      updateDirectoryAppConfig(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
+      updateDirectoryAppConfig(c => c.copy(svUser = s"${c.svUser}-$suffix")),
       updateAllSplitwellAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
       updateAllRemoteSplitwellAppConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
@@ -408,7 +408,7 @@ object CNNodeConfigTransforms {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
       }),
       updateDirectoryAppConfig(c => {
-        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
       }),
       updateAllDirectoryAppClientConfigs_(c => {
         c.focus(_.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))

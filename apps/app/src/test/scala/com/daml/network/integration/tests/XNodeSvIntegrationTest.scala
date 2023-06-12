@@ -135,37 +135,39 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     }
   }
 
-  "SV parties can't act as the SVC party and can read as both themselves and the SVC party" in {
-    implicit env =>
-      initSvc()
-      svs.foreach(sv => {
-        val rights = sv.participantClient.ledger_api.users.rights.list(sv.config.ledgerApiUser)
-        rights.actAs should not contain svcParty
-        rights.readAs should contain(svcParty)
-      })
-      actAndCheck(
-        "creating a `ValidatorOnboarding` contract readable only by sv3", {
-          val sv = sv3 // it doesn't really matter which sv we pick
-          val svParty = sv.getSvcInfo().svParty
-          sv.listOngoingValidatorOnboardings() shouldBe empty
-          sv.participantClient.ledger_api_extensions.commands.submitWithResult(
-            sv.config.ledgerApiUser,
-            actAs = Seq(svParty),
-            readAs = Seq.empty,
-            update = new cn.validatoronboarding.ValidatorOnboarding(
-              svParty.toProtoPrimitive,
-              "test",
-              env.environment.clock.now.toInstant.plusSeconds(3600),
-            ).create,
-          )
+  "SV users can act as SV party and act or read as the SVC party" in { implicit env =>
+    initSvc()
+    val rights = sv1.participantClient.ledger_api.users.rights.list(sv1.config.ledgerApiUser)
+    rights.actAs should contain(svcParty)
+    rights.readAs shouldBe empty
+    Seq(sv2, sv3, sv4).foreach(sv => {
+      val rights = sv.participantClient.ledger_api.users.rights.list(sv.config.ledgerApiUser)
+      rights.actAs should not contain svcParty
+      rights.readAs should contain(svcParty)
+    })
+    actAndCheck(
+      "creating a `ValidatorOnboarding` contract readable only by sv3", {
+        val sv = sv3 // it doesn't really matter which sv we pick
+        val svParty = sv.getSvcInfo().svParty
+        sv.listOngoingValidatorOnboardings() shouldBe empty
+        sv.participantClient.ledger_api_extensions.commands.submitWithResult(
+          sv.config.ledgerApiUser,
+          actAs = Seq(svParty),
+          readAs = Seq.empty,
+          update = new cn.validatoronboarding.ValidatorOnboarding(
+            svParty.toProtoPrimitive,
+            "test",
+            env.environment.clock.now.toInstant.plusSeconds(3600),
+          ).create,
+        )
+      },
+    )(
+      "sv3's store ingests the contract",
+      created =>
+        inside(sv3.listOngoingValidatorOnboardings()) { case Seq(visible) =>
+          visible.contractId shouldBe created.contractId
         },
-      )(
-        "sv3's store ingests the contract",
-        created =>
-          inside(sv3.listOngoingValidatorOnboardings()) { case Seq(visible) =>
-            visible.contractId shouldBe created.contractId
-          },
-      )
+    )
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>

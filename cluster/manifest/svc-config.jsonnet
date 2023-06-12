@@ -111,7 +111,7 @@ local deployments(config) = [
       timeoutSeconds: 10,
     },
     extraEnvVars=
-    c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBinding("sv1-validator", "validator") + c.appUserNameEnvBindings(["svc", "directory"]) + [
+    c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBinding("sv1-validator", "validator") + c.appUserNameEnvBindings(["svc"]) + [
       { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
       { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
       { name: "CANTON_PARTICIPANT_USERS", json: [
@@ -119,13 +119,6 @@ local deployments(config) = [
           name: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" },
           primaryParty: { allocate: "svc_party" },
           actAs: [{ fromUser: "self" }],
-          readAs: [],
-          admin: true,
-        },
-        {
-          name: { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME" },
-          primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
-          actAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
           readAs: [],
           admin: true,
         },
@@ -138,13 +131,6 @@ local deployments(config) = [
       ] },
     ]
   ),
-
-  c.deployment(config, "directory-app", [
-    {
-      name: "dir-api",
-      port: 5010,
-    },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "directory")),
 
   c.deployment(config, "svc-app", [
     {

@@ -212,6 +212,16 @@ local deployments(num, svConfig, config) =
       ], image="scan-web-ui", namespace=namespace, cpuRequest=0.5),
 
     ] else []
+  ) + (
+    if num == 1 then [
+      c.deployment(config, "directory-app", [
+        {
+          name: "dir-api",
+          port: 5010,
+        },
+      ], namespace=namespace, extraEnvVars=c.appAuthEnvBinding(config, "sv", "directory") + [{ name: "CN_APP_DIRECTORY_PARTICIPANT_ADDRESS", value: "participant.svc" }]),
+
+    ] else []
   );
 
 {

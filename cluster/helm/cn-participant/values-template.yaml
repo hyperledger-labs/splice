@@ -39,12 +39,6 @@ extraEnvVars:
       key: ledger-api-user
       name: cn-app-scan-ledger-api-auth
       optional: false
-- name: CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME
-  valueFrom:
-    secretKeyRef:
-      key: ledger-api-user
-      name: cn-app-directory-ledger-api-auth
-      optional: false
 - name: CN_APP_SV1_VALIDATOR_LEDGER_API_AUTH_USER_NAME
   valueFrom:
     secretKeyRef:
@@ -52,4 +46,4 @@ extraEnvVars:
       name: cn-app-sv1-validator-ledger-api-auth
       optional: false
 
-participantUsers: '[{"actAs":[{"fromUser":"self"}],"admin":true,"name":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"},"primaryParty":{"allocate":"svc_party"},"readAs":[]},{"actAs":[{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}}],"admin":true,"name":{"env":"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME"},"primaryParty":{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}},"readAs":[]},{"actAs":[{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}}],"admin":true,"name":{"env":"CN_APP_SV1_LEDGER_API_AUTH_USER_NAME"},"readAs":[]}]'
+participantUsers: '[{"actAs":[{"fromUser":"self"}],"admin":true,"name":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"},"primaryParty":{"allocate":"svc_party"},"readAs":[]},{"actAs":[{"fromUser":{"env":"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME"}}],"admin":true,"name":{"env":"CN_APP_SV1_LEDGER_API_AUTH_USER_NAME"},"readAs":[]}]'
