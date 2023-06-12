@@ -35,8 +35,10 @@
               <regex>(UpdateService/GetLedgerEnd|TransactionService/GetLedgerEnd|StateService/GetConnectedDomains)</regex>
             </matcher>
             <expression>
-              hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
-              requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
+                level &lt;= INFO &amp;&amp;
+                ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
+                  requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
+                )
             </expression>
           </evaluator>
           <OnMismatch>NEUTRAL</OnMismatch>
@@ -130,8 +132,10 @@
                       <regex>(StateService/GetLedgerEnd|TransactionService/GetLedgerEnd|StateService/GetConnectedDomains)</regex>
                     </matcher>
                     <expression>
-                      hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
-                      requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
+                        level &lt;= INFO &amp;&amp;
+                        ( hacoordinator_logger.matches(logger) &amp;&amp; hacoordinator_message.matches(message) ||
+                          requestlogger_logger.matches(logger) &amp;&amp; requestlogger_message.matches(message)
+                        )
                     </expression>
                   </evaluator>
                   <OnMismatch>NEUTRAL</OnMismatch>
