@@ -320,15 +320,19 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   def setUserPrimaryParty(userId: String, primaryParty: PartyId)(implicit
       ec: ExecutionContext
   ): Future[Unit] = {
-    val requestBuilder = admin.UserManagementServiceOuterClass.UpdateUserRequest.newBuilder()
     for {
       user <- getUserProto(userId)
       newUser = user.toBuilder.setPrimaryParty(primaryParty.toProtoPrimitive).build
-      _ = requestBuilder.setUser(newUser)
-      _ = requestBuilder.setUpdateMask(FieldMask.newBuilder.addPaths("primary_party").build)
-      _ <- wrapFuture(userManagementServiceStub.updateUser(requestBuilder.build, _))
+      _ <- updateUser(newUser, FieldMask.newBuilder.addPaths("primary_party").build)
     } yield ()
   }
+
+  def updateUser(user: UserManagementServiceOuterClass.User, mask: FieldMask): Future[Unit] = {
+    val requestBuilder = admin.UserManagementServiceOuterClass.UpdateUserRequest.newBuilder()
+    requestBuilder.setUser(user)
+    requestBuilder.setUpdateMask(mask)
+    wrapFuture(userManagementServiceStub.updateUser(requestBuilder.build, _))
+  }.map(_ => ())
 
   def listUserRights(userId: String)(implicit
       ec: ExecutionContext

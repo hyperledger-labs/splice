@@ -7,6 +7,7 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.lf.archive.DarParser
+import com.daml.ledger.api.v1.admin.ObjectMetaOuterClass
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
@@ -46,7 +47,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.ByteString
+import com.google.protobuf.{ByteString, FieldMask}
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.nio.file.{Files, Path}
@@ -409,6 +410,56 @@ class CNLedgerConnection(
   def setUserPrimaryParty(user: String, party: PartyId): Future[Unit] =
     client.setUserPrimaryParty(user, party)
 
+  def ensureUserMetadataAnnotation(userId: String, key: String, value: String)(implicit
+      ec: ExecutionContext
+  ): Future[Unit] =
+    retryProvider.ensureThat(
+      s"user $userId has metadata $key set to $value",
+      client.getUserProto(userId).map { user =>
+        user.hasMetadata && user.getMetadata.getAnnotationsMap.asScala
+          .get(key)
+          .fold(false)(_ == value)
+      },
+      for {
+        user <- client.getUserProto(userId)
+        newMetadata =
+          if (user.hasMetadata) {
+            val metadata = user.getMetadata
+            metadata.toBuilder.putAnnotations(key, value).build
+          } else {
+            ObjectMetaOuterClass.ObjectMeta.newBuilder.putAnnotations(key, value).build
+          }
+        newUser = user.toBuilder.setMetadata(newMetadata).build
+        mask = FieldMask.newBuilder
+          .addPaths("metadata.annotations")
+          .addPaths("metadata.resource_version")
+          .build
+        _ <- client.updateUser(newUser, mask)
+      } yield (),
+      logger,
+    )
+
+  def waitForUserMetadata(userId: String, key: String): Future[String] =
+    retryProvider.getValueWithRetriesNoPretty(
+      s"metadata field $key of user $userId",
+      client.getUserProto(userId).map { user =>
+        if (user.hasMetadata) {
+          val metadata = user.getMetadata
+          metadata.getAnnotationsMap.asScala.getOrElse(
+            key,
+            throw Status.NOT_FOUND
+              .withDescription(s"User $userId has no metadata annotation for key $key")
+              .asRuntimeException(),
+          )
+        } else {
+          throw Status.NOT_FOUND
+            .withDescription(s"User $userId has no metadata")
+            .asRuntimeException()
+        }
+      },
+      logger,
+    )
+
   // TODO(tech-debt): Factor out user/party allocation and make it robust (current implementation is racy)
   def getOrAllocateParty(
       username: String,
@@ -607,6 +658,12 @@ class CNLedgerConnection(
       }
   }
 
+  // Note that this will only work for apps that run as the SV user, i.e., directory and scan.
+  def getSvcPartyFromUserMetadata(userId: String): Future[PartyId] =
+    waitForUserMetadata(userId, CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY).map(
+      PartyId.tryFromProtoPrimitive(_)
+    )
+
   // simulate the completion check of command service; future only yields
   // successfully if the completion was OK
   private[this] def awaitCompletion(
@@ -722,6 +779,8 @@ class CNLedgerSubscription[S](
 }
 
 object CNLedgerConnection {
+
+  val SVC_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/svc_party"
 
   /** Abstract representation of a command-id for deduplication.
     *

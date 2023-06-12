@@ -126,6 +126,11 @@ class JoiningNodeInitializer(
             .startOnboardingWithSvcPartyMigration(initConnection)
         }
       _ <- waitForSvcMembership(svcStore)
+      _ <- svAutomation.connection.ensureUserMetadataAnnotation(
+        config.ledgerApiUser,
+        CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
+        svcPartyId.toProtoPrimitive,
+      )
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {

@@ -70,7 +70,9 @@ class ScanApp(
       serviceUserPrimaryParty: PartyId,
   ): Future[ScanApp.State] = {
     for {
-      svcParty <- getSvcParty(ledgerClient.connection(this.getClass.getSimpleName, loggerFactory))
+      svcParty <- ledgerClient
+        .connection(this.getClass.getSimpleName, loggerFactory)
+        .getSvcPartyFromUserMetadata(config.svUser)
       store <- Future.successful(
         ScanStore(
           svcParty,
@@ -158,29 +160,6 @@ class ScanApp(
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   override lazy val requiredTemplates = Set(coinCodegen.Coin.TEMPLATE_ID)
-
-  private def getSvcParty(connection: CNLedgerConnection) =
-    retryProvider.getValueWithRetries(
-      s"svcParty from readAs rights of sv user ${config.svUser}",
-      getReadAsParty(connection, config.svUser),
-      logger,
-    )
-
-  private def getReadAsParty(connection: CNLedgerConnection, user: String) =
-    connection
-      .getUserReadAs(user)
-      .map(_.toList match {
-        case List() =>
-          throw Status.FAILED_PRECONDITION
-            .withDescription(s"No readAs party found for user $user")
-            .asRuntimeException()
-        case List(party) =>
-          party
-        case _ =>
-          throw new IllegalArgumentException(
-            "more than 1 readAs party from svUser is not expected"
-          )
-      })
 }
 
 object ScanApp {

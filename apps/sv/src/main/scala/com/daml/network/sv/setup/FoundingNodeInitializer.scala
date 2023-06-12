@@ -83,6 +83,11 @@ class FoundingNodeInitializer(
         svStore,
         ledgerClient,
       )
+      _ <- svAutomation.connection.ensureUserMetadataAnnotation(
+        config.ledgerApiUser,
+        CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
+        svcParty.toProtoPrimitive,
+      )
       globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global.alias)
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
