@@ -53,7 +53,6 @@ export async function installSplitwell(
     await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
     await installAuth0Secret(auth0Client, xns, 'validator', 'splitwell_validator'),
     await installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
-    await installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
     await installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
     await installAuth0UISecret(auth0Client, xns, 'wallet', 'splitwell'),
   ];

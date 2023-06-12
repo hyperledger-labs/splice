@@ -34,13 +34,6 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
         admin: true,
       },
       {
-        name: { env: 'CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME' },
-        primaryParty: { fromUser: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' } },
-        actAs: [],
-        readAs: [{ fromUser: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' } }],
-        admin: false,
-      },
-      {
         name: { env: 'CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME' },
         primaryParty: { fromUser: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' } },
         actAs: [{ fromUser: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' } }],
@@ -56,7 +49,6 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
     ],
     [
       auth0UserNameEnvVar('directory'),
-      auth0UserNameEnvVar('scan'),
       auth0UserNameEnvVar('sv', 'sv1'),
       auth0UserNameEnvVar('svc'),
       auth0UserNameEnvVar('validator'),
@@ -67,7 +59,6 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
   const dependsOn = [
     participant,
     await installAuth0Secret(auth0Client, xns, 'directory', 'directory'),
-    await installAuth0Secret(auth0Client, xns, 'scan', 'scan'),
     await installAuth0Secret(auth0Client, xns, 'sv1', 'sv-1'),
     await installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
     await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
@@ -161,7 +152,7 @@ export async function installSvNode(
     if (nodename === 'sv-2') {
       installCNHelmChart(
         xns,
-        'scan' + xns.logicalName,
+        'scan-' + xns.logicalName,
         'cn-scan',
         {},
         dependsOn.concat([participant])

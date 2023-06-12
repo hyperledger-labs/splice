@@ -568,16 +568,6 @@
                               }
                            },
                            {
-                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
-                              "valueFrom": {
-                                 "secretKeyRef": {
-                                    "key": "ledger-api-user",
-                                    "name": "cn-app-scan-ledger-api-auth",
-                                    "optional": false
-                                 }
-                              }
-                           },
-                           {
                               "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
                               "valueFrom": {
                                  "secretKeyRef": {
@@ -597,7 +587,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [ ], \"admin\": false, \"name\": {\"env\": \"CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc_party\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -4453,7 +4443,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "url",
-                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -4463,7 +4453,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-id",
-                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -4473,7 +4463,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "client-secret",
-                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }
@@ -4483,7 +4473,7 @@
                               "valueFrom": {
                                  "secretKeyRef": {
                                     "key": "ledger-api-user",
-                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "name": "cn-app-sv-ledger-api-auth",
                                     "optional": false
                                  }
                               }

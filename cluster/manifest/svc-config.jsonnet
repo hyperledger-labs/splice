@@ -111,7 +111,7 @@ local deployments(config) = [
       timeoutSeconds: 10,
     },
     extraEnvVars=
-    c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBinding("sv1-validator", "validator") + c.appUserNameEnvBindings(["svc", "scan", "directory"]) + [
+    c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBinding("sv1-validator", "validator") + c.appUserNameEnvBindings(["svc", "directory"]) + [
       { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
       { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
       { name: "CANTON_PARTICIPANT_USERS", json: [
@@ -121,13 +121,6 @@ local deployments(config) = [
           actAs: [{ fromUser: "self" }],
           readAs: [],
           admin: true,
-        },
-        {
-          name: { env: "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME" },
-          primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
-          actAs: [],
-          readAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-          admin: false,
         },
         {
           name: { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME" },
@@ -167,7 +160,7 @@ local deployments(config) = [
       name: "scan-api",
       port: 5012,
     },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "scan")),
+  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "sv", "scan")),
 
   c.deployment(config, "scan-web-ui", [
     {

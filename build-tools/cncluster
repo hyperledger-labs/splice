@@ -1112,7 +1112,6 @@ function subcmd_update_secrets() {
   local -Ar appToClientId=(
       [validator]='cf0cZaTagQUN59C1HBL2udiIBdFh2CWq'
       [svc]='XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC'
-      [scan]='nDgBS0c1gPwbzF1v07CpyVw5yahYC9c6'
       [directory]='PRmBKfOZNmInZKg0qyIWn66RCSe9UBPs'
       [splitwell]='ekPlYxilradhEnpWdS80WfW63z1nHvKy'
       [splitwell_validator]='hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW'
@@ -1138,6 +1137,7 @@ function subcmd_update_secrets() {
   for i in \
     "cn-app-validator-ledger-api-auth validator validator1" \
     "cn-app-svc-ledger-api-auth svc svc" \
+    "cn-app-sv-ledger-api-auth sv1 svc" \
     "cn-app-sv-ledger-api-auth sv1 sv-1" \
     "cn-app-validator-ledger-api-auth sv1_validator sv-1" \
     "cn-app-sv-ledger-api-auth sv2 sv-2" \
@@ -1146,7 +1146,6 @@ function subcmd_update_secrets() {
     "cn-app-validator-ledger-api-auth sv3_validator sv-3" \
     "cn-app-sv-ledger-api-auth sv4 sv-4" \
     "cn-app-validator-ledger-api-auth sv4_validator sv-4" \
-    "cn-app-scan-ledger-api-auth scan svc" \
     "cn-app-directory-ledger-api-auth directory svc" \
     "cn-app-splitwell-ledger-api-auth splitwell splitwell" \
     "cn-app-validator-ledger-api-auth splitwell_validator splitwell"
