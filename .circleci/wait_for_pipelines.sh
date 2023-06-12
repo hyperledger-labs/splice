@@ -43,10 +43,10 @@ wait_for_pipeline_to_complete() {
         sleep 5
         CURRENT_TIME=$(date +%s)
         DIFF=$((CURRENT_TIME - START_TIME))
-        # 120*60s, i.e., 120min
-        MAX=$((120 * 60))
+        # 240*60s, i.e., 240min
+        MAX=$((240 * 60))
         if [[ $DIFF -ge $MAX ]]; then
-            echo "Waited for 120min, continuing anyway"
+            echo "Waited for 240min, continuing anyway"
             break
         fi
     done
