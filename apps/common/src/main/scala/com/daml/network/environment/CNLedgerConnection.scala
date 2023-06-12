@@ -391,27 +391,8 @@ class CNLedgerConnection(
       _ <- retryProvider.ensureThat(
         s"Party $partyId is allocated",
         client.getParties(Seq(partyId)).map(_.nonEmpty),
-        for {
-          _ <- participantAdminConnection.authorizePartyToParticipantX(
-            partyId,
-            Seq.empty,
-            participantId,
-            participantId,
-          )
-          // It takes some time for the ledger API to see the party allocation so we wait here.
-          // Otherwise ensureThat is going to fail because the condition does not yet hold.
-          _ <- retryProvider.waitUntil(
-            s"party allocation of $partyId is observed on ledger API",
-            client.getParties(Seq(partyId)).map { parties =>
-              if (parties.isEmpty) {
-                throw Status.NOT_FOUND
-                  .withDescription(s"Party $partyId is not visible on ledger API")
-                  .asRuntimeException()
-              }
-            },
-            logger,
-          )
-        } yield (),
+        participantAdminConnection
+          .authorizePartyToParticipantX(partyId, Seq.empty, participantId, participantId),
         logger,
       )
     } yield partyId

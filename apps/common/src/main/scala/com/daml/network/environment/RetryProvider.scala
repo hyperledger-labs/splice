@@ -236,39 +236,35 @@ class RetryProvider(
       implicit val tc: TraceContext = tc0;
       logger.info(s"Ensuring that $conditionDesc")
       retryForAutomation(
-        s"Check that $conditionDesc, and establish it if not", {
-          logger.debug(s"Checking whether $conditionDesc")
-          check.flatMap(conditionHolds =>
-            conditionHolds match {
-              case Some(result) =>
-                logger.info(show"Condition holds, result is $result")
-                Future.successful(result)
-              case None =>
-                logger.debug(s"Attempting to establish that $conditionDesc")
-                establish.flatMap(_ => {
-                  logger.debug(s"Established that $conditionDesc, checking that it holds")
-                  check.flatMap(conditionNowHolds =>
-                    conditionNowHolds match {
-                      case Some(result) =>
-                        logger.info(show"Condition holds after establishing, result is ${result}")
-                        Future.successful(result)
-                      case None =>
-                        val msg =
-                          s"Post-condition violation: expected that $conditionDesc, but it does not"
-                        logger.error(msg)
-                        Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-                    }
-                  )
-                })
-            }
-          )
-        },
+        s"Check whether $conditionDesc",
+        check,
         logger,
         additionalCodes,
-      ).transform(
-        r => {
-          logger.info(s"Success: $conditionDesc")
-          r
+      ).flatMap {
+        case Some(result) => Future.successful(result)
+        case None =>
+          logger.debug(s"Attempting to establish that $conditionDesc")
+          establish.flatMap(_ => {
+            logger.debug(s"Established that $conditionDesc, waiting until it is observable")
+            retryForAutomation(
+              s"Wait until observing $conditionDesc",
+              check.flatMap {
+                case Some(result) => Future.successful(result)
+                case None =>
+                  Future.failed(
+                    Status.FAILED_PRECONDITION
+                      .withDescription(s"Condition $conditionDesc is not (yet) observable")
+                      .asRuntimeException()
+                  )
+              },
+              logger,
+              additionalCodes,
+            )
+          })
+      }.transform(
+        result => {
+          logger.info(show"Success: $conditionDesc, result is $result")
+          result
         },
         exception => {
           if (isClosing)
