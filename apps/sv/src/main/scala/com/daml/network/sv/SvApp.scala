@@ -9,7 +9,6 @@ import cats.syntax.either.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AuthConfig, HMACVerifier, RSAVerifier}
@@ -84,7 +83,7 @@ class SvApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CNNode[SvApp.State](
+) extends CNNodeBase[SvApp.State](
       config.ledgerApiUser,
       config.participantClient,
       coinAppParameters,
@@ -95,24 +94,7 @@ class SvApp(
   private val cometBftConfig = config.cometBftConfig
     .filter(_.enabled)
 
-  override def ensureUserPrimaryParty(connection: CNLedgerConnection) =
-    for {
-      svParty <- allocateUserPrimaryPartyIfNeeded(
-        connection,
-        Some(config.svPartyHint.getOrElse(config.onboarding.name)),
-      )
-      // We share the SV party between the validator user and the SV user. Therefore, we allocate the validator user here with the SV
-      // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
-      // That ensures the validator app won't try to allocate its own primary party because it waits first for the user to be created
-      // and then checks if it has a primary party already.
-      _ <- connection.createUserWithPrimaryParty(
-        config.validatorLedgerApiUser,
-        svParty,
-        Seq(User.Right.ParticipantAdmin.INSTANCE),
-      )
-    } yield ()
-
-  override def initialize(ledgerClient: CNLedgerClient, svPartyId: PartyId): Future[SvApp.State] = {
+  override def initializeNode(ledgerClient: CNLedgerClient): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
       timeouts,
@@ -147,7 +129,6 @@ class SvApp(
       participantAdminConnection,
       localDomainNode,
       ledgerClient,
-      svPartyId,
     )
       .recoverWith { case err =>
         // TODO(#3474) Replace this by a more general solution for closing resources on
@@ -162,7 +143,6 @@ class SvApp(
       participantAdminConnection: ParticipantAdminConnection,
       localDomainNode: Option[LocalDomainNode],
       ledgerClient: CNLedgerClient,
-      svParty: PartyId,
   ): Future[SvApp.State] = {
     for {
       // Setup basic connections and retrieve participant id
@@ -206,7 +186,6 @@ class SvApp(
             retryProvider,
             ledgerClient,
             participantAdminConnection,
-            svParty,
             participantId,
             clock,
             storage,
@@ -224,7 +203,6 @@ class SvApp(
             retryProvider,
             ledgerClient,
             participantAdminConnection,
-            svParty,
             participantId,
             clock,
             storage,
@@ -328,7 +306,7 @@ class SvApp(
                   adminHandler,
                   SvAuthExtractor(
                     verifier,
-                    svParty,
+                    svStore.key.svParty,
                     svAutomation.connection,
                     loggerFactory,
                     "canton network sv admin realm",
@@ -368,21 +346,6 @@ class SvApp(
   }
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
-
-  // The SV app uploads package but there is a bug in Canton around concurrent package uploads
-  // so we wait for the validator app to finish the upload first. See https://github.com/DACH-NY/canton/issues/12993
-  override lazy val requiredTemplates =
-    config.onboarding match {
-      // The validator app waits on the sv app so if we wait on the dar upload here, we create
-      // a circular dependency.
-      // The validator app waits on the svc party before uploading a DAR so there is no chance of the
-      // upload happening concurrently here.
-      case _: SvOnboardingConfig.FoundCollective => Set.empty
-      case _ =>
-        Set(cc.coin.Coin.TEMPLATE_ID) ++
-          (if (config.enableCoinRulesUpgrade) Set(ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID)
-           else Set.empty)
-    }
 
   private val darFilesToUploadDuringInit: Seq[UploadablePackage] =
     Seq(

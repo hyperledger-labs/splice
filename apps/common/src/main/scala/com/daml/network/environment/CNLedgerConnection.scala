@@ -11,6 +11,7 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
   ExercisedEvent,
+  Identifier,
   LedgerOffset,
   Transaction,
   TransactionTree,
@@ -44,6 +45,7 @@ import com.digitalasset.canton.participant.protocol.v0.multidomain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
+import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -357,6 +359,21 @@ class CNLedgerConnection(
   ): Future[PartyId] =
     client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive)
 
+  def ensureUserPrimaryPartyIsAllocated(userId: String, hint: String): Future[PartyId] =
+    retryProvider.ensureThatWithResult(
+      s"User $userId has primary party",
+      check = getOptionalPrimaryParty(userId),
+      establish = for {
+        party <- allocatePartyViaLedgerApi(
+          Some(hint),
+          Some(hint),
+        )
+        _ <- setUserPrimaryParty(userId, party)
+        _ <- grantUserRights(userId, actAsParties = Seq(party), readAsParties = Seq.empty)
+      } yield (),
+      logger,
+    )
+
   def getUser(user: String): Future[User] = client.getUser(user)
 
   private def createPartyAndUser(
@@ -458,6 +475,33 @@ class CNLedgerConnection(
 
   def listPackages(): Future[Set[String]] =
     client.listPackages().map(_.toSet)
+
+  def waitForPackages(
+      requiredTemplates: Set[Identifier]
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    import com.daml.network.util.PrettyInstances.*
+
+    if (requiredTemplates.isEmpty) {
+      logger.debug("Skipping waiting for required packages to be uploaded, as there are none.")
+      Future.unit
+    } else
+      retryProvider.waitUntil(
+        show"packages for $requiredTemplates are uploaded",
+        for {
+          actual <- (listPackages(): Future[Set[String]])
+        } yield {
+          val missing = requiredTemplates.filter(t => !actual.contains(t.getPackageId))
+          if (missing.isEmpty) {
+            ()
+          } else {
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(show"packages for $missing")
+            )
+          }
+        },
+        logger,
+      )
+  }
 
   private def uploadDarFileInternal(packageId: String, path: String, darFile: => ByteString)(
       implicit traceContext: TraceContext

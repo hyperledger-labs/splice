@@ -46,7 +46,6 @@ class FoundingNodeInitializer(
     retryProvider: RetryProvider,
     ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    svParty: PartyId,
     participantId: ParticipantId,
     clock: Clock,
     storage: Storage,
@@ -72,9 +71,11 @@ class FoundingNodeInitializer(
         SvcRulesLock,
     )
   ] = {
+    val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     for {
       // TODO(#3856): find a better way to get the SVC party ID
       svcParty <- retryProvider.getValueWithRetries("SVC party ID", getSvcPartyId, logger)
+      svParty <- SetupUtil.setupSvParty(initConnection, config)
 
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)

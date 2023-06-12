@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
@@ -43,7 +44,6 @@ class JoiningNodeInitializer(
     retryProvider: RetryProvider,
     ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    svParty: PartyId,
     participantId: ParticipantId,
     clock: Clock,
     storage: Storage,
@@ -70,9 +70,11 @@ class JoiningNodeInitializer(
         SvcRulesLock,
     )
   ] = {
+    val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     for {
       // TODO(#3856): find a better way to get the SVC party ID
       svcPartyId <- retryProvider.getValueWithRetries("SVC party ID", getSvcPartyId, logger)
+      svParty <- SetupUtil.setupSvParty(initConnection, config)
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -121,7 +123,7 @@ class JoiningNodeInitializer(
               "Starting onboarding with SVC party migration."
           )
           new WithSvStore(svAutomation, svcPartyHosting, globalDomain)
-            .startOnboardingWithSvcPartyMigration()
+            .startOnboardingWithSvcPartyMigration(initConnection)
         }
       _ <- waitForSvcMembership(svcStore)
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
@@ -256,12 +258,22 @@ class JoiningNodeInitializer(
       }
     }
 
-    def startOnboardingWithSvcPartyMigration(): Future[(SvSvcStore, SvSvcAutomationService)] = {
+    def startOnboardingWithSvcPartyMigration(
+        initConnection: CNLedgerConnection
+    ): Future[(SvSvcStore, SvSvcAutomationService)] = {
       config.onboarding match {
         case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
               for {
+                // TODO(#5141) Wait for the validator app to upload its packages because Canton doesn't
+                // handle concurrent package uploads/vetting.
+                _ <- initConnection.waitForPackages(
+                  Set(cc.coin.Coin.TEMPLATE_ID) ++
+                    (if (config.enableCoinRulesUpgrade)
+                       Set(ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID)
+                     else Set.empty)
+                )
                 _ <- svStoreWithIngestion.connection.uploadDarFiles(requiredDars)
                 _ <- waitForValidatorLicense()
                 _ <- requestOnboarding(

@@ -1,42 +1,20 @@
 package com.daml.network.environment
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.{ConnectionContext, Http}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
-import akka.http.scaladsl.server.Directive0
-import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.network.admin.api.HttpRequestLogger
-import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
-import com.daml.network.store.DomainStore
-import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.digitalasset.canton.DomainAlias
+import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  SyncCloseable,
-}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.time.HasUptime
-import com.digitalasset.canton.topology.{DomainId, PartyId, UniqueIdentifier}
-import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
-import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{Status, StatusRuntimeException}
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
+import com.digitalasset.canton.tracing.TracerProvider
+import io.grpc.Status
 
-import java.util.concurrent.atomic.AtomicReference
-import javax.net.ssl.SSLContext
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
-import scala.util.control.NonFatal
 
-/** A running instance of a canton node */
+/** Subclass of CNNodeBase that provides default initialization for most apps */
 abstract class CNNode[State <: AutoCloseable & HasHealth](
     serviceUser: String,
     participantClient: CNParticipantClientConfig,
@@ -47,127 +25,20 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
-) extends CantonNode
-    with FlagCloseableAsync
-    with NamedLogging
-    with HasUptime
-    with NoTracing {
+) extends CNNodeBase[State](
+      serviceUser,
+      participantClient,
+      parameters,
+      loggerFactory,
+      tracerProvider,
+    ) {
   val name: InstanceName
-
-  protected val retryProvider: RetryProvider =
-    RetryProvider(loggerFactory, parameters.processingTimeouts)
-
-  override val timeouts = parameters.processingTimeouts
-
-  private val isInitializedVar: AtomicReference[Boolean] = new AtomicReference(false)
-
-  protected def isInitialized = isInitializedVar.get()
-
-  protected val packages = Seq("dar/canton-coin-0.1.0.dar")
-
-  lazy private val packageSignatures = {
-    ResourceTemplateDecoder.loadPackageSignaturesFromResources(packages)
-  }
-
-  lazy protected implicit val templateDecoder: TemplateJsonDecoder =
-    new ResourceTemplateDecoder(packageSignatures, loggerFactory)
-
-  private val httpExt = Http()(ac)
-
-  protected implicit val httpClient: HttpRequest => Future[HttpResponse] = (request: HttpRequest) =>
-    {
-      import parameters.loggingConfig.api.*
-      val logPayload = messagePayloads.getOrElse(false)
-      val pathLimited = request.uri.path.toString
-        .limit(maxMethodLength)
-      def msg(message: String): String =
-        s"HTTP client (${request.method.name} ${pathLimited}): ${message}"
-
-      if (logPayload) {
-        request.entity match {
-          // Only logging strict messages which are already in memory, not attempting to log streams
-          case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-            logger.debug(
-              msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
-            )
-          case _ => logger.debug(msg(s"omitting logging of request entity data."))
-        }
-      }
-      logger.trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
-      val host = request.uri.authority.host.address()
-      val port = request.uri.effectivePort
-      logger.trace(
-        s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
-      )
-      val connectionContext = request.uri.scheme match {
-        case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
-        case _ => ConnectionContext.noEncryption()
-      }
-      val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] =
-        Http()
-          .outgoingConnectionUsingContext(host, port, connectionContext)
-
-      // A new stream is materialized, creating a new connection for every request. The connection is closed on stream completion (success or failure)
-      // There is overhead in doing this, but it is the simplest way to implement a request-timeout.
-      def dispatchRequest(request: HttpRequest): Future[HttpResponse] =
-        Source
-          .single(request)
-          .via(connectionFlow)
-          .completionTimeout(parameters.requestTimeout.asFiniteApproximation)
-          .runWith(Sink.head)
-          .recoverWith { case NonFatal(e) =>
-            logger.debug(msg("HTTP request failed"), e)(traceContext)
-            Future.failed(e)
-          }
-      val start = System.currentTimeMillis()
-      dispatchRequest(request).map { response =>
-        val end = System.currentTimeMillis()
-        logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))
-        logger.debug(msg(s"Received response with status code: ${response.status}"))
-        if (logPayload) {
-          response.entity match {
-            // Only logging strict messages which are already in memory, not attempting to log streams
-            case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
-              logger.debug(
-                msg(
-                  s"Received response with entity data: ${data.utf8String.limit(maxStringLength)}"
-                )
-              )
-            case _ => logger.debug(msg(s"omitting logging of response entity data."))
-          }
-        }
-        logger.trace(
-          msg(s"Response contains headers: ${response.headers.toString.limit(maxMetadataSize)}")
-        )
-        response
-      }
-    }
-  def requestLogger(implicit traceContext: TraceContext): Directive0 =
-    HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
-
-  def isActive: Boolean = {
-    // initialized and the state reports itself as healthy
-    isInitialized && initializeF.value.exists(_.toOption.exists(_.isHealthy))
-  }
-
-  protected def ports: Map[String, Port]
 
   /** Templates whose packages must be available before init will run.
     * It it save to omit a template if there is another template in the same
     * package in the set.
     */
   protected def requiredTemplates: Set[Identifier] = Set.empty
-
-  protected def waitForDomainConnection(
-      store: DomainStore,
-      domain: DomainAlias,
-  ): Future[DomainId] = {
-    logger.info(show"Waiting for domain $domain to be connected")
-    store.signalWhenConnected(domain).map { r =>
-      logger.info(show"Connection to domain $domain has been established")
-      r
-    }
-  }
 
   // TODO(#736): fork or generalize status definition.
   override def status: Future[NodeStatus.Status] = {
@@ -183,108 +54,19 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     Future.successful(status)
   }
 
+  protected def ensureUserPrimaryParty(connection: CNLedgerConnection): Future[Unit]
+
   def initialize(
       ledgerClient: CNLedgerClient,
       party: PartyId,
   ): Future[State]
 
-  private def waitForPackages(connection: CNLedgerConnection): Future[Unit] = {
-    import com.daml.network.util.PrettyInstances.*
-
-    if (requiredTemplates.isEmpty) {
-      logger.debug("Skipping waiting for required packages to be uploaded, as there are none.")
-      Future.unit
-    } else
-      retryProvider.waitUntil(
-        show"packages for $requiredTemplates are uploaded",
-        for {
-          actual <- (connection.listPackages(): Future[Set[String]])
-        } yield {
-          val missing = requiredTemplates.filter(t => !actual.contains(t.getPackageId))
-          if (missing.isEmpty) {
-            ()
-          } else {
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(show"packages for $missing")
-            )
-          }
-        },
-        logger,
-      )
-  }
-
-  private def createLedgerClient(): Future[CNLedgerClient] = for {
-    _ <- Future.successful(())
-    _ = logger.info("Creating ledger API auth token source")
-    authTokenSource = AuthTokenSource.fromConfig(
-      participantClient.ledgerApi.authConfig,
-      loggerFactory,
-    )
-    token <- retryProvider.retryForAutomation(
-      "Acquiring initial auth token",
-      authTokenSource.getToken,
-      logger,
-    )
-  } yield {
-    logger.debug(s"Using token $token for this ledger client")
-    new CNLedgerClient(
-      participantClient.ledgerApi.clientConfig,
-      // Note: When ledger API auth is enabled, application ID must be equal to user ID
-      serviceUser,
-      // TODO(#1596): Make sure the client correctly refreshes tokens.
-      //  E.g., by adding something like [[com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenManager]] to
-      //  automatically re-fetch tokens shortly before they expire and then a [[io.grpc.ClientInterceptor]] to add the current token
-      //  to all requests.
-      token,
-      timeouts,
-      parameters.loggingConfig.api,
-      loggerFactory,
-      tracerProvider,
-      retryProvider,
-    )
-  }
-
-  protected def allocateUserPrimaryPartyIfNeeded(
-      connection: CNLedgerConnection,
-      partyHint: Option[String] = None,
-  ): Future[PartyId] = {
-    val hint = partyHint.getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(serviceUser))
-    for {
-      _ <- retryProvider.ensureThat(
-        s"User $serviceUser has primary party",
-        check = connection.getOptionalPrimaryParty(serviceUser).map(_.isDefined),
-        establish = for {
-          party <- connection.allocatePartyViaLedgerApi(
-            Some(hint),
-            Some(hint),
-          )
-          _ <- connection.setUserPrimaryParty(serviceUser, party)
-          _ <- connection
-            .grantUserRights(serviceUser, actAsParties = Seq(party), readAsParties = Seq.empty)
-        } yield (),
-        logger,
-      )
-      party <- connection.getPrimaryParty(serviceUser)
-    } yield party
-  }
-
-  private def waitForUser(connection: CNLedgerConnection): Future[Unit] =
-    retryProvider.getValueWithRetries(
-      s"user $serviceUser",
-      connection.getUser(serviceUser).map(_ => ()),
-      logger,
-      additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
-    )
-
-  protected def ensureUserPrimaryParty(connection: CNLedgerConnection): Future[Unit]
-
-  private def initializeNode(
+  override protected def initializeNode(
       ledgerClient: CNLedgerClient
-  ) = for {
+  ): Future[State] = for {
     _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
     initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-    _ <- waitForUser(initConnection)
     _ <- ensureUserPrimaryParty(initConnection)
     serviceParty <-
       retryProvider.getValueWithRetries[PartyId](
@@ -298,65 +80,8 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
         additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
-    _ <- waitForPackages(initConnection)
+    _ <- initConnection.waitForPackages(requiredTemplates)
     _ = logger.info(s"Packages available, running app-specific init")
     state <- initialize(ledgerClient, serviceParty)
   } yield state
-
-  logger.info(s"Starting initialization")
-  private val ledgerClientF = createLedgerClient()
-  private val initializeF = ledgerClientF.flatMap { client =>
-    initializeNode(client)
-  }
-
-  initializeF.foreach { _ =>
-    logger.info(s"Initialization complete, running on version ${BuildInfo.compiledVersion}")
-    isInitializedVar.set(true)
-  }
-
-  // TODO(tech-debt): Handle cleanup in case some initialization failed mid-way.
-  // For example, if we fail to get the service party we won't close the ledger client.
-  // Note that we have a similar issue in app-initialization, so this should be handled
-  // in a generic way
-  val initUnlessClosing = initializeF.andThen {
-    case Failure(err) if this.isClosing =>
-      logger.info(
-        s"Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
-      )
-    case Failure(err) =>
-      val msg = s"Initialization of $name failed"
-      logger.error(msg, err)
-      System.err.println(s"$msg, so exiting; check the application logs for details")
-      sys.exit(1)
-  }
-
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-    logger.info(s"Stopping $name node")
-    Seq(
-      // Close first to trigger the node-wide shutdown signal before shutting down actual services
-      SyncCloseable(
-        s"$name retry provider",
-        retryProvider.close(),
-      ),
-      AsyncCloseable(
-        s"$name App state",
-        initUnlessClosing.transform {
-          case Failure(_) if this.isClosing => Success(())
-          case Failure(e) => Failure(e)
-          case Success(node) => Success(node.close())
-        },
-        closingTimeout,
-      ),
-      AsyncCloseable(
-        s"$name Ledger API connection",
-        ledgerClientF.map(_.close()),
-        closingTimeout,
-      ),
-      AsyncCloseable(
-        "http pool",
-        httpExt.shutdownAllConnectionPools(),
-        closingTimeout,
-      ),
-    )
-  }
 }

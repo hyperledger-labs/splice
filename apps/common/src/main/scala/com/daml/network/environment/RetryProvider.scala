@@ -213,44 +213,72 @@ class RetryProvider(
       establish: => Future[Unit],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext) = TraceContext.withNewTraceContext(tc0 => {
-    implicit val tc: TraceContext = tc0;
-    logger.info(s"Ensuring that $conditionDesc")
-    retryForAutomation(
-      s"Check that $conditionDesc, and establish it if not", {
-        logger.debug(s"Checking whether $conditionDesc")
-        check.flatMap(conditionHolds =>
-          if (conditionHolds) Future.unit
-          else {
-            logger.debug(s"Attempting to establish that $conditionDesc")
-            establish.flatMap(_ => {
-              logger.debug(s"Established that $conditionDesc, checking that it holds")
-              check.flatMap(conditionNowHolds =>
-                if (conditionNowHolds) Future.unit
-                else {
-                  val msg =
-                    s"Post-condition violation: expected that $conditionDesc, but it does not"
-                  logger.error(msg)
-                  Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-                }
-              )
-            })
-          }
-        )
-      },
+  )(implicit ec: ExecutionContext): Future[Unit] =
+    ensureThatWithResult(
+      conditionDesc,
+      check.map(Option.when(_)(())),
+      establish,
       logger,
       additionalCodes,
-    ).transform(
-      _ => logger.info(s"Success: $conditionDesc"),
-      exception => {
-        if (isClosing)
-          logger.info(s"Gave up ensuring $conditionDesc, as we are shutting down")
-        else
-          logger.error(s"Gave up ensuring $conditionDesc", exception)
-        exception
-      },
     )
-  })
+
+  /** Variant of ensureThat that allows the condition to
+    * return a result if it is successful.
+    */
+  def ensureThatWithResult[T](
+      conditionDesc: String,
+      check: => Future[Option[T]],
+      establish: => Future[Unit],
+      logger: TracedLogger,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit ec: ExecutionContext, pp: Pretty[T]): Future[T] =
+    TraceContext.withNewTraceContext(tc0 => {
+      implicit val tc: TraceContext = tc0;
+      logger.info(s"Ensuring that $conditionDesc")
+      retryForAutomation(
+        s"Check that $conditionDesc, and establish it if not", {
+          logger.debug(s"Checking whether $conditionDesc")
+          check.flatMap(conditionHolds =>
+            conditionHolds match {
+              case Some(result) =>
+                logger.info(show"Condition holds, result is $result")
+                Future.successful(result)
+              case None =>
+                logger.debug(s"Attempting to establish that $conditionDesc")
+                establish.flatMap(_ => {
+                  logger.debug(s"Established that $conditionDesc, checking that it holds")
+                  check.flatMap(conditionNowHolds =>
+                    conditionNowHolds match {
+                      case Some(result) =>
+                        logger.info(show"Condition holds after establishing, result is ${result}")
+                        Future.successful(result)
+                      case None =>
+                        val msg =
+                          s"Post-condition violation: expected that $conditionDesc, but it does not"
+                        logger.error(msg)
+                        Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
+                    }
+                  )
+                })
+            }
+          )
+        },
+        logger,
+        additionalCodes,
+      ).transform(
+        r => {
+          logger.info(s"Success: $conditionDesc")
+          r
+        },
+        exception => {
+          if (isClosing)
+            logger.info(s"Gave up ensuring $conditionDesc, as we are shutting down")
+          else
+            logger.error(s"Gave up ensuring $conditionDesc", exception)
+          exception
+        },
+      )
+    })
 
   import RetryProvider.{AutomationRetryConfig, RetryConfig}
 

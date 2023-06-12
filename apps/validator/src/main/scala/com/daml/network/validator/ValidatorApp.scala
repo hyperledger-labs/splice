@@ -80,10 +80,13 @@ class ValidatorApp(
   // primary party set to the SV app already so this is a noop.
   // For regular validators, this allocates a new user.
   override def ensureUserPrimaryParty(connection: CNLedgerConnection) =
-    allocateUserPrimaryPartyIfNeeded(
-      connection,
-      config.validatorPartyHint,
-    ).map(_ => ())
+    connection
+      .ensureUserPrimaryPartyIsAllocated(
+        config.ledgerApiUser,
+        config.validatorPartyHint
+          .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
+      )
+      .map(_ => ())
 
   private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
