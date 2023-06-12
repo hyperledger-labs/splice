@@ -1,7 +1,10 @@
 package com.daml.network.integration.tests
 
 import better.files.File
-import com.daml.network.config.CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth
+import com.daml.network.config.CNNodeConfigTransforms.{
+  disableDistributedDomain,
+  useSelfSignedTokensForLedgerApiAuth,
+}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -24,7 +27,10 @@ class XNodeBootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunn
         this.getClass.getSimpleName,
       )
       .clearConfigTransforms()
-      .addConfigTransform((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
+      .addConfigTransforms(
+        (_, config) => disableDistributedDomain(config),
+        (_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config),
+      )
 
   "Bootstrap script should pass" in { implicit env =>
     // the script logs errors when a CNS name check fails but then recovers from this

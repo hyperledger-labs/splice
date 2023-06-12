@@ -48,6 +48,14 @@ final class LocalDomainNode(
 ) extends FlagCloseable
     with NamedLogging {
 
+  val sequencerConnection =
+    new GrpcSequencerConnection(
+      LocalDomainNode.toEndpoints(sequencerPublicConfig),
+      transportSecurity = sequencerPublicConfig.tls.isDefined,
+      customTrustCertificates = None,
+      SequencerAlias.Default,
+    )
+
   private def containsIdentityTransactions(
       uid: UniqueIdentifier,
       txs: Seq[GenericSignedTopologyTransactionX],
@@ -188,12 +196,7 @@ final class LocalDomainNode(
             mediatorAdminConnection.initialize(
               domainId,
               staticDomainParameters,
-              new GrpcSequencerConnection(
-                LocalDomainNode.toEndpoints(sequencerPublicConfig),
-                transportSecurity = sequencerPublicConfig.tls.isDefined,
-                customTrustCertificates = None,
-                SequencerAlias.Default,
-              ),
+              sequencerConnection,
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")
@@ -279,7 +282,7 @@ final class LocalDomainNode(
             sequencerAdminConnection.initialize(
               snapshot.topologySnapshot,
               staticDomainParameters,
-              snapshot.sequencerSnapshot,
+              Some(snapshot.sequencerSnapshot),
             )
           case NodeStatus.Success(_) =>
             logger.info("Mediator is already initialized")

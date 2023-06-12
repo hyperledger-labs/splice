@@ -1766,7 +1766,7 @@ workflows:
           - slack-context
         name: "scala_test x nodes distributed domain wall clock time"
         test_names_file: "test-full-class-names-xnode-distributed-domain.log"
-        start_canton_options: "-d -p external -x -w"
+        start_canton_options: "-d -p external -x -w -b"
         resource_class: "2xlarge"
         parallelism: 1
     - bundle:

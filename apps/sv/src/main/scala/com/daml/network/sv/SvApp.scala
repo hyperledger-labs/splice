@@ -126,9 +126,9 @@ class SvApp(
         )
       )
     initialize(
+      ledgerClient,
       participantAdminConnection,
       localDomainNode,
-      ledgerClient,
     )
       .recoverWith { case err =>
         // TODO(#3474) Replace this by a more general solution for closing resources on
@@ -140,14 +140,11 @@ class SvApp(
   }
 
   private def initialize(
+      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
       localDomainNode: Option[LocalDomainNode],
-      ledgerClient: CNLedgerClient,
   ): Future[SvApp.State] = {
     for {
-      // Setup basic connections and retrieve participant id
-      // ----------------------------------------------------
-
       // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
       // reconnect all domains at the beginning of SV initialization just in case.
       _ <- participantAdminConnection.reconnectAllDomains()
@@ -191,6 +188,7 @@ class SvApp(
             storage,
             futureSupervisor,
             coinAppParameters,
+            localDomainNode,
           )
           initializer.bootstrapCollective()
         case joiningConfig: SvOnboardingConfig.JoinWithKey =>

@@ -55,13 +55,13 @@ class SequencerAdminConnection(
   def initialize(
       topologySnapshot: GenericStoredTopologyTransactionsX,
       domainParameters: StaticDomainParameters,
-      sequencerSnapshot: SequencerSnapshot,
+      sequencerSnapshot: Option[SequencerSnapshot],
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponseX] =
     runCmd(
       EnterpriseSequencerAdminCommands.InitializeX(
         topologySnapshot,
         domainParameters,
-        Some(sequencerSnapshot),
+        sequencerSnapshot,
       )
     )
 }

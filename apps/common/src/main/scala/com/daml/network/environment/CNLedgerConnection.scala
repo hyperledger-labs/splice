@@ -12,7 +12,7 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
   ExercisedEvent,
-  Identifier,
+  Identifier as LapiIdentifier,
   LedgerOffset,
   Transaction,
   TransactionTree,
@@ -43,7 +43,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.participant.protocol.v0.multidomain
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -375,6 +375,47 @@ class CNLedgerConnection(
       logger,
     )
 
+  def ensurePartyAllocated(
+      hint: String,
+      namespace: Namespace,
+      participantAdminConnection: ParticipantAdminConnection,
+  )(implicit traceContext: TraceContext) =
+    for {
+      participantId <- participantAdminConnection.getParticipantId(true)
+      partyId = PartyId(
+        UniqueIdentifier(
+          Identifier.tryCreate(hint),
+          namespace,
+        )
+      )
+      _ <- retryProvider.ensureThat(
+        s"Party $partyId is allocated",
+        client.getParties(Seq(partyId)).map(_.nonEmpty),
+        for {
+          _ <- participantAdminConnection.authorizePartyToParticipantX(
+            partyId,
+            Seq.empty,
+            participantId,
+            participantId,
+          )
+          // It takes some time for the ledger API to see the party allocation so we wait here.
+          // Otherwise ensureThat is going to fail because the condition does not yet hold.
+          _ <- retryProvider.waitUntil(
+            s"party allocation of $partyId is observed on ledger API",
+            client.getParties(Seq(partyId)).map { parties =>
+              if (parties.isEmpty) {
+                throw Status.NOT_FOUND
+                  .withDescription(s"Party $partyId is not visible on ledger API")
+                  .asRuntimeException()
+              }
+            },
+            logger,
+          )
+        } yield (),
+        logger,
+      )
+    } yield partyId
+
   def getUser(user: String): Future[User] = client.getUser(user)
 
   private def createPartyAndUser(
@@ -528,7 +569,7 @@ class CNLedgerConnection(
     client.listPackages().map(_.toSet)
 
   def waitForPackages(
-      requiredTemplates: Set[Identifier]
+      requiredTemplates: Set[LapiIdentifier]
   )(implicit traceContext: TraceContext): Future[Unit] = {
     import com.daml.network.util.PrettyInstances.*
 

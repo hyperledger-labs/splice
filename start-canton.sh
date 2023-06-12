@@ -11,6 +11,7 @@ function usage() {
   echo "  -s               only start canton instance with simulated time"
   echo "  -m               start canton with a minimal topology for frontend testing"
   echo "  -x               use experimental canton x instances instead of the default nodes"
+  echo "  -b               start canton to test BFT domain operations. In that case, the participants are not automatically connected to the domain"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
 
@@ -21,9 +22,10 @@ simtime=1
 x=0
 POSTGRES_MODE=docker
 CANTON=canton
+bft=0
 bootstrapScriptPath=bootstrap-canton.sc
 
-while getopts "hdap:c:wsmxy" arg; do
+while getopts "hdap:c:wsmxb" arg; do
   case ${arg} in
     h)
       usage
@@ -54,6 +56,10 @@ while getopts "hdap:c:wsmxy" arg; do
     c)
       CANTON="${OPTARG}"
       echo "using custom canton binary: $CANTON"
+      ;;
+    b)
+      bft=1
+      echo "start canton to test bft domain, not connecting participants to global domain"
       ;;
     ?)
       usage
@@ -188,7 +194,7 @@ if [ $wallclocktime -eq 1 ]; then
   else
     # For now we reuse canton.tokens here which makes it not possible to run the wallclock canton and X node canton at the same time.
     tmux_cmd canton-x \
-      "CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+      "CANTON_TOKEN_FILENAME=canton.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
         -c ./apps/app/src/test/resources/simple-topology-canton-x.conf \
         --log-level-canton=DEBUG \
         --log-encoder json \
@@ -209,7 +215,7 @@ if [ $simtime -eq 1 ]; then
   else
     # For now we reuse canton-simtime.tokens here which makes it not possible to run the simtime canton and X node canton at the same time.
     tmux_cmd canton-x-simtime \
-      "CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+      "CANTON_TOKEN_FILENAME=canton-simtime.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
         -c ./apps/app/src/test/resources/simple-topology-canton-x-simtime.conf \
         --log-level-canton=DEBUG \
         --log-encoder json \

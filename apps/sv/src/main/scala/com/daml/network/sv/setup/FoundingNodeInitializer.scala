@@ -2,6 +2,8 @@ package com.daml.network.sv.setup
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
+import cats.syntax.functorFilter.*
+import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn
 import com.daml.network.config.SharedCNNodeAppParameters
@@ -9,6 +11,7 @@ import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, DomainStore}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
@@ -20,10 +23,16 @@ import com.daml.network.util.CNNodeUtil.{
   defaultEnabledChoices,
 }
 import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{
   DomainId,
@@ -32,8 +41,15 @@ import com.digitalasset.canton.topology.{
   PartyId,
   UniqueIdentifier,
 }
+import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransactionX,
+  StoredTopologyTransactionsX,
+}
+import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, UnionspaceDefinitionX}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
@@ -56,6 +72,7 @@ class FoundingNodeInitializer(
     storage: Storage,
     futureSupervisor: FutureSupervisor,
     coinAppParameters: SharedCNNodeAppParameters,
+    localDomainNode: Option[LocalDomainNode],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
@@ -78,14 +95,39 @@ class FoundingNodeInitializer(
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     for {
-      _ <- Future.unit
-      // TODO(#5488) Actually allocate the SVC party id here.
-      svcParty = PartyId(
-        UniqueIdentifier(
-          Identifier.tryCreate(foundingConfig.svcPartyHint),
-          participantId.uid.namespace,
-        )
-      )
+      svcParty <- localDomainNode match {
+        case None =>
+// TODO(#5488) Actually allocate the SVC party id here.
+          Future.successful(
+            PartyId(
+              UniqueIdentifier(
+                Identifier.tryCreate(foundingConfig.svcPartyHint),
+                participantId.uid.namespace,
+              )
+            )
+          )
+        case Some(domainNode) =>
+          for {
+            namespace <- bootstrapDomain(domainNode)
+            svc <- initConnection.ensurePartyAllocated(
+              foundingConfig.svcPartyHint,
+              namespace,
+              participantAdminConnection,
+            )
+            // this is idempotent
+            _ <- initConnection.grantUserRights(
+              config.ledgerApiUser,
+              Seq(svc),
+              Seq.empty,
+            )
+            // this is idempotent
+            _ <- initConnection.createUserWithPrimaryParty(
+              foundingConfig.svcLedgerApiUser,
+              svc,
+              Seq.empty,
+            )
+          } yield svc
+      }
       svParty <- SetupUtil.setupSvParty(initConnection, config)
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
@@ -146,6 +188,114 @@ class FoundingNodeInitializer(
       svcAutomation,
       svcRulesLock,
     )
+  }
+
+  private def bootstrapDomain(domainNode: LocalDomainNode) = {
+    logger.info("Bootstrapping the domain as the founding node")
+    for {
+      participantId <- participantAdminConnection.getParticipantId(true)
+      mediatorId <- domainNode.mediatorAdminConnection.getMediatorId
+      sequencerId <- domainNode.sequencerAdminConnection.getSequencerId
+      namespace = UnionspaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
+      domainId <- retryProvider.ensureThatWithResult(
+        "sequencer is initialized",
+        domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
+        for {
+          identityTransactions <- List(
+            participantAdminConnection,
+            domainNode.mediatorAdminConnection,
+            domainNode.sequencerAdminConnection,
+          ).traverse { con =>
+            con.getId(true).flatMap(con.getIdentityTransactions(_, domainId = None))
+          }.map(_.flatten)
+          // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
+          // been proposed.
+          unionspace <- participantAdminConnection.proposeUnionspace(
+            namespace,
+            NonEmpty.mk(Set, participantId.uid.namespace),
+            threshold = PositiveInt.one,
+            signedBy = Some(participantId.uid.namespace.fingerprint),
+          )
+          domainId = DomainId(
+            UniqueIdentifier(
+              Identifier.tryCreate("global-domain"),
+              namespace,
+            )
+          )
+          domainParametersState <- participantAdminConnection.proposeDomainParameters(
+            domainId,
+            DynamicDomainParameters.initialXValues(clock, ProtocolVersion.dev),
+            signedBy = Some(participantId.uid.namespace.fingerprint),
+          )
+          sequencerState <- TopologyAdminConnection.proposeCollectively(
+            NonEmpty.mk(List, participantAdminConnection, domainNode.sequencerAdminConnection)
+          ) { case (con, id) =>
+            con.proposeSequencers(
+              domainId,
+              threshold = PositiveInt.one,
+              active = Seq(sequencerId),
+              passive = Seq.empty,
+              signedBy = Some(id.namespace.fingerprint),
+            )
+          }
+          mediatorState <- TopologyAdminConnection.proposeCollectively(
+            NonEmpty.mk(List, participantAdminConnection, domainNode.mediatorAdminConnection)
+          ) { case (con, id) =>
+            con.proposeMediators(
+              domainId,
+              group = NonNegativeInt.zero,
+              threshold = PositiveInt.one,
+              active = Seq(mediatorId),
+              passive = Seq.empty,
+              signedBy = Some(id.namespace.fingerprint),
+            )
+          }
+          bootstrapTransactions =
+            (Seq(
+              unionspace,
+              domainParametersState,
+              sequencerState,
+              mediatorState,
+            ) ++ identityTransactions)
+              .mapFilter(_.selectOp[TopologyChangeOpX.Replace])
+              .map(signed =>
+                StoredTopologyTransactionX(
+                  SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
+                  EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
+                  None,
+                  signed,
+                )
+              )
+          _ <- domainNode.sequencerAdminConnection.initialize(
+            StoredTopologyTransactionsX(bootstrapTransactions),
+            domainNode.staticDomainParameters,
+            None,
+          )
+        } yield (),
+        logger,
+      )
+      _ <- retryProvider.ensureThat(
+        "mediator is initialized",
+        domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
+        domainNode.mediatorAdminConnection.initialize(
+          domainId,
+          domainNode.staticDomainParameters,
+          domainNode.sequencerConnection,
+        ),
+        logger,
+      )
+      // This is idempotent.
+      _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
+      _ <- participantAdminConnection.registerDomain(
+        DomainConnectionConfig(
+          config.domains.global.alias,
+          sequencerConnections = SequencerConnections.default(domainNode.sequencerConnection),
+          manualConnect = false,
+          domainId = Some(domainId),
+        )
+      )
+      _ = logger.info("Participant connected to domain")
+    } yield namespace
   }
 
   /** A private class to share the svcStoreWithIngestion and the global domain-id

@@ -24,12 +24,43 @@ class XNodeDistributedDomainIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyXDistributedDomain(this.getClass.getSimpleName)
+      .withPreSetup(preSetup =
+        implicit env =>
+          // TODO(#5488) Switch to default init once it no longer allocates the SVC party
+          Seq(sv1, sv2, sv3, sv4).foreach { sv =>
+            sv.participantClientWithAdminToken.ledger_api.users.create(
+              id = sv.config.ledgerApiUser,
+              actAs = Set.empty,
+              readAs = Set.empty,
+              primaryParty = None,
+              participantAdmin = true,
+            )
+          }
+      )
+      .withAllocatedValidatorUsers()
       .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")
 
+  // TODO(#5586) Remove custom init logic once apps can initialize without domain already being connected.
+  def initSvcDistributedDomain()(implicit env: CNNodeTestConsoleEnvironment) = {
+    startAllSync(sv1, sv1Scan, sv1Validator, svc)
+    val domainConfig = sv1.participantClient.domains.config(sv1.config.domains.global.alias).value
+    Seq(sv2, sv3, sv4).foreach(_.participantClient.domains.connect(domainConfig))
+    startAllSync(
+      sv2,
+      sv2Scan,
+      sv2Validator,
+      sv3,
+      sv3Validator,
+      sv4,
+      sv4Validator,
+    )
+    domainConfig
+  }
+
   "SV onboarding on X nodes" in { implicit env =>
-    initSvc()
+    val globalDomainConfig = initSvcDistributedDomain()
     clue("Sequencers are initialized") {
       sv1.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
       sv2.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
@@ -87,6 +118,7 @@ class XNodeDistributedDomainIntegrationTest
       sv4.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
     }
 
+    aliceValidator.participantClient.domains.connect(globalDomainConfig)
     aliceValidator.startSync()
 
     // Check that things work for external validators
@@ -115,6 +147,6 @@ class XNodeDistributedDomainIntegrationTest
   }
 
   "SVs can be onboarded a second time" in { implicit env =>
-    initSvc()
+    initSvcDistributedDomain()
   }
 }

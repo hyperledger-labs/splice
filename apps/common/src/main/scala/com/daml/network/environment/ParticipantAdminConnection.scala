@@ -54,6 +54,11 @@ class ParticipantAdminConnection(
     )
   } yield ()
 
+  def registerDomain(config: DomainConnectionConfig)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    runCmd(ParticipantAdminCommands.DomainConnectivity.RegisterDomain(config))
+
   def downloadAcsSnapshot(
       parties: Set[PartyId],
       filterDomainId: String = "",

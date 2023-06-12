@@ -37,11 +37,13 @@ sealed trait SvOnboardingConfig {
 object SvOnboardingConfig {
   case class FoundCollective(
       name: String,
+      // TODO(#5537) Remove this once the SVC app no longer has its own user.
+      svcLedgerApiUser: String = "svc_shared_service_user",
+      svcPartyHint: String = "svc",
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       // TODO(#2168): test edge cases.
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,
-      svcPartyHint: String = "svc",
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

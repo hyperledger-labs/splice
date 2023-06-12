@@ -1,5 +1,8 @@
 package com.daml.network.environment
 
+import cats.syntax.traverse.*
+import com.daml.nonempty.NonEmpty
+import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.admin.api.client.commands.{
   TopologyAdminCommands,
   TopologyAdminCommandsX,
@@ -12,9 +15,11 @@ import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.topology.{
   DomainId,
   MediatorId,
+  Namespace,
   ParticipantId,
   PartyId,
   SequencerId,
@@ -24,6 +29,7 @@ import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseQueryX}
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQuery, TimeQueryX}
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.transaction.{
+  DomainParametersStateX,
   HostingParticipant,
   MediatorDomainStateX,
   ParticipantPermission,
@@ -33,6 +39,8 @@ import com.digitalasset.canton.topology.transaction.{
   SequencerDomainStateX,
   TopologyChangeOp,
   TopologyChangeOpX,
+  TopologyMappingX,
+  UnionspaceDefinitionX,
 }
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   NamespaceDelegationX,
@@ -43,7 +51,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.G
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 /** Connection to nodes that expose topology information (sequencer, mediator, participant)
   */
@@ -310,4 +318,61 @@ class TopologyAdminConnection(
         None,
       )
     )
+
+  def proposeUnionspace(
+      namespace: Namespace,
+      owners: NonEmpty[Set[Namespace]],
+      threshold: PositiveInt,
+      signedBy: Option[Fingerprint],
+  )(implicit
+      traceContext: TraceContext
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, UnionspaceDefinitionX]] =
+    runCmd(
+      TopologyAdminCommandsX.Write.Propose(
+        UnionspaceDefinitionX.create(
+          namespace,
+          threshold,
+          owners,
+        ),
+        signedBy = signedBy.toList,
+        None,
+      )
+    )
+
+  def proposeDomainParameters(
+      domainId: DomainId,
+      parameters: DynamicDomainParameters,
+      signedBy: Option[Fingerprint],
+  )(implicit
+      traceContext: TraceContext
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, DomainParametersStateX]] =
+    runCmd(
+      TopologyAdminCommandsX.Write.Propose(
+        DomainParametersStateX(domainId, parameters),
+        signedBy = signedBy.toList,
+        None,
+      )
+    )
+}
+
+object TopologyAdminConnection {
+  def proposeCollectively[T <: TopologyMappingX](
+      connections: NonEmpty[List[TopologyAdminConnection]]
+  )(
+      f: (
+          TopologyAdminConnection,
+          UniqueIdentifier,
+      ) => Future[SignedTopologyTransactionX[TopologyChangeOpX, T]]
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, T]] = {
+    connections.toNEF
+      .traverse { con =>
+        con.getId(true).flatMap(f(con, _))
+      }
+      .map(_.reduceLeft[SignedTopologyTransactionX[TopologyChangeOpX, T]] { case (a, b) =>
+        a.addSignatures(b.signatures.toSeq)
+      })
+  }
 }

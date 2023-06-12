@@ -67,6 +67,14 @@ object CNNodeConfigTransforms {
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
           validatorLedgerApiUser = s"${c.validatorLedgerApiUser}-$suffix",
           svPartyHint = c.svPartyHint.map(sv => s"$sv-$suffix"),
+          onboarding = c.onboarding match {
+            case c: SvOnboardingConfig.FoundCollective =>
+              c.copy(
+                svcLedgerApiUser = s"${c.svcLedgerApiUser}-$suffix",
+                svcPartyHint = s"${c.svcPartyHint}-$suffix",
+              )
+            case c: SvOnboardingConfig.JoinWithKey => c
+          },
         )
       ),
       updateAllSvAppFoundCollectiveConfigs_(c =>

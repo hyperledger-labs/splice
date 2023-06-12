@@ -25,6 +25,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.util.DisclosedContracts
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -302,6 +303,19 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
         .allocateParty(requestBuilder.build, _)
     )
       .map(_.getPartyDetails.getParty)
+  }
+
+  def getParties(
+      parties: Seq[PartyId]
+  )(implicit ec: ExecutionContext): Future[Seq[PartyDetails]] = {
+    import com.daml.ledger.api.v1.admin.party_management_service.PartyDetails as ScalaPartyDetails
+    val requestBuilder = PartyManagementServiceOuterClass.GetPartiesRequest.newBuilder
+    requestBuilder.addAllParties(parties.map(_.toProtoPrimitive).asJava)
+    wrapFuture(partyManagementServiceStub.getParties(requestBuilder.build, _)).map(r =>
+      r.getPartyDetailsList.asScala.toSeq.map(details =>
+        PartyDetails.fromProtoPartyDetails(ScalaPartyDetails.fromJavaProto(details))
+      )
+    )
   }
 
   def createUser(user: User, initialRights: Seq[User.Right])(implicit

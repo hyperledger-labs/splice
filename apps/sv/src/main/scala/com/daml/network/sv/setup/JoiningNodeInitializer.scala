@@ -4,8 +4,8 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
+import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, DomainStore}
