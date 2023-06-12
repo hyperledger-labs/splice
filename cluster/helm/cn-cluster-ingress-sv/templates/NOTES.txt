@@ -1,1 +1,1 @@
-Canton Network Cluster Ingress
+Canton Network Cluster SV-Only Ingress

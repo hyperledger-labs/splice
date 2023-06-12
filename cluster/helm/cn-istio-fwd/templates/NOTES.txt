@@ -1,1 +1,4 @@
-A temporary helm chart that forwards all traffic from istio to nginx
+Canton Network Istio Virtual Service
+
+A VirtualService that forwards all inbound traffic from Istio to Nginx
+for the purpose of routing to back end services.

@@ -1,1 +1,4 @@
-Configures an Istio gateway that terminates tls and exposes all required ports into the cluster
+Canton Network Istio Gateway
+
+An Istio gateway that terminates TLS and exposes all required ports
+into the cluster
