@@ -1822,15 +1822,14 @@ workflows:
             - slack-context
           requires:
             - hold
-      - deploy_cluster:
+      - deploy_cluster_pulumi:
           <<: *main-branch-never
           context:
             - artifactory
             - datadog
             - slack-context
-          cluster: scratchneta
+          cluster: "scratchneta"
           requires:
-            - hold
             - deployment_test
             - docker_images_push
       - deploy_sv_runbook:
@@ -1839,35 +1838,35 @@ workflows:
             - artifactory
             - datadog
             - slack-context
-          cluster: scratchneta
+          cluster: "scratchneta"
           requires:
-            - deploy_cluster
+            - deploy_cluster_pulumi
       - preflight_check:
           <<: *main-branch-never
-          cluster: scratchneta
           context:
             - artifactory
             - canton-network-vpn
             - datadog
             - slack-context
+          cluster: "scratchneta"
           requires:
-            - hold
             - deployment_test
             - docker_images_push
-            - deploy_cluster
+            - deploy_cluster_pulumi
+            - deploy_sv_runbook
       - preflight_sv_check:
           <<: *main-branch-never
-          cluster: scratchneta
           context:
             - artifactory
             - canton-network-vpn
             - datadog
             - slack-context
+          cluster: "scratchneta"
           requires:
             - deploy_sv_runbook
       - reset_cluster:
           <<: *main-branch-never
-          cluster: scratchneta
+          cluster: "scratchneta"
           context:
             - canton-network-vpn
             - datadog
@@ -1899,15 +1898,14 @@ workflows:
             - slack-context
           requires:
             - hold
-      - deploy_cluster:
+      - deploy_cluster_pulumi:
           <<: *main-branch-never
           context:
             - artifactory
             - datadog
             - slack-context
-          cluster: scratchnetb
+          cluster: "scratchnetb"
           requires:
-            - hold
             - deployment_test
             - docker_images_push
       - deploy_sv_runbook:
@@ -1916,35 +1914,35 @@ workflows:
             - artifactory
             - datadog
             - slack-context
-          cluster: scratchnetb
+          cluster: "scratchnetb"
           requires:
-            - deploy_cluster
+            - deploy_cluster_pulumi
       - preflight_check:
           <<: *main-branch-never
-          cluster: scratchnetb
           context:
             - artifactory
             - canton-network-vpn
             - datadog
             - slack-context
+          cluster: "scratchnetb"
           requires:
-            - hold
             - deployment_test
             - docker_images_push
-            - deploy_cluster
+            - deploy_cluster_pulumi
+            - deploy_sv_runbook
       - preflight_sv_check:
           <<: *main-branch-never
-          cluster: scratchnetb
           context:
             - artifactory
             - canton-network-vpn
             - datadog
             - slack-context
+          cluster: "scratchnetb"
           requires:
             - deploy_sv_runbook
       - reset_cluster:
           <<: *main-branch-never
-          cluster: scratchnetb
+          cluster: "scratchnetb"
           context:
             - canton-network-vpn
             - datadog
@@ -1976,15 +1974,14 @@ workflows:
             - slack-context
           requires:
             - hold
-      - deploy_cluster:
+      - deploy_cluster_pulumi:
           <<: *main-branch-never
           context:
             - artifactory
             - datadog
             - slack-context
-          cluster: scratchnetc
+          cluster: "scratchnetc"
           requires:
-            - hold
             - deployment_test
             - docker_images_push
       - deploy_sv_runbook:
@@ -1993,41 +1990,43 @@ workflows:
             - artifactory
             - datadog
             - slack-context
-          cluster: scratchnetc
+          cluster: "scratchnetc"
           requires:
-            - deploy_cluster
+            - deploy_cluster_pulumi
       - preflight_check:
           <<: *main-branch-never
-          cluster: scratchnetc
           context:
             - artifactory
             - canton-network-vpn
             - datadog
             - slack-context
+          cluster: "scratchnetc"
           requires:
-            - hold
             - deployment_test
             - docker_images_push
-            - deploy_cluster
+            - deploy_cluster_pulumi
+            - deploy_sv_runbook
       - preflight_sv_check:
           <<: *main-branch-never
-          cluster: scratchnetc
           context:
             - artifactory
             - canton-network-vpn
             - datadog
             - slack-context
+          cluster: "scratchnetc"
           requires:
             - deploy_sv_runbook
       - reset_cluster:
           <<: *main-branch-never
-          cluster: scratchnetc
+          cluster: "scratchnetc"
           context:
             - canton-network-vpn
             - datadog
           requires:
             - preflight_check
             - preflight_sv_check
+
+
 
   deploy_staging:
     when:
