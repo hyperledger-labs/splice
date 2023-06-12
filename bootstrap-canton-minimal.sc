@@ -2,8 +2,6 @@ import scala.collection.mutable.ListBuffer
 
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
-import com.digitalasset.canton.console.ParticipantReference
-import com.digitalasset.canton.topology.PartyId
 
 println("Running canton bootstrap script...")
 
@@ -27,49 +25,19 @@ splitwellParticipant.domains.connect_local(splitwellUpgrade)
 
 println(s"Allocating users for local testing...")
 // These users are created for BootstrapTest and start-backends-for-local-frontend-testing.sh to work.
-def createUser(
-    participant: ParticipantReference,
-    user: String,
-    additionalActAsParties: Set[PartyId] = Set(),
-    readAsParties: Set[PartyId] = Set(),
-) = {
-  val party = participant.ledger_api.parties.allocate(user, user).party
-  participant.ledger_api.users.create(
-    id = user,
-    actAs = Set(party) ++ additionalActAsParties,
-    primaryParty = Some(party),
-    readAs = readAsParties,
-    participantAdmin = true,
-  )
-  party
-}
-
 Seq(
+  (svcParticipant, "sv1"),
   (aliceParticipant, "alice_validator_user"),
   (splitwellParticipant, "splitwell_validator_user"),
-  (splitwellParticipant, "splitwell_provider"),
 ).foreach { case (participant, user) =>
-  createUser(participant, user)
+  participant.ledger_api.users.create(
+    id = user,
+    primaryParty = None,
+    actAs = Set.empty,
+    readAs = Set.empty,
+    participantAdmin = true,
+  )
 }
-
-val svcParty = svcParticipant.ledger_api.parties.allocate("svc", "svc").party
-
-val sv1Party = createUser(svcParticipant, "sv1_validator_user")
-svcParticipant.ledger_api.users.create(
-  id = "sv1",
-  primaryParty = Some(sv1Party),
-  actAs = Set(sv1Party, svcParty),
-  readAs = Set.empty,
-  participantAdmin = true,
-)
-
-svcParticipant.ledger_api.users.create(
-  id = "directory_provider",
-  actAs = Set(svcParty),
-  primaryParty = Some(svcParty),
-  readAs = Set(),
-  participantAdmin = false,
-)
 
 println(s"Collecting admin tokens...")
 val adminTokensData = ListBuffer[(String, String)]()

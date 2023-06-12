@@ -27,25 +27,15 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
     [],
     [
       {
-        name: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' },
-        primaryParty: { allocate: 'svc' },
-        actAs: [{ fromUser: 'self' }],
-        readAs: [],
+        actAs: [],
         admin: true,
-      },
-      {
-        name: { env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME' },
-        actAs: [{ fromUser: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' } }],
+        name: {
+          env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME',
+        },
         readAs: [],
-        admin: true,
       },
     ],
-    [
-      auth0UserNameEnvVar('sv', 'sv1'),
-      auth0UserNameEnvVar('validator'),
-      // TODO(#5488) Remove dummy user once SVC party is no longer allocated here.
-      { name: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME', value: 'svc_dummy_user' },
-    ],
+    [auth0UserNameEnvVar('sv', 'sv1')],
     [domain]
   );
 
@@ -84,7 +74,7 @@ function installSvParticipant(xns: ExactNamespace): k8s.helm.v3.Release {
         readAs: [],
       },
     ],
-    [auth0UserNameEnvVar('validator'), auth0UserNameEnvVar('sv')]
+    [auth0UserNameEnvVar('sv')]
   );
 }
 

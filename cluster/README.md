@@ -796,32 +796,31 @@ of a participant for bootstrapping. The configuration for those users
 is specified through a `CANTON_PARTICIPANT_USERS` environment
 variable. That variable specifies an array of users in JSON format
 that will be allocated in the given order. Each user specifies the
-user name, the primary party which can either be taken from another
+user name and, optionally, the primary party which can either be taken from another
 user or allocated freshly as well as `actAs`, `readAs` and `admin`
 claims. `actAs` and `readAs` claims can also be set to the primary
 party of another user. References can go through environment variables
 which allows us to pick up k8s secrets which are exposed through other
-environment variables. Using the SVC participant as an example, here
-is how the SVC user and Directory user are specified. Note
-how the Directory user shares its primary party and
-`actAs`/`readAs`with the SVC user.
+environment variables.
+
+Note that you typically don't need to allocate parties manually at all,
+only (admin) users. Party allocation is handled by CN apps themselves
+and happens during app initialization.
+
+Using a typical SV participant as an example, here is how an admin user for the SV app is allocated.
+Using this user, the SV app later takes care of allocating the SV party, the SV validator user and,
+if the SV is the SVC founder, also the SVC party.
 
 ```json
 [
   {
-    name: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" },
-    primaryParty: { allocate: "svc_party" },
-    actAs: [{ fromUser: "self" }],
+    name: {
+      env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME',
+    },
+    actAs: [],
     readAs: [],
     admin: true,
   },
-  {
-    name: { env: "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME" },
-    primaryParty: { fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } },
-    actAs: [{ fromUser: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" } }],
-    readAs: [],
-    admin: true,
-  }
 ]
 ```
 

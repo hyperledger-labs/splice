@@ -55,7 +55,7 @@ class XNodeWalletSurviveCantonRestartIntegrationTest
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
       )
-      .withAllocatedSvcAndSvUsers()
+      .withAllocatedSvUsers()
       .withManualStart
   }
 

@@ -2,14 +2,17 @@ package com.daml.network.integration
 
 import better.files.{File, Resource}
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
-import com.daml.network.console.{CNParticipantClientReference, ValidatorAppBackendReference}
+import com.daml.network.console.{
+  CNParticipantClientReference,
+  ValidatorAppBackendReference,
+  SvAppBackendReference,
+}
 import com.daml.network.environment.{
   CNNodeConsoleEnvironment,
   CNNodeEnvironmentFactory,
   CNNodeEnvironmentImpl,
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.sv.config.SvOnboardingConfig
 import com.digitalasset.canton.admin.api.client.data.User
 import com.digitalasset.canton.config.{ClockConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.TestConsoleOutput
@@ -60,30 +63,11 @@ case class CNNodeEnvironmentDefinition(
       .copy(setup = _ => ())
   }
 
-  def withAllocatedSvcAndSvUsers(): CNNodeEnvironmentDefinition =
+  def withAllocatedSvUsers(): CNNodeEnvironmentDefinition =
     copy(preSetup = env => {
       import env.*
       this.preSetup(env)
-      val sv1 = svs.local.find(sv => sv.name == "sv1").value
-      val foundingConfig = inside(sv1.config.onboarding) {
-        case founding: SvOnboardingConfig.FoundCollective => founding
-      }
-      val svcParty = CNNodeEnvironmentDefinition.allocateParty(
-        sv1.participantClientWithAdminToken,
-        foundingConfig.svcPartyHint,
-      )
-      svs.local.foreach(sv => {
-        sv.participantClientWithAdminToken.ledger_api.users.create(
-          id = sv.config.ledgerApiUser,
-          actAs = sv.config.onboarding match {
-            case _: SvOnboardingConfig.FoundCollective => Set(svcParty)
-            case _ => Set.empty
-          },
-          primaryParty = None,
-          readAs = Set.empty,
-          participantAdmin = true,
-        )
-      })
+      svs.local.foreach(sv => CNNodeEnvironmentDefinition.withAllocatedSv(sv))
     })
 
   def withAllocatedValidatorUsers(): CNNodeEnvironmentDefinition =
@@ -221,13 +205,13 @@ object CNNodeEnvironmentDefinition {
   private def simpleTopology(testName: String): CNNodeEnvironmentDefinition =
     fromResource("simple-topology.conf", testName)
       .withAllocatedValidatorUsers()
-      .withAllocatedSvcAndSvUsers()
+      .withAllocatedSvUsers()
       .withInitializedNodes()
 
   def simpleTopologyXDistributedDomain(testName: String): CNNodeEnvironmentDefinition =
     fromResources(Seq("simple-topology.conf", "x-node-overrides.conf"), testName)
       .withAllocatedValidatorUsers()
-      .withAllocatedSvcAndSvUsers()
+      .withAllocatedSvUsers()
       .withInitializedNodes()
 
   def simpleTopologyXDistributedDomainWithSimTime(testName: String): CNNodeEnvironmentDefinition =
@@ -279,6 +263,16 @@ object CNNodeEnvironmentDefinition {
 
   def allocateParty(participant: CNParticipantClientReference, hint: String) =
     participant.ledger_api.parties.allocate(hint, hint).party
+
+  def withAllocatedSv(sv: SvAppBackendReference): User = {
+    sv.participantClientWithAdminToken.ledger_api.users.create(
+      id = sv.config.ledgerApiUser,
+      actAs = Set.empty,
+      primaryParty = None,
+      readAs = Set.empty,
+      participantAdmin = true,
+    )
+  }
 
   def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {
     validator.participantClientWithAdminToken.ledger_api.users.create(

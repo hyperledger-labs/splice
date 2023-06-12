@@ -4,11 +4,10 @@ import cats.syntax.either._
 import cats.syntax.functorFilter._
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
-import com.digitalasset.canton.console.{LocalInstanceReferenceX, LocalParticipantReferenceX}
+import com.digitalasset.canton.console.LocalInstanceReferenceX
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
@@ -152,49 +151,19 @@ if (System.getenv("BFT") != "1") {
   // These user allocations mainly exist for XNodeBootstrapTest. For local testing we usually
   // use bootstrap-canton-minimal.sc
   println(s"Allocating users for local testing...")
-  def createUser(
-      participant: LocalParticipantReferenceX,
-      user: String,
-      additionalActAsParties: Set[PartyId] = Set(),
-      readAsParties: Set[PartyId] = Set(),
-  ) = {
-    val party = participant.ledger_api.parties.allocate(user, user).party
-    participant.ledger_api.users.create(
-      id = user,
-      actAs = Set(party) ++ additionalActAsParties,
-      primaryParty = Some(party),
-      readAs = readAsParties,
-      participantAdmin = true,
-    )
-    party
-  }
-
   Seq(
+    (sv1Participant, "sv1"),
     (aliceParticipant, "alice_validator_user"),
     (splitwellParticipant, "splitwell_validator_user"),
-    (splitwellParticipant, "splitwell_provider"),
   ).foreach { case (participant, user) =>
-    createUser(participant, user)
+    participant.ledger_api.users.create(
+      id = user,
+      primaryParty = None,
+      actAs = Set.empty,
+      readAs = Set.empty,
+      participantAdmin = true,
+    )
   }
-
-  val svcParty = sv1Participant.ledger_api.parties.allocate("svc", "svc").party
-
-  val sv1Party = createUser(sv1Participant, "sv1_validator_user")
-  sv1Participant.ledger_api.users.create(
-    id = "sv1",
-    primaryParty = Some(sv1Party),
-    actAs = Set(sv1Party, svcParty),
-    readAs = Set.empty,
-    participantAdmin = true,
-  )
-
-  sv1Participant.ledger_api.users.create(
-    id = "directory_provider",
-    actAs = Set(svcParty),
-    primaryParty = Some(svcParty),
-    readAs = Set(),
-    participantAdmin = false,
-  )
 }
 
 println(s"Collecting admin tokens...")

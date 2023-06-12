@@ -593,6 +593,8 @@ To add a new library as a dependency for some module:
 
 #### SVC App
 
+*Warning: The SVC App is being phased out; below infos are at least partially outdated.*
+
 The SVC app is special since it creates the SVC party which eventually
 needs to be decentralized and because other apps rely on the SVC app
 being up so they can query the SVC party identity.

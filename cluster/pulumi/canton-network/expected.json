@@ -1435,16 +1435,6 @@
         "extraDomains": "[]",
         "extraEnvVars": [
           {
-            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-validator-ledger-api-auth",
-                "optional": false
-              }
-            }
-          },
-          {
             "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
             "valueFrom": {
               "secretKeyRef": {
@@ -1771,16 +1761,6 @@
         "extraDomains": "[]",
         "extraEnvVars": [
           {
-            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-validator-ledger-api-auth",
-                "optional": false
-              }
-            }
-          },
-          {
             "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
             "valueFrom": {
               "secretKeyRef": {
@@ -2033,16 +2013,6 @@
         "enableHealthProbes": true,
         "extraDomains": "[]",
         "extraEnvVars": [
-          {
-            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-validator-ledger-api-auth",
-                "optional": false
-              }
-            }
-          },
           {
             "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
             "valueFrom": {
@@ -2379,24 +2349,10 @@
                 "optional": false
               }
             }
-          },
-          {
-            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-validator-ledger-api-auth",
-                "optional": false
-              }
-            }
-          },
-          {
-            "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
-            "value": "svc_dummy_user"
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"name\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"svc\"},\"actAs\":[{\"fromUser\":\"self\"}],\"readAs\":[],\"admin\":true},{\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"actAs\":[{\"fromUser\":{\"env\":\"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}],\"readAs\":[],\"admin\":true}]",
+        "participantUsers": "[{\"actAs\":[],\"admin\":true,\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"readAs\":[]}]",
         "postgres": "postgres.svc.svc.cluster.local",
         "postgresSchema": "svc_participant",
         "resources": {

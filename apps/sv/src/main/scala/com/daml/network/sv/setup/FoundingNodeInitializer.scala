@@ -37,6 +37,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{
   DomainId,
   Identifier,
+  Namespace,
   ParticipantId,
   PartyId,
   UniqueIdentifier,
@@ -95,39 +96,11 @@ class FoundingNodeInitializer(
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     for {
-      svcParty <- localDomainNode match {
-        case None =>
-// TODO(#5488) Actually allocate the SVC party id here.
-          Future.successful(
-            PartyId(
-              UniqueIdentifier(
-                Identifier.tryCreate(foundingConfig.svcPartyHint),
-                participantId.uid.namespace,
-              )
-            )
-          )
-        case Some(domainNode) =>
-          for {
-            namespace <- bootstrapDomain(domainNode)
-            svc <- initConnection.ensurePartyAllocated(
-              foundingConfig.svcPartyHint,
-              namespace,
-              participantAdminConnection,
-            )
-            // this is idempotent
-            _ <- initConnection.grantUserRights(
-              config.ledgerApiUser,
-              Seq(svc),
-              Seq.empty,
-            )
-            // this is idempotent
-            _ <- initConnection.createUserWithPrimaryParty(
-              foundingConfig.svcLedgerApiUser,
-              svc,
-              Seq.empty,
-            )
-          } yield svc
+      namespace <- localDomainNode match {
+        case None => Future.successful(participantId.uid.namespace)
+        case Some(domainNode) => bootstrapDomain(domainNode)
       }
+      svcParty <- setupSvcParty(initConnection, namespace)
       svParty <- SetupUtil.setupSvParty(initConnection, config)
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
@@ -135,11 +108,7 @@ class FoundingNodeInitializer(
         svStore,
         ledgerClient,
       )
-      _ <- svAutomation.connection.ensureUserMetadataAnnotation(
-        config.ledgerApiUser,
-        CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
-        svcParty.toProtoPrimitive,
-      )
+      _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcParty)
       globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global.alias)
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
@@ -190,7 +159,29 @@ class FoundingNodeInitializer(
     )
   }
 
-  private def bootstrapDomain(domainNode: LocalDomainNode) = {
+  private def setupSvcParty(connection: CNLedgerConnection, namespace: Namespace): Future[PartyId] =
+    for {
+      svc <- connection.ensurePartyAllocated(
+        foundingConfig.svcPartyHint,
+        namespace,
+        participantAdminConnection,
+        config.xNodes.isDefined,
+      )
+      // this is idempotent
+      _ <- connection.grantUserRights(
+        config.ledgerApiUser,
+        Seq(svc),
+        Seq.empty,
+      )
+      // this is idempotent
+      _ <- connection.createUserWithPrimaryParty(
+        foundingConfig.svcLedgerApiUser,
+        svc,
+        Seq.empty,
+      )
+    } yield svc
+
+  private def bootstrapDomain(domainNode: LocalDomainNode): Future[Namespace] = {
     logger.info("Bootstrapping the domain as the founding node")
     for {
       participantId <- participantAdminConnection.getParticipantId(true)

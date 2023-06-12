@@ -44,6 +44,11 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.participant.protocol.v0.multidomain
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.transaction.{
+  ParticipantPermission,
+  RequestSide,
+  TopologyChangeOp,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -379,9 +384,10 @@ class CNLedgerConnection(
       hint: String,
       namespace: Namespace,
       participantAdminConnection: ParticipantAdminConnection,
+      useXNodes: Boolean,
   )(implicit traceContext: TraceContext) =
     for {
-      participantId <- participantAdminConnection.getParticipantId(true)
+      participantId <- participantAdminConnection.getParticipantId(useXNodes)
       partyId = PartyId(
         UniqueIdentifier(
           Identifier.tryCreate(hint),
@@ -391,8 +397,25 @@ class CNLedgerConnection(
       _ <- retryProvider.ensureThat(
         s"Party $partyId is allocated",
         client.getParties(Seq(partyId)).map(_.nonEmpty),
-        participantAdminConnection
-          .authorizePartyToParticipantX(partyId, Seq.empty, participantId, participantId),
+        for {
+          _ <-
+            if (useXNodes) {
+              participantAdminConnection.authorizePartyToParticipantX(
+                partyId,
+                Seq.empty,
+                participantId,
+                participantId,
+              )
+            } else {
+              participantAdminConnection.authorizePartyToParticipant(
+                TopologyChangeOp.Add,
+                partyId,
+                participantId,
+                RequestSide.Both,
+                ParticipantPermission.Submission,
+              )
+            }
+        } yield (),
         logger,
       )
     } yield partyId
@@ -680,7 +703,7 @@ class CNLedgerConnection(
       }
   }
 
-  // Note that this will only work for apps that run as the SV user, i.e., directory and scan.
+  // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
   def getSvcPartyFromUserMetadata(userId: String): Future[PartyId] =
     waitForUserMetadata(userId, CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY).map(
       PartyId.tryFromProtoPrimitive(_)

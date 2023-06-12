@@ -27,4 +27,14 @@ private[setup] object SetupUtil {
         Seq(User.Right.ParticipantAdmin.INSTANCE),
       )
     } yield svParty
+
+  def ensureSvcPartyMetadataAnnotation(
+      connection: CNLedgerConnection,
+      config: SvAppBackendConfig,
+      svcParty: PartyId,
+  )(implicit ec: ExecutionContext): Future[Unit] = connection.ensureUserMetadataAnnotation(
+    config.ledgerApiUser,
+    CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
+    svcParty.toProtoPrimitive,
+  )
 }

@@ -38,7 +38,7 @@ initCollective isDevNet = do
   -- allocate users for the four founding members
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
-  -- allocate collective party
+  -- the founding SV allocates the collective party as part of its initialization
   -- TODO(M3-46): make this a real collective party
   svc <- allocateParty "svc"
 

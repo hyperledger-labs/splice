@@ -24,20 +24,6 @@ class XNodeDistributedDomainIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyXDistributedDomain(this.getClass.getSimpleName)
-      .withPreSetup(preSetup =
-        implicit env =>
-          // TODO(#5488) Switch to default init once it no longer allocates the SVC party
-          Seq(sv1, sv2, sv3, sv4).foreach { sv =>
-            sv.participantClientWithAdminToken.ledger_api.users.create(
-              id = sv.config.ledgerApiUser,
-              actAs = Set.empty,
-              readAs = Set.empty,
-              primaryParty = None,
-              participantAdmin = true,
-            )
-          }
-      )
-      .withAllocatedValidatorUsers()
       .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")

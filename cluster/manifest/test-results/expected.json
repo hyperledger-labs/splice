@@ -558,10 +558,6 @@
                               }
                            },
                            {
-                              "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
-                              "value": "svc_dummy_user"
-                           },
-                           {
                               "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
                               "value": "postgres"
                            },
@@ -571,7 +567,7 @@
                            },
                            {
                               "name": "CANTON_PARTICIPANT_USERS",
-                              "value": "[{\"actAs\": [{\"fromUser\": \"self\"}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}, \"primaryParty\": {\"allocate\": \"svc\"}, \"readAs\": [ ]}, {\"actAs\": [{\"fromUser\": {\"env\": \"CN_APP_SVC_LEDGER_API_AUTH_USER_NAME\"}}], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
+                              "value": "[{\"actAs\": [ ], \"admin\": true, \"name\": {\"env\": \"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"}, \"readAs\": [ ]}]"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
