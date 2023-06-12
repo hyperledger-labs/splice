@@ -161,6 +161,10 @@ export async function installSvNode(
         publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
         externalAddress: p2pExternalAddress,
       },
+      istioVirtualService: {
+        enabled: true,
+        gateway: 'cluster-ingress/apps-gateway',
+      },
       node: {
         id: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
         privateKey:

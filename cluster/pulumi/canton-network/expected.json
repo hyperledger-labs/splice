@@ -1192,6 +1192,10 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "istioVirtualService": {
+          "enabled": true,
+          "gateway": "cluster-ingress/apps-gateway"
+        },
         "node": {
           "externalAddress": "sv-1.svc.mock.network.canton.global:26656",
           "id": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",

@@ -222,3 +222,10 @@ spec:
     hosts:
     - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
+  - port:
+      number: 26656
+      name: cometbft-gw
+      protocol: TCP
+    hosts:
+      - "{{ (.Values.cluster).hostname }}"
+      - "*.svc.{{ (.Values.cluster).hostname }}"

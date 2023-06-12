@@ -114,6 +114,7 @@ function configureGatewayService(
             ingressPort('sw-lg-gw', 6201),
             ingressPort('grpc-sw-api', 5213),
             ingressPort('sw-api-gw', 6213),
+            ingressPort('cometbft-gw', 26656),
           ],
         },
       },

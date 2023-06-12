@@ -391,6 +391,12 @@
               "port": 6213,
               "protocol": "TCP",
               "targetPort": 6213
+            },
+            {
+              "name": "cometbft-gw",
+              "port": 26656,
+              "protocol": "TCP",
+              "targetPort": 26656
             }
           ]
         }

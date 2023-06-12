@@ -31,6 +31,10 @@ node:
     privateKey: ""
     publicKey: ""
 
+istioVirtualService:
+  enabled: false
+  gateway: ""
+
 genesis:
   chainId: ""
 
