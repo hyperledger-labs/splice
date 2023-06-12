@@ -75,19 +75,27 @@ clusters.)
 3. Enable support for nix flakes and the nix command by adding to the
    following to your nix config (either `/etc/nix/nix.conf` if you
    have a multi-user install or `~/.config/nix/nix.conf`):
-```
-extra-experimental-features = nix-command flakes
-```
-4. Configure artifactory credentials so Nix can download `canton-research`.
-   To do so, add the following to `/etc/nix/netrc` (you might need to create that directory as root):
-   ```
-   machine digitalasset.jfrog.io
-   login yourartifactoryusername
-   password yourartifactoryapikey
-   ```
+    ```
+    extra-experimental-features = nix-command flakes
+    ```
+4. Configure artifactory credentials
    You can create an artifactory API key [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    If you need permissions - please email help@digitalasset.com and ask for artifactory permissions.
+   1. For Nix can download `canton-research`.
+      To do so, add the following to `/etc/nix/netrc` (you might need to create that directory as root):
+      ```
+      machine digitalasset.jfrog.io
+      login yourartifactoryusername
+      password yourartifactoryapikey
+      ```
+   2. For access to the canton enterprise docker repo
+      To do so, the `ARTIFACTORY_USER` and `ARTIFACTORY_PASSWORD` must be configured.
+      Best would be to add the to the `.envrc.private` file like so:
+      ```
+      export ARTIFACTORY_USER="yourartifactoryusername"
+      export ARTIFACTORY_PASSWORD="yourartifactoryapikey"
+      ```
 5. After switching to the CC repo you should see a line like
    ```
    direnv: error /home/moritz/daml-projects/canton-coin/.envrc is blocked. Run `direnv allow` to approve its content
