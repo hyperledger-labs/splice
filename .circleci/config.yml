@@ -654,7 +654,10 @@ commands:
     steps:
       - execute_sbt_command:
           # run all tests except the live cluster ones
-          pre_sbt_cmd: ./start-canton.sh << parameters.start_canton_options >> << parameters.extra_pre_sbt_cmd >> && $(top -b -o %MEM -c -w 256 > log/memory &)
+          pre_sbt_cmd: |
+            top -b -o %MEM -c -w 256 > log/memory &
+            ./start-canton.sh << parameters.start_canton_options >>
+            << parameters.extra_pre_sbt_cmd >>
           extra_env_vars: POSTGRES_DB=postgres
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-canton.sh external << parameters.extra_post_sbt_cmd >>
@@ -1741,7 +1744,7 @@ workflows:
         name: "scala_test x nodes frontend wall clock time"
         test_names_file: "test-full-class-names-xnode-frontend.log"
         start_canton_options: "-d -p external -x -w"
-        extra_pre_sbt_cmd: "&& ./start-frontends.sh -d -e -s"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
         parallelism: 4
@@ -1754,7 +1757,7 @@ workflows:
         name: "scala_test x nodes frontend sim time"
         test_names_file: "test-full-class-names-xnode-frontend-sim-time.log"
         start_canton_options: "-d -p external -x -s"
-        extra_pre_sbt_cmd: "&& ./start-frontends.sh -d -e -s"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
         parallelism: 1
