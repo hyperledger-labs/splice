@@ -62,7 +62,7 @@ trait SvTestUtil extends CNNodeTestCommon {
     )
   }
 
-  def startAllSync(nodes: Seq[CNNodeAppBackendReference]): Unit = {
+  def startAllSync(nodes: CNNodeAppBackendReference*): Unit = {
     nodes.foreach(_.start())
     nodes.foreach(_.waitForInitialization())
   }

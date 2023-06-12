@@ -4,7 +4,6 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.round.*
-import com.daml.network.console.CNNodeAppBackendReference
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.Contract
@@ -269,8 +268,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
           )
     }
     initSvc()
-    val nodes = Seq(aliceValidator, bobValidator)
-    startAllSync(nodes)
+    startAllSync(aliceValidator, bobValidator)
 
     val round =
       sv1Scan.getTransferContextWithInstances(getLedgerTime).latestOpenMiningRound.contract
@@ -317,17 +315,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
   "expire stale `SvOnboarding` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      val nodes = Seq(
-        svc: CNNodeAppBackendReference,
-        sv1Scan: CNNodeAppBackendReference,
-        sv1,
-        sv2,
-        sv3,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-      )
-      startAllSync(nodes)
+      startAllSync(svc, sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
       sv1.getSvcInfo().svcRules.payload.members should have size 3
     }
     clue(
@@ -359,17 +347,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
   "expire stale `SvOnboardingConfirmed` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      val nodes = Seq(
-        svc: CNNodeAppBackendReference,
-        sv1Scan: CNNodeAppBackendReference,
-        sv1,
-        sv2,
-        sv3,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-      )
-      startAllSync(nodes)
+      startAllSync(svc, sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
       sv1.getSvcInfo().svcRules.payload.members should have size 3
     }
     val svXParty = allocateRandomSvParty("svX")
@@ -448,9 +426,9 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
   "expire stale `Confirmation` contracts" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
-      val nodes = Seq(
-        svc: CNNodeAppBackendReference,
-        sv1Scan: CNNodeAppBackendReference,
+      startAllSync(
+        svc,
+        sv1Scan,
         sv1,
         sv2,
         sv3,
@@ -460,7 +438,6 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
         sv3Validator,
         sv4Validator,
       )
-      startAllSync(nodes)
       sv1.getSvcInfo().svcRules.payload.members should have size 4
     }
     clue(
@@ -532,9 +509,9 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
   "detect an inactive leader" in { implicit env =>
     val svcRulesBeforeElection = clue("Initialize SVC with 4 SVs") {
-      val nodes = Seq(
-        svc: CNNodeAppBackendReference,
-        sv1Scan: CNNodeAppBackendReference,
+      startAllSync(
+        svc,
+        sv1Scan,
         sv1,
         sv2,
         sv3,
@@ -544,7 +521,6 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
         sv3Validator,
         sv4Validator,
       )
-      startAllSync(nodes)
       val svcRulesBeforeElection = svc.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
         .head
