@@ -220,6 +220,12 @@ local deployments(num, svConfig, config) =
           port: 5010,
         },
       ], namespace=namespace, extraEnvVars=c.appAuthEnvBinding(config, "sv", "directory") + [{ name: "CN_APP_DIRECTORY_PARTICIPANT_ADDRESS", value: "participant.svc" }]),
+      c.deployment(config, "svc-app", [
+        {
+          name: "grpc-svc-adm",
+          port: 5005,
+        },
+      ], namespace=namespace, extraEnvVars=c.appAuthEnvBinding(config, "sv", "svc") + [{ name: "CN_APP_SVC_PARTICIPANT_ADDRESS", value: "participant.svc" }]),
 
     ] else []
   );

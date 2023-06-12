@@ -41,6 +41,7 @@ object SvOnboardingConfig {
       // TODO(#2168): test edge cases.
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,
+      svcPartyHint: String = "svc",
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

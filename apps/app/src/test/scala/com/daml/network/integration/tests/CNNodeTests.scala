@@ -7,6 +7,7 @@ import com.auth0.exception.Auth0Exception
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.{
+  CNNodeAppBackendReference,
   DirectoryAppClientReference,
   LedgerApiExtensions,
   SplitwellAppClientReference,
@@ -75,6 +76,11 @@ object CNNodeTests {
     protected def initSvcWithSv1Only()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
       env.minimalSvcApps.local.foreach(_.start())
       env.minimalSvcApps.local.foreach(_.waitForInitialization())
+    }
+
+    protected def startAllSync(nodes: CNNodeAppBackendReference*): Unit = {
+      nodes.foreach(_.start())
+      nodes.foreach(_.waitForInitialization())
     }
   }
 

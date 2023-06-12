@@ -22,7 +22,7 @@ import com.digitalasset.canton.integration.{
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
-import org.scalatest.{Inspectors, OptionValues}
+import org.scalatest.{Inside, Inspectors, OptionValues}
 import org.scalatest.matchers.should.Matchers
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.SuppressingLogger
@@ -47,7 +47,8 @@ case class CNNodeEnvironmentDefinition(
     with Inspectors
     with Matchers
     with NamedLogging
-    with OptionValues {
+    with OptionValues
+    with Inside {
   override def loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
   override val configTransforms = configTransformsWithContext(context)
 
@@ -63,31 +64,25 @@ case class CNNodeEnvironmentDefinition(
     copy(preSetup = env => {
       import env.*
       this.preSetup(env)
-      svcOpt.foreach(svc => {
-        // TODO(M3-46) At some point the svcParty should be created even when `svcOpt == None`
-        val svcParty = CNNodeEnvironmentDefinition.allocateParty(
-          svc.participantClientWithAdminToken,
-          svc.config.ledgerApiUser,
-        )
-        svc.participantClientWithAdminToken.ledger_api.users.create(
-          id = svc.config.ledgerApiUser,
-          actAs = Set(svcParty),
-          primaryParty = Some(svcParty),
+      val sv1 = svs.local.find(sv => sv.name == "sv1").value
+      val foundingConfig = inside(sv1.config.onboarding) {
+        case founding: SvOnboardingConfig.FoundCollective => founding
+      }
+      val svcParty = CNNodeEnvironmentDefinition.allocateParty(
+        sv1.participantClientWithAdminToken,
+        foundingConfig.svcPartyHint,
+      )
+      svs.local.foreach(sv => {
+        sv.participantClientWithAdminToken.ledger_api.users.create(
+          id = sv.config.ledgerApiUser,
+          actAs = sv.config.onboarding match {
+            case _: SvOnboardingConfig.FoundCollective => Set(svcParty)
+            case _ => Set.empty
+          },
+          primaryParty = None,
           readAs = Set.empty,
           participantAdmin = true,
         )
-        svs.local.foreach(sv => {
-          sv.participantClientWithAdminToken.ledger_api.users.create(
-            id = sv.config.ledgerApiUser,
-            actAs = sv.config.onboarding match {
-              case _: SvOnboardingConfig.FoundCollective => Set(svcParty)
-              case _ => Set.empty
-            },
-            primaryParty = None,
-            readAs = Set.empty,
-            participantAdmin = true,
-          )
-        })
       })
     })
 

@@ -41,7 +41,7 @@ class SvcApp(
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
 ) extends CNNode[SvcApp.State](
-      config.ledgerApiUser,
+      config.svUser,
       config.participantClient,
       coinAppParameters,
       loggerFactory,
@@ -52,9 +52,13 @@ class SvcApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      svcPartyId: PartyId,
+      svPartyId: PartyId,
   ): Future[SvcApp.State] =
     for {
+      initConnection <- Future.successful(
+        ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+      )
+      svcPartyId <- initConnection.getSvcPartyFromUserMetadata(config.svUser)
       store <- Future.successful(
         SvcStore(
           svcPartyId,
@@ -81,7 +85,7 @@ class SvcApp(
         .addService(
           SvcServiceGrpc.bindService(
             new GrpcSvcAppService(
-              config.ledgerApiUser,
+              config.svUser,
               automation,
               domainId,
               loggerFactory,

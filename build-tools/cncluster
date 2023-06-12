@@ -1111,7 +1111,6 @@ function subcmd_update_secrets() {
 
   local -Ar appToClientId=(
       [validator]='cf0cZaTagQUN59C1HBL2udiIBdFh2CWq'
-      [svc]='XJbLZ0uz6iceI4sHeQlIleuFZeCjczjC'
       [splitwell]='ekPlYxilradhEnpWdS80WfW63z1nHvKy'
       [splitwell_validator]='hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW'
       [sv1]='OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn'
@@ -1135,7 +1134,6 @@ function subcmd_update_secrets() {
 
   for i in \
     "cn-app-validator-ledger-api-auth validator validator1" \
-    "cn-app-svc-ledger-api-auth svc svc" \
     "cn-app-sv-ledger-api-auth sv1 svc" \
     "cn-app-sv-ledger-api-auth sv1 sv-1" \
     "cn-app-validator-ledger-api-auth sv1_validator sv-1" \

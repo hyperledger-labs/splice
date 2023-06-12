@@ -1,3 +1,4 @@
+{{- if eq .Values.onboardingType "found-collective" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,7 +25,9 @@ spec:
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
-        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "svc" "keyName" "svc" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
+        - name: CN_APP_SVC_PARTICIPANT_ADDRESS
+          value: {{ .Values.participantAddress }}
+        {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "svc" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         ports:
         - containerPort: 5005
           name: svc-app-adm-api
@@ -45,3 +48,4 @@ spec:
   - name: svc-app-adm-api
     port: 5005
     protocol: TCP
+{{- end}}

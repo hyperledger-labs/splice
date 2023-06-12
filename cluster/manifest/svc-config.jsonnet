@@ -111,13 +111,15 @@ local deployments(config) = [
       timeoutSeconds: 10,
     },
     extraEnvVars=
-    c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBinding("sv1-validator", "validator") + c.appUserNameEnvBindings(["svc"]) + [
+    c.appUserNameEnvBinding("sv1", "sv") + c.appUserNameEnvBinding("sv1-validator", "validator") + [
+      // TODO(#5488) Remove dummy user once SVC party is no longer allocated here.
+      { name: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME", value: "svc_dummy_user" },
       { name: "CANTON_PARTICIPANT_POSTGRES_SERVER", value: "postgres" },
       { name: "CANTON_PARTICIPANT_POSTGRES_SCHEMA", value: "cn_participant" },
       { name: "CANTON_PARTICIPANT_USERS", json: [
         {
           name: { env: "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME" },
-          primaryParty: { allocate: "svc_party" },
+          primaryParty: { allocate: "svc" },
           actAs: [{ fromUser: "self" }],
           readAs: [],
           admin: true,
@@ -131,13 +133,6 @@ local deployments(config) = [
       ] },
     ]
   ),
-
-  c.deployment(config, "svc-app", [
-    {
-      name: "grpc-svc-adm",
-      port: 5005,
-    },
-  ], namespace="svc", extraEnvVars=c.appAuthEnvBinding(config, "svc")),
 
   [svnode.deployments(num, std.get(svConfig, std.format("sv%d", num)), config) for num in std.range(1, config.numberOfSvNodes)],
 

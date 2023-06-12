@@ -61,12 +61,17 @@ object CNNodeConfigTransforms {
     val suffix = context.toLowerCase
 
     val transforms = Seq(
-      updateSvcAppConfig(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
+      updateSvcAppConfig(c => c.copy(svUser = s"${c.svUser}-$suffix")),
       updateAllSvAppConfigs_(c =>
         c.copy(
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
           validatorLedgerApiUser = s"${c.validatorLedgerApiUser}-$suffix",
           svPartyHint = c.svPartyHint.map(sv => s"$sv-$suffix"),
+        )
+      ),
+      updateAllSvAppFoundCollectiveConfigs_(c =>
+        c.copy(
+          svcPartyHint = s"${c.svcPartyHint}-$suffix"
         )
       ),
       updateAllScanAppConfigs_(c => c.copy(svUser = s"${c.svUser}-$suffix")),
@@ -399,7 +404,7 @@ object CNNodeConfigTransforms {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
       updateSvcAppConfig(c => {
-        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
       }),
       updateAllSvAppConfigs_(c => {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))

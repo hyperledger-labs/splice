@@ -14,7 +14,6 @@ import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
-import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.CNNodeUtil.{
   defaultCoinConfig,
   defaultCoinConfigSchedule,
@@ -26,7 +25,13 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{
+  DomainId,
+  Identifier,
+  ParticipantId,
+  PartyId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -73,10 +78,15 @@ class FoundingNodeInitializer(
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     for {
-      // TODO(#3856): find a better way to get the SVC party ID
-      svcParty <- retryProvider.getValueWithRetries("SVC party ID", getSvcPartyId, logger)
+      _ <- Future.unit
+      // TODO(#5488) Actually allocate the SVC party id here.
+      svcParty = PartyId(
+        UniqueIdentifier(
+          Identifier.tryCreate(foundingConfig.svcPartyHint),
+          participantId.uid.namespace,
+        )
+      )
       svParty <- SetupUtil.setupSvParty(initConnection, config)
-
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -351,19 +361,6 @@ class FoundingNodeInitializer(
       logger.info(show"Connection to domain $domain has been established")
       r
     }
-  }
-
-  private def getSvcPartyId: Future[PartyId] = {
-    // From SVC app for now
-    val svcConnection = new SvcConnection(
-      config.svcClient.clientAdminApi,
-      coinAppParameters.processingTimeouts,
-      loggerFactory,
-    )
-    svcConnection
-      .getDebugInfo()
-      .map(_.svcParty)
-      .andThen(_ => svcConnection.close())
   }
 
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {

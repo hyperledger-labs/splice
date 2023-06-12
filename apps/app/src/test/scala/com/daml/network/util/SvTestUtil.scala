@@ -2,7 +2,6 @@ package com.daml.network.util
 
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cn
-import com.daml.network.console.CNNodeAppBackendReference
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -60,10 +59,5 @@ trait SvTestUtil extends CNNodeTestCommon {
           .data
           .members should contain key svParty.toProtoPrimitive,
     )
-  }
-
-  def startAllSync(nodes: CNNodeAppBackendReference*): Unit = {
-    nodes.foreach(_.start())
-    nodes.foreach(_.waitForInitialization())
   }
 }

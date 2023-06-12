@@ -619,7 +619,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       actAndCheck(
         "Add a fake sv4 Party to SvcRules.members to simulate sv4 is already added to SVC", {
           svc.participantClient.ledger_api_extensions.commands.submitWithResult(
-            svc.config.ledgerApiUser,
+            svc.config.svUser,
             actAs = Seq(svcParty),
             readAs = Seq.empty,
             update = sv1
@@ -942,7 +942,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     actAndCheck(
       "execute an action to remove sv3 on svcRules contract to trigger `GarbageCollectCoinPriceVotesTrigger` to remove duplicated and non member votes", {
         svc.participantClient.ledger_api_extensions.commands.submitWithResult(
-          svc.config.ledgerApiUser,
+          svc.config.svUser,
           actAs = Seq(svcParty),
           readAs = Seq.empty,
           update = sv1
@@ -1078,7 +1078,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       amount: Double,
   )(implicit env: CNNodeTestConsoleEnvironment) =
     participant.ledger_api_extensions.commands.submitWithResult(
-      svc.config.ledgerApiUser,
+      svc.config.svUser,
       actAs = Seq(svcParty),
       readAs = Seq.empty,
       update = coin(amount, svcParty).create,
@@ -1099,7 +1099,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       coinPrice: Option[BigDecimal],
   )(implicit env: CNNodeTestConsoleEnvironment) =
     svc.participantClient.ledger_api_extensions.commands.submitWithResult(
-      svc.config.ledgerApiUser,
+      svc.config.svUser,
       actAs = Seq(svcParty),
       readAs = Seq.empty,
       update = new cn.svc.coinprice.CoinPriceVote(

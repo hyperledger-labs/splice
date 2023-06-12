@@ -46,7 +46,6 @@ export async function installValidator(
     xns.ns,
     participant,
     await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
-    await installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
     await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
   ];
 

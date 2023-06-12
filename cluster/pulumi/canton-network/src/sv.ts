@@ -28,7 +28,7 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
     [
       {
         name: { env: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME' },
-        primaryParty: { allocate: 'svc_party' },
+        primaryParty: { allocate: 'svc' },
         actAs: [{ fromUser: 'self' }],
         readAs: [],
         admin: true,
@@ -42,8 +42,9 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
     ],
     [
       auth0UserNameEnvVar('sv', 'sv1'),
-      auth0UserNameEnvVar('svc'),
       auth0UserNameEnvVar('validator'),
+      // TODO(#5488) Remove dummy user once SVC party is no longer allocated here.
+      { name: 'CN_APP_SVC_LEDGER_API_AUTH_USER_NAME', value: 'svc_dummy_user' },
     ],
     [domain]
   );
@@ -51,7 +52,6 @@ export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.
   const dependsOn = [
     participant,
     await installAuth0Secret(auth0Client, xns, 'sv1', 'sv-1'),
-    await installAuth0Secret(auth0Client, xns, 'svc', 'svc'),
     await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
   ];
 
@@ -189,7 +189,7 @@ export async function installSvNode(
   if (joinWithKey) {
     values.joinWithKeyOnboarding = {
       sponsorApiUrl: 'http://sv-app.sv-1:5014',
-      svcApiAddress: 'svc-app.svc',
+      svcApiAddress: 'svc-app.sv-1',
     };
   }
 

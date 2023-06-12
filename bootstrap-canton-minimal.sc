@@ -52,7 +52,7 @@ Seq(
   createUser(participant, user)
 }
 
-val svcParty = createUser(svcParticipant, "svc_shared_service_user")
+val svcParty = svcParticipant.ledger_api.parties.allocate("svc", "svc").party
 
 val sv1Party = createUser(svcParticipant, "sv1_validator_user")
 svcParticipant.ledger_api.users.create(
