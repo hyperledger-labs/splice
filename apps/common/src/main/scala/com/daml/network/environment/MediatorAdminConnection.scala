@@ -9,6 +9,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{MediatorNodeStatus, NodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.{SequencerConnection, SequencerConnections}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, MediatorId}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -22,12 +23,14 @@ class MediatorAdminConnection(
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
+    clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
       timeouts,
       loggerFactory,
       retryProvider,
+      clock,
     ) {
 
   override val serviceName = "Canton Mediator Admin API"

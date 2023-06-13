@@ -12,17 +12,18 @@ import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResul
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   BaseResult,
   ListMediatorDomainStateResult,
-  ListPartyToParticipantResult as ListPartyToParticipantResultX,
   ListSequencerDomainStateResult,
   ListUnionspaceDefinitionResult,
 }
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.time.{Clock, WallClock, RemoteClock}
 import com.digitalasset.canton.topology.{
   DomainId,
   MediatorId,
@@ -59,6 +60,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
+import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.reflect.ClassTag
 
@@ -69,6 +71,7 @@ class TopologyAdminConnection(
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
+    clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends AppConnection(
       config,
@@ -126,7 +129,7 @@ class TopologyAdminConnection(
       filterParty: String = "",
       filterParticipant: String = "",
       timeQuery: TimeQueryX = TimeQueryX.HeadState,
-  )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResultX]] = {
+  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipantX]]] = {
     runCmd(
       TopologyAdminCommandsX.Read.ListPartyToParticipant(
         BaseQueryX(
@@ -140,7 +143,7 @@ class TopologyAdminConnection(
         filterParty,
         filterParticipant,
       )
-    )
+    ).map(_.map(r => TopologyResult(r.context, r.item)))
   }
 
   def getPartyToParticipantMappingsX(
@@ -149,12 +152,11 @@ class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] =
     listPartyToParticipantMappingsX(domainId.filterString, filterParty = partyId.filterString).map {
       txs =>
-        val ListPartyToParticipantResultX(base, mapping) = txs.headOption.getOrElse(
+        txs.headOption.getOrElse(
           throw Status.NOT_FOUND
             .withDescription(s"No PartyToParticipantX state for $partyId on domain $domainId")
             .asRuntimeException
         )
-        TopologyResult(base, mapping)
     }
 
   def getSequencerDomainState(domainId: DomainId)(implicit
@@ -539,9 +541,37 @@ class TopologyAdminConnection(
       signedBy = signedBy,
       serial = PositiveInt.one,
     )
+
+  def waitForTopologyChangeToBeValid(description: String, validFrom: Instant)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    val validFromSkewed = CantonTimestamp
+      .assertFromInstant(validFrom)
+      .plus(TopologyAdminConnection.TOPOLOGY_CHANGE_SKEW)
+    logger.info(
+      s"Waiting for topology change $description to be valid at $validFrom (with skew $validFromSkewed)"
+    )
+    clock match {
+      case _: WallClock =>
+        clock
+          .scheduleAt(_ => (), validFromSkewed)
+          .failOnShutdownTo(
+            new RuntimeException(s"Aborting waiting for topology change due to node shutting down")
+          )
+          .map { _ =>
+            logger.debug("Topology change is now valid")
+          }
+      case _: RemoteClock =>
+        logger.debug("Running in simtime mode, topology change is valid immediately")
+        Future.unit
+      case c => sys.error(s"Unknown clock config: $c")
+    }
+  }
 }
 
 object TopologyAdminConnection {
+  val TOPOLOGY_CHANGE_SKEW: Duration = Duration.ofMillis(100)
+
   def proposeCollectively[T <: TopologyMappingX](
       connections: NonEmpty[List[TopologyAdminConnection]]
   )(

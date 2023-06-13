@@ -28,6 +28,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -379,10 +380,14 @@ class HttpSvHandler(
           Future.unit
         }
 
-      acsBytes <- participantAdminConnection.downloadAcsSnapshot(
-        Set(svcParty),
-        filterDomainId = globalDomain.toProtoPrimitive,
-        timestamp = Some(authorizedAt),
+      acsBytes <- retryProvider.retryForAutomation(
+        show"Download ACS snapshot for SVC at $authorizedAt",
+        participantAdminConnection.downloadAcsSnapshot(
+          Set(svcParty),
+          filterDomainId = globalDomain.toProtoPrimitive,
+          timestamp = Some(authorizedAt),
+        ),
+        logger,
       )
       // TODO(M3-57) consider if a more space-efficient encoding is necessary
       encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)

@@ -11,6 +11,7 @@ import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
@@ -26,12 +27,14 @@ class SequencerAdminConnection(
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
+    clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
       timeouts,
       loggerFactory,
       retryProvider,
+      clock,
     ) {
 
   override val serviceName = "Canton Sequencer Admin API"
