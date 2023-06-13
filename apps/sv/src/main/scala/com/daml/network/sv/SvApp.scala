@@ -95,6 +95,8 @@ class SvApp(
   private val cometBftConfig = config.cometBftConfig
     .filter(_.enabled)
 
+  override def packages = super.packages ++ Seq("dar/svc-governance-0.1.0.dar")
+
   override def initializeNode(ledgerClient: CNLedgerClient): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,

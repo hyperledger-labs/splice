@@ -50,10 +50,6 @@ spec:
             {{- with .Values.joinWithKeyOnboarding }}
             - name: ADDITIONAL_CONFIG_SV_ONBOARDING
               value: |
-                _svc_client {
-                  admin-api.port = 5005
-                  admin-api.address = "{{ .svcApiAddress }}"
-                }
                 _onboarding {
                   type = "join-with-key"
                   sv-client.admin-api.url = "{{ .sponsorApiUrl }}"

@@ -91,8 +91,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   // A test to make debugging bootstrap problems easier
   "SV apps can start one by one" in { implicit env =>
     clue("Starting SVC app and SV1 app") {
-      // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
-      startAllSync(svc, sv1Scan, sv1Validator, sv1)
+      startAllSync(sv1Scan, sv1Validator, sv1)
     }
     def startSv(
         number: Int,
@@ -715,13 +714,12 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
       clue("Starting SVC app and SV1 app") {
-        // TODO(#3856) don't start SVC app here once we don't use it anymore for getting the svcParty
-        startAllSync(svc, sv1Scan, sv1)
+        startAllSync(sv1Scan, sv1)
       }
 
-      val svcParty = svcClient.getDebugInfo().svcParty
+      val svcParty = sv1.getSvcInfo().svcParty
       val svcPartyStr: String = svcParty.toProtoPrimitive
-      val svcParticipant = svc.participantClient
+      val svcParticipant = sv1.participantClient
       val sv4Participant = sv4.participantClient
 
       clue(

@@ -147,7 +147,6 @@ export async function installSvNode(
   if (joinWithKey) {
     values.joinWithKeyOnboarding = {
       sponsorApiUrl: 'http://sv-app.sv-1:5014',
-      svcApiAddress: 'svc-app.sv-1',
     };
   }
 

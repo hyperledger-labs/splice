@@ -1717,8 +1717,7 @@
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014",
-          "svcApiAddress": "svc-app.sv-1"
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
         "onboardingName": "Canton-Foundation-2",
         "onboardingType": "join-with-key",
@@ -2074,8 +2073,7 @@
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014",
-          "svcApiAddress": "svc-app.sv-1"
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
         "onboardingName": "Canton-Foundation-3",
         "onboardingType": "join-with-key",
@@ -2431,8 +2429,7 @@
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014",
-          "svcApiAddress": "svc-app.sv-1"
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
         "onboardingName": "Canton-Foundation-4",
         "onboardingType": "join-with-key",

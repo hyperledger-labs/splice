@@ -8,7 +8,6 @@ import com.daml.network.config.{
   HttpCNNodeClientConfig,
   NetworkAppClientConfig,
 }
-import com.daml.network.svc.config.SvcAppClientConfig
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
@@ -72,8 +71,6 @@ case class SvAppBackendConfig(
     validatorLedgerApiUser: String,
     auth: AuthConfig,
     participantClient: CNParticipantClientConfig,
-    // TODO(#3856): consider if we can remove this already
-    svcClient: SvcAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
     isDevNet: Boolean = false,

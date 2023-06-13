@@ -419,8 +419,7 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",
-          "svcApiAddress": "svrun.network.com.network.canton.global"
+          "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv"
         },
         "onboardingName": "DA-Helm-Test-Node"
       }

@@ -16,7 +16,6 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
-import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -69,8 +68,7 @@ class JoiningNodeInitializer(
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     for {
-      // TODO(#3856): find a better way to get the SVC party ID
-      svcPartyId <- retryProvider.getValueWithRetries("SVC party ID", getSvcPartyId, logger)
+      svcPartyId <- getSvcPartyId(initConnection)
       svParty <- SetupUtil.setupSvParty(initConnection, config)
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey)
@@ -466,18 +464,27 @@ class JoiningNodeInitializer(
     loggerFactory,
   )
 
-  private def getSvcPartyId: Future[PartyId] = {
-    // From SVC app for now
-    val svcConnection = new SvcConnection(
-      config.svcClient.clientAdminApi,
+  private def getSvcPartyId(connection: CNLedgerConnection): Future[PartyId] = for {
+    svcPartyFromMetadata <- connection.lookupSvcPartyFromUserMetadata(config.ledgerApiUser)
+    svcParty <- svcPartyFromMetadata
+      .fold(
+        retryProvider.getValueWithRetries(
+          "SVC party ID from sponsoring SV",
+          getSvcPartyIdFromSponsor,
+          logger,
+        )
+      )(Future.successful)
+  } yield svcParty
+
+  private def getSvcPartyIdFromSponsor: Future[PartyId] =
+    SvConnection(
+      joiningConfig.svClient.adminApi,
+      retryProvider,
       coinAppParameters.processingTimeouts,
       loggerFactory,
-    )
-    svcConnection
-      .getDebugInfo()
-      .map(_.svcParty)
-      .andThen(_ => svcConnection.close())
-  }
+    ).flatMap { svConnection =>
+      svConnection.getSvcInfo().map(_.svcParty).andThen(_ => svConnection.close())
+    }
 
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()

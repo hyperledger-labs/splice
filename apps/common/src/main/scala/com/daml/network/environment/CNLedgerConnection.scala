@@ -520,6 +520,15 @@ class CNLedgerConnection(
       logger,
     )
 
+  def lookupUserMetadata(userId: String, key: String): Future[Option[String]] =
+    client.getUserProto(userId).map { user =>
+      if (user.hasMetadata) {
+        user.getMetadata.getAnnotationsMap.asScala.get(key)
+      } else {
+        None
+      }
+    }
+
   // TODO(tech-debt): Factor out user/party allocation and make it robust (current implementation is racy)
   def getOrAllocateParty(
       username: String,
@@ -720,6 +729,12 @@ class CNLedgerConnection(
   def getSvcPartyFromUserMetadata(userId: String): Future[PartyId] =
     waitForUserMetadata(userId, CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY).map(
       PartyId.tryFromProtoPrimitive(_)
+    )
+
+  // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
+  def lookupSvcPartyFromUserMetadata(userId: String): Future[Option[PartyId]] =
+    lookupUserMetadata(userId, CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY).map(
+      _.map(PartyId.tryFromProtoPrimitive(_))
     )
 
   // simulate the completion check of command service; future only yields

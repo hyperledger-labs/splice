@@ -96,6 +96,17 @@ final class SvConnection private (
         sequencerId
       ),
     )
+
+  def getSvcInfo()(implicit
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateDecoder: TemplateJsonDecoder,
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): Future[HttpSvAppClient.SvcInfo] =
+    runHttpCmd(
+      config.url,
+      HttpSvAppClient.GetSvcInfo,
+    )
 }
 
 object SvConnection {
