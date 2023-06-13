@@ -297,7 +297,7 @@
               "targetPort": 10013
             },
             {
-              "name": "dir-api",
+              "name": "directory-api",
               "port": 5010,
               "protocol": "TCP",
               "targetPort": 5010

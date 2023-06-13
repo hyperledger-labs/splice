@@ -98,7 +98,7 @@ function configureGatewayService(
             ingressPort('grpc-svcp-adm', 5002),
             ingressPort('grpc-svcp-lg', 5001),
             ingressPort('svcp-metrics', 10013),
-            ingressPort('dir-api', 5010),
+            ingressPort('directory-api', 5010),
             ingressPort('grpc-svc-adm', 5005),
             ingressPort('scan-api', 5012),
             ingressPort('grpc-val1-adm', 5102),

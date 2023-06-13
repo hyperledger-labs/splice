@@ -20,7 +20,7 @@ window.canton_network_config = {
     directory: {
       // URL of the directory backend
       // Edit this to the cluster you're trying to connect on.
-      url: 'https://directory.TARGET_CLUSTER.network.canton.global',
+      url: 'https://directory.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/directory',
     },
     // END_DIRECTORY_CONFIG
     wallet: {

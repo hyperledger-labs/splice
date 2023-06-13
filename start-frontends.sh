@@ -51,7 +51,8 @@ function start_frontend() {
   local node_name=$4
   local test_auth=$5
   local algorithm="${6:-rs-256}"
-  local cluster_address="${7:-'http://localhost'}"
+  local cluster_protocol="${7:-'http'}"
+  local cluster_address="${8:-'localhost'}"
 
   local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
@@ -65,6 +66,7 @@ function start_frontend() {
   config_file=$(mktemp)
 
   jsonnet \
+    --tla-str clusterProtocol="$cluster_protocol" \
     --tla-str clusterAddress="$cluster_address" \
     --tla-str authAlgorithm="$algorithm" \
     --tla-str enableTestAuth="$test_auth" \
@@ -204,9 +206,9 @@ function start_local_frontends() {
 
 # The set of frontends we want to start for the preflight self-hosted directory UI test
 function start_preflight_frontends() {
-  # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
-  start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
-  start_frontend   directory 3004 alice   "preflight" $enable_test_auth "rs-256" "https://${NETWORK_APPS_ADDRESS}"
+  # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-protocol> <cluster-address>
+  start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https" "${NETWORK_APPS_ADDRESS}"
+  start_frontend   directory 3004 alice   "preflight" $enable_test_auth "rs-256" "https" "${NETWORK_APPS_ADDRESS}"
 }
 
 if [ $use_preflight_frontends -eq 0 ]; then

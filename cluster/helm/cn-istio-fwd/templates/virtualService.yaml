@@ -7,7 +7,7 @@ spec:
   hosts:
   - "{{ (.Values.cluster).basename }}.network.canton.global"
   - "wallet.splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
-  - "directory.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "directory.sv-1.svc.{{ (.Values.cluster).basename }}.network.canton.global"
   - "splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
   - "wallet.splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
   - "scan.sv-1.svc.{{ (.Values.cluster).basename }}.network.canton.global"

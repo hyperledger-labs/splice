@@ -30,7 +30,7 @@ spec:
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "directory" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         ports:
         - containerPort: 5010
-          name: dir-api
+          name: directory-api
           protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
@@ -45,7 +45,7 @@ spec:
   selector:
     app: directory-app
   ports:
-  - name: dir-api
+  - name: directory-api
     port: 5010
     protocol: TCP
 {{- end}}

@@ -38,7 +38,7 @@ local testAuth(enabled) =
   else
     {};
 
-local validatorNodes(clusterAddress) = {
+local validatorNodes(clusterProtocol, clusterAddress) = {
   alice: {
     ledgerApi: { url: "http://localhost:6201" },
     jsonApi: { url: "http://localhost:3004/api/json-api/" },
@@ -66,8 +66,8 @@ local validatorNodes(clusterAddress) = {
     validator: { url: "http://localhost:5003" },
     wallet: { url: "http://localhost:5003", uiUrl: "http://localhost:3000" },
     splitwell: { url: "http://localhost:6113" },
-    directory: { url: clusterAddress + ":5010" },
-    scan: { url: clusterAddress + ":5012" },
+    directory: { url: clusterProtocol + "://" + "directory.sv-1.svc." + clusterAddress + "/api/v0/directory" },
+    scan: { url: clusterProtocol + "://" + clusterAddress + ":5012" },
   },
   scan: {
     scan: { url: "http://localhost:5012" },
@@ -86,9 +86,9 @@ local validatorNodes(clusterAddress) = {
   },
 };
 
-local services(node, clusterAddress) =
-  if (std.objectHas(validatorNodes(clusterAddress), node)) then
-    { services: validatorNodes(clusterAddress)[node] }
+local services(node, clusterProtocol, clusterAddress) =
+  if (std.objectHas(validatorNodes(clusterProtocol, clusterAddress), node)) then
+    { services: validatorNodes(clusterProtocol, clusterAddress)[node] }
   else
     error "Unknown node name " + node;
 
@@ -97,5 +97,6 @@ function(
   enableTestAuth,
   validatorNode,
   app,
+  clusterProtocol,
   clusterAddress
-) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterAddress)
+) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterProtocol, clusterAddress)

@@ -31,7 +31,7 @@ spec:
   - name: svcp-metrics
     port: 10013
     protocol: TCP
-  - name: dir-api
+  - name: directory-api
     port: 5010
     protocol: TCP
   - name: grpc-svc-adm
@@ -141,7 +141,7 @@ spec:
           name: svcp-metrics
           protocol: TCP
         - containerPort: 5010
-          name: dir-api
+          name: directory-api
           protocol: TCP
         - containerPort: 5005
           name: grpc-svc-adm

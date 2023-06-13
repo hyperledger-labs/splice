@@ -13,7 +13,7 @@ window.canton_network_config = {
     },
     directory: {
       // URL of the directory backend.
-      url: `https://directory.${cluster}`,
+      url: `https://directory.sv-1.svc.${cluster}/api/v0/directory`,
     },
     scan: {
       // URL of the scan app's HTTP API

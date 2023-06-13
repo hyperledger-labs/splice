@@ -216,8 +216,9 @@ local deployments(num, svConfig, config) =
     if num == 1 then [
       c.deployment(config, "directory-app", [
         {
-          name: "dir-api",
+          name: "directory-api",
           port: 5010,
+          internalOnly: true,
         },
       ], namespace=namespace, extraEnvVars=c.appAuthEnvBinding(config, "sv", "directory") + [{ name: "CN_APP_DIRECTORY_PARTICIPANT_ADDRESS", value: "participant.svc" }]),
       c.deployment(config, "svc-app", [

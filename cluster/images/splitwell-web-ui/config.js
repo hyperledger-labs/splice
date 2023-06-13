@@ -28,7 +28,7 @@ window.canton_network_config = {
     },
     directory: {
       // URL of the directory backend. Note that this is not (yet) exposed over TLS.
-      url: `https://directory.${cluster}`,
+      url: `https://directory.sv-1.svc.${cluster}/api/v0/directory`,
     },
     scan: {
       // URL of the scan app's HTTP API

@@ -322,9 +322,12 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     clue(
       "Add a phantom SV and stop SV3 so that SV4 can't gather enough confirmations just yet"
     ) {
-      addPhantomSv()
-      sv3.stop()
-      eventually() { sv1.getSvcInfo().svcRules.payload.members should have size 4 }
+      actAndCheck(
+        "Add phantom Sv and stop sv3", {
+          addPhantomSv()
+          sv3.stop()
+        },
+      )("there are 4 members", _ => sv1.getSvcInfo().svcRules.payload.members should have size 4)
       // We now need 3 confirmations to execute an action, but only sv1 and sv2 are active.
     }
     clue("SV4 starts") {
