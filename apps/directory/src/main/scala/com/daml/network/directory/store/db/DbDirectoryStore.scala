@@ -1,5 +1,8 @@
 package com.daml.network.directory.store.db
 
+import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.directory.{DirectoryEntry, DirectoryInstall}
 import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.DirectoryStore
@@ -10,7 +13,7 @@ import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithout
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -18,7 +21,9 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
 import io.circe.Json
+import slick.dbio
 
 class DbDirectoryStore(
     override val providerParty: PartyId,
@@ -39,12 +44,51 @@ class DbDirectoryStore(
     )
     with DirectoryStore
     with AcsTables
-    with AcsQueries {
+    with AcsQueries
+    with NamedLogging {
 
   import storage.api.jdbcProfile.api.*
+  import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.{waitUntilAcsIngested, lastIngestedOffset}
 
   def storeId: Int = multiDomainAcsStore.storeId
+
+  override def ingestionInsert(
+      createdEvent: CreatedEvent
+  )(implicit tc: TraceContext): Either[String, dbio.DBIO[_]] = {
+    DirectoryAcsStoreRowData.fromCreatedEvent(createdEvent).map {
+      case DirectoryAcsStoreRowData(
+            contract,
+            contractExpiresAt,
+            directoryInstallUser,
+            directoryEntryName,
+            directoryEntryOwner,
+            subscriptionContextContractId,
+            subscriptionNextPaymentDueAt,
+          ) =>
+        val safeDirectoryName = directoryEntryName.map(lengthLimited)
+        val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
+        val templateId = contract.identifier
+        val createArguments = contract.toJson.payload
+        val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
+        val contractMetadataContractKeyHash =
+          lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
+        val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
+        sqlu"""
+              insert into directory_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal,
+                                        contract_expires_at, directory_install_user, directory_entry_name,
+                                        directory_entry_owner, subscription_context_contract_id,
+                                        subscription_next_payment_due_at)
+              values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal,
+                      $contractExpiresAt, $directoryInstallUser, $safeDirectoryName,
+                      $directoryEntryOwner, $subscriptionContextContractId,
+                      $subscriptionNextPaymentDueAt)
+              on conflict do nothing
+            """
+    }
+  }
 
   override def lookupInstallByUserWithOffset(user: PartyId)(implicit tc: TraceContext): Future[
     MultiDomainAcsStore.QueryResult[Option[Contract[DirectoryInstall.ContractId, DirectoryInstall]]]

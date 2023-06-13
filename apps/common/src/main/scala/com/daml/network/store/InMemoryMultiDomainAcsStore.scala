@@ -712,7 +712,7 @@ object InMemoryMultiDomainAcsStore {
       val addedArchivedTombstones = Seq.newBuilder[ContractId[_]]
 
       val stNew = Trees.foldTree(tx, this)(
-        (st, ev, _) => {
+        onCreate = (st, ev, _) => {
           if (p(ev)) {
             val location = ContractLocation(new ContractId(ev.getContractId), domain)
             val (stNew, summary) = st.ingestCreatedEvent(
@@ -733,7 +733,7 @@ object InMemoryMultiDomainAcsStore {
             st
           }
         },
-        (st, ev, _) => {
+        onExercise = (st, ev, _) => {
           if (ev.isConsuming) {
             val cid = new ContractId(ev.getContractId)
             val (newSt, summary) = st.ingestArchivedEvent(cid)

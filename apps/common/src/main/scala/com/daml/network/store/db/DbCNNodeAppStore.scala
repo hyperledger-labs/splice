@@ -1,5 +1,6 @@
 package com.daml.network.store.db
 
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   CNNodeAppStore,
@@ -12,6 +13,8 @@ import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.tracing.TraceContext
+import slick.dbio.DBIO
 
 import scala.concurrent.ExecutionContext
 
@@ -41,6 +44,7 @@ abstract class DbCNNodeAppStore[
       acsContractFilter,
       txLogParser,
       retryProvider,
+      (evt, tc) => ingestionInsert(evt)(tc),
     )
 
   override def txLog: TxLogStore[TXI, TXE] = new InMemoryMultiDomainAcsStore(
@@ -56,6 +60,10 @@ abstract class DbCNNodeAppStore[
       loggerFactory,
       retryProvider,
     )
+
+  def ingestionInsert(createdEvent: CreatedEvent)(implicit
+      tc: TraceContext
+  ): Either[String, DBIO[?]]
 
   override def close(): Unit = ()
 }

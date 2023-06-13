@@ -2,19 +2,14 @@ package com.daml.network.store
 
 import akka.actor.ActorSystem
 import cats.syntax.foldable.*
-import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.codegen.java.cn.scripts.testwallet.TestDeliveryOffer
 import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.{DeliveryOffer, DeliveryOfferView}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.ledger.api.{
-  ActiveContract,
-  TransferEvent,
-  TransferUpdate,
-  TransactionTreeUpdate,
-}
+import com.daml.network.environment.ledger.api.{TransferEvent, TransactionTreeUpdate}
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
@@ -38,14 +33,6 @@ abstract class MultiDomainAcsStoreTest[
 
   import MultiDomainAcsStore.*
   import MultiDomainAcsStore.InterfaceImplementation
-
-  private var offsetCounter = 0
-
-  private def nextOffset: String = {
-    val offset = "%08d".format(offsetCounter)
-    offsetCounter += 1
-    offset
-  }
 
   private var transferCounter = 0
   private def nextTransferId: String = {
@@ -91,96 +78,6 @@ abstract class MultiDomainAcsStoreTest[
   }
 
   protected def mkStore(): Store
-
-  private def mkCreateTx[TCid <: ContractId[T], T](
-      offset: String,
-      createRequests: Seq[Contract[TCid, T]],
-  ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent))
-
-  private def acs[TCid <: ContractId[T], T](
-      acs: Seq[(Contract[TCid, T], DomainId)] = Seq.empty,
-      transferOuts: Seq[(Contract[TCid, T], DomainId, DomainId, String)] = Seq.empty,
-      acsOffset: String = nextOffset,
-  )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
-    _ <- store.ingestionSink.initialize()
-    _ <- store.ingestionSink.ingestAcs(
-      acsOffset,
-      acs.map { case (contract, domain) => ActiveContract(domain, toCreatedEvent(contract)) },
-      transferOuts.map { case (c, sourceDomain, targetDomain, tfid) =>
-        toInFlightTransferOutEvent(
-          c,
-          tfid,
-          sourceDomain,
-          targetDomain,
-        )
-      },
-    )
-  } yield ()
-
-  // Convenient syntax to make the tests easy to read.
-  private implicit class DomainSyntax(private val domain: DomainId) {
-
-    def create[TCid <: ContractId[T], T](
-        c: Contract[TCid, T],
-        offset: String = nextOffset,
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransactionTreeUpdate(
-          mkCreateTx(
-            offset,
-            Seq(c),
-          )
-        ),
-      )
-    def archive[TCid <: ContractId[T], T](
-        c: Contract[TCid, T]
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransactionTreeUpdate(
-          mkTx(nextOffset, Seq(toArchivedEvent(c)))
-        ),
-      )
-
-    def transferOut[TCid <: ContractId[T], T](
-        contractAndDomain: (Contract[TCid, T], DomainId),
-        transferId: String,
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransferUpdate(
-          mkTransfer(
-            nextOffset,
-            toTransferOutEvent(
-              contractAndDomain._1.contractId,
-              transferId,
-              domain,
-              contractAndDomain._2,
-            ),
-          )
-        ),
-      )
-
-    def transferIn[TCid <: ContractId[T], T](
-        contractAndDomain: (Contract[TCid, T], DomainId),
-        transferId: String,
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransferUpdate(
-          mkTransfer(
-            nextOffset,
-            toTransferInEvent(
-              contractAndDomain._1,
-              transferId,
-              contractAndDomain._2,
-              domain,
-            ),
-          )
-        ),
-      )
-  }
 
   protected type Store = S
   private type C = Contract[AppRewardCoupon.ContractId, AppRewardCoupon]

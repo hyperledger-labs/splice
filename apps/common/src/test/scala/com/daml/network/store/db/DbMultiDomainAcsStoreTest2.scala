@@ -46,6 +46,8 @@ class DbMultiDomainAcsStoreTest2
       txFilter,
       TestTxLogStoreParser,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      // TODO (#5483): when merging with DbMultiDomainAcsStoreTest(1), replace with the implementation there
+      (_, _) => Left("unimplemented"),
     )
   }
 

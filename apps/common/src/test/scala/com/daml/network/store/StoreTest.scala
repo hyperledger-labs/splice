@@ -12,7 +12,14 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.google.protobuf
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
-import com.daml.network.environment.ledger.api.{InFlightTransferOutEvent, Transfer, TransferEvent}
+import com.daml.network.environment.ledger.api.{
+  ActiveContract,
+  InFlightTransferOutEvent,
+  TransactionTreeUpdate,
+  Transfer,
+  TransferEvent,
+  TransferUpdate,
+}
 import com.daml.network.util.{Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
@@ -22,6 +29,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
 
 import java.time.Instant
+import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -208,6 +216,105 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   )
 
   protected def mkValidatorRewardCoupon(i: Int) = validatorRewardCoupon(i, userParty(i))
+
+  private var offsetCounter = 0
+
+  private def nextOffset: String = {
+    val offset = "%08d".format(offsetCounter)
+    offsetCounter += 1
+    offset
+  }
+
+  protected def mkCreateTx[TCid <: ContractId[T], T](
+      offset: String,
+      createRequests: Seq[Contract[TCid, T]],
+  ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent))
+
+  protected def acs[TCid <: ContractId[T], T](
+      acs: Seq[(Contract[TCid, T], DomainId)] = Seq.empty,
+      transferOuts: Seq[(Contract[TCid, T], DomainId, DomainId, String)] = Seq.empty,
+      acsOffset: String = nextOffset,
+  )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
+    _ <- store.ingestionSink.initialize()
+    _ <- store.ingestionSink.ingestAcs(
+      acsOffset,
+      acs.map { case (contract, domain) => ActiveContract(domain, toCreatedEvent(contract)) },
+      transferOuts.map { case (c, sourceDomain, targetDomain, tfid) =>
+        toInFlightTransferOutEvent(
+          c,
+          tfid,
+          sourceDomain,
+          targetDomain,
+        )
+      },
+    )
+  } yield ()
+
+  // Convenient syntax to make the tests easy to read.
+  protected implicit class DomainSyntax(private val domain: DomainId) {
+
+    def create[TCid <: ContractId[T], T](
+        c: Contract[TCid, T],
+        offset: String = nextOffset,
+    )(implicit store: MultiDomainAcsStore) =
+      store.ingestionSink.ingestUpdate(
+        domain,
+        TransactionTreeUpdate(
+          mkCreateTx(
+            offset,
+            Seq(c),
+          )
+        ),
+      )
+
+    def archive[TCid <: ContractId[T], T](
+        c: Contract[TCid, T]
+    )(implicit store: MultiDomainAcsStore) =
+      store.ingestionSink.ingestUpdate(
+        domain,
+        TransactionTreeUpdate(
+          mkTx(nextOffset, Seq(toArchivedEvent(c)))
+        ),
+      )
+
+    def transferOut[TCid <: ContractId[T], T](
+        contractAndDomain: (Contract[TCid, T], DomainId),
+        transferId: String,
+    )(implicit store: MultiDomainAcsStore) =
+      store.ingestionSink.ingestUpdate(
+        domain,
+        TransferUpdate(
+          mkTransfer(
+            nextOffset,
+            toTransferOutEvent(
+              contractAndDomain._1.contractId,
+              transferId,
+              domain,
+              contractAndDomain._2,
+            ),
+          )
+        ),
+      )
+
+    def transferIn[TCid <: ContractId[T], T](
+        contractAndDomain: (Contract[TCid, T], DomainId),
+        transferId: String,
+    )(implicit store: MultiDomainAcsStore) =
+      store.ingestionSink.ingestUpdate(
+        domain,
+        TransferUpdate(
+          mkTransfer(
+            nextOffset,
+            toTransferInEvent(
+              contractAndDomain._1,
+              transferId,
+              contractAndDomain._2,
+              domain,
+            ),
+          )
+        ),
+      )
+  }
 
   protected def mkTx(offset: String, events: Seq[TreeEvent]): TransactionTree = {
     val eventsWithId = events.zipWithIndex.map { case (e, i) => withEventId(e, s"$offset:$i") }

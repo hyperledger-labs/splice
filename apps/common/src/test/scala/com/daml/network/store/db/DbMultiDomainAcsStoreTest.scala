@@ -1,6 +1,7 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.api.v1.value.Identifier
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
@@ -32,7 +33,7 @@ class DbMultiDomainAcsStoreTest
   "DbMultiDomainAcsStore" should {
 
     "stream rows" in {
-      val store = mkStore()
+      implicit val store = mkStore()
       val coupons = (1 to 3).map(n => appRewardCoupon(n, svcParty))
       val seenCoupons =
         new AtomicReference(Seq.empty[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]])
@@ -43,11 +44,11 @@ class DbMultiDomainAcsStoreTest
       for {
         _ <- store.ingestionSink.initialize()
         _ <- store.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty)
-        _ <- create(store.storeId, coupons.head)
+        _ <- dummyDomain.create(coupons.head)
         _ = eventually()(seenCoupons.get() should be(Seq(coupons.head)))
-        _ <- create(store.storeId, coupons(1))
+        _ <- dummyDomain.create(coupons(1))
         _ = eventually()(seenCoupons.get() should be(coupons.take(2)))
-        _ <- create(store.storeId, coupons(2))
+        _ <- dummyDomain.create(coupons(2))
         _ <- done
       } yield {
         seenCoupons.get() should be(coupons)
@@ -67,30 +68,42 @@ class DbMultiDomainAcsStoreTest
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    val unusedTxFilter = MultiDomainAcsStore
-      .SimpleContractFilter(PartyId.tryFromProtoPrimitive("aaaa::bbbb"), Map.empty, Map.empty)
+    val contractFilter = MultiDomainAcsStore
+      .SimpleContractFilter(
+        PartyId.tryFromProtoPrimitive("aaaa::bbbb"),
+        Map(AppRewardCoupon.COMPANION.TEMPLATE_ID -> (_ => true)),
+        Map.empty,
+      )
 
-    new DbMultiDomainAcsStore(
-      storage,
-      "acs_store_template",
-      storeDescriptor,
-      _ => Future.successful(DomainId.tryFromString("domain1::domain")),
-      loggerFactory,
-      unusedTxFilter,
-      TestTxLogStoreParser,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
-    )
+    lazy val store
+        : DbMultiDomainAcsStore[StoreTest.TestTxLogIndexRecord, StoreTest.TestTxLogEntry] =
+      new DbMultiDomainAcsStore(
+        storage,
+        "acs_store_template",
+        storeDescriptor,
+        _ => Future.successful(DomainId.tryFromString("domain1::domain")),
+        loggerFactory,
+        contractFilter,
+        TestTxLogStoreParser,
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+        (evt, _) => Right(create(store.storeId, evt)),
+      )
+    store
   }
 
   private var eventNumber = 0L
   private def create(
       storeId: Int,
-      contract: Contract[AppRewardCoupon.ContractId, AppRewardCoupon],
-  ) = {
+      evt: CreatedEvent,
+  ): DBIO[Unit] = {
+    val contract = Contract
+      .fromCreatedEvent(AppRewardCoupon.COMPANION)(evt)
+      .valueOrFail("Failed to parse contract.")
+    val contractId = new ContractId[Any](evt.getContractId)
     val row = AcsStoreRowTemplate(
       storeId = storeId,
       eventNumber = eventNumber,
-      contractId = contract.contractId.asInstanceOf[ContractId[Any]],
+      contractId = contractId,
       templateId = TemplateId.fromIdentifier(
         Identifier.of(
           contract.identifier.getPackageId,
@@ -103,18 +116,13 @@ class DbMultiDomainAcsStoreTest
       contractMetadataContractKeyHash = Some(contract.metadata.contractKeyHash.toStringUtf8),
       contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray,
     )
-    storage
-      .queryAndUpdate(
-        insertRowIfNotExists(AcsStoreTemplateTable)(
-          _.contractId === contract.contractId.asInstanceOf[ContractId[Any]],
-          row,
-        ),
-        "insert",
-      )
-      .map { result =>
-        eventNumber += 1
-        result
-      }
+    insertRowIfNotExists(AcsStoreTemplateTable)(
+      _.contractId === contractId,
+      row,
+    ).map { result =>
+      eventNumber += 1
+      result
+    }
   }
 
   // we can just use the template table for these

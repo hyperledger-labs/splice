@@ -4,19 +4,21 @@ import akka.NotUsed
 import akka.stream.DelayOverflowStrategy
 import akka.stream.scaladsl.Source
 import cats.implicits.*
-import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.{CreatedEvent, Template}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   InFlightTransferOutEvent,
+  TransactionTreeUpdate,
   TransferEvent,
+  TransferUpdate,
   TreeUpdate,
 }
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.*
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, TemplateJsonDecoder, Trees}
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -27,6 +29,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.unused
+import scala.collection.immutable.VectorMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.DurationInt
 
@@ -39,6 +42,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     contractFilter: MultiDomainAcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     @unused retryProvider: RetryProvider,
+    ingestInsert: (CreatedEvent, TraceContext) => Either[String, slick.dbio.DBIO[?]],
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -352,10 +356,92 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       }
     }
 
-    // TODO(#5481): Implement ingesting ACS/TxLog data.
+    // TODO (#5623) : update txlog tables too
     override def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
         traceContext: TraceContext
-    ): Future[Unit] = ???
+    ): Future[Unit] = {
+      for {
+        (offset, todo) <- getIngestionWork(transfer)
+        _ <- ingestWork(offset, todo)
+      } yield ()
+    }
+
+    private def getIngestionWork(transfer: TreeUpdate): Future[(String, WorkTodo)] = {
+      transfer match {
+        case TransferUpdate(_) =>
+          // TODO (#5314): support transfers
+          Future.failed(new UnsupportedOperationException("Transfers are unsupported."))
+        case TransactionTreeUpdate(tree) =>
+          Future {
+            (
+              tree.getOffset,
+              Trees.foldTree(tree, WorkTodo(VectorMap.empty))(
+                onCreate = (st, ev, _) => {
+                  if (contractFilter.contains(ev)) {
+                    WorkTodo(st.todo + (ev.getContractId -> Insert(ev)))
+                  } else {
+                    st
+                  }
+                },
+                onExercise = (st, ev, _) => {
+                  if (ev.isConsuming) {
+                    // optimization: a delete on a contract cancels-out with the corresponding insert
+                    if (st.todo.contains(ev.getContractId)) {
+                      WorkTodo(st.todo - ev.getContractId)
+                    } else {
+                      WorkTodo(
+                        st.todo + (ev.getContractId -> Delete(
+                          new ContractId[Any](ev.getContractId)
+                        ))
+                      )
+                    }
+                  } else {
+                    st
+                  }
+                },
+              ),
+            )
+          }
+      }
+    }
+
+    private def ingestWork(offset: String, workTodo: WorkTodo)(implicit
+        tc: TraceContext
+    ): Future[Unit] = {
+      storage
+        .queryAndUpdate(
+          DBIO
+            .sequence(
+              // TODO (#5643): batch inserts
+              // TODO (#5645): implement a summary of changes
+              workTodo.todo.toVector.map {
+                case (_, Insert(evt)) =>
+                  ingestInsert(evt, tc) match {
+                    case Left(err) =>
+                      val errMsg =
+                        s"Item at offset $offset with contract id ${evt.getContractId} cannot be ingested: $err"
+                      logger.error(errMsg)
+                      throw new IllegalArgumentException(errMsg)
+                    case Right(action) =>
+                      action.map(_ => ())
+                  }
+                case (_, Delete(contractId)) =>
+                  sqlu"""
+                         delete from #$tableName
+                         where contract_id = $contractId
+                        """.map(_ => ())
+              } :+ updateOffset(offset)
+            )
+            .transactionally
+            .map(_ => ()),
+          "ingest tree",
+        )
+    }
+
+    sealed trait OperationToDo
+    case class Insert(evt: CreatedEvent) extends OperationToDo
+    case class Delete(id: ContractId[Any]) extends OperationToDo
+    case class WorkTodo(todo: VectorMap[String, OperationToDo])
   }
 
   override def close(): Unit = ()

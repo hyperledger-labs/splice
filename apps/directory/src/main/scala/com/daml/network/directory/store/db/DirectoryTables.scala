@@ -1,6 +1,7 @@
 package com.daml.network.directory.store.db
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionContext
 import com.daml.network.store.db.AcsTables
@@ -9,6 +10,10 @@ import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.PartyId
 import io.circe.Json
 import shapeless.HNil
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.util.Contract
+import com.daml.network.util.Contract.Companion
 
 object DirectoryTables extends AcsTables {
   import profile.api.*
@@ -31,6 +36,125 @@ object DirectoryTables extends AcsTables {
       subscriptionContextContractId: Option[ContractId[SubscriptionContext]] = None,
       subscriptionNextPaymentDueAt: Option[Timestamp] = None,
   )
+
+  case class DirectoryAcsStoreRowData(
+      contract: Contract[?, ?],
+      contractExpiresAt: Option[Timestamp],
+      directoryInstallUser: Option[PartyId],
+      directoryEntryName: Option[String],
+      directoryEntryOwner: Option[PartyId],
+      subscriptionContextContractId: Option[ContractId[SubscriptionContext]],
+      subscriptionNextPaymentDueAt: Option[Timestamp],
+  )
+
+  object DirectoryAcsStoreRowData {
+    def fromCreatedEvent(createdEvent: CreatedEvent): Either[String, DirectoryAcsStoreRowData] = {
+      createdEvent.getTemplateId match {
+        case directoryCodegen.DirectoryInstall.TEMPLATE_ID =>
+          tryToDecode(directoryCodegen.DirectoryInstall.COMPANION, createdEvent) { contract =>
+            DirectoryAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              directoryInstallUser = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+              directoryEntryName = None,
+              directoryEntryOwner = None,
+              subscriptionContextContractId = None,
+              subscriptionNextPaymentDueAt = None,
+            )
+          }
+        case directoryCodegen.DirectoryInstallRequest.TEMPLATE_ID =>
+          tryToDecode(directoryCodegen.DirectoryInstallRequest.COMPANION, createdEvent) {
+            contract =>
+              DirectoryAcsStoreRowData(
+                contract = contract,
+                contractExpiresAt = None,
+                directoryInstallUser = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+                directoryEntryName = None,
+                directoryEntryOwner = None,
+                subscriptionContextContractId = None,
+                subscriptionNextPaymentDueAt = None,
+              )
+          }
+        case directoryCodegen.DirectoryEntry.TEMPLATE_ID =>
+          tryToDecode(directoryCodegen.DirectoryEntry.COMPANION, createdEvent) { contract =>
+            DirectoryAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              directoryInstallUser = None,
+              directoryEntryName = Some(contract.payload.name),
+              directoryEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+              subscriptionContextContractId = None,
+              subscriptionNextPaymentDueAt = None,
+            )
+          }
+        case directoryCodegen.DirectoryEntryContext.TEMPLATE_ID =>
+          tryToDecode(directoryCodegen.DirectoryEntryContext.COMPANION, createdEvent) { contract =>
+            DirectoryAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              directoryInstallUser = None,
+              directoryEntryName = Some(contract.payload.name),
+              directoryEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+              subscriptionContextContractId = None,
+              subscriptionNextPaymentDueAt = None,
+            )
+          }
+        case subsCodegen.SubscriptionIdleState.TEMPLATE_ID =>
+          tryToDecode(subsCodegen.SubscriptionIdleState.COMPANION, createdEvent) { contract =>
+            DirectoryAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              directoryInstallUser = None,
+              directoryEntryName = None,
+              directoryEntryOwner = None,
+              subscriptionContextContractId = Some(contract.payload.subscriptionData.context),
+              subscriptionNextPaymentDueAt =
+                Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
+            )
+          }
+        case subsCodegen.SubscriptionInitialPayment.TEMPLATE_ID =>
+          tryToDecode(subsCodegen.SubscriptionInitialPayment.COMPANION, createdEvent) { contract =>
+            DirectoryAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              directoryInstallUser = None,
+              directoryEntryName = None,
+              directoryEntryOwner = None,
+              subscriptionContextContractId = Some(contract.payload.subscriptionData.context),
+              subscriptionNextPaymentDueAt = None,
+            )
+          }
+        case subsCodegen.SubscriptionPayment.TEMPLATE_ID =>
+          tryToDecode(subsCodegen.SubscriptionPayment.COMPANION, createdEvent) { contract =>
+            DirectoryAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              directoryInstallUser = None,
+              directoryEntryName = None,
+              directoryEntryOwner = None,
+              subscriptionContextContractId = Some(contract.payload.subscriptionData.context),
+              subscriptionNextPaymentDueAt = None,
+            )
+          }
+        case t =>
+          Left(s"Template $t cannot be decoded as an entry for the directory store.")
+      }
+    }
+
+    private def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?]](
+        companion: Companion.Template[TCid, T],
+        createdEvent: CreatedEvent,
+    )(
+        toData: Contract[TCid, T] => DirectoryAcsStoreRowData
+    ): Either[String, DirectoryAcsStoreRowData] = {
+      Contract
+        .fromCreatedEvent(companion)(createdEvent)
+        .map(toData)
+        .toRight(
+          s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
+        )
+    }
+  }
 
   class DirectoryAcsStore(_tableTag: Tag)
       extends AcsStoreTemplate[DirectoryAcsStoreRow](_tableTag, "directory_acs_store") {

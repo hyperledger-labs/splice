@@ -31,8 +31,24 @@ trait AcsJdbcTypes {
   protected implicit lazy val timestampGetResultOption: GetResult[Option[Timestamp]] =
     GetResult.GetLongOption.andThen(_.map(Timestamp.assertFromLong))
 
+  protected implicit lazy val timestampSetParameter: SetParameter[Timestamp] =
+    (ts: Timestamp, pp: PositionedParameters) => SetParameter.SetLong.apply(ts.micros, pp)
+
+  protected implicit lazy val timestampSetParameterOption: SetParameter[Option[Timestamp]] =
+    (ts: Option[Timestamp], pp: PositionedParameters) =>
+      SetParameter.SetLongOption.apply(ts.map(_.micros), pp)
+
   protected implicit def contractIdJdbcType[T]: JdbcType[ContractId[T]] =
     MappedColumnType.base[ContractId[T], String](_.contractId, new ContractId[T](_))
+
+  protected implicit def contractIdSetParameter[T]: SetParameter[ContractId[T]] =
+    (c: ContractId[T], pp: PositionedParameters) =>
+      implicitly[SetParameter[String2066]].apply(lengthLimited(c.contractId), pp)
+
+  protected implicit def contractIdSetParameterOption[T]: SetParameter[Option[ContractId[T]]] =
+    (cId: Option[ContractId[T]], pp: PositionedParameters) =>
+      implicitly[SetParameter[Option[String2066]]]
+        .apply(cId.map(c => lengthLimited(c.contractId)), pp)
 
   protected implicit def contractIdGetResult[T]: GetResult[ContractId[T]] =
     GetResult.GetString.andThen(new ContractId[T](_))
@@ -98,6 +114,11 @@ trait AcsJdbcTypes {
   protected implicit lazy val partyIdJdbcType: JdbcType[PartyId] =
     MappedColumnType.base[PartyId, String](_.toProtoPrimitive, PartyId.tryFromProtoPrimitive)
 
+  protected implicit lazy val partyIdSetParameterOption: SetParameter[Option[PartyId]] =
+    (partyId: Option[PartyId], pp: PositionedParameters) =>
+      implicitly[SetParameter[Option[String2066]]]
+        .apply(partyId.map(party => lengthLimited(party.toProtoPrimitive)), pp)
+
   protected implicit lazy val jsonJdbcType: JdbcType[Json] = new profile.DriverJdbcType[Json]() {
     override def sqlType: Int = java.sql.Types.OTHER
 
@@ -131,6 +152,11 @@ trait AcsJdbcTypes {
         .parse(value)
         .getOrElse(throw new IllegalStateException("JSONB column didn't contain valid JSON."))
   }
+
+  protected implicit lazy val jsonSetParameter: SetParameter[Json] =
+    (json: Json, pp: PositionedParameters) => {
+      pp.setObject(json.noSpaces, java.sql.Types.OTHER)
+    }
 
   /** The DB may truncate strings of unbounded length, so it's advised to use a LengthLimitedString instead.
     * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
