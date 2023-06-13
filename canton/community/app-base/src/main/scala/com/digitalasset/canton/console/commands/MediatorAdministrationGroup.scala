@@ -185,7 +185,7 @@ class MediatorAdministrationGroupWithInit(
         mediatorId,
         topologySnapshot,
         domainParameters.toInternal,
-        SequencerConnections.default(sequencerConnection),
+        SequencerConnections.single(sequencerConnection),
       )
     )
   }

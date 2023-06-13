@@ -62,7 +62,7 @@ object InitializeMediatorRequest {
       mediatorId,
       topologyState,
       domainParameters,
-      SequencerConnections.default(sequencerConnection),
+      SequencerConnections.single(sequencerConnection),
     )
   }
 }

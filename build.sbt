@@ -846,7 +846,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("org", "jline", _ @_*) => MergeStrategy.first
     // Dedup between ledger-api-java-proto (pulled in via Scala bindings)
     // and the copy of that inlined into bindings-java.
-    case PathList("com", "daml", "ledger", "api", "v1", _*) => MergeStrategy.first
+    case PathList("com", "daml", "ledger", "api", "v1" | "v2", _*) => MergeStrategy.first
     case PathList(
           "com",
           "digitalasset",

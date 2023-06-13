@@ -55,7 +55,7 @@ class MediatorAdminConnection(
       EnterpriseMediatorAdministrationCommands.InitializeX(
         domainId,
         domainParameters,
-        SequencerConnections.default(sequencerConnection),
+        SequencerConnections.single(sequencerConnection),
       )
     )
 }

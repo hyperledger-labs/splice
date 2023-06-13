@@ -262,7 +262,7 @@ class FoundingNodeInitializer(
       _ <- participantAdminConnection.registerDomain(
         DomainConnectionConfig(
           config.domains.global.alias,
-          sequencerConnections = SequencerConnections.default(domainNode.sequencerConnection),
+          sequencerConnections = SequencerConnections.single(domainNode.sequencerConnection),
           manualConnect = false,
           domainId = Some(domainId),
         )

@@ -466,7 +466,7 @@ file along with your dar changes.
 
 ### Bumping Our Canton fork
 
-Current Canton commit: `6529da97040ba8fbb3d639fdc5fd9c06abc2b315`
+Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
 
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
@@ -497,7 +497,7 @@ Current Canton commit: `6529da97040ba8fbb3d639fdc5fd9c06abc2b315`
       2. Set `version` in `CantonDependencies.scala` to the SDK version from Step 1.2
       3. Set `daml_version` in `nix/canton-sources.json` to the SDK version from Step 1.2
       4. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same version.
-      5. Change the JSON API hash in `jsonapi.nix`. To do so lhange a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `jsonapi.nix`, and then call `direnv reload`,
+      5. Change the JSON API hash in `jsonapi.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `jsonapi.nix`, and then call `direnv reload`,
          to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
          Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
       6.  Repeat the same with the sha256 of the protobufs in `daml_pbs.nix`.
@@ -520,8 +520,10 @@ Current Canton commit: `6529da97040ba8fbb3d639fdc5fd9c06abc2b315`
      - If the file defining the class exists in the OSS repo but not in our fork, copy it over manually. You should also fix `copy-canton.sh` to ensure it gets
        copied over correctly in the future.
      - If the file already exists in our fork, you may need to [update the build dependencies](#updating-canton-build-dependencies).
-6. Make a PR with your changes, so CI starts churning.
-7. If there are any, remove all `*.rej` files.
+6. Step 5 may have made changes to `package-lock.json` files; commit all of these changes.
+7. Run `sbt damlDarsLockFileUpdate` and commit the changes to `daml/dars.lock`.
+8. Make a PR with your changes, so CI starts churning.
+9. If there are any, remove all `*.rej` files.
 
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 
