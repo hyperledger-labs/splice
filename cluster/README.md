@@ -920,7 +920,6 @@ The Pulumi script depends on the following env variables to be defined (e.g. by 
 - ARTIFACTORY_PASSWORD: Your API key at digitalasset.jfrog.io (can be obtained by creating an API key in your user profile)
 
 
-Note that at the moment, the `sv-runbook` stack can *not* be deployed in parallel to the `full` CN deployment. If you need to spin up both, you will need to use two separate scratchnet clusters.
 To deploy the SV node following the runbook, cd to the scratchnet directory you wish to use, lock it, and run:
 
 `cncluster papply_sv <cluster running the global domain> [<artifactory charts version>]`
@@ -993,9 +992,6 @@ gcloud and local helm charts.
    ```
    cert-manager will already be setup so no need to do anything about that.
 9. You can reach the ingress at the usual address of you scratchnet, e.g., `https://scratchb.network.canton.global` or `https://sv.sv-1.svc.scratchb.network.canton.global`.
-
-Please remember that `cncluster reset` does not currently tear down anything deployed using Helm, so please
-make sure to delete manually any helm charts that were deployed manually.
 
 ## SV Operations
 
