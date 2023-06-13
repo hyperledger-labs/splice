@@ -17,6 +17,12 @@ Release Notes
 
 * Removed the ``svc-client`` config parameter from the SV app. The SVC app is no longer used for SV onboarding and initialization.
 
+* Bugfixes
+
+  * Fix a bug where the SV and validator app sometimes would stop
+    observing ledger updates if the participant was down for a longer
+    period of time and only recovered after a restart.
+
 2023-06-11
 ----------
 

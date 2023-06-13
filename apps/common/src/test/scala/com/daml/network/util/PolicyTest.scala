@@ -36,7 +36,15 @@ class PolicyTest extends AsyncFunSpec with BaseTest with HasExecutorService with
       val maxDelay = 250.millis
       implicit val jitter: Jitter = Jitter.none(maxDelay)
       val policy =
-        Backoff(logger, flagCloseable, maxRetries, maxDelay, maxDelay, "op", resetRetriesAfter)
+        Backoff(
+          logger,
+          flagCloseable,
+          maxRetries,
+          maxDelay,
+          maxDelay,
+          "op",
+          Some(resetRetriesAfter),
+        )
       policy(run(), AllExnRetryable)
     }
 

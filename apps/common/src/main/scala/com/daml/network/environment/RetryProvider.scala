@@ -293,27 +293,44 @@ class RetryProvider(
       )
     })
 
-  import RetryProvider.{AutomationRetryConfig, RetryConfig}
+  import RetryProvider.RetryConfig
 
   private val retryForAutomationConfig =
-    AutomationRetryConfig(
-      RetryConfig(
-        maxRetries = 35,
-        initialDelay = 200.millis,
-        maxDelay = 5.seconds,
-        resetRetriesAfter = 1.minute,
-      ),
-      outerLoopDelay = 5.seconds,
+    RetryConfig(
+      maxRetries = 35,
+      initialDelay = 200.millis,
+      maxDelay = 5.seconds,
+      resetRetriesAfter = None,
     )
+
+  private val retryForLongRunningAutomationConfig =
+    RetryConfig(
+      maxRetries = Int.MaxValue,
+      initialDelay = 200.millis,
+      maxDelay = 5.seconds,
+      resetRetriesAfter = Some(1.minute),
+    )
+
   private val retryForClientCallsConfig =
     RetryConfig(
       maxRetries = 10,
       initialDelay = 100.millis,
       maxDelay = 1.seconds,
-      resetRetriesAfter = 24.hours,
+      resetRetriesAfter = None,
     )
 
-  /** A retry intended for automation calls, retries forever. */
+  private def retryable(
+      operationName: String,
+      additionalCodes: Seq[Status.Code],
+  ): ExceptionRetryable = RetryProvider.RetryableError(
+    operationName,
+    additionalCodes,
+    transientDescription,
+    nonTransientDescription,
+    fatalBehavior,
+  )
+
+  /** A retry intended for automation calls that are expected to succeed eventually. Retries a bounded number of times. */
   def retryForAutomation[T](
       operationName: String,
       task: => Future[T],
@@ -323,30 +340,37 @@ class RetryProvider(
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[T] =
-    retryForAutomation(
+    retry(
       operationName,
       task,
       logger,
-      RetryProvider.RetryableError(
+      retryForAutomationConfig,
+      retryable(
         _,
         additionalCodes,
-        transientDescription,
-        nonTransientDescription,
-        fatalBehavior,
       ),
     )
 
-  /** A retry intended for automation calls, retries forever. */
-  private def retryForAutomation[T](
+  /** A retry intended for automation that is expected to run forever, e.g., ledger ingestion. Retries forever. */
+  def retryForLongRunningAutomation[T](
       operationName: String,
       task: => Future[T],
       logger: TracedLogger,
-      retryable: String => ExceptionRetryable,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[T] =
-    retry(operationName, task, logger, retryForAutomationConfig.config, retryable)
+    retry(
+      operationName,
+      task,
+      logger,
+      retryForLongRunningAutomationConfig,
+      retryable(
+        _,
+        additionalCodes,
+      ),
+    )
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T](
@@ -362,12 +386,9 @@ class RetryProvider(
       operationName,
       task,
       logger,
-      RetryProvider.RetryableError(
+      retryable(
         _,
         additionalCodes,
-        transientDescription,
-        nonTransientDescription,
-        fatalBehavior,
       ),
     )
 
@@ -418,17 +439,7 @@ object RetryProvider {
       maxRetries: Int,
       initialDelay: FiniteDuration,
       maxDelay: Duration,
-      resetRetriesAfter: FiniteDuration,
-  )
-
-  /** Retry config for automation. For automation we use an outer loop that retries forever
-    * with a fixed delay `outerLoopDelay` and an inner loop with exponential backoff configured
-    * by `config`. This allows us to quickly retry on transient failures while
-    * never running out of retries.
-    */
-  final case class AutomationRetryConfig(
-      config: RetryConfig,
-      outerLoopDelay: FiniteDuration,
+      resetRetriesAfter: Option[FiniteDuration],
   )
 
   def apply(

@@ -20,7 +20,7 @@ import com.digitalasset.canton.util.retry.RetryWithDelay.{RetryOutcome, RetryTer
 import com.digitalasset.canton.util.{DelayUtil, LoggerUtil}
 import org.slf4j.event.Level
 
-import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.DurationConverters.*
 import scala.util.control.NonFatal
@@ -103,12 +103,12 @@ abstract class RetryWithDelay(
     actionable: Option[String], // How to mitigate the error
     initialDelay: FiniteDuration,
     totalMaxRetries: Int,
-    resetRetriesAfter: FiniteDuration,
+    resetRetriesAfter: Option[FiniteDuration],
     flagCloseable: FlagCloseable,
     retryLogLevel: Option[Level],
 ) extends Policy(logger) {
 
-  private val complainAfterRetries: Int = 10
+  private val complainAfterRetries: Int = 60
 
   private val actionableMessage: String = actionable.map(" " + _).getOrElse("")
 
@@ -264,7 +264,10 @@ abstract class RetryWithDelay(
                       )
                     import scala.math.Ordering.Implicits.*
                     val (nextTotalRetries, nextDelayIs) =
-                      if (resetRetriesAfter.toJava <= JDuration.between(startedAt, finishedAt))
+                      if (
+                        resetRetriesAfter
+                          .fold(false)(_.toJava <= JDuration.between(startedAt, finishedAt))
+                      )
                         (0, initialDelay)
                       else
                         (totalRetries + 1, nextDelay(totalRetries + 1, delay))
@@ -375,7 +378,7 @@ final case class Directly(
       None,
       Duration.Zero,
       maxRetries,
-      resetRetriesAfter = 24.hours,
+      resetRetriesAfter = None,
       flagCloseable,
       retryLogLevel,
     ) {
@@ -400,7 +403,7 @@ final case class Pause(
       actionable,
       delay,
       maxRetries,
-      resetRetriesAfter = 24.hours,
+      resetRetriesAfter = None,
       flagCloseable,
       retryLogLevel,
     ) {
@@ -448,7 +451,7 @@ final case class Backoff(
     initialDelay: FiniteDuration,
     maxDelay: Duration,
     operationName: String,
-    resetRetriesAfter: FiniteDuration = 24.hours,
+    resetRetriesAfter: Option[FiniteDuration] = None,
     longDescription: String = "",
     actionable: Option[String] = None,
     retryLogLevel: Option[Level] = None,
