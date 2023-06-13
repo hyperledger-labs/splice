@@ -446,6 +446,24 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
         .toSeq
     )
 
+  override def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
+      ec: ExecutionContext
+  ): Future[A] = {
+    import cats.implicits.*
+
+    Future {
+      stateVar.txLog
+        .foldM[Either[A, *], Z](init) { case (z, t) => p(z, t.payload) }
+        .fold(
+          identity,
+          _ =>
+            throw Status.NOT_FOUND
+              .withDescription("No matching log indices found")
+              .asRuntimeException,
+        )
+    }
+  }
+
   override def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
       ec: ExecutionContext
   ): Future[TXI] =

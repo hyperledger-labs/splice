@@ -57,6 +57,10 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
   def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
       ec: ExecutionContext
   ): Future[Seq[TXI]]
+
+  def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
+      ec: ExecutionContext
+  ): Future[A]
 }
 
 object TxLogStore {

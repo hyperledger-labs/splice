@@ -387,4 +387,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   )(implicit ec: ExecutionContext) = ???
 
   override def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit ec: ExecutionContext) = ???
+
+  override def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
+      ec: ExecutionContext
+  ): Future[A] = ???
 }

@@ -15,7 +15,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
 import scala.concurrent.*
-
 import java.time.Instant
 
 class InMemoryScanStore(
@@ -81,24 +80,24 @@ class InMemoryScanStore(
   }
 
   override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] = {
-    // TODO(#2930): For now, this is simply the latest closed mining round, since we are computing everything on-demand
+    // TODO(#2930): For now, this is the latest closed mining round which has a corresponding open mining round in the log, since we are computing everything on-demand
     // Note that for all existing (and currently planned) queries, we could make this also the latest open mining round
     // that has been archived, but for now we're going for the later event of the round closing, to be a bit more future-proof.
-    for {
-      round <- txLog.getLatestTxLogIndex((indexRecord) =>
-        indexRecord match {
-          case _: ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord => true
-          case _ => false
-        }
-      )
-    } yield {
-      round match {
-        case r: ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord =>
-          (r.round, r.effectiveAt)
-        case _ =>
-          throw Status.INTERNAL.withDescription("Unexpected log entry type").asRuntimeException()
+
+    type Closed = ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord
+    type Open = ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord
+
+    txLog
+      .findLatestTxLogIndex[Closed, Map[Long, Closed]](Map.empty) {
+        case (closed, r: Closed) =>
+          (closed + (r.round -> r)).asRight
+        case (closed, r: Open) =>
+          closed.get(r.round).fold(closed.asRight[Closed]) { c: Closed =>
+            c.asLeft[Map[Long, Closed]]
+          }
+        case (z, _) => z.asRight
       }
-    }
+      .map(r => r.round -> r.effectiveAt)
   }
 
   override def verifyDataExistsForEndOfRound(
