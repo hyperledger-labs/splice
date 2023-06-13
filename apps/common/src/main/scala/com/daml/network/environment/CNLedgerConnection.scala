@@ -420,6 +420,21 @@ class CNLedgerConnection(
       )
     } yield partyId
 
+  def waitForPartyOnLedgerApi(
+      party: PartyId
+  ): Future[Unit] =
+    retryProvider.waitUntil(
+      show"Party $party is observed on ledger API",
+      client.getParties(Seq(party)).map { result =>
+        if (result.isEmpty) {
+          throw Status.NOT_FOUND
+            .withDescription(show"Party $party is not visible on ledger API")
+            .asRuntimeException()
+        }
+      },
+      logger,
+    )
+
   def getUser(user: String): Future[User] = client.getUser(user)
 
   private def createPartyAndUser(

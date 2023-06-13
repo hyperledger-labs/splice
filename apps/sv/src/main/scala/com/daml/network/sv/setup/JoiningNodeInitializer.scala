@@ -286,6 +286,9 @@ class JoiningNodeInitializer(
                 // Wait on the SV store because the SVC party is not yet onboarded.
                 _ <- waitForSvOnboardingConfirmedInSvStore()
                 _ <- startHostingSvcPartyInParticipant()
+                // We need to wait for the ledger API server to see the party otherwise the
+                // grantUserRights call will fail.
+                _ <- initConnection.waitForPartyOnLedgerApi(svStore.key.svcParty)
                 _ <- svStoreWithIngestion.connection.grantUserRights(
                   config.ledgerApiUser,
                   Seq.empty,
