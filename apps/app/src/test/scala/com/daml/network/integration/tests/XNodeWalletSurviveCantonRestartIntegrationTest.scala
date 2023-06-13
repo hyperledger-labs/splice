@@ -89,12 +89,6 @@ class XNodeWalletSurviveCantonRestartIntegrationTest
       }
       clue("Second run of Canton participant") {
         Using.resource(startCanton(cantonArgs, "wallet-survives-canton-restarts-2")) { _ =>
-          clue("Connect restarted participant to global domain again") {
-            eventuallySucceeds(timeUntilSuccess = 40.seconds) {
-              aliceValidator.participantClient.domains
-                .connect(DomainAlias.tryCreate("global"), "http://localhost:5008")
-            }
-          }
           clue("We can tap and list after Canton restart and domain reconnection") {
             eventuallySucceeds() {
               aliceWallet.tap(2)
