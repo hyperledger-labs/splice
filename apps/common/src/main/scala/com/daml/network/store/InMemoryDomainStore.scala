@@ -62,14 +62,15 @@ class InMemoryDomainStore(
               logger.debug(msg)
               throw Status.UNAVAILABLE.withDescription(msg).asRuntimeException()
             }
+            .map(domainId => {
+              logger.info(show"Success: connected to domain $alias with domain-id $domainId")
+              domainId
+            })
           val supervisedFuture =
             retryProvider.futureSupervisor.supervised(actionDesc)(connectedOrShutdown)
           (newState, supervisedFuture)
       }
-    ).flatten.map(domainId => {
-      logger.info(show"Success: connected to domain $alias with domain-id $domainId")
-      domainId
-    })
+    ).flatten
 
   private def nextDomainStateUpdate[T](
       previousState: InMemoryDomainStore.State
