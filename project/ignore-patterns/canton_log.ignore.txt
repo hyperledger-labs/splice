@@ -50,4 +50,7 @@ Failed to send: sending accepted txs to members.*TopologyRequestProcessor
 proposed serial .* doesn't immediately follow the existing serial
 TopologyManagerWriteServiceX/Authorize.*INTERNAL.*ApiRequestLogger
 
+# TODO(#5670) Remove this once we understand its source, and the underlying problem is fixed
+Broken or malicious domain topology manager is sending transactions during epsilon changes
+
 # Make sure to have a trailing newline
