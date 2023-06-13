@@ -34,6 +34,7 @@ pipeline_workflows_complete() {
 }
 
 START_TIME=$(date +%s)
+MAX_TIMEOUT_MINUTES=480
 
 wait_for_pipeline_to_complete() {
     pipeline_id=$1
@@ -43,11 +44,11 @@ wait_for_pipeline_to_complete() {
         sleep 5
         CURRENT_TIME=$(date +%s)
         DIFF=$((CURRENT_TIME - START_TIME))
-        # 240*60s, i.e., 240min
-        MAX=$((240 * 60))
+        # wait up to $MAX_TIMEOUT_MINUTES number of minutes
+        MAX=$((MAX_TIMEOUT_MINUTES * 60))
         if [[ $DIFF -ge $MAX ]]; then
-            echo "Waited for 240min, continuing anyway"
-            break
+            echo "Waited for $MAX_TIMEOUT_MINUTES min, but previous pipeline never became available. Quitting."
+            exit 1
         fi
     done
 }
