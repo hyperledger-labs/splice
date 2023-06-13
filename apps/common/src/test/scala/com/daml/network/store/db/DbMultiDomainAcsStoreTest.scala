@@ -78,8 +78,7 @@ class DbMultiDomainAcsStoreTest
       loggerFactory,
       unusedTxFilter,
       TestTxLogStoreParser,
-      FutureSupervisor.Noop,
-      RetryProvider(loggerFactory, timeouts),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
     )
   }
 

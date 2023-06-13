@@ -46,6 +46,7 @@ class SvcApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      futureSupervisor,
     ) {
 
   override def ensureUserPrimaryParty(connection: CNLedgerConnection) = Future.unit
@@ -65,7 +66,6 @@ class SvcApp(
           storage,
           config.domains,
           loggerFactory,
-          futureSupervisor,
           retryProvider,
         )
       )

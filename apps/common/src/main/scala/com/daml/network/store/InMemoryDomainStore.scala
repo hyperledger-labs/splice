@@ -4,7 +4,6 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -18,7 +17,6 @@ import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
 class InMemoryDomainStore(
     party: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
-    futureSupervisor: FutureSupervisor,
     retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
@@ -63,7 +61,8 @@ class InMemoryDomainStore(
                 .withDescription(show"Aborting $name because we're shutting down")
                 .asRuntimeException()
             }
-          val supervisedFuture = futureSupervisor.supervised(name)(connectedOrShutdown)
+          val supervisedFuture =
+            retryProvider.futureSupervisor.supervised(name)(connectedOrShutdown)
           (newState, supervisedFuture)
       }
     ).flatten

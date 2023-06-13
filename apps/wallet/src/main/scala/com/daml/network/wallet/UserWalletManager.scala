@@ -10,7 +10,6 @@ import com.daml.network.util.{Contract, HasHealth}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{RunOnShutdown, *}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -38,7 +37,6 @@ class UserWalletManager(
     scanConnection: ScanConnection,
     override val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
-    futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends AutoCloseable
     with NamedLogging
@@ -93,7 +91,8 @@ class UserWalletManager(
         )
       // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
       // without the entire node going down.
-      val userRetryProvider = RetryProvider(loggerFactory, retryProvider.timeouts)
+      val userRetryProvider =
+        RetryProvider(loggerFactory, retryProvider.timeouts, retryProvider.futureSupervisor)
       val walletService = new UserWalletService(
         ledgerClient,
         globalDomain,
@@ -107,7 +106,6 @@ class UserWalletManager(
         loggerFactory,
         scanConnection,
         timeouts,
-        futureSupervisor,
       )
 
       val wasUserAdded = endUserWalletsMap

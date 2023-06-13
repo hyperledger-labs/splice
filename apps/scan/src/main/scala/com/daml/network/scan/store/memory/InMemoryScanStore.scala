@@ -8,7 +8,6 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.Validat
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.{InMemoryCNNodeAppStore, TxLogStore}
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -21,7 +20,6 @@ class InMemoryScanStore(
     override val svcParty: PartyId,
     override protected[this] val scanConfig: ScanAppBackendConfig,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val futureSupervisor: FutureSupervisor,
     override protected val connection: CNLedgerConnection,
     override protected val retryProvider: RetryProvider,
 )(implicit

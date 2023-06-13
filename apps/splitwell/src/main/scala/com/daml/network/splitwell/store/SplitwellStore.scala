@@ -14,7 +14,6 @@ import com.daml.network.store.{
   TxLogStore,
 }
 import com.daml.network.util.Contract
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -184,7 +183,6 @@ object SplitwellStore {
       storage: Storage,
       domainConfig: SplitwellDomainConfig,
       loggerFactory: NamedLoggerFactory,
-      futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext
@@ -195,7 +193,6 @@ object SplitwellStore {
           providerParty,
           domainConfig,
           loggerFactory,
-          futureSupervisor,
           retryProvider,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")

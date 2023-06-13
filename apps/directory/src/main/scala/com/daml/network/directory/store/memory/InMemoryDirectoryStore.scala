@@ -6,7 +6,6 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -22,7 +21,6 @@ class InMemoryDirectoryStore(
     override val svcParty: PartyId,
     override protected[this] val domainConfig: DirectoryDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val futureSupervisor: FutureSupervisor,
     override protected val retryProvider: RetryProvider,
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory

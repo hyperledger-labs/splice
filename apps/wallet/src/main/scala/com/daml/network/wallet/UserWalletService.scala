@@ -10,7 +10,6 @@ import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -34,7 +33,6 @@ class UserWalletService(
     loggerFactory0: NamedLoggerFactory,
     scanConnection: ScanConnection,
     override protected val timeouts: ProcessingTimeout,
-    futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends FlagCloseable
     with NamedLogging
@@ -49,7 +47,6 @@ class UserWalletService(
       storage,
       globalDomain,
       loggerFactory,
-      futureSupervisor,
       // The store needs its own connection to expand tx-history entries
       ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
       retryProvider,

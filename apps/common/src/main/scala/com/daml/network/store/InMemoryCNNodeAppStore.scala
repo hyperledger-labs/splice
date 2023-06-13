@@ -12,16 +12,15 @@ abstract class InMemoryCNNodeAppStore[
     TXE <: TxLogStore.Entry[TXI],
 ](implicit protected val ec: ExecutionContext)
     extends CNNodeAppStore[TXI, TXE] {
-  protected def futureSupervisor: FutureSupervisor
 
   protected def retryProvider: RetryProvider
+  final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
 
   override val multiDomainAcsStore: InMemoryMultiDomainAcsStore[TXI, TXE] =
     new InMemoryMultiDomainAcsStore(
       loggerFactory,
       acsContractFilter,
       txLogParser,
-      futureSupervisor,
       retryProvider,
     )
 
@@ -31,7 +30,6 @@ abstract class InMemoryCNNodeAppStore[
     new InMemoryDomainStore(
       acsContractFilter.ingestionFilter.primaryParty,
       loggerFactory,
-      futureSupervisor,
       retryProvider,
     )
 

@@ -8,7 +8,6 @@ import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -27,7 +26,6 @@ class DbDirectoryStore(
     storage: DbStorage,
     override protected[this] val domainConfig: DirectoryDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val futureSupervisor: FutureSupervisor,
     override protected val retryProvider: RetryProvider,
 )(implicit
     override protected val ec: ExecutionContext,

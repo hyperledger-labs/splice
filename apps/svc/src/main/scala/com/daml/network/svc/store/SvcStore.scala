@@ -14,7 +14,6 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.svc.config.SvcDomainConfig
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.Contract
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -85,7 +84,6 @@ object SvcStore {
       storage: Storage,
       domains: SvcDomainConfig,
       loggerFactory: NamedLoggerFactory,
-      futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext
@@ -96,7 +94,6 @@ object SvcStore {
           svcParty = svcParty,
           domains,
           loggerFactory,
-          futureSupervisor,
           retryProvider,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")

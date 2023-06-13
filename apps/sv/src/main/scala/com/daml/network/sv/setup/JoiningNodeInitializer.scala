@@ -19,7 +19,6 @@ import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -47,7 +46,6 @@ class JoiningNodeInitializer(
     participantId: ParticipantId,
     clock: Clock,
     storage: Storage,
-    futureSupervisor: FutureSupervisor,
     coinAppParameters: SharedCNNodeAppParameters,
     localDomainNode: Option[LocalDomainNode],
 )(implicit
@@ -426,7 +424,6 @@ class JoiningNodeInitializer(
     storage,
     config.domains,
     loggerFactory,
-    futureSupervisor,
     retryProvider,
   )
 
@@ -449,7 +446,6 @@ class JoiningNodeInitializer(
     storage,
     config,
     loggerFactory,
-    futureSupervisor,
     retryProvider,
   )
 

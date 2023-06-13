@@ -18,7 +18,6 @@ import com.daml.network.util.Contract
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.daml.network.wallet.store.WalletStore
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -106,12 +105,11 @@ object ValidatorStore {
       storage: Storage,
       domains: ValidatorDomainConfig,
       loggerFactory: NamedLoggerFactory,
-      futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext): ValidatorStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryValidatorStore(key, domains, loggerFactory, futureSupervisor, retryProvider)
+        new InMemoryValidatorStore(key, domains, loggerFactory, retryProvider)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

@@ -35,7 +35,6 @@ import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -747,7 +746,6 @@ object SvSvcStore {
       storage: Storage,
       config: SvAppBackendConfig,
       loggerFactory: NamedLoggerFactory,
-      futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext): SvSvcStore =
     storage match {
@@ -756,7 +754,6 @@ object SvSvcStore {
           key,
           config,
           loggerFactory,
-          futureSupervisor,
           retryProvider,
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")

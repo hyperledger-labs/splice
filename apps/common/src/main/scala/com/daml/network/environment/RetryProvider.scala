@@ -7,6 +7,7 @@ import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.network.admin.api.client.commands.HttpCommandException
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{
@@ -45,6 +46,7 @@ import scala.util.{Failure, Try}
 class RetryProvider(
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
+    val futureSupervisor: FutureSupervisor,
 ) extends NamedLogging
     with FlagCloseable {
 
@@ -435,8 +437,12 @@ object RetryProvider {
       outerLoopDelay: FiniteDuration,
   )
 
-  def apply(loggerFactory: NamedLoggerFactory, timeouts: ProcessingTimeout): RetryProvider = {
-    new RetryProvider(loggerFactory, timeouts)
+  def apply(
+      loggerFactory: NamedLoggerFactory,
+      timeouts: ProcessingTimeout,
+      futureSupervisor: FutureSupervisor,
+  ): RetryProvider = {
+    new RetryProvider(loggerFactory, timeouts, futureSupervisor)
   }
 
   /** @param additionalCodes Additional gRPC status codes on which we can retry the given call,

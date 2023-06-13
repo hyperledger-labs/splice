@@ -17,7 +17,6 @@ import com.daml.network.environment.ledger.api.{
 }
 import com.daml.network.util.{Contract, Trees}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
@@ -33,7 +32,6 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
-    futureSupervisor: FutureSupervisor,
     retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
@@ -510,7 +508,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
           .onShutdown(
             logger.debug(s"Aborted $name, as we are shutting down")
           )
-        val supervisedFuture = futureSupervisor.supervised(name)(ingestedOrShutdown)
+        val supervisedFuture = retryProvider.futureSupervisor.supervised(name)(ingestedOrShutdown)
         (newState, supervisedFuture)
       }
     ).flatten

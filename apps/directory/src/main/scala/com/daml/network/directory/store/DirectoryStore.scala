@@ -11,7 +11,6 @@ import com.daml.network.store.{
   ConfiguredDefaultDomain,
 }
 import com.daml.network.util.Contract
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -104,7 +103,6 @@ object DirectoryStore {
       storage: Storage,
       domains: DirectoryDomainConfig,
       loggerFactory: NamedLoggerFactory,
-      futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext
@@ -114,7 +112,6 @@ object DirectoryStore {
       svcParty = svcParty,
       domains,
       loggerFactory,
-      futureSupervisor,
       retryProvider,
     )
     storage match {

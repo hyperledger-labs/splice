@@ -25,8 +25,7 @@ class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
       new InMemoryDomainStore(
         alice,
         loggerFactory,
-        FutureSupervisor.Noop,
-        RetryProvider(loggerFactory, timeouts),
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
       )
     )
 

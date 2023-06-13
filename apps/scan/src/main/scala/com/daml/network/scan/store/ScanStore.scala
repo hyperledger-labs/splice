@@ -16,7 +16,6 @@ import com.daml.network.store.{
 }
 import MultiDomainAcsStore.ReadyContract
 import com.daml.network.util.{CoinConfigSchedule, Contract}
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -132,7 +131,6 @@ object ScanStore {
       storage: Storage,
       scanConfig: ScanAppBackendConfig,
       loggerFactory: NamedLoggerFactory,
-      futureSupervisor: FutureSupervisor,
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
@@ -144,7 +142,6 @@ object ScanStore {
           svcParty = svcParty,
           scanConfig,
           loggerFactory,
-          futureSupervisor,
           connection,
           retryProvider,
         )

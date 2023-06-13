@@ -22,8 +22,7 @@ class InMemoryMultiDomainAcsStoreTest
       loggerFactory,
       txFilter,
       TestTxLogStoreParser,
-      FutureSupervisor.Noop,
-      RetryProvider(loggerFactory, timeouts),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
     )(actorSystem.dispatcher)
 
   override def assertTestState(

@@ -4,7 +4,6 @@ import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.InMemoryCNNodeAppStore
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.util.ShowUtil.*
 
@@ -14,7 +13,6 @@ class InMemoryUserWalletStore(
     override val key: UserWalletStore.Key,
     override val defaultAcsDomain: DomainAlias,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val futureSupervisor: FutureSupervisor,
     override protected val connection: CNLedgerConnection,
     override protected val retryProvider: RetryProvider,
 )(implicit

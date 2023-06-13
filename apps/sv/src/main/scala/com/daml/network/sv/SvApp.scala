@@ -89,6 +89,7 @@ class SvApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      futureSupervisor,
     ) {
 
   private val cometBftConfig = config.cometBftConfig
@@ -189,7 +190,6 @@ class SvApp(
             participantId,
             clock,
             storage,
-            futureSupervisor,
             coinAppParameters,
             localDomainNode,
           )
@@ -207,7 +207,6 @@ class SvApp(
             participantId,
             clock,
             storage,
-            futureSupervisor,
             coinAppParameters,
             localDomainNode,
           )

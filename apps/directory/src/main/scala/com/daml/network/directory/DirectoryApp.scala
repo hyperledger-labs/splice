@@ -58,6 +58,7 @@ class DirectoryApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      futureSupervisor,
     ) {
 
   override def ensureUserPrimaryParty(connection: CNLedgerConnection) = Future.unit
@@ -85,7 +86,6 @@ class DirectoryApp(
         storage,
         config.domains,
         loggerFactory,
-        futureSupervisor,
         retryProvider,
       )
       automation = new DirectoryAutomationService(

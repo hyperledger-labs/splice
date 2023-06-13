@@ -57,6 +57,7 @@ class ScanApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      futureSupervisor,
     ) {
 
   override def ensureUserPrimaryParty(connection: CNLedgerConnection) = Future.unit
@@ -79,7 +80,6 @@ class ScanApp(
           storage,
           config,
           loggerFactory,
-          futureSupervisor,
           // ScanStore needs its own connection for enriching the tx history on-demand
           ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
           retryProvider,

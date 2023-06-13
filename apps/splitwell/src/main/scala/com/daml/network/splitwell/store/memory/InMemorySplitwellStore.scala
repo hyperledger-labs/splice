@@ -9,7 +9,6 @@ import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.InMemoryCNNodeAppStoreWithoutHistory
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.util.Contract
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -20,7 +19,6 @@ class InMemorySplitwellStore(
     override val providerParty: PartyId,
     override protected[this] val domainConfig: SplitwellDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val futureSupervisor: FutureSupervisor,
     override protected val retryProvider: RetryProvider,
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory

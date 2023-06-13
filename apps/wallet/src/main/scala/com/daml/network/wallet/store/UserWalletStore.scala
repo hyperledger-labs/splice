@@ -38,7 +38,6 @@ import com.daml.network.wallet.store.UserWalletStore.{
 }
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.*
@@ -466,7 +465,6 @@ object UserWalletStore {
       storage: Storage,
       globalDomain: DomainAlias,
       loggerFactory: NamedLoggerFactory,
-      futureSupervisor: FutureSupervisor,
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
@@ -478,7 +476,6 @@ object UserWalletStore {
           key,
           globalDomain,
           loggerFactory,
-          futureSupervisor,
           connection,
           retryProvider,
         )

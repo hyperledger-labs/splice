@@ -363,8 +363,7 @@ class DbDirectoryStoreTest
       storage,
       GlobalOnlyDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       loggerFactory,
-      FutureSupervisor.Noop,
-      RetryProvider(loggerFactory, timeouts),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

@@ -14,7 +14,6 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.util.Contract
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.tracing.TraceContext
@@ -140,12 +139,11 @@ object SvSvStore {
       storage: Storage,
       domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
-      futureSupervisor: FutureSupervisor,
       retryProvider: RetryProvider,
   )(implicit ec: ExecutionContext): SvSvStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemorySvSvStore(key, domains, loggerFactory, futureSupervisor, retryProvider)
+        new InMemorySvSvStore(key, domains, loggerFactory, retryProvider)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

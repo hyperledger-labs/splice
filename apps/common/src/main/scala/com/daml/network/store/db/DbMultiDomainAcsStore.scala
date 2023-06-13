@@ -17,7 +17,6 @@ import com.daml.network.environment.ledger.api.{
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.*
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -39,7 +38,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
-    @unused futureSupervisor: FutureSupervisor,
     @unused retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext,

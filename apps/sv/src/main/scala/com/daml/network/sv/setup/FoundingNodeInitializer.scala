@@ -25,7 +25,6 @@ import com.daml.network.util.CNNodeUtil.{
 import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -71,7 +70,6 @@ class FoundingNodeInitializer(
     participantId: ParticipantId,
     clock: Clock,
     storage: Storage,
-    futureSupervisor: FutureSupervisor,
     coinAppParameters: SharedCNNodeAppParameters,
     localDomainNode: Option[LocalDomainNode],
 )(implicit
@@ -432,7 +430,6 @@ class FoundingNodeInitializer(
     storage,
     config.domains,
     loggerFactory,
-    futureSupervisor,
     retryProvider,
   )
 
@@ -455,7 +452,6 @@ class FoundingNodeInitializer(
     storage,
     config,
     loggerFactory,
-    futureSupervisor,
     retryProvider,
   )
 

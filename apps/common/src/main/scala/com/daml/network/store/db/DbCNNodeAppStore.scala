@@ -27,9 +27,9 @@ abstract class DbCNNodeAppStore[
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
 ) extends CNNodeAppStore[TXI, TXE] { this: ConfiguredDefaultDomain =>
-  protected def futureSupervisor: FutureSupervisor
 
   protected def retryProvider: RetryProvider
+  final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
 
   override val multiDomainAcsStore: DbMultiDomainAcsStore[TXI, TXE] =
     new DbMultiDomainAcsStore(
@@ -40,7 +40,6 @@ abstract class DbCNNodeAppStore[
       loggerFactory,
       acsContractFilter,
       txLogParser,
-      futureSupervisor,
       retryProvider,
     )
 
@@ -48,7 +47,6 @@ abstract class DbCNNodeAppStore[
     loggerFactory,
     acsContractFilter,
     txLogParser,
-    futureSupervisor,
     retryProvider,
   )
 
@@ -56,7 +54,6 @@ abstract class DbCNNodeAppStore[
     new InMemoryDomainStore(
       acsContractFilter.ingestionFilter.primaryParty,
       loggerFactory,
-      futureSupervisor,
       retryProvider,
     )
 

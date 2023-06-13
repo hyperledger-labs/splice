@@ -73,6 +73,7 @@ class ValidatorApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      futureSupervisor,
     )
     with BasicDirectives {
 
@@ -237,7 +238,6 @@ class ValidatorApp(
         storage,
         config.domains,
         loggerFactory,
-        futureSupervisor,
         retryProvider,
       )
       walletManager =
@@ -253,7 +253,6 @@ class ValidatorApp(
           scanConnection,
           loggerFactory,
           timeouts,
-          futureSupervisor,
         )
       automation = new ValidatorAutomationService(
         config.automation,

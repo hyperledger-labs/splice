@@ -12,6 +12,7 @@ import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParame
 import com.daml.network.store.DomainStore
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.CantonNode
@@ -27,8 +28,8 @@ import com.digitalasset.canton.time.HasUptime
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
-
 import io.grpc.Status
+
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -42,6 +43,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     parameters: SharedCNNodeAppParameters,
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -54,7 +56,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   val name: InstanceName
 
   protected val retryProvider: RetryProvider =
-    RetryProvider(loggerFactory, parameters.processingTimeouts)
+    RetryProvider(loggerFactory, parameters.processingTimeouts, futureSupervisor)
 
   override val timeouts = parameters.processingTimeouts
 

@@ -5,6 +5,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.util.HasHealth
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -21,6 +22,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     parameters: SharedCNNodeAppParameters,
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
+    futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -31,6 +33,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
       parameters,
       loggerFactory,
       tracerProvider,
+      futureSupervisor,
     ) {
   val name: InstanceName
 

@@ -52,6 +52,7 @@ class SplitwellApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      futureSupervisor,
     ) {
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
@@ -64,7 +65,7 @@ class SplitwellApp(
       party: PartyId,
   ): Future[SplitwellApp.State] = for {
     store <- Future.successful(
-      SplitwellStore(party, storage, config.domains, loggerFactory, futureSupervisor, retryProvider)
+      SplitwellStore(party, storage, config.domains, loggerFactory, retryProvider)
     )
     scanConnection <-
       ScanConnection(
