@@ -52,7 +52,7 @@ private[automation] class UpgradeGroupTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val (groupId, domainId) = task
     for {
-      preferredDomain <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      preferredDomain <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       _ <- connection.submitTransferAndWaitNoDedup(
         submitter = store.providerParty,
         command = TransferCommand.Out(

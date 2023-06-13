@@ -4,21 +4,20 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
+import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
-import com.daml.network.store.{CNNodeAppStoreWithIngestion, DomainStore}
-import com.daml.network.sv.{LocalDomainNode, SvApp}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.svc.admin.api.client.SvcConnection
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -79,7 +78,7 @@ class JoiningNodeInitializer(
         svStore,
         ledgerClient,
       )
-      globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global.alias)
+      globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
         participantAdminConnection,
@@ -100,7 +99,7 @@ class JoiningNodeInitializer(
             svcStore = newSvcStore(svStore.key)
             svcAutomation =
               newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
-            _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
+            _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThat(
               show"the SvcRules list the SV party ${svcStore.key.svParty} as a member",
               isOnboarded(svcStore), {
@@ -295,9 +294,8 @@ class JoiningNodeInitializer(
                 _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for svcParty")
                 svcStore = newSvcStore(svStore.key)
                 svcAutomation = newSvSvcAutomationService(svcStore)
-                _ <- waitForDomainConnection(
-                  svcAutomation.store.domains,
-                  config.domains.global.alias,
+                _ <- svcAutomation.store.domains.waitForDomainConnection(
+                  config.domains.global.alias
                 )
                 withSvcStore = new WithSvcStore(svcAutomation)
                 _ <- withSvcStore.addConfirmedMemberToSvc()
@@ -405,18 +403,6 @@ class JoiningNodeInitializer(
         loggerFactory,
         retryProvider.timeouts,
       )
-
-    // TODO(#5437): remove this duplication of the method which is also present on CNNode
-    protected def waitForDomainConnection(
-        store: DomainStore,
-        domain: DomainAlias,
-    ): Future[DomainId] = {
-      logger.info(show"Waiting for domain $domain to be connected")
-      store.signalWhenConnected(domain).map { r =>
-        logger.info(show"Connection to domain $domain has been established")
-        r
-      }
-    }
   }
 
   private def newSvStore(key: SvStore.Key) = SvSvStore(
@@ -479,18 +465,6 @@ class JoiningNodeInitializer(
     retryProvider,
     loggerFactory,
   )
-
-  // TODO(#5437): remove this duplication of the method which is also present on CNNode
-  protected def waitForDomainConnection(
-      store: DomainStore,
-      domain: DomainAlias,
-  ): Future[DomainId] = {
-    logger.info(show"Waiting for domain $domain to be connected")
-    store.signalWhenConnected(domain).map { r =>
-      logger.info(show"Connection to domain $domain has been established")
-      r
-    }
-  }
 
   private def getSvcPartyId: Future[PartyId] = {
     // From SVC app for now

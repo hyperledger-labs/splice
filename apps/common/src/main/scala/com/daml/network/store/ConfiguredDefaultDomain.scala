@@ -15,5 +15,5 @@ trait ConfiguredDefaultDomain { this: CNNodeAppStore[?, ?] =>
   def defaultAcsDomain: DomainAlias
 
   final def defaultAcsDomainIdF(implicit tc: TraceContext): Future[DomainId] =
-    domains.signalWhenConnected(defaultAcsDomain)
+    domains.waitForDomainConnection(defaultAcsDomain)
 }

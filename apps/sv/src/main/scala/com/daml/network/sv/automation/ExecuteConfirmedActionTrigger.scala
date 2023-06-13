@@ -60,7 +60,7 @@ class ExecuteConfirmedActionTrigger(
         )
       else
         for {
-          domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+          domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
           svcRules <- store.getSvcRules()
           requiredNumConfirmations = SvUtil.requiredNumVotes(svcRules)
           confirmations <- store.listConfirmations(action)

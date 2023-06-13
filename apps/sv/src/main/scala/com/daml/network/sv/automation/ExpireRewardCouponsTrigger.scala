@@ -70,7 +70,7 @@ class ExpireRewardCouponsTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       cmds <- getCmdsForRound(closedRound, svcRules, coinRules)
       _ <- Future.sequence(
         cmds.map(cmd =>

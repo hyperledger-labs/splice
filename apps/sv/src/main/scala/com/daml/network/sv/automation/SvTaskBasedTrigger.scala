@@ -49,7 +49,7 @@ trait SvTaskBasedTrigger[T] { this: TaskbasedTrigger[T] =>
     val store = svTaskContext.svcStore
 
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
       currentRequesters <- store.listElectionRequests(svcRules).map(_.map(_.payload.requester))
       self = store.key.svParty.toProtoPrimitive

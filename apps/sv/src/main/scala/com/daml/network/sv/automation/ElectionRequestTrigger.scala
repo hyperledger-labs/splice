@@ -41,7 +41,7 @@ class ElectionRequestTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
       currentLeader = svcRules.payload.leader
       self = store.key.svParty.toProtoPrimitive

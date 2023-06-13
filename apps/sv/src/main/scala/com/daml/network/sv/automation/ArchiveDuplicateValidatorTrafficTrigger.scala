@@ -60,7 +60,7 @@ class ArchiveDuplicateValidatorTrafficTrigger(
       )
     else {
       for {
-        domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+        domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
         svcRules <- store.getSvcRules()
         coinRules <- store.getCoinRules()
         cmd = svcRules.contractId.exerciseSvcRules_ArchiveDuplicateValidatorTrafficContracts(

@@ -266,7 +266,7 @@ class ValidatorApp(
         loggerFactory,
         timeouts,
       )
-      domainId <- waitForDomainConnection(store.domains, config.domains.global.alias)
+      domainId <- store.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(
           name,

@@ -61,7 +61,7 @@ class PublishLocalCometBftNodeConfigTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] =
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       cmd = task.svcRules.contractId.exerciseSvcRules_SetDomainNodeConfig(
         store.key.svParty.toProtoPrimitive,
         SvUtil.defaultSvcDomainNumber, // TODO(#4901): do not use default, but reconcile all configured CometBFT networks

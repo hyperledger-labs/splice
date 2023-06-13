@@ -75,7 +75,7 @@ class ArchiveClosedMiningRoundsTrigger(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
       closedRound = task.value
@@ -112,7 +112,7 @@ class ArchiveClosedMiningRoundsTrigger(
       task: Task
   )(implicit tc: TraceContext): Future[Boolean] = {
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       closedRound = task.value
       // lookup closed mining round once again in the ACS to check if it was archived
       closedRoundExists <- store.multiDomainAcsStore

@@ -48,7 +48,7 @@ class ExpireIssuingMiningRoundTrigger(
     for {
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       cmd = svcRules.contractId.exerciseSvcRules_MiningRound_Close(
         coinRules.contractId,
         round.contract.contractId,

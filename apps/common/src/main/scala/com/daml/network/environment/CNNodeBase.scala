@@ -9,9 +9,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.auth.AuthTokenSource
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
-import com.daml.network.store.DomainStore
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.Port
@@ -25,7 +23,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.HasUptime
-import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -152,17 +150,6 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   }
 
   protected def ports: Map[String, Port]
-
-  protected def waitForDomainConnection(
-      store: DomainStore,
-      domain: DomainAlias,
-  ): Future[DomainId] = {
-    logger.info(show"Waiting for domain $domain to be connected")
-    store.signalWhenConnected(domain).map { r =>
-      logger.info(show"Connection to domain $domain has been established")
-      r
-    }
-  }
 
   // TODO(#736): fork or generalize status definition.
   override def status: Future[NodeStatus.Status] = {

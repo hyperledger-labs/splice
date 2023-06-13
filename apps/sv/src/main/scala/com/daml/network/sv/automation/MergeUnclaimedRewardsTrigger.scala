@@ -34,7 +34,7 @@ class MergeUnclaimedRewardsTrigger(
           for {
             // Fetch up to two times the threshold of contracts for increased merging throughput.
             unclaimedRewards <- store.listUnclaimedRewards(threshold * 2)
-            domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+            domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
             res <- (unclaimedRewards.length > threshold) match {
               case false =>
                 Future(None)

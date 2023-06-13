@@ -186,7 +186,7 @@ class TreasuryService(
   private def tryLookupCoinOperation(
       op0: installCodegen.CoinOperation
   )(implicit tc: TraceContext): Future[Unit] =
-    userStore.domains.signalWhenConnected(userStore.defaultAcsDomain).flatMap { domainId =>
+    userStore.domains.waitForDomainConnection(userStore.defaultAcsDomain).flatMap { domainId =>
       op0 match {
         case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
           for {
@@ -477,7 +477,7 @@ class TreasuryService(
         val imr = r.contract.payload
         (imr.round, imr)
       }.toMap
-      domainId <- walletManager.store.domains.signalWhenConnected(
+      domainId <- walletManager.store.domains.waitForDomainConnection(
         walletManager.store.defaultAcsDomain
       )
       validatorRights <- walletManager.store.multiDomainAcsStore

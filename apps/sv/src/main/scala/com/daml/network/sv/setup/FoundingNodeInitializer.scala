@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
-import com.daml.network.store.{CNNodeAppStoreWithIngestion, DomainStore}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
@@ -24,7 +24,6 @@ import com.daml.network.util.CNNodeUtil.{
 }
 import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -33,20 +32,13 @@ import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{
-  DomainId,
-  Identifier,
-  Namespace,
-  ParticipantId,
-  PartyId,
-  UniqueIdentifier,
-}
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
 }
 import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, UnionspaceDefinitionX}
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -107,7 +99,7 @@ class FoundingNodeInitializer(
         ledgerClient,
       )
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcParty)
-      globalDomain <- waitForDomainConnection(svStore.domains, config.domains.global.alias)
+      globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
         participantAdminConnection,
@@ -137,7 +129,7 @@ class FoundingNodeInitializer(
 
       svcStore = newSvcStore(svStore.key)
       svcAutomation = newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
-      _ <- waitForDomainConnection(svcStore.domains, config.domains.global.alias)
+      _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- retryProvider.ensureThat(
         show"the SvcRules and CoinRules are bootstrapped",
         isOnboarded(svcStore), {
@@ -485,18 +477,6 @@ class FoundingNodeInitializer(
     retryProvider,
     loggerFactory,
   )
-
-  // TODO(#5437): remove this duplication of the method which is also present on CNNode
-  protected def waitForDomainConnection(
-      store: DomainStore,
-      domain: DomainAlias,
-  ): Future[DomainId] = {
-    logger.info(show"Waiting for domain $domain to be connected")
-    store.signalWhenConnected(domain).map { r =>
-      logger.info(show"Connection to domain $domain has been established")
-      r
-    }
-  }
 
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()

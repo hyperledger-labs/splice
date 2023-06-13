@@ -42,7 +42,7 @@ class ExpiredDirectoryEntryTrigger(
     val cmd =
       co.work.contract.contractId
         .exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
-    store.domains.signalWhenConnected(store.defaultAcsDomain).flatMap { domainId =>
+    store.domains.waitForDomainConnection(store.defaultAcsDomain).flatMap { domainId =>
       connection
         .submitCommandsNoDedup(
           actAs = Seq(store.providerParty),

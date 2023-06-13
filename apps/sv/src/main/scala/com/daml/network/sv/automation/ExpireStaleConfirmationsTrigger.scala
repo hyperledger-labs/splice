@@ -46,7 +46,7 @@ class ExpireStaleConfirmationsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svcRules <- store.getSvcRules()
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       cmd = svcRules.contractId.exerciseSvcRules_ExpireStaleConfirmation(
         task.work.contract.contractId
       )

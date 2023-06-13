@@ -44,28 +44,32 @@ class InMemoryDomainStore(
         )
       )(Future.successful(_))
 
-  override def signalWhenConnected(
+  override def waitForDomainConnection(
       alias: DomainAlias
   )(implicit tc: TraceContext): Future[DomainId] =
     updateState[Future[DomainId]](state =>
       state.connectedDomains.get(alias) match {
         case Some(domainId) => (state, Future.successful(domainId))
         case None =>
+          val actionDesc = show"Waiting for domain $alias to be connected"
+          logger.info(actionDesc)
           val (newState, promise) = state.addAliasToSignal(alias)
-          val name = show"signalWhenConnectedOrShutdown($alias)"
           val connectedOrShutdown = retryProvider
             .waitUnlessShutdown(promise.future)
             .onShutdown {
-              logger.debug(s"Aborted $name, as we are shutting down")
-              throw Status.UNAVAILABLE
-                .withDescription(show"Aborting $name because we're shutting down")
-                .asRuntimeException()
+              val msg =
+                show"Gave up waiting for domain $alias to be connected, as we are shutting down"
+              logger.debug(msg)
+              throw Status.UNAVAILABLE.withDescription(msg).asRuntimeException()
             }
           val supervisedFuture =
-            retryProvider.futureSupervisor.supervised(name)(connectedOrShutdown)
+            retryProvider.futureSupervisor.supervised(actionDesc)(connectedOrShutdown)
           (newState, supervisedFuture)
       }
-    ).flatten
+    ).flatten.map(domainId => {
+      logger.info(show"Success: connected to domain $alias with domain-id $domainId")
+      domainId
+    })
 
   private def nextDomainStateUpdate[T](
       previousState: InMemoryDomainStore.State

@@ -13,7 +13,8 @@ abstract class DomainStore extends AutoCloseable {
   def listConnectedDomains(): Future[Map[DomainAlias, DomainId]]
   def getDomainId(alias: DomainAlias): Future[DomainId]
 
-  def signalWhenConnected(alias: DomainAlias)(implicit tc: TraceContext): Future[DomainId]
+  /** Wait until a domain with the given alias is connected and return its domain-id. */
+  def waitForDomainConnection(alias: DomainAlias)(implicit tc: TraceContext): Future[DomainId]
 
   /** Stream all domain connection events, starts with
     * DomainAdded for all current domains and then sends updates.
@@ -24,6 +25,7 @@ abstract class DomainStore extends AutoCloseable {
   def streamEvents(): Source[DomainStore.DomainConnectionEvent, NotUsed]
 
   def ingestionSink: DomainStore.IngestionSink
+
 }
 
 object DomainStore {

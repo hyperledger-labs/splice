@@ -98,7 +98,7 @@ class DirectoryApp(
         loggerFactory,
         timeouts,
       )
-      _ <- waitForDomainConnection(store.domains, config.domains.global.alias)
+      _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
       handler = new HttpDirectoryHandler(
         store,
         loggerFactory,

@@ -49,7 +49,7 @@ class ExecuteVoteRequestActionTrigger(
           )
         else
           for {
-            domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+            domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
             svcRules <- store.getSvcRules()
             requiredNumVotes = SvUtil.requiredNumVotes(svcRules)
             votes <- store.listEligibleVotes(voteRequestId)

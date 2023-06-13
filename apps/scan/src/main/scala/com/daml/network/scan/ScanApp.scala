@@ -94,7 +94,7 @@ class ScanApp(
         timeouts,
         store,
       )
-      _ <- waitForDomainConnection(store.domains, config.domains.global.alias)
+      _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- retryProvider.waitUntil(
         "there is an OpenMiningRound contract",
         store.multiDomainAcsStore

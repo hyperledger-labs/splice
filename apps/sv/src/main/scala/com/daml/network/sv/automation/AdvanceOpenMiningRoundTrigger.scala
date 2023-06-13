@@ -50,7 +50,7 @@ class AdvanceOpenMiningRoundTrigger(
         logger.debug(s"Starting work as leader ${svcRules.payload.leader} for ${task.work}")
       )
     for {
-      domainId <- store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
       coinPriceVotes <- store.listMemberCoinPriceVotes()
       cmd = svcRules.contractId.exerciseSvcRules_AdvanceOpenMiningRounds(
@@ -135,7 +135,7 @@ class AdvanceOpenMiningRoundTrigger(
     import cats.syntax.traverse.*
 
     (for {
-      domainId <- OptionT liftF store.domains.signalWhenConnected(store.defaultAcsDomain)
+      domainId <- OptionT liftF store.domains.waitForDomainConnection(store.defaultAcsDomain)
       _ <- OptionT(
         store.multiDomainAcsStore
           .lookupContractByIdOnDomain(cc.coin.CoinRules.COMPANION)(domainId, task.work.coinRulesId)
