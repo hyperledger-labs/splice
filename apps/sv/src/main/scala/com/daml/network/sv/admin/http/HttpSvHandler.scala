@@ -362,6 +362,22 @@ class HttpSvHandler(
       _ = logger.info(
         s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
       )
+      ourParticipant <- participantAdminConnection.getParticipantId(svcPartyHosting.useXNodes)
+      // TODO(#5636) Always make SVC party a unionspace and get rid of this slightly hacky
+      // check.
+      _ <-
+        if (svcParty.uid.namespace != ourParticipant.uid.namespace) {
+          logger.info("Adding candidate SV to unionspace")
+          participantAdminConnection.ensureUnionspaceDefinition(
+            globalDomain,
+            svcParty.uid.namespace,
+            participantId.uid.namespace,
+            ourParticipant.uid.namespace.fingerprint,
+          )
+        } else {
+          logger.info(s"SVC party is not allocated through a unionspace")
+          Future.unit
+        }
 
       acsBytes <- participantAdminConnection.downloadAcsSnapshot(
         Set(svcParty),

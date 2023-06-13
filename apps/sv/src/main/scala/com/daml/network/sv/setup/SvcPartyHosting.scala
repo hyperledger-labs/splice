@@ -31,7 +31,7 @@ class SvcPartyHosting(
     onboardingConfig: SvOnboardingConfig,
     participantAdminConnection: ParticipantAdminConnection,
     svcParty: PartyId,
-    useXNodes: Boolean,
+    val useXNodes: Boolean,
     coinAppParameters: SharedCNNodeAppParameters,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,

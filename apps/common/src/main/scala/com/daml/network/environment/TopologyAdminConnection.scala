@@ -14,6 +14,7 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListMediatorDomainStateResult,
   ListPartyToParticipantResult as ListPartyToParticipantResultX,
   ListSequencerDomainStateResult,
+  ListUnionspaceDefinitionResult,
 }
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
@@ -201,6 +202,31 @@ class TopologyAdminConnection(
         .getOrElse(
           throw Status.NOT_FOUND
             .withDescription(s"No mediator state for domain $domainId")
+            .asRuntimeException()
+        )
+      TopologyResult(base, mapping)
+    }
+
+  def getUnionspaceDefinition(domainId: DomainId, unionspace: Namespace)(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[UnionspaceDefinitionX]] =
+    runCmd(
+      TopologyAdminCommandsX.Read.ListUnionspaceDefinition(
+        BaseQueryX(
+          filterStore = domainId.filterString,
+          proposals = false,
+          timeQuery = TimeQueryX.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterNamespace = unionspace.toProtoPrimitive,
+      )
+    ).map { txs =>
+      val ListUnionspaceDefinitionResult(base, mapping) = txs.headOption
+        .getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(show"No unionspace definition for $unionspace on domain $domainId")
             .asRuntimeException()
         )
       TopologyResult(base, mapping)
@@ -476,6 +502,29 @@ class TopologyAdminConnection(
       ),
       signedBy = signedBy,
       serial = PositiveInt.one,
+    )
+
+  def ensureUnionspaceDefinition(
+      domainId: DomainId,
+      unionspace: Namespace,
+      newOwner: Namespace,
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    ensureTopologyMapping[UnionspaceDefinitionX](
+      show"Namespace $newOwner is in owners of UnionspaceDefinition",
+      getUnionspaceDefinition(domainId, unionspace).map(result =>
+        Either.cond(result.mapping.owners.contains(newOwner), (), result)
+      ),
+      previous =>
+        // constructor is not exposed so no copy
+        UnionspaceDefinitionX.create(
+          previous.unionspace,
+          previous.threshold,
+          previous.owners.incl(newOwner),
+        ),
+      signedBy,
     )
 
   def proposeInitialDomainParameters(
