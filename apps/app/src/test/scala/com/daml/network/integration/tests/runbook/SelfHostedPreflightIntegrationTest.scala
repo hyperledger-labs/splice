@@ -91,7 +91,7 @@ class SelfHostedPreflightIntegrationTest
 
         // Generate new random CNS names to avoid conflicts between multiple preflight check runs
         val id = (new scala.util.Random).nextInt().toHexString
-        val cnsName = s"alice+${id}.cns"
+        val cnsName = s"alice_${id}.cns"
 
         startWebDriver("alice-selfhosted")
 

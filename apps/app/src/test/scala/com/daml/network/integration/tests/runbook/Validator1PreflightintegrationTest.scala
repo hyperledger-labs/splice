@@ -251,6 +251,10 @@ class Validator1PreflightIntegrationTest
 
     val aliceUser = auth0Users.get("alice-validator1").value
 
+    // Generate new random CNS names to avoid conflicts between multiple preflight check runs
+    val entryId = (new scala.util.Random).nextInt().toHexString
+    val cnsName = s"alice_${entryId}.cns"
+
     withFrontEnd("alice-validator1") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
 
@@ -263,7 +267,7 @@ class Validator1PreflightIntegrationTest
             directoryUiUrl,
             () => find(id("entry-name-field")) should not be empty,
           ),
-        "alice.cns",
+        cnsName,
       )
     }
   }
