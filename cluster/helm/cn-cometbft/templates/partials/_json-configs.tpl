@@ -22,7 +22,7 @@
   },
   "validators": [
     {
-      "address": "{{ $.Values.founder.nodeId }}",
+      "address": "{{ $.Values.founder.keyAddress }}",
       "pub_key": {
         "type": "tendermint/PubKeyEd25519",
         "value": "{{ $.Values.founder.publicKey }}"
@@ -49,7 +49,7 @@
 
 {{- define "privValidatorKeyJson" }}
 {
-  "address": "{{ $.Values.node.id }}",
+  "address": "{{ $.Values.node.validator.keyAddress }}",
   "pub_key": {
     "type": "tendermint/PubKeyEd25519",
     "value": "{{ $.Values.node.validator.publicKey }}"

@@ -3,15 +3,9 @@ import * as k8s from '@pulumi/kubernetes';
 import * as postgres from './postgres';
 import { auth0UserNameEnvVar, installAuth0Secret, installAuth0UISecret } from './auth0';
 import type { Auth0Client } from './auth0types';
+import { installCometBftNode } from './cometbft';
 import { installDomain, installParticipant } from './ledger';
-import {
-  ChartValues,
-  CLUSTER_DNS_NAME,
-  CLUSTER_NAME,
-  ExactNamespace,
-  exactNamespace,
-  installCNHelmChart,
-} from './utils';
+import { ChartValues, ExactNamespace, exactNamespace, installCNHelmChart } from './utils';
 
 export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.Release> {
   const xns = exactNamespace('svc');
@@ -140,37 +134,7 @@ export async function installSvNode(
       );
     }
   }
-  if (isNodeSv1) {
-    const p2pExternalAddress = `${nodename}.svc.${CLUSTER_DNS_NAME}:26656`;
-    installCNHelmChart(xns, nodename + '-cometbft', 'cn-cometbft', {
-      svNodeId: nodename,
-      nodeName: onboardingName,
-      imageName: 'cometbft',
-      founder: {
-        nodeId: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
-        publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
-        externalAddress: p2pExternalAddress,
-      },
-      istioVirtualService: {
-        enabled: true,
-        gateway: 'cluster-ingress/apps-gateway',
-      },
-      node: {
-        id: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
-        privateKey:
-          '/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==',
-        externalAddress: p2pExternalAddress,
-        validator: {
-          privateKey:
-            'npgiYbG0Iaslb/JHzliAg5BkfYMOaK3tCdKWvvO4FjCCmTBzVYK20vxkBMEg9YgFEKtvR5XgnAwKeNFrnpEQ/A==',
-          publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
-        },
-      },
-      genesis: {
-        chainId: CLUSTER_NAME,
-      },
-    });
-  }
+  installCometBftNode(xns, nodename, onboardingName);
 
   const participantAddress = isNodeSv1 ? 'participant.svc' : 'participant';
 

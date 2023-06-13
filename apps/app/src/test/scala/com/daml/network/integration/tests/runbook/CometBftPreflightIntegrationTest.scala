@@ -20,12 +20,14 @@ class CometBftPreflightIntegrationTest extends CNNodeIntegrationTest {
       this.getClass.getSimpleName()
     )
 
-  // Ignored as the CI preflight tests still use jsonnet
-  "p2p port for SV1 CometBft node is accessible" ignore { _ =>
-    val cometBftP2pUrl = s"sv-1.svc.${sys.env("NETWORK_APPS_ADDRESS")}";
-    // All we care about is the p2p port for CometBFT being accessible by other nodes
-    // The socket connects in the constructor, therefore if no error is thrown during the initialization then a successful TCP connection is established
-    val socket = new Socket(cometBftP2pUrl, 26656)
-    socket.close()
+  "p2p port for all CometBft nodes is accessible" in { env =>
+    env.svs.remote.map { svs =>
+      val cometBftP2pUrl = s"${svs.name}.svc.${sys.env("NETWORK_APPS_ADDRESS")}";
+      // All we care about is the p2p port for CometBFT being accessible by other nodes
+      // The socket connects in the constructor, therefore if no error is thrown during the initialization then a successful TCP connection is established
+      val socket = new Socket(cometBftP2pUrl, 26656)
+      socket.close()
+    }
   }
+
 }

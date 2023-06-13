@@ -13,8 +13,15 @@ founder:
   nodeId:
   # The public key of the CometBFT founding node
   publicKey:
+  keyAddress: ""
   # External address, in the format <host>:<port> that can be used to access the p2p port of the founding node
   externalAddress:
+peers:
+  # Permanent peers to add alongside the founder
+  # The CometBFT node ID of the peer node
+  #- nodeId:
+  # External address, in the format <host>:<port> that can be used to access the p2p port of the peer
+  #  externalAddress:
 node:
   # The CometBFT node ID
   id:
@@ -28,6 +35,7 @@ node:
   # The node private key
   privateKey: ""
   validator:
+    keyAddress: ""
     privateKey: ""
     publicKey: ""
 

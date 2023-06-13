@@ -8,6 +8,7 @@
 {{ $_ := required ".Values.founder.nodeId is required." (.Values.founder).nodeId }}
 {{ $_ := required ".Values.founder.publicKey is required." (.Values.founder).publicKey }}
 {{ $_ := required ".Values.founder.externalAddress is required." (.Values.founder).externalAddress }}
+{{ $_ := required ".Values.founder.keyAddress is required." (.Values.founder).keyAddress }}
 
 {{ $_ := required ".Values.node.id is required." (.Values.node).id }}
 {{ $_ := required ".Values.node.p2pPort is required." (.Values.node).p2pPort }}
@@ -15,6 +16,7 @@
 {{ $_ := required ".Values.node.externalAddress is required." (.Values.node).externalAddress }}
 {{ $_ := required ".Values.node.privateKey is required." (.Values.node).privateKey }}
 {{ $_ := required ".Values.node.validator.privateKey is required." ((.Values.node).validator).privateKey }}
+{{ $_ := required ".Values.node.validator.keyAddress is required." ((.Values.node).validator).keyAddress }}
 {{ $_ := required ".Values.node.validator.publicKey is required." ((.Values.node).validator).publicKey }}
 
 {{ $_ := required ".Values.genesis.chainId is required." (.Values.genesis).chainId }}

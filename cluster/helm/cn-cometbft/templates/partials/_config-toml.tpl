@@ -76,7 +76,7 @@ abci = "socket"
 
 # If true, query the ABCI app on connecting to a new peer
 # so the app can decide if we should keep the connection or not
-filter_peers = true
+filter_peers = false
 
 
 #######################################################################
@@ -212,9 +212,14 @@ external_address = "{{ .Values.node.externalAddress }}"
 # Comma separated list of seed nodes to connect to
 seeds = ""
 
+{{- $peers := print .Values.founder.nodeId "@" .Values.founder.externalAddress -}}
+{{- range $index, $item := .Values.peers -}}
+  {{- $peers = print $peers "," $item.nodeId "@" $item.externalAddress -}}
+{{- end -}}
+
 # Comma separated list of nodes to keep persistent connections to
 {{- if ne .Values.founder.nodeId .Values.node.id }}
-persistent_peers = "{{ .Values.founder.nodeId }}@{{ .Values.founder.externalAddress }}"
+persistent_peers = "{{ $peers }}"
 {{- else }}
 persistent_peers = ""
 {{- end }}
