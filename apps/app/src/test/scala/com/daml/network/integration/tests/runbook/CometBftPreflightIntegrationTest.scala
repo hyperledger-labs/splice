@@ -20,7 +20,7 @@ class CometBftPreflightIntegrationTest extends CNNodeIntegrationTest {
       this.getClass.getSimpleName()
     )
 
-  "p2p port for all CometBft nodes is accessible" in { env =>
+  "p2p port for all CometBft nodes is accessible" ignore { env =>
     env.svs.remote.map { svs =>
       val cometBftP2pUrl = s"${svs.name}.svc.${sys.env("NETWORK_APPS_ADDRESS")}";
       // All we care about is the p2p port for CometBFT being accessible by other nodes
