@@ -366,7 +366,7 @@ class CNLedgerConnection(
     client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive)
 
   def ensureUserPrimaryPartyIsAllocated(userId: String, hint: String): Future[PartyId] =
-    retryProvider.ensureThatWithResult(
+    retryProvider.ensureThatO(
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
@@ -394,7 +394,7 @@ class CNLedgerConnection(
           namespace,
         )
       )
-      _ <- retryProvider.ensureThat(
+      _ <- retryProvider.ensureThatB(
         s"Party $partyId is allocated",
         client.getParties(Seq(partyId)).map(_.nonEmpty),
         for {
@@ -473,7 +473,7 @@ class CNLedgerConnection(
   def ensureUserMetadataAnnotation(userId: String, key: String, value: String)(implicit
       ec: ExecutionContext
   ): Future[Unit] =
-    retryProvider.ensureThat(
+    retryProvider.ensureThatB(
       s"user $userId has metadata $key set to $value",
       client.getUserProto(userId).map { user =>
         user.hasMetadata && user.getMetadata.getAnnotationsMap.asScala

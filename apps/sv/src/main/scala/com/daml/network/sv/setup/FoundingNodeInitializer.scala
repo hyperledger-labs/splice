@@ -130,7 +130,7 @@ class FoundingNodeInitializer(
       svcStore = newSvcStore(svStore.key)
       svcAutomation = newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
-      _ <- retryProvider.ensureThat(
+      _ <- retryProvider.ensureThatB(
         show"the SvcRules and CoinRules are bootstrapped",
         isOnboarded(svcStore), {
           new WithSvcStore(svcAutomation, globalDomain).foundCollective()
@@ -172,7 +172,7 @@ class FoundingNodeInitializer(
       mediatorId <- domainNode.mediatorAdminConnection.getMediatorId
       sequencerId <- domainNode.sequencerAdminConnection.getSequencerId
       namespace = UnionspaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
-      domainId <- retryProvider.ensureThatWithResult(
+      domainId <- retryProvider.ensureThatO(
         "sequencer is initialized",
         domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
         for {
@@ -247,7 +247,7 @@ class FoundingNodeInitializer(
         } yield (),
         logger,
       )
-      _ <- retryProvider.ensureThat(
+      _ <- retryProvider.ensureThatB(
         "mediator is initialized",
         domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
         domainNode.mediatorAdminConnection.initialize(

@@ -204,19 +204,15 @@ class RetryProvider(
         )
     })
 
-  /** Ensure that a particular condition holds as part of an init-like process.
-    *
-    * Checks the condition and establishes it, if it does not. Also double-checks
-    * that the condition holds after establishing it.
-    */
-  def ensureThat(
+  /** Variant of ensureThat where the check returns only a Boolean. */
+  def ensureThatB(
       conditionDesc: String,
       check: => Future[Boolean],
       establish: => Future[Unit],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext): Future[Unit] =
-    ensureThatWithResult(
+    ensureThatO(
       conditionDesc,
       check.map(Option.when(_)(())),
       establish,
@@ -224,17 +220,15 @@ class RetryProvider(
       additionalCodes,
     )
 
-  /** Variant of ensureThat that allows the condition to
-    * return a result if it is successful.
-    */
-  def ensureThatWithResult[T](
+  /** Variant of ensureThat where the check returns only a result. */
+  def ensureThatO[T](
       conditionDesc: String,
       check: => Future[Option[T]],
       establish: => Future[Unit],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext, pp: Pretty[T]): Future[T] =
-    ensureThatWithResultAndFailedState(
+    ensureThat(
       conditionDesc,
       check = check.map(_.toRight(())),
       establish = (_: Unit) => establish,
@@ -242,10 +236,12 @@ class RetryProvider(
       additionalCodes,
     )
 
-  /** Variant of ensureThatWithResult that allows the check to
-    * pass a result to the establish function.
+  /** Ensure that a particular condition holds as part of an init-like process.
+    *
+    * Checks the condition and establishes it, if it does not; and waits
+    * until the condition holds after establishing it.
     */
-  def ensureThatWithResultAndFailedState[A, B](
+  def ensureThat[A, B](
       conditionDesc: String,
       check: => Future[Either[A, B]],
       establish: A => Future[Unit],
@@ -256,7 +252,7 @@ class RetryProvider(
       implicit val tc: TraceContext = tc0;
       logger.info(s"Ensuring that $conditionDesc")
       retryForAutomation(
-        s"Check whether $conditionDesc and establishing it if needed",
+        s"Check whether $conditionDesc and establish it if needed",
         check.flatMap {
           case Right(result) => Future.successful(Right(result))
           case Left(error) =>
@@ -270,16 +266,14 @@ class RetryProvider(
           logger.debug(s"Established that $conditionDesc, waiting until it is observable")
           retryForAutomation(
             s"Wait until observing $conditionDesc",
-            check.flatMap {
-              case Right(result) => Future.successful(result)
+            check.map {
+              case Right(result) => result
               case Left(error) =>
-                Future.failed(
-                  Status.FAILED_PRECONDITION
-                    .withDescription(
-                      show"Condition $conditionDesc is not (yet) observable; check failed with $error"
-                    )
-                    .asRuntimeException()
-                )
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(
+                    show"Condition $conditionDesc is not (yet) observable; check failed with $error"
+                  )
+                  .asRuntimeException()
             },
             logger,
             additionalCodes,

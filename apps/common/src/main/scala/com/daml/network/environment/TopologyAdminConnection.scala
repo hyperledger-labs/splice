@@ -327,7 +327,7 @@ class TopologyAdminConnection(
       update: M => Either[String, M],
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[Unit] =
-    retryProvider.ensureThatWithResultAndFailedState[TopologyResult[M], Unit](
+    retryProvider.ensureThat[TopologyResult[M], Unit](
       description,
       check = check,
       establish = { case TopologyResult(baseResult, mapping) =>
