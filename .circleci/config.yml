@@ -1148,6 +1148,7 @@ jobs:
           cmd: |
             set -eou pipefail
             make cluster/build
+          cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: Apply Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
