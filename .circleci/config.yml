@@ -1853,7 +1853,6 @@ workflows:
             - deployment_test
             - docker_images_push
             - deploy_cluster_pulumi
-            - deploy_sv_runbook
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -1929,7 +1928,6 @@ workflows:
             - deployment_test
             - docker_images_push
             - deploy_cluster_pulumi
-            - deploy_sv_runbook
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -2005,7 +2003,6 @@ workflows:
             - deployment_test
             - docker_images_push
             - deploy_cluster_pulumi
-            - deploy_sv_runbook
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -2154,7 +2151,6 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster_pulumi
-          - deploy_sv_runbook
     - preflight_sv_check:
         <<: *main-branch-only
         context:
