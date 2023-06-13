@@ -432,7 +432,6 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
         "501":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/501"
-  #TODO(#4354): Part of potential fixes: consider splitting this endpoint (previously named debug) in two (e.g. svc and sv)
   /svc:
     get:
       tags: [sv]

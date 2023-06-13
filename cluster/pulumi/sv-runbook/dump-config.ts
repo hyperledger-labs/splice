@@ -1,7 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as sinon from 'sinon';
 
-// TODO(#5036) Reduce code duplication throughout Pulumi projects
+// TODO(#4584) Reduce code duplication throughout Pulumi projects
 export enum PulumiFunction {
   // tokens for functions being called during the test run,
   // these are of the form "package:module:function"

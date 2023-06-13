@@ -76,7 +76,7 @@ class CometBftHttpRpcClient(
     ).map(_ => {})
   }
 
-  // TODO(#5024) add retries for failures
+  // TODO(#5428) add retries for failures
   private def callCometBftJsonHttp[T: Decoder](
       method: String,
       param: Map[String, Json],

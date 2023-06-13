@@ -69,7 +69,6 @@ class GrpcSplitwellService(
         acceptedGroupInvites <- store.listAcceptedGroupInvites(userParty, request.groupId)
       } yield {
         v0.ListAcceptedGroupInvitesResponse(
-          // TODO(#3181) Expose state to frontend
           acceptedGroupInvites.map(_.contract.toProtoV0)
         )
       }
@@ -84,7 +83,6 @@ class GrpcSplitwellService(
         balanceUpdates <- store.listBalanceUpdates(userParty, groupKey(request.getGroupKey))
       } yield {
         v0.ListBalanceUpdatesResponse(
-          // TODO(#3181) Expose state to frontend
           balanceUpdates
             .map(_.contract.toProtoV0)
         )

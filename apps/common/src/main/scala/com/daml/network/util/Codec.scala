@@ -136,7 +136,6 @@ object Codec {
     def instance = domainIdValue
   }
 
-  // TODO (#3819): use a different exception
   private def failedToDecode(err: String) = {
     throw new StatusRuntimeException(
       Status.INVALID_ARGUMENT.withDescription(s"Failed to decode: $err")

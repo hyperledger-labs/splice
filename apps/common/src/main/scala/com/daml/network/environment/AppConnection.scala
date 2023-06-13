@@ -88,7 +88,6 @@ abstract class AppConnection(
 
   private def runVersionCompatCheck() = {
     val _ = for {
-      // TODO(#3597) -- add retries here
       _ <- checkVersionCompatibility()
     } yield {}
   }

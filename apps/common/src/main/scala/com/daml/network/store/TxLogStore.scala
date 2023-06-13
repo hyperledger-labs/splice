@@ -44,8 +44,6 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
   /** List all events that come after the given event id up to the set limit.
     * Excludes the event with the given id.
     */
-  // TODO(#3181) Consider if we cannot instead do cross-domain reads
-  // paginated by synthetic event numbers.
   def getTxLogIndicesAfterEventId(domainId: DomainId, beginAfterEventId: String, limit: Int)(
       implicit ec: ExecutionContext
   ): Future[Seq[TXI]]

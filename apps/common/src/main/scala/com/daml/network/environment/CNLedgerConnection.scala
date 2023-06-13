@@ -689,8 +689,6 @@ class CNLedgerConnection(
             command,
           )
           .andThen { _ =>
-            // TODO(#2864) Consider removing this log once we no longer needs this
-            // for synchronization.
             logger.info(
               s"Submitted transfer to ledger, waiting for completion: commandId: $commandId"
             )

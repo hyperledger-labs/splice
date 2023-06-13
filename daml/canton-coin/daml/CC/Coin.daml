@@ -300,7 +300,6 @@ template CoinRules
         let ccSpent = usdSpent / contextMiningRound.coinPrice
         let transfer = API.Transfer with
               sender = validator
-              -- TODO(#3499): make this a parameter so callers can decide who should get the rewards
               provider = svc
               inputs
               outputs = [ API.TransferOutput with

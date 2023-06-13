@@ -492,7 +492,7 @@ class HttpSvHandler(
       )
     } yield ()
 
-  // TODO(#5095) Replace this in favor of a Daml based flow. Note that for now
+  // TODO(#5196) Replace this in favor of a Daml based flow. Note that for now
   // there is no authorization check here. The daml flow will naturally give us one
   // so implementing it here seems like wasted effort.
   private def onboardMediator(

@@ -43,7 +43,7 @@ const VoteRequest: React.FC = () => {
     },
 
     onError: error => {
-      // TODO (#2831): show an error to the user.
+      // TODO (#5491): show an error to the user.
       console.error(`Failed to send vote request to svc`, error);
     },
   });

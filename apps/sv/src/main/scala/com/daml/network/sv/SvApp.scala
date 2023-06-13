@@ -274,7 +274,6 @@ class SvApp(
         loggerFactory,
       )
 
-      // TODO(#3467) -- attach handler before app initialization, i.e. in bootstrap
       commonAdminHandler = new HttpAdminHandler(
         status
           .map(CNNodeStatus.fromNodeStatus)

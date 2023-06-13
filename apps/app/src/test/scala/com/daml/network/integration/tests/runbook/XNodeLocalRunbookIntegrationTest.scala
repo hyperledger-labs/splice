@@ -156,7 +156,6 @@ class XNodeLocalRunbookIntegrationTest
         env.fullSvcApps.local.foreach(_.waitForInitialization())
       })
 
-  // TODO(#1983)
   "run through runbook against local SVC" in { implicit env =>
     runScript(validatorPath / "validator.sc")(env.environment)
     runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)

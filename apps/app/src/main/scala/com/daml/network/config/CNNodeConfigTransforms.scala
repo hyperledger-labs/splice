@@ -70,8 +70,7 @@ object CNNodeConfigTransforms {
           onboarding = c.onboarding match {
             case c: SvOnboardingConfig.FoundCollective =>
               c.copy(
-                svcLedgerApiUser = s"${c.svcLedgerApiUser}-$suffix",
-                svcPartyHint = s"${c.svcPartyHint}-$suffix",
+                svcPartyHint = s"${c.svcPartyHint}-$suffix"
               )
             case c: SvOnboardingConfig.JoinWithKey => c
           },

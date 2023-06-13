@@ -115,7 +115,7 @@ testUpgrade = do
   pure ()
 
 
--- TODO(#3707): everything below is copied from other places, replacing all CoinRules with CoinRulesV2Test.
+-- TODO(tech-debt): everything below is copied from other places, replacing all CoinRules with CoinRulesV2Test.
 -- Consider cleaning this up and reducing code duplication here.
 
 tapThroughV2Test : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)

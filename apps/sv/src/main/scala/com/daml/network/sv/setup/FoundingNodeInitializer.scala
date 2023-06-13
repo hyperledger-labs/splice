@@ -163,12 +163,6 @@ class FoundingNodeInitializer(
         Seq(svc),
         Seq.empty,
       )
-      // this is idempotent
-      _ <- connection.createUserWithPrimaryParty(
-        foundingConfig.svcLedgerApiUser,
-        svc,
-        Seq.empty,
-      )
     } yield svc
 
   private def bootstrapDomain(domainNode: LocalDomainNode): Future[Namespace] = {

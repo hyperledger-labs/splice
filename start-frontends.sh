@@ -88,7 +88,7 @@ function start_frontend() {
 function start_json_api() {
   local ledger_api_port=$1
   local extra_args=$2
-  local log_file="${LOG_DIR}/participant-json-api.clog" # TODO(#3600)
+  local log_file="${LOG_DIR}/participant-json-api.clog"
   local conf="--log-encoder json --log-level DEBUG --ledger-host localhost --ledger-port $ledger_api_port --address 0.0.0.0 --http-port 7575 $extra_args";
 
   tmux_cmd "json-api" "alice" ":"

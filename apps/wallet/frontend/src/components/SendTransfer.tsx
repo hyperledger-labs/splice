@@ -59,7 +59,7 @@ const SendTransfer: React.FC = () => {
       navigate('/transactions');
     },
     onError: error => {
-      // TODO (#2831): show an error to the user.
+      // TODO (#5491): show an error to the user.
       console.error(
         `Failed to send transfer to ${receiver} of ${ccAmount} CC with idempotencyKey ${idempotencyKey}`,
         error

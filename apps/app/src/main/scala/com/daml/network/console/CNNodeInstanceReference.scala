@@ -145,7 +145,6 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   def httpHealth = {
     consoleEnvironment.run {
       // Map failing HTTP requests to a failed NodeStatus if the status endpoint isn't up yet (e.g. slow app initialization)
-      // TODO(#3467) see if we still need this after the initialization order is fixed
       ConsoleCommandResult.fromEither(
         Right(
           httpCommand(

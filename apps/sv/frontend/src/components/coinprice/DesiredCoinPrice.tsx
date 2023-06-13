@@ -124,9 +124,8 @@ const DesiredCoinPrice: React.FC = () => {
               setCurPrice(
                 curSvCoinPriceVote?.coinPrice
                   ? maybeBigNumber(curSvCoinPriceVote.coinPrice)!
-                  : // TODO(#4632) If desired price is not yet set in this SV
+                  : // TODO(M3-73) If desired price is not yet set in this SV
                     // Current median value would be a better choice than 0.0 as a initial value for editing.
-                    // but it would be easier to do it after #4632 is done.
                     new BigNumber(0.0)
               );
               setEnableEdit(true);

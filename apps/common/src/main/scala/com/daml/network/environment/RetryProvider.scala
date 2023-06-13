@@ -466,7 +466,7 @@ object RetryProvider {
         ErrorCategory.InvalidGivenCurrentSystemStateSeekAfterEnd,
       )
 
-    // TODO (#1066) Remove the need to retry on UNIMPLEMENTED.
+    // TODO (#2770) Remove the need to retry on UNIMPLEMENTED.
     private val retryableStatusCodes = Seq(
       Status.Code.UNIMPLEMENTED,
       Status.Code.UNAVAILABLE,
