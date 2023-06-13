@@ -201,11 +201,11 @@ class FoundingNodeInitializer(
           }.map(_.flatten)
           // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
           // been proposed.
-          unionspace <- participantAdminConnection.proposeUnionspace(
+          unionspace <- participantAdminConnection.proposeInitialUnionspaceDefinition(
             namespace,
             NonEmpty.mk(Set, participantId.uid.namespace),
             threshold = PositiveInt.one,
-            signedBy = Some(participantId.uid.namespace.fingerprint),
+            signedBy = participantId.uid.namespace.fingerprint,
           )
           domainId = DomainId(
             UniqueIdentifier(
@@ -213,32 +213,30 @@ class FoundingNodeInitializer(
               namespace,
             )
           )
-          domainParametersState <- participantAdminConnection.proposeDomainParameters(
+          domainParametersState <- participantAdminConnection.proposeInitialDomainParameters(
             domainId,
             DynamicDomainParameters.initialXValues(clock, ProtocolVersion.dev),
-            signedBy = Some(participantId.uid.namespace.fingerprint),
+            signedBy = participantId.uid.namespace.fingerprint,
           )
           sequencerState <- TopologyAdminConnection.proposeCollectively(
             NonEmpty.mk(List, participantAdminConnection, domainNode.sequencerAdminConnection)
           ) { case (con, id) =>
-            con.proposeSequencers(
+            con.proposeInitialSequencerDomainState(
               domainId,
-              threshold = PositiveInt.one,
               active = Seq(sequencerId),
-              passive = Seq.empty,
-              signedBy = Some(id.namespace.fingerprint),
+              observers = Seq.empty,
+              signedBy = id.namespace.fingerprint,
             )
           }
           mediatorState <- TopologyAdminConnection.proposeCollectively(
             NonEmpty.mk(List, participantAdminConnection, domainNode.mediatorAdminConnection)
           ) { case (con, id) =>
-            con.proposeMediators(
+            con.proposeInitialMediatorDomainState(
               domainId,
               group = NonNegativeInt.zero,
-              threshold = PositiveInt.one,
               active = Seq(mediatorId),
-              passive = Seq.empty,
-              signedBy = Some(id.namespace.fingerprint),
+              observers = Seq.empty,
+              signedBy = id.namespace.fingerprint,
             )
           }
           bootstrapTransactions =

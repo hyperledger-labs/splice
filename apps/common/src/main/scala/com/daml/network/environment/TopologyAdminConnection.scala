@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
@@ -9,12 +10,17 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
-  ListPartyToParticipantResult as ListPartyToParticipantResultX
+  BaseResult,
+  ListMediatorDomainStateResult,
+  ListPartyToParticipantResult as ListPartyToParticipantResultX,
+  ListSequencerDomainStateResult,
 }
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.topology.{
   DomainId,
@@ -49,9 +55,11 @@ import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.reflect.ClassTag
 
 /** Connection to nodes that expose topology information (sequencer, mediator, participant)
   */
@@ -59,6 +67,7 @@ class TopologyAdminConnection(
     config: ClientConfig,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
+    retryProvider: RetryProvider,
 )(implicit ec: ExecutionContextExecutor)
     extends AppConnection(
       config,
@@ -67,6 +76,8 @@ class TopologyAdminConnection(
       // The version endpoint is only injected into our own apps so we cannot run this against the admin API.
       enableVersionCompatCheck = false,
     ) {
+  import TopologyAdminConnection.TopologyResult
+
   override val serviceName = "Canton Participant Admin API"
 
   def getId(
@@ -131,9 +142,23 @@ class TopologyAdminConnection(
     )
   }
 
-  def getSequencerState(domainId: DomainId)(implicit
+  def getPartyToParticipantMappingsX(
+      domainId: DomainId,
+      partyId: PartyId,
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] =
+    listPartyToParticipantMappingsX(domainId.filterString, filterParty = partyId.filterString).map {
+      txs =>
+        val ListPartyToParticipantResultX(base, mapping) = txs.headOption.getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(s"No PartyToParticipantX state for $partyId on domain $domainId")
+            .asRuntimeException
+        )
+        TopologyResult(base, mapping)
+    }
+
+  def getSequencerDomainState(domainId: DomainId)(implicit
       traceContext: TraceContext
-  ): Future[SequencerDomainStateX] =
+  ): Future[TopologyResult[SequencerDomainStateX]] =
     runCmd(
       TopologyAdminCommandsX.Read.SequencerDomainState(
         BaseQueryX(
@@ -147,18 +172,18 @@ class TopologyAdminConnection(
         filterDomain = "",
       )
     ).map { txs =>
-      txs.headOption
+      val ListSequencerDomainStateResult(base, mapping) = txs.headOption
         .getOrElse(
           throw Status.NOT_FOUND
             .withDescription(s"No sequencer state for domain $domainId")
             .asRuntimeException()
         )
-        .item
+      TopologyResult(base, mapping)
     }
 
-  def getMediatorState(domainId: DomainId)(implicit
+  def getMediatorDomainState(domainId: DomainId)(implicit
       traceContext: TraceContext
-  ): Future[MediatorDomainStateX] =
+  ): Future[TopologyResult[MediatorDomainStateX]] =
     runCmd(
       TopologyAdminCommandsX.Read.MediatorDomainState(
         BaseQueryX(
@@ -172,13 +197,13 @@ class TopologyAdminConnection(
         filterDomain = "",
       )
     ).map { txs =>
-      txs.headOption
+      val ListMediatorDomainStateResult(base, mapping) = txs.headOption
         .getOrElse(
           throw Status.NOT_FOUND
             .withDescription(s"No mediator state for domain $domainId")
             .asRuntimeException()
         )
-        .item
+      TopologyResult(base, mapping)
     }
 
   def getIdentityTransactions(
@@ -244,30 +269,102 @@ class TopologyAdminConnection(
       )
     ).map(_ => ())
 
-  def authorizePartyToParticipantX(
-      party: PartyId,
-      existingParticipants: Seq[ParticipantId],
-      newParticipant: ParticipantId,
-      authorizingParticipant: ParticipantId,
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  def proposeMapping[M <: TopologyMappingX: ClassTag](
+      mapping: M,
+      signedBy: Fingerprint,
+      serial: PositiveInt,
+  )(implicit traceContext: TraceContext): Future[SignedTopologyTransactionX[TopologyChangeOpX, M]] =
     runCmd(
       TopologyAdminCommandsX.Write.Propose(
-        mapping = PartyToParticipantX(
-          party,
-          None,
-          PositiveInt.tryCreate(1), // Increase this to switch to a real consortium party
-          (newParticipant +: existingParticipants).map(
-            HostingParticipant(
-              _,
-              ParticipantPermissionX.Submission,
-            )
-          ),
-          groupAddressing = false,
-        ),
-        signedBy = Seq(authorizingParticipant.uid.namespace.fingerprint),
-        serial = None,
+        mapping = mapping,
+        signedBy = Seq(signedBy),
+        serial = Some(serial),
       )
+    )
+
+  def proposeMapping[M <: TopologyMappingX: ClassTag](
+      mapping: Either[String, M],
+      signedBy: Fingerprint,
+      serial: PositiveInt,
+  )(implicit traceContext: TraceContext): Future[SignedTopologyTransactionX[TopologyChangeOpX, M]] =
+    proposeMapping(
+      mapping.valueOr(err => throw new IllegalArgumentException(s"Invalid topology mapping: $err")),
+      signedBy,
+      serial,
+    )
+
+  def ensureTopologyMapping[M <: TopologyMappingX: ClassTag](
+      description: String,
+      check: => Future[Either[TopologyResult[M], Unit]],
+      update: M => Either[String, M],
+      signedBy: Fingerprint,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    retryProvider.ensureThatWithResultAndFailedState[TopologyResult[M], Unit](
+      description,
+      check = check,
+      establish = { case TopologyResult(baseResult, mapping) =>
+        val updatedMapping = update(mapping)
+        proposeMapping(
+          updatedMapping,
+          signedBy,
+          serial = baseResult.serial + PositiveInt.one,
+        ).map(_ => ())
+      },
+      logger,
+      // TODO(#5628) Stop retrying on INTERNAL. Canton doesn't even produce an
+      // error string on the client side that we can match on.
+      additionalCodes = Seq(Status.Code.INTERNAL),
+    )
+
+  def proposeInitialPartyToParticipantX(
+      partyId: PartyId,
+      participantId: ParticipantId,
+      signedBy: Fingerprint,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    proposeMapping(
+      PartyToParticipantX(
+        partyId,
+        None,
+        PositiveInt.one,
+        Seq(
+          HostingParticipant(
+            participantId,
+            ParticipantPermissionX.Submission,
+          )
+        ),
+        groupAddressing = false,
+      ),
+      signedBy = signedBy,
+      serial = PositiveInt.one,
     ).map(_ => ())
+
+  def ensurePartyToParticipantX(
+      domainId: DomainId,
+      party: PartyId,
+      newParticipant: ParticipantId,
+      signedBy: Fingerprint,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    ensureTopologyMapping[PartyToParticipantX](
+      show"Party $party is authorized on $newParticipant",
+      getPartyToParticipantMappingsX(domainId, party).map(result =>
+        Either.cond(
+          result.mapping.participants
+            .exists(hosting => hosting.participantId == newParticipant),
+          (),
+          result,
+        )
+      ),
+      previous =>
+        Right(
+          previous.copy(
+            participants = HostingParticipant(
+              newParticipant,
+              ParticipantPermissionX.Submission,
+            ) +: previous.participants
+          )
+        ),
+      signedBy,
+    )
 
   def addTopologyTransactions(txs: Seq[GenericSignedTopologyTransactionX])(implicit
       traceContext: TraceContext
@@ -276,82 +373,122 @@ class TopologyAdminConnection(
       TopologyAdminCommandsX.Write.AddTransactions(txs)
     )
 
-  def proposeSequencers(
+  def proposeInitialSequencerDomainState(
       domainId: DomainId,
-      threshold: PositiveInt,
       active: Seq[SequencerId],
-      passive: Seq[SequencerId] = Seq.empty,
-      signedBy: Option[Fingerprint] = None,
+      observers: Seq[SequencerId],
+      signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransactionX[TopologyChangeOpX, SequencerDomainStateX]] =
-    runCmd(
-      TopologyAdminCommandsX.Write.Propose(
-        SequencerDomainStateX
-          .create(domain = domainId, threshold = threshold, active = active, observers = passive),
-        signedBy.toList,
-        None,
-      )
+    proposeMapping(
+      SequencerDomainStateX.create(
+        domainId,
+        PositiveInt.one,
+        active,
+        observers,
+      ),
+      signedBy,
+      serial = PositiveInt.one,
     )
 
-  def proposeMediators(
+  def ensureSequencerDomainState(
+      domainId: DomainId,
+      newActiveSequencer: SequencerId,
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    ensureTopologyMapping[SequencerDomainStateX](
+      show"Sequencer $newActiveSequencer is active in SequencerDomainState",
+      getSequencerDomainState(domainId).map(result =>
+        Either.cond(result.mapping.active.contains(newActiveSequencer), (), result)
+      ),
+      previous =>
+        // constructor is not exposed so no copy
+        SequencerDomainStateX.create(
+          previous.domain,
+          previous.threshold,
+          newActiveSequencer +: previous.active,
+          previous.observers,
+        ),
+      signedBy,
+    )
+
+  def proposeInitialMediatorDomainState(
       domainId: DomainId,
       group: NonNegativeInt,
-      threshold: PositiveInt,
       active: Seq[MediatorId],
-      passive: Seq[MediatorId] = Seq.empty,
-      signedBy: Option[Fingerprint] = None,
+      observers: Seq[MediatorId],
+      signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransactionX[TopologyChangeOpX, MediatorDomainStateX]] =
-    runCmd(
-      TopologyAdminCommandsX.Write.Propose(
-        MediatorDomainStateX
-          .create(
-            domain = domainId,
-            group = group,
-            threshold = threshold,
-            active = active,
-            observers = passive,
-          ),
-        signedBy.toList,
-        None,
-      )
+    proposeMapping(
+      MediatorDomainStateX.create(
+        domain = domainId,
+        group = group,
+        threshold = PositiveInt.one,
+        active = active,
+        observers = observers,
+      ),
+      signedBy,
+      serial = PositiveInt.one,
     )
 
-  def proposeUnionspace(
+  def ensureMediatorDomainState(
+      domainId: DomainId,
+      newActiveMediator: MediatorId,
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    ensureTopologyMapping[MediatorDomainStateX](
+      show"Mediator $newActiveMediator is active in MediatorDomainState",
+      getMediatorDomainState(domainId).map(result =>
+        Either.cond(result.mapping.active.contains(newActiveMediator), (), result)
+      ),
+      previous =>
+        // constructor is not exposed so no copy
+        MediatorDomainStateX.create(
+          previous.domain,
+          previous.group,
+          previous.threshold,
+          newActiveMediator +: previous.active,
+          previous.observers,
+        ),
+      signedBy,
+    )
+
+  def proposeInitialUnionspaceDefinition(
       namespace: Namespace,
       owners: NonEmpty[Set[Namespace]],
       threshold: PositiveInt,
-      signedBy: Option[Fingerprint],
+      signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransactionX[TopologyChangeOpX, UnionspaceDefinitionX]] =
-    runCmd(
-      TopologyAdminCommandsX.Write.Propose(
-        UnionspaceDefinitionX.create(
-          namespace,
-          threshold,
-          owners,
-        ),
-        signedBy = signedBy.toList,
-        None,
-      )
+    proposeMapping(
+      UnionspaceDefinitionX.create(
+        namespace,
+        threshold,
+        owners,
+      ),
+      signedBy = signedBy,
+      serial = PositiveInt.one,
     )
 
-  def proposeDomainParameters(
+  def proposeInitialDomainParameters(
       domainId: DomainId,
       parameters: DynamicDomainParameters,
-      signedBy: Option[Fingerprint],
+      signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransactionX[TopologyChangeOpX, DomainParametersStateX]] =
-    runCmd(
-      TopologyAdminCommandsX.Write.Propose(
-        DomainParametersStateX(domainId, parameters),
-        signedBy = signedBy.toList,
-        None,
-      )
+    proposeMapping(
+      DomainParametersStateX(domainId, parameters),
+      signedBy = signedBy,
+      serial = PositiveInt.one,
     )
 }
 
@@ -375,4 +512,27 @@ object TopologyAdminConnection {
         a.addSignatures(b.signatures.toSeq)
       })
   }
+
+  final case class TopologyResult[M <: TopologyMappingX](
+      base: BaseResult,
+      mapping: M,
+  ) extends PrettyPrinting {
+    override val pretty = prettyNode(
+      "TopologyResult",
+      param("base", _.base),
+      param("mapping", _.mapping),
+    )
+  }
+
+  implicit val prettyBaseResult: Pretty[BaseResult] =
+    prettyNode(
+      "BaseResult",
+      param("domain", _.domain.unquoted),
+      param("validFrom", _.validFrom),
+      param("validUntil", _.validUntil),
+      param("operation", _.operation),
+      param("transactionHash", _.transactionHash),
+      param("serial", _.serial),
+      param("signedBy", _.signedBy),
+    )
 }

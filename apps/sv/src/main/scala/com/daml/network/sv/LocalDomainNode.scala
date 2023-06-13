@@ -176,12 +176,12 @@ final class LocalDomainNode(
         "local sequencer observes mediator as onboarded",
         // Otherwise we might fail with `PERMISSION_DENIED` during initialization
         sequencerAdminConnection
-          .getMediatorState(domainId)
+          .getMediatorDomainState(domainId)
           .map { state =>
-            if (!state.active.contains(mediatorId)) {
+            if (!state.mapping.active.contains(mediatorId)) {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
-                  s"Mediator $mediatorId not in active mediators ${state.active.forgetNE}"
+                  s"Mediator $mediatorId not in active mediators ${state.mapping.active.forgetNE}"
                 )
                 .asRuntimeException()
             }
@@ -212,11 +212,11 @@ final class LocalDomainNode(
       )
       _ <- retryProvider.waitUntil(
         "mediator observes itself as onboarded",
-        mediatorAdminConnection.getMediatorState(domainId).map { state =>
-          if (!state.active.contains(mediatorId)) {
+        mediatorAdminConnection.getMediatorDomainState(domainId).map { state =>
+          if (!state.mapping.active.contains(mediatorId)) {
             throw Status.FAILED_PRECONDITION
               .withDescription(
-                s"Mediator $mediatorId not in active mediators ${state.active.forgetNE}"
+                s"Mediator $mediatorId not in active mediators ${state.mapping.active.forgetNE}"
               )
               .asRuntimeException()
           }

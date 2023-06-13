@@ -46,4 +46,8 @@ ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to loc
 # TODO(#5383) Consider not ignoring this
 Failed to send: sending accepted txs to members.*TopologyRequestProcessor
 
+# TODO(#528) Remove this again
+proposed serial .* doesn't immediately follow the existing serial
+TopologyManagerWriteServiceX/Authorize.*INTERNAL.*ApiRequestLogger
+
 # Make sure to have a trailing newline

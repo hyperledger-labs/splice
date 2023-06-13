@@ -232,35 +232,56 @@ class RetryProvider(
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext, pp: Pretty[T]): Future[T] =
+    ensureThatWithResultAndFailedState(
+      conditionDesc,
+      check = check.map(_.toRight(())),
+      establish = (_: Unit) => establish,
+      logger,
+      additionalCodes,
+    )
+
+  /** Variant of ensureThatWithResult that allows the check to
+    * pass a result to the establish function.
+    */
+  def ensureThatWithResultAndFailedState[A, B](
+      conditionDesc: String,
+      check: => Future[Either[A, B]],
+      establish: A => Future[Unit],
+      logger: TracedLogger,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit ec: ExecutionContext, pa: Pretty[A], pb: Pretty[B]): Future[B] =
     TraceContext.withNewTraceContext(tc0 => {
       implicit val tc: TraceContext = tc0;
       logger.info(s"Ensuring that $conditionDesc")
       retryForAutomation(
-        s"Check whether $conditionDesc",
-        check,
+        s"Check whether $conditionDesc and establishing it if needed",
+        check.flatMap {
+          case Right(result) => Future.successful(Right(result))
+          case Left(error) =>
+            establish(error).map(Left(_))
+        },
         logger,
         additionalCodes,
       ).flatMap {
-        case Some(result) => Future.successful(result)
-        case None =>
-          logger.debug(s"Attempting to establish that $conditionDesc")
-          establish.flatMap(_ => {
-            logger.debug(s"Established that $conditionDesc, waiting until it is observable")
-            retryForAutomation(
-              s"Wait until observing $conditionDesc",
-              check.flatMap {
-                case Some(result) => Future.successful(result)
-                case None =>
-                  Future.failed(
-                    Status.FAILED_PRECONDITION
-                      .withDescription(s"Condition $conditionDesc is not (yet) observable")
-                      .asRuntimeException()
-                  )
-              },
-              logger,
-              additionalCodes,
-            )
-          })
+        case Right(result) => Future.successful(result)
+        case Left(()) =>
+          logger.debug(s"Established that $conditionDesc, waiting until it is observable")
+          retryForAutomation(
+            s"Wait until observing $conditionDesc",
+            check.flatMap {
+              case Right(result) => Future.successful(result)
+              case Left(error) =>
+                Future.failed(
+                  Status.FAILED_PRECONDITION
+                    .withDescription(
+                      show"Condition $conditionDesc is not (yet) observable; check failed with $error"
+                    )
+                    .asRuntimeException()
+                )
+            },
+            logger,
+            additionalCodes,
+          )
       }.transform(
         result => {
           logger.info(show"Success: $conditionDesc, result is $result")

@@ -400,12 +400,12 @@ class CNLedgerConnection(
         for {
           _ <-
             if (useXNodes) {
-              participantAdminConnection.authorizePartyToParticipantX(
-                partyId,
-                Seq.empty,
-                participantId,
-                participantId,
-              )
+              participantAdminConnection
+                .proposeInitialPartyToParticipantX(
+                  partyId,
+                  participantId,
+                  participantId.uid.namespace.fingerprint,
+                )
             } else {
               participantAdminConnection.authorizePartyToParticipant(
                 TopologyChangeOp.Add,

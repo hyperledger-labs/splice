@@ -99,6 +99,7 @@ class SvApp(
       config.participantClient.adminApi,
       timeouts,
       loggerFactory,
+      retryProvider,
     )
     val localDomainNode = config.xNodes
       .flatMap(_.domain)
@@ -108,11 +109,13 @@ class SvApp(
             config.sequencer.adminApi,
             timeouts,
             loggerFactory,
+            retryProvider,
           ),
           new MediatorAdminConnection(
             config.mediator.adminApi,
             timeouts,
             loggerFactory,
+            retryProvider,
           ),
           config.parameters
             .toStaticDomainParameters(CommunityCryptoConfig())

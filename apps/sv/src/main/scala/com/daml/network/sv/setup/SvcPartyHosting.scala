@@ -251,12 +251,11 @@ class SvcPartyHosting(
               case Seq(mapping) => mapping
               case _ => throw new IllegalStateException(s"Mappings are borked: $mappings")
             }
-            // This is run under a (SvcRules) lock so no need to worry about race conditions with concurrent onboardings.
-            _ <- participantAdminConnection.authorizePartyToParticipantX(
+            _ <- participantAdminConnection.ensurePartyToParticipantX(
+              domain,
               svcParty,
-              mapping.item.participants.map(_.participantId),
               participantId,
-              sourceParticipant,
+              sourceParticipant.uid.namespace.fingerprint,
             )
             authorizedAt <- waitForSvcPartyToParticipantAuthorization(
               domain,

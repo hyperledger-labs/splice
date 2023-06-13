@@ -25,11 +25,13 @@ class SequencerAdminConnection(
     config: ClientConfig,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
+    retryProvider: RetryProvider,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
       timeouts,
       loggerFactory,
+      retryProvider,
     ) {
 
   override val serviceName = "Canton Sequencer Admin API"

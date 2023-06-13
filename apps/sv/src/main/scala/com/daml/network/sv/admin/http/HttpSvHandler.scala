@@ -9,7 +9,6 @@ import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.environment.{
   CNLedgerConnection,
-  MediatorAdminConnection,
   ParticipantAdminConnection,
   RetryProvider,
   SequencerAdminConnection,
@@ -281,11 +280,8 @@ class HttpSvHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       (for {
         mediatorId <- Codec.decode(Codec.Mediator)(body.mediatorId)
-        mediatorConnection <- localDomainNode
-          .map(_.mediatorAdminConnection)
-          .toRight("Onboarding mediator configured to use X nodes but sponsoring SV is not")
       } yield {
-        onboardMediator(mediatorConnection, mediatorId)
+        onboardMediator(mediatorId)
       }).fold(
         errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
         _.map(_ => v0.SvResource.OnboardSvMediatorResponseOK),
@@ -387,43 +383,27 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info("Proposing new sequencer")
     for {
-      sequencerState <- participantAdminConnection.getSequencerState(globalDomain)
       ourParticipant <- participantAdminConnection.getParticipantId(true)
-      _ <-
-        if (sequencerState.active.contains(sequencerId)) {
-          logger.info(s"Sequencer has already been added to topology state")
-          Future.unit
-        } else {
-          logger.info("Proposing new sequencer")
-          for {
-            _ <- participantAdminConnection.proposeSequencers(
-              globalDomain,
-              sequencerState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
-              sequencerId +: sequencerState.active,
-              sequencerState.observers,
-              Some(ourParticipant.uid.namespace.fingerprint),
-            )
-            msg = "Waiting to observe new sequencer proposal"
-            _ = logger.info(msg)
-            _ <- retryProvider.retryForClientCalls(
-              msg,
-              for {
-                state <- sequencerAdminConnection.getSequencerState(globalDomain)
-              } yield {
-                if (!state.active.forgetNE.contains(sequencerId)) {
-                  throw Status.FAILED_PRECONDITION
-                    .withDescription(
-                      s"Sequencer $sequencerId was not a member of ${state.active.forgetNE}"
-                    )
-                    .asRuntimeException()
-                } else {
-                  state
-                }
-              },
-              logger,
-            )
-          } yield ()
-        }
+      _ <- participantAdminConnection.ensureSequencerDomainState(
+        globalDomain,
+        sequencerId,
+        ourParticipant.uid.namespace.fingerprint,
+      )
+      _ <- retryProvider.waitUntil(
+        "New sequencer is observed in SequencerDomainState through existing sequencer",
+        sequencerAdminConnection
+          .getSequencerDomainState(globalDomain)
+          .map(result =>
+            if (!result.mapping.active.contains(sequencerId)) {
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Sequencer $sequencerId is not in active sequencers ${result.mapping.active}"
+                )
+                .asRuntimeException()
+            }
+          ),
+        logger,
+      )
     } yield ()
   }
 
@@ -485,61 +465,25 @@ class HttpSvHandler(
   }
 
   private def addMediatorToTopologyState(
-      mediatorAdminConnection: MediatorAdminConnection,
-      mediatorId: MediatorId,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    logger.info("Querying mediator domain state")
+      mediatorId: MediatorId
+  )(implicit traceContext: TraceContext): Future[Unit] =
     for {
-      mediatorState <- mediatorAdminConnection.getMediatorState(globalDomain)
       ourParticipant <- participantAdminConnection.getParticipantId(true)
-      _ <-
-        if (mediatorState.active.contains(mediatorId)) {
-          logger.info(s"Mediator has already been added to topology state")
-          Future.unit
-        } else {
-          logger.info("Proposing new mediator")
-          for {
-            _ <- participantAdminConnection.proposeMediators(
-              globalDomain,
-              mediatorState.group, // Put all mediators in the same group. Within a group we get BFT guarantees, different groups are for load balancing.
-              mediatorState.threshold, // TODO(#5093) Increase this instead of copying the previous value.
-              mediatorId +: mediatorState.active,
-              mediatorState.observers,
-              Some(ourParticipant.uid.namespace.fingerprint),
-            )
-            msg = "Waiting to observe new mediator proposal"
-            _ = logger.info(msg)
-            _ <- retryProvider.retryForClientCalls(
-              msg,
-              for {
-                state <- mediatorAdminConnection.getMediatorState(globalDomain)
-              } yield {
-                if (!state.active.forgetNE.contains(mediatorId)) {
-                  throw Status.FAILED_PRECONDITION
-                    .withDescription(
-                      s"Mediator $mediatorId was not a member of ${state.active.forgetNE}"
-                    )
-                    .asRuntimeException()
-                } else {
-                  state
-                }
-              },
-              logger,
-            )
-          } yield ()
-        }
+      _ <- participantAdminConnection.ensureMediatorDomainState(
+        globalDomain,
+        mediatorId,
+        ourParticipant.uid.namespace.fingerprint,
+      )
     } yield ()
-  }
 
   // TODO(#5095) Replace this in favor of a Daml based flow. Note that for now
   // there is no authorization check here. The daml flow will naturally give us one
   // so implementing it here seems like wasted effort.
   private def onboardMediator(
-      mediatorAdminConnection: MediatorAdminConnection,
-      mediatorId: MediatorId,
+      mediatorId: MediatorId
   )(implicit traceContext: TraceContext) = {
     for {
-      _ <- addMediatorToTopologyState(mediatorAdminConnection, mediatorId)
+      _ <- addMediatorToTopologyState(mediatorId)
     } yield ()
   }
 
