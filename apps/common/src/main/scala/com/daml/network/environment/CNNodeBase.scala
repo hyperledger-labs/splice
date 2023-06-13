@@ -19,6 +19,7 @@ import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
+  HasCloseContext,
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -48,6 +49,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     esf: ExecutionSequencerFactory,
 ) extends CantonNode
     with FlagCloseableAsync
+    with HasCloseContext
     with NamedLogging
     with HasUptime
     with NoTracing {

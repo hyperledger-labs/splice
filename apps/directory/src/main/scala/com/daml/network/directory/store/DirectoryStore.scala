@@ -3,15 +3,17 @@ package com.daml.network.directory.store
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.config.DirectoryDomainConfig
+import com.daml.network.directory.store.db.DbDirectoryStore
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
-  MultiDomainAcsStore,
   ConfiguredDefaultDomain,
+  MultiDomainAcsStore,
 }
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -105,21 +107,28 @@ object DirectoryStore {
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      closeContext: CloseContext,
   ): DirectoryStore = {
-    val inMemory = new InMemoryDirectoryStore(
-      providerParty = providerParty,
-      svcParty = svcParty,
-      domains,
-      loggerFactory,
-      retryProvider,
-    )
     storage match {
       case _: MemoryStorage =>
-        inMemory
-      case _: DbStorage =>
-        // TODO (#4423): Replace with persistent version
-        inMemory
+        new InMemoryDirectoryStore(
+          providerParty = providerParty,
+          svcParty = svcParty,
+          domains,
+          loggerFactory,
+          retryProvider,
+        )
+      case db: DbStorage =>
+        new DbDirectoryStore(
+          providerParty = providerParty,
+          svcParty = svcParty,
+          db,
+          domains,
+          loggerFactory,
+          retryProvider,
+        )
     }
   }
 
