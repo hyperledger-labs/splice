@@ -779,7 +779,7 @@ function subcmd_ci_assert_fresh_lock() {
     if lockholder=$(_current_lockholder); then
         age_secs="$(_current_lock_age)"
 
-        if (( age_secs > 43200 )); then
+        if (( age_secs > 21600 )); then
             _error "Cluster lock held by ${lockholder} is stale. Lock age: $(_current_lock_age_formatted)"
         else
             _info "Cluster lock held by ${lockholder} is fresh. Lock age: $(_current_lock_age_formatted)"

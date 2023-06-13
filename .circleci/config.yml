@@ -263,7 +263,7 @@ commands:
         enum: ["scratchneta", "scratchnetb", "scratchnetc"]
     steps:
       - run_bash_command_in_nix:
-          cmd_name: Reap << parameters.cluster >> if lock older than 12 hours
+          cmd_name: Reap << parameters.cluster >> if lock older than 6 hours
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
           gce_authenticate: true
