@@ -140,7 +140,7 @@ object CometBftClientIntegrationTest {
             change = Some(
               SvNodeConfigChange.of(
                 SetConfig(
-                  SvNodeConfig.of(
+                  SvNodeConfig(
                     Map("nodeId" -> CometBftNodeConfig.of(pubKey, votingPower = 1))
                   )
                 )

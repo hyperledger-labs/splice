@@ -391,7 +391,7 @@ lazy val `apps-sv` =
       `validator-lifecycle-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime),
+      libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime, comet_bft_proto),
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "sv-openapi",

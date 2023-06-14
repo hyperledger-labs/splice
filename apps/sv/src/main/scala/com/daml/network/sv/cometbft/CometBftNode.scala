@@ -8,7 +8,6 @@ import com.daml.network.codegen.java.cn.svcrules.{MemberInfo, SvcRules}
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftError
 import com.daml.network.sv.config.CometBftConfig
 import com.digitalasset.canton.drivers as proto
-import com.digitalasset.canton.drivers.cometbft.{NetworkConfigChangeRequest, SvNodeConfig}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyUtil}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
@@ -66,7 +65,7 @@ class CometBftNode(
 
   def getLocalNodeConfig()(implicit
       tc: TraceContext
-  ): EitherT[Future, CometBftError, SvNodeConfig] = {
+  ): EitherT[Future, CometBftError, proto.cometbft.SvNodeConfig] = {
     cometBftClient
       .nodeStatus()
       .map { status =>
@@ -97,7 +96,7 @@ object CometBftNode {
       deletes: Seq[proto.cometbft.NetworkConfigChangeRequest],
       updates: Seq[proto.cometbft.NetworkConfigChangeRequest],
   ) {
-    lazy val requests: Seq[NetworkConfigChangeRequest] = deletes ++ updates
+    lazy val requests: Seq[proto.cometbft.NetworkConfigChangeRequest] = deletes ++ updates
   }
 
   /** Compute the set of change requests that, when applied, make the current network config
@@ -254,4 +253,5 @@ object CometBftNode {
       SvUtil.defaultSvcDomainNumber
     )
   }
+
 }

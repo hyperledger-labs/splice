@@ -343,7 +343,7 @@ commands:
           cmd_name: Executing "sbt << parameters.cmd >>"
           no_output_timeout: << parameters.no_output_timeout >>
           when: << parameters.when >>
-          additional_nix_args: << parameters.additional_nix_args >>
+          additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD << parameters.additional_nix_args >>
           cmd: |
             on_exit() {
               local CODE="$?"
@@ -1526,6 +1526,8 @@ jobs:
          cmd_name: Build app
          cmd: make build -j
          cmd_retry_count: 5 # Retry in case of sbt/maven dependency download errors
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
       - docker_login_artifactory
       - docker_build
       - run_bash_command_in_nix:
@@ -1614,6 +1616,8 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Build app
          cmd: make build -j
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
       - docker_login_artifactory
       - docker_build
       - cleanup_sbt_test_job

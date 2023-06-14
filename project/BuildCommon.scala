@@ -64,6 +64,13 @@ object BuildCommon {
       scalatest % Test,
       Dependencies.daml_bindings_java,
     ),
+    resolvers += "Artifactory Canton Drivers" at "https://digitalasset.jfrog.io/artifactory/canton-drivers/",
+    credentials += Credentials(
+      "Artifactory Realm",
+      "digitalasset.jfrog.io",
+      sys.env("ARTIFACTORY_USER"),
+      sys.env("ARTIFACTORY_PASSWORD"),
+    ),
     // Enable logging of begin and end of test cases, test suites, and test runs.
     Test / testOptions += Tests.Argument("-C", "com.digitalasset.canton.LogReporter"),
   )

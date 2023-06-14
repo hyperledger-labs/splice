@@ -1,13 +1,12 @@
 package com.daml.network.sv.cometbft
 
 import java.util.Base64
-
 import cats.data.EitherT
 import cats.implicits.catsSyntaxTuple4Semigroupal
 import com.daml.network.sv.cometbft.CometBftClient.{CometBftNodeDump, GovernanceAbciQueryParams}
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.NodeStatus
+import com.digitalasset.canton.drivers.cometbft.data.CometBftTx
 import com.digitalasset.canton.drivers.cometbft.{
-  CometBftTx,
   GetNetworkConfigResponse,
   UpdateNetworkConfigRequest,
 }

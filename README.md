@@ -89,7 +89,7 @@ clusters.)
       login yourartifactoryusername
       password yourartifactoryapikey
       ```
-   2. For access to the canton enterprise docker repo
+   2. For access to the canton enterprise docker repo and for sbt to download internal dependencies
       To do so, the `ARTIFACTORY_USER` and `ARTIFACTORY_PASSWORD` must be configured.
       Best would be to add the to the `.envrc.private` file like so:
       ```
@@ -136,11 +136,11 @@ clusters.)
 
            Also, you can bypass running pre-commit hooks altogether using the `--no-verify` / `-n` git commit option.
 
-**Important:** start your IDE and other development tools from a console that
-has this `direnv` loaded; and thus has the proper version of all the
-project dependencies on its `PATH`.
+    **Important:** start your IDE and other development tools from a console that
+    has this `direnv` loaded; and thus has the proper version of all the
+    project dependencies on its `PATH`.
 
-If you encounter issues, try exiting and reentering the directory to reactivate direnv.
+    If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
 9. On MacOS, please install the following globally:
    1. Envoy, by running: `brew update ; brew install envoy`

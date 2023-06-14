@@ -53,4 +53,8 @@ object Dependencies {
     "com.typesafe.akka" %% "akka-http-spray-json" % "10.2.8"
 
   lazy val better_files = CantonDependencies.better_files
+
+  lazy val comet_bft_proto =
+    "com.digitalasset.canton.drivers" % "canton-drivers-proto" % "0.1.4"
+
 }
