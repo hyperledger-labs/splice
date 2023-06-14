@@ -4,7 +4,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   EnterpriseMediatorAdministrationCommands,
   StatusAdminCommands,
 }
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{MediatorNodeStatus, NodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
@@ -20,14 +20,12 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   */
 class MediatorAdminConnection(
     config: ClientConfig,
-    timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
-      timeouts,
       loggerFactory,
       retryProvider,
       clock,

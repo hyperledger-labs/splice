@@ -91,7 +91,6 @@ class ScanApp(
         ledgerClient,
         retryProvider,
         loggerFactory,
-        timeouts,
         store,
       )
       _ <- store.domains.waitForDomainConnection(config.domains.global.alias)

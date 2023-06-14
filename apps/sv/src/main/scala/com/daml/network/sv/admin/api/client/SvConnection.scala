@@ -6,7 +6,6 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -16,7 +15,6 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 final class SvConnection private (
     config: NetworkAppClientConfig,
     retryProvider: RetryProvider,
-    timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -24,7 +22,7 @@ final class SvConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config, retryProvider, timeouts, loggerFactory) {
+) extends HttpAppConnection(config, retryProvider, loggerFactory) {
 
   override val serviceName = "sv"
 
@@ -113,7 +111,6 @@ object SvConnection {
   def apply(
       config: NetworkAppClientConfig,
       retryProvider: RetryProvider,
-      timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ec: ExecutionContextExecutor,
@@ -123,6 +120,6 @@ object SvConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[SvConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new SvConnection(config, retryProvider, timeouts, loggerFactory)
+      new SvConnection(config, retryProvider, loggerFactory)
     )
 }

@@ -2,7 +2,6 @@ package com.daml.network.sv.setup
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.sv.admin.api.client.SvConnection
@@ -35,7 +34,6 @@ class SvcPartyHosting(
     participantAdminConnection: ParticipantAdminConnection,
     svcParty: PartyId,
     val useXNodes: Boolean,
-    coinAppParameters: SharedCNNodeAppParameters,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -142,7 +140,6 @@ class SvcPartyHosting(
       SvConnection(
         sponsorSvConfig.adminApi,
         retryProvider,
-        coinAppParameters.processingTimeouts,
         loggerFactory,
       ).flatMap { svConnection =>
         svConnection

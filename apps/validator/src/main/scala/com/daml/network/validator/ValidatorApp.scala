@@ -203,7 +203,6 @@ class ValidatorApp(
       SvConnection(
         svConfig,
         retryProvider,
-        coinAppParameters.processingTimeouts,
         loggerFactory,
       ).flatMap { svConnection =>
         svConnection
@@ -224,7 +223,6 @@ class ValidatorApp(
         config.scanClient,
         clock,
         retryProvider,
-        coinAppParameters.processingTimeouts,
         loggerFactory,
       )
       svcParty <- scanConnection.getSvcPartyIdWithRetries()
@@ -252,7 +250,6 @@ class ValidatorApp(
           retryProvider,
           scanConnection,
           loggerFactory,
-          timeouts,
         )
       automation = new ValidatorAutomationService(
         config.automation,
@@ -264,7 +261,6 @@ class ValidatorApp(
         ledgerClient,
         retryProvider,
         loggerFactory,
-        timeouts,
       )
       domainId <- store.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>

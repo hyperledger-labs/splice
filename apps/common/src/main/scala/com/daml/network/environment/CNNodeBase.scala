@@ -198,7 +198,6 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
       // Note: When ledger API auth is enabled, application ID must be equal to user ID
       serviceUser,
       () => getToken,
-      timeouts,
       parameters.loggingConfig.api,
       loggerFactory,
       tracerProvider,

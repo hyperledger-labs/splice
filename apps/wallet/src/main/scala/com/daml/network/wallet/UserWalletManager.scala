@@ -10,7 +10,6 @@ import com.daml.network.util.{Contract, HasHealth}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{RunOnShutdown, *}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -36,7 +35,6 @@ class UserWalletManager(
     retryProvider: RetryProvider,
     scanConnection: ScanConnection,
     override val loggerFactory: NamedLoggerFactory,
-    timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends AutoCloseable
     with NamedLogging
@@ -105,7 +103,6 @@ class UserWalletManager(
         userRetryProvider,
         loggerFactory,
         scanConnection,
-        timeouts,
       )
 
       val wasUserAdded = endUserWalletsMap

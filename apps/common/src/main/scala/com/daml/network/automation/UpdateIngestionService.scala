@@ -9,7 +9,6 @@ import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TransferU
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -29,7 +28,6 @@ class UpdateIngestionService(
     connection: CNLedgerConnection,
     override protected val retryProvider: RetryProvider,
     baseLoggerFactory: NamedLoggerFactory,
-    override val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -59,7 +57,6 @@ class UpdateIngestionService(
       source = updateSource(subscribeFrom),
       mapOperator = Flow[GetTreeUpdatesResponse].mapAsync(1)(process),
       retryProvider = retryProvider,
-      timeouts = timeouts,
       loggerFactory = baseLoggerFactory.append("subsClient", this.getClass.getSimpleName),
     )
 

@@ -77,7 +77,6 @@ class DirectoryApp(
         config.scanClient,
         clock,
         retryProvider,
-        coinAppParameters.processingTimeouts,
         loggerFactory,
       )
       store = DirectoryStore(
@@ -96,7 +95,6 @@ class DirectoryApp(
         scanConnection,
         retryProvider,
         loggerFactory,
-        timeouts,
       )
       _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
       handler = new HttpDirectoryHandler(

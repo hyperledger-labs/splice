@@ -7,10 +7,11 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 
 /** Convenience class to capture the shared context required to instantiate triggers in an automation service. */
-case class TriggerContext(
+final case class TriggerContext(
     config: AutomationConfig,
-    timeouts: ProcessingTimeout,
     clock: Clock,
     retryProvider: RetryProvider,
     loggerFactory: NamedLoggerFactory,
-)
+) {
+  def timeouts: ProcessingTimeout = retryProvider.timeouts
+}

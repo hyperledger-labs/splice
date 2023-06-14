@@ -107,7 +107,6 @@ class SvApp(
   override def initializeNode(ledgerClient: CNLedgerClient): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
-      timeouts,
       loggerFactory,
       retryProvider,
       clock,
@@ -118,14 +117,12 @@ class SvApp(
         new LocalDomainNode(
           new SequencerAdminConnection(
             config.sequencer.adminApi,
-            timeouts,
             loggerFactory,
             retryProvider,
             clock,
           ),
           new MediatorAdminConnection(
             config.mediator.adminApi,
-            timeouts,
             loggerFactory,
             retryProvider,
             clock,
@@ -136,7 +133,6 @@ class SvApp(
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
             ),
           config.sequencer.publicApi,
-          timeouts,
           loggerFactory,
           retryProvider,
         )
@@ -202,7 +198,6 @@ class SvApp(
             participantId,
             clock,
             storage,
-            coinAppParameters,
             localDomainNode,
           )
           initializer.bootstrapCollective()
@@ -219,7 +214,6 @@ class SvApp(
             participantId,
             clock,
             storage,
-            coinAppParameters,
             localDomainNode,
           )
           initializer.joinCollectiveAndOnboardNodes()
@@ -236,7 +230,6 @@ class SvApp(
             participantId,
             clock,
             storage,
-            coinAppParameters,
             localDomainNode,
           )
           initializer.joinCollectiveAndOnboardNodes()

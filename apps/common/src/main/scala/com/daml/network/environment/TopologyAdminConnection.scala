@@ -16,7 +16,7 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListUnionspaceDefinitionResult,
 }
 import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -68,18 +68,17 @@ import scala.reflect.ClassTag
   */
 class TopologyAdminConnection(
     config: ClientConfig,
-    timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
-    retryProvider: RetryProvider,
+    override protected[this] val retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends AppConnection(
       config,
-      timeouts,
       loggerFactory,
       // The version endpoint is only injected into our own apps so we cannot run this against the admin API.
       enableVersionCompatCheck = false,
-    ) {
+    )
+    with RetryProvider.Has {
   import TopologyAdminConnection.TopologyResult
 
   override val serviceName = "Canton Participant Admin API"

@@ -9,7 +9,6 @@ import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -26,7 +25,6 @@ class ValidatorAutomationService(
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,

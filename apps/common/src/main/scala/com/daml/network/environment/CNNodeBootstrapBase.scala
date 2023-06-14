@@ -150,7 +150,7 @@ abstract class CNNodeBootstrapBase[
   // This absolutely must be a "def", because it is used during class initialization.
   protected def connectionPoolForParticipant: Boolean = false
 
-  val timeouts: ProcessingTimeout = parameterConfig.processingTimeouts
+  override protected val timeouts: ProcessingTimeout = parameterConfig.processingTimeouts
 
   protected def isActive: Boolean
 

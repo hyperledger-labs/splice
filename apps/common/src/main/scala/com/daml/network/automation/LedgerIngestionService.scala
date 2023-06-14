@@ -18,6 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
 abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: Tracer)
     extends HasHealth
     with FlagCloseableAsync
+    with RetryProvider.Has
     with NamedLogging
     with Spanning {
 

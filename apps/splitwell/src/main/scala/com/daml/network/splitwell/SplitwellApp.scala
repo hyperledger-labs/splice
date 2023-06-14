@@ -73,7 +73,6 @@ class SplitwellApp(
         config.scanClient,
         clock,
         retryProvider,
-        coinAppParameters.processingTimeouts,
         loggerFactory,
       )
     automation = new SplitwellAutomationService(
@@ -84,7 +83,6 @@ class SplitwellApp(
       scanConnection,
       retryProvider,
       loggerFactory,
-      timeouts,
     )
     _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
     preferred <- store.domains.waitForDomainConnection(config.domains.splitwell.preferred.alias)

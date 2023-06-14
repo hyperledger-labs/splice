@@ -605,4 +605,14 @@ object RetryProvider {
         NoErrorKind
     }
   }
+
+  /** A mixin that always derives `#timeouts` from `#retryProvider`, thus
+    * obviating the former parameter.  If you get a scalac error "self-type...
+    * Has does not conform...", then you can simply remove this mixin, as it is
+    * no longer useful at that place.
+    */
+  private[network] trait Has { this: FlagCloseable =>
+    protected[this] def retryProvider: RetryProvider
+    override protected final def timeouts: ProcessingTimeout = retryProvider.timeouts
+  }
 }

@@ -12,7 +12,6 @@ import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -28,7 +27,6 @@ class UserWalletAutomationService(
     clock: Clock,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

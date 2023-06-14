@@ -7,7 +7,7 @@ import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -36,15 +36,15 @@ final class LocalDomainNode(
     val mediatorAdminConnection: MediatorAdminConnection,
     val staticDomainParameters: StaticDomainParameters,
     val sequencerPublicConfig: ClientConfig,
-    override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
-    retryProvider: RetryProvider,
+    override protected[this] val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
     mat: Materializer,
-) extends FlagCloseable
+) extends RetryProvider.Has
+    with FlagCloseable
     with NamedLogging {
 
   val sequencerConnection =

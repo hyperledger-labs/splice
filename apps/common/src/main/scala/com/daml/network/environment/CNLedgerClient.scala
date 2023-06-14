@@ -5,7 +5,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ApiClientRequestLogger
 import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelConfiguration
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -20,17 +20,17 @@ class CNLedgerClient(
     config: ClientConfig,
     applicationId: String,
     getToken: () => Future[Option[AuthToken]],
-    override protected val timeouts: ProcessingTimeout,
     apiLoggingConfig: ApiLoggingConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    retryProvider: RetryProvider,
+    override protected[this] val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
     as: ActorSystem,
     esf: ExecutionSequencerFactory,
     elc: ErrorLoggingContext,
-) extends FlagCloseable
+) extends RetryProvider.Has
+    with FlagCloseable
     with NamedLogging {
   private val client = {
     val clientChannelConfig = LedgerClientChannelConfiguration(
@@ -69,7 +69,6 @@ class CNLedgerClient(
       this.client,
       applicationId,
       baseLoggerFactory.append("connClient", connectionClient),
-      timeouts,
       retryProvider,
       callbacks,
       completionOffsetCallback,

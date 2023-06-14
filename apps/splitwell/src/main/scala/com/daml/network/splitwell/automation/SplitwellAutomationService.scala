@@ -11,7 +11,6 @@ import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -27,7 +26,6 @@ class SplitwellAutomationService(
     scanConnection: ScanConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
-    processingTimeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -39,8 +37,6 @@ class SplitwellAutomationService(
       ledgerClient,
       retryProvider,
     ) {
-
-  override protected def timeouts: ProcessingTimeout = processingTimeouts
 
   registerTrigger(
     new AcceptedAppPaymentRequestsTrigger(

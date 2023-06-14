@@ -14,7 +14,6 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.MultiDomainAcsStore.ContractWithState
 import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder, DisclosedContracts}
 import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -35,7 +34,6 @@ final class ScanConnection private (
     config: ScanAppClientConfig,
     clock: Clock,
     retryProvider: RetryProvider,
-    timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -43,7 +41,7 @@ final class ScanConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config.adminApi, retryProvider, timeouts, loggerFactory) {
+) extends HttpAppConnection(config.adminApi, retryProvider, loggerFactory) {
 
   // register the callback to potentially invalidate the CoinRules cache.
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
@@ -311,7 +309,6 @@ object ScanConnection {
       config: ScanAppClientConfig,
       clock: Clock,
       retryProvider: RetryProvider,
-      timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit
       ec: ExecutionContextExecutor,
@@ -321,7 +318,7 @@ object ScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new ScanConnection(coinLedgerClient, config, clock, retryProvider, timeouts, loggerFactory)
+      new ScanConnection(coinLedgerClient, config, clock, retryProvider, loggerFactory)
     )
 
   private case class CachedCoinRules(

@@ -40,7 +40,6 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
       connection,
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
-      triggerContext.timeouts,
     )
   )
 

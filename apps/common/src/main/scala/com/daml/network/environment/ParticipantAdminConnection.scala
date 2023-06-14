@@ -3,7 +3,7 @@ package com.daml.network.environment
 import com.digitalasset.canton.{DomainAlias, DiscardOps}
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
@@ -22,14 +22,12 @@ import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
   */
 class ParticipantAdminConnection(
     config: ClientConfig,
-    timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
-      timeouts,
       loggerFactory,
       retryProvider,
       clock,

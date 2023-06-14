@@ -6,7 +6,6 @@ import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn
-import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.CNNodeAppStoreWithIngestion
@@ -62,7 +61,6 @@ class FoundingNodeInitializer(
     participantId: ParticipantId,
     clock: Clock,
     storage: Storage,
-    coinAppParameters: SharedCNNodeAppParameters,
     localDomainNode: Option[LocalDomainNode],
 )(implicit
     ec: ExecutionContextExecutor,
@@ -430,7 +428,6 @@ class FoundingNodeInitializer(
       ledgerClient,
       retryProvider,
       loggerFactory,
-      retryProvider.timeouts,
     )
 
   private def newSvcStore(key: SvStore.Key) = SvSvcStore(
@@ -456,7 +453,6 @@ class FoundingNodeInitializer(
       retryProvider,
       cometBftNode,
       loggerFactory,
-      retryProvider.timeouts,
     )
 
   private def newSvcPartyHosting(
@@ -467,7 +463,6 @@ class FoundingNodeInitializer(
     participantAdminConnection,
     storeKey.svcParty,
     config.xNodes.isDefined,
-    coinAppParameters,
     retryProvider,
     loggerFactory,
   )

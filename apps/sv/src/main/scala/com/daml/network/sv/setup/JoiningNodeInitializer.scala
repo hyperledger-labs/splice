@@ -6,7 +6,7 @@ import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
-import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
@@ -44,7 +44,6 @@ class JoiningNodeInitializer(
     participantId: ParticipantId,
     clock: Clock,
     storage: Storage,
-    coinAppParameters: SharedCNNodeAppParameters,
     localDomainNode: Option[LocalDomainNode],
 )(implicit
     ec: ExecutionContextExecutor,
@@ -360,7 +359,6 @@ class JoiningNodeInitializer(
             SvConnection(
               sponsorConfig,
               retryProvider,
-              retryProvider.timeouts,
               loggerFactory,
             ).flatMap { svConnection =>
               svConnection
@@ -402,7 +400,6 @@ class JoiningNodeInitializer(
         retryProvider,
         cometBftNode,
         loggerFactory,
-        retryProvider.timeouts,
       )
   }
 
@@ -425,7 +422,6 @@ class JoiningNodeInitializer(
       ledgerClient,
       retryProvider,
       loggerFactory,
-      retryProvider.timeouts,
     )
 
   private def newSvcStore(key: SvStore.Key) = SvSvcStore(
@@ -451,7 +447,6 @@ class JoiningNodeInitializer(
       retryProvider,
       cometBftNode,
       loggerFactory,
-      retryProvider.timeouts,
     )
 
   private def newSvcPartyHosting(
@@ -462,7 +457,6 @@ class JoiningNodeInitializer(
     participantAdminConnection,
     storeKey.svcParty,
     config.xNodes.isDefined,
-    coinAppParameters,
     retryProvider,
     loggerFactory,
   )
@@ -493,7 +487,6 @@ class JoiningNodeInitializer(
     SvConnection(
       sponsorConfig,
       retryProvider,
-      coinAppParameters.processingTimeouts,
       loggerFactory,
     ).flatMap { svConnection =>
       svConnection.getSvcInfo().map(_.svcParty).andThen(_ => svConnection.close())
@@ -513,7 +506,6 @@ class JoiningNodeInitializer(
       SvConnection(
         svConfig,
         retryProvider,
-        coinAppParameters.processingTimeouts,
         loggerFactory,
       ).flatMap { svConnection =>
         f(localDomainNode, svConnection).andThen(_ => svConnection.close())

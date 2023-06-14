@@ -31,7 +31,6 @@ import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.{DisclosedContracts, UploadablePackage}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.CantonErrorResource
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -71,7 +70,6 @@ class CNLedgerConnection(
     client: LedgerClient,
     applicationId: String,
     protected val loggerFactory: NamedLoggerFactory,
-    protected val timeouts: ProcessingTimeout,
     retryProvider: RetryProvider,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
     completionOffsetCallback: String => Future[Unit],
@@ -83,6 +81,8 @@ class CNLedgerConnection(
   )
 
   import CNLedgerConnection.*
+
+  private[this] def timeouts = retryProvider.timeouts
 
   private def callCallbacksOnCompletion[T, U](
       result: Future[T]
@@ -801,11 +801,11 @@ class CNLedgerConnection(
 class CNLedgerSubscription[S](
     source: Source[S, NotUsed],
     mapOperator: Flow[S, ?, ?],
-    retryProvider: RetryProvider,
-    override protected val timeouts: ProcessingTimeout,
+    override protected[this] val retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, mat: Materializer)
-    extends FlagCloseableAsync
+    extends RetryProvider.Has
+    with FlagCloseableAsync
     with NamedLogging {
 
   import TraceContext.Implicits.Empty.*

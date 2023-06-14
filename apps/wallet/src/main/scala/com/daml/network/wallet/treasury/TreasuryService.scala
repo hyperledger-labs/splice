@@ -40,7 +40,6 @@ import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService.*
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -78,13 +77,13 @@ class TreasuryService(
     clock: Clock,
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
-    retryProvider: RetryProvider,
+    override protected[this] val retryProvider: RetryProvider,
     scanConnection: ScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends NamedLogging
     with FlagCloseableAsync
+    with RetryProvider.Has
     with Spanning
     with HasHealth {
 

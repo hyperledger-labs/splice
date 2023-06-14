@@ -76,7 +76,6 @@ class SvcApp(
         ledgerClient,
         retryProvider,
         loggerFactory,
-        timeouts,
       )
       domainId <- store.domains.waitForDomainConnection(config.domains.global.alias)
       _ = logger.info(s"SVC App is initialized")

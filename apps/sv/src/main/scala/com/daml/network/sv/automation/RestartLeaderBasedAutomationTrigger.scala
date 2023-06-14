@@ -125,7 +125,6 @@ class RestartLeaderBasedAutomationTrigger(
          svTaskContext,
          retryProvider,
          loggerFactory,
-         timeouts,
        )
 
        epochStateVar = Some(

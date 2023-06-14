@@ -7,7 +7,7 @@ import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -22,8 +22,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 abstract class BaseAppConnection(
-    override val timeouts: ProcessingTimeout,
-    override val loggerFactory: NamedLoggerFactory,
+    override val loggerFactory: NamedLoggerFactory
 ) extends FlagCloseableAsync
     with NamedLogging {
 
@@ -70,11 +69,10 @@ object BaseAppConnection {
   */
 abstract class AppConnection(
     config: ClientConfig,
-    override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
     enableVersionCompatCheck: Boolean = true,
 )(implicit ec: ExecutionContextExecutor)
-    extends BaseAppConnection(timeouts, loggerFactory)
+    extends BaseAppConnection(loggerFactory)
     with FlagCloseableAsync
     with NamedLogging {
   private val channel = new CloseableChannel(
@@ -150,8 +148,7 @@ abstract class AppConnection(
   */
 abstract class HttpAppConnection(
     config: NetworkAppClientConfig,
-    retryProvider: RetryProvider,
-    override val timeouts: ProcessingTimeout,
+    override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -159,7 +156,8 @@ abstract class HttpAppConnection(
     mat: Materializer,
     templateDecoder: TemplateJsonDecoder,
     httpClient: HttpRequest => Future[HttpResponse],
-) extends BaseAppConnection(timeouts, loggerFactory)
+) extends BaseAppConnection(loggerFactory)
+    with RetryProvider.Has
     with FlagCloseableAsync
     with NamedLogging {
 

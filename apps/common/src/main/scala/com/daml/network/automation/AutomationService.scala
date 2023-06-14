@@ -14,9 +14,10 @@ import java.util.concurrent.atomic.AtomicReference
 abstract class AutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
-    retryProvider: RetryProvider,
+    override protected[this] val retryProvider: RetryProvider,
 ) extends HasHealth
     with FlagCloseableAsync
+    with RetryProvider.Has
     with NamedLogging
     with Spanning {
 
@@ -27,7 +28,7 @@ abstract class AutomationService(
 
   /** Shared parameters for instantiating triggers. */
   protected def triggerContext: TriggerContext =
-    TriggerContext(automationConfig, timeouts, clock, retryProvider, loggerFactory)
+    TriggerContext(automationConfig, clock, retryProvider, loggerFactory)
 
   override def isHealthy: Boolean = backgroundServices.get().forall(_.isHealthy)
 

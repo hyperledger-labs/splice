@@ -10,7 +10,6 @@ import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -29,12 +28,12 @@ class UserWalletService(
     clock: Clock,
     treasuryConfig: TreasuryConfig,
     storage: Storage,
-    retryProvider: RetryProvider,
+    override protected[this] val retryProvider: RetryProvider,
     loggerFactory0: NamedLoggerFactory,
     scanConnection: ScanConnection,
-    override protected val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
-    extends FlagCloseable
+    extends RetryProvider.Has
+    with FlagCloseable
     with NamedLogging
     with HasHealth {
 
@@ -62,7 +61,6 @@ class UserWalletService(
     retryProvider,
     scanConnection,
     loggerFactory,
-    timeouts,
   )
 
   private val automation = new UserWalletAutomationService(
@@ -74,7 +72,6 @@ class UserWalletService(
     clock,
     retryProvider,
     loggerFactory,
-    timeouts,
   )
 
   /** The connection to use when submitting commands based on reads from the WalletStore.
