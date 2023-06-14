@@ -1399,7 +1399,9 @@ jobs:
           cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: Run SV preflight tests
-          additional_nix_args: "--keep SV_WEB_UI_PASSWORD"
+          additional_nix_args: "--keep SV_WEB_UI_PASSWORD \
+            --keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD"
           cluster: << parameters.cluster >>
           cmd: |
             cncluster preflight_sv
