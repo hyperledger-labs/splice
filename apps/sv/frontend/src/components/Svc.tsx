@@ -1,12 +1,15 @@
+import { UseQueryResult } from '@tanstack/react-query';
 import { Loading, PartyId, SvClientProvider, TitledTable } from 'common-frontend';
 import React from 'react';
 import JSONPretty from 'react-json-pretty';
 import 'react-json-pretty/themes/monikai.css';
+import { CometBftNodeDumpOrErrorResponse } from 'sv-openapi';
 
 import { Box, Tab, TableBody, TableRow, Tabs } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 
 import { useSvcInfos } from '../contexts/SvContext';
+import { useCometBftDebug } from '../hooks/useCometBftDebug';
 import { config } from '../utils';
 
 function getInfoTable(title: string, rows: { key: string; value: string; isParty: boolean }[]) {
@@ -92,6 +95,33 @@ const TabPanel = (props: TabPanelProps) => {
   );
 };
 
+function getCometBftDebugData(
+  cometBftNodeDebugQuery: UseQueryResult<CometBftNodeDumpOrErrorResponse>
+) {
+  if (cometBftNodeDebugQuery.isLoading) {
+    return <Loading />;
+  }
+  if (cometBftNodeDebugQuery.isError) {
+    return <p>Error, something went wrong.</p>;
+  }
+
+  const data = cometBftNodeDebugQuery.data;
+
+  if (data.error) {
+    return <p>Error encountered in cometBFT node: {data.error?.error} </p>;
+  }
+
+  var JSONPrettyMon = require('react-json-pretty/dist/monikai');
+  return (
+    <JSONPretty
+      id="comet-bft-debug"
+      style={{ fontSize: '10pt' }}
+      data={data.response?.status}
+      theme={JSONPrettyMon}
+    />
+  );
+}
+
 function tabProps(info: string) {
   return {
     id: `information-tab-${info}`,
@@ -105,12 +135,16 @@ const SvcViewPrettyJSON = () => {
     setValue(newValue);
   };
 
-  const resp = useSvcInfos();
-  if (resp.isLoading) {
+  const svcInfoResp = useSvcInfos();
+  const cometBftNodeDebugQuery = useCometBftDebug();
+
+  if (svcInfoResp.isLoading) {
     return <Loading />;
   }
-  const data = resp.data;
+  const svcInfoData = svcInfoResp.data;
   var JSONPrettyMon = require('react-json-pretty/dist/monikai');
+
+  const cometBftDebugTab = getCometBftDebugData(cometBftNodeDebugQuery);
 
   return (
     <>
@@ -119,6 +153,7 @@ const SvcViewPrettyJSON = () => {
           <Tab label="General" {...tabProps('general')} />
           <Tab label="SVC Configuration" {...tabProps('svc-configuration')} />
           <Tab label="Canton Coin Configuration" {...tabProps('cc-configuration')} />
+          <Tab label="CometBFT Debug Info" {...tabProps('cometBft-debug')} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
@@ -128,7 +163,7 @@ const SvcViewPrettyJSON = () => {
         <JSONPretty
           id="svc-rules-information"
           style={{ fontSize: '10pt' }}
-          data={data?.svcRules}
+          data={svcInfoData?.svcRules}
           theme={JSONPrettyMon}
         />
       </TabPanel>
@@ -136,9 +171,12 @@ const SvcViewPrettyJSON = () => {
         <JSONPretty
           id="coin-rules-information"
           style={{ fontSize: '10pt' }}
-          data={data?.coinRules}
+          data={svcInfoData?.coinRules}
           theme={JSONPrettyMon}
         />
+      </TabPanel>
+      <TabPanel value={value} index={3}>
+        {cometBftDebugTab}
       </TabPanel>
     </>
   );

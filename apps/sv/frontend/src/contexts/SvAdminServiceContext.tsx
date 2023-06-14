@@ -61,6 +61,7 @@ export interface SvAdminClient {
   listCoinPriceVotes: () => Promise<ListCoinPriceVotesResponse>;
   updateDesiredCoinPrice: (coinPrice: BigNumber) => Promise<void>;
   listOpenMiningRounds: () => Promise<ListOpenMiningRoundsResponse>;
+  getCometBftNodeDebug: () => Promise<openapi.CometBftNodeDumpOrErrorResponse>;
 }
 
 class ApiMiddleware
@@ -154,6 +155,9 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       },
       listOpenMiningRounds: async (): Promise<ListOpenMiningRoundsResponse> => {
         return await svAdminClient.listOpenMiningRounds();
+      },
+      getCometBftNodeDebug: async (): Promise<openapi.CometBftNodeDumpOrErrorResponse> => {
+        return await svAdminClient.getCometBftNodeDebugDump();
       },
     };
   }, [url, userAccessToken]);
