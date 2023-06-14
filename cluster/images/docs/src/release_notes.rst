@@ -18,6 +18,12 @@ Release Notes
     Section :ref:`Using the Canton Coin Scan UI <helm-scan-web-ui>` explains the UI.
     Note that not all fields in the Scan UI are hooked up to fetch data in the backend yet.
     Ones that should work at this point are the as-of round in the top-right corner, and the Validator and App leaderboards.
+  * A CometBft node is now being deployed as part of the SV node in our runbook.
+
+    * See instructions for generating a node identity in :ref:`Generating the CometBft node identity <cometbft-identity>`.
+    * See instructions for configuring the required secrets with the node identity in :ref:`Configuring your CometBft node keys <helm-cometbft-secrets-config>`
+    * See instructions for deploying the ``cn-cometbft`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
+      and the new required ingress rule in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
 
 * Removed the ``svc-client`` config parameter from the SV app. The SVC app is no longer used for SV onboarding and initialization.
 

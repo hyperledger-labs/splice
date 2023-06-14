@@ -9,15 +9,16 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "{{ .Values.svNodeId }}.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+    - "{{ .Values.node.identifier }}.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+    - "{{ .Values.node.identifier }}.sv.svc.{{ (.Values.cluster).basename }}.network.canton.global"
   gateways:
     - {{ .Values.istioVirtualService.gateway }}
   tcp:
     - match:
-        - port: 26656
+        - port: {{ .Values.istioVirtualService.port }}
       route:
         - destination:
             host: {{ $p2pServiceName }}.{{ .Release.Namespace }}.svc.cluster.local
             port:
-              number: 26656
+              number: {{ .Values.node.p2pPort }}
 {{- end }}

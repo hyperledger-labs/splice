@@ -222,10 +222,11 @@ spec:
     hosts:
     - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
+  {{- range $index, $value := .Values.cometbftPorts }}
   - port:
-      number: 26656
-      name: cometbft-gw
+      number: {{ $value }}
+      name: cometbft{{ add $index 1 }}-gw
       protocol: TCP
     hosts:
-      - "{{ (.Values.cluster).hostname }}"
-      - "*.svc.{{ (.Values.cluster).hostname }}"
+      - "cometbft-sv-{{ add $index 1 }}.svc.{{ ($.Values.cluster).hostname }}"
+  {{- end }}

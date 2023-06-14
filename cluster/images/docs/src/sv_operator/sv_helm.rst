@@ -29,18 +29,21 @@ Requirements
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-4) You should have an SV key pair generated and approved by Digital Asset.
+4) You should have the CometBft node keys generated.
+See instructions in the :ref:`Generating the CometBft node identity <cometbft-identity>`.
+
+5) You should have an SV key pair generated and approved by Digital Asset.
 See instructions in the :ref:`Generating an SV identity section <sv-identity>`.
 
-5) You should have completed the self hosted validator setup,
+6) You should have completed the self hosted validator setup,
    including Auth0 setup. Dedicated instructions can be found in the :ref:`Self-Hosted Validator section <self_hosted_validator>`
 
-6) Your cluster either needs to be connected to the GCP DA Canton
+7) Your cluster either needs to be connected to the GCP DA Canton
    DevNet VPN or you need a static egress IP. In the latter case,
    please provide that IP address to your contact at Digital Asset to
    add it to the firewall rules.
 
-7) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
+8) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
 .. parsed-literal::
 
@@ -237,6 +240,21 @@ SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
 The ``AUTH0_TENANT_NAME`` is the name of your Auth0 tenant as shown at the top left of your Auth0 project.
 You can obtain the client ID and secret of each Auth0 app from the settings pages of that app.
 
+.. _helm-cometbft-secrets-config:
+
+Configuring your CometBft node keys
++++++++++++++++++++++++++++++++++++
+
+The CometBft node is configured with a secret, based on the output from :ref:`Generating the CometBft node identity <cometbft-identity>`
+The secret is created as follows, with the `node_key.json` and `priv_validator_key.json` files representing the files generated as part of the node identity:
+
+.. code-block:: bash
+
+    kubectl create --namespace sv secret generic cometbft-keys \
+        "--from-file=node_key.json=node_key.json" \
+        "--from-file=priv_validator_key.json=priv_validator_key.json"
+
+
 .. _helm-sv-auth-secrets-config:
 
 Configuring Authentication on your SV Node
@@ -262,7 +280,6 @@ For technical reasons, please also create the following dummy secrets (a require
     kubectl create --namespace sv secret generic cn-app-scan-ledger-api-auth "--from-literal=ledger-api-user=dummy"
     kubectl create --namespace sv secret generic cn-app-directory-ledger-api-auth "--from-literal=ledger-api-user=dummy"
     kubectl create --namespace sv secret generic cn-app-svc-ledger-api-auth "--from-literal=ledger-api-user=dummy"
-
 
 The SV app is configured with a secret as follows:
 
@@ -316,6 +333,14 @@ similar.
 
 |chart_version_set|
 
+An SV node includes a CometBft node so you also need to configure
+that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml`` as follows:
+
+- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
+- Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBft node
+- Replace ``YOUR_HOSTNAME`` with the hostname that will be used for the ingress
+
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` as follows:
 
 - Replace ``TARGET_CLUSTER`` in the `globalDomain.url` entry with |cn_cluster|, per the cluster to which you are connecting.
@@ -361,6 +386,7 @@ reaches a stable state prior to moving on to the next step.
     helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml --wait
     helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml --wait
     helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} --wait
+    helm install cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in each of the three new
@@ -379,6 +405,7 @@ namespaces. A typical query might look as follows:
     sv                wallet-web-ui-54c9ddbb8-nvkmp                              1/1     Running   0             43m
     sv                participant-6fdff7fc4-vzg8c                                3/3     Running   1 (72m ago)   72m
     sv                postgres-0                                                 1/1     Running   0             120m
+    sv                cometbft-6fdff7fc4-vzg8c                                   1/1     Running   0             120m
 
 
 Note also that ``Pod`` restarts may happen during bringup,
@@ -400,6 +427,8 @@ The following routes should be configured in your cluster ingress controller:
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/*`` should be routed to port 5014 of pod ``sv-app`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``scan-web-ui`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/v0/scan/*`` should be routed to port 5012 in pod ``scan-app`` in the ``sv`` namespace
+* ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol
+
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have

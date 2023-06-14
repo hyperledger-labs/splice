@@ -41,6 +41,12 @@ export function installLoopback(
             ingressPort('grpc-svc', 5005),
             ingressPort('grpc-domain', 5008),
             ingressPort('http-scan', 5012),
+            // see notes when installing a CometBft node in the full deployment
+            ingressPort('cometbft-1', 26656),
+            ingressPort('cometbft-2', 26666),
+            ingressPort('cometbft-3', 26676),
+            ingressPort('cometbft-4', 26686),
+            ingressPort('cometbft-5', 26696),
           ],
         },
       },

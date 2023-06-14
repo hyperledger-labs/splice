@@ -249,6 +249,29 @@
     "type": "kubernetes:core/v1:Secret"
   },
   {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoicUdLRWRQL0V5T2d1dVBJc0JYQ0E5cURZeEN3OUp0UTljVEJzcm9RY0FiU0dEcXZ6NDJTY0lPOEw4ZzJXMEFPbndZdG9Lc1cweDhHSTQxeGdLcjRlbWc9PSJ9fQ==",
+          "priv_validator_key.json": "ewogICJhZGRyZXNzIjogIjA2NDdFNEZGMjc5MDhCOEI4NzRDMjY0NzUzNkFDOTg2QzlFQTBCQUIiLAogICJwdWJfa2V5IjogewogICAgInR5cGUiOiAidGVuZGVybWludC9QdWJLZXlFZDI1NTE5IiwKICAgICJ2YWx1ZSI6ICIzVEhIQnc0amVjQ0dPZWgxVWRiU0hmSDU0QlZqRmpxS2hySm5yWEFPZ2xNPSIKICB9LAogICJwcml2X2tleSI6IHsKICAgICJ0eXBlIjogInRlbmRlcm1pbnQvUHJpdktleUVkMjU1MTkiLAogICAgInZhbHVlIjogIjhmWkRzVkxyYTFWRTgvMjhrYUltaXdrV1BqVWdUZUF0SmN6VHh2cDVIQ25kTWNjSERpTjV3SVk1NkhWUjF0SWQ4Zm5nRldNV09vcUdzbWV0Y0E2Q1V3PT0iCiAgfQp9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cometbft-keys",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cometbft-keys",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
     "custom": false,
     "id": "infra.svrun",
     "inputs": {
@@ -307,6 +330,36 @@
               "port": 5012,
               "protocol": "TCP",
               "targetPort": 5012
+            },
+            {
+              "name": "cometbft-1",
+              "port": 26656,
+              "protocol": "TCP",
+              "targetPort": 26656
+            },
+            {
+              "name": "cometbft-2",
+              "port": 26666,
+              "protocol": "TCP",
+              "targetPort": 26666
+            },
+            {
+              "name": "cometbft-3",
+              "port": 26676,
+              "protocol": "TCP",
+              "targetPort": 26676
+            },
+            {
+              "name": "cometbft-4",
+              "port": 26686,
+              "protocol": "TCP",
+              "targetPort": 26686
+            },
+            {
+              "name": "cometbft-5",
+              "port": 26696,
+              "protocol": "TCP",
+              "targetPort": 26696
             }
           ],
           "type": "ClusterIP"
@@ -425,6 +478,43 @@
       }
     },
     "name": "sv-1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cometbft/",
+      "compat": "true",
+      "name": "sv-5-cometbft",
+      "namespace": "sv",
+      "values": {
+        "cluster": {
+          "basename": "svrun"
+        },
+        "founder": {
+          "externalAddress": "cometbft-sv-1.svc.svrun.network.com.network.canton.global:26656"
+        },
+        "genesis": {
+          "chainId": "svrun.network.com.canton"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "istioVirtualService": {
+          "enabled": true,
+          "gateway": "cluster-ingress/apps-gateway",
+          "port": 26696
+        },
+        "node": {
+          "externalAddress": "cometbft-sv-5.svc.svrun.network.canton.global:26696",
+          "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
+          "identifier": "cometbft-sv-5",
+          "keysSecret": "cometbft-keys"
+        },
+        "nodeName": "DA-Helm-Test-Node"
+      }
+    },
+    "name": "sv-5-cometbft",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },

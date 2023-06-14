@@ -33,7 +33,7 @@
   ],
   "app_hash": "",
   "app_state": {
-    "sv_node_id": "{{ $.Values.svNodeId }}"
+    "sv_node_id": "sv-1"
   }
 }
 {{- end }}

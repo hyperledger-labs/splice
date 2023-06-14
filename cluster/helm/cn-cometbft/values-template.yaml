@@ -1,19 +1,17 @@
-imageRepo: digitalasset-canton-enterprise-docker.jfrog.io
-imageName: cometbft-canton-network
+imageRepo: digitalasset-canton-network-docker.jfrog.io/digitalasset
+imageName: cometbft
 cluster:
   imageTag: IMAGE_TAG
 
-# The SV node id which will manage this CometBFT node
-svNodeId: ""
 # Node names use as a moniker to identify the node in the CometBFT network
 nodeName: ""
 
 founder:
   # The CometBFT node ID of the founding node
-  nodeId:
+  nodeId: "5af57aa83abcec085c949323ed8538108757be9c"
   # The public key of the CometBFT founding node
-  publicKey:
-  keyAddress: ""
+  publicKey: "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+  keyAddress: "8A931AB5F957B8331BDEF3A0A081BD9F017A777F"
   # External address, in the format <host>:<port> that can be used to access the p2p port of the founding node
   externalAddress:
 peers:
@@ -29,9 +27,13 @@ node:
   p2pPort: 26656
   # The rpc port exposed by the CometBFT container
   rpcPort: 26657
+  # Identifier used to prefix created resources and as part of the optional Istio ingress
+  identifier:
   # URL that can be used by other nodes to access the p2p port of the node.
   # Must be set in the format <host>:<port>
   externalAddress: ""
+  # Either keysSecret or privateKey and validator values must be provided
+  keysSecret: ""
   # The node private key
   privateKey: ""
   validator:
@@ -42,6 +44,7 @@ node:
 istioVirtualService:
   enabled: false
   gateway: ""
+  port: 26656
 
 genesis:
   chainId: ""

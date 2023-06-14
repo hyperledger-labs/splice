@@ -60,6 +60,37 @@ An SV node includes a validator node, so just like when
 
    curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/sv/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
+
+.. _cometbft-identity:
+
+Generating the CometBft node identity
+-------------------------------------
+
+Every SV node also deploys a CometBft node. This node must be configured to join the existing Canton network BFT chain.
+To do that, you first must generate the keys that will identify the node.
+
+To generate the node config you must have access to the CometBft docker image provided through the Canton Network artifacotry (digitalasset-canton-network-docker.jfrog.io).
+
+Use the following shell commands to generate the proper keys:
+
+.. parsed-literal::
+
+    # Create a folder to store the config
+  mkdir cometbft
+  # Init the node
+  docker run -v $(pwd):/init https://digitalasset.jfrog.io/artifactory/canton-network-docker/digitalasset/cometbft:|version| init --home /init
+  # Read the node id and keep a note of it for the deployment
+  docker run -v $(pwd):/init https://digitalasset.jfrog.io/artifactory/canton-network-docker/digitalasset/cometbft:|version| show-node-id --home /init
+
+Please keep a note of the node ID printed out above.
+
+In addition, please retain some of the configuration files generated, as follows (you might need to change the permissions/ownership for them as they are accessible only by the root user): ::
+
+  cometbft/config/node_key.json
+  cometbft/config/priv_validator_key.json
+
+Any other files can be ignored.
+
 .. _sv-identity:
 
 Generating an SV identity

@@ -53,3 +53,14 @@ export function loadYamlFromFile(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ChartValues = { [key: string]: any };
+
+export const CLUSTER_BASENAME = requiredEnv(
+  'GCP_CLUSTER_BASENAME',
+  'The cluster in which this chart is being installed'
+);
+export const REPO_ROOT = requiredEnv('REPO_ROOT', 'root directory of the repo');
+export const TARGET_CLUSTER = requiredEnv(
+  'TARGET_CLUSTER',
+  'the cluster in which the global domain is running'
+);
+export const SV_NAME = 'DA-Helm-Test-Node';

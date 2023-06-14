@@ -64,7 +64,11 @@ spec:
               - configMap:
                   name: {{ include "prefix" (list $.Values "config-cometbft") }}
               - secret:
+                  {{ if not $.Values.node.keysSecret }}
                   name: {{ include "prefix" (list $.Values "keys") }}
+                  {{- else }}
+                  name: {{ $.Values.node.keysSecret }}
+                  {{- end }}
         - name: initial-data
           configMap:
             name: {{ include "prefix" (list $.Values "initial-data") }}

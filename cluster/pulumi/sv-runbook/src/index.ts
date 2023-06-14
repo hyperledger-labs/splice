@@ -1,5 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 
+import { installCometBftNode } from './cometbft';
 import { installCNSVHelmChart, installCNSVHelmChartByNamespaceName } from './helm';
 import { installLoopback } from './loopback';
 import {
@@ -15,23 +16,22 @@ import {
   svKeySecret,
   svcUserParticipantSecret,
 } from './secrets';
-import { exactNamespace, requiredEnv, loadYamlFromFile } from './utils';
+import {
+  exactNamespace,
+  requiredEnv,
+  loadYamlFromFile,
+  CLUSTER_BASENAME,
+  TARGET_CLUSTER,
+  REPO_ROOT,
+  SV_NAME,
+} from './utils';
 
 // Note that for now this assumes the entire cluster is under this scripts's control,
 // i.e. it was only initialized with the `infrastructure` pulumi, no other `cncluster` scripts (specifically, no other secrets or namespaces created).
 
-const REPO_ROOT = requiredEnv('REPO_ROOT', 'root directory of the repo');
 const version = process.env.CHARTS_VERSION;
 const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
-const CLUSTER_BASENAME = requiredEnv(
-  'GCP_CLUSTER_BASENAME',
-  'The cluster in which this chart is being installed'
-);
 const AUTH0_DOMAIN = requiredEnv('AUTH0_DOMAIN', 'the Auth0 tenant domain'); // auth0 plugin requires this to be defined anyway, so we just reuse that
-const TARGET_CLUSTER = requiredEnv(
-  'TARGET_CLUSTER',
-  'the cluster in which the global domain is running'
-);
 const SV_WALLET_USER_ID = process.env.SV_WALLET_USER_ID || 'auth0|64553aa683015a9687d9cc2e'; // Default to admin@sv.com at the sv-test tenant by default
 const SV_NAMESPACE = process.env.SV_NAMESPACE || 'sv';
 
@@ -43,7 +43,6 @@ console.error(
 console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
 console.error(`Installing SV node in namespace: ${SV_NAMESPACE}`);
 
-const SV_NAME = 'DA-Helm-Test-Node';
 const SV_PUBLIC_KEY =
   'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==';
 const SV_PRIVATE_KEY =
@@ -166,3 +165,5 @@ installCNSVHelmChartByNamespaceName(
   version,
   ingressImagePullDeps.concat([sv, validator])
 );
+
+installCometBftNode(svNamespace);
