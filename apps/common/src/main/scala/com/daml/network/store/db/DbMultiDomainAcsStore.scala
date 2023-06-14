@@ -1,7 +1,6 @@
 package com.daml.network.store.db
 
 import akka.NotUsed
-import akka.stream.DelayOverflowStrategy
 import akka.stream.scaladsl.Source
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, Template}
@@ -31,7 +30,6 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.unused
 import scala.collection.immutable.VectorMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.concurrent.duration.DurationInt
 
 class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     storage: DbStorage,
@@ -227,6 +225,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .flatMapConcat { domainId =>
         Source
           .unfoldAsync(0L) { fromEventNumber =>
+            val offsetPromise = offsetChangedAfterStreamingQuery.get()
             storage
               .query( // index: acs_store_template_sid_tid_en
                 sql"""
@@ -239,37 +238,28 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                      """.as[AcsStoreRowTemplate],
                 "streamReadyContracts",
               )
-              .map { rows =>
-                Some(
-                  rows.lastOption
-                    .map(_.eventNumber)
-                    .map { lastEventNumber =>
+              .flatMap { rows =>
+                rows.lastOption.map(_.eventNumber) match {
+                  case Some(lastEventNumber) =>
+                    Future.successful(
                       (
                         lastEventNumber + 1,
                         rows.map(row => ReadyContract(contractFromRow(companion)(row), domainId)),
                       )
-                    }
-                    .getOrElse(fromEventNumber -> Vector.empty)
-                )
-              }
-          }
-          .delayWith(
-            () =>
-              (rows: Vector[ReadyContract[TCid, T]]) => {
-                if (rows.isEmpty) {
-                  // TODO (#5374): the polling shouldn't be necessary
-                  StreamSleepOnNoResult // no need to spam the DB with queries that give empty results
-                } else {
-                  0.millis
+                    )
+                  case None =>
+                    // to avoid polling the DB, we wait for a new offset to have been ingested
+                    offsetPromise.future.map(_ => fromEventNumber -> Vector.empty)
                 }
-              },
-            DelayOverflowStrategy.backpressure,
-          )
+              }
+              .map(Some(_))
+          }
       }
       .mapConcat(identity)
   }
 
-  private val StreamSleepOnNoResult = 500.millis
+  private val offsetChangedAfterStreamingQuery: AtomicReference[Promise[Unit]] =
+    new AtomicReference(Promise())
 
   override def streamReadyForTransferIn(): Source[TransferEvent.Out, NotUsed] = ???
 
@@ -350,6 +340,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         _ <- storage.update(updateOffset(offset), "ingestAcs.updateOffset")
       } yield {
         finishedAcsIngestion.success(())
+        notifyStreamsOfNewOffset()
         logger.info(
           s"Store $storeId ingested the ACS and switched to ingesting updates at $offset"
         )
@@ -363,7 +354,14 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       for {
         (offset, todo) <- getIngestionWork(transfer)
         _ <- ingestWork(offset, todo)
-      } yield ()
+      } yield {
+        notifyStreamsOfNewOffset()
+      }
+    }
+
+    private def notifyStreamsOfNewOffset(): Unit = {
+      val previousPromise = offsetChangedAfterStreamingQuery.getAndSet(Promise())
+      previousPromise.success(())
     }
 
     private def getIngestionWork(transfer: TreeUpdate): Future[(String, WorkTodo)] = {
