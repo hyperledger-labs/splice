@@ -1713,17 +1713,6 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-        name: "scala_test sim time"
-        test_names_file: "test-full-class-names-sim-time.log"
-        start_canton_options: "-d -p external -s"
-        resource_class: "2xlarge"
-        parallelism: 2
-    - scala_test:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - datadog
-          - slack-context
         name: "scala_test x nodes wall clock time"
         test_names_file: "test-full-class-names-xnode.log"
         start_canton_options: "-d -p external -x -w"

@@ -14,7 +14,7 @@ import java.math.RoundingMode
 import java.time.{Duration as JavaDuration}
 import scala.jdk.CollectionConverters.*
 
-class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
+class XNodeSvTimeBasedIntegrationTest extends XNodeSvTimeBasedIntegrationTestBase {
 
   "SVs collect SvcReward and SvReward automatically" in { implicit env =>
     initSvc()

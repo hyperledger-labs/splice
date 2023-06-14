@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.da.types.Tuple2
 import java.time.{Duration as JavaDuration}
 import scala.jdk.CollectionConverters.*
 
-class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTestBase {
+class XNodeSvTimeBasedRoundMgmtIntegrationTest extends XNodeSvTimeBasedIntegrationTestBase {
 
   "round management" in { implicit env =>
     initSvc()

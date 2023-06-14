@@ -202,12 +202,6 @@ case class CNNodeEnvironmentDefinition(
 }
 
 object CNNodeEnvironmentDefinition {
-  private def simpleTopology(testName: String): CNNodeEnvironmentDefinition =
-    fromResource("simple-topology.conf", testName)
-      .withAllocatedValidatorUsers()
-      .withAllocatedSvUsers()
-      .withInitializedNodes()
-
   def simpleTopologyXDistributedDomain(testName: String): CNNodeEnvironmentDefinition =
     fromResources(Seq("simple-topology.conf", "x-node-overrides.conf"), testName)
       .withAllocatedValidatorUsers()
@@ -225,9 +219,6 @@ object CNNodeEnvironmentDefinition {
 
   def simpleTopologyXCentralizedDomainWithSimTime(testName: String): CNNodeEnvironmentDefinition =
     simpleTopologyXCentralizedDomain(testName).withSimTime(useXNodes = true)
-
-  def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopology(testName).withSimTime(useXNodes = false)
 
   def preflightTopology(testName: String): CNNodeEnvironmentDefinition = {
     fromResource("preflight-topology.conf", testName)

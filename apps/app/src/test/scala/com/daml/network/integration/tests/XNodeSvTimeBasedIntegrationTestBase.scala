@@ -16,7 +16,7 @@ import monocle.macros.syntax.lens.*
 import java.time.{Duration as JavaDuration, Instant}
 import scala.concurrent.duration.*
 
-class SvTimeBasedIntegrationTestBase
+class XNodeSvTimeBasedIntegrationTestBase
     extends CNNodeIntegrationTest
     with SvTestUtil
     with WalletTestUtil
@@ -25,7 +25,7 @@ class SvTimeBasedIntegrationTestBase
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
       .withManualStart
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
       .withoutAutomaticRewardsCollectionAndCoinMerging

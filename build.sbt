@@ -1061,7 +1061,6 @@ printTests := {
   import java.io._
   println("Appending full class names of tests.")
   val pw = new PrintWriter(new FileWriter(s"test-full-class-names.log", true))
-  val pwSimTime = new PrintWriter(new FileWriter(s"test-full-class-names-sim-time.log", true))
   val pwPreflight = new PrintWriter(new FileWriter(s"test-full-class-names-preflight.log", true))
   val pwPreflightSv =
     new PrintWriter(new FileWriter(s"test-full-class-names-preflight-sv.log", true))
@@ -1104,16 +1103,6 @@ printTests := {
 
   Seq(
     (
-      "tests with simulated time",
-      pwSimTime,
-      (t: String) =>
-        isTimeBasedTest(t) && !isFrontEndTest(t) && !isPreflightIntegrationTest(
-          t
-        ) && !isPreflightSvIntegrationTest(t) && !isXNodeTest(
-          t
-        ),
-    ),
-    (
       "Preflight tests",
       pwPreflight,
       (t: String) => isPreflightIntegrationTest(t),
@@ -1137,7 +1126,9 @@ printTests := {
       "XNode tests with simulated time",
       pwXNodeSimTime,
       (t: String) =>
-        isXNodeTest(t) && isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(
+        // All simtime tests are migrated to X nodes so we explicitly don't exclude non-xnode
+        // tests here to make sure that we don't introduce any new ones.
+        isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(
           t
         ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
@@ -1174,7 +1165,6 @@ printTests := {
   }
 
   pw.close()
-  pwSimTime.close()
   pwPreflight.close()
   pwPreflightSv.close()
   pwXNode.close()
