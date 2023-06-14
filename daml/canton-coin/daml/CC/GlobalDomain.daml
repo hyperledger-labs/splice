@@ -42,6 +42,13 @@ data DomainFeesConfig = DomainFeesConfig with
 -- Extra traffic tracking
 -------------------------
 
+-- | Expression of intent to purchase domain traffic (for the first time) by a validator operator.
+template ValidatorTrafficCreationIntent with
+    validator : Party -- ^ The party representing the validator node and its operator
+    domainId : Text -- ^ The id of the domain for which the validator wants to purchase extra traffic.
+  where
+    signatory validator
+
 -- | The state of the extra domain traffic purchases of a validator operator.
 template ValidatorTraffic with
     svc : Party

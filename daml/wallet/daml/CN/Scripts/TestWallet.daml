@@ -510,17 +510,21 @@ testBuyExtraTraffic = script do
 
   -- test that buying less extra traffic than the configured min topup amount fails
   let minTopupAmount = globalDomainConfig.fees.minTopupAmount
+  intentCid1 <- submit aliceValidator.primaryParty $
+    createCmd (ValidatorTrafficCreationIntent aliceValidator.primaryParty globalDomainConfig.activeDomain)
   outcome <- executeCoinOperation app aliceValidator $
-    CO_BuyExtraTraffic (minTopupAmount-1) (Left globalDomainConfig.activeDomain) (minutes 1)
+    CO_BuyExtraTraffic (minTopupAmount-1) (Left intentCid1) (minutes 1)
   outcome === COO_Error (ITR_Other ("The requirement 'extraTraffic is at least as much as the configured minTopupAmount' was not met.") )
 
   -- test that creating the initial traffic contract works when buying it initially
   COO_BuyExtraTraffic trafficCid1 <- executeCoinOperation app aliceValidator $
-    CO_BuyExtraTraffic (minTopupAmount) (Left globalDomainConfig.activeDomain) (minutes 1)
+    CO_BuyExtraTraffic (minTopupAmount) (Left intentCid1) (minutes 1)
 
   -- buying a second time w/o referring to the previous contract results in a second contract
+  intentCid2 <- submit aliceValidator.primaryParty $
+    createCmd (ValidatorTrafficCreationIntent aliceValidator.primaryParty globalDomainConfig.activeDomain)
   COO_BuyExtraTraffic trafficCid2 <- executeCoinOperation app aliceValidator $
-    CO_BuyExtraTraffic (minTopupAmount + 1) (Left globalDomainConfig.activeDomain) (minutes 1)
+    CO_BuyExtraTraffic (minTopupAmount + 1) (Left intentCid2) (minutes 1)
 
   -- however the SVC can merge the two contracts, and drop the one with the lower total (the first one)
   [(coinRulesCid, _)] <- query @CoinRules app.svc

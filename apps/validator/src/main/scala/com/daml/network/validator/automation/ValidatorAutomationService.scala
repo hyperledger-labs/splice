@@ -44,10 +44,11 @@ class ValidatorAutomationService(
     registerTrigger(
       new TopupValidatorTrafficBalanceTrigger(
         triggerContext,
+        store,
+        connection,
         buyExtraTrafficConfig,
         clock,
         walletManager,
-        store,
         scanConnection,
       )
     )

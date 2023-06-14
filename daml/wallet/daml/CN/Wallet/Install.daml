@@ -78,16 +78,16 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]
     handleLeft errorMsg = executeCoinOperationRec endUserP validatorP context inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
 
-    handleBuyExtraTraffic extraTraffic domainIdOrTrafficCid minTopupInterval = do
+    handleBuyExtraTraffic extraTraffic intentOrTrafficCid minTopupInterval = do
       -- protect against successive topups being too close together
-      case domainIdOrTrafficCid of
+      case intentOrTrafficCid of
         Left _ -> pure ()  -- nothing has to be done if a traffic contract is created freshly for a domain
         Right trafficCid -> do
           traffic <- fetch trafficCid
           now <- getTime
           require "enough time has elapsed since the last topup" (addRelTime traffic.lastPurchasedAt minTopupInterval <= now)
       exercise (fromInterfaceContractId @CoinRules context.coinRules)
-        (CoinRules_BuyExtraTraffic inputs context validatorP domainIdOrTrafficCid extraTraffic)
+        (CoinRules_BuyExtraTraffic inputs context validatorP intentOrTrafficCid extraTraffic)
 
 executeCoinOperationRec _endUserP _validatorP _context _inputs prevResults [] = do
   return prevResults
@@ -113,7 +113,7 @@ data CoinOperation
   | CO_MergeTransferInputs
   | CO_BuyExtraTraffic with
       extraTrafficAmount: Int
-      domainIdOrTrafficCid : Either Text (ContractId ValidatorTraffic)
+      intentOrTrafficCid : Either (ContractId ValidatorTrafficCreationIntent) (ContractId ValidatorTraffic)
       minTopupInterval: RelTime
   | CO_Tap with
       tapAmount: Decimal

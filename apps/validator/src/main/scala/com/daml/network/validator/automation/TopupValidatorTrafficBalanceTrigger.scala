@@ -2,7 +2,10 @@ package com.daml.network.validator.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.{
+  ValidatorTraffic,
+  ValidatorTrafficCreationIntent,
+}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyExtraTraffic
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_BuyExtraTraffic,
@@ -10,6 +13,8 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types as damlTypes
+import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorTrafficBalance
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -30,10 +35,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class TopupValidatorTrafficBalanceTrigger(
     override protected val context: TriggerContext,
+    store: ValidatorStore,
+    connection: CNLedgerConnection,
     buyExtraTrafficConfig: BuyExtraTrafficConfig,
     clock: Clock,
     walletManager: UserWalletManager,
-    store: ValidatorStore,
     scanConnection: ScanConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -138,31 +144,72 @@ class TopupValidatorTrafficBalanceTrigger(
       topupParameters: ExtraTrafficTopupParameters,
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     logger.info(s"Topping up traffic balance by ${topupParameters.topupAmount / 1e6} MB")
-    val domainOrTrafficCid =
-      validatorTraffic.value.fold[damlTypes.Either[String, ValidatorTraffic.ContractId]](
-        new damlTypes.either.Left(activeDomainId.toProtoPrimitive)
-      )(co => new damlTypes.either.Right(co.contractId))
-    val coBuyExtraTraffic = new CO_BuyExtraTraffic(
-      topupParameters.topupAmount,
-      domainOrTrafficCid,
-      new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
-    )
-    validatorTreasury
-      // TODO(#4914): ideally the initial buy of a validator traffic contract should be protected via command deduplication
-      .enqueueCoinOperation(coBuyExtraTraffic)
-      .flatMap {
-        case outcome: COO_BuyExtraTraffic =>
-          logger.info(
-            s"topUpValidatorTraffic outcome - successfully bought extra traffic: $outcome"
+    for {
+      intentOrTrafficCid <- validatorTraffic match {
+        case QueryResult(offset, None) =>
+          getOrCreateTrafficCreationIntent(activeDomainId, offset).map(cid =>
+            new damlTypes.either.Left[
+              ValidatorTrafficCreationIntent.ContractId,
+              ValidatorTraffic.ContractId,
+            ](cid)
           )
-          Future.successful(true)
-        case error: COO_Error =>
-          logger.info(
-            s"topUpValidatorTraffic outcome - received an unexpected COOError: $error - ignoring for now"
+        case QueryResult(_, Some(traffic)) =>
+          Future.successful(
+            new damlTypes.either.Right[
+              ValidatorTrafficCreationIntent.ContractId,
+              ValidatorTraffic.ContractId,
+            ](traffic.contractId)
           )
-          // given the error, don't retry immediately
-          Future.successful(false)
-        case otherwise => sys.error(s"unexpected COO return type: $otherwise")
       }
+      coBuyExtraTraffic = new CO_BuyExtraTraffic(
+        topupParameters.topupAmount,
+        intentOrTrafficCid,
+        new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
+      )
+      taskOutcome <-
+        validatorTreasury
+          .enqueueCoinOperation(coBuyExtraTraffic)
+          .map {
+            case outcome: COO_BuyExtraTraffic =>
+              logger.info(
+                s"topUpValidatorTraffic outcome - successfully bought extra traffic: $outcome"
+              )
+              true
+            case error: COO_Error =>
+              logger.info(
+                s"topUpValidatorTraffic outcome - received an unexpected COOError: $error - ignoring for now"
+              )
+              // given the error, don't retry immediately
+              false
+            case otherwise => sys.error(s"unexpected COO return type: $otherwise")
+          }
+    } yield taskOutcome
+  }
+
+  private def getOrCreateTrafficCreationIntent(activeDomainId: DomainId, dedupOffset: String)(
+      implicit traceContext: TraceContext
+  ): Future[ValidatorTrafficCreationIntent.ContractId] = {
+    store.lookupValidatorTrafficCreationIntent(activeDomainId).flatMap {
+      case Some(co) => Future.successful(co.contractId)
+      case None =>
+        val validator = store.key.validatorParty
+        connection
+          .submitWithResult(
+            Seq(validator),
+            Seq(validator),
+            ValidatorTrafficCreationIntent.create(
+              validator.toProtoPrimitive,
+              activeDomainId.toProtoPrimitive,
+            ),
+            CNLedgerConnection.CommandId(
+              "com.daml.network.validator.automation.TopupValidatorTrafficBalanceTrigger.getOrCreateTrafficCreationIntent",
+              Seq(validator),
+              activeDomainId.toProtoPrimitive,
+            ),
+            DedupOffset(dedupOffset),
+            activeDomainId,
+          )
+          .map(ev => new ValidatorTrafficCreationIntent.ContractId(ev.contractId.contractId))
+    }
   }
 }

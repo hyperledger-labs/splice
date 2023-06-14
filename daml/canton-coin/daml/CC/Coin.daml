@@ -283,7 +283,7 @@ template CoinRules
         inputs : [API.TransferInput]
         context : API.PaymentTransferContext
         validator : Party
-        domainIdOrTrafficCid: Either Text (ContractId ValidatorTraffic)
+        intentOrTrafficCid: Either (ContractId ValidatorTrafficCreationIntent) (ContractId ValidatorTraffic)
         extraTraffic : Int
       controller validator
       do
@@ -313,10 +313,12 @@ template CoinRules
         -- burn the coin created for the SVC
         _ <- archive coin
         -- fetch, archive, and validate traffic contract
-        traffic <- case domainIdOrTrafficCid of
-          Left domainId -> do
-            require "Known domain-id" (domainId `Set.member` configUsd.globalDomain.requiredDomains)
-            pure $ initialValidatorTraffic svc validator domainId
+        traffic <- case intentOrTrafficCid of
+          Left intentCid -> do
+            intent <- fetch intentCid
+            archive intentCid
+            require "Known domain-id" (intent.domainId `Set.member` configUsd.globalDomain.requiredDomains)
+            pure $ initialValidatorTraffic svc intent.validator intent.domainId
           Right trafficCid -> do
             traffic <- fetch trafficCid
             archive trafficCid

@@ -4,7 +4,10 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.{
+  ValidatorTraffic,
+  ValidatorTrafficCreationIntent,
+}
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
@@ -88,6 +91,17 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       )
     )
 
+  def lookupValidatorTrafficCreationIntent(domainId: DomainId)(implicit tc: TraceContext): Future[
+    Option[Contract[ValidatorTrafficCreationIntent.ContractId, ValidatorTrafficCreationIntent]]
+  ] =
+    defaultAcsDomainIdF.flatMap(defaultDomainId =>
+      // TODO(#4913): read from all domains in the global domain
+      multiDomainAcsStore.findContractOnDomain(ValidatorTrafficCreationIntent.COMPANION)(
+        defaultDomainId,
+        intent => intent.payload.domainId == domainId.toProtoPrimitive,
+      )
+    )
+
   def listUsers()(implicit tc: TraceContext): Future[Seq[String]] = {
     for {
       domainId <- defaultAcsDomainIdF
@@ -153,6 +167,7 @@ object ValidatorStore {
           co.payload.validator == validator &&
             co.payload.svc == svc
         ),
+        mkFilter(ValidatorTrafficCreationIntent.COMPANION)(co => co.payload.validator == validator),
         mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == validator
