@@ -31,8 +31,8 @@
       - [Fixing Connection Issues in kubectl](#fixing-connection-issues-in-kubectl)
     - [Cluster Infrastructure Setup](#cluster-infrastructure-setup)
     - [Deploy a Build to a Cluster](#deploy-a-build-to-a-cluster)
-    - [Update a Single Component in a Cluster](#update-a-single-component-in-a-cluster)
     - [Add a Component to the Build](#add-a-component-to-the-build)
+    - [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
     - [Memory Settings](#memory-settings)
   - [TLS Certificate Provisioning](#tls-certificate-provisioning)
     - [Adding TLS to {insert-service-here}](#adding-tls-to-insert-service-here)
@@ -725,6 +725,29 @@ cover the typical lifecycle of a Canton Network cluster.
        (ports that the applications actually use)
 1. If you touched any of the Helm charts or Pulumi stacks, you will need to update the
    characterization tests for our deployment with `make cluster/pulumi/update-expected`
+
+### Modifying a Deployed Cluster
+
+For certain cases, local modifications may be applied to a cluster by simply rerunning `cncluster apply`.
+An extreme option if that does not work is simply `cncluster pdown && cncluster apply`,
+however that takes several minutes and is hard to iterate with.
+
+It is often much more convenient to experiment with modifications directly on the deployed resources, via `kubectl edit`, or `e` in `k9s`.
+
+Alternatively, for changes in a Helm chart, or in the values with which it is deployed, also consider one of the following options:
+
+To uninstall a single Helm chart, and have Pulumi reinstall it with whatever modifications you made locally:
+1. Run `helm list -A` to see a list of all deployed Helm chart in all namespaces, and find the one of interest
+1. Uninstall the current Helm chart using `helm uninstall -n <namespace> <name>`, for example `helm uninstall -n sv-1 sv-1-sv-app
+1. Run `cncluster prefresh` to get Pulumi to refresh its state against that of the cluster
+1. Run `cncluster apply` to get Pulumi to reinstall the uninstalled chart.
+
+Alternatively, you can also modify an installed chart, e.g. to change the values with which it is installed, or simply to reinstall it to apply local changes to the chart:
+1. Run `helm list -A` to see a list of all deployed Helm chart in all namespaces, and find the one of interest
+1. Run `helm get values -n <namespace> <name> > vals.yaml` to get the values with which the chart is currently installed
+1. Edit `vals.yaml`: delete the first line ("USER-SUPPLIED VALUES:"), and modify whatever values you with to change
+1. Run `helm upgrade -n <namespace> <name> $REPO_ROOT/cluster/helm/target/<your-helm-chart>.tgz -f vals.yaml
+
 
 ### Memory Settings
 
