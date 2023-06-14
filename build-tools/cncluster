@@ -92,40 +92,6 @@ function _cluster_install_network_gateway() {
 function _cluster_apply() {
     IMAGE_TAG=$1
 
-    TOKEN_ARG=fixedTokens=false
-
-    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
-        TOKEN_ARG=fixedTokens=true
-    fi
-
-    TICK_DURATION_ARG="tickDuration=null"
-
-    if [ -n "${CNCLUSTER_TICK_DURATION:-}" ]; then
-        TICK_DURATION_ARG="tickDuration=\"${CNCLUSTER_TICK_DURATION}\""
-    fi
-
-    _cluster_install_network_gateway
-
-    _info "Applying jsonnet manifest"
-
-    # Apply base cluster config
-    jsonnet --tla-str gcpRegion="${CLOUDSDK_COMPUTE_REGION}" \
-            --tla-str gcpRepoName="${GCP_REPO_NAME}" \
-            --tla-str gcpDnsProject="${GCP_DNS_PROJECT}" \
-            --tla-str gcpDnsSASecret="${GCP_DNS_SA_SECRET}" \
-            --tla-str imageTag="${IMAGE_TAG}" \
-            --tla-str ipAddr="$(_cluster_ip)" \
-            --tla-str clusterName="${GCP_CLUSTER_NAME}" \
-            --tla-str clusterDnsName="${CLUSTER_DNS_NAME}" \
-            --tla-code $TOKEN_ARG \
-            --tla-code "$TICK_DURATION_ARG" \
-            "$REPO_ROOT/cluster/manifest/canton-network-config.jsonnet" \
-        | kubectl apply -f -
-}
-
-function _cluster_papply() {
-    IMAGE_TAG=$1
-
     VERSION_NUMBER=$(get-snapshot-version)
 
     args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
@@ -152,40 +118,6 @@ function _cluster_papply() {
     _info "Applying Pulumi Stack"
 
     subcmd_pulumi canton-network up --yes --show-sames "${args[@]}"
-}
-
-function _cluster_update_module() {
-    module=$1
-
-    _log "Pushing module: ${module}"
-
-    pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
-
-    if [ ! -f "${pushStateFile}" ]; then
-        _error "Module not available for deployment (failure during either push or build): $1"
-    fi
-
-    imageTag=$(gawk -F '::' '{ print $2; }' < "${pushStateFile}")
-
-    dnames=$(kubectl get deployment --all-namespaces -l moduleName="${module}" -o jsonpath='{.items[*].metadata}' \
-                 | jq -r '.name + if has("namespace") then "@" + .namespace else "" end')
-
-    if [ -z "$dnames" ]; then
-        _warning "No deployment found for module: ${module}"
-    else
-        for dname in $dnames; do
-            _log "Setting module for deployment: ${dname}"
-            IFS='@' read -ra NAME_NS <<<"$dname"
-            kubectl set image --namespace "${NAME_NS[1]-default}" "deployment/${NAME_NS[0]}" "${NAME_NS[0]}=${imageTag}"
-        done
-
-        _log "Deleting module pods to force restart: ${module}"
-
-        # Delete the pods to force recreation. This forces a reload of
-        # the docker image, even if the tag has not changed, due to
-        # the imagePullPolicy setting of "Always".
-        kubectl delete pods --all-namespaces -l "moduleName=${module}"
-    fi
 }
 
 function _cluster_show() {
@@ -303,102 +235,6 @@ function subcmd_activate() {
     _cluster_must_exist
 
     gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
-}
-
-###
-
-subcommand_whitelist[apply]='Apply the current manifest to the cluster. Accepts an optional tag for images.'
-
-function subcmd_apply() {
-    _production_gate
-    _prompt_to_confirm
-
-    IMAGE_TAG=${SOURCE_IMAGE_TAG}
-
-    if [ -z "${1-}" ]; then
-        if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
-            _docker_must_be_running
-            if ! make -C "${REPO_ROOT}" docker-check -j; then
-                _error "Images missing from artifact registry, cannot apply."
-            fi
-        else
-            _warning "docker-check bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
-        fi
-    else
-        IMAGE_TAG=$1
-        _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
-    fi
-
-    _cluster_apply "${IMAGE_TAG}"
-}
-
-###
-
-subcommand_whitelist[deploy]='Rebuild local working copy and deploy to cluster.'
-
-function subcmd_deploy() {
-    _production_gate
-    _prompt_to_confirm
-    _docker_must_be_running
-
-    make -C "${REPO_ROOT}" clean -j
-
-    if ! make -C "${REPO_ROOT}" docker-build -j; then
-        _error "Error building images, cannot apply."
-    fi
-
-    if ! make -C "${REPO_ROOT}" docker-push -j; then
-        _error "Error pushing images, cannot apply."
-    fi
-
-    _cluster_apply "${SOURCE_IMAGE_TAG}"
-}
-
-###
-
-subcommand_whitelist[push]='Update one or more modules running on a cluster'
-
-function subcmd_push() {
-    _production_gate
-    _prompt_to_confirm
-    _cluster_must_exist
-    _docker_must_be_running
-
-    # Assemble target lists for parallel clean and then build.
-    clean_targets=""
-    db_targets=""
-    dpf_targets=""
-    for module in "$@"
-    do
-        if [ ! -d "${REPO_ROOT}/cluster/images/${module}" ]; then
-            _error "Unknown module: $module"
-        fi
-
-        clean_targets="${clean_targets} cluster/images/${module}/clean"
-        db_targets="${db_targets} cluster/images/${module}/docker-build"
-        dpf_targets="${dpf_targets} cluster/images/${module}/docker-push"
-    done
-
-    if [ -z "${db_targets}" ]; then
-        _error "No modules specified."
-    fi
-
-    # Clean and build in parallel
-    # shellcheck disable=SC2086
-    make -C "${REPO_ROOT}" ${clean_targets} -j
-    # shellcheck disable=SC2086
-    make -C "${REPO_ROOT}" ${db_targets} -j
-
-    # Run the push serially (since the push is ultimately serialized across
-    # the shared upload link anyway, and adding contention won't help speed
-    # things up).
-    # shellcheck disable=SC2086
-    make -C "${REPO_ROOT}" ${dpf_targets}
-
-    # Update all the modules in cluster
-    for module in "$@"; do
-        _cluster_update_module "${module}"
-    done
 }
 
 ###
@@ -718,29 +554,6 @@ function subcmd_obliterate_state() {
     kubectl delete Service external --ignore-not-found=true
 
     _info "Cluster state obliterated"
-}
-
-###
-
-subcommand_whitelist[ci_papply]='Run only by CircleCI'
-
-function subcmd_ci_papply() {
-    _assert_lock --for-ci
-
-    # A CI-specific variant of 'cncluster apply' that removes the need
-    # for manual confirmation and ensures that all pods are deleted
-    # and recreated during the apply. With current (September 2022)
-    # DevNet, the ledger is stored in memory and the pod reset
-    # has the effect of clearing out all ledger state.
-
-    if [ -z "${CI-}" ]; then
-        _error "This subcommand is available to CI jobs only."
-    fi
-
-    _cluster_show
-
-    _cluster_reset
-    _cluster_papply "${SOURCE_IMAGE_TAG}"
 }
 
 ###
@@ -1261,9 +1074,9 @@ function subcmd_pulumi() {
 
 ###
 
-subcommand_whitelist[papply]="Apply the current Pulumi configuration (--preview to preview only)"
+subcommand_whitelist[apply]="Apply the current Pulumi configuration (--preview to preview only)"
 
-function subcmd_papply() {
+function subcmd_apply() {
     _production_gate
     _cluster_must_exist
 
@@ -1361,12 +1174,12 @@ function subcmd_prefresh() {
 
 ###
 
-subcommand_whitelist[papply_sv]="Apply the sv-runbook Pulumi stack"
+subcommand_whitelist[apply_sv]="Apply the sv-runbook Pulumi stack"
 
-function subcmd_papply_sv(){
+function subcmd_apply_sv(){
     local -x TARGET_CLUSTER="${1-}"
     if [ -z "$TARGET_CLUSTER" ]; then
-        _error "Usage: $SCRIPTNAME papply_sv <target-domain-cluster> [<charts-version>]"
+        _error "Usage: $SCRIPTNAME apply_sv <target-domain-cluster> [<charts-version>]"
     fi
 
     _production_gate
@@ -1380,12 +1193,12 @@ function subcmd_papply_sv(){
 
 ###
 
-subcommand_whitelist[ci_papply_sv]='Run only by CircleCI'
+subcommand_whitelist[ci_apply_sv]='Run only by CircleCI'
 
-function subcmd_ci_papply_sv() {
+function subcmd_ci_apply_sv() {
     _assert_lock --for-ci
 
-    # A CI-specific variant of 'cncluster papply_sv' that removes the need
+    # A CI-specific variant of 'cncluster apply_sv' that removes the need
     # for manual confirmation, and also always uses the same target cluster
     # as the one the sv is deployed on.
 

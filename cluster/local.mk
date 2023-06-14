@@ -1,4 +1,3 @@
-include cluster/manifest/local.mk
 include cluster/images/local.mk
 include cluster/helm/local.mk
 include cluster/pulumi/local.mk

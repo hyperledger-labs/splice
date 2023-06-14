@@ -4,11 +4,6 @@
 repos:
   - repo: local
     hooks:
-      - id: jsonnetfmt
-        name: jsonnetfmt
-        language: system
-        entry: "jsonnetfmt --string-style d --in-place --"
-        types: [jsonnet]
       - id: scalafmt
         name: scalafmt
         language: system

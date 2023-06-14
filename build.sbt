@@ -926,20 +926,6 @@ syncpackCheck := {
   runCommand(Seq("syncpack", "list-mismatches"), log, None, Some(baseDirectory.value / "apps"))
 }
 
-lazy val jsonnetfmtCheck = taskKey[Unit]("Check format of `.jsonnet` files`")
-jsonnetfmtCheck := {
-  val log = streams.value.log
-  val files = baseDirectory.value ** "*.jsonnet"
-  runCommand(Seq("jsonnetfmt", "--test", "--string-style", "d", "--") ++ files.getPaths, log)
-}
-
-lazy val jsonnetfmtFix = taskKey[Unit]("Format `.jsonnet` files`")
-jsonnetfmtFix := {
-  val log = streams.value.log
-  val files = baseDirectory.value ** "*.jsonnet"
-  runCommand(Seq("jsonnetfmt", "--in-place", "--string-style", "d", "--") ++ files.getPaths, log)
-}
-
 lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `canton-coin`")
 cleanCnDars := {
   val log = streams.value.log
