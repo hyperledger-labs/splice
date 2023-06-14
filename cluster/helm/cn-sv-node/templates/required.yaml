@@ -6,3 +6,7 @@
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
 
 {{ $_ := required ".Values.onboardingName is required." .Values.onboardingName }}
+
+{{- if (.Values.cometBFT).enabled }}
+{{ $_ := required ".Values.cometBft.connectionUri is required if cometBFT is enabled." (.Values.cometBFT).connectionUri }}
+{{- end }}

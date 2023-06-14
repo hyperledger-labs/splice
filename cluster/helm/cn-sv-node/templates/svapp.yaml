@@ -73,6 +73,18 @@ spec:
                 canton.sv-apps.sv.x-nodes {
                 }
             {{- end }}
+            {{- if (.Values.cometBFT).enabled }}
+            - name: CN_APP_SV_COMETBFT_ENABLED
+              value: {{ (.Values.cometBFT).enabled | quote }}
+            {{- end }}
+            {{- if (.Values.cometBFT).automationEnabled }}
+            - name: CN_APP_SV_COMETBFT_AUTOMATION_ENABLED
+              value: {{ (.Values.cometBFT).automationEnabled | quote }}
+            {{- end }}
+            {{- if (.Values.cometBFT).connectionUri }}
+            - name: CN_APP_SV_COMETBFT_CONNECTION_URI
+              value: {{ (.Values.cometBFT).connectionUri }}
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

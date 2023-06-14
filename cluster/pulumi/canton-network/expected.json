@@ -1290,6 +1290,11 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
+        "cometBFT": {
+          "automationEnabled": false,
+          "connectionUri": "http://cometbft-sv-1-cometbft-rpc:26657",
+          "enabled": true
+        },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
@@ -1719,6 +1724,11 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
+        "cometBFT": {
+          "automationEnabled": false,
+          "connectionUri": "http://cometbft-sv-2-cometbft-rpc:26657",
+          "enabled": true
+        },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
@@ -2078,6 +2088,11 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
+        "cometBFT": {
+          "automationEnabled": false,
+          "connectionUri": "http://cometbft-sv-3-cometbft-rpc:26657",
+          "enabled": true
+        },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
@@ -2437,6 +2452,11 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
+        "cometBFT": {
+          "automationEnabled": false,
+          "connectionUri": "http://cometbft-sv-4-cometbft-rpc:26657",
+          "enabled": true
+        },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",

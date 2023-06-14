@@ -138,19 +138,24 @@ export async function installSvNode(
 
   const participantAddress = isNodeSv1 ? 'participant.svc' : 'participant';
 
-  const values = {
+  const svValues = {
     participantAddress,
     onboardingType: joinWithKey ? 'join-with-key' : 'found-collective',
     onboardingName,
+    cometBFT: {
+      enabled: true,
+      automationEnabled: false,
+      connectionUri: `http://cometbft-${nodename}-cometbft-rpc:26657`,
+    },
   } as ChartValues;
 
   if (joinWithKey) {
-    values.joinWithKeyOnboarding = {
+    svValues.joinWithKeyOnboarding = {
       sponsorApiUrl: 'http://sv-app.sv-1:5014',
     };
   }
 
-  const svApp = installCNHelmChart(xns, nodename + '-sv-app', 'cn-sv-node', values, dependsOn);
+  const svApp = installCNHelmChart(xns, nodename + '-sv-app', 'cn-sv-node', svValues, dependsOn);
 
   installCNHelmChart(
     xns,
