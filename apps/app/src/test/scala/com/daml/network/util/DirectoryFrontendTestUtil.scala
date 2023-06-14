@@ -4,11 +4,15 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import scala.concurrent.duration.*
 import org.openqa.selenium.support.ui.ExpectedConditions
+import org.scalatest.compatible.Assertion
+
+import java.time.format.DateTimeFormatter
+import java.time.{Duration, LocalDateTime}
 
 trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
 
-  def allocateDirectoryEntry(
+  private def allocateDirectoryEntry(
       directoryUiLogin: () => Unit,
       entryName: String,
   )(implicit
@@ -29,11 +33,17 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
     click on "request-entry-with-sub-button"
   }
 
-  def reserveDirectoryNameFor(directoryUiLogin: () => Unit, entryName: String)(implicit
+  def reserveDirectoryNameFor(
+      directoryUiLogin: () => Unit,
+      expectedName: String,
+      expectedAmount: String,
+      expectedCurrency: String,
+      expectedInterval: String,
+  )(implicit
       webDriver: WebDriverType
-  ): String = {
-    clue(s"Reserving directory name: ${entryName}") {
-      allocateDirectoryEntry(directoryUiLogin, entryName)
+  ): Assertion = {
+    clue(s"Reserving directory name: ${expectedName}") {
+      allocateDirectoryEntry(directoryUiLogin, expectedName)
 
       // user is redirected to their wallet...
       eventually() {
@@ -55,9 +65,26 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
       val row: Element = inside(findAll(className("entries-table-row")).toList) { case Seq(row) =>
         row
       }
-      val name = row.childElement(className("entries-table-name"))
-      name.text should be(entryName)
-      entryName
+
+      val name = row.childElement(className("entries-table-name")).text
+      val amount = row.childElement(className("entries-table-amount")).text
+      val currency = row.childElement(className("entries-table-currency")).text
+      val interval = row.childElement(className("entries-table-payment-interval")).text
+      val expiresAt = row.childElement(className("entries-table-expires-at")).text
+
+      name should be(expectedName)
+      amount should be(expectedAmount)
+      currency should be(expectedCurrency)
+      interval should be(expectedInterval)
+
+      // only compare date and not time to avoid test flakes when running the test right when the hour changes
+      // We accept the flake when running this test right at the change of the date.
+      val expiry = LocalDateTime.now().plus(Duration.ofDays(90))
+      val expectedExpiry =
+        DateTimeFormatter
+          .ofPattern("MM/dd/yyyy")
+          .format(expiry)
+      expiresAt should startWith(expectedExpiry)
     }
   }
 }

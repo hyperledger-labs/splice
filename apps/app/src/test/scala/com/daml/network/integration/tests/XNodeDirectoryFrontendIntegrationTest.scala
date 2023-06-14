@@ -6,9 +6,6 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, DirectoryFrontendTestUtil, WalletTestUtil}
 
 import org.openqa.selenium.support.ui.ExpectedConditions
-import java.time.format.DateTimeFormatter
-import java.time.{Duration, LocalDateTime}
-import scala.concurrent.duration.DurationInt
 
 class XNodeDirectoryFrontendIntegrationTest
     extends FrontendIntegrationTest("alice")
@@ -42,43 +39,16 @@ class XNodeDirectoryFrontendIntegrationTest
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
       withFrontEnd("alice") { implicit webDriver =>
-        allocateDirectoryEntry(() => login(3004, aliceDamlUser), entryName)
+        // login to wallet UI once to create saved localstorage auth session
+        login(3000, aliceDamlUser)
 
-        // Alice is redirected to wallet...
-        loginOnCurrentPage(3000, aliceDamlUser)
-        click on className("sub-request-accept-button")
-
-        // And then back to directory, where she is already logged in
-        val goToDirectoryEntriesButton = eventually() {
-          find(id("directory-entries-button")).valueOrFail("The success page did not load.")
-        }
-        click on goToDirectoryEntriesButton
-
-        eventually(scaled(10 seconds)) {
-          val row: Element = inside(findAll(className("entries-table-row")).toList) {
-            case Seq(row) =>
-              row
-          }
-          val name = row.childElement(className("entries-table-name")).text
-          val amount = row.childElement(className("entries-table-amount")).text
-          val currency = row.childElement(className("entries-table-currency")).text
-          val interval = row.childElement(className("entries-table-payment-interval")).text
-          val expiresAt = row.childElement(className("entries-table-expires-at")).text
-
-          name should be(entryName)
-          amount should be("1.0")
-          currency should be("USD")
-          interval should be("90 days")
-
-          // only compare date and not time to avoid test flakes when running the test right when the hour changes
-          // We accept the flake when running this test right at the change of the date.
-          val expiry = LocalDateTime.now().plus(Duration.ofDays(90))
-          val expectedExpiry =
-            DateTimeFormatter
-              .ofPattern("MM/dd/yyyy")
-              .format(expiry)
-          expiresAt should startWith(expectedExpiry)
-        }
+        reserveDirectoryNameFor(
+          () => login(3004, aliceDamlUser),
+          entryName,
+          "1.0",
+          "USD",
+          "90 days",
+        )
 
         clue("requesting an existing name to check the already taken message") {
           waitForQuery(id("entry-name-field"))

@@ -260,7 +260,7 @@ class Validator1PreflightIntegrationTest
 
       tapCoins(100)
 
-      allocateDirectoryEntry(
+      reserveDirectoryNameFor(
         () =>
           auth0Login(
             aliceUser,
@@ -268,6 +268,9 @@ class Validator1PreflightIntegrationTest
             () => find(id("entry-name-field")) should not be empty,
           ),
         cnsName,
+        "1.0",
+        "USD",
+        "90 days",
       )
     }
   }

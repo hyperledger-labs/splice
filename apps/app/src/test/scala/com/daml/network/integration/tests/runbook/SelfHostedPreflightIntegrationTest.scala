@@ -98,7 +98,13 @@ class SelfHostedPreflightIntegrationTest
         withFrontEnd("alice-selfhosted") { implicit webDriver =>
           login(walletUiPort, "alice")
           tapCoins(100)
-          reserveDirectoryNameFor(() => login(directoryUiPort, "alice"), cnsName)
+          reserveDirectoryNameFor(
+            () => login(directoryUiPort, "alice"),
+            cnsName,
+            "1.0",
+            "USD",
+            "90 days",
+          )
           // "Close" frontend before Canton is shut down to avoid failures in ACS queries.
           go to "about:blank"
           eventually() {
