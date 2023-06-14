@@ -158,7 +158,7 @@ OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid
 VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
 SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
-SV_CLIENT_SECRET        The client id of the Auth0 app for the SV app backend
+SV_CLIENT_SECRET        The client secret of the Auth0 app for the SV app backend
 WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
 SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
 ======================= ===========================================================================
@@ -232,7 +232,7 @@ OIDC_AUTHORITY_URL      ``https://AUTH0_TENANT_NAME.us.auth0.com``
 VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
 SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
-SV_CLIENT_SECRET        The client id of the Auth0 app for the SV app backend
+SV_CLIENT_SECRET        The client secret of the Auth0 app for the SV app backend
 WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
 SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
 ======================= ===========================================================================
