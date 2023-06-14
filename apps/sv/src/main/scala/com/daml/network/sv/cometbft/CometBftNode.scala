@@ -74,7 +74,7 @@ class CometBftNode(
             status.nodeInfo.id ->
               proto.cometbft.CometBftNodeConfig(
                 validatorPubKey = status.validatorInfo.publicKey.value,
-                votingPower = cometBftConfig.votingPower,
+                votingPower = 1, // hard-coded to one for now, as we only have one node at most
               )
           )
         )

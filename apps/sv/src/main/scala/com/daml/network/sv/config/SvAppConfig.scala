@@ -100,7 +100,6 @@ case class CometBftConfig(
     // TODO(#5740): Remove the option to disable automation once we're ready to pull that trigger
     automationEnabled: Boolean = false,
     connectionUri: String = "",
-    votingPower: Long = 0,
 )
 
 final case class SvSequencerConfig(
