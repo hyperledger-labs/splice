@@ -131,8 +131,8 @@ and allow you to obtain client identifiers for the web UIs your SV node will be 
 Currently, these are the SV web UI and the Wallet web UI.
 You might be required to whitelist a range of URLs on your OIDC provider, such as "Allowed Callback URLs", "Allowed Logout URLs", "Allowed Web Origins", and "Allowed Origins (CORS)".
 If you are using the ingress configuration of this runbook, the correct URLs to configure here are
-``https://sv.sv.svc.YOUR_CLUSTER_URL`` (for the SV web UI) and
-``https://wallet.sv.svc.YOUR_CLUSTER_URL`` (for the Wallet web UI).
+``https://sv.sv.svc.YOUR_HOSTNAME`` (for the SV web UI) and
+``https://wallet.sv.svc.YOUR_HOSTNAME`` (for the Wallet web UI).
 An identifier that is unique to the user must be set via the `sub` field of the issued JWT.
 On some occasions, this identifier will be used as a user name for that user on your SV node's Canton participant.
 In :ref:`helm-sv-install`, you will be required to configure a user identifier as the ``validatorWalletUser`` -
@@ -199,7 +199,7 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button.
     b. Choose "Single Page Web Applications", call it ``SV web UI``, and click Create.
     c. Determine the URL for your validator's SV UI.
-       If you're using the ingress configuration of this runbook, that would be ``https://sv.sv.svc.YOUR_CLUSTER_URL``.
+       If you're using the ingress configuration of this runbook, that would be ``https://sv.sv.svc.YOUR_HOSTNAME``.
     d. In the Auth0 application settings, add the SV URL to the following:
 
        - "Allowed Callback URLs"
@@ -213,7 +213,7 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
 
    - In step b, use ``Wallet web UI`` as the name of your application.
    - In steps c and d, use the URL for your SV's *wallet* UI.
-     If you're using the ingress configuration of this runbook, that would be ``https://wallet.sv.svc.YOUR_CLUSTER_URL``.
+     If you're using the ingress configuration of this runbook, that would be ``https://wallet.sv.svc.YOUR_HOSTNAME``.
 
 Please refer to Auth0's `own documentation on user management <https://auth0.com/docs/manage-users>`_ for pointers on how to set up end-user accounts for the two web UI applications you created.
 Note that you will need to create at least one such user account for completing the steps in :ref:`helm-sv-install` - for being able to log in as your SV node's administrator.
@@ -397,7 +397,7 @@ The following routes should be configured in your cluster ingress controller:
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``wallet-web-ui`` in the ``sv`` namespace
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5003 of pod ``validator-app`` in the ``sv`` namespace
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``sv-web-ui`` in the ``sv`` namespace
-* ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5014 of pod ``sv-app`` in the ``sv`` namespace
+* ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/*`` should be routed to port 5014 of pod ``sv-app`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``scan-web-ui`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/v0/scan/*`` should be routed to port 5012 in pod ``scan-app`` in the ``sv`` namespace
 
