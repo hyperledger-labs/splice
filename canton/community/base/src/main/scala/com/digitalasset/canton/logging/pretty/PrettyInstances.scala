@@ -36,7 +36,7 @@ import slick.util.{DumpInfo, Dumpable}
 import java.net.URI
 import java.time.{Duration as JDuration, Instant}
 import java.util.UUID
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.Duration
 
 /** Collects instances of [[Pretty]] for common types.
   */
@@ -106,16 +106,7 @@ trait PrettyInstances {
     _.toString.substring(2).replaceAll("(\\d[HMS])(?!$)", "$1 ").toLowerCase
   )
 
-  implicit def prettyDuration: Pretty[Duration] = { (duration: Duration) =>
-    duration match {
-      case fduration: FiniteDuration =>
-        import scala.jdk.DurationConverters.ScalaDurationOps
-        prettyJDuration.treeOf(
-          fduration.toJava
-        )
-      case infDuration: Duration.Infinite => Tree.Literal(infDuration.toString)
-    }
-  }
+  implicit def prettyDuration: Pretty[Duration] = prettyOfString(_.toString)
 
   implicit def prettyURI: Pretty[URI] = prettyOfString(_.toString)
 
