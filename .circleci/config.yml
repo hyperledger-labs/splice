@@ -260,7 +260,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Reap << parameters.cluster >> if lock older than 6 hours
@@ -457,7 +457,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet", "none"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "none"]
         default: "none"
       additional_nix_args:
         type: string
@@ -758,7 +758,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
@@ -794,7 +794,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
     steps:
       - run:
           name: Checkout cluster version
@@ -863,7 +863,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
     steps:
       - run_bash_command_in_nix:
           when: always
@@ -907,7 +907,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
       channel_notify:
         # This parameter allows selecting different notification channels, which can be handy when a subteam
         # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
@@ -1140,7 +1140,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
     steps:
       - checkout
       - record_job_start_time
@@ -1167,7 +1167,7 @@ jobs:
           cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
 
-  deploy_cluster_pulumi:
+  deploy_cluster:
     circleci_ip_ranges: true
     docker:
       - image: cimg/base:2021.04
@@ -1177,7 +1177,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
     steps:
       - checkout
       - record_job_start_time
@@ -1215,7 +1215,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
     steps:
       - checkout
       - record_job_start_time
@@ -1249,7 +1249,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
       channel_notify:
         type: string
         # #team-canton-network-internal
@@ -1323,7 +1323,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["devnet", "scratchneta", "scratchnetb", "scratchnetc", "staging", "stagingb"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging"]
       channel_notify:
         type: string
         # #team-canton-network-internal
@@ -1379,7 +1379,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
       channel_notify:
         type: string
         # #team-canton-network-internal
@@ -1442,6 +1442,8 @@ jobs:
           cluster: "scratchnetb"
       - cluster_lock_reaper:
           cluster: "scratchnetc"
+      - cluster_lock_reaper:
+          cluster: "scratchnetd"
 
   update_pipeline_schedule:
     docker:
@@ -1609,7 +1611,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "stagingb", "devnet", "testnet", "scratchneta", "scratchnetb", "scratchnetc"]
+        enum: ["staging", "devnet", "testnet", "scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
     docker:
       - image: cimg/base:2021.04
     environment:
@@ -1795,7 +1797,7 @@ workflows:
             - slack-context
           requires:
             - hold
-      - deploy_cluster_pulumi:
+      - deploy_cluster:
           <<: *main-branch-never
           context:
             - artifactory
@@ -1813,7 +1815,7 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           requires:
-            - deploy_cluster_pulumi
+            - deploy_cluster
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -1825,7 +1827,7 @@ workflows:
           requires:
             - deployment_test
             - docker_images_push
-            - deploy_cluster_pulumi
+            - deploy_cluster
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -1870,7 +1872,7 @@ workflows:
             - slack-context
           requires:
             - hold
-      - deploy_cluster_pulumi:
+      - deploy_cluster:
           <<: *main-branch-never
           context:
             - artifactory
@@ -1888,7 +1890,7 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - deploy_cluster_pulumi
+            - deploy_cluster
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -1900,7 +1902,7 @@ workflows:
           requires:
             - deployment_test
             - docker_images_push
-            - deploy_cluster_pulumi
+            - deploy_cluster
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -1945,7 +1947,7 @@ workflows:
             - slack-context
           requires:
             - hold
-      - deploy_cluster_pulumi:
+      - deploy_cluster:
           <<: *main-branch-never
           context:
             - artifactory
@@ -1963,7 +1965,7 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - deploy_cluster_pulumi
+            - deploy_cluster
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -1975,7 +1977,7 @@ workflows:
           requires:
             - deployment_test
             - docker_images_push
-            - deploy_cluster_pulumi
+            - deploy_cluster
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -1996,6 +1998,80 @@ workflows:
             - preflight_check
             - preflight_sv_check
 
+  deploy_scratchnet_D:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - deployment_test
+            - docker_images_push
+            - deploy_cluster
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - deploy_sv_runbook
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetd"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check
 
   deploy_staging:
     when:
@@ -2022,7 +2098,7 @@ workflows:
           - artifactory
           - slack-context
         workflow_names: "deploy_staging"
-    - deploy_cluster_pulumi:
+    - deploy_cluster:
         <<: *main-branch-only
         context:
           - artifactory
@@ -2041,27 +2117,27 @@ workflows:
           - slack-context
         cluster: "staging"
         requires:
-          - deploy_cluster_pulumi
+          - deploy_cluster
     - preflight_check:
+        cluster: "staging"
         <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
           - datadog
           - slack-context
-        cluster: "staging"
         requires:
           - deployment_test
           - docker_images_push
-          - deploy_cluster_pulumi
+          - deploy_cluster
     - preflight_sv_check:
         <<: *main-branch-only
+        cluster: "staging"
         context:
           - artifactory
           - canton-network-vpn
           - datadog
           - slack-context
-        cluster: "staging"
         requires:
           - deploy_sv_runbook
 
@@ -2090,7 +2166,7 @@ workflows:
           - artifactory
           - slack-context
         workflow_names: "deploy_devnet devnet_health_check"
-    - deploy_cluster_pulumi:
+    - deploy_cluster:
         <<: *main-branch-only
         context:
           - artifactory
@@ -2176,6 +2252,12 @@ workflows:
           - slack-context
     - refresh_tokens:
         cluster: "scratchnetc"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+    - refresh_tokens:
+        cluster: "scratchnetd"
         <<: *main-branch-only
         context:
           - artifactory
