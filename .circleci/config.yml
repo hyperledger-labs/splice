@@ -1293,7 +1293,7 @@ jobs:
         # #team-canton-network-internal
         default: C03J6NCPSE4
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
@@ -1367,7 +1367,7 @@ jobs:
         # #team-canton-network-internal
         default: C03J6NCPSE4
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
@@ -1423,7 +1423,7 @@ jobs:
         # #team-canton-network-internal
         default: C03J6NCPSE4
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
@@ -1517,7 +1517,7 @@ jobs:
 
   docker_images_push:
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
     steps:
@@ -1550,7 +1550,7 @@ jobs:
 
   publish_public_release:
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
     steps:
@@ -1608,7 +1608,7 @@ jobs:
 
   docker_images_build:
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
     steps:
