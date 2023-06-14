@@ -1,7 +1,7 @@
 ARG base_version
 FROM --platform=linux/amd64 cn-app:${base_version}
 
-FROM nginx
+FROM nginx:stable
 RUN apt-get update && \
     apt-get install gettext -y
 COPY default.conf /etc/nginx/conf.d
