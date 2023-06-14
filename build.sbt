@@ -1073,6 +1073,8 @@ printTests := {
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-frontend-sim-time.log", true))
   val pwXNodeDistributedDomain =
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-distributed-domain.log", true))
+  val pwXNodeDomainFeesSimTIme =
+    new PrintWriter(new FileWriter(s"test-full-class-names-xnode-domain-fees-sim-time.log", true))
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
@@ -1081,6 +1083,8 @@ printTests := {
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
   def isPreflightSvIntegrationTest(name: String): Boolean =
     name.contains("PreflightSvIntegrationTest")
+  def isDomainFeesTest(name: String): Boolean = name.contains("DomainFees")
+
   def printTestNames(
       testSet: String,
       testNames: Seq[String],
@@ -1120,7 +1124,9 @@ printTests := {
         // tests here to make sure that we don't introduce any new ones.
         !isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(
           t
-        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
+        ) && !isDomainFeesTest(t) && !isPreflightIntegrationTest(
+          t
+        ) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode tests with simulated time",
@@ -1130,7 +1136,9 @@ printTests := {
         // tests here to make sure that we don't introduce any new ones.
         isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(
           t
-        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
+        ) && !isDomainFeesTest(t) && !isPreflightIntegrationTest(
+          t
+        ) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode frontend tests with wall clock time",
@@ -1160,6 +1168,13 @@ printTests := {
           t
         ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
+    (
+      "XNode tests with domain fees and sim time",
+      pwXNodeDomainFeesSimTIme,
+      (t: String) =>
+        isXNodeTest(t) && isTimeBasedTest(t) && isDomainFeesTest(t) &&
+          !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
+    ),
   ).foreach { case (testSet, pw, predicate) =>
     printTestNames(testSet, allTestNames, pw, predicate)
   }
@@ -1172,6 +1187,7 @@ printTests := {
   pwXNodeFrontEnd.close()
   pwXNodeFrontEndSimTime.close()
   pwXNodeDistributedDomain.close()
+  pwXNodeDomainFeesSimTIme.close()
 }
 
 Global / excludeLintKeys += `root` / wartremoverErrors

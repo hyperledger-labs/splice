@@ -12,6 +12,7 @@ function usage() {
   echo "  -m               start canton with a minimal topology for frontend testing"
   echo "  -x               use experimental canton x instances instead of the default nodes"
   echo "  -b               start canton to test BFT domain operations. In that case, the participants are not automatically connected to the domain"
+  echo "  -t               start canton with traffic control enabled"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
 
@@ -23,9 +24,10 @@ x=0
 POSTGRES_MODE=docker
 CANTON=canton
 bft=0
+trafficQoS=0
 bootstrapScriptPath=bootstrap-canton.sc
 
-while getopts "hdap:c:wsmxb" arg; do
+while getopts "hdap:c:wsmxbt" arg; do
   case ${arg} in
     h)
       usage
@@ -60,6 +62,11 @@ while getopts "hdap:c:wsmxb" arg; do
     b)
       bft=1
       echo "start canton to test bft domain, not connecting participants to global domain"
+      ;;
+    t)
+      x=1
+      trafficQoS=1
+      echo "start canton with traffic control enabled"
       ;;
     ?)
       usage
@@ -182,11 +189,16 @@ tmux new-session -d -s "${tmux_session}"
 # Feel free to bump if you encounter issues but make sure the nodes don't run out of memory.
 JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g -Dlogback.configurationFile=./scripts/canton-logback.xml"
 
+config_overrides=""
+if [ $trafficQoS -eq 1 ]; then
+  config_overrides="$config_overrides -c ./apps/app/src/test/resources/domain-fees-overrides.conf"
+fi
+
 if [ $wallclocktime -eq 1 ]; then
   if [ $x -eq 0 ]; then
     tmux_cmd canton-wallclocktime \
       "CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
-        -c ./apps/app/src/test/resources/simple-topology-canton.conf \
+        -c ./apps/app/src/test/resources/simple-topology-canton.conf $config_overrides \
         --log-level-canton=DEBUG \
         --log-encoder json \
         --log-file-name log/canton.clog \
@@ -195,7 +207,7 @@ if [ $wallclocktime -eq 1 ]; then
     # For now we reuse canton.tokens here which makes it not possible to run the wallclock canton and X node canton at the same time.
     tmux_cmd canton-x \
       "CANTON_TOKEN_FILENAME=canton.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
-        -c ./apps/app/src/test/resources/simple-topology-canton-x.conf \
+        -c ./apps/app/src/test/resources/simple-topology-canton-x.conf $config_overrides \
         --log-level-canton=DEBUG \
         --log-encoder json \
         --log-file-name log/canton-x.clog \
@@ -207,7 +219,7 @@ if [ $simtime -eq 1 ]; then
   if [ $x -eq 0 ]; then
     tmux_cmd canton-simtime \
       "CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\"  $CANTON \
-        -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
+        -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf $config_overrides \
         --log-level-canton=DEBUG \
         --log-encoder json \
         --log-file-name log/canton-simtime.clog \
@@ -216,7 +228,7 @@ if [ $simtime -eq 1 ]; then
     # For now we reuse canton-simtime.tokens here which makes it not possible to run the simtime canton and X node canton at the same time.
     tmux_cmd canton-x-simtime \
       "CANTON_TOKEN_FILENAME=canton-simtime.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
-        -c ./apps/app/src/test/resources/simple-topology-canton-x-simtime.conf \
+        -c ./apps/app/src/test/resources/simple-topology-canton-x-simtime.conf $config_overrides \
         --log-level-canton=DEBUG \
         --log-encoder json \
         --log-file-name log/canton-x-simtime.clog \
