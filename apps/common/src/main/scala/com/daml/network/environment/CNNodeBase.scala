@@ -146,7 +146,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   def requestLogger(implicit traceContext: TraceContext): Directive0 =
     HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
 
-  def isActive: Boolean = {
+  final def isActive: Boolean = {
     // initialized and the state reports itself as healthy
     isInitialized && initializeF.value.exists(_.toOption.exists(_.isHealthy))
   }
@@ -154,7 +154,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   protected def ports: Map[String, Port]
 
   // TODO(#736): fork or generalize status definition.
-  override def status: Future[NodeStatus.Status] = {
+  override final def status: Future[NodeStatus.Status] = {
     val status = SimpleStatus(
       uid = UniqueIdentifier.tryFromProtoPrimitive(s"coin::$name"),
       uptime = uptime(),

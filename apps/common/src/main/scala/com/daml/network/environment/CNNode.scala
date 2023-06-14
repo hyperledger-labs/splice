@@ -7,9 +7,8 @@ import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParame
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.Status
 
@@ -42,20 +41,6 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     * package in the set.
     */
   protected def requiredTemplates: Set[Identifier] = Set.empty
-
-  // TODO(#736): fork or generalize status definition.
-  override def status: Future[NodeStatus.Status] = {
-    val status = SimpleStatus(
-      uid = UniqueIdentifier.tryFromProtoPrimitive(s"coin::$name"),
-      uptime = uptime(),
-      ports = ports,
-      active = isActive,
-      topologyQueue = TopologyQueueStatus(0, 0, 0),
-      // TODO(#3859) Set this to something useful.
-      components = Seq.empty,
-    )
-    Future.successful(status)
-  }
 
   protected def ensureUserPrimaryParty(connection: CNLedgerConnection): Future[Unit]
 
