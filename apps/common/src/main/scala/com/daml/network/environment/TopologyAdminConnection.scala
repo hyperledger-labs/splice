@@ -339,9 +339,6 @@ class TopologyAdminConnection(
         ).map(_ => ())
       },
       logger,
-      // TODO(#5628) Stop retrying on INTERNAL. Canton doesn't even produce an
-      // error string on the client side that we can match on.
-      additionalCodes = Seq(Status.Code.INTERNAL),
     )
 
   def proposeInitialPartyToParticipantX(
