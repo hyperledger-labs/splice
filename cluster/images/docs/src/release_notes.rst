@@ -6,6 +6,10 @@ Release Notes
 2023-06-18
 ----------
 
+* Frontend updates:
+
+  * Super validators can now feature and unfeature an application provider in the governance tab.
+
 * Deployment updates:
 
   * The Canton Coin Scan app is now being deployed as part of the SV node in our runbook.

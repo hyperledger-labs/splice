@@ -1,4 +1,4 @@
-import { DateDisplay, Loading, SvClientProvider } from 'common-frontend';
+import { CopyableTypography, DateDisplay, Loading, SvClientProvider } from 'common-frontend';
 import { Contract } from 'common-frontend';
 import React, { useMemo, useState } from 'react';
 
@@ -78,14 +78,21 @@ const ListVoteRequests: React.FC = () => {
   function getAction(action: ActionRequiringConfirmation) {
     if (action.tag === 'ARC_SvcRules') {
       const svcRulesAction = action.value.svcAction;
-      if (svcRulesAction.tag === 'SRARC_RemoveMember') {
-        return `${svcRulesAction.tag} : ${svcInfosQuery.data!.svcRules.payload.members.get(
-          svcRulesAction.value.member
-        )?.name!}`;
-      } else {
-        throw Error('Action tag not defined.');
+      switch (svcRulesAction.tag) {
+        case 'SRARC_RemoveMember': {
+          return `${svcRulesAction.tag} : ${svcInfosQuery.data!.svcRules.payload.members.get(
+            svcRulesAction.value.member
+          )?.name!}`;
+        }
+        case 'SRARC_GrantFeaturedAppRight': {
+          return `${svcRulesAction.tag} : ${svcRulesAction.value.provider}`;
+        }
+        case 'SRARC_RevokeFeaturedAppRight': {
+          return `${svcRulesAction.tag} : ${svcRulesAction.value.rightCid}`;
+        }
       }
     }
+    return 'Action tag not defined.';
   }
 
   return (
@@ -141,7 +148,7 @@ const ListVoteRequests: React.FC = () => {
 
 interface VoteRequestsRowProps {
   contractId: ContractId<VoteRequest>;
-  action: string | undefined;
+  action: string;
   requester: string;
   expires: Date;
   idx: number;
@@ -173,7 +180,9 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
             {open === idx ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
-        <TableCell className="vote-row-action">{action}</TableCell>
+        <TableCell className="vote-row-action">
+          <CopyableTypography text={action} />
+        </TableCell>
         <TableCell className="vote-row-requester">{requester}</TableCell>
         <TableCell>
           <DateDisplay datetime={expires.toISOString()} />
@@ -229,7 +238,7 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
 
 interface ListVoteRequestsTableProps {
   voteRequests: Contract<VoteRequest>[];
-  getAction: (action: ActionRequiringConfirmation) => string | undefined;
+  getAction: (action: ActionRequiringConfirmation) => string;
   svcRules: Contract<SvcRules>;
   openModalWithVoteRequest: (voteRequestContractId: ContractId<VoteRequest>) => void;
   tableBodyId: string;

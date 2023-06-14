@@ -18,7 +18,9 @@ import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useSvcInfos } from '../../contexts/SvContext';
 import { config } from '../../utils';
 import ListVoteRequests from './ListVoteRequests';
+import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import RemoveMember from './actions/RemoveMember';
+import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 
 const VoteRequest: React.FC = () => {
   const [actionName, setActionName] = useState('SRARC_RemoveMember');
@@ -26,7 +28,11 @@ const VoteRequest: React.FC = () => {
   const [url, setUrl] = useState<string>('');
   const svcInfosQuery = useSvcInfos();
 
-  const actionNameOptions = [{ name: 'Remove Member', value: 'SRARC_RemoveMember' }];
+  const actionNameOptions = [
+    { name: 'Remove Member', value: 'SRARC_RemoveMember' },
+    { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
+    { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
+  ];
 
   const [action, setAction] = useState<object | undefined>(undefined);
   const chooseAction = (action: object) => {
@@ -37,7 +43,7 @@ const VoteRequest: React.FC = () => {
   const createVoteRequestMutation = useMutation({
     mutationFn: async () => {
       const requester = svcInfosQuery.data?.svPartyId!;
-      if (actionName === 'SRARC_RemoveMember') {
+      if (actionNameOptions.map(e => e.value).includes(actionName)) {
         return await createVoteRequest(requester, JSON.stringify(action), url, description);
       }
     },
@@ -73,7 +79,12 @@ const VoteRequest: React.FC = () => {
             </FormControl>
           </Stack>
           {actionName === 'SRARC_RemoveMember' && <RemoveMember chooseAction={chooseAction} />}
-
+          {actionName === 'SRARC_GrantFeaturedAppRight' && (
+            <GrantFeaturedAppRight chooseAction={chooseAction} />
+          )}
+          {actionName === 'SRARC_RevokeFeaturedAppRight' && (
+            <RevokeFeaturedAppRight chooseAction={chooseAction} />
+          )}
           <Typography variant="h5">Reason</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>

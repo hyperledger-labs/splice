@@ -102,7 +102,11 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({ voteRequestC
                   </TableCell>
                   <TableCell>
                     {voteRequestContractId && (
-                      <CopyableTypography variant="body2" text={voteRequestContractId} />
+                      <CopyableTypography
+                        variant="body2"
+                        id={'vote-request-modal-content-contract-id'}
+                        text={voteRequestContractId}
+                      />
                     )}
                   </TableCell>
                 </TableRow>

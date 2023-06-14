@@ -18,16 +18,40 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
 
   if (action.tag === 'ARC_SvcRules') {
     const svcAction = action.value.svcAction;
-    if (svcAction.tag === 'SRARC_RemoveMember') {
-      return (
-        <ActionValueTable
-          actionType={actionType}
-          actionName={svcAction.tag}
-          valuesMap={{
-            member: <PartyId partyId={svcAction.value.member} />,
-          }}
-        />
-      );
+    switch (svcAction.tag) {
+      case 'SRARC_RemoveMember': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={svcAction.tag}
+            valuesMap={{
+              Member: <PartyId partyId={svcAction.value.member} />,
+            }}
+          />
+        );
+      }
+      case 'SRARC_GrantFeaturedAppRight': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={svcAction.tag}
+            valuesMap={{
+              Provider: <PartyId partyId={svcAction.value.provider} />,
+            }}
+          />
+        );
+      }
+      case 'SRARC_RevokeFeaturedAppRight': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={svcAction.tag}
+            valuesMap={{
+              FeatureAppRightCid: <PartyId partyId={svcAction.value.rightCid} />,
+            }}
+          />
+        );
+      }
     }
   }
   return <p>Not yet implemented for this action</p>;

@@ -12,13 +12,20 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AuthConfig, HMACVerifier, RSAVerifier}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+  SRARC_GrantFeaturedAppRight,
+  SRARC_RemoveMember,
+  SRARC_RevokeFeaturedAppRight,
+}
 import com.daml.network.codegen.java.cn.svcrules.{
   Reason,
+  SvcRules_GrantFeaturedAppRight,
   SvcRules_RemoveMember,
   SvcRules_RequestVote,
+  SvcRules_RevokeFeaturedAppRight,
 }
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.SharedCNNodeAppParameters
@@ -628,6 +635,26 @@ object SvApp {
       case "SRARC_RemoveMember" =>
         Right(
           new ARC_SvcRules(new SRARC_RemoveMember(new SvcRules_RemoveMember(jsonDic("member").str)))
+        )
+      case "SRARC_GrantFeaturedAppRight" =>
+        // TODO(M3-56): validate application provider such that users can't create non-sense requests
+        Right(
+          new ARC_SvcRules(
+            new SRARC_GrantFeaturedAppRight(
+              new SvcRules_GrantFeaturedAppRight(jsonDic("provider").str)
+            )
+          )
+        )
+      case "SRARC_RevokeFeaturedAppRight" =>
+        // TODO(M3-56): validate that the application provider is already featured
+        Right(
+          new ARC_SvcRules(
+            new SRARC_RevokeFeaturedAppRight(
+              new SvcRules_RevokeFeaturedAppRight(
+                new FeaturedAppRight.ContractId(jsonDic("rightCid").str)
+              )
+            )
+          )
         )
       case _ => Left("Action not defined")
     }

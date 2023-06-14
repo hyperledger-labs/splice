@@ -288,152 +288,278 @@ class XNodeSvFrontendIntegrationTest
       }
     }
 
-    "can create a valid \"SRARC_RemoveMember\" vote request and cast vote on it" in {
-      implicit env =>
-        val requestReasonUrl = "This is a request reason url."
-        val requestReasonBody = "This is a request reason."
-        val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
-          implicit webDriver =>
-            actAndCheck(
-              "sv1 operator can login and browse to the governance tab", {
-                go to s"http://localhost:$sv1Port/votes"
-                loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
-              },
-            )(
-              "sv1 can see the create vote request button",
-              _ => {
-                find(id("create-voterequest-submit-button")) should not be empty
-              },
-            )
-
-            val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
-              "sv1 operator can create a new vote request", {
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("SRARC_RemoveMember")
-
-                val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
-                dropDownMember.selectByIndex(3)
-
-                inside(find(id("create-reason-url"))) { case Some(element) =>
-                  element.underlying.sendKeys(requestReasonUrl)
-                }
-                inside(find(id("create-reason-description"))) { case Some(element) =>
-                  element.underlying.sendKeys(requestReasonBody)
-                }
-
-                click on "create-voterequest-submit-button"
-              },
-            )(
-              "sv1 can see the new vote request",
-              _ => {
-                val tbody = find(id("sv-voting-in-progress-table-body"))
-                inside(tbody) { case Some(tb) =>
-                  val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
-                  rows should have size 1
-                  (
-                    rows.head.childElement(className("vote-row-action")).text,
-                    rows.head.childElement(className("vote-row-requester")).text,
-                  )
-                }
-              },
-            )
-            (createdVoteRequestAction, createdVoteRequestRequester)
-        }
-
-        withFrontEnd("sv2") { implicit webDriver =>
-          val (_, reviewButton) = actAndCheck(
-            "sv2 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv2Port/votes"
-              loginOnCurrentPage(sv2Port, sv2.config.ledgerApiUser)
+    "can create a valid SRARC_RemoveMember vote request and cast vote on it" in { implicit env =>
+      val requestReasonUrl = "This is a request reason url."
+      val requestReasonBody = "This is a request reason."
+      val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
+        implicit webDriver =>
+          actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1Port/votes"
+              loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
             },
           )(
-            "sv2 can see the new vote request",
+            "sv1 can see the create vote request button",
             _ => {
-              val tbody = find(id("sv-voting-action-needed-table-body"))
+              find(id("create-voterequest-submit-button")) should not be empty
+            },
+          )
+
+          val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
+            "sv1 operator can create a new vote request", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("SRARC_RemoveMember")
+
+              val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+              dropDownMember.selectByIndex(3)
+
+              inside(find(id("create-reason-url"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonUrl)
+              }
+              inside(find(id("create-reason-description"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonBody)
+              }
+
+              click on "create-voterequest-submit-button"
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
                 val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
                 rows should have size 1
-                rows.head.childElement(className("vote-row-action")).text should matchText(
-                  createdVoteRequestAction
+                (
+                  rows.head.childElement(className("vote-row-action")).text,
+                  rows.head.childElement(className("vote-row-requester")).text,
                 )
-                rows.head.childElement(className("vote-row-requester")).text should matchText(
-                  createdVoteRequestRequester
-                )
-                val reviewButton = rows.head
-                  .childElement(className("vote-row-review"))
-                  .childElement(className("vote-row-review-button"))
-                reviewButton.text should matchText("REVIEW")
-                reviewButton.underlying
               }
             },
           )
+          (createdVoteRequestAction, createdVoteRequestRequester)
+      }
 
-          actAndCheck(
-            "sv2 operator can review the vote request", {
-              reviewButton.click()
-            },
-          )(
-            "sv2 can see the new vote request detail",
-            _ => {
-              inside(find(id("vote-request-modal-action-type"))) { case Some(element) =>
-                element.text should matchText("ARC_SvcRules")
-              }
-              inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
-                element.text should matchText("SRARC_RemoveMember")
-              }
-              inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
-                element.text should matchText(sv1.getSvcInfo().svParty.toProtoPrimitive)
-              }
-              inside(find(id("vote-request-modal-reason-body"))) { case Some(element) =>
-                element.text should matchText(requestReasonBody)
-              }
-              inside(find(id("vote-request-modal-reason-url"))) { case Some(element) =>
-                element.text should matchText(requestReasonUrl)
-              }
-              inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-                element.text should matchText("0")
-              }
-              inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-                element.text should matchText("1")
-              }
-            },
-          )
+      withFrontEnd("sv2") { implicit webDriver =>
+        val (_, reviewButton) = actAndCheck(
+          "sv2 operator can login and browse to the governance tab", {
+            go to s"http://localhost:$sv2Port/votes"
+            loginOnCurrentPage(sv2Port, sv2.config.ledgerApiUser)
+          },
+        )(
+          "sv2 can see the new vote request",
+          _ => {
+            val tbody = find(id("sv-voting-action-needed-table-body"))
+            inside(tbody) { case Some(tb) =>
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              rows.head.childElement(className("vote-row-action")).text should matchText(
+                createdVoteRequestAction
+              )
+              rows.head.childElement(className("vote-row-requester")).text should matchText(
+                createdVoteRequestRequester
+              )
+              val reviewButton = rows.head
+                .childElement(className("vote-row-review"))
+                .childElement(className("vote-row-review-button"))
+              reviewButton.text should matchText("REVIEW")
+              reviewButton.underlying
+            }
+          },
+        )
 
-          val voteReasonBody = "vote reason body"
-          val voteReasonUrl = "vote reason url"
-          actAndCheck(
-            "sv2 operator can cast vote", {
-              click on "cast-vote-button"
-              click on "reject-vote-button"
-              inside(find(id("vote-reason-url"))) { case Some(element) =>
-                element.underlying.sendKeys(voteReasonUrl)
-              }
-              inside(find(id("vote-reason-body"))) { case Some(element) =>
-                element.underlying.sendKeys(voteReasonBody)
-              }
-              click on "save-vote-button"
-            },
-          )(
-            "sv2 can see the new vote request detail",
-            _ => {
-              inside(find(id("vote-request-modal-vote-reason-body"))) { case Some(element) =>
-                element.text should matchText(voteReasonBody)
-              }
-              inside(find(id("vote-request-modal-vote-reason-url"))) { case Some(element) =>
-                element.text should matchText(voteReasonUrl)
-              }
-              inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-                element.text should matchText("1")
-              }
-              inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-                element.text should matchText("1")
-              }
-            },
-          )
+        actAndCheck(
+          "sv2 operator can review the vote request", {
+            reviewButton.click()
+          },
+        )(
+          "sv2 can see the new vote request detail",
+          _ => {
+            inside(find(id("vote-request-modal-action-type"))) { case Some(element) =>
+              element.text should matchText("ARC_SvcRules")
+            }
+            inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
+              element.text should matchText("SRARC_RemoveMember")
+            }
+            inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
+              element.text should matchText(sv1.getSvcInfo().svParty.toProtoPrimitive)
+            }
+            inside(find(id("vote-request-modal-reason-body"))) { case Some(element) =>
+              element.text should matchText(requestReasonBody)
+            }
+            inside(find(id("vote-request-modal-reason-url"))) { case Some(element) =>
+              element.text should matchText(requestReasonUrl)
+            }
+            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
+              element.text should matchText("0")
+            }
+            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
+              element.text should matchText("1")
+            }
+          },
+        )
+
+        val voteReasonBody = "vote reason body"
+        val voteReasonUrl = "vote reason url"
+        actAndCheck(
+          "sv2 operator can cast vote", {
+            click on "cast-vote-button"
+            click on "reject-vote-button"
+            inside(find(id("vote-reason-url"))) { case Some(element) =>
+              element.underlying.sendKeys(voteReasonUrl)
+            }
+            inside(find(id("vote-reason-body"))) { case Some(element) =>
+              element.underlying.sendKeys(voteReasonBody)
+            }
+            click on "save-vote-button"
+          },
+        )(
+          "sv2 can see the new vote request detail",
+          _ => {
+            inside(find(id("vote-request-modal-vote-reason-body"))) { case Some(element) =>
+              element.text should matchText(voteReasonBody)
+            }
+            inside(find(id("vote-request-modal-vote-reason-url"))) { case Some(element) =>
+              element.text should matchText(voteReasonUrl)
+            }
+            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
+              element.text should matchText("1")
+            }
+            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
+              element.text should matchText("1")
+            }
+          },
+        )
+      }
+
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "sv1 operator can see the vote request detail by clicking review button", {
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            inside(tbody) { case Some(tb) =>
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              val reviewButton = rows.head
+                .childElement(className("vote-row-review"))
+                .childElement(className("vote-row-review-button"))
+              reviewButton.text should matchText("REVIEW")
+              reviewButton.underlying.click()
+            }
+          },
+        )(
+          "sv1 can see the new vote request detail",
+          _ => {
+            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
+              element.text should matchText("1")
+            }
+            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
+              element.text should matchText("1")
+            }
+          },
+        )
+      }
+
+      val updatedVoteReasonBody = "new vote reason body"
+      val updatedVoteReasonUrl = "new vote reason url"
+      withFrontEnd("sv2") { implicit webDriver =>
+        actAndCheck(
+          "sv2 operator can update its vote", {
+            click on "edit-vote-button"
+            click on "accept-vote-button"
+            inside(find(id("vote-reason-url"))) { case Some(element) =>
+              element.underlying.clear()
+              element.underlying.sendKeys(updatedVoteReasonUrl)
+            }
+            inside(find(id("vote-reason-body"))) { case Some(element) =>
+              element.underlying.clear()
+              element.underlying.sendKeys(updatedVoteReasonBody)
+            }
+            click on "save-vote-button"
+          },
+        )(
+          "sv2 can see the new updated vote",
+          _ => {
+            inside(find(id("vote-request-modal-vote-reason-body"))) { case Some(element) =>
+              element.text should matchText(updatedVoteReasonBody)
+            }
+            inside(find(id("vote-request-modal-vote-reason-url"))) { case Some(element) =>
+              element.text should matchText(updatedVoteReasonUrl)
+            }
+            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
+              element.text should matchText("0")
+            }
+            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
+              element.text should matchText("2")
+            }
+          },
+        )
+      }
+
+      withFrontEnd("sv1") { implicit webDriver =>
+        clue("sv1 can see the updated vote by sv2") {
+          eventually() {
+            inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
+              element.text should matchText("0")
+            }
+            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
+              element.text should matchText("2")
+            }
+          }
         }
+      }
+    }
+
+    "can create valid SRARC_GrantFeaturedAppRight and SRARC_RevokeFeaturedAppRight vote requests" in {
+      implicit env =>
+        val requestProviderParty = "TestProviderParty"
+        val requestReasonUrl = "This is a request reason url."
+        val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>
           actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1Port/votes"
+              loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+            },
+          )(
+            "sv1 can see the create vote request button",
+            _ => {
+              find(id("create-voterequest-submit-button")) should not be empty
+            },
+          )
+
+          actAndCheck(
+            "sv1 operator can create a new vote request", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("SRARC_GrantFeaturedAppRight")
+
+              inside(find(id("set-application-provider"))) { case Some(element) =>
+                element.underlying.sendKeys(requestProviderParty)
+              }
+              inside(find(id("create-reason-url"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonUrl)
+              }
+              inside(find(id("create-reason-description"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonBody)
+              }
+
+              click on "create-voterequest-submit-button"
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              inside(tbody) { case Some(tb) =>
+                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                rows should have size 1
+                (
+                  rows.head.childElement(className("vote-row-action")).text,
+                  rows.head.childElement(className("vote-row-requester")).text,
+                )
+              }
+            },
+          )
+
+          val (_, rightCid) = actAndCheck(
             "sv1 operator can see the vote request detail by clicking review button", {
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
@@ -449,65 +575,51 @@ class XNodeSvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request detail",
             _ => {
-              inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-                element.text should matchText("1")
-              }
-              inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-                element.text should matchText("1")
-              }
+              val RightCid =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
+                }
+              RightCid
             },
           )
-        }
 
-        val updatedVoteReasonBody = "new vote reason body"
-        val updatedVoteReasonUrl = "new vote reason url"
-        withFrontEnd("sv2") { implicit webDriver =>
           actAndCheck(
-            "sv2 operator can update its vote", {
-              click on "edit-vote-button"
-              click on "accept-vote-button"
-              inside(find(id("vote-reason-url"))) { case Some(element) =>
-                element.underlying.clear()
-                element.underlying.sendKeys(updatedVoteReasonUrl)
+            "sv1 operator can create a new vote request to revoke the featured app right", {
+              go to s"http://localhost:$sv1Port/votes"
+
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("SRARC_RevokeFeaturedAppRight")
+
+              inside(find(id("set-application-rightcid"))) { case Some(element) =>
+                element.underlying.sendKeys(rightCid)
               }
-              inside(find(id("vote-reason-body"))) { case Some(element) =>
-                element.underlying.clear()
-                element.underlying.sendKeys(updatedVoteReasonBody)
+
+              inside(find(id("create-reason-url"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonUrl)
               }
-              click on "save-vote-button"
+              inside(find(id("create-reason-description"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonBody)
+              }
+
+              click on "create-voterequest-submit-button"
             },
           )(
-            "sv2 can see the new updated vote",
+            "sv1 can see the new vote request",
             _ => {
-              inside(find(id("vote-request-modal-vote-reason-body"))) { case Some(element) =>
-                element.text should matchText(updatedVoteReasonBody)
-              }
-              inside(find(id("vote-request-modal-vote-reason-url"))) { case Some(element) =>
-                element.text should matchText(updatedVoteReasonUrl)
-              }
-              inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-                element.text should matchText("0")
-              }
-              inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-                element.text should matchText("2")
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              inside(tbody) { case Some(tb) =>
+                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                rows should have size 2
+                (
+                  rows.head.childElement(className("vote-row-action")).text,
+                  rows.head.childElement(className("vote-row-requester")).text,
+                )
               }
             },
           )
         }
-
-        withFrontEnd("sv1") { implicit webDriver =>
-          clue("sv1 can see the updated vote by sv2") {
-            eventually() {
-              inside(find(id("vote-request-modal-rejected-count"))) { case Some(element) =>
-                element.text should matchText("0")
-              }
-              inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-                element.text should matchText("2")
-              }
-            }
-          }
-        }
     }
+
   }
 
   private def svCoinPriceShouldMatch(
