@@ -189,7 +189,7 @@ class SvApp(
       // We branch here on the type of onboarding config, as bootstrapping
       // a fresh collective is fundamentally different from joining an existing collective
       config.onboarding match {
-        case foundingConfig: SvOnboardingConfig.FoundCollective =>
+        case Some(foundingConfig: SvOnboardingConfig.FoundCollective) =>
           val initializer = new FoundingNodeInitializer(
             config,
             foundingConfig,
@@ -206,10 +206,27 @@ class SvApp(
             localDomainNode,
           )
           initializer.bootstrapCollective()
-        case joiningConfig: SvOnboardingConfig.JoinWithKey =>
+        case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           val initializer = new JoiningNodeInitializer(
             config,
-            joiningConfig,
+            Some(joiningConfig),
+            cometBftNode,
+            darFilesToUploadDuringInit,
+            loggerFactory,
+            retryProvider,
+            ledgerClient,
+            participantAdminConnection,
+            participantId,
+            clock,
+            storage,
+            coinAppParameters,
+            localDomainNode,
+          )
+          initializer.joinCollectiveAndOnboardNodes()
+        case None =>
+          val initializer = new JoiningNodeInitializer(
+            config,
+            None,
             cometBftNode,
             darFilesToUploadDuringInit,
             loggerFactory,

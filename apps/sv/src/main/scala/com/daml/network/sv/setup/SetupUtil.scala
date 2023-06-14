@@ -11,11 +11,18 @@ private[setup] object SetupUtil {
 
   def setupSvParty(connection: CNLedgerConnection, config: SvAppBackendConfig)(implicit
       ec: ExecutionContext
-  ): Future[PartyId] =
+  ): Future[PartyId] = {
+    val partyHint = config.svPartyHint.getOrElse(
+      config.onboarding
+        .getOrElse(
+          sys.error("Cannot setup SV party without either party hint or an onboarding config")
+        )
+        .name
+    )
     for {
       svParty <- connection.ensureUserPrimaryPartyIsAllocated(
         config.ledgerApiUser,
-        config.svPartyHint.getOrElse(config.onboarding.name),
+        partyHint,
       )
       // We share the SV party between the validator user and the SV user. Therefore, we allocate the validator user here with the SV
       // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
@@ -27,6 +34,7 @@ private[setup] object SetupUtil {
         Seq(User.Right.ParticipantAdmin.INSTANCE),
       )
     } yield svParty
+  }
 
   def ensureSvcPartyMetadataAnnotation(
       connection: CNLedgerConnection,

@@ -68,11 +68,14 @@ object CNNodeConfigTransforms {
           validatorLedgerApiUser = s"${c.validatorLedgerApiUser}-$suffix",
           svPartyHint = c.svPartyHint.map(sv => s"$sv-$suffix"),
           onboarding = c.onboarding match {
-            case c: SvOnboardingConfig.FoundCollective =>
-              c.copy(
-                svcPartyHint = s"${c.svcPartyHint}-$suffix"
+            case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
+              Some(
+                foundCollective.copy(
+                  svcPartyHint = s"${foundCollective.svcPartyHint}-$suffix"
+                )
               )
-            case c: SvOnboardingConfig.JoinWithKey => c
+            case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
+            case None => None
           },
         )
       ),
@@ -258,8 +261,10 @@ object CNNodeConfigTransforms {
     updateAllSvAppConfigs_(c =>
       c.focus(_.onboarding)
         .modify(_ match {
-          case found: SvOnboardingConfig.FoundCollective => update(found)
-          case other => other
+          case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
+            Some(update(foundCollective))
+          case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
+          case None => None
         })
     )
 

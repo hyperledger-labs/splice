@@ -31,7 +31,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 /** Class used to orchestrate the flow of SVC Party hosting on SV dedicated participant.
   */
 class SvcPartyHosting(
-    onboardingConfig: SvOnboardingConfig,
+    onboardingConfig: Option[SvOnboardingConfig],
     participantAdminConnection: ParticipantAdminConnection,
     svcParty: PartyId,
     val useXNodes: Boolean,
@@ -104,19 +104,25 @@ class SvcPartyHosting(
           )
           _ <- participantAdminConnection.reconnectAllDomains()
           _ = logger.info("candidate SV participant reconnected to global domain")
-          _ <- waitForSvcPartyToParticipantAuthorization(domainId, participantId, RequestSide.From)
-          _ = logger.info(s"svc party is now hosted in the candidate SV participant $participantId")
+          _ <- waitForSvcPartyToParticipantAuthorization(
+            domainId,
+            participantId,
+            RequestSide.From,
+          )
+          _ = logger.info(
+            s"svc party is now hosted in the candidate SV participant $participantId"
+          )
         } yield Right(())
       case None =>
-        Future.successful(Left("unexpected on-boarding config"))
+        Future.successful(Left("unexpected onboarding config"))
     }
   }
 
   private def getSponsorSvConfig(
-      onboardingConfig: SvOnboardingConfig
+      onboardingConfig: Option[SvOnboardingConfig]
   ): Option[SvAppClientConfig] =
     onboardingConfig match {
-      case SvOnboardingConfig.JoinWithKey(_, sponsorSv, _, _) =>
+      case Some(SvOnboardingConfig.JoinWithKey(_, sponsorSv, _, _)) =>
         Some(sponsorSv)
       case _ => None
     }

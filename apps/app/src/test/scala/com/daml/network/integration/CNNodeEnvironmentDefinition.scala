@@ -67,7 +67,11 @@ case class CNNodeEnvironmentDefinition(
     copy(preSetup = env => {
       import env.*
       this.preSetup(env)
-      svs.local.foreach(sv => CNNodeEnvironmentDefinition.withAllocatedSv(sv))
+      svs.local.foreach(sv => {
+        if (!sv.name.endsWith("Onboarded")) {
+          CNNodeEnvironmentDefinition.withAllocatedSv(sv)
+        }
+      })
     })
 
   def withAllocatedValidatorUsers(): CNNodeEnvironmentDefinition =

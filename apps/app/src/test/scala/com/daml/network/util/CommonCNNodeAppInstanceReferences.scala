@@ -40,6 +40,10 @@ trait CommonCNNodeAppInstanceReferences {
 
   def sv1(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
 
+  def sv1Onboarded(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb(
+    "sv1Onboarded"
+  )
+
   def sv2(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv2")
 
   def sv3(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv3")

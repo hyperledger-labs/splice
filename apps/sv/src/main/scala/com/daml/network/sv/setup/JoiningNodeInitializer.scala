@@ -34,7 +34,7 @@ import scala.jdk.CollectionConverters.*
 class JoiningNodeInitializer(
     // TODO(#5364): cleanup the order and mass of these parameters
     config: SvAppBackendConfig,
-    joiningConfig: SvOnboardingConfig.JoinWithKey,
+    joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
     cometBftNode: Option[CometBftNode],
     requiredDars: Seq[UploadablePackage],
     override protected val loggerFactory: NamedLoggerFactory,
@@ -175,7 +175,10 @@ class JoiningNodeInitializer(
       private val svcStore: SvSvcStore = svcStoreWithIngestion.store
 
       def startOnboardingWithSvcPartyHosted(): Future[Unit] = {
-        val SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) = joiningConfig
+        val SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =
+          joiningConfig.getOrElse(
+            sys.error("An onboarding config is required to start onboarding; exiting.")
+          )
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
             for {
@@ -256,7 +259,9 @@ class JoiningNodeInitializer(
     def startOnboardingWithSvcPartyMigration(
         initConnection: CNLedgerConnection
     ): Future[(SvSvcStore, SvSvcAutomationService)] = {
-      config.onboarding match {
+      joiningConfig.getOrElse(
+        sys.error("An onboarding config is required to start onboarding; exiting.")
+      ) match {
         case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
@@ -299,7 +304,6 @@ class JoiningNodeInitializer(
               } yield (svcStore, svcAutomation)
             case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
           }
-        case _ => sys.error(s"only JoinWithKey is expected")
       }
     }
 
@@ -467,17 +471,27 @@ class JoiningNodeInitializer(
     svcPartyFromMetadata <- connection.lookupSvcPartyFromUserMetadata(config.ledgerApiUser)
     svcParty <- svcPartyFromMetadata
       .fold(
-        retryProvider.getValueWithRetries(
-          "SVC party ID from sponsoring SV",
-          getSvcPartyIdFromSponsor,
-          logger,
-        )
+        {
+          val sponsorConfig = joiningConfig
+            .getOrElse(
+              sys.error(
+                "An onboarding config is required to get the SVC party ID from a sponsoring SV; exiting."
+              )
+            )
+            .svClient
+            .adminApi
+          retryProvider.getValueWithRetries(
+            "SVC party ID from sponsoring SV",
+            getSvcPartyIdFromSponsor(sponsorConfig),
+            logger,
+          )
+        }
       )(Future.successful)
   } yield svcParty
 
-  private def getSvcPartyIdFromSponsor: Future[PartyId] =
+  private def getSvcPartyIdFromSponsor(sponsorConfig: NetworkAppClientConfig): Future[PartyId] =
     SvConnection(
-      joiningConfig.svClient.adminApi,
+      sponsorConfig,
       retryProvider,
       coinAppParameters.processingTimeouts,
       loggerFactory,
@@ -494,10 +508,7 @@ class JoiningNodeInitializer(
   )(f: (LocalDomainNode, SvConnection) => Future[A]): Future[Unit] =
     (for {
       localDomainNode <- localDomainNodeO
-      svConfig <- config.onboarding match {
-        case conf: SvOnboardingConfig.JoinWithKey => Some(conf.svClient.adminApi)
-        case _: SvOnboardingConfig.FoundCollective => None
-      }
+      svConfig <- joiningConfig.map(_.svClient.adminApi)
     } yield (localDomainNode, svConfig)).traverse_ { case (localDomainNode, svConfig) =>
       SvConnection(
         svConfig,

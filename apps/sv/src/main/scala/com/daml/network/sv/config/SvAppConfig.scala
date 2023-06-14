@@ -79,8 +79,7 @@ case class SvAppBackendConfig(
     // If not set the onboarding name is used. We set this in our tests
     // because this one can be suffixed per test while we keep the onboarding name stable.
     svPartyHint: Option[String] = None,
-    // TODO(#5288) make this an `Option` with default `= None`
-    onboarding: SvOnboardingConfig,
+    onboarding: Option[SvOnboardingConfig] = None,
     initialCoinPriceVote: Option[BigDecimal] = None,
     enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,

@@ -18,7 +18,7 @@ import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.sv.config.SvOnboardingConfig.FoundCollective
+import com.daml.network.sv.config.SvOnboardingConfig
 import com.daml.network.util.{
   Auth0Util,
   CNNodeUtil,
@@ -199,9 +199,9 @@ object CNNodeTests {
 
     def defaultTickDuration(implicit env: CNNodeTestConsoleEnvironment): NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds((sv1.config.onboarding match {
-        case foundCollective: FoundCollective =>
+        case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
           foundCollective.initialTickDuration.asJava
-        case _ =>
+        case Some(_: SvOnboardingConfig.JoinWithKey) | None =>
           fail("Failed to retrieve defaultTickDuration from sv1. sv1 is not part of the SVC.")
       }).toSeconds)
 
