@@ -135,7 +135,6 @@ class JoiningNodeInitializer(
             globalDomain,
             participantAdminConnection,
             svConnection,
-            svcRulesLock,
           )
         } yield ()
       }

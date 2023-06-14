@@ -4,7 +4,6 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.environment.*
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.util.SvcRulesLock
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
@@ -125,7 +124,6 @@ final class LocalDomainNode(
       domainId: DomainId,
       participantAdminConnection: ParticipantAdminConnection,
       svConnection: SvConnection,
-      svcRulesLock: SvcRulesLock,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider
       .getValueWithRetries(
@@ -136,7 +134,7 @@ final class LocalDomainNode(
       .flatMap {
         case Left(NodeStatus.NotInitialized(_)) =>
           logger.info("Onboarding mediator")
-          onboardLocalMediator(domainId, participantAdminConnection, svConnection, svcRulesLock)
+          onboardLocalMediator(domainId, participantAdminConnection, svConnection)
         case Right(NodeStatus.Success(_)) =>
           logger.info("Mediator is already onboarded")
           Future.unit
@@ -149,7 +147,6 @@ final class LocalDomainNode(
       domainId: DomainId,
       participantAdminConnection: ParticipantAdminConnection,
       svConnection: SvConnection,
-      svcRulesLock: SvcRulesLock,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info("Adding mediator identity transactions")
     for {
@@ -162,9 +159,6 @@ final class LocalDomainNode(
         participantAdminConnection,
         identity,
       )
-      // We need to lock between the topology transaction and the mediator initializing. Otherwise things blow up with
-      // "Unable to find mediator group"
-      _ <- svcRulesLock.lock()
       _ = logger.info(s"Onboarding mediator $mediatorId through sponsoring SV")
       _ <- retryProvider.retryForAutomation(
         "Onboarding mediator through sponsoring SV",
@@ -223,7 +217,6 @@ final class LocalDomainNode(
         },
         logger,
       )
-      _ <- svcRulesLock.unlock()
     } yield ()
   }
 
