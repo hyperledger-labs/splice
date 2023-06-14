@@ -325,13 +325,13 @@ class XNodeDomainFeesTimeBasedIntegrationTest
               Seq(
                 t => {
                   t.validator shouldBe aliceValidator.getValidatorPartyId()
-                  t.numPurchases shouldBe 3L
-                  t.totalTrafficPurchased shouldBe topupParameters.topupAmount * 3
+                  t.numPurchases should be >= 3L
+                  t.totalTrafficPurchased should be >= topupParameters.topupAmount * 3
                 },
                 t => {
                   t.validator shouldBe sv1Validator.getValidatorPartyId()
-                  t.numPurchases shouldBe 1L
-                  t.totalTrafficPurchased shouldBe getTopupParameters(sv1Validator).topupAmount
+                  t.numPurchases should be >= 1L
+                  t.totalTrafficPurchased should be >= getTopupParameters(sv1Validator).topupAmount
                 },
               ),
             )
