@@ -265,13 +265,16 @@ commands:
       - run_bash_command_in_nix:
           cmd_name: Reap << parameters.cluster >> if lock older than 6 hours
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL"
+          additional_nix_args: "--keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
             set -eou pipefail
             export KUBECONFIG=$PWD/.kubecfg
 
             cncluster activate
+            export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
+            export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
+            export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
             cncluster show
             if ! cncluster ci_assert_fresh_lock; then
               lockholder=$(cncluster lockholder)
