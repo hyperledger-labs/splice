@@ -3,7 +3,7 @@ package com.daml.network.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import cats.syntax.traverse.*
-import com.daml.ledger.api.v1.transaction_filter as scalaFilter
+import com.daml.ledger.api.v2.transaction_filter.{TransactionFilter as LapiTransactionFilter}
 import com.daml.ledger.javaapi.data.{
   ContractMetadata,
   CreatedEvent,
@@ -384,9 +384,9 @@ object MultiDomainAcsStore {
 
     // TODO (#3956) callers should use `toTransactionFilter` instead when
     // state service supports real filters
-    def toTransactionFilterAllContractsScala: scalaFilter.TransactionFilter =
-      scalaFilter.TransactionFilter(
-        Map(primaryParty.toProtoPrimitive -> scalaFilter.Filters())
+    def toTransactionFilterAllContractsScala: LapiTransactionFilter =
+      LapiTransactionFilter(
+        Map(primaryParty.toProtoPrimitive -> com.daml.ledger.api.v1.transaction_filter.Filters())
       )
   }
 

@@ -29,11 +29,11 @@ import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.participant.protocol.v0.multidomain
+import com.daml.ledger.api.v2 as lapi
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration, FieldMask}
-import com.google.protobuf.empty.Empty
 import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
@@ -78,16 +78,22 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
   private val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
     withCredentials(UserManagementServiceGrpc.newStub(channel), token)
-  private val updateServiceStub: multidomain.UpdateServiceGrpc.UpdateServiceStub =
-    withCredentials(multidomain.UpdateServiceGrpc.stub(channel), token)
-  private val transferSubmissionServiceStub
-      : multidomain.TransferSubmissionServiceGrpc.TransferSubmissionServiceStub =
-    withCredentials(multidomain.TransferSubmissionServiceGrpc.stub(channel), token)
+  private val updateServiceStub: lapi.update_service.UpdateServiceGrpc.UpdateServiceStub =
+    withCredentials(lapi.update_service.UpdateServiceGrpc.stub(channel), token)
+  private val commandSubmissionServiceStub
+      : lapi.command_submission_service.CommandSubmissionServiceGrpc.CommandSubmissionServiceStub =
+    withCredentials(
+      lapi.command_submission_service.CommandSubmissionServiceGrpc.stub(channel),
+      token,
+    )
   private val multidomainCompletionServiceStub
-      : multidomain.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
-    withCredentials(multidomain.CommandCompletionServiceGrpc.stub(channel), token)
-  private val stateServiceStub: multidomain.StateServiceGrpc.StateServiceStub =
-    withCredentials(multidomain.StateServiceGrpc.stub(channel), token)
+      : lapi.command_completion_service.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
+    withCredentials(
+      lapi.command_completion_service.CommandCompletionServiceGrpc.stub(channel),
+      token,
+    )
+  private val stateServiceStub: lapi.state_service.StateServiceGrpc.StateServiceStub =
+    withCredentials(lapi.state_service.StateServiceGrpc.stub(channel), token)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -106,10 +112,15 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
 
   override def close(): Unit = GrpcChannel.close(channel)
 
-  def ledgerEnd(): Future[LedgerOffset.Absolute] = {
-    val req = multidomain.GetLedgerEndRequest()
+  def ledgerEnd(): Future[ParticipantOffset.Value.Absolute] = {
+    val req = lapi.state_service.GetLedgerEndRequest()
     stateServiceStub.getLedgerEnd(req).map { resp =>
-      new LedgerOffset.Absolute(resp.offset)
+      val participantOffset =
+        resp.offset.getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
+      val absolute = participantOffset.value.absolute
+        .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
+
+      ParticipantOffset.Value.Absolute(absolute)
     }
   }
 
@@ -121,8 +132,8 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   }
 
   def activeContracts(
-      request: multidomain.GetActiveContractsRequest
-  ): Source[multidomain.GetActiveContractsResponse, NotUsed] =
+      request: lapi.state_service.GetActiveContractsRequest
+  ): Source[lapi.state_service.GetActiveContractsResponse, NotUsed] =
     ClientAdapter
       .serverStreaming(request, stateServiceStub.getActiveContracts)
 
@@ -144,7 +155,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
 
   def updates(request: GetUpdatesRequest): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] = {
     ClientAdapter
-      .serverStreaming(request.toProto, updateServiceStub.getTreeUpdates)
+      .serverStreaming(request.toProto, updateServiceStub.getUpdateTrees)
       .map(GetTreeUpdatesResponse.fromProto)
   }
 
@@ -384,8 +395,8 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       submitter: PartyId,
       command: LedgerClient.TransferCommand,
   ): Future[Unit] =
-    transferSubmissionServiceStub
-      .submit(
+    commandSubmissionServiceStub
+      .submitReassignment(
         LedgerClient
           .TransferSubmitRequest(
             applicationId,
@@ -396,19 +407,18 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
           )
           .toProto
       )
-      .map((_: Empty) => ())
+      .map((_: lapi.command_submission_service.SubmitReassignmentResponse) => ())
 
   def completions(
       applicationId: String,
       parties: Seq[PartyId],
-      begin: Option[LedgerOffset],
+      begin: Option[ParticipantOffset],
   ): Source[CompletionStreamResponse, NotUsed] =
     ClientAdapter.serverStreaming(
-      multidomain.CompletionStreamRequest(
-        ledgerId = "",
+      lapi.command_completion_service.CompletionStreamRequest(
         applicationId = applicationId,
         parties = parties.map(_.toProtoPrimitive),
-        offset = begin map (lo => ledger_offset.LedgerOffset.fromJavaProto(lo.toProto)),
+        beginExclusive = begin,
       ),
       multidomainCompletionServiceStub.completionStream,
     ) map CompletionStreamResponse.fromProto
@@ -416,7 +426,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   def getConnectedDomains(
       party: PartyId
   ): Future[Map[DomainAlias, DomainId]] = {
-    val req = multidomain.GetConnectedDomainsRequest(
+    val req = lapi.state_service.GetConnectedDomainsRequest(
       party = party.toProtoPrimitive
     )
     stateServiceStub.getConnectedDomains(req).map { resp =>
@@ -452,20 +462,28 @@ object LedgerClient {
     }
   }
 
+  private def filterForParty(partyId: PartyId): lapi.transaction_filter.TransactionFilter = {
+
+    val filters = com.daml.ledger.api.v1.transaction_filter.Filters(
+      Some(com.daml.ledger.api.v1.transaction_filter.InclusiveFilters(Nil, Nil))
+    )
+
+    lapi.transaction_filter.TransactionFilter(
+      Map(partyId.toLf -> filters)
+    )
+
+  }
+
   final case class GetUpdatesRequest(
-      begin: LedgerOffset,
-      end: Option[LedgerOffset],
+      begin: ParticipantOffset,
+      end: Option[ParticipantOffset],
       party: PartyId,
   ) {
-
-    import com.daml.ledger.api.v1.ledger_offset as sclo
-
-    private[LedgerClient] def toProto: multidomain.GetUpdatesRequest =
-      multidomain.GetUpdatesRequest(
-        ledgerId = "",
-        begin = Some(sclo.LedgerOffset.fromJavaProto(begin.toProto)),
-        end = end.map(lc => sclo.LedgerOffset.fromJavaProto(lc.toProto)),
-        party = party.toLf,
+    private[LedgerClient] def toProto: lapi.update_service.GetUpdatesRequest =
+      lapi.update_service.GetUpdatesRequest(
+        beginExclusive = Some(begin),
+        endInclusive = end,
+        filter = Some(filterForParty(party)),
       )
   }
 
@@ -476,21 +494,37 @@ object LedgerClient {
 
   object GetTreeUpdatesResponse {
 
-    import multidomain.GetTreeUpdatesResponse.Update as TU
+    import lapi.update_service.GetUpdateTreesResponse.Update as TU
 
     private[LedgerClient] def fromProto(
-        proto: multidomain.GetTreeUpdatesResponse
-    ): GetTreeUpdatesResponse =
-      GetTreeUpdatesResponse(
-        proto.update match {
-          case TU.TransactionTree(tree) =>
-            TransactionTreeUpdate(TransactionTree fromProto scalapbToJava(tree)(_.companion))
-          case TU.Transfer(x) =>
-            TransferUpdate(Transfer.fromProto(x))
-          case TU.Empty => sys.error("uninitialized update service result")
-        },
-        DomainId.tryFromString(proto.domainId),
-      )
+        proto: lapi.update_service.GetUpdateTreesResponse
+    ): GetTreeUpdatesResponse = {
+      proto.update match {
+        case TU.TransactionTree(tree) =>
+          // TODO(#5713) Avoid having to convert to the old Java bindings type.
+          import io.scalaland.chimney.dsl.*
+          val treeV1 = tree.into[com.daml.ledger.api.v1.transaction.TransactionTree].transform
+
+          val update = TransactionTreeUpdate(
+            TransactionTree fromProto scalapbToJava(treeV1)(_.companion)
+          )
+          GetTreeUpdatesResponse(update, DomainId.tryFromString(tree.domainId))
+
+        case TU.Reassignment(x) =>
+          val domainIdP = x.event match {
+            case lapi.reassignment.Reassignment.Event.Empty =>
+              sys.error("uninitialized update service result (event)")
+            case lapi.reassignment.Reassignment.Event.UnassignedEvent(unassign) => unassign.source
+            case lapi.reassignment.Reassignment.Event.AssignedEvent(assign) => assign.target
+          }
+          GetTreeUpdatesResponse(
+            TransferUpdate(Transfer.fromProto(x)),
+            DomainId.tryFromString(domainIdP),
+          )
+
+        case TU.Empty => sys.error("uninitialized update service result (update)")
+      }
+    }
   }
 
   sealed abstract class TransferCommand extends Product with Serializable
@@ -501,8 +535,8 @@ object LedgerClient {
         source: DomainId,
         target: DomainId,
     ) extends TransferCommand {
-      def toProto: multidomain.TransferOutCommand =
-        multidomain.TransferOutCommand(
+      def toProto: lapi.reassignment_command.UnassignCommand =
+        lapi.reassignment_command.UnassignCommand(
           contractId = contractId.contractId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
@@ -514,9 +548,9 @@ object LedgerClient {
         source: DomainId,
         target: DomainId,
     ) extends TransferCommand {
-      def toProto: multidomain.TransferInCommand =
-        multidomain.TransferInCommand(
-          transferOutId = transferOutId,
+      def toProto: lapi.reassignment_command.AssignCommand =
+        lapi.reassignment_command.AssignCommand(
+          unassignId = transferOutId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
         )
@@ -530,8 +564,8 @@ object LedgerClient {
       submitter: PartyId,
       command: TransferCommand,
   ) {
-    def toProto: multidomain.SubmitRequest = {
-      val baseCommand = multidomain.TransferCommand(
+    def toProto: lapi.command_submission_service.SubmitReassignmentRequest = {
+      val baseCommand = lapi.reassignment_command.ReassignmentCommand(
         applicationId = applicationId,
         commandId = commandId,
         submissionId = submissionId,
@@ -539,11 +573,11 @@ object LedgerClient {
       )
       val updatedCommand = command match {
         case out: TransferCommand.Out =>
-          baseCommand.withTransferOutCommand(out.toProto)
+          baseCommand.withUnassignCommand(out.toProto)
         case in: TransferCommand.In =>
-          baseCommand.withTransferInCommand(in.toProto)
+          baseCommand.withAssignCommand(in.toProto)
       }
-      multidomain.SubmitRequest(
+      lapi.command_submission_service.SubmitReassignmentRequest(
         Some(updatedCommand)
       )
     }
@@ -552,7 +586,9 @@ object LedgerClient {
   final case class CompletionStreamResponse(laterOffset: LedgerOffset, completion: Completion)
 
   object CompletionStreamResponse {
-    def fromProto(spb: multidomain.CompletionStreamResponse): CompletionStreamResponse = {
+    def fromProto(
+        spb: lapi.command_completion_service.CompletionStreamResponse
+    ): CompletionStreamResponse = {
       val offset = (for {
         checkpoint <- spb.checkpoint
         offset <- checkpoint.offset
@@ -583,10 +619,12 @@ object LedgerClient {
   }
 
   object Completion {
-    def fromProto(spb: completion.Completion): Completion = {
+    def fromProto(spb: lapi.completion.Completion): Completion = {
       // ignoring transactionId, actAs, deduplicationPeriod
+
       val (grpcStatus, errors) =
         spb.status map parseStatusScalapb getOrElse ((GrpcStatus.Code.UNKNOWN.toStatus, Seq.empty))
+
       Completion(
         applicationId = spb.applicationId,
         commandId = spb.commandId,
@@ -595,7 +633,6 @@ object LedgerClient {
         errorDetails = errors,
       )
     }
-
     @throws[IllegalStateException]
     private def parseStatusScalapb(
         spb: com.google.rpc.status.Status

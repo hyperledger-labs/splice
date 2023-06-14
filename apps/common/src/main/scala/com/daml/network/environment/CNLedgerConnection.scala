@@ -12,11 +12,11 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
   ExercisedEvent,
-  Identifier as LapiIdentifier,
   LedgerOffset,
   Transaction,
   TransactionTree,
   User,
+  Identifier as LapiIdentifier,
 }
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, Update}
 import com.daml.network.environment.ledger.api.{
@@ -28,7 +28,7 @@ import com.daml.network.environment.ledger.api.{
   NoDedup,
 }
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
-import com.daml.network.util.{UploadablePackage, DisclosedContracts}
+import com.daml.network.util.{DisclosedContracts, UploadablePackage}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -37,12 +37,14 @@ import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
-  SyncCloseable,
   FutureUnlessShutdown,
+  SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
-import com.digitalasset.canton.participant.protocol.v0.multidomain
+import com.daml.ledger.api.v2 as lapi
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.Value
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.transaction.{
   ParticipantPermission,
@@ -135,7 +137,7 @@ class CNLedgerConnection(
         throw new IllegalStateException(s"I was promised a real offset, not $nonsenseOff")
     }
 
-  def ledgerEnd(): Future[LedgerOffset.Absolute] =
+  def ledgerEnd(): Future[Value.Absolute] =
     client.ledgerEnd()
 
   def submitCommandsNoDedup(
@@ -298,26 +300,25 @@ class CNLedgerConnection(
 
   def activeContracts(
       filter: IngestionFilter,
-      offset: LedgerOffset.Absolute,
+      offset: ParticipantOffset.Value.Absolute,
   ): Future[(Seq[ActiveContract], Seq[InFlightTransferOutEvent])] = {
     val activeContractsRequest = client.activeContracts(
-      multidomain.GetActiveContractsRequest(
-        validAtOffset = offset.getOffset,
+      lapi.state_service.GetActiveContractsRequest(
+        activeAtOffset = offset.value,
         filter = Some(filter.toTransactionFilterAllContractsScala),
       )
     )
     for {
       responseSequence <- activeContractsRequest runWith Sink.seq
       contractStateComponents = responseSequence
-        .flatMap(_.contractStateComponents)
-        .map(_.contractStateComponent)
+        .map(_.contractEntry)
       active = contractStateComponents.collect {
-        case multidomain.ContractStateComponent.ContractStateComponent.ActiveContract(contract) =>
+        case lapi.state_service.GetActiveContractsResponse.ContractEntry.ActiveContract(contract) =>
           ActiveContract.fromProto(contract)
       }
       inFlight = contractStateComponents.collect {
-        case multidomain.ContractStateComponent.ContractStateComponent
-              .IncompleteTransferredOut(ev) =>
+        case lapi.state_service.GetActiveContractsResponse.ContractEntry
+              .IncompleteUnassigned(ev) =>
           InFlightTransferOutEvent.fromProto(ev)
       }
     } yield (active, inFlight)
@@ -327,7 +328,7 @@ class CNLedgerConnection(
     client.getConnectedDomains(party)
 
   def updates(
-      beginOffset: LedgerOffset,
+      beginOffset: ParticipantOffset,
       party: PartyId,
   ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
@@ -344,7 +345,7 @@ class CNLedgerConnection(
       user <- client
         .getUser(user)
         .map(Some(_))
-      partyId = user.flatMap(_.getPrimaryParty.toScala).map(PartyId.tryFromProtoPrimitive(_))
+      partyId = user.flatMap(_.getPrimaryParty.toScala).map(PartyId.tryFromProtoPrimitive)
     } yield partyId
   }
 

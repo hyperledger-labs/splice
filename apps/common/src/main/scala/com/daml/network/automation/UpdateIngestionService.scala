@@ -2,6 +2,7 @@ package com.daml.network.automation
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.Flow
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
 import com.daml.network.environment.ledger.api.{TransactionTreeUpdate, TransferUpdate}
@@ -48,7 +49,7 @@ class UpdateIngestionService(
       subscribeFrom <- lastIngestedOffset match {
         case None =>
           for {
-            offset <- connection.ledgerEnd().map(_.getOffset)
+            offset <- connection.ledgerEnd().map(_.value)
             _ <- ingestAcsAndInFlight(offset)
           } yield offset
         case Some(offset) =>
@@ -77,13 +78,16 @@ class UpdateIngestionService(
     } yield ()
   }
 
-  private def updateSource(subscribeFrom: String) =
-    connection.updates(new LedgerOffset.Absolute(subscribeFrom), filter.primaryParty)
+  private def updateSource(subscribeFrom: String) = {
+    val participantOffset = ParticipantOffset(ParticipantOffset.Value.Absolute(subscribeFrom))
+
+    connection.updates(participantOffset, filter.primaryParty)
+  }
 
   private def ingestAcsAndInFlight(
       offset: String
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val javaOffset = new LedgerOffset.Absolute(offset)
+    val javaOffset = ParticipantOffset.Value.Absolute(offset)
     for {
       // TODO(#5534): stream contracts instead of ingesting them as a single Seq
       (evs, tfs) <- connection.activeContracts(filter, javaOffset)

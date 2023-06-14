@@ -26,9 +26,11 @@ cp "$CANTON/protobuf/community/com/digitalasset/canton/protocol/v0/topology.prot
 cp "$CANTON/protobuf/community/com/digitalasset/canton/protocol/v0/sequencing.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/protocol/v0/sequencing.proto"
 cp "$CANTON/protobuf/community/com/digitalasset/canton/v0/trace_context.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/v0/trace_context.proto"
 
-mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/participant/protocol/v0/multidomain"
-cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/digitalasset/canton/participant/protocol/v0/multidomain/transfer.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/participant/protocol/v0/multidomain/transfer.proto"
-cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/digitalasset/canton/participant/protocol/v0/multidomain/state_service.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/participant/protocol/v0/multidomain/state_service.proto"
+mkdir -p "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2"
+cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/daml/ledger/api/v2/participant_offset.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2/participant_offset.proto"
+cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/daml/ledger/api/v2/reassignment.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2/reassignment.proto"
+cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/daml/ledger/api/v2/state_service.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2/state_service.proto"
+cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/daml/ledger/api/v2/transaction_filter.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2/transaction_filter.proto"
 
 mkdir "$DIR/ts"
 

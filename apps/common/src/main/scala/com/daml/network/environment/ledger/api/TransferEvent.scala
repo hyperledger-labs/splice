@@ -5,7 +5,8 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.participant.protocol.v0.multidomain
+import com.daml.ledger.api.v2.reassignment as multidomain
+import com.daml.ledger.api.v2.state_service
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 case class InFlightTransferOutEvent(
@@ -15,10 +16,10 @@ case class InFlightTransferOutEvent(
 
 object InFlightTransferOutEvent {
   def fromProto(
-      proto: multidomain.IncompleteTransferredOut
+      proto: state_service.IncompleteUnassigned
   ): InFlightTransferOutEvent =
     InFlightTransferOutEvent(
-      transferEvent = TransferEvent.Out.fromProto(proto.getTransferredOutEvent),
+      transferEvent = TransferEvent.Out.fromProto(proto.getUnassignedEvent),
       createdEvent =
         CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
     )
@@ -55,12 +56,12 @@ object TransferEvent {
   }
 
   object Out {
-    private[api] def fromProto(proto: multidomain.TransferredOutEvent): Out = {
+    private[api] def fromProto(proto: multidomain.UnassignedEvent): Out = {
       Out(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
         source = DomainId.tryFromString(proto.source),
         target = DomainId.tryFromString(proto.target),
-        transferOutId = proto.transferOutId,
+        transferOutId = proto.unassignId,
         contractId = new ContractId(proto.contractId),
       )
     }
@@ -84,13 +85,13 @@ object TransferEvent {
   }
 
   object In {
-    private[api] def fromProto(proto: multidomain.TransferredInEvent): In = {
+    private[api] def fromProto(proto: multidomain.AssignedEvent): In = {
       import com.daml.ledger.api.v1.event as scalaEvent
       In(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
         source = DomainId.tryFromString(proto.source),
         target = DomainId.tryFromString(proto.target),
-        transferOutId = proto.transferOutId,
+        transferOutId = proto.unassignId,
         createdEvent =
           CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
       )

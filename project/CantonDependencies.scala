@@ -123,6 +123,7 @@ object CantonDependencies {
   lazy val netty_boring_ssl = "io.netty" % "netty-tcnative-boringssl-static" % "2.0.46.Final"
   lazy val netty_handler = "io.netty" % "netty-handler" % netty_version
   lazy val grpc_services = "io.grpc" % "grpc-services" % grpc_version
+  lazy val google_common_protos = "com.google.api.grpc" % "proto-google-common-protos" % "2.0.1"
 
   lazy val scopt = "com.github.scopt" %% "scopt" % "4.0.0"
 

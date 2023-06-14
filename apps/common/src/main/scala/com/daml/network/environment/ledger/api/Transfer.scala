@@ -3,7 +3,7 @@ package com.daml.network.environment.ledger.api
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
-import com.digitalasset.canton.participant.protocol.v0.multidomain
+import com.daml.ledger.api.v2.reassignment as multidomain
 
 final case class Transfer[+E](
     updateId: String,
@@ -19,12 +19,12 @@ final case class Transfer[+E](
 }
 
 object Transfer {
-  private[api] def fromProto(proto: multidomain.Transfer): Transfer[TransferEvent] = {
+  private[api] def fromProto(proto: multidomain.Reassignment): Transfer[TransferEvent] = {
     val offset = new LedgerOffset.Absolute(proto.offset)
     val event = proto.event match {
-      case multidomain.Transfer.Event.TransferOutEvent(out) => TransferEvent.Out.fromProto(out)
-      case multidomain.Transfer.Event.TransferInEvent(in) => TransferEvent.In.fromProto(in)
-      case multidomain.Transfer.Event.Empty =>
+      case multidomain.Reassignment.Event.UnassignedEvent(out) => TransferEvent.Out.fromProto(out)
+      case multidomain.Reassignment.Event.AssignedEvent(in) => TransferEvent.In.fromProto(in)
+      case multidomain.Reassignment.Event.Empty =>
         throw new IllegalArgumentException("uninitialized transfer event")
     }
     Transfer(

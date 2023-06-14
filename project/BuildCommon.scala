@@ -892,20 +892,19 @@ object BuildCommon {
       .Project("aaa-canton-research-services", file("canton/research/app"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .dependsOn(
-        `canton-community-base`
       )
       .settings(
         removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
+          CantonDependencies.google_common_protos % "protobuf",
           daml_ledger_api_scalapb,
           daml_ledger_api_proto % "protobuf",
-          CantonDependencies.grpc_services % "protobuf",
           scalapb_runtime_grpc,
           scalapb_runtime,
         ),
         Compile / PB.targets := Seq(
-          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+          scalapb.gen(flatPackage = false) -> (Compile / sourceManaged).value / "protobuf"
         ),
       )
   }

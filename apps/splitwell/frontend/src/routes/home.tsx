@@ -1,10 +1,10 @@
 import { usePrimaryParty, useStateSnapshotServiceClient } from 'common-frontend';
 import { useGetSvcPartyId } from 'common-frontend/scan-api';
+import { GetConnectedDomainsRequest } from 'common-protobuf/com/daml/ledger/api/v2/state_service_pb';
 import {
   ListSplitwellInstallsRequest,
   SplitwellContext,
 } from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
-import { GetConnectedDomainsRequest } from 'common-protobuf/com/digitalasset/canton/participant/protocol/v0/multidomain/state_service_pb';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useState, useEffect } from 'react';
 
