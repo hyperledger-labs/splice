@@ -1,4 +1,3 @@
-// TODO (#5549): make abstract and base both DbDirectoryStoreTest and InMemoryDirectoryStoreTest on it
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.ContractMetadata
@@ -16,8 +15,10 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.{DomainConfig, GlobalOnlyDomainConfig}
+import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.store.DirectoryStore.IdleDirectorySubscription
 import com.daml.network.directory.store.db.DbDirectoryStore
+import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
@@ -26,20 +27,15 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.{DomainAlias, HasActorSystem}
+import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.google.protobuf
 
 import java.time.Instant
 import scala.concurrent.Future
 
-class DbDirectoryStoreTest
-    extends StoreTest
-    with CNPostgresTest
-    with HasActorSystem
-    with AcsJdbcTypes
-    with AcsTables {
+abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
 
-  "DbDirectoryStore" should {
+  "DirectoryStore" should {
 
     "lookupInstallByUserWithOffset" should {
 
@@ -82,26 +78,6 @@ class DbDirectoryStoreTest
             store.lookupEntryByNameWithOffset("wanted").futureValue.value should be(
               Some(wantedContract)
             )
-          }
-        }
-      }
-
-    }
-
-    "lookupEntryByParty" should {
-
-      "return the first lexicographical entry of the user" in {
-        for {
-          store <- mkStore()
-          unwantedContract = directoryEntry(1, "unwanted")
-          aContract = directoryEntry(2, "a")
-          bContract = directoryEntry(2, "b")
-          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(bContract)(store.multiDomainAcsStore)
-        } yield {
-          eventually() {
-            store.lookupEntryByParty(userParty(2)).futureValue should be(Some(aContract))
           }
         }
       }
@@ -174,7 +150,9 @@ class DbDirectoryStoreTest
     )
   }
 
-  private def directoryEntry(n: Int, name: String) = {
+  var cIdCounter = 0
+  protected def directoryEntry(n: Int, name: String, cId: Int = cIdCounter) = {
+    cIdCounter += 1
     val templateId = DirectoryEntry.TEMPLATE_ID
     val template = new DirectoryEntry(
       userParty(n).toProtoPrimitive,
@@ -184,7 +162,7 @@ class DbDirectoryStoreTest
     )
     Contract(
       identifier = templateId,
-      contractId = new DirectoryEntry.ContractId(s"$domain#$n"),
+      contractId = new DirectoryEntry.ContractId(s"$domain#$cId"),
       payload = template,
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
@@ -239,7 +217,61 @@ class DbDirectoryStoreTest
     )
   }
 
-  private def mkStore(): Future[DbDirectoryStore] = {
+  protected def mkStore(): Future[DirectoryStore]
+
+  lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
+  lazy val domain = dummyDomain.toProtoPrimitive
+}
+
+class InMemoryDirectoryStoreTest extends DirectoryStoreTest {
+  override protected def mkStore(): Future[InMemoryDirectoryStore] = {
+    val store = new InMemoryDirectoryStore(
+      provider,
+      svcParty,
+      GlobalOnlyDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
+      loggerFactory,
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+    )
+    for {
+      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
+      _ <- store.multiDomainAcsStore.ingestionSink
+        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty)
+      _ <- store.domains.ingestionSink.ingestConnectedDomains(
+        Map(DomainAlias.tryCreate(domain) -> dummyDomain)
+      )
+    } yield store
+  }
+}
+
+class DbDirectoryStoreTest
+    extends DirectoryStoreTest
+    with HasActorSystem
+    with CNPostgresTest
+    with AcsJdbcTypes
+    with AcsTables {
+
+  // TODO (#4835): when "then the first one lexicographically is returned" works for in-mem, move to the parent test
+  "lookupEntryByParty" should {
+
+    "return the first lexicographical entry of the user" in {
+      for {
+        store <- mkStore()
+        unwantedContract = directoryEntry(1, "unwanted")
+        bContract = directoryEntry(2, "b")
+        aContract = directoryEntry(2, "a")
+        _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(bContract)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
+      } yield {
+        eventually() {
+          store.lookupEntryByParty(userParty(2)).futureValue should be(Some(aContract))
+        }
+      }
+    }
+
+  }
+
+  override protected def mkStore(): Future[DbDirectoryStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         Seq(
@@ -264,9 +296,6 @@ class DbDirectoryStoreTest
         .ingestAcs(offset.toHexString, Seq.empty, Seq.empty)
     } yield store
   }
-
-  lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
-  lazy val domain = dummyDomain.toProtoPrimitive
 
   override protected def cleanDb(storage: DbStorage): Future[?] =
     for {

@@ -100,7 +100,9 @@ class InMemoryDirectoryStore(
       }
     // Only deliver the ones referencing an active directory entry context
     // TODO(tech-debt): consider whether this kind of join might be leading to stale subscriptions not being expired.
-    result = subscriptionsWithContext.iterator
+    result = subscriptionsWithContext
+      .sortBy(_._1.payload.nextPaymentDueAt)
+      .iterator
       .collect { case (subscription, Some(context)) =>
         DirectoryStore.IdleDirectorySubscription(subscription, context)
       }
