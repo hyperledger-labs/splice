@@ -98,6 +98,8 @@ case class SvAppClientConfig(
 }
 case class CometBftConfig(
     enabled: Boolean = false,
+    // TODO(#5740): Remove the option to disable automation once we're ready to pull that trigger
+    automationEnabled: Boolean = false,
     connectionUri: String = "",
     votingPower: Long = 0,
 )

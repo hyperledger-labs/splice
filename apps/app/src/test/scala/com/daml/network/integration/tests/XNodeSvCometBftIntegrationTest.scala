@@ -32,6 +32,7 @@ class XNodeSvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUt
               Some(
                 CometBftConfig(
                   enabled = true,
+                  automationEnabled = true,
                   votingPower = 1,
                 )
               )

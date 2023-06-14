@@ -22,7 +22,7 @@ import scala.jdk.CollectionConverters.*
   */
 class CometBftNode(
     cometBftClient: CometBftClient,
-    cometBftConfig: CometBftConfig,
+    val cometBftConfig: CometBftConfig,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {

@@ -46,16 +46,18 @@ class SvSvcAutomationService(
 
   // Register optional BFT triggers
   cometBft.foreach { node =>
-    registerTrigger(
-      new PublishLocalCometBftNodeConfigTrigger(triggerContext, svcStore, connection, node)
-    )
-    registerTrigger(
-      new ReconcileCometBftNetworkConfigWithSvcRulesTrigger(
-        triggerContext,
-        svcStore,
-        node,
+    if (node.cometBftConfig.automationEnabled) {
+      registerTrigger(
+        new PublishLocalCometBftNodeConfigTrigger(triggerContext, svcStore, connection, node)
       )
-    )
+      registerTrigger(
+        new ReconcileCometBftNetworkConfigWithSvcRulesTrigger(
+          triggerContext,
+          svcStore,
+          node,
+        )
+      )
+    }
   }
 
   registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
