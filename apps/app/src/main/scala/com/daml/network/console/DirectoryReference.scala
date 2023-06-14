@@ -106,7 +106,7 @@ class DirectoryAppClientReference(
     config.ledgerApi.clientConfig.address,
     config.ledgerApi.clientConfig.port,
     config.ledgerApi.clientConfig.tls,
-    config.ledgerApi.getToken(),
+    config.ledgerApi.getToken().map(_.accessToken),
   )(consoleEnvironment)
 
   override protected val instanceType = "Remote directory"

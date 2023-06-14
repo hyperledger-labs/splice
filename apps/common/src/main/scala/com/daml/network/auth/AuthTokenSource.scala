@@ -4,37 +4,52 @@
 package com.daml.network.auth
 
 import akka.actor.ActorSystem
+import com.daml.network.auth.OAuthApi.TokenResponse
 import com.daml.network.config.AuthTokenSourceConfig
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait AuthTokenSource {
-  def getToken(implicit tc: TraceContext): Future[Option[String]]
+object AuthToken {
+  /* Creates a token that never expires */
+  def apply(accessToken: String): AuthToken =
+    AuthToken(accessToken, CantonTimestamp.MaxValue)
+  def apply(tokenResponse: TokenResponse): AuthToken =
+    AuthToken(
+      tokenResponse.access_token,
+      CantonTimestamp.now().plusMillis(tokenResponse.expiresIn.toMillis),
+    )
+}
+final case class AuthToken(accessToken: String, expiresAt: CantonTimestamp)
+
+sealed trait AuthTokenSource {
+  def getToken(implicit tc: TraceContext): Future[Option[AuthToken]]
 }
 
-class AuthTokenSourceNone() extends AuthTokenSource {
-  override def getToken(implicit tc: TraceContext): Future[Option[String]] = Future.successful(None)
+case class AuthTokenSourceNone() extends AuthTokenSource {
+  override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] =
+    Future.successful(None)
 }
 
-class AuthTokenSourceStatic(
+case class AuthTokenSourceStatic(
     token: String
 ) extends AuthTokenSource {
-  override def getToken(implicit tc: TraceContext): Future[Option[String]] =
-    Future.successful(Some(token))
+  override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] =
+    Future.successful(Some(AuthToken(token)))
 }
 
-class AuthTokenSourceSelfSigned(
+case class AuthTokenSourceSelfSigned(
     audience: String,
     user: String,
     secret: String,
 ) extends AuthTokenSource {
-  override def getToken(implicit tc: TraceContext): Future[Option[String]] =
-    Future.successful(Some(AuthUtil.testTokenSecret(audience, user, secret)))
+  override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] =
+    Future.successful(Some(AuthToken(AuthUtil.testTokenSecret(audience, user, secret))))
 }
 
-class AuthTokenSourceOAuthClientCredentials(
+case class AuthTokenSourceOAuthClientCredentials(
     wellKnownConfigUrl: String,
     clientId: String,
     clientSecret: String,
@@ -43,13 +58,16 @@ class AuthTokenSourceOAuthClientCredentials(
 )(implicit ec: ExecutionContext, ac: ActorSystem)
     extends AuthTokenSource
     with NamedLogging {
-  val oauth = new OAuthApi(loggerFactory)
+  private val oauth = new OAuthApi(loggerFactory)
 
-  override def getToken(implicit tc: TraceContext): Future[Option[String]] =
+  override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] = {
     for {
       wk <- oauth.getWellKnown(wellKnownConfigUrl)
-      token <- oauth.requestToken(wk.token_endpoint, clientId, clientSecret, audience)
-    } yield Some(token)
+      tokenResponse <- oauth.requestToken(wk.token_endpoint, clientId, clientSecret, audience)
+    } yield Some(
+      AuthToken(tokenResponse)
+    )
+  }
 }
 
 object AuthTokenSource {

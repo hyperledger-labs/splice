@@ -9,6 +9,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import spray.json.{DefaultJsonProtocol, *}
 
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Failure
 
@@ -20,7 +22,10 @@ object OAuthApi {
       grant_type: String = "client_credentials",
   )
 
-  final case class TokenResponse(access_token: String)
+  /** expires_in is in seconds */
+  final case class TokenResponse(access_token: String, expires_in: Long) {
+    def expiresIn: FiniteDuration = FiniteDuration(expires_in, TimeUnit.SECONDS)
+  }
 
   // We want to be compatible with a wide range of IAMs so we
   // only include the required fields based on the standard
@@ -36,7 +41,7 @@ object OAuthApi {
 trait OAuthApiJson extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val clientCredentialRequestFormat = jsonFormat4(OAuthApi.ClientCredentialRequest)
   implicit val wellKnownResponseFormat = jsonFormat4(OAuthApi.WellKnownResponse)
-  implicit val tokenResponseFormat = jsonFormat1(OAuthApi.TokenResponse)
+  implicit val tokenResponseFormat = jsonFormat2(OAuthApi.TokenResponse)
 }
 
 class OAuthApi(
@@ -86,7 +91,7 @@ class OAuthApi(
       clientId: String,
       clientSecret: String,
       audience: String,
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TokenResponse] = {
     logger.debug(s"Using OAuth client credentials flow with clientId='$clientId' at $tokenUrl")
 
     val payload = ClientCredentialRequest(clientId, clientSecret, audience).toJson.toString
@@ -104,9 +109,9 @@ class OAuthApi(
 
     for {
       res <- responseFuture
-      body <- decodeAndLog[TokenResponse](res, "OAuth token")
+      tokenResponse <- decodeAndLog[TokenResponse](res, "OAuth token")
     } yield {
-      body.access_token
+      tokenResponse
     }
   }
 }

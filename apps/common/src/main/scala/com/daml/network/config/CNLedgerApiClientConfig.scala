@@ -1,11 +1,10 @@
 package com.daml.network.config
 
 import akka.actor.ActorSystem
-import com.daml.network.auth.AuthTokenSource
+import com.daml.network.auth.{AuthTokenSource, AuthToken}
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
-
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
@@ -19,7 +18,7 @@ case class CNLedgerApiClientConfig(
   // Note: Some places, e.g., Cantons RemoteParticipantConfig expects a static token,
   // CNLedgerApiClientConfig contains information for how to acquire tokens.
   // We need to perform some blocking IO to generate the token here.
-  def getToken()(implicit actorSystem: ActorSystem): Option[String] = {
+  def getToken()(implicit actorSystem: ActorSystem): Option[AuthToken] = {
     implicit val executionContext = actorSystem.dispatcher
     implicit val traceContext = TraceContext.empty
     val loggerFactory = NamedLoggerFactory.root

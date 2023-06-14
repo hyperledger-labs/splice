@@ -84,7 +84,7 @@ final class SplitwellAppClientReference(
       config.participantClient.ledgerApi.clientConfig.address,
       config.participantClient.ledgerApi.clientConfig.port,
       config.participantClient.ledgerApi.clientConfig.tls,
-      config.participantClient.ledgerApi.getToken(),
+      config.participantClient.ledgerApi.getToken().map(_.accessToken),
     )(consoleEnvironment)
 
   override lazy val participantAdminApi =

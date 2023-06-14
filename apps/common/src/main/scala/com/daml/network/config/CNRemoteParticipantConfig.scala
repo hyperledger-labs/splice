@@ -17,8 +17,8 @@ case class CNParticipantClientConfig(
   override def clientLedgerApi: ClientConfig = ledgerApi.clientConfig
 
   def getParticipantClientConfig()(implicit actorSystem: ActorSystem): RemoteParticipantConfig = {
-    val token = ledgerApi.getToken()
-    RemoteParticipantConfig(adminApi, ledgerApi.clientConfig, token)
+    val tokenStrO = ledgerApi.getToken().map(_.accessToken)
+    RemoteParticipantConfig(adminApi, ledgerApi.clientConfig, tokenStrO)
   }
 
   def participantClientConfigWithAdminToken: RemoteParticipantConfig =

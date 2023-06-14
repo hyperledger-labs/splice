@@ -17,6 +17,8 @@ Release Notes
 
 * Removed the ``svc-client`` config parameter from the SV app. The SVC app is no longer used for SV onboarding and initialization.
 
+* Auth0 tokens used in Ledger connections are renewed 2 minutes before they expire.
+
 * Bugfixes
 
   * Fix a bug where the SV and validator app sometimes would stop

@@ -22,6 +22,7 @@ import com.daml.ledger.javaapi.data.{
   User,
 }
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.util.DisclosedContracts
 import com.digitalasset.canton.DomainAlias
@@ -32,6 +33,7 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.emptyTraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration, FieldMask}
 import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
@@ -57,43 +59,50 @@ final case class DedupDuration(duration: Duration) extends DedupConfig
   * 2. They convert to futures and akka sources for akka.
   * All functionality built on top of that is part of CNLedgerConnection.
   */
-class LedgerClient(channel: Channel, token: Option[String])(implicit
+private[environment] class LedgerClient(
+    channel: Channel,
+    getToken: () => Future[Option[AuthToken]],
+)(implicit
     esf: ExecutionSequencerFactory,
     ec: ExecutionContext,
     elc: ErrorLoggingContext,
 ) extends Closeable {
-
   import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest}
 
+  private def withCredentials[T <: AbstractStub[T]](
+      stub: T
+  ): Future[T] = {
+    getToken().map { token =>
+      token.fold(stub) { token =>
+        elc.logger.trace(s"Using token $token for this ledger client")
+        stub.withCallCredentials(new LedgerCallCredentials(token.accessToken))
+      }
+    }
+  }
+
   private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
-    withCredentials(CommandServiceGrpc.newStub(channel), token)
+    CommandServiceGrpc.newStub(channel)
   private val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
-    withCredentials(TransactionServiceGrpc.newStub(channel), token)
+    TransactionServiceGrpc.newStub(channel)
   private val packageServiceStub: PackageServiceGrpc.PackageServiceStub =
-    withCredentials(PackageServiceGrpc.newStub(channel), token)
+    PackageServiceGrpc.newStub(channel)
   private val packageManagementServiceStub
       : PackageManagementServiceGrpc.PackageManagementServiceStub =
-    withCredentials(PackageManagementServiceGrpc.newStub(channel), token)
+    PackageManagementServiceGrpc.newStub(channel)
   private val partyManagementServiceStub: PartyManagementServiceGrpc.PartyManagementServiceStub =
-    withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
+    PartyManagementServiceGrpc.newStub(channel)
   private val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
-    withCredentials(UserManagementServiceGrpc.newStub(channel), token)
+    UserManagementServiceGrpc.newStub(channel)
   private val updateServiceStub: lapi.update_service.UpdateServiceGrpc.UpdateServiceStub =
-    withCredentials(lapi.update_service.UpdateServiceGrpc.stub(channel), token)
+    lapi.update_service.UpdateServiceGrpc.stub(channel)
   private val commandSubmissionServiceStub
       : lapi.command_submission_service.CommandSubmissionServiceGrpc.CommandSubmissionServiceStub =
-    withCredentials(
-      lapi.command_submission_service.CommandSubmissionServiceGrpc.stub(channel),
-      token,
-    )
+    lapi.command_submission_service.CommandSubmissionServiceGrpc.stub(channel)
   private val multidomainCompletionServiceStub
       : lapi.command_completion_service.CommandCompletionServiceGrpc.CommandCompletionServiceStub =
-    withCredentials(
-      lapi.command_completion_service.CommandCompletionServiceGrpc.stub(channel),
-      token,
-    )
+    lapi.command_completion_service.CommandCompletionServiceGrpc.stub(channel)
   private val stateServiceStub: lapi.state_service.StateServiceGrpc.StateServiceStub =
-    withCredentials(lapi.state_service.StateServiceGrpc.stub(channel), token)
+    lapi.state_service.StateServiceGrpc.stub(channel)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -103,39 +112,45 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     futureObserver.promise.future
   }
 
-  private def withCredentials[T <: AbstractStub[T]](
-      stub: T,
-      token: Option[String],
-  ): T = {
-    token.fold(stub)(token => stub.withCallCredentials(new LedgerCallCredentials(token)))
-  }
+  private def toSource[T](f: Future[Source[T, NotUsed]]) =
+    Source.futureSource(f).mapMaterializedValue(_ => NotUsed)
 
   override def close(): Unit = GrpcChannel.close(channel)
 
   def ledgerEnd(): Future[ParticipantOffset.Value.Absolute] = {
     val req = lapi.state_service.GetLedgerEndRequest()
-    stateServiceStub.getLedgerEnd(req).map { resp =>
-      val participantOffset =
-        resp.offset.getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
-      val absolute = participantOffset.value.absolute
-        .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
+    for {
+      stub <- withCredentials(stateServiceStub)
+      offset <- stub.getLedgerEnd(req).map { resp =>
+        val participantOffset =
+          resp.offset
+            .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
+        val absolute = participantOffset.value.absolute
+          .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
 
-      ParticipantOffset.Value.Absolute(absolute)
-    }
+        ParticipantOffset.Value.Absolute(absolute)
+      }
+    } yield offset
   }
 
   def participantLedgerEnd(): Future[LedgerOffset] = {
     val req = TransactionServiceOuterClass.GetLedgerEndRequest.newBuilder.build
-    wrapFuture(
-      transactionServiceStub.getLedgerEnd(req, _)
-    ).map(GetLedgerEndResponse.fromProto(_).getOffset)
+    for {
+      stub <- withCredentials(transactionServiceStub)
+      res <- wrapFuture(stub.getLedgerEnd(req, _))
+        .map(GetLedgerEndResponse.fromProto(_).getOffset)
+    } yield res
   }
 
   def activeContracts(
       request: lapi.state_service.GetActiveContractsRequest
   ): Source[lapi.state_service.GetActiveContractsResponse, NotUsed] =
-    ClientAdapter
-      .serverStreaming(request, stateServiceStub.getActiveContracts)
+    toSource(
+      for {
+        stub <- withCredentials(stateServiceStub)
+      } yield ClientAdapter
+        .serverStreaming(request, stub.getActiveContracts)
+    )
 
   def tryGetTransactionTreeByEventId(
       parties: Seq[String],
@@ -145,18 +160,22 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       .setEventId(id)
       .addAllRequestingParties(parties.asJava)
       .build()
-    wrapFuture(
-      transactionServiceStub
-        .getTransactionByEventId(req, _)
-    ).map { resp =>
-      TransactionTree.fromProto(resp.getTransaction)
-    }
+    for {
+      stub <- withCredentials(transactionServiceStub)
+      res <- wrapFuture(stub.getTransactionByEventId(req, _)).map { resp =>
+        TransactionTree.fromProto(resp.getTransaction)
+      }
+    } yield res
   }
 
   def updates(request: GetUpdatesRequest): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] = {
-    ClientAdapter
-      .serverStreaming(request.toProto, updateServiceStub.getUpdateTrees)
-      .map(GetTreeUpdatesResponse.fromProto)
+    toSource(
+      for {
+        stub <- withCredentials(updateServiceStub)
+      } yield ClientAdapter
+        .serverStreaming(request.toProto, stub.getUpdateTrees)
+        .map(GetTreeUpdatesResponse.fromProto)
+    )
   }
 
   private def submitAndWaitRequest(
@@ -212,10 +231,13 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       commands,
       disclosedContracts,
     )
-    wrapFuture(
-      commandServiceStub
-        .submitAndWaitForTransactionId(request, _)
-    ).map(response => response.getCompletionOffset)
+    for {
+      stub <- withCredentials(commandServiceStub)
+      res <- wrapFuture(
+        stub
+          .submitAndWaitForTransactionId(request, _)
+      ).map(response => response.getCompletionOffset)
+    } yield res
   }
 
   def submitAndWaitForTransaction(
@@ -238,9 +260,12 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       commands,
       disclosedContracts,
     )
-    wrapFuture(
-      commandServiceStub.submitAndWaitForTransaction(request, _)
-    ).map(response => Transaction.fromProto(response.getTransaction))
+    for {
+      stub <- withCredentials(commandServiceStub)
+      res <- wrapFuture(
+        stub.submitAndWaitForTransaction(request, _)
+      ).map(response => Transaction.fromProto(response.getTransaction))
+    } yield res
   }
 
   def submitAndWaitForTransactionTree(
@@ -263,16 +288,22 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       commands,
       disclosedContracts,
     )
-    wrapFuture(
-      commandServiceStub
-        .submitAndWaitForTransactionTree(request, _)
-    ).map(response => TransactionTree.fromProto(response.getTransaction))
+    for {
+      stub <- withCredentials(commandServiceStub)
+      res <- wrapFuture(
+        stub
+          .submitAndWaitForTransactionTree(request, _)
+      ).map(response => TransactionTree.fromProto(response.getTransaction))
+    } yield res
   }
 
   def listPackages()(implicit ec: ExecutionContext): Future[Seq[String]] = {
     val request = PackageServiceOuterClass.ListPackagesRequest.newBuilder().build()
-    wrapFuture(packageServiceStub.listPackages(request, _))
-      .map(_.getPackageIdsList.asScala.toSeq)
+    for {
+      stub <- withCredentials(packageServiceStub)
+      res <- wrapFuture(stub.listPackages(request, _))
+        .map(_.getPackageIdsList.asScala.toSeq)
+    } yield res
   }
 
   def uploadDarFile(darFile: ByteString)(implicit ec: ExecutionContext): Future[Unit] = {
@@ -280,14 +311,20 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       .newBuilder()
       .setDarFile(darFile)
       .build
-    wrapFuture(packageManagementServiceStub.uploadDarFile(request, _)).map(_ => ())
+    for {
+      stub <- withCredentials(packageManagementServiceStub)
+      res <- wrapFuture(stub.uploadDarFile(request, _)).map(_ => ())
+    } yield res
   }
 
   def getUserProto(
       userId: String
   )(implicit ec: ExecutionContext): Future[UserManagementServiceOuterClass.User] = {
     val request = new GetUserRequest(userId).toProto
-    wrapFuture(userManagementServiceStub.getUser(request, _)).map(_.getUser)
+    for {
+      stub <- withCredentials(userManagementServiceStub)
+      res <- wrapFuture(stub.getUser(request, _)).map(_.getUser)
+    } yield res
   }
 
   def getUser(userId: String)(implicit ec: ExecutionContext): Future[User] =
@@ -309,11 +346,14 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       .newBuilder()
     hint.foreach(requestBuilder.setPartyIdHint(_))
     displayName.foreach(requestBuilder.setDisplayName(_))
-    wrapFuture(
-      partyManagementServiceStub
-        .allocateParty(requestBuilder.build, _)
-    )
-      .map(_.getPartyDetails.getParty)
+    for {
+      stub <- withCredentials(partyManagementServiceStub)
+      res <- wrapFuture(
+        stub
+          .allocateParty(requestBuilder.build, _)
+      )
+        .map(_.getPartyDetails.getParty)
+    } yield res
   }
 
   def getParties(
@@ -322,11 +362,14 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     import com.daml.ledger.api.v1.admin.party_management_service.PartyDetails as ScalaPartyDetails
     val requestBuilder = PartyManagementServiceOuterClass.GetPartiesRequest.newBuilder
     requestBuilder.addAllParties(parties.map(_.toProtoPrimitive).asJava)
-    wrapFuture(partyManagementServiceStub.getParties(requestBuilder.build, _)).map(r =>
-      r.getPartyDetailsList.asScala.toSeq.map(details =>
-        PartyDetails.fromProtoPartyDetails(ScalaPartyDetails.fromJavaProto(details))
+    for {
+      stub <- withCredentials(partyManagementServiceStub)
+      res <- wrapFuture(stub.getParties(requestBuilder.build, _)).map(r =>
+        r.getPartyDetailsList.asScala.toSeq.map(details =>
+          PartyDetails.fromProtoPartyDetails(ScalaPartyDetails.fromJavaProto(details))
+        )
       )
-    )
+    } yield res
   }
 
   def createUser(user: User, initialRights: Seq[User.Right])(implicit
@@ -337,9 +380,12 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       case hd +: tl => new CreateUserRequest(user, hd, tl: _*).toProto
       case _ => throw new IllegalArgumentException("createUser requires at least one right")
     }
-    wrapFuture(userManagementServiceStub.createUser(request, _)).map(r =>
-      CreateUserResponse.fromProto(r).getUser
-    )
+    for {
+      stub <- withCredentials(userManagementServiceStub)
+      res <- wrapFuture(stub.createUser(request, _)).map(r =>
+        CreateUserResponse.fromProto(r).getUser
+      )
+    } yield res
   }
 
   def setUserPrimaryParty(userId: String, primaryParty: PartyId)(implicit
@@ -356,16 +402,22 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     val requestBuilder = admin.UserManagementServiceOuterClass.UpdateUserRequest.newBuilder()
     requestBuilder.setUser(user)
     requestBuilder.setUpdateMask(mask)
-    wrapFuture(userManagementServiceStub.updateUser(requestBuilder.build, _))
+    for {
+      stub <- withCredentials(userManagementServiceStub)
+      res <- wrapFuture(stub.updateUser(requestBuilder.build, _))
+    } yield res
   }.map(_ => ())
 
   def listUserRights(userId: String)(implicit
       ec: ExecutionContext
   ): Future[Seq[User.Right]] = {
     val request = new ListUserRightsRequest(userId).toProto
-    wrapFuture(userManagementServiceStub.listUserRights(request, _)).map(r =>
-      ListUserRightsResponse.fromProto(r).getRights.asScala.toSeq
-    )
+    for {
+      stub <- withCredentials(userManagementServiceStub)
+      res <- wrapFuture(stub.listUserRights(request, _)).map(r =>
+        ListUserRightsResponse.fromProto(r).getRights.asScala.toSeq
+      )
+    } yield res
   }
 
   def grantUserRights(userId: String, rights: Seq[User.Right])(implicit
@@ -375,7 +427,10 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       case hd +: tl => new GrantUserRightsRequest(userId, hd, tl: _*).toProto
       case _ => throw new IllegalArgumentException("grantUserRights requires at least one right")
     }
-    wrapFuture(userManagementServiceStub.grantUserRights(request, _)).map(_ => ())
+    for {
+      stub <- withCredentials(userManagementServiceStub)
+      res <- wrapFuture(stub.grantUserRights(request, _)).map(_ => ())
+    } yield res
   }
 
   def revokeUserRights(userId: String, rights: Seq[User.Right])(implicit
@@ -385,7 +440,10 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       case hd +: tl => new RevokeUserRightsRequest(userId, hd, tl: _*).toProto
       case _ => throw new IllegalArgumentException("revokeUserRights requires at least one right")
     }
-    wrapFuture(userManagementServiceStub.revokeUserRights(request, _)).map(_ => ())
+    for {
+      stub <- withCredentials(userManagementServiceStub)
+      res <- wrapFuture(stub.revokeUserRights(request, _)).map(_ => ())
+    } yield res
   }
 
   def submitTransfer(
@@ -395,33 +453,40 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       submitter: PartyId,
       command: LedgerClient.TransferCommand,
   ): Future[Unit] =
-    commandSubmissionServiceStub
-      .submitReassignment(
-        LedgerClient
-          .TransferSubmitRequest(
-            applicationId,
-            commandId,
-            submissionId,
-            submitter,
-            command,
-          )
-          .toProto
-      )
-      .map((_: lapi.command_submission_service.SubmitReassignmentResponse) => ())
+    for {
+      stub <- withCredentials(commandSubmissionServiceStub)
+      res <- stub
+        .submitReassignment(
+          LedgerClient
+            .TransferSubmitRequest(
+              applicationId,
+              commandId,
+              submissionId,
+              submitter,
+              command,
+            )
+            .toProto
+        )
+        .map((_: lapi.command_submission_service.SubmitReassignmentResponse) => ())
+    } yield res
 
   def completions(
       applicationId: String,
       parties: Seq[PartyId],
       begin: Option[ParticipantOffset],
   ): Source[CompletionStreamResponse, NotUsed] =
-    ClientAdapter.serverStreaming(
-      lapi.command_completion_service.CompletionStreamRequest(
-        applicationId = applicationId,
-        parties = parties.map(_.toProtoPrimitive),
-        beginExclusive = begin,
-      ),
-      multidomainCompletionServiceStub.completionStream,
-    ) map CompletionStreamResponse.fromProto
+    toSource(
+      for {
+        stub <- withCredentials(multidomainCompletionServiceStub)
+      } yield ClientAdapter.serverStreaming(
+        lapi.command_completion_service.CompletionStreamRequest(
+          applicationId = applicationId,
+          parties = parties.map(_.toProtoPrimitive),
+          beginExclusive = begin,
+        ),
+        stub.completionStream,
+      ) map CompletionStreamResponse.fromProto
+    )
 
   def getConnectedDomains(
       party: PartyId
@@ -429,11 +494,14 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     val req = lapi.state_service.GetConnectedDomainsRequest(
       party = party.toProtoPrimitive
     )
-    stateServiceStub.getConnectedDomains(req).map { resp =>
-      resp.connectedDomains.map { cd =>
-        DomainAlias.tryCreate(cd.domainAlias) -> DomainId.tryFromString(cd.domainId)
-      }.toMap
-    }
+    for {
+      stub <- withCredentials(stateServiceStub)
+      res <- stub.getConnectedDomains(req).map { resp =>
+        resp.connectedDomains.map { cd =>
+          DomainAlias.tryCreate(cd.domainAlias) -> DomainId.tryFromString(cd.domainId)
+        }.toMap
+      }
+    } yield res
   }
 }
 

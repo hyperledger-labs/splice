@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.Directive0
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.HttpRequestLogger
-import com.daml.network.auth.AuthTokenSource
+import com.daml.network.auth.{AuthTokenManager, AuthTokenSource, AuthTokenSourceNone}
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -23,7 +23,7 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.time.HasUptime
+import com.digitalasset.canton.time.{HasUptime, WallClock}
 import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -174,22 +174,30 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
       participantClient.ledgerApi.authConfig,
       loggerFactory,
     )
-    token <- retryProvider.retryForAutomation(
-      "Acquiring initial auth token",
-      authTokenSource.getToken,
-      logger,
-    )
   } yield {
-    logger.debug(s"Using token $token for this ledger client")
+    // AuthTokenSourceNone source does not work with AuthTokenManager which re-requests on None result
+    val getToken = authTokenSource match {
+      case none: AuthTokenSourceNone => none.getToken
+      case other =>
+        val clock = new WallClock(timeouts, loggerFactory)
+        val getT = new AuthTokenManager(
+          () => other.getToken,
+          this.isClosing,
+          clock,
+          loggerFactory,
+        ).getToken
+        retryProvider.retryForAutomation(
+          "Acquiring auth token",
+          getT,
+          logger,
+        )
+    }
+
     new CNLedgerClient(
       participantClient.ledgerApi.clientConfig,
       // Note: When ledger API auth is enabled, application ID must be equal to user ID
       serviceUser,
-      // TODO(#1596): Make sure the client correctly refreshes tokens.
-      //  E.g., by adding something like [[com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenManager]] to
-      //  automatically re-fetch tokens shortly before they expire and then a [[io.grpc.ClientInterceptor]] to add the current token
-      //  to all requests.
-      token,
+      () => getToken,
       timeouts,
       parameters.loggingConfig.api,
       loggerFactory,

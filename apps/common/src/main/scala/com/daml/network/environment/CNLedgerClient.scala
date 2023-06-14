@@ -3,6 +3,7 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.client.ApiClientRequestLogger
+import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelConfiguration
@@ -18,7 +19,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class CNLedgerClient(
     config: ClientConfig,
     applicationId: String,
-    token: Option[String],
+    getToken: () => Future[Option[AuthToken]],
     override protected val timeouts: ProcessingTimeout,
     apiLoggingConfig: ApiLoggingConfig,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -31,7 +32,6 @@ class CNLedgerClient(
     elc: ErrorLoggingContext,
 ) extends FlagCloseable
     with NamedLogging {
-
   private val client = {
     val clientChannelConfig = LedgerClientChannelConfiguration(
       sslContext = config.tls.map(x => ClientChannelBuilder.sslContext(x)),
@@ -40,7 +40,6 @@ class CNLedgerClient(
       // the participants should agree on a lower limit and enforce that through domain parameters.
       maxInboundMessageSize = Int.MaxValue,
     )
-
     val builder = clientChannelConfig
       .builderFor(config.address, config.port.unwrap)
       .executor(ec)
@@ -50,8 +49,7 @@ class CNLedgerClient(
       )
 
     val channel = builder.build
-
-    new LedgerClient(channel, token)
+    new LedgerClient(channel, getToken)
   }
 
   private val callbacks = new AtomicReference[Seq[String => Unit]](Seq())
