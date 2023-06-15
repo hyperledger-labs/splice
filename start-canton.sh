@@ -88,87 +88,99 @@ rm -f canton*.tokens
 # Start Postgres
 ./scripts/postgres.sh "$POSTGRES_MODE" start
 
+db_names=()
 if [ $wallclocktime -eq 1 ] && [ $x -eq 0 ]; then
-  # Create new databases (one for each node used in `simple-topology-canton.conf`)
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_svc"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv2"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv3"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv4"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "self_hosted_participant"
+  # One DB for each node used in `simple-topology-canton.conf`)
+  db_names+=(
+    "participant_svc"
+    "participant_alice"
+    "participant_bob"
+    "participant_splitwell"
+    "participant_sv2"
+    "participant_sv3"
+    "participant_sv4"
+    "domain_global"
+    "domain_splitwell"
+    "domain_splitwell_upgrade"
+    "self_hosted_participant"
+  )
 fi
 
 if [ $simtime -eq 1 ] && [ $x -eq 0 ]; then
-  # Create new databases (one for each node used in `simple-topology-canton-simtime.conf`)
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_svc_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv2_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv3_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv4_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_global_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_splitwell_upgrade_simtime"
+  # One DB for each node used in `simple-topology-canton-simtime.conf`)
+  db_names+=(
+    "participant_svc_simtime"
+    "participant_alice_simtime"
+    "participant_bob_simtime"
+    "participant_splitwell_simtime"
+    "participant_sv2_simtime"
+    "participant_sv3_simtime"
+    "participant_sv4_simtime"
+    "domain_global_simtime"
+    "domain_splitwell_simtime"
+    "domain_splitwell_upgrade_simtime"
+  )
 fi
 
 if [ $wallclocktime -eq 1 ] && [ $x -eq 1 ]; then
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv1_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv2_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv3_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv4_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_splitwell"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_splitwell_upgrade"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv1_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv2_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv3_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv4_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_splitwell_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_splitwell_upgrade_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv1_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv2_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv3_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv4_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_splitwell_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_splitwell_upgrade_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell_x"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "self_hosted_participant"
+  db_names+=(
+    "participant_sv1_x"
+    "participant_sv2_x"
+    "participant_sv3_x"
+    "participant_sv4_x"
+    "sequencer_driver"
+    "sequencer_driver_splitwell"
+    "sequencer_driver_splitwell_upgrade"
+    "sequencer_sv1_x"
+    "sequencer_sv2_x"
+    "sequencer_sv3_x"
+    "sequencer_sv4_x"
+    "sequencer_splitwell_x"
+    "sequencer_splitwell_upgrade_x"
+    "mediator_sv1_x"
+    "mediator_sv2_x"
+    "mediator_sv3_x"
+    "mediator_sv4_x"
+    "mediator_splitwell_x"
+    "mediator_splitwell_upgrade_x"
+    "participant_alice_x"
+    "participant_bob_x"
+    "participant_splitwell_x"
+    "self_hosted_participant"
+  )
 fi
-
 
 if [ $simtime -eq 1 ] && [ $x -eq 1 ]; then
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv1_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv2_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv3_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_sv4_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_splitwell_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_driver_splitwell_upgrade_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv1_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv2_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv3_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_sv4_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_splitwell_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "sequencer_splitwell_upgrade_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv1_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv2_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv3_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_sv4_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_splitwell_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "mediator_splitwell_upgrade_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_x_simtime"
-  ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwell_x_simtime"
+  db_names+=(
+    "participant_sv1_x_simtime"
+    "participant_sv2_x_simtime"
+    "participant_sv3_x_simtime"
+    "participant_sv4_x_simtime"
+    "sequencer_driver_simtime"
+    "sequencer_driver_splitwell_simtime"
+    "sequencer_driver_splitwell_upgrade_simtime"
+    "sequencer_sv1_x_simtime"
+    "sequencer_sv2_x_simtime"
+    "sequencer_sv3_x_simtime"
+    "sequencer_sv4_x_simtime"
+    "sequencer_splitwell_x_simtime"
+    "sequencer_splitwell_upgrade_x_simtime"
+    "mediator_sv1_x_simtime"
+    "mediator_sv2_x_simtime"
+    "mediator_sv3_x_simtime"
+    "mediator_sv4_x_simtime"
+    "mediator_splitwell_x_simtime"
+    "mediator_splitwell_upgrade_x_simtime"
+    "participant_alice_x_simtime"
+    "participant_bob_x_simtime"
+    "participant_splitwell_x_simtime"
+  )
 fi
 
+# Create the DB's in parallel
+printf '%s\n' "${db_names[@]}" | xargs -P 64 -I {} ./scripts/postgres.sh "$POSTGRES_MODE" createdb {}
+
+# Tmux session setup
 function tmux_cmd() {
   local title=$1
   local cmd=$2
