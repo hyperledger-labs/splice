@@ -1,4 +1,0 @@
-{{ $_ := required ".Release.Namespace is required." .Release.Namespace }}
-
-{{ $_ := required ".Values.cluster.imageTag is required." (.Values.cluster).imageTag }}
-{{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}

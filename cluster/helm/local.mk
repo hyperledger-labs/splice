@@ -3,7 +3,6 @@ app_charts := \
 	cn-cluster-ingress-sv \
 	cn-cluster-loopback-gateway \
 	cn-cometbft \
-	cn-directory-web-ui \
 	cn-docs \
 	cn-domain \
 	cn-istio-fwd \

@@ -318,6 +318,28 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "name": "cn-app-directory-ui-auth",
+        "namespace": "splitwell"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-splitwell-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
         "name": "cn-app-wallet-ui-auth",
         "namespace": "splitwell"
       },
@@ -330,6 +352,28 @@
       }
     },
     "name": "auth0-ui-secret-splitwell-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ui-auth",
+        "namespace": "sv-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-1-directory",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -384,6 +428,28 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "name": "cn-app-directory-ui-auth",
+        "namespace": "sv-2"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-2-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
         "name": "cn-app-sv-ui-auth",
         "namespace": "sv-2"
       },
@@ -428,6 +494,28 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
+        "name": "cn-app-directory-ui-auth",
+        "namespace": "sv-3"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cgxHguMv32JLeew9S6wBDgNPHmPCIKaP",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-3-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
         "name": "cn-app-sv-ui-auth",
         "namespace": "sv-3"
       },
@@ -462,6 +550,28 @@
       }
     },
     "name": "auth0-ui-secret-sv-3-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ui-auth",
+        "namespace": "sv-4"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "VoSuAamXhvwISHGgaCtULYmbRIWbQeTb",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-4-directory",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -2809,69 +2919,6 @@
       }
     },
     "name": "helm-svc-svc",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-directory-web-ui/",
-      "compat": "true",
-      "name": "directory-web-ui",
-      "namespace": "validator1",
-      "timeout": 300,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "34.70.160.201/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32",
-              "104.198.172.213/32",
-              "34.70.176.204/32",
-              "20.250.62.34/32",
-              "3.248.162.60/32",
-              "34.254.73.185/32",
-              "54.228.250.8/32",
-              "52.50.252.242/32",
-              "52.210.114.82/32",
-              "34.31.226.101/32"
-            ],
-            "jvmHeapMemoryFactor": 0.75,
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "xNodes": false
-      }
-    },
-    "name": "helm-validator1-directory-web-ui",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },

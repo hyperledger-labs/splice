@@ -73,7 +73,7 @@ Ensure that your local helm installation has access to the Digital Asset Helm ch
         --username ${ARTIFACTORY_USER} \
         --password ${ARTIFACTORY_PASSWORD}
 
-Create the application namespace within Kubernetes and ensure is has image pull credentials for fetching images from the Digital Asset Artifactory repository used for Docker images.
+Create the application namespace within Kubernetes and ensure it has image pull credentials for fetching images from the Digital Asset Artifactory repository used for Docker images.
 
 .. code-block:: bash
 
@@ -218,6 +218,13 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
    - In steps c and d, use the URL for your SV's *wallet* UI.
      If you're using the ingress configuration of this runbook, that would be ``https://wallet.sv.svc.YOUR_HOSTNAME``.
 
+6. Create an Auth0 Application for the directory web UI.
+   Repeat all steps described in step 5, with following modifications:
+
+   - In step b, use ``Directory web UI`` as the name of your application.
+   - In steps c and d, use the URL for your SV's *directory* UI.
+     If you're using the ingress configuration of this runbook, that would be ``https://directory.sv.svc.YOUR_CLUSTER_URL``.
+
 Please refer to Auth0's `own documentation on user management <https://auth0.com/docs/manage-users>`_ for pointers on how to set up end-user accounts for the two web UI applications you created.
 Note that you will need to create at least one such user account for completing the steps in :ref:`helm-sv-install` - for being able to log in as your SV node's administrator.
 You will be asked to obtain the user identifier for this user account.
@@ -235,6 +242,7 @@ SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
 SV_CLIENT_SECRET        The client secret of the Auth0 app for the SV app backend
 WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
 SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
+DIRECTORY_UI_CLIENT_ID  The client id of the Auth0 app for the directory UI.
 ======================= ===========================================================================
 
 The ``AUTH0_TENANT_NAME`` is the name of your Auth0 tenant as shown at the top left of your Auth0 project.
@@ -428,7 +436,8 @@ The following routes should be configured in your cluster ingress controller:
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``scan-web-ui`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/v0/scan/*`` should be routed to port 5012 in pod ``scan-app`` in the ``sv`` namespace
 * ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol
-
+* ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``directory-web-ui`` in the ``sv`` namespace
+* ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*`` should be routed to port 7575 in pod ``participant`` in the ``sv`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have
@@ -539,6 +548,21 @@ Once logged in one should see the transactions page.
 .. image:: images/wallet_home.png
   :width: 600
   :alt: After logged in into the wallet UI
+
+.. _helm-directory-web-ui:
+
+Logging into the directory UI
+-----------------------------
+
+You can open your browser at
+https://wallet.sv.svc.YOUR_HOSTNAME and login using the
+credentials for the user that you configured as
+``validatorWalletUser`` earlier. You will be able to register a name on the
+Canton Name Service.
+
+.. image:: images/directory_home.png
+  :width: 600
+  :alt: After logged in into the Directory UI
 
 .. _local-sv-web-ui:
 

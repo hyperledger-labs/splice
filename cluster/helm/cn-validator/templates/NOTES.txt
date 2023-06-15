@@ -1,1 +1,1 @@
-Canton Network Validator Backend and Wallet Web UI
+Canton Network Validator Backend, Wallet Web UI and Directory Web UI

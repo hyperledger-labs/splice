@@ -14,6 +14,7 @@ const validatorAuth0ClientId = 'uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr';
 const validatorAuth0Secret = auth0.Client.get('validator', validatorAuth0ClientId).clientSecret;
 const walletUIClientId = 'l9MS11POtbvPaVvgzns3Tdj9IDnosLwl';
 const svUIClientId = '8S8o4U6OYWWuw5vPCIpFQGzzWM2IpHkx';
+const directoryClientId = 'iwZgud30aDMMUYpZc5caSnjNATWwITzp';
 
 function participantSecret(
   ns: ExactNamespace,
@@ -159,6 +160,10 @@ export function createSvValidatorSecrets(ns: ExactNamespace): AppAndUiSecrets {
     appSecret: appSecret(ns, 'validator', validatorAuth0ClientId, validatorAuth0Secret),
     uiSecret: uiSecret(ns, 'wallet-ui', walletUIClientId),
   };
+}
+
+export function createSvDirectoryUiSecrets(ns: ExactNamespace): k8s.core.v1.Secret {
+  return uiSecret(ns, 'directory-ui', directoryClientId);
 }
 
 export function createSvAppSecrets(ns: ExactNamespace): AppAndUiSecrets {

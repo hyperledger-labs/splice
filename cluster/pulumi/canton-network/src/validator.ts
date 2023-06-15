@@ -33,10 +33,6 @@ export async function installValidator(
     [auth0UserNameEnvVar('validator')]
   );
 
-  installCNHelmChart(xns, 'directory-web-ui', 'cn-directory-web-ui', {}, [
-    await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
-  ]);
-
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [
     await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
@@ -47,6 +43,7 @@ export async function installValidator(
     participant,
     await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
     await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
+    await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
   ];
 
   return installCNHelmChart(

@@ -880,7 +880,7 @@ After setting that first refresh the secrets. This will not set client
 id and secret but instead query auth0 for an m2m token and set that:
 
 ```
-cncluster update_secret
+cncluster update_secrets
 ```
 
 After that, you can now apply the manifest (while still keeping the environment variable set).

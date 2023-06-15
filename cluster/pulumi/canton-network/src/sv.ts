@@ -116,6 +116,7 @@ export async function installSvNode(
     await installAuth0UISecret(auth0Client, xns, 'sv', nodename),
     await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
     await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
+    await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
   ].concat(
     joinWithKey ? [installSvKeySecret(xns, joinWithKey.publicKey, joinWithKey.privateKey)] : []
   );

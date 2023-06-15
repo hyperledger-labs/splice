@@ -6,6 +6,7 @@ import { installLoopback } from './loopback';
 import {
   createSvAppSecrets,
   createSvValidatorSecrets,
+  createSvDirectoryUiSecrets,
   /*configureSecrets, */
   directoryUserParticipantSecret,
   imagePullSecret,
@@ -102,6 +103,7 @@ const validatorValues = loadYamlFromFile(
 );
 
 const svValidatorSecrets = createSvValidatorSecrets(svNamespace);
+const svDirectoryUiSecrets = createSvDirectoryUiSecrets(svNamespace);
 
 const validator = installCNSVHelmChart(
   svNamespace,
@@ -113,6 +115,7 @@ const validator = installCNSVHelmChart(
   svImagePullDeps
     .concat([participant])
     .concat([svValidatorSecrets.appSecret, svValidatorSecrets.uiSecret])
+    .concat([svDirectoryUiSecrets])
 );
 
 const svValues = loadYamlFromFile(
