@@ -63,4 +63,7 @@ MEDIATOR_INVALID_MESSAGE.*Received a mediator response.*with an unknown request 
 # TODO(#5753) Remove once the issue is fixed in Canton
 ACS_COMMITMENT_MISMATCH.*The local commitment does not match the remote commitment
 
+# TODO(#5763) Remove this once this is fixed in Canton
+LOCAL_VERDICT_MALFORMED_REQUEST.*Received a request.*with a view that is not correctly authorized
+
 # Make sure to have a trailing newline
