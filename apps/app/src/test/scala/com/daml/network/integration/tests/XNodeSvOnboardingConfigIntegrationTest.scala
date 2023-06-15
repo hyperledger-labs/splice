@@ -19,7 +19,7 @@ class XNodeSvOnboardingConfigIntegrationTest extends CNNodeIntegrationTest with 
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .fromResources(
-        Seq("simple-topology.conf", "include/svs/sv1-onboarded.conf", "x-node-overrides.conf"),
+        Seq("simple-topology.conf", "include/svs/sv1-onboarded.conf"),
         this.getClass.getSimpleName,
       )
       .withAllocatedValidatorUsers()

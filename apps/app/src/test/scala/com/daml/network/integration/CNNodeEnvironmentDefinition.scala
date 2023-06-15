@@ -208,7 +208,7 @@ case class CNNodeEnvironmentDefinition(
 
 object CNNodeEnvironmentDefinition {
   def simpleTopologyXDistributedDomain(testName: String): CNNodeEnvironmentDefinition =
-    fromResources(Seq("simple-topology.conf", "x-node-overrides.conf"), testName)
+    fromResources(Seq("simple-topology.conf"), testName)
       .withAllocatedValidatorUsers()
       .withAllocatedSvUsers()
       .withInitializedNodes()

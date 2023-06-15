@@ -9,8 +9,6 @@ function usage() {
   echo "  -p postgres_mode postgres mode used in scripts/postgres.sh, default 'docker'"
   echo "  -w               only start canton instance with wall clock time"
   echo "  -s               only start canton instance with simulated time"
-  echo "  -m               start canton with a minimal topology for frontend testing"
-  echo "  -x               use experimental canton x instances instead of the default nodes"
   echo "  -b               start canton to test BFT domain operations. In that case, the participants are not automatically connected to the domain"
   echo "  -t               start canton with traffic control enabled"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
@@ -20,14 +18,13 @@ function usage() {
 daemon=0
 wallclocktime=1
 simtime=1
-x=0
 POSTGRES_MODE=docker
 CANTON=canton
 bft=0
 trafficQoS=0
 bootstrapScriptPath=bootstrap-canton.sc
 
-while getopts "hdap:c:wsmxbt" arg; do
+while getopts "hdap:c:wsbt" arg; do
   case ${arg} in
     h)
       usage
@@ -47,14 +44,6 @@ while getopts "hdap:c:wsmxbt" arg; do
       wallclocktime=0
       echo "starting canton with simulated time only"
       ;;
-    m)
-      bootstrapScriptPath=bootstrap-canton-minimal.sc
-      echo "starting canton with with minimal topology for frontend test"
-      ;;
-    x)
-      x=1
-      echo "starting canton using x nodes"
-      ;;
     c)
       CANTON="${OPTARG}"
       echo "using custom canton binary: $CANTON"
@@ -64,7 +53,6 @@ while getopts "hdap:c:wsmxbt" arg; do
       echo "start canton to test bft domain, not connecting participants to global domain"
       ;;
     t)
-      x=1
       trafficQoS=1
       echo "start canton with traffic control enabled"
       ;;
@@ -89,91 +77,58 @@ rm -f canton*.tokens
 ./scripts/postgres.sh "$POSTGRES_MODE" start
 
 db_names=()
-if [ $wallclocktime -eq 1 ] && [ $x -eq 0 ]; then
-  # One DB for each node used in `simple-topology-canton.conf`)
+if [ $wallclocktime -eq 1 ]; then
   db_names+=(
-    "participant_svc"
-    "participant_alice"
-    "participant_bob"
-    "participant_splitwell"
+    "participant_sv1"
     "participant_sv2"
     "participant_sv3"
     "participant_sv4"
-    "domain_global"
-    "domain_splitwell"
-    "domain_splitwell_upgrade"
-    "self_hosted_participant"
-  )
-fi
-
-if [ $simtime -eq 1 ] && [ $x -eq 0 ]; then
-  # One DB for each node used in `simple-topology-canton-simtime.conf`)
-  db_names+=(
-    "participant_svc_simtime"
-    "participant_alice_simtime"
-    "participant_bob_simtime"
-    "participant_splitwell_simtime"
-    "participant_sv2_simtime"
-    "participant_sv3_simtime"
-    "participant_sv4_simtime"
-    "domain_global_simtime"
-    "domain_splitwell_simtime"
-    "domain_splitwell_upgrade_simtime"
-  )
-fi
-
-if [ $wallclocktime -eq 1 ] && [ $x -eq 1 ]; then
-  db_names+=(
-    "participant_sv1_x"
-    "participant_sv2_x"
-    "participant_sv3_x"
-    "participant_sv4_x"
     "sequencer_driver"
     "sequencer_driver_splitwell"
     "sequencer_driver_splitwell_upgrade"
-    "sequencer_sv1_x"
-    "sequencer_sv2_x"
-    "sequencer_sv3_x"
-    "sequencer_sv4_x"
-    "sequencer_splitwell_x"
-    "sequencer_splitwell_upgrade_x"
-    "mediator_sv1_x"
-    "mediator_sv2_x"
-    "mediator_sv3_x"
-    "mediator_sv4_x"
-    "mediator_splitwell_x"
-    "mediator_splitwell_upgrade_x"
-    "participant_alice_x"
-    "participant_bob_x"
-    "participant_splitwell_x"
+    "sequencer_sv1"
+    "sequencer_sv2"
+    "sequencer_sv3"
+    "sequencer_sv4"
+    "sequencer_splitwell"
+    "sequencer_splitwell_upgrade"
+    "mediator_sv1"
+    "mediator_sv2"
+    "mediator_sv3"
+    "mediator_sv4"
+    "mediator_splitwell"
+    "mediator_splitwell_upgrade"
+    "participant_alice"
+    "participant_bob"
+    "participant_splitwell"
     "self_hosted_participant"
   )
 fi
 
-if [ $simtime -eq 1 ] && [ $x -eq 1 ]; then
+if [ $simtime -eq 1 ]; then
   db_names+=(
-    "participant_sv1_x_simtime"
-    "participant_sv2_x_simtime"
-    "participant_sv3_x_simtime"
-    "participant_sv4_x_simtime"
+    "participant_sv1_simtime"
+    "participant_sv2_simtime"
+    "participant_sv3_simtime"
+    "participant_sv4_simtime"
     "sequencer_driver_simtime"
     "sequencer_driver_splitwell_simtime"
     "sequencer_driver_splitwell_upgrade_simtime"
-    "sequencer_sv1_x_simtime"
-    "sequencer_sv2_x_simtime"
-    "sequencer_sv3_x_simtime"
-    "sequencer_sv4_x_simtime"
-    "sequencer_splitwell_x_simtime"
-    "sequencer_splitwell_upgrade_x_simtime"
-    "mediator_sv1_x_simtime"
-    "mediator_sv2_x_simtime"
-    "mediator_sv3_x_simtime"
-    "mediator_sv4_x_simtime"
-    "mediator_splitwell_x_simtime"
-    "mediator_splitwell_upgrade_x_simtime"
-    "participant_alice_x_simtime"
-    "participant_bob_x_simtime"
-    "participant_splitwell_x_simtime"
+    "sequencer_sv1_simtime"
+    "sequencer_sv2_simtime"
+    "sequencer_sv3_simtime"
+    "sequencer_sv4_simtime"
+    "sequencer_splitwell_simtime"
+    "sequencer_splitwell_upgrade_simtime"
+    "mediator_sv1_simtime"
+    "mediator_sv2_simtime"
+    "mediator_sv3_simtime"
+    "mediator_sv4_simtime"
+    "mediator_splitwell_simtime"
+    "mediator_splitwell_upgrade_simtime"
+    "participant_alice_simtime"
+    "participant_bob_simtime"
+    "participant_splitwell_simtime"
   )
 fi
 
@@ -207,45 +162,23 @@ if [ $trafficQoS -eq 1 ]; then
 fi
 
 if [ $wallclocktime -eq 1 ]; then
-  if [ $x -eq 0 ]; then
-    tmux_cmd canton-wallclocktime \
-      "CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
-        -c ./apps/app/src/test/resources/simple-topology-canton.conf $config_overrides \
-        --log-level-canton=DEBUG \
-        --log-encoder json \
-        --log-file-name log/canton.clog \
-        --bootstrap $bootstrapScriptPath"
-  else
-    # For now we reuse canton.tokens here which makes it not possible to run the wallclock canton and X node canton at the same time.
-    tmux_cmd canton-x \
-      "CANTON_TOKEN_FILENAME=canton.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
-        -c ./apps/app/src/test/resources/simple-topology-canton-x.conf $config_overrides \
-        --log-level-canton=DEBUG \
-        --log-encoder json \
-        --log-file-name log/canton-x.clog \
-        --bootstrap bootstrap-canton-x.sc"
-  fi
+ tmux_cmd canton \
+   "CANTON_TOKEN_FILENAME=canton.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+     -c ./apps/app/src/test/resources/simple-topology-canton.conf $config_overrides \
+     --log-level-canton=DEBUG \
+     --log-encoder json \
+     --log-file-name log/canton.clog \
+     --bootstrap $bootstrapScriptPath"
 fi
 
 if [ $simtime -eq 1 ]; then
-  if [ $x -eq 0 ]; then
-    tmux_cmd canton-simtime \
-      "CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\"  $CANTON \
-        -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf $config_overrides \
-        --log-level-canton=DEBUG \
-        --log-encoder json \
-        --log-file-name log/canton-simtime.clog \
-        --bootstrap $bootstrapScriptPath"
-  else
-    # For now we reuse canton-simtime.tokens here which makes it not possible to run the simtime canton and X node canton at the same time.
-    tmux_cmd canton-x-simtime \
-      "CANTON_TOKEN_FILENAME=canton-simtime.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
-        -c ./apps/app/src/test/resources/simple-topology-canton-x-simtime.conf $config_overrides \
-        --log-level-canton=DEBUG \
-        --log-encoder json \
-        --log-file-name log/canton-x-simtime.clog \
-        --bootstrap bootstrap-canton-x.sc"
-  fi
+ tmux_cmd canton-simtime \
+   "CANTON_TOKEN_FILENAME=canton-simtime.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+     -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf $config_overrides \
+     --log-level-canton=DEBUG \
+     --log-encoder json \
+     --log-file-name log/canton-simtime.clog \
+     --bootstrap $bootstrapScriptPath"
 fi
 
 

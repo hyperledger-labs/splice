@@ -1685,7 +1685,7 @@ workflows:
           - slack-context
         name: "scala_test x nodes wall clock time"
         test_names_file: "test-full-class-names-xnode.log"
-        start_canton_options: "-d -p external -x -w"
+        start_canton_options: "-d -p external -w"
         resource_class: "2xlarge"
         parallelism: 8
     - scala_test:
@@ -1696,7 +1696,7 @@ workflows:
           - slack-context
         name: "scala_test x nodes sim time"
         test_names_file: "test-full-class-names-xnode-sim-time.log"
-        start_canton_options: "-d -p external -x -s"
+        start_canton_options: "-d -p external -s"
         resource_class: "2xlarge"
         parallelism: 4
     - scala_test:
@@ -1707,7 +1707,7 @@ workflows:
           - slack-context
         name: "scala_test x nodes frontend wall clock time"
         test_names_file: "test-full-class-names-xnode-frontend.log"
-        start_canton_options: "-d -p external -x -w"
+        start_canton_options: "-d -p external -w"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
@@ -1720,7 +1720,7 @@ workflows:
           - slack-context
         name: "scala_test x nodes frontend sim time"
         test_names_file: "test-full-class-names-xnode-frontend-sim-time.log"
-        start_canton_options: "-d -p external -x -s"
+        start_canton_options: "-d -p external -s"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
@@ -1733,7 +1733,7 @@ workflows:
           - slack-context
         name: "scala_test x nodes distributed domain wall clock time"
         test_names_file: "test-full-class-names-xnode-distributed-domain.log"
-        start_canton_options: "-d -p external -x -w -b"
+        start_canton_options: "-d -p external -w -b"
         resource_class: "2xlarge"
         parallelism: 1
     - scala_test:
@@ -1744,7 +1744,7 @@ workflows:
           - slack-context
         name: "scala_test x nodes domain fees sim time"
         test_names_file: "test-full-class-names-xnode-domain-fees-sim-time.log"
-        start_canton_options: "-d -p external -x -s -t"
+        start_canton_options: "-d -p external -s -t"
         resource_class: "2xlarge+"
         parallelism: 1
     - bundle:

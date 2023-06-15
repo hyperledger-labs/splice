@@ -1,47 +1,168 @@
 import scala.collection.mutable.ListBuffer
 
+import cats.syntax.either._
+import cats.syntax.functorFilter._
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
+import com.digitalasset.canton.console.LocalInstanceReferenceX
+import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
+import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
 println("Running canton bootstrap script...")
 
-Seq(global, splitwell, splitwellUpgrade).foreach(domain =>
-  // Reduce participant response timeout to force faster timeouts in particular around time changes in simtime.
-  // See #3186
-  domain.service.update_dynamic_domain_parameters(
-    _.update(participantResponseTimeout = NonNegativeFiniteDuration.ofSeconds(10))
-  )
+val domainParametersConfig = DomainParametersConfig(
+  protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
+  devVersionSupport = true,
+  uniqueContractKeys = false,
 )
 
-println("Connecting all participants to global domain...")
-participants.all.domains.connect_local(global)
+def staticParameters(sequencer: LocalInstanceReferenceX) =
+  domainParametersConfig
+    .toStaticDomainParameters(sequencer.config.crypto)
+    .flatMap(StaticDomainParameters(_).leftMap(_.toString))
+    .getOrElse(sys.error("whatever"))
+
+if (System.getenv("BFT") != "1") {
+  println("Bootstrapping global domain")
+
+  def identityTransactions(
+      node: LocalInstanceReferenceX
+  ): Seq[GenericSignedTopologyTransactionX] = {
+    val codes = Set(NamespaceDelegationX.code, OwnerToKeyMappingX.code)
+    node.topology.transactions
+      .list(filterAuthorizedKey = Some(node.id.uid.namespace.fingerprint))
+      .result
+      .map(_.transaction)
+      .filter(x => codes.contains(x.transaction.mapping.code))
+  }
+
+// The identity transactions for the 3 nodes that are part of the bootstrap transactions.
+  val identityTxs: Seq[GenericSignedTopologyTransactionX] =
+    Seq(sv1Participant, globalSequencerSv1, globalMediatorSv1).flatMap(identityTransactions(_))
+
+// The unionspace definition containing sv1Participant as the only member.
+  val unionspace = sv1Participant.topology.unionspaces.propose(
+    Set(sv1Participant.id.uid.namespace.fingerprint),
+    threshold = PositiveInt.one,
+    signedBy = Some(sv1Participant.id.uid.namespace.fingerprint),
+  )
+
+  val globalDomainId = DomainId(
+    UniqueIdentifier(
+      Identifier.tryCreate("global-domain"),
+      unionspace.transaction.mapping.unionspace,
+    )
+  )
+
+  val domainParameterState = sv1Participant.topology.domain_parameters.propose(
+    globalDomainId,
+    DynamicDomainParameters
+      .initialXValues(consoleEnvironment.environment.clock, ProtocolVersion.dev),
+    signedBy = Some(sv1Participant.id.uid.namespace.fingerprint),
+  )
+
+// The mediator state signed by both the unionspace owner, sv1Participant and the mediator. Note
+// that due to lack of validation in Canton nothing breaks if we only use one of the two.
+  val mediatorState = {
+    val txs = Seq(sv1Participant, globalMediatorSv1).map(node =>
+      node.topology.mediators.propose(
+        globalDomainId,
+        threshold = PositiveInt.one,
+        active = Seq(globalMediatorSv1.id),
+        signedBy = Some(node.id.uid.namespace.fingerprint),
+      )
+    )
+    txs.reduce[GenericSignedTopologyTransactionX] { case (a, b) =>
+      a.addSignatures(b.signatures.toSeq)
+    }
+  }
+
+// The sequencer state signed by both the unionspace owner, sv1Participant and the mediator. Note
+// that due to lack of validation in Canton nothing breaks if we only use one of the two.
+  val sequencerState = {
+    val txs = Seq(sv1Participant, globalSequencerSv1).map(node =>
+      node.topology.sequencers.propose(
+        globalDomainId,
+        threshold = PositiveInt.one,
+        active = Seq(globalSequencerSv1.id),
+        signedBy = Some(node.id.uid.namespace.fingerprint),
+      )
+    )
+    txs.reduce[GenericSignedTopologyTransactionX] { case (a, b) =>
+      a.addSignatures(b.signatures.toSeq)
+    }
+  }
+
+// The transactions required for bootstrapping
+  val bootstrapTransactions =
+    (identityTxs ++ Seq(domainParameterState, mediatorState, sequencerState): Seq[
+      GenericSignedTopologyTransactionX
+    ]).mapFilter(_.selectOp[TopologyChangeOpX.Replace])
+
+  globalSequencerSv1.setup.assign_from_beginning(
+    bootstrapTransactions,
+    staticParameters(globalSequencerSv1),
+  )
+
+  globalMediatorSv1.setup.assign(
+    globalDomainId,
+    staticParameters(globalSequencerSv1),
+    SequencerConnections.single(globalSequencerSv1.sequencerConnection),
+  )
+
+  println("Bootstrapped global domain")
+}
+
+Seq(
+  ("splitwell", splitwellSequencer, splitwellMediator),
+  ("splitwellUpgrade", splitwellUpgradeSequencer, splitwellUpgradeMediator),
+).foreach { case (name, sequencer, mediator) =>
+  sequencer.domain.bootstrap(
+    name,
+    staticParameters(sequencer),
+    domainOwners = Seq(sequencer, mediator),
+    sequencers = Seq(sequencer),
+    mediators = Seq(mediator),
+  )
+}
+
 println("Connecting splitwell, alice & bob participant to splitwell domain...")
 Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(
-  _.domains.connect_local(splitwell)
+  _.domains.connect_local(splitwellSequencer, alias = Some(DomainAlias.tryCreate("splitwell")))
 )
 // We only connect splitwell by default since we want to simulate users connecting gradually to the domain.
 println("Connecting splitwell to upgraded domain...")
-splitwellParticipant.domains.connect_local(splitwellUpgrade)
+splitwellParticipant.domains.connect_local(
+  splitwellUpgradeSequencer,
+  alias = Some(DomainAlias.tryCreate("splitwellUpgrade")),
+)
 
-println(s"Allocating users for local testing...")
-// These users are created for BootstrapTest and start-backends-for-local-frontend-testing.sh to work.
-Seq(
-  (svcParticipant, "sv1"),
-  (aliceParticipant, "alice_validator_user"),
-  (splitwellParticipant, "splitwell_validator_user"),
-).foreach { case (participant, user) =>
-  participant.ledger_api.users.create(
-    id = user,
-    primaryParty = None,
-    actAs = Set.empty,
-    readAs = Set.empty,
-    participantAdmin = true,
-  )
+if (System.getenv("BFT") != "1") {
+  // These user allocations mainly exist for XNodeBootstrapTest. For local testing we usually
+  // use bootstrap-canton-minimal.sc
+  println(s"Allocating users for local testing...")
+  Seq(
+    (sv1Participant, "sv1"),
+    (aliceParticipant, "alice_validator_user"),
+    (splitwellParticipant, "splitwell_validator_user"),
+  ).foreach { case (participant, user) =>
+    participant.ledger_api.users.create(
+      id = user,
+      primaryParty = None,
+      actAs = Set.empty,
+      readAs = Set.empty,
+      participantAdmin = true,
+    )
+  }
 }
 
 println(s"Collecting admin tokens...")
 val adminTokensData = ListBuffer[(String, String)]()
-participants.local.foreach(participant => {
+participantsX.local.foreach(participant => {
   val adminToken = participant.underlying.map(_.adminToken.secret).getOrElse("")
   val port = participant.config.ledgerApi.internalPort.get.unwrap
   adminTokensData.append(s"$port" -> adminToken)

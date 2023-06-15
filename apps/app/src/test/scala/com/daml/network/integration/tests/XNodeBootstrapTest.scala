@@ -23,7 +23,7 @@ class XNodeBootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunn
     CNNodeEnvironmentDefinition
       // we want a network in the same state that we would get when running `start-backends-for-local-frontend-testing.sh`
       .fromResources(
-        Seq("minimal-topology.conf", "x-node-overrides-minimal.conf"),
+        Seq("minimal-topology.conf"),
         this.getClass.getSimpleName,
       )
       .clearConfigTransforms()
