@@ -307,7 +307,7 @@ class XNodeDomainFeesTimeBasedIntegrationTest
         // Check that Scan correctly reports validator traffic purchases
         clue("Scan reports validator traffic purchases correctly") {
           // Advance rounds to ensure getRoundOfLatestData returns a valid value
-          (1 to 3).foreach(_ => advanceTime(tickDurationWithBuffer))
+          (1 to 5).foreach(_ => advanceTime(tickDurationWithBuffer))
           eventually() {
             advanceTime(tickDurationWithBuffer)
             val roundOfLatestData = sv1Scan.getRoundOfLatestData()._1
