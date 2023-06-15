@@ -125,7 +125,7 @@ template ElectionRequest with
     epoch : Int  -- current epoch whose leader should be replaced
     reason : ElectionRequestReason -- reason for electing a new leader
     ranking : [Party] -- preference ranking for new leaders
-    -- TODO(M3-67): add time-based expiry to ensure timely cleanup of bogus leader election requests
+    -- TODO(#5212): add time-based expiry to ensure timely cleanup of bogus leader election requests
   where
     -- NOTE: we expect the requester to observe this contract through being
     -- a backing member of the 'svc' collective party. The requester can in

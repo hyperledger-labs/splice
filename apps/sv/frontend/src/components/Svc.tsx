@@ -20,7 +20,7 @@ function getInfoTable(title: string, rows: { key: string; value: string; isParty
     >
       <TableBody>
         {rows.map(row => (
-          <TableRow key={row.key}>
+          <TableRow id={row.key} key={row.key}>
             <TableCell align="left" className="general-svc-key-name">
               {row.key}
             </TableCell>
@@ -57,6 +57,7 @@ const GeneralInformationView: React.FC = () => {
     const svcInfos = [
       createRow('svcLeaderPartyId', data.svcRules.payload.leader.toString(), true),
       createRow('svcPartyId', data.svcPartyId, true),
+      createRow('svcEpoch', data.svcRules.payload.epoch.toString()),
     ];
     return (
       <Box>

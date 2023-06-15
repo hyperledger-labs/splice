@@ -78,12 +78,12 @@ class XNodeSvFrontendIntegrationTest
               e.text shouldBe "Canton Coin Configuration"
             }
             click on "information-tab-general"
-            val rows = findAll(className("general-svc-value-name")).toSeq
-            rows should have length 8
-            forExactly(1, rows)(
+            val valueCells = findAll(className("general-svc-value-name")).toSeq
+            valueCells should have length 9
+            forExactly(1, valueCells)(
               _.text should matchText(sv1.getSvcInfo().svUser)
             )
-            forExactly(3, rows)(
+            forExactly(3, valueCells)(
               _.text should matchText(sv1.getSvcInfo().svParty.toProtoPrimitive)
             )
           },
