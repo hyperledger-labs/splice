@@ -1,6 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-
-import { exactNamespace, installCNHelmChart } from './utils';
+import { exactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 export function installDocs(): k8s.helm.v3.Release {
   const xns = exactNamespace('docs');

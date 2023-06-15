@@ -1,4 +1,5 @@
-import { Auth0Fetch } from './auth0';
+import { Auth0Fetch } from 'cn-pulumi-common';
+
 import { installCluster } from './installCluster';
 
 async function main() {

@@ -32,6 +32,7 @@
         "lint:check": "npm run lint:check --workspaces --if-present"
     },
     "workspaces": [
+        "common",
         "canton-network",
         "canton-network-gateway",
         "infrastructure",

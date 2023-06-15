@@ -1,7 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as sinon from 'sinon';
-
-import type { Auth0ClientSecret } from './src/auth0types';
+import type { Auth0ClientSecret } from 'cn-pulumi-common';
 
 // StackReferences cannot be mocked in tests currently
 // (see https://github.com/pulumi/pulumi/issues/9212)
@@ -86,6 +85,7 @@ async function main() {
 
   installCluster.installCluster({
     getSecrets: () => Promise.resolve(secrets),
+    /* eslint-disable @typescript-eslint/no-unused-vars */
     getClientAccessToken: (clientId: string, clientSecret: string) =>
       Promise.resolve('access_token'),
   });

@@ -1,6 +1,10 @@
 import { Output } from '@pulumi/pulumi';
-
-import { CLUSTER_BASENAME, CLUSTER_DNS_NAME, ExactNamespace, installCNHelmChart } from './utils';
+import {
+  CLUSTER_DNS_NAME,
+  CLUSTER_BASENAME,
+  ExactNamespace,
+  installCNHelmChart,
+} from 'cn-pulumi-common';
 
 const sv1NodeConfig = {
   id: '5af57aa83abcec085c949323ed8538108757be9c',

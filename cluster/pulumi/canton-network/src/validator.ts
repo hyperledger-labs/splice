@@ -1,10 +1,15 @@
 import * as k8s from '@pulumi/kubernetes';
+import {
+  auth0UserNameEnvVar,
+  installAuth0Secret,
+  installAuth0UISecret,
+  exactNamespace,
+  installCNHelmChart,
+} from 'cn-pulumi-common';
+import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { auth0UserNameEnvVar, installAuth0Secret, installAuth0UISecret } from './auth0';
-import type { Auth0Client } from './auth0types';
 import { installParticipant } from './ledger';
-import { exactNamespace, installCNHelmChart } from './utils';
 
 export async function installValidator(
   auth0Client: Auth0Client,

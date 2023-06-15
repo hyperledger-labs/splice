@@ -1,7 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-
-import { installCNHelmChartByNamespaceName } from './utils';
+import { installCNHelmChartByNamespaceName } from 'cn-pulumi-common';
 
 export function installClusterIngress(
   ingressNsName: pulumi.Output<string>,

@@ -1,10 +1,16 @@
 import * as k8s from '@pulumi/kubernetes';
+import {
+  auth0UserNameEnvVar,
+  installAuth0Secret,
+  installAuth0UISecret,
+  exactNamespace,
+  fixedTokens,
+  installCNHelmChart,
+} from 'cn-pulumi-common';
+import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { auth0UserNameEnvVar, installAuth0Secret, installAuth0UISecret } from './auth0';
-import type { Auth0Client } from './auth0types';
 import { installDomain, installParticipant } from './ledger';
-import { exactNamespace, fixedTokens, installCNHelmChart } from './utils';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,

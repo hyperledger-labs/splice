@@ -1,7 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-
-import { ExactNamespace, installCNHelmChart } from './utils';
+import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 export function installDomain(
   xns: ExactNamespace,

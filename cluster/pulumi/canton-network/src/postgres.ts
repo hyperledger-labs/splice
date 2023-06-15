@@ -1,8 +1,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-
-import { ExactNamespace, GLOBAL_TIMEOUT_SEC, cnChartValues } from './utils';
+import { ExactNamespace, GLOBAL_TIMEOUT_SEC, cnChartValues } from 'cn-pulumi-common';
 
 const project = gcp.organizations.getProjectOutput({});
 

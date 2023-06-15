@@ -1,11 +1,18 @@
 import * as k8s from '@pulumi/kubernetes';
+import {
+  auth0UserNameEnvVar,
+  installAuth0Secret,
+  installAuth0UISecret,
+  ChartValues,
+  ExactNamespace,
+  exactNamespace,
+  installCNHelmChart,
+} from 'cn-pulumi-common';
+import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { auth0UserNameEnvVar, installAuth0Secret, installAuth0UISecret } from './auth0';
-import type { Auth0Client } from './auth0types';
 import { installCometBftNode } from './cometbft';
 import { installDomain, installParticipant } from './ledger';
-import { ChartValues, ExactNamespace, exactNamespace, installCNHelmChart } from './utils';
 
 export async function installSVC(auth0Client: Auth0Client): Promise<k8s.helm.v3.Release> {
   const xns = exactNamespace('svc');
