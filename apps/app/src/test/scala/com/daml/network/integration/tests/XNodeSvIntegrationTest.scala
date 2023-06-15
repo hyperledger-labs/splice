@@ -275,6 +275,9 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
         }
       },
     )._1
+    // Not starting validator so we need to connect the participant manually.
+    val config = sv1.participantClient.domains.config(sv1.config.domains.global.alias).value
+    bobValidator.participantClient.domains.connect(config)
     val candidate = clue("create a dummy party") {
       val name = "dummy" + env.environment.config.name.getOrElse("")
       bobValidator.participantClientWithAdminToken.ledger_api.parties

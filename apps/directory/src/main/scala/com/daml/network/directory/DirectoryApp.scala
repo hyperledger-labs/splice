@@ -14,7 +14,7 @@ import com.daml.network.directory.admin.http.HttpDirectoryHandler
 import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
+import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -60,8 +60,6 @@ class DirectoryApp(
       tracerProvider,
       futureSupervisor,
     ) {
-
-  override def ensureUserPrimaryParty(connection: CNLedgerConnection) = Future.unit
 
   override def initialize(
       ledgerClient: CNLedgerClient,

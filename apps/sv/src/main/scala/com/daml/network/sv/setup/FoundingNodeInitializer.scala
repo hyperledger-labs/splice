@@ -29,7 +29,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencing.SequencerConnections
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
@@ -88,6 +88,18 @@ class FoundingNodeInitializer(
         case None => Future.successful(participantId.uid.namespace)
         case Some(domainNode) => bootstrapDomain(domainNode)
       }
+      _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
+      _ <- participantAdminConnection.ensureDomainRegistered(
+        DomainConnectionConfig(
+          config.domains.global.alias,
+          sequencerConnections = SequencerConnections.single(
+            GrpcSequencerConnection.tryCreate(config.domains.global.url)
+          ),
+          manualConnect = false,
+          domainId = None,
+        )
+      )
+      _ = logger.info("Participant connected to domain")
       svcParty <- setupSvcParty(initConnection, namespace)
       svParty <- SetupUtil.setupSvParty(initConnection, config)
       storeKey = SvStore.Key(svParty, svcParty)
@@ -255,17 +267,6 @@ class FoundingNodeInitializer(
         ),
         logger,
       )
-      // This is idempotent.
-      _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
-      _ <- participantAdminConnection.registerDomain(
-        DomainConnectionConfig(
-          config.domains.global.alias,
-          sequencerConnections = SequencerConnections.single(domainNode.sequencerConnection),
-          manualConnect = false,
-          domainId = Some(domainId),
-        )
-      )
-      _ = logger.info("Participant connected to domain")
     } yield namespace
   }
 

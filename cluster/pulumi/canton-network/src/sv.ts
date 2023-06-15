@@ -147,6 +147,7 @@ export async function installSvNode(
       automationEnabled: false,
       connectionUri: `http://cometbft-${nodename}-cometbft-rpc:26657`,
     },
+    globalDomainUrl: 'http://global-domain.svc:5008',
   } as ChartValues;
 
   if (joinWithKey) {
@@ -166,6 +167,7 @@ export async function installSvNode(
       additionalUsers: [],
       appDars: [],
       validatorWalletUser,
+      globalDomainUrl: 'http://global-domain.svc:5008',
     },
     dependsOn.concat([svApp])
   );

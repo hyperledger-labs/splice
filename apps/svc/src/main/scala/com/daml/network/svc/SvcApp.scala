@@ -3,7 +3,7 @@ package com.daml.network.svc
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode}
+import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.SvcAutomationService
 import com.daml.network.svc.config.SvcAppBackendConfig
@@ -48,8 +48,6 @@ class SvcApp(
       tracerProvider,
       futureSupervisor,
     ) {
-
-  override def ensureUserPrimaryParty(connection: CNLedgerConnection) = Future.unit
 
   override def initialize(
       ledgerClient: CNLedgerClient,

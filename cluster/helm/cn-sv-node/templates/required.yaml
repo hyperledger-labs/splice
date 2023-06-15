@@ -10,3 +10,5 @@
 {{- if (.Values.cometBFT).enabled }}
 {{ $_ := required ".Values.cometBft.connectionUri is required if cometBFT is enabled." (.Values.cometBFT).connectionUri }}
 {{- end }}
+
+{{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}

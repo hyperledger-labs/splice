@@ -7,6 +7,7 @@ scanAddress: "https://TARGET_CLUSTER.network.canton.global"
 # not only the suffix ``43b68e1e4978b000cefba352``:
 validatorWalletUser: "SV_WALLET_USER_ID"
 clusterUrl: "TARGET_CLUSTER.network.canton.global"
+globalDomainUrl: "http://TARGET_CLUSTER.network.canton.global:5008"
 auth:
   audience: https://canton.network.global
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL

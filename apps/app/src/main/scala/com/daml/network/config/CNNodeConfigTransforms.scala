@@ -1,5 +1,6 @@
 package com.daml.network.config
 
+import akka.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthUtil
 import com.daml.network.directory.config.{DirectoryAppBackendConfig, DirectoryAppClientConfig}
 import com.daml.network.scan.config.ScanAppBackendConfig
@@ -311,6 +312,22 @@ object CNNodeConfigTransforms {
         .focus(_.remoteParticipants)
         .modify(_.map { case (pName, pConfig) => (pName, update(pName.unwrap, pConfig)) })
 
+  def bumpCantonDomainPortsBy(bump: Int): CNNodeConfigTransform = {
+    def bumpUrl(s: String): String = {
+      val uri = Uri(s)
+      uri.withPort(uri.effectivePort + bump).toString
+    }
+
+    updateAllSvAppConfigs_(
+      _.focus(_.domains.global.url)
+        .modify(bumpUrl(_))
+    ) compose
+      updateAllValidatorConfigs_(
+        _.focus(_.domains.global.url)
+          .modify(bumpUrl(_))
+      )
+  }
+
   def bumpCantonPortsBy(bump: Int): CNNodeConfigTransform = {
 
     val transforms = Seq(
@@ -323,7 +340,8 @@ object CNNodeConfigTransforms {
       ),
       updateAllScanAppConfigs_(_.focus(_.participantClient).modify(portTransform(bump, _))),
       updateAllValidatorConfigs_(
-        _.focus(_.participantClient).modify(portTransform(bump, _))
+        _.focus(_.participantClient)
+          .modify(portTransform(bump, _))
       ),
       updateDirectoryAppConfig(
         _.focus(_.participantClient).modify(portTransform(bump, _))

@@ -62,6 +62,18 @@ class ParticipantAdminConnection(
   ): Future[Unit] =
     runCmd(ParticipantAdminCommands.DomainConnectivity.RegisterDomain(config))
 
+  def ensureDomainRegistered(
+      config: DomainConnectionConfig
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    retryProvider
+      .ensureThat(
+        s"participant has domain connection to ${config.domain}",
+        lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
+        (_: Unit) => registerDomain(config),
+        logger,
+      )
+      .map(_ => ())
+
   def downloadAcsSnapshot(
       parties: Set[PartyId],
       filterDomainId: String = "",
@@ -96,20 +108,26 @@ class ParticipantAdminConnection(
   )(implicit traceContext: TraceContext): Future[ParticipantId] =
     getId(useXNodes).map(ParticipantId(_))
 
-  def getDomainConnectionConfig(
+  def lookupDomainConnectionConfig(
       domain: DomainAlias
-  )(implicit traceContext: TraceContext): Future[DomainConnectionConfig] =
+  )(implicit traceContext: TraceContext): Future[Option[DomainConnectionConfig]] =
     for {
       configuredDomains <- runCmd(ParticipantAdminCommands.DomainConnectivity.ListConfiguredDomains)
     } yield configuredDomains
       .collectFirst {
         case (config, _) if config.domain == domain => config
       }
-      .getOrElse(
+
+  def getDomainConnectionConfig(
+      domain: DomainAlias
+  )(implicit traceContext: TraceContext): Future[DomainConnectionConfig] =
+    lookupDomainConnectionConfig(domain).map(
+      _.getOrElse(
         throw Status.NOT_FOUND
           .withDescription(s"Domain $domain is not configured on the participant")
           .asRuntimeException()
       )
+    )
 
   def setDomainConnectionConfig(config: DomainConnectionConfig)(implicit
       traceContext: TraceContext

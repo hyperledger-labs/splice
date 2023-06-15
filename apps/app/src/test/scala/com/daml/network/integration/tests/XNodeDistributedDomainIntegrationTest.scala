@@ -28,25 +28,8 @@ class XNodeDistributedDomainIntegrationTest
 
   private val globalDomain = DomainAlias.tryCreate("global")
 
-  // TODO(#5586) Remove custom init logic once apps can initialize without domain already being connected.
-  def initSvcDistributedDomain()(implicit env: CNNodeTestConsoleEnvironment) = {
-    startAllSync(sv1, sv1Scan, sv1Validator, svc)
-    val domainConfig = sv1.participantClient.domains.config(sv1.config.domains.global.alias).value
-    Seq(sv2, sv3, sv4).foreach(_.participantClient.domains.connect(domainConfig))
-    startAllSync(
-      sv2,
-      sv2Scan,
-      sv2Validator,
-      sv3,
-      sv3Validator,
-      sv4,
-      sv4Validator,
-    )
-    domainConfig
-  }
-
   "SV onboarding on X nodes" in { implicit env =>
-    val globalDomainConfig = initSvcDistributedDomain()
+    initSvc()
     clue("Sequencers are initialized") {
       sv1.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
       sv2.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
@@ -63,7 +46,7 @@ class XNodeDistributedDomainIntegrationTest
           .connections
           .forgetNE
       ) { case Seq(GrpcSequencerConnection(endpoints, _, _, _)) =>
-        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5008)))
+        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("localhost", Port.tryCreate(5008)))
       }
       inside(
         sv2.participantClient.domains
@@ -73,7 +56,7 @@ class XNodeDistributedDomainIntegrationTest
           .connections
           .forgetNE
       ) { case Seq(GrpcSequencerConnection(endpoints, _, _, _)) =>
-        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5608)))
+        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("localhost", Port.tryCreate(5608)))
       }
       inside(
         sv3.participantClient.domains
@@ -83,7 +66,7 @@ class XNodeDistributedDomainIntegrationTest
           .connections
           .forgetNE
       ) { case Seq(GrpcSequencerConnection(endpoints, _, _, _)) =>
-        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5708)))
+        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("localhost", Port.tryCreate(5708)))
       }
       inside(
         sv4.participantClient.domains
@@ -93,7 +76,7 @@ class XNodeDistributedDomainIntegrationTest
           .connections
           .forgetNE
       ) { case Seq(GrpcSequencerConnection(endpoints, _, _, _)) =>
-        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("127.0.0.1", Port.tryCreate(5808)))
+        endpoints shouldBe NonEmpty.mk(Seq, Endpoint("localhost", Port.tryCreate(5808)))
       }
     }
 
@@ -120,7 +103,6 @@ class XNodeDistributedDomainIntegrationTest
       }
     }
 
-    aliceValidator.participantClient.domains.connect(globalDomainConfig)
     aliceValidator.startSync()
 
     // Check that things work for external validators
@@ -149,6 +131,6 @@ class XNodeDistributedDomainIntegrationTest
   }
 
   "SVs can be onboarded a second time" in { implicit env =>
-    initSvcDistributedDomain()
+    initSvc()
   }
 }

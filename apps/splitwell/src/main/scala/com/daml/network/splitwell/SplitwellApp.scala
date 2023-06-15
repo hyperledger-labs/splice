@@ -5,7 +5,7 @@ import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode}
+import com.daml.network.environment.{CNLedgerClient, CNNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.admin.grpc.GrpcSplitwellService
@@ -56,9 +56,6 @@ class SplitwellApp(
     ) {
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
-
-  // Allocated by the validator app
-  override def ensureUserPrimaryParty(connection: CNLedgerConnection) = Future.unit
 
   override def initialize(
       ledgerClient: CNLedgerClient,

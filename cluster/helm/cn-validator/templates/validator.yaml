@@ -72,6 +72,8 @@ spec:
         - name: CN_APP_VALIDATOR_AUTH_JWKS_URL
           value: {{ .Values.auth.jwksUrl | quote }}
         {{ end }}
+        - name: CN_APP_VALIDATOR_GLOBAL_DOMAIN_URL
+          value: {{ .Values.globalDomainUrl | quote }}
         ports:
         - containerPort: 5003
           name: val-http

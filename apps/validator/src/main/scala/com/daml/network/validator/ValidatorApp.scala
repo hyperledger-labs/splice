@@ -16,7 +16,13 @@ import com.daml.network.auth.{AuthConfig, AuthExtractor, HMACVerifier, RSAVerifi
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  CNLedgerConnection,
+  CNNode,
+  CNNodeStatus,
+  ParticipantAdminConnection,
+}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
@@ -43,7 +49,9 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
@@ -80,14 +88,16 @@ class ValidatorApp(
   // Note that for the validator of an SV app, the user will be created by the SV app with a
   // primary party set to the SV app already so this is a noop.
   // For regular validators, this allocates a new user.
-  override def ensureUserPrimaryParty(connection: CNLedgerConnection) =
-    connection
-      .ensureUserPrimaryPartyIsAllocated(
-        config.ledgerApiUser,
-        config.validatorPartyHint
-          .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
-      )
-      .map(_ => ())
+  override def preInitialize(connection: CNLedgerConnection) =
+    ensureGlobalDomainRegistered().flatMap(_ =>
+      connection
+        .ensureUserPrimaryPartyIsAllocated(
+          config.ledgerApiUser,
+          config.validatorPartyHint
+            .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
+        )
+        .map(_ => ())
+    )
 
   private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
@@ -211,6 +221,22 @@ class ValidatorApp(
       },
       logger,
     )
+  }
+
+  private def ensureGlobalDomainRegistered(): Future[Unit] = {
+    val participantAdminConnection = new ParticipantAdminConnection(
+      config.participantClient.adminApi,
+      loggerFactory,
+      retryProvider,
+      clock,
+    )
+    val domainConfig = DomainConnectionConfig(
+      config.domains.global.alias,
+      SequencerConnections.single(GrpcSequencerConnection.tryCreate(config.domains.global.url)),
+    )
+    participantAdminConnection.ensureDomainRegistered(domainConfig).andThen { _ =>
+      participantAdminConnection.close()
+    }
   }
 
   override def initialize(

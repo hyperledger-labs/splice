@@ -177,8 +177,9 @@ case class CNNodeEnvironmentDefinition(
           )
         )
     )
-      .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.bumpCantonPortsBy(10_000)(conf)
+      .addConfigTransformsToFront(
+        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(10_000)(conf),
+        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(10_000)(conf),
       )
       // we bump remote app ports separately in order to not confuse
       // the PreflightIntegrationTest which also uses bumpCantonPortsBy

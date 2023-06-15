@@ -942,7 +942,7 @@
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"actAs\":[{\"fromUser\":\"self\"}],\"admin\":true,\"name\":{\"env\":\"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"primaryParty\":{\"allocate\":\"splitwell_validator_service_user\"},\"readAs\":[]}]",
+        "participantUsers": "[{\"actAs\":[],\"admin\":true,\"name\":{\"env\":\"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"readAs\":[]}]",
         "postgres": "postgres.splitwell.svc.cluster.local",
         "postgresSchema": "splitwell_participant",
         "resources": {
@@ -1106,6 +1106,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
@@ -1297,6 +1298,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingName": "Canton-Foundation-1",
         "onboardingType": "found-collective",
@@ -1376,6 +1378,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant.svc",
         "resources": {
@@ -1731,6 +1734,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -1813,6 +1817,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "resources": {
@@ -2095,6 +2100,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -2177,6 +2183,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "resources": {
@@ -2459,6 +2466,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -2541,6 +2549,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "resources": {
@@ -3095,6 +3104,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "globalDomainUrl": "http://global-domain.svc:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "postgres": "postgres.validator1.svc.cluster.local",

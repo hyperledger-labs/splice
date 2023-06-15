@@ -18,7 +18,9 @@ import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -68,6 +70,17 @@ class JoiningNodeInitializer(
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     for {
       svcPartyId <- getSvcPartyId(initConnection)
+      // We need to connect to the domain here because otherwise we create a circular dependency
+      // with the validator app: The validator app waits for its user to be provisioned which
+      // happens in setupSvParty before establish a domain connection but allocating the SV
+      // party requires a domain connection.
+      domainConfig = DomainConnectionConfig(
+        config.domains.global.alias,
+        SequencerConnections.single(
+          GrpcSequencerConnection.tryCreate(config.domains.global.url)
+        ),
+      )
+      _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
       svParty <- SetupUtil.setupSvParty(initConnection, config)
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey)

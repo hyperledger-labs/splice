@@ -76,18 +76,14 @@ class XNodeLocalRunbookIntegrationTest
       |  sequencers = Seq(svc_sequencer),
       |  mediators = Seq(svc_mediator),
       |)
-      |println("Connecting svc participant to domain")
-      |svc_participant.domains.connect("global", "http://localhost:9008")
-      |Seq("sv1", "sv2", "sv3", "sv4").foreach(svUserName => {
-      |  println("Creating " + svUserName + " user")
-      |  svc_participant.ledger_api.users.create(
-      |    id = svUserName,
-      |    actAs = Set.empty,
-      |    readAs = Set.empty,
-      |    primaryParty = None,
-      |    participantAdmin = true,
-      |  )
-      |})
+      |println("Creating sv1 user")
+      |svc_participant.ledger_api.users.create(
+      |  id = "sv1",
+      |  actAs = Set.empty,
+      |  readAs = Set.empty,
+      |  primaryParty = None,
+      |  participantAdmin = true,
+      |)
       |""".stripMargin)
     bootstrapFile.append(validatorBootstrapContent)
 
@@ -114,7 +110,6 @@ class XNodeLocalRunbookIntegrationTest
         bootstrapFile.toString,
       ),
       "local-runbook",
-      ("DOMAIN_URL", "http://localhost:9008"),
     )
     cantonProcess = Some(process)
   }
@@ -147,6 +142,7 @@ class XNodeLocalRunbookIntegrationTest
         // This test starts the participant on ports 7xxx instead, so we need to adjust all remote participant
         // configs of apps started on the self-hosted validator node.
         (_, conf) => CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf),
+        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(4000)(conf),
         (_, conf) => expectValidatorOnboarding(conf, "validatorsecret"),
         (_, conf) => localValidatorSvSponsorUrl(conf),
       )

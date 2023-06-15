@@ -9,7 +9,7 @@ import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, CNNode, CNNodeStatus}
+import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.admin.http.HttpScanHandler
@@ -59,8 +59,6 @@ class ScanApp(
       tracerProvider,
       futureSupervisor,
     ) {
-
-  override def ensureUserPrimaryParty(connection: CNLedgerConnection) = Future.unit
 
   override def initialize(
       ledgerClient: CNLedgerClient,

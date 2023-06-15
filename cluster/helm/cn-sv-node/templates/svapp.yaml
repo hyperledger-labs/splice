@@ -67,6 +67,8 @@ spec:
                   name: "cn-app-sv-key"
                   optional: false
             {{- end }}
+            - name: CN_APP_SV_GLOBAL_DOMAIN_URL
+              value: {{ .Values.globalDomainUrl | quote }}
             {{- if .Values.xNodes }}
             - name: ADDITIONAL_CONFIG_SV_XNODE
               value: |

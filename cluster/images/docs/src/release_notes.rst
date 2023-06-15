@@ -29,6 +29,11 @@ Release Notes
 
 * Auth0 tokens used in Ledger connections are renewed 2 minutes before they expire.
 
+* The domain connection is now initiated by the validator and SV app
+  instead of the participant bootstrap script which requires
+  specifying it in the ``globalDomainUrl`` field in ``sv-values.yaml``
+  and ``validator-values.yaml``.
+
 * Bugfixes
 
   * Fix a bug where the SV and validator app sometimes would stop

@@ -11,8 +11,6 @@ final case class AllocateParty(allocate: String) extends PrimaryParty
 final case class PartyFromUser(fromUser: EnvSubst) extends PrimaryParty
 
 def main() {
-  tools.connectGlobalDomain(participant, participant.health)
-
   val users = decode[Seq[tools.UserDef]](sys.env("CANTON_PARTICIPANT_USERS")).getOrElse(
     sys.error("Failed to parse users config")
   )

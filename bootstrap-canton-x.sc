@@ -115,12 +115,6 @@ if (System.getenv("BFT") != "1") {
   )
 
   println("Bootstrapped global domain")
-
-  println("Connecting all participants to global domain...")
-  participantsX.local.foreach(
-    _.domains.connect_local(globalSequencerSv1, alias = Some(DomainAlias.tryCreate("global")))
-  )
-
 }
 
 Seq(

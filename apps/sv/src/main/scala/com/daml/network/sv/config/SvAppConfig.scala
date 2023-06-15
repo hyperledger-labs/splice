@@ -8,6 +8,7 @@ import com.daml.network.config.{
   HttpCNNodeClientConfig,
   NetworkAppClientConfig,
 }
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
@@ -60,6 +61,15 @@ object SvOnboardingConfig {
     }
   }
 }
+
+final case class SvGlobalDomainConfig(
+    alias: DomainAlias,
+    url: String,
+)
+
+final case class SvDomainConfig(
+    global: SvGlobalDomainConfig
+)
 
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),

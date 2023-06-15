@@ -2,6 +2,7 @@ joinWithKeyOnboarding:
   sponsorApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
 # Replace YOUR_SV_NAME with the name you provided for your SV identity
 onboardingName: YOUR_SV_NAME
+globalDomainUrl: "http://TARGET_CLUSTER.network.canton.global:5008"
 auth:
   audience: https://canton.network.global
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL

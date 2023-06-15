@@ -57,6 +57,7 @@ final case class BuyExtraTrafficConfig(
 
 case class ValidatorGlobalDomainConfig(
     alias: DomainAlias,
+    url: String,
     buyExtraTraffic: BuyExtraTrafficConfig = BuyExtraTrafficConfig(),
 )
 

@@ -23,13 +23,10 @@ export async function installSplitwell(
     [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     [
       {
-        actAs: [{ fromUser: 'self' }],
+        actAs: [],
         admin: true,
         name: {
           env: 'CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME',
-        },
-        primaryParty: {
-          allocate: 'splitwell_validator_service_user',
         },
         readAs: [],
       },
@@ -72,6 +69,7 @@ export async function installSplitwell(
     {
       postgres: postgresDb,
       additionalUsers: [auth0UserNameEnvVar('splitwell')],
+      globalDomainUrl: 'http://global-domain.svc:5008',
       additionalConfig: [
         ...fixedTokenConfig,
         'canton.validator-apps.validator_backend.app-instances.splitwise = {',

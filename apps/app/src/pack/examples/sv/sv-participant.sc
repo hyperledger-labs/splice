@@ -1,45 +1,20 @@
-import com.digitalasset.canton.topology.PartyId
 import scala.annotation.tailrec
-
-val domainUrl = sys.env.get("DOMAIN_URL") match {
-  case None =>
-    sys.error(
-      "Environment variable DOMAIN_URL was not set, set it to http://${targetcluster}.network.canton.global:5008"
-    )
-  case Some(url) => url
-}
 
 // Note: the sv user name is defined in sv.conf
 val svUserName = System.getProperty("SV_USER_NAME", "sv_user")
-val svValidatorUserName = System.getProperty("SV_VALIDATOR_USER_NAME", "sv_validator_user")
 
 println("Starting SV participant node")
 svParticipant.start()
 
-println(s"Connecting SV participant to the domain $domainUrl")
-svParticipant.domains.connect("global", domainUrl)
-
 if (userExists(svUserName)) {
   println(s"Found existing SV user: " + svUserName)
 } else {
-  println("Creating SV party...")
-  val svParty =
-    svParticipant.ledger_api.parties.allocate("sv", "sv").party
-  println(s"Created SV party: ${svParty.toProtoPrimitive}")
   println(s"Creating SV user $svUserName")
   svParticipant.ledger_api.users.create(
     id = svUserName,
-    actAs = Set(svParty),
+    actAs = Set.empty,
     readAs = Set.empty,
-    primaryParty = Some(svParty),
-    participantAdmin = true,
-  )
-  println("Creating SV validator user $svValidatorUserName")
-  svParticipant.ledger_api.users.create(
-    id = svValidatorUserName,
-    actAs = Set(svParty),
-    readAs = Set.empty,
-    primaryParty = Some(svParty),
+    primaryParty = None,
     participantAdmin = true,
   )
 }

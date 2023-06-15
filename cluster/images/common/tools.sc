@@ -33,16 +33,6 @@ def connectDomain(
   pHealth.ping(p.id)
 }
 
-def connectGlobalDomain(
-    p: ParticipantReferenceCommon,
-    pHealth: ParticipantHealthAdministrationCommon,
-) {
-  val domainAlias = sys.env.get("GLOBAL_DOMAIN_ALIAS").getOrElse("global")
-  val domainUrl = sys.env.get("GLOBAL_DOMAIN_URL").getOrElse("http://global-domain.svc:5008")
-
-  connectDomain(p, pHealth, DomainDef(domainAlias, domainUrl))
-}
-
 def ensureParticipantUser(
     p: ParticipantReferenceCommon,
     userName: String,
@@ -130,12 +120,20 @@ def resolvePrimaryParty(p: ParticipantReferenceCommon, primaryParty: PrimaryPart
     case PartyFromUser(env) => p.ledger_api.users.get(resolveEnv(env)).primaryParty.get
   }
 
-def resolvePartyRef(p: ParticipantReferenceCommon, userId: String, self: Option[PartyId], ref: PartyRef) =
+def resolvePartyRef(
+    p: ParticipantReferenceCommon,
+    userId: String,
+    self: Option[PartyId],
+    ref: PartyRef,
+) =
   ref match {
     case PartyFromSelf(_) => self.getOrElse(sys.error(s"User $userId has no primary party"))
     case PartyFromOther(env) =>
       val otherId = resolveEnv(env)
-      p.ledger_api.users.get(otherId).primaryParty.getOrElse(sys.error(s"User $otherId has no primary party"))
+      p.ledger_api.users
+        .get(otherId)
+        .primaryParty
+        .getOrElse(sys.error(s"User $otherId has no primary party"))
   }
 
 def createUser(p: ParticipantReferenceCommon, user: UserDef) = {

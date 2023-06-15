@@ -12,6 +12,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.Status
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Subclass of CNNodeBase that provides default initialization for most apps */
@@ -42,7 +43,11 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     */
   protected def requiredTemplates: Set[Identifier] = Set.empty
 
-  protected def ensureUserPrimaryParty(connection: CNLedgerConnection): Future[Unit]
+  // Code that is run after the user has been allocated but before
+  // waiting for the primary party. This can be used for things like
+  // domain connections and allocation of the primary party.
+  @nowarn("cat=unused")
+  protected def preInitialize(connection: CNLedgerConnection): Future[Unit] = Future.unit
 
   def initialize(
       ledgerClient: CNLedgerClient,
@@ -55,7 +60,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
     initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-    _ <- ensureUserPrimaryParty(initConnection)
+    _ <- preInitialize(initConnection)
     serviceParty <-
       retryProvider.getValueWithRetries[PartyId](
         s"primary party of service user $serviceUser",

@@ -470,6 +470,7 @@
           "audience": "https://canton.network.global",
           "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json"
         },
+        "globalDomainUrl": "http://svrun.network.com.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv"
@@ -565,6 +566,7 @@
           "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
+        "globalDomainUrl": "http://svrun.network.com.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "scanAddress": "https://svrun.network.com.network.canton.global",
