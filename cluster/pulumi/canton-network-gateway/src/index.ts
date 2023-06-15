@@ -3,7 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 
 const clusterBasename = process.env.GCP_CLUSTER_BASENAME;
 const infraStack = new pulumi.StackReference(`infra.${clusterBasename}`);
-const ingressNs = infraStack.getOutput('ingressNs');
+const ingressNs = infraStack.requireOutput('ingressNs');
 
 function configureForwardAll(ingressNs: pulumi.Output<string>) {
   const repo_root = process.env.REPO_ROOT;

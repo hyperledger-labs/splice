@@ -32,20 +32,26 @@ repos:
         types_or: [javascript, jsx, ts, tsx]
         exclude: "/[.]prettierrc[.]cjs$"
       - id: pulumi_infra
-        name: check pulumi infrastructure config
+        name: check pulumi infra config
         language: system
-        entry: "make cluster/pulumi/infrastructure/diff-config"
-        files: '^cluster/pulumi/infrastructure/src/.*[.]ts$'
+        entry: "make cluster/pulumi/infra/diff-config"
+        files: '^cluster/pulumi/infra/.*[.]ts$'
         pass_filenames: false
       - id: pulumi_cn
         name: check pulumi canton-network config
         language: system
         entry: "make cluster/pulumi/canton-network/diff-config"
-        files: '^cluster/pulumi/canton-network/src/.*[.]ts$'
+        files: '^cluster/pulumi/canton-network/.*[.]ts$'
+        pass_filenames: false
+      - id: pulumi_cn_gw
+        name: check pulumi canton-network-gateway config
+        language: system
+        entry: "make cluster/pulumi/canton-network-gateway/diff-config"
+        files: '^cluster/pulumi/canton-network-gateway/.*[.]ts$'
         pass_filenames: false
       - id: pulumi_sv
         name: check pulumi sv-runbook config
         language: system
         entry: "make cluster/pulumi/sv-runbook/diff-config"
-        files: '^cluster/pulumi/sv-runbook/src/.*[.]ts$'
+        files: '^cluster/pulumi/sv-runbook/.*[.]ts$'
         pass_filenames: false
