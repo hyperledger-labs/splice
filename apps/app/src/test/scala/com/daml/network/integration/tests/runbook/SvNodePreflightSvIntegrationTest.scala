@@ -33,6 +33,36 @@ class SvNodePreflightSvIntegrationTest
     }
   }
 
+  "CometBFT is working" in { _ =>
+    val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val svUsername = s"admin@sv.com";
+    val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
+
+    withFrontEnd("sv") { implicit webDriver =>
+      actAndCheck(
+        s"Logging in to SV UI at: ${svUiUrl}", {
+          completeAuth0LoginWithAuthorization(
+            svUiUrl,
+            svUsername,
+            svPassword,
+            () => find(id("logout-button")) should not be empty,
+          )
+
+          click on "information-tab-cometBft-debug"
+        },
+      )(
+        s"We see all other SVs as peers",
+        _ => {
+          inside(find(id("comet-bft-debug-network"))) { case Some(e) =>
+            forAll(Range(1, 5)) { sv =>
+              e.text should include(s"\"moniker\": \"Canton-Foundation-$sv\"")
+            }
+          }
+        },
+      )
+    }
+  }
+
   "The SV can log in to their wallet" in { _ =>
     val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
     val svUsername = s"admin@sv.com";

@@ -106,7 +106,7 @@ const svAppSecrets = createSvAppSecrets(svNamespace);
 
 const sv = installCNSVHelmChart(
   svNamespace,
-  'sv-1',
+  'sv-app',
   'cn-sv-node',
   svValues,
   localCharts,

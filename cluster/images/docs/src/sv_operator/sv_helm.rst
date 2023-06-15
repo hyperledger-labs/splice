@@ -577,6 +577,11 @@ Once logged in one should see a page with some SV collective information.
   :width: 600
   :alt: After logged in into the sv UI
 
+The SV UI presents also some useful debug information for the CometBFT node. To see it, click on the "CometBFT Debug Info" tab.
+If your CometBFT is configured correctly, and it has connectivity to all other nodes, you should see ``n_peers`` that is equal to the size of the SVC, excluding your own node,
+and you should see all peer SV members listed as peers (their human-friendly names will be listed in the ``moniker`` fields).
+
+
 .. _helm-scan-web-ui:
 
 Observing the Canton Coin Scan UI

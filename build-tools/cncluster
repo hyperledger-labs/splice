@@ -1192,7 +1192,7 @@ function subcmd_apply_sv(){
 
     local -x CHARTS_VERSION="${2-}"
 
-    subcmd_pulumi sv-runbook up --yes
+    subcmd_pulumi sv-runbook up --yes --skip-preview
 }
 
 ###

@@ -113,12 +113,20 @@ function getCometBftDebugData(
 
   var JSONPrettyMon = require('react-json-pretty/dist/monikai');
   return (
-    <JSONPretty
-      id="comet-bft-debug"
-      style={{ fontSize: '10pt' }}
-      data={data.response?.status}
-      theme={JSONPrettyMon}
-    />
+    <div>
+      <JSONPretty
+        id="comet-bft-debug-status"
+        style={{ fontSize: '10pt' }}
+        data={data.response?.status}
+        theme={JSONPrettyMon}
+      />
+      <JSONPretty
+        id="comet-bft-debug-network"
+        style={{ fontSize: '10pt' }}
+        data={data.response?.networkInfo}
+        theme={JSONPrettyMon}
+      />
+    </div>
   );
 }
 

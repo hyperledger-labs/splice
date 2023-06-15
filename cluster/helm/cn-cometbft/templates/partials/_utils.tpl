@@ -6,4 +6,5 @@
 
 {{- define "cliArgs" }}
 --home /cometbft \
+--log_level="*:debug" \
 {{- end }}

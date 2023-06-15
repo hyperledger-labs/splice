@@ -3,18 +3,6 @@
 Release Notes
 =============
 
-2023-06-25
-----------
-_helm-sv-directory-ui:
-* Deployment updates:
-
-  * The Canton Name Service Directory UI is now being deployed as part of the SV node in our runbook.
-    See instructions for deploying the ``cn-validator`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
-    and two new required ingress rules in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
-    Section :ref:`Using the Canton Coin Directory UI <helm-directory-web-ui>` explains the UI.
-    By searching for a name in the UI, an SV operator can register the name on Canton name service if it is not yet
-    registered.
-
 2023-06-18
 ----------
 
@@ -30,13 +18,24 @@ _helm-sv-directory-ui:
     Section :ref:`Using the Canton Coin Scan UI <helm-scan-web-ui>` explains the UI.
     Note that not all fields in the Scan UI are hooked up to fetch data in the backend yet.
     Ones that should work at this point are the as-of round in the top-right corner, and the Validator and App leaderboards.
+
   * A CometBft node is now being deployed as part of the SV node in our runbook.
 
     * See instructions for generating a node identity in :ref:`Generating the CometBft node identity <cometbft-identity>`.
     * See instructions for configuring the required secrets with the node identity in :ref:`Configuring your CometBft node keys <helm-cometbft-secrets-config>`
     * See instructions for deploying the ``cn-cometbft`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
       and the new required ingress rule in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
+    * See instructions for verifying that your node is connected in :ref:`Logging into the SV UI <local-sv-web-ui>`.
+    * NOTE: you now need to configure your ingress to accept connections from the other SVs, talk to your contact at DA for the current list of IPs to whitelist.
+
   * The startup order for SV nodes has changed slightly: The SV app needs to be started before the validator app now.
+
+  * The Canton Name Service Directory UI is now being deployed as part of the SV node in our runbook.
+    See instructions for deploying the ``cn-validator`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
+    and two new required ingress rules in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
+    Section :ref:`Using the Canton Coin Directory UI <helm-directory-web-ui>` explains the UI.
+    By searching for a name in the UI, an SV operator can register the name on Canton name service if it is not yet
+    registered.
 
 * Removed the ``svc-client`` config parameter from the SV app. The SVC app is no longer used for SV onboarding and initialization.
 

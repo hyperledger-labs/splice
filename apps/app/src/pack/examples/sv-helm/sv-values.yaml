@@ -7,3 +7,7 @@ auth:
   audience: https://canton.network.global
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+cometBFT:
+  enabled: true
+  automationEnabled: false
+  connectionUri: "http://cometbft-cometbft-rpc:26657"

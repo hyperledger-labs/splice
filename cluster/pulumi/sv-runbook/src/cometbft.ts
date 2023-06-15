@@ -49,12 +49,11 @@ export function installCometBftNode(xns: ExactNamespace): void {
   );
   installCNSVHelmChart(
     xns,
-    'sv-5-cometbft',
+    'cometbft',
     'cn-cometbft',
     _.mergeWith(cometBftValues, {
       node: {
-        identifier: 'cometbft-sv-5',
-        externalAddress: `cometbft-sv-5.svc.${CLUSTER_BASENAME}.network.canton.global:26696`,
+        externalAddress: `cometbft.svc.${CLUSTER_BASENAME}.network.canton.global:26696`,
       },
       istioVirtualService: {
         enabled: true,

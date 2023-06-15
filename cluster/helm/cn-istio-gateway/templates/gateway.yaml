@@ -230,3 +230,9 @@ spec:
     hosts:
       - "cometbft-sv-{{ add $index 1 }}.svc.{{ ($.Values.cluster).hostname }}"
   {{- end }}
+  - port:
+      number: 26696
+      name: cometbft-sv-gw
+      protocol: TCP
+    hosts:
+      - "cometbft.sv.svc.{{ ($.Values.cluster).hostname }}"
