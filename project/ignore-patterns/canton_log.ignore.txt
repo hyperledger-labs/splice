@@ -60,4 +60,7 @@ domain outbox flusher The domain.*failed the following topology transactions
 # TODO(#5706): investigate and remove once fixed
 MEDIATOR_INVALID_MESSAGE.*Received a mediator response.*with an unknown request id.*Discarding response
 
+# TODO(#5753) Remove once the issue is fixed in Canton
+ACS_COMMITMENT_MISMATCH.*The local commitment does not match the remote commitment
+
 # Make sure to have a trailing newline
