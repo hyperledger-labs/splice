@@ -93,6 +93,37 @@ const participant = installCNSVHelmChart(
   ])
 );
 
+const svValues = loadYamlFromFile(
+  `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
+  {
+    TARGET_CLUSTER: TARGET_CLUSTER,
+    YOUR_SV_NAME: SV_NAME,
+    OIDC_AUTHORITY_URL: AUTH0_DOMAIN,
+  }
+);
+
+const svAppSecrets = createSvAppSecrets(svNamespace);
+
+const sv = installCNSVHelmChart(
+  svNamespace,
+  'sv-1',
+  'cn-sv-node',
+  svValues,
+  localCharts,
+  version,
+  svImagePullDeps.concat([participant]).concat([svAppSecrets.appSecret, svAppSecrets.uiSecret])
+);
+
+installCNSVHelmChart(
+  svNamespace,
+  'scan',
+  'cn-scan',
+  {},
+  localCharts,
+  version,
+  svImagePullDeps.concat([sv, participant]).concat(svAppSecrets.appSecret)
+);
+
 const validatorValues = loadYamlFromFile(
   `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`,
   {
@@ -113,42 +144,9 @@ const validator = installCNSVHelmChart(
   localCharts,
   version,
   svImagePullDeps
-    .concat([participant])
+    .concat([sv, participant])
     .concat([svValidatorSecrets.appSecret, svValidatorSecrets.uiSecret])
     .concat([svDirectoryUiSecrets])
-);
-
-const svValues = loadYamlFromFile(
-  `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
-  {
-    TARGET_CLUSTER: TARGET_CLUSTER,
-    YOUR_SV_NAME: SV_NAME,
-    OIDC_AUTHORITY_URL: AUTH0_DOMAIN,
-  }
-);
-
-const svAppSecrets = createSvAppSecrets(svNamespace);
-
-const sv = installCNSVHelmChart(
-  svNamespace,
-  'sv-1',
-  'cn-sv-node',
-  svValues,
-  localCharts,
-  version,
-  svImagePullDeps
-    .concat([validator, participant])
-    .concat([svAppSecrets.appSecret, svAppSecrets.uiSecret])
-);
-
-installCNSVHelmChart(
-  svNamespace,
-  'scan',
-  'cn-scan',
-  {},
-  localCharts,
-  version,
-  svImagePullDeps.concat([participant]).concat(svAppSecrets.appSecret)
 );
 
 const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);

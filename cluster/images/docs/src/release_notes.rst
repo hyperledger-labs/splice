@@ -36,6 +36,7 @@ _helm-sv-directory-ui:
     * See instructions for configuring the required secrets with the node identity in :ref:`Configuring your CometBft node keys <helm-cometbft-secrets-config>`
     * See instructions for deploying the ``cn-cometbft`` Helm chart in :ref:`Installing the Software <helm-sv-install>`,
       and the new required ingress rule in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
+  * The startup order for SV nodes has changed slightly: The SV app needs to be started before the validator app now.
 
 * Removed the ``svc-client`` config parameter from the SV app. The SVC app is no longer used for SV onboarding and initialization.
 

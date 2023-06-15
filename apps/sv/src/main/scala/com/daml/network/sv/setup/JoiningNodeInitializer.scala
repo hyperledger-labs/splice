@@ -3,8 +3,6 @@ package com.daml.network.sv.setup
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.syntax.foldable.*
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
@@ -71,9 +69,8 @@ class JoiningNodeInitializer(
     for {
       svcPartyId <- getSvcPartyId(initConnection)
       // We need to connect to the domain here because otherwise we create a circular dependency
-      // with the validator app: The validator app waits for its user to be provisioned which
-      // happens in setupSvParty before establish a domain connection but allocating the SV
-      // party requires a domain connection.
+      // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
+      // before establishing a domain connection, but allocating the SV party requires a domain connection.
       domainConfig = DomainConnectionConfig(
         config.domains.global.alias,
         SequencerConnections.single(
@@ -278,16 +275,7 @@ class JoiningNodeInitializer(
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
               for {
-                // TODO(#5141) Wait for the validator app to upload its packages because Canton doesn't
-                // handle concurrent package uploads/vetting.
-                _ <- initConnection.waitForPackages(
-                  Set(cc.coin.Coin.TEMPLATE_ID) ++
-                    (if (config.enableCoinRulesUpgrade)
-                       Set(ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID)
-                     else Set.empty)
-                )
                 _ <- svStoreWithIngestion.connection.uploadDarFiles(requiredDars)
-                _ <- waitForValidatorLicense()
                 _ <- requestOnboarding(
                   svClient.adminApi,
                   name,
@@ -318,21 +306,6 @@ class JoiningNodeInitializer(
           }
       }
     }
-
-    private def waitForValidatorLicense(): Future[
-      Contract[
-        cc.validatorlicense.ValidatorLicense.ContractId,
-        cc.validatorlicense.ValidatorLicense,
-      ]
-    ] =
-      // If the validator license contract gets created after we disconnected from the domain, Canton blows up during the SVC party migration
-      // because the contract gets added both via the party migration and through the regular event stream for the SV party which is an observer.
-      // Therefore, we let the validator app do its thing first.
-      retryProvider.getValueWithRetries(
-        show"ValidatorLicense contract for ${svStore.key.svParty}",
-        svStore.getValidatorLicense(),
-        logger,
-      )
 
     private def waitForSvOnboardingConfirmedInSvStore()
         : Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] =

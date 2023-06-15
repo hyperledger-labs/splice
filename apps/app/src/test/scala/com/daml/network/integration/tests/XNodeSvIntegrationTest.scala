@@ -65,6 +65,26 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     sv1.startSync()
   }
 
+  "can start before its validator app" in { implicit env =>
+    // we want this so we can have a clear init dependency validator app -> sv app
+    clue("Starting founding SV's SV app") {
+      sv1.startSync()
+    }
+    clue("Starting founding SV's scan app") {
+      // validators need this
+      sv1Scan.startSync()
+    }
+    clue("Starting founding SV's validator app") {
+      sv1Validator.startSync()
+    }
+    clue("Starting joining SV's SV app") {
+      sv2.startSync()
+    }
+    clue("Starting joining SV's validator app") {
+      sv2Validator.startSync()
+    }
+  }
+
   "connect to all domains during initialization" in { implicit env =>
     initSvc()
     sv4.stop()

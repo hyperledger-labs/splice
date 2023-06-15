@@ -9,6 +9,7 @@ import cats.syntax.either.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AuthConfig, HMACVerifier, RSAVerifier}
@@ -234,6 +235,15 @@ class SvApp(
           )
           initializer.joinCollectiveAndOnboardNodes()
       }
+
+      // TODO(#5141) Remove the comment about DAR uploads.
+      // We create the validator user only after the SVC party migration and DAR uploads have completed. This avoids two issues:
+      // 1. The ValidatorLicense has both the SVC and the SV as a stakeholder.
+      //    That can cause problems during the SVC party migration because the contract is imported there
+      //    but could also be imported through the stream of the SV party. By only creating the validator user here
+      //    we ensure that the party migration has been completed before the contract is created.
+      // 2. Concurrent DAR uploads currently break Canton's topology state management.
+      _ <- SvApp.createValidatorUser(svAutomation.connection, config, svStore.key.svParty)
 
       // Ensure Daml-level invariants for the SV
       // ----------------------------------------
@@ -939,6 +949,22 @@ object SvApp {
   private[sv] def isDevNet(
       svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   ): Boolean = svcRules.payload.isDevNet
+
+  private def createValidatorUser(
+      connection: CNLedgerConnection,
+      config: SvAppBackendConfig,
+      svParty: PartyId,
+  ): Future[PartyId] = {
+    // We share the SV party between the validator user and the SV user. Therefore, we allocate the validator user here with the SV
+    // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
+    // That ensures the validator app won't try to allocate its own primary party because it waits first for the user to be created
+    // and then checks if it has a primary party already.
+    connection.createUserWithPrimaryParty(
+      config.validatorLedgerApiUser,
+      svParty,
+      Seq(User.Right.ParticipantAdmin.INSTANCE),
+    )
+  }
 
   val coinPackage: UploadablePackage = new UploadablePackage {
     lazy val packageId: String = cc.coin.Coin.COMPANION.TEMPLATE_ID.getPackageId
