@@ -23,14 +23,11 @@ class SvNodePreflightSvIntegrationTest
       this.getClass.getSimpleName()
     )
 
-  "The SV UI of the node is working as expected" in { _ =>
+  "The SV UI of the node is working as expected" in { env =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val svUsername = s"admin@sv.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
-    // TODO(#5166): Consider getting the party IDs of the other members from the UI,
-    // and using those for the coin voting check in testSvUi below
-    val votedSvParties = Seq.empty
-
+    val votedSvParties = env.svs.remote.map(_.getSvcInfo().svParty)
     withFrontEnd("sv") { implicit webDriver =>
       testSvUi(svUiUrl, svUsername, svPassword, None, votedSvParties)
     }
