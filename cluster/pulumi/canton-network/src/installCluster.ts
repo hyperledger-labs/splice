@@ -34,8 +34,13 @@ const SV4_KEY = {
 
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   const svc = await installSVC(auth0Client);
-  const validator = await installValidator(auth0Client, svc, 'validator1');
-  const splitwell = await installSplitwell(auth0Client, svc);
+  const validator = await installValidator(
+    auth0Client,
+    svc,
+    'validator1',
+    'auth0|63e3d75ff4114d87a2c1e4f5'
+  );
+  const splitwell = await installSplitwell(auth0Client, svc, 'auth0|63e12e0415ad881ffe914e61');
 
   await installSvNode(
     auth0Client,

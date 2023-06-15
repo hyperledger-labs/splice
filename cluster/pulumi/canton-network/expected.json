@@ -1167,6 +1167,10 @@
                 "optional": false
               }
             }
+          },
+          {
+            "name": "CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME",
+            "value": "auth0|63e12e0415ad881ffe914e61"
           }
         ],
         "cluster": {
@@ -3165,6 +3169,7 @@
           }
         },
         "validatorPartyHint": "validator1_validator_service_user",
+        "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5",
         "xNodes": false
       }
     },

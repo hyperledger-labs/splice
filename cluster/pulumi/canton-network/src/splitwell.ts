@@ -8,7 +8,8 @@ import { exactNamespace, fixedTokens, installCNHelmChart } from './utils';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,
-  svc: k8s.helm.v3.Release
+  svc: k8s.helm.v3.Release,
+  providerWalletUser: string
 ): Promise<k8s.helm.v3.Release> {
   const xns = exactNamespace('splitwell');
 
@@ -69,7 +70,10 @@ export async function installSplitwell(
     'cn-validator',
     {
       postgres: postgresDb,
-      additionalUsers: [auth0UserNameEnvVar('splitwell')],
+      additionalUsers: [
+        auth0UserNameEnvVar('splitwell'),
+        { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },
+      ],
       globalDomainUrl: 'http://global-domain.svc:5008',
       additionalConfig: [
         ...fixedTokenConfig,

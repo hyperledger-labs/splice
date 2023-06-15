@@ -9,7 +9,8 @@ import { exactNamespace, installCNHelmChart } from './utils';
 export async function installValidator(
   auth0Client: Auth0Client,
   svc: k8s.helm.v3.Release,
-  name: string
+  name: string,
+  validatorWalletUser?: string
 ): Promise<k8s.helm.v3.Release> {
   const xns = exactNamespace(name);
 
@@ -60,6 +61,7 @@ export async function installValidator(
         'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar',
       ],
       globalDomainUrl: 'http://global-domain.svc:5008',
+      validatorWalletUser,
     },
     dependsOn
   );
