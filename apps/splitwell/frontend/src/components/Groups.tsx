@@ -1,19 +1,18 @@
 import {
   Contract,
   sameContracts,
-  sameReadyContracts,
   useInterval,
   DirectoryEntry as DirectoryEntryComponent,
   DirectoryField,
-  ReadyContract,
   TransferButton,
+  Loading,
+  ErrorDisplay,
 } from 'common-frontend';
 import {
   GroupKey,
   ListAcceptedGroupInvitesRequest,
   ListBalancesRequest,
   ListBalanceUpdatesRequest,
-  ListGroupsRequest,
   SplitwellContext,
 } from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
 import { Decimal } from 'decimal.js';
@@ -45,8 +44,14 @@ import {
 import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
-import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
 import { useSplitwellClient } from '../contexts/SplitwellServiceContext';
+import {
+  useAddMember,
+  useCreateInvite,
+  useEnterPayment,
+  useGroups,
+  useInitiateTransfer,
+} from '../hooks';
 import { config } from '../utils/config';
 import { SplitwellInstalls } from '../utils/installs';
 
@@ -79,7 +84,6 @@ const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean =
 
 const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, install }) => {
   const splitwellClient = useSplitwellClient();
-  const ledgerApiClient = useSplitwellLedgerApiClient();
   const [balances, setBalances] = useState<Map<string, string>>(new Map());
   const fetchBalances = useCallback(async () => {
     const balanceMap = (
@@ -103,24 +107,21 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, i
     });
     setBalances(prev => (balanceEqual(prev, balances) ? prev : balances));
   }, [splitwellClient, setBalances, group, party]);
+
   useInterval(fetchBalances);
 
-  const initiateSettleDebts = async () => {
+  const initiateTransfer = useInitiateTransfer(party, provider, domainId, install);
+
+  const groupId = group.payload.id;
+
+  const initiateSettleDebts = useCallback(() => {
     const amounts: ReceiverCCAmount[] = Array.from(balances)
       .filter(([_, v]) => new Decimal(v).isNegative())
       .map(([k, v]) => {
         return { receiver: k, ccAmount: Decimal.abs(new Decimal(v)).toString() };
       });
-
-    return await ledgerApiClient.initiateTransfer(
-      party,
-      provider,
-      group.contractId,
-      amounts,
-      domainId,
-      install
-    );
-  };
+    return initiateTransfer.mutateAsync({ groupId, amounts });
+  }, [balances, groupId, initiateTransfer]);
 
   return (
     <Stack>
@@ -173,7 +174,6 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   install,
 }) => {
   const splitwellClient = useSplitwellClient();
-  const ledgerApiClient = useSplitwellLedgerApiClient();
   const [acceptedInvites, setAcceptedInvites] = useState<Contract<AcceptedGroupInvite>[]>([]);
   const fetchAcceptedInvites = useCallback(async () => {
     const invites = (
@@ -189,16 +189,8 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   }, [group.payload.id.unpack, party, splitwellClient]);
   useInterval(fetchAcceptedInvites);
 
-  const onAddMember = async (invite: Contract<AcceptedGroupInvite>) => {
-    await ledgerApiClient.joinGroup(
-      party,
-      provider,
-      group.contractId,
-      invite.contractId,
-      domainId,
-      install
-    );
-  };
+  const addMember = useAddMember(party, provider, domainId, install);
+
   return (
     <Box>
       <Stack sx={{ px: 2, py: 1 }}>
@@ -210,7 +202,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
                 data-group={group.payload.id.unpack}
                 data-invitee={invite.payload.invitee}
                 className="add-user-link"
-                onClick={() => onAddMember(invite)}
+                onClick={() => addMember.mutate(invite)}
               >
                 Add
               </Button>
@@ -233,41 +225,30 @@ interface EntryProps {
 }
 
 const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId, install }) => {
-  const ledgerApiClient = useSplitwellLedgerApiClient();
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentDescription, setPaymentDescription] = useState<string>('');
-  const onEnterPayment = async () => {
-    await ledgerApiClient.enterPayment(
-      party,
-      provider,
-      group.contractId,
-      paymentAmount,
-      paymentDescription,
-      domainId,
-      install
-    );
-  };
+  const enterPayment = useEnterPayment(party, provider, domainId, install);
   const [transferAmount, setTransferAmount] = useState<string>('');
   const [transferReceiver, setTransferReceiver] = useState<string | undefined>();
-  const initiateTransfer = async () => {
+  const initiateTransfer = useInitiateTransfer(party, provider, domainId, install);
+  const groupId = group.payload.id;
+
+  const transfer = async () => {
     const members = [group.payload.owner, ...group.payload.members];
     if (!transferReceiver) {
       throw new Error('Transfer receiver not set');
-    } else if (members.includes(transferReceiver)) {
-      return await ledgerApiClient.initiateTransfer(
-        party,
-        provider,
-        group.contractId,
-        [{ receiver: transferReceiver, ccAmount: transferAmount }],
-        domainId,
-        install
-      );
-    } else {
+    } else if (!members.includes(transferReceiver)) {
       throw new Error(
         `Transfer receiver ${transferReceiver} is not part of the group’s members: ${members}`
       );
+    } else {
+      const amounts: ReceiverCCAmount[] = [
+        { receiver: transferReceiver, ccAmount: transferAmount },
+      ];
+      return await initiateTransfer.mutateAsync({ groupId, amounts });
     }
   };
+
   return (
     <div
       className="group-entry"
@@ -288,7 +269,12 @@ const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId, install
             value={paymentDescription}
             onChange={event => setPaymentDescription(event.target.value)}
           ></TextField>
-          <Button className="enter-payment-link" onClick={onEnterPayment}>
+          <Button
+            className="enter-payment-link"
+            onClick={() =>
+              enterPayment.mutate({ groupId: group.payload.id, paymentAmount, paymentDescription })
+            }
+          >
             Enter payment
           </Button>
         </Stack>
@@ -306,7 +292,7 @@ const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId, install
           <TransferButton
             className="transfer-link"
             text="Transfer"
-            createPaymentRequest={initiateTransfer}
+            createPaymentRequest={transfer}
             walletPath={config.services.wallet.uiUrl}
           ></TransferButton>
         </Stack>
@@ -379,11 +365,8 @@ interface GroupProps {
 }
 
 const Group: React.FC<GroupProps> = ({ group, party, provider, domainId, install }) => {
-  const ledgerApiClient = useSplitwellLedgerApiClient();
   const isOwner = party === group.payload.owner;
-  const onCreateInvite = async () => {
-    await ledgerApiClient.createGroupInvite(party, provider, group.contractId, domainId, install);
-  };
+  const createInvite = useCreateInvite(party, provider, domainId, install);
 
   return (
     <Paper elevation={3} sx={{ width: 600 }}>
@@ -403,7 +386,7 @@ const Group: React.FC<GroupProps> = ({ group, party, provider, domainId, install
           <Button
             data-group={group.payload.id.unpack}
             className="create-invite-link"
-            onClick={onCreateInvite}
+            onClick={() => createInvite.mutate(group.payload.id)}
           >
             Create Invite
           </Button>
@@ -451,30 +434,19 @@ interface GroupsProps {
 }
 
 const Groups: React.FC<GroupsProps> = ({ party, provider, installs }) => {
-  const splitwellClient = useSplitwellClient();
+  const groups = useGroups(party);
 
-  const [groups, setGroups] = useState<ReadyContract<CodegenGroup>[]>([]);
+  if (groups.isLoading) {
+    return <Loading />;
+  }
 
-  const fetchGroups = useCallback(async () => {
-    const newGroups = (
-      await splitwellClient.listGroups(
-        new ListGroupsRequest().setContext(new SplitwellContext().setUserPartyId(party)),
-        undefined
-      )
-    ).getGroupsList();
-    const decoded = newGroups.flatMap(g => {
-      // don't display groups in-flight from one domain to another
-      const d = ReadyContract.decodeContractWithState(g, CodegenGroup);
-      return d === undefined ? [] : [d];
-    });
-    setGroups(prev => (sameReadyContracts(prev, decoded) ? prev : decoded));
-  }, [splitwellClient, party]);
-
-  useInterval(fetchGroups);
+  if (groups.isError) {
+    return <ErrorDisplay message={'Error while retrieving groups'} />;
+  }
 
   return (
     <Stack spacing={2}>
-      {groups.flatMap(({ contract: group, domainId }) => {
+      {groups.data.flatMap(({ contract: group, domainId }) => {
         const install = installs.get(domainId);
         return install
           ? [

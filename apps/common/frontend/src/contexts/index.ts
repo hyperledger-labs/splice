@@ -9,6 +9,7 @@ export {
 export {
   buildLedgerApiClientInterface,
   LedgerApiClient,
+  LedgerApiClientProps,
   LedgerApiClientProvider,
   useLedgerApiClient,
 } from './LedgerApiContext';

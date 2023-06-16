@@ -8,6 +8,7 @@ import {
   theme,
 } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
+import { RpcError, StatusCode } from 'grpc-web';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {
@@ -32,6 +33,19 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     defaultOptions: {
       queries: {
         refetchInterval: 500, // re-fetch all queries every 500ms by default
+      },
+      mutations: {
+        retry: (failureCount, error) => {
+          const rpcError = error as RpcError;
+          // We only retry certain grpc errors. Retrying everything is more confusing than helpful
+          // because tha then also retries on invalid user input.
+          return (
+            [StatusCode.FAILED_PRECONDITION, StatusCode.ABORTED, StatusCode.NOT_FOUND].includes(
+              rpcError.code
+            ) && failureCount < 10
+          );
+        },
+        retryDelay: 500,
       },
     },
   });

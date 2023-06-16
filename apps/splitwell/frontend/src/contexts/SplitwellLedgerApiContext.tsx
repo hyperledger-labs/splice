@@ -1,8 +1,15 @@
-import { LedgerApiClient, buildLedgerApiClientInterface, Contract } from 'common-frontend';
+import {
+  LedgerApiClient,
+  LedgerApiClientProps,
+  buildLedgerApiClientInterface,
+  Contract,
+  ReadyContract,
+} from 'common-frontend';
 
 import {
   AcceptedGroupInvite,
   Group,
+  GroupId,
   GroupInvite,
   SplitwellInstall,
 } from '@daml.js/splitwell/lib/CN/Splitwell';
@@ -11,6 +18,15 @@ import { ContractId } from '@daml/types';
 
 class SplitwellLedgerApiClient extends LedgerApiClient {
   acceptDuration: string = (5 * 60 * 1000000).toString();
+
+  private getGroup(id: GroupId, groups: ReadyContract<Group>[]): ReadyContract<Group> {
+    console.log(JSON.stringify(groups));
+    const group = groups.find(c => c.contract.payload.id.unpack === id.unpack);
+    if (!group) {
+      throw new Error(`Group ${id} does not exist`);
+    }
+    return group;
+  }
 
   async requestGroup(
     user: string,
@@ -42,17 +58,19 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
   async createGroupInvite(
     user: string,
     provider: string,
-    group: ContractId<Group>,
+    groupId: GroupId,
+    groups: ReadyContract<Group>[],
     domainId: string,
     install: ContractId<SplitwellInstall>
   ) {
+    const group = this.getGroup(groupId, groups);
     await this.exercise(
       [user],
       [],
       SplitwellInstall.SplitwellInstall_CreateInvite,
       install,
       {
-        group: group,
+        group: group.contract.contractId,
       },
       domainId
     );
@@ -81,18 +99,20 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
   async joinGroup(
     user: string,
     provider: string,
-    group: ContractId<Group>,
+    groupId: GroupId,
+    groups: ReadyContract<Group>[],
     inviteContractId: ContractId<AcceptedGroupInvite>,
     domainId: string,
     install: ContractId<SplitwellInstall>
   ) {
+    const group = this.getGroup(groupId, groups);
     await this.exercise(
       [user],
       [],
       SplitwellInstall.SplitwellInstall_Join,
       install,
       {
-        group: group,
+        group: group.contract.contractId,
         cid: inviteContractId,
       },
       domainId
@@ -102,19 +122,21 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
   async enterPayment(
     user: string,
     provider: string,
-    group: ContractId<Group>,
+    groupId: GroupId,
+    groups: ReadyContract<Group>[],
     amount: string,
     description: string,
     domainId: string,
     install: ContractId<SplitwellInstall>
   ) {
+    const group = this.getGroup(groupId, groups);
     await this.exercise(
       [user],
       [],
       SplitwellInstall.SplitwellInstall_EnterPayment,
       install,
       {
-        group: group,
+        group: group.contract.contractId,
         amount: amount,
         description: description,
       },
@@ -125,18 +147,20 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
   async initiateTransfer(
     sender: string,
     provider: string,
-    group: ContractId<Group>,
+    groupId: GroupId,
+    groups: ReadyContract<Group>[],
     receiverAmounts: ReceiverCCAmount[],
     domainId: string,
     install: ContractId<SplitwellInstall>
   ) {
+    const group = this.getGroup(groupId, groups);
     return await this.exercise(
       [sender],
       [],
       SplitwellInstall.SplitwellInstall_InitiateTransfer,
       install,
       {
-        group: group,
+        group: group.contract.contractId,
         receiverAmounts: receiverAmounts,
       },
       domainId
@@ -144,5 +168,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
   }
 }
 
-export const [SplitwellLedgerApiClientProvider, useSplitwellLedgerApiClient] =
-  buildLedgerApiClientInterface(SplitwellLedgerApiClient);
+export const [SplitwellLedgerApiClientProvider, useSplitwellLedgerApiClient]: [
+  React.FC<React.PropsWithChildren<LedgerApiClientProps>>,
+  () => SplitwellLedgerApiClient
+] = buildLedgerApiClientInterface(SplitwellLedgerApiClient);

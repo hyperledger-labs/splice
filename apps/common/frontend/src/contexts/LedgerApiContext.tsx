@@ -25,57 +25,13 @@ import {
 } from 'common-protobuf/com/daml/ledger/api/v1/transaction_filter_pb';
 import { TransactionTree } from 'common-protobuf/com/daml/ledger/api/v1/transaction_pb';
 import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
-import grpcWeb, { RpcError, StatusCode } from 'grpc-web';
+import grpcWeb from 'grpc-web';
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Choice, ContractId, Template } from '@daml/types';
 
 import { Contract, decodeProtoMetadata, useUserState } from '..';
-
-const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const retrySubmit = async <T,>(
-  maxRetries: number,
-  retryDelay: number,
-  task: () => Promise<T>
-): Promise<T> => {
-  let retries = 0;
-  let error;
-  while (retries < maxRetries) {
-    if (retries > 0) {
-      console.debug('Retrying now...');
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response: { type: 'success'; value: T } | { type: 'retryable'; error: any } = await task()
-      .then<{ type: 'success'; value: T }>(r => {
-        return { type: 'success', value: r };
-      })
-      .catch(e => {
-        const rpcError = e as RpcError;
-        if (rpcError.code === StatusCode.NOT_FOUND) {
-          return { type: 'retryable', error: e };
-        } else {
-          console.debug('Fatal error, aborting...');
-          throw e;
-        }
-      });
-    switch (response.type) {
-      case 'retryable':
-        console.debug(
-          `Found retryable error ${JSON.stringify(error)}, retrying after ${retryDelay}ms...`
-        );
-        error = response.error;
-        retries++;
-        await sleep(retryDelay);
-        break;
-      case 'success':
-        return response.value;
-    }
-  }
-  console.debug('Exceeded retries, giving up...');
-  throw error;
-};
 
 // Description of a command that we can log
 type CommandDescription =
@@ -208,8 +164,6 @@ export class LedgerApiClient {
     domainId: string | undefined,
     disclosedContracts: DisclosedContract[] = []
   ): Promise<TransactionTree> {
-    const maxRetries = 10;
-    const retryDelay = 500;
     const commandId = uuidv4();
     const cmds = new Commands()
       .setCommandsList([command])
@@ -222,27 +176,21 @@ export class LedgerApiClient {
       cmds.setWorkflowId(`domain-id:${domainId}`);
     }
     const request = new SubmitAndWaitRequest().setCommands(cmds);
-    const response: SubmitAndWaitForTransactionTreeResponse = await retrySubmit(
-      maxRetries,
-      retryDelay,
-      async () => {
-        console.debug(
-          `Submitting command: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
-            readAs
-          )}, commandId=${commandId}, domainId=${domainId}, cmd=${JSON.stringify(jsonCommand)}`
-        );
-        return await this.commandServiceClient
-          .submitAndWaitForTransactionTree(request, this.metaData)
-          .then(r => {
-            console.debug(`Command with commandId=${commandId} succeeded`);
-            return r;
-          })
-          .catch(e => {
-            console.debug(`Command with commandId=${commandId} failed: ${JSON.stringify(e)}`);
-            throw e;
-          });
-      }
+    console.debug(
+      `Submitting command: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
+        readAs
+      )}, commandId=${commandId}, domainId=${domainId}, cmd=${JSON.stringify(jsonCommand)}`
     );
+    const response: SubmitAndWaitForTransactionTreeResponse = await this.commandServiceClient
+      .submitAndWaitForTransactionTree(request, this.metaData)
+      .then(r => {
+        console.debug(`Command with commandId=${commandId} succeeded`);
+        return r;
+      })
+      .catch(e => {
+        console.debug(`Command with commandId=${commandId} failed: ${JSON.stringify(e)}`);
+        throw e;
+      });
     return response.getTransaction()!;
   }
   async queryAcs<T extends object, K, I extends string>(
