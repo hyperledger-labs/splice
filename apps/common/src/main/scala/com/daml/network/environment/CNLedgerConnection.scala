@@ -45,11 +45,6 @@ import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.Value
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
-import com.digitalasset.canton.topology.transaction.{
-  ParticipantPermission,
-  RequestSide,
-  TopologyChangeOp,
-}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -385,10 +380,9 @@ class CNLedgerConnection(
       hint: String,
       namespace: Namespace,
       participantAdminConnection: ParticipantAdminConnection,
-      useXNodes: Boolean,
   )(implicit traceContext: TraceContext) =
     for {
-      participantId <- participantAdminConnection.getParticipantId(useXNodes)
+      participantId <- participantAdminConnection.getParticipantId()
       partyId = PartyId(
         UniqueIdentifier(
           Identifier.tryCreate(hint),
@@ -398,25 +392,12 @@ class CNLedgerConnection(
       _ <- retryProvider.ensureThatB(
         s"Party $partyId is allocated",
         client.getParties(Seq(partyId)).map(_.nonEmpty),
-        for {
-          _ <-
-            if (useXNodes) {
-              participantAdminConnection
-                .proposeInitialPartyToParticipantX(
-                  partyId,
-                  participantId,
-                  participantId.uid.namespace.fingerprint,
-                )
-            } else {
-              participantAdminConnection.authorizePartyToParticipant(
-                TopologyChangeOp.Add,
-                partyId,
-                participantId,
-                RequestSide.Both,
-                ParticipantPermission.Submission,
-              )
-            }
-        } yield (),
+        participantAdminConnection
+          .proposeInitialPartyToParticipant(
+            partyId,
+            participantId,
+            participantId.uid.namespace.fingerprint,
+          ),
         logger,
       )
     } yield partyId

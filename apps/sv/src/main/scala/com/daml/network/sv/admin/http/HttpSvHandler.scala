@@ -26,7 +26,6 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
-import com.digitalasset.canton.topology.transaction.RequestSide
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status.Code
@@ -354,7 +353,6 @@ class HttpSvHandler(
       authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
         globalDomain,
         participantId,
-        RequestSide.From,
       )
       _ = logger
         .info(s"Sponsor SV finished authorizing svc party to participant $participantId")
@@ -363,7 +361,7 @@ class HttpSvHandler(
       _ = logger.info(
         s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
       )
-      ourParticipant <- participantAdminConnection.getParticipantId(svcPartyHosting.useXNodes)
+      ourParticipant <- participantAdminConnection.getParticipantId()
       // TODO(#5636) Always make SVC party a unionspace and get rid of this slightly hacky
       // check.
       _ <-
@@ -404,7 +402,7 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info("Proposing new sequencer")
     for {
-      ourParticipant <- participantAdminConnection.getParticipantId(true)
+      ourParticipant <- participantAdminConnection.getParticipantId()
       _ <- participantAdminConnection.ensureSequencerDomainState(
         globalDomain,
         sequencerId,
@@ -441,9 +439,7 @@ class HttpSvHandler(
       _ <- retryProvider.retryForClientCalls(
         msg,
         for {
-          state <- sequencerAdminConnection.listPartyToParticipantMappingsX(filterParty =
-            party.filterString
-          )
+          state <- sequencerAdminConnection.listPartyToParticipant(filterParty = party.filterString)
         } yield {
           if (state.isEmpty) {
             throw Status.FAILED_PRECONDITION
@@ -489,7 +485,7 @@ class HttpSvHandler(
       mediatorId: MediatorId
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
-      ourParticipant <- participantAdminConnection.getParticipantId(true)
+      ourParticipant <- participantAdminConnection.getParticipantId()
       _ <- participantAdminConnection.ensureMediatorDomainState(
         globalDomain,
         mediatorId,

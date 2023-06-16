@@ -39,7 +39,7 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
       validatorParty: PartyId,
   )(implicit traceContext: TraceContext) = {
     participantAdminConnection
-      .getPartyToParticipantMappingsX(domainId, validatorParty)
+      .getPartyToParticipant(domainId, validatorParty)
       .map(
         _.mapping.participants.headOption.getOrElse(
           throw Status.NOT_FOUND
@@ -68,7 +68,7 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
       taskOutcome <-
         if (totalExtraTrafficLimit < validatorTraffic_.totalPurchased)
           participantAdminConnection
-            .getParticipantId(true)
+            .getParticipantId()
             .flatMap(svParticipantId =>
               participantAdminConnection
                 .ensureTrafficControlState(

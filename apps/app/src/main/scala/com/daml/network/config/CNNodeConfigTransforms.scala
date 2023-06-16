@@ -336,7 +336,7 @@ object CNNodeConfigTransforms {
         _.focus(_.participantClient)
           .modify(portTransform(bump, _))
           .focus(_.xNodes)
-          .modify(_.map(portTransform(bump, _)))
+          .modify(portTransform(bump, _))
       ),
       updateAllScanAppConfigs_(_.focus(_.participantClient).modify(portTransform(bump, _))),
       updateAllValidatorConfigs_(
@@ -486,7 +486,7 @@ object CNNodeConfigTransforms {
   def disableDistributedDomain: CNNodeConfigTransform =
     updateAllSvAppConfigs_(c =>
       c.copy(
-        xNodes = Some(SvXNodesConfig(None))
+        xNodes = SvXNodesConfig(None)
       )
     )
 

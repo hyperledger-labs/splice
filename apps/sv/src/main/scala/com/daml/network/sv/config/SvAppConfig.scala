@@ -93,7 +93,7 @@ case class SvAppBackendConfig(
     initialCoinPriceVote: Option[BigDecimal] = None,
     enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,
-    xNodes: Option[SvXNodesConfig] = None,
+    xNodes: SvXNodesConfig,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

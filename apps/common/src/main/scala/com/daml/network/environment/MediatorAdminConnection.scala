@@ -42,7 +42,7 @@ class MediatorAdminConnection(
     )
 
   def getMediatorId(implicit traceContext: TraceContext): Future[MediatorId] =
-    getId(true).map(MediatorId(_))
+    getId().map(MediatorId(_))
 
   def initialize(
       domainId: DomainId,

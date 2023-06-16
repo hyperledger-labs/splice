@@ -46,7 +46,7 @@ class SequencerAdminConnection(
     )
 
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =
-    getId(true).map(SequencerId(_))
+    getId().map(SequencerId(_))
 
   def getSequencerSnapshot(ts: CantonTimestamp)(implicit
       traceContext: TraceContext

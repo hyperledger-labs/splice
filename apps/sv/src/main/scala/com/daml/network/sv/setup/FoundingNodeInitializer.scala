@@ -165,7 +165,6 @@ class FoundingNodeInitializer(
         foundingConfig.svcPartyHint,
         namespace,
         participantAdminConnection,
-        config.xNodes.isDefined,
       )
       // this is idempotent
       _ <- connection.grantUserRights(
@@ -178,7 +177,7 @@ class FoundingNodeInitializer(
   private def bootstrapDomain(domainNode: LocalDomainNode): Future[Namespace] = {
     logger.info("Bootstrapping the domain as the founding node")
     for {
-      participantId <- participantAdminConnection.getParticipantId(true)
+      participantId <- participantAdminConnection.getParticipantId()
       mediatorId <- domainNode.mediatorAdminConnection.getMediatorId
       sequencerId <- domainNode.sequencerAdminConnection.getSequencerId
       namespace = UnionspaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
@@ -191,7 +190,7 @@ class FoundingNodeInitializer(
             domainNode.mediatorAdminConnection,
             domainNode.sequencerAdminConnection,
           ).traverse { con =>
-            con.getId(true).flatMap(con.getIdentityTransactions(_, domainId = None))
+            con.getId().flatMap(con.getIdentityTransactions(_, domainId = None))
           }.map(_.flatten)
           // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
           // been proposed.
@@ -464,7 +463,6 @@ class FoundingNodeInitializer(
     config.onboarding,
     participantAdminConnection,
     storeKey.svcParty,
-    config.xNodes.isDefined,
     retryProvider,
     loggerFactory,
   )

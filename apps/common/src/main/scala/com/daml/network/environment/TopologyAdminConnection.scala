@@ -4,11 +4,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
-import com.digitalasset.canton.admin.api.client.commands.{
-  TopologyAdminCommands,
-  TopologyAdminCommandsX,
-}
-import com.digitalasset.canton.admin.api.client.data.ListPartyToParticipantResult
+import com.digitalasset.canton.admin.api.client.commands.{TopologyAdminCommandsX}
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   BaseResult,
   ListMediatorDomainStateResult,
@@ -34,20 +30,17 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   UniqueIdentifier,
 }
-import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, BaseQueryX}
-import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQuery, TimeQueryX}
+import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
+import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQueryX}
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.transaction.{
   DomainParametersStateX,
   HostingParticipant,
   MediatorDomainStateX,
-  ParticipantPermission,
   ParticipantPermissionX,
   PartyToParticipantX,
-  RequestSide,
   SequencerDomainStateX,
   SignedTopologyTransactionX,
-  TopologyChangeOp,
   TopologyChangeOpX,
   TopologyMappingX,
   TrafficControlStateX,
@@ -86,45 +79,11 @@ class TopologyAdminConnection(
   override val serviceName = "Canton Participant Admin API"
 
   def getId(
-      useXNodes: Boolean
-  )(implicit traceContext: TraceContext): Future[UniqueIdentifier] =
-    if (useXNodes) {
-      runCmd(
-        TopologyAdminCommandsX.Init.GetId()
-      )
-    } else {
-      runCmd(
-        TopologyAdminCommands.Init.GetId()
-      )
-    }
+  )(implicit traceContext: TraceContext): Future[UniqueIdentifier] = runCmd(
+    TopologyAdminCommandsX.Init.GetId()
+  )
 
-  def listPartyToParticipantMappings(
-      filterStore: String = "",
-      operation: Option[TopologyChangeOp] = None,
-      filterParty: String = "",
-      filterParticipant: String = "",
-      filterRequestSide: Option[RequestSide] = None,
-      filterPermission: Option[ParticipantPermission] = None,
-  )(implicit traceContext: TraceContext): Future[Seq[ListPartyToParticipantResult]] = {
-    runCmd(
-      TopologyAdminCommands.Read.ListPartyToParticipant(
-        BaseQuery(
-          filterStore,
-          useStateStore = true,
-          TimeQuery.HeadState,
-          operation,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
-        filterParty,
-        filterParticipant,
-        filterRequestSide,
-        filterPermission,
-      )
-    )
-  }
-
-  def listPartyToParticipantMappingsX(
+  def listPartyToParticipant(
       filterStore: String = "",
       operation: Option[TopologyChangeOpX] = None,
       filterParty: String = "",
@@ -147,17 +106,16 @@ class TopologyAdminConnection(
     ).map(_.map(r => TopologyResult(r.context, r.item)))
   }
 
-  def getPartyToParticipantMappingsX(
+  def getPartyToParticipant(
       domainId: DomainId,
       partyId: PartyId,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] =
-    listPartyToParticipantMappingsX(domainId.filterString, filterParty = partyId.filterString).map {
-      txs =>
-        txs.headOption.getOrElse(
-          throw Status.NOT_FOUND
-            .withDescription(s"No PartyToParticipantX state for $partyId on domain $domainId")
-            .asRuntimeException
-        )
+    listPartyToParticipant(domainId.filterString, filterParty = partyId.filterString).map { txs =>
+      txs.headOption.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(s"No PartyToParticipantX state for $partyId on domain $domainId")
+          .asRuntimeException
+      )
     }
 
   def getSequencerDomainState(domainId: DomainId)(implicit
@@ -278,26 +236,6 @@ class TopologyAdminConnection(
       )
     )
 
-  def authorizePartyToParticipant(
-      ops: TopologyChangeOp,
-      party: PartyId,
-      participant: ParticipantId,
-      side: RequestSide,
-      permission: ParticipantPermission,
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    runCmd(
-      TopologyAdminCommands.Write.AuthorizePartyToParticipant(
-        ops,
-        None,
-        side,
-        party,
-        participant,
-        permission,
-        replaceExisting = true,
-        force = false,
-      )
-    ).map(_ => ())
-
   def lookupTrafficControlState(
       domainId: DomainId,
       member: Member,
@@ -373,7 +311,7 @@ class TopologyAdminConnection(
       logger,
     )
 
-  def proposeInitialPartyToParticipantX(
+  def proposeInitialPartyToParticipant(
       partyId: PartyId,
       participantId: ParticipantId,
       signedBy: Fingerprint,
@@ -395,7 +333,7 @@ class TopologyAdminConnection(
       serial = PositiveInt.one,
     ).map(_ => ())
 
-  def ensurePartyToParticipantX(
+  def ensurePartyToParticipant(
       domainId: DomainId,
       party: PartyId,
       newParticipant: ParticipantId,
@@ -403,7 +341,7 @@ class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[Unit] =
     ensureTopologyMapping[PartyToParticipantX](
       show"Party $party is authorized on $newParticipant",
-      getPartyToParticipantMappingsX(domainId, party).map(result =>
+      getPartyToParticipant(domainId, party).map(result =>
         Either.cond(
           result.mapping.participants
             .exists(hosting => hosting.participantId == newParticipant),
@@ -643,7 +581,7 @@ object TopologyAdminConnection {
   ): Future[SignedTopologyTransactionX[TopologyChangeOpX, T]] = {
     connections.toNEF
       .traverse { con =>
-        con.getId(true).flatMap(f(con, _))
+        con.getId().flatMap(f(con, _))
       }
       .map(_.reduceLeft[SignedTopologyTransactionX[TopologyChangeOpX, T]] { case (a, b) =>
         a.addSignatures(b.signatures.toSeq)

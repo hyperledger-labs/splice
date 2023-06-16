@@ -123,10 +123,8 @@ class ParticipantAdminConnection(
     )
   }
 
-  def getParticipantId(
-      useXNodes: Boolean
-  )(implicit traceContext: TraceContext): Future[ParticipantId] =
-    getId(useXNodes).map(ParticipantId(_))
+  def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =
+    getId().map(ParticipantId(_))
 
   def lookupDomainConnectionConfig(
       domain: DomainAlias

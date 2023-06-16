@@ -69,7 +69,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.opentelemetry.api.trace.Tracer
 
@@ -112,8 +112,7 @@ class SvApp(
       retryProvider,
       clock,
     )
-    val localDomainNode = config.xNodes
-      .flatMap(_.domain)
+    val localDomainNode = config.xNodes.domain
       .map(config =>
         new LocalDomainNode(
           new SequencerAdminConnection(
@@ -163,7 +162,7 @@ class SvApp(
       _ <- participantAdminConnection.reconnectAllDomains()
       participantId <- retryProvider.getValueWithRetries(
         "Participant ID",
-        getParticipantId(participantAdminConnection),
+        participantAdminConnection.getParticipantId(),
         logger,
       )
       cometBftClient = newCometBftClient
@@ -390,12 +389,6 @@ class SvApp(
       else
         Seq.empty
     )
-
-  private def getParticipantId(
-      participantAdminConnection: ParticipantAdminConnection
-  ): Future[ParticipantId] = {
-    participantAdminConnection.getParticipantId(config.xNodes.isDefined)
-  }
 
   private def newCometBftClient = {
     cometBftConfig

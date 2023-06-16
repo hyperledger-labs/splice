@@ -453,7 +453,6 @@ class JoiningNodeInitializer(
     config.onboarding,
     participantAdminConnection,
     storeKey.svcParty,
-    config.xNodes.isDefined,
     retryProvider,
     loggerFactory,
   )
