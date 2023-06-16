@@ -19,7 +19,7 @@ parameters:
     default: "16"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, refresh-fixed-tokens, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   mark-for-testnet:
     type: boolean
@@ -1606,32 +1606,6 @@ jobs:
             set -eou pipefail
             .circleci/wait_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
 
-  refresh_tokens:
-    circleci_ip_ranges: true
-    parameters:
-      cluster:
-        type: enum
-        enum: ["staging", "devnet", "testnet", "scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Refresh auth0 tokens
-          cluster: << parameters.cluster >>
-          gce_authenticate: true
-          additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET"
-          cmd: |
-            set -eou pipefail
-            cncluster activate
-            cncluster update_secrets
-          cmd_retry_count: 5
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-
 workflows:
   version: 2
 
@@ -2216,41 +2190,6 @@ workflows:
           - slack-context
         requires:
           - deploy_cluster_testnet_release
-
-  daily_refresh_tokens:
-    when:
-      equal: [ refresh-fixed-tokens, << pipeline.parameters.run-job >> ]
-    jobs:
-    - refresh_tokens:
-        cluster: "staging"
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - slack-context
-    - refresh_tokens:
-        cluster: "scratchneta"
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - slack-context
-    - refresh_tokens:
-        cluster: "scratchnetb"
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - slack-context
-    - refresh_tokens:
-        cluster: "scratchnetc"
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - slack-context
-    - refresh_tokens:
-        cluster: "scratchnetd"
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - slack-context
 
   testnet_health_check:
     when:
