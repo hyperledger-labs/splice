@@ -77,6 +77,15 @@ class JoiningNodeInitializer(
           GrpcSequencerConnection.tryCreate(config.domains.global.url)
         ),
       )
+      // TODO(#5803) Consider removing this once Canton stops falling apart.
+      // Wait for the sponsoring SV which also ensures the domain is initialized.
+      _ <- joiningConfig.traverse_ { conf =>
+        retryProvider.waitUntil(
+          "Sponsoring SV is active",
+          withSvConnection(conf.svClient.adminApi)(_.checkActive()),
+          logger,
+        )
+      }
       _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
       svParty <- SetupUtil.setupSvParty(initConnection, config)
       storeKey = SvStore.Key(svParty, svcPartyId)
@@ -155,6 +164,14 @@ class JoiningNodeInitializer(
       svcStore,
       svcAutomation,
       svcRulesLock,
+    )
+  }
+
+  private def withSvConnection[T](
+      sponsorConfig: NetworkAppClientConfig
+  )(f: SvConnection => Future[T]): Future[T] = {
+    SvConnection(sponsorConfig, retryProvider, loggerFactory).flatMap(con =>
+      f(con).andThen(_ => con.close())
     )
   }
 
@@ -342,15 +359,7 @@ class JoiningNodeInitializer(
           logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
           retryProvider.retryForAutomation(
             "request onboarding",
-            SvConnection(
-              sponsorConfig,
-              retryProvider,
-              loggerFactory,
-            ).flatMap { svConnection =>
-              svConnection
-                .startSvOnboarding(token)
-                .andThen(_ => svConnection.close())
-            },
+            withSvConnection(sponsorConfig)(_.startSvOnboarding(token)),
             logger,
           )
         case Left(error) =>

@@ -24,7 +24,7 @@ class XNodeWalletPaymentIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
 
   "A wallet" should {
     "fail to get a non-existent payment request" in { implicit env =>

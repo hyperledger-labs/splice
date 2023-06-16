@@ -89,15 +89,17 @@ class ValidatorApp(
   // primary party set to the SV app already so this is a noop.
   // For regular validators, this allocates a new user.
   override def preInitialize(connection: CNLedgerConnection) =
-    ensureGlobalDomainRegistered().flatMap(_ =>
-      connection
-        .ensureUserPrimaryPartyIsAllocated(
-          config.ledgerApiUser,
-          config.validatorPartyHint
-            .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
-        )
-        .map(_ => ())
-    )
+    for {
+      // TODO(#5803) Consider removing this once Canton stops falling apart.
+      // Wait for the sponsoring SV which also ensures the domain is initialized.
+      _ <- config.onboarding.traverse_(waitUntilSponsorIsActive(_))
+      _ <- ensureGlobalDomainRegistered()
+      _ <- connection.ensureUserPrimaryPartyIsAllocated(
+        config.ledgerApiUser,
+        config.validatorPartyHint
+          .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
+      )
+    } yield ()
 
   private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
@@ -202,6 +204,20 @@ class ValidatorApp(
     )
   }
 
+  private def withSvConnection[T](
+      svConfig: NetworkAppClientConfig
+  )(f: SvConnection => Future[T]): Future[T] =
+    SvConnection(svConfig, retryProvider, loggerFactory).flatMap(con =>
+      f(con).andThen(_ => con.close())
+    )
+
+  private def waitUntilSponsorIsActive(onboarding: ValidatorOnboardingConfig): Future[Unit] =
+    retryProvider.waitUntil(
+      "Sponsor SV is active",
+      withSvConnection(onboarding.svClient.adminApi)(_.checkActive()),
+      logger,
+    )
+
   private def requestOnboarding(
       svConfig: NetworkAppClientConfig,
       validatorParty: PartyId,
@@ -210,15 +226,7 @@ class ValidatorApp(
     logger.info(s"Requesting to be onboarded by SV at: ${svConfig.url}")
     retryProvider.retryForAutomation(
       "request onboarding",
-      SvConnection(
-        svConfig,
-        retryProvider,
-        loggerFactory,
-      ).flatMap { svConnection =>
-        svConnection
-          .onboardValidator(validatorParty, secret)
-          .andThen(_ => svConnection.close())
-      },
+      withSvConnection(svConfig)(_.onboardValidator(validatorParty, secret)),
       logger,
     )
   }
@@ -287,6 +295,9 @@ class ValidatorApp(
         ledgerClient,
         retryProvider,
         loggerFactory,
+      )
+      _ = logger.info(
+        s"Waiting for domain connection on ${config.domains.global.alias} before setting up app instances"
       )
       domainId <- store.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>

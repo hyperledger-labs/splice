@@ -15,7 +15,7 @@ class XNodeSvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTe
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withManualStart
 

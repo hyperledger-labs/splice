@@ -141,23 +141,21 @@ splitwellParticipant.domains.connect_local(
   alias = Some(DomainAlias.tryCreate("splitwellUpgrade")),
 )
 
-if (System.getenv("BFT") != "1") {
-  // These user allocations mainly exist for XNodeBootstrapTest. For local testing we usually
-  // use bootstrap-canton-minimal.sc
-  println(s"Allocating users for local testing...")
-  Seq(
-    (sv1Participant, "sv1"),
-    (aliceParticipant, "alice_validator_user"),
-    (splitwellParticipant, "splitwell_validator_user"),
-  ).foreach { case (participant, user) =>
-    participant.ledger_api.users.create(
-      id = user,
-      primaryParty = None,
-      actAs = Set.empty,
-      readAs = Set.empty,
-      participantAdmin = true,
-    )
-  }
+// These user allocations are only there
+// for local testing. Our tests allocate their own users.
+println(s"Allocating users for local testing...")
+Seq(
+  (sv1Participant, "sv1"),
+  (aliceParticipant, "alice_validator_user"),
+  (splitwellParticipant, "splitwell_validator_user"),
+).foreach { case (participant, user) =>
+  participant.ledger_api.users.create(
+    id = user,
+    primaryParty = None,
+    actAs = Set.empty,
+    readAs = Set.empty,
+    participantAdmin = true,
+  )
 }
 
 println(s"Collecting admin tokens...")

@@ -18,7 +18,7 @@ class XNodeWalletSubscriptionsFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .withCoinPrice(2)
 
   "A wallet UI" should {

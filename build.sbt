@@ -1057,15 +1057,12 @@ printTests := {
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-frontend.log", true))
   val pwXNodeFrontEndSimTime =
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-frontend-sim-time.log", true))
-  val pwXNodeDistributedDomain =
-    new PrintWriter(new FileWriter(s"test-full-class-names-xnode-distributed-domain.log", true))
   val pwXNodeDomainFeesSimTIme =
     new PrintWriter(new FileWriter(s"test-full-class-names-xnode-domain-fees-sim-time.log", true))
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
   def isXNodeTest(name: String): Boolean = name.contains("XNode")
-  def isDistributedDomainTest(name: String): Boolean = name.contains("DistributedDomain")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
   def isPreflightSvIntegrationTest(name: String): Boolean =
     name.contains("PreflightSvIntegrationTest")
@@ -1108,11 +1105,9 @@ printTests := {
       (t: String) =>
         // All wallclock tests are migrated to X nodes so we explicitly don't exclude non-xnode
         // tests here to make sure that we don't introduce any new ones.
-        !isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(
+        !isTimeBasedTest(t) && !isFrontEndTest(t) && !isDomainFeesTest(
           t
-        ) && !isDomainFeesTest(t) && !isPreflightIntegrationTest(
-          t
-        ) && !isPreflightSvIntegrationTest(t),
+        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode tests with simulated time",
@@ -1120,11 +1115,9 @@ printTests := {
       (t: String) =>
         // All simtime tests are migrated to X nodes so we explicitly don't exclude non-xnode
         // tests here to make sure that we don't introduce any new ones.
-        isTimeBasedTest(t) && !isFrontEndTest(t) && !isDistributedDomainTest(
+        isTimeBasedTest(t) && !isFrontEndTest(t) && !isDomainFeesTest(
           t
-        ) && !isDomainFeesTest(t) && !isPreflightIntegrationTest(
-          t
-        ) && !isPreflightSvIntegrationTest(t),
+        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode frontend tests with wall clock time",
@@ -1132,9 +1125,8 @@ printTests := {
       (t: String) =>
         // All frontend tests are migrated to X nodes so we explicitly don't exclude non-xnode
         // tests here to make sure that we don't introduce any new ones.
-        !isTimeBasedTest(t) && isFrontEndTest(t) && !isDistributedDomainTest(
-          t
-        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
+        !isTimeBasedTest(t) && isFrontEndTest(t)
+          && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode frontend tests with simulated time",
@@ -1142,17 +1134,9 @@ printTests := {
       (t: String) =>
         // All frontend tests are migrated to X nodes so we explicitly don't exclude non-xnode
         // tests here to make sure that we don't introduce any new ones.
-        isTimeBasedTest(t) && isFrontEndTest(t) && !isDistributedDomainTest(
+        isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(
           t
-        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
-    ),
-    (
-      "XNode tests with a distributed domain and wall clock time",
-      pwXNodeDistributedDomain,
-      (t: String) =>
-        isXNodeTest(t) && !isTimeBasedTest(t) && isDistributedDomainTest(
-          t
-        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
+        ) && !isPreflightSvIntegrationTest(t),
     ),
     (
       "XNode tests with domain fees and sim time",
@@ -1172,7 +1156,6 @@ printTests := {
   pwXNodeSimTime.close()
   pwXNodeFrontEnd.close()
   pwXNodeFrontEndSimTime.close()
-  pwXNodeDistributedDomain.close()
   pwXNodeDomainFeesSimTIme.close()
 }
 

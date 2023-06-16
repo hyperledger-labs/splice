@@ -32,10 +32,10 @@ class XNodeSplitwellFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         CNNodeEnvironmentDefinition
-          .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+          .simpleTopologyX(this.getClass.getSimpleName)
           .setup(env)
         Seq(splitwellDarPath, directoryDarPath).foreach { path =>
           aliceValidator.participantClient.upload_dar_unless_exists(path)

@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -22,12 +21,8 @@ class XNodeSvOnboardingConfigIntegrationTest extends CNNodeIntegrationTest with 
         Seq("simple-topology.conf", "include/svs/sv1-onboarded.conf"),
         this.getClass.getSimpleName,
       )
-      .withAllocatedValidatorUsers()
-      .withAllocatedSvUsers()
+      .withAllocatedUsers()
       .withManualStart
-      .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.disableDistributedDomain(conf)
-      )
 
   "start previously onboarded participant without onboarding config" in { implicit env =>
     val svcInfoFromSv1 = clue("Start sv1 and get SvcInfo") {

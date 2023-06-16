@@ -30,7 +30,7 @@ class XNodeValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTes
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .withManualStart
 
   "start and restart cleanly" in { implicit env =>

@@ -22,7 +22,7 @@ class XNodeWalletTransactionHistoryFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withCoinPrice(coinPrice)
 

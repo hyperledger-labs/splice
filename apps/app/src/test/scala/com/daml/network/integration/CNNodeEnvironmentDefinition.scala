@@ -2,11 +2,7 @@ package com.daml.network.integration
 
 import better.files.{File, Resource}
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
-import com.daml.network.console.{
-  CNParticipantClientReference,
-  ValidatorAppBackendReference,
-  SvAppBackendReference,
-}
+import com.daml.network.console.{CNParticipantClientReference, ValidatorAppBackendReference}
 import com.daml.network.environment.{
   CNNodeConsoleEnvironment,
   CNNodeEnvironmentFactory,
@@ -63,24 +59,26 @@ case class CNNodeEnvironmentDefinition(
       .copy(setup = _ => ())
   }
 
-  def withAllocatedSvUsers(): CNNodeEnvironmentDefinition =
+  def withAllocatedUsers(
+      extraIgnoredValidatorPrefixes: Seq[String] = Seq.empty
+  ): CNNodeEnvironmentDefinition =
     copy(preSetup = env => {
       import env.*
       this.preSetup(env)
       svs.local.foreach(sv => {
         if (!sv.name.endsWith("Onboarded")) {
-          CNNodeEnvironmentDefinition.withAllocatedSv(sv)
+          CNNodeEnvironmentDefinition.withAllocatedAdminUser(
+            sv.config.ledgerApiUser,
+            sv.participantClientWithAdminToken,
+          )
         }
       })
-    })
-
-  def withAllocatedValidatorUsers(): CNNodeEnvironmentDefinition =
-    copy(preSetup = env => {
-      import env.*
-      this.preSetup(env)
       validators.local.foreach(validator => {
-        if (!validator.name.startsWith("sv")) {
-          CNNodeEnvironmentDefinition.withAllocatedValidator(validator)
+        if (
+          !validator.name.startsWith("sv") && !extraIgnoredValidatorPrefixes
+            .exists(validator.name.startsWith)
+        ) {
+          CNNodeEnvironmentDefinition.withAllocatedValidatorUser(validator)
         }
       })
     })
@@ -207,17 +205,17 @@ case class CNNodeEnvironmentDefinition(
 }
 
 object CNNodeEnvironmentDefinition {
-  def simpleTopologyXDistributedDomain(testName: String): CNNodeEnvironmentDefinition =
+
+  def simpleTopologyX(testName: String): CNNodeEnvironmentDefinition =
     fromResources(Seq("simple-topology.conf"), testName)
-      .withAllocatedValidatorUsers()
-      .withAllocatedSvUsers()
+      .withAllocatedUsers()
       .withInitializedNodes()
 
   def simpleTopologyXDistributedDomainWithSimTime(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopologyXDistributedDomain(testName).withSimTime(useXNodes = true)
+    simpleTopologyX(testName).withSimTime(useXNodes = true)
 
-  def simpleTopologyXCentralizedDomain(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopologyXDistributedDomain(testName)
+  private def simpleTopologyXCentralizedDomain(testName: String): CNNodeEnvironmentDefinition =
+    simpleTopologyX(testName)
       .addConfigTransformsToFront((_, conf) =>
         CNNodeConfigTransforms.disableDistributedDomain(conf)
       )
@@ -260,9 +258,12 @@ object CNNodeEnvironmentDefinition {
   def allocateParty(participant: CNParticipantClientReference, hint: String) =
     participant.ledger_api.parties.allocate(hint, hint).party
 
-  def withAllocatedSv(sv: SvAppBackendReference): User = {
-    sv.participantClientWithAdminToken.ledger_api.users.create(
-      id = sv.config.ledgerApiUser,
+  private def withAllocatedAdminUser(
+      user: String,
+      admin: com.digitalasset.canton.console.commands.BaseLedgerApiAdministration,
+  ): User = {
+    admin.ledger_api.users.create(
+      id = user,
       actAs = Set.empty,
       primaryParty = None,
       readAs = Set.empty,
@@ -270,13 +271,9 @@ object CNNodeEnvironmentDefinition {
     )
   }
 
-  def withAllocatedValidator(validator: ValidatorAppBackendReference): User = {
-    validator.participantClientWithAdminToken.ledger_api.users.create(
-      id = validator.config.ledgerApiUser,
-      actAs = Set.empty,
-      primaryParty = None,
-      readAs = Set.empty,
-      participantAdmin = true,
+  def withAllocatedValidatorUser(validator: ValidatorAppBackendReference): User =
+    withAllocatedAdminUser(
+      validator.config.ledgerApiUser,
+      validator.participantClientWithAdminToken,
     )
-  }
 }

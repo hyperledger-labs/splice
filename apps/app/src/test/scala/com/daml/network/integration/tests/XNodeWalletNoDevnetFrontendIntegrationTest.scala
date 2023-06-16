@@ -15,7 +15,7 @@ class XNodeWalletNoDevNetFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppConfigs((_, c) => c.copy(isDevNet = false))(config)
       )

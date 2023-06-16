@@ -62,17 +62,37 @@ class ParticipantAdminConnection(
   ): Future[Unit] =
     runCmd(ParticipantAdminCommands.DomainConnectivity.RegisterDomain(config))
 
+  def connectDomain(alias: DomainAlias)(implicit
+      traceContext: TraceContext
+  ): Future[Boolean] =
+    runCmd(ParticipantAdminCommands.DomainConnectivity.ConnectDomain(alias, retry = false))
+
   def ensureDomainRegistered(
       config: DomainConnectionConfig
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    retryProvider
+  )(implicit traceContext: TraceContext): Future[Unit] = for {
+    _ <- retryProvider
       .ensureThat(
-        s"participant has domain connection to ${config.domain}",
+        s"participant registered ${config.domain}",
         lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
         (_: Unit) => registerDomain(config),
         logger,
       )
-      .map(_ => ())
+    // Albeit Canton auto-connects on registering a domain that auto-connect fails if the domain is
+    // not yet running. So we need to play it safe and ensure connectivity ourselves.
+    // This is particularly important, as without that later party-allocations won't get propagated properly.
+    // TODO(#5784): see whether we can improve Canton so that this kind of connectivity management is less brittle
+    _ <- retryProvider.waitUntil(
+      s"participant is connected to ${config.domain}",
+      // We're slightly abusing 'waitUntil' here, using a side-effecting condition. It's idempotent though, so all good.
+      connectDomain(config.domain).map(isConnected =>
+        if (!isConnected) {
+          val msg = s"failed to connect to ${config.domain}"
+          throw Status.Code.FAILED_PRECONDITION.toStatus.withDescription(msg).asRuntimeException()
+        }
+      ),
+      logger,
+    )
+  } yield ()
 
   def downloadAcsSnapshot(
       parties: Set[PartyId],

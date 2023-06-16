@@ -9,12 +9,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.{ProcessTestUtil, WalletTestUtil}
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import scala.util.Using
 import scala.concurrent.duration.*
+import scala.util.Using
 
 class XNodeWalletSurviveCantonRestartIntegrationTest
     extends CNNodeIntegrationTest
@@ -46,7 +45,7 @@ class XNodeWalletSurviveCantonRestartIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
@@ -55,7 +54,8 @@ class XNodeWalletSurviveCantonRestartIntegrationTest
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf)
       )
-      .withAllocatedSvUsers()
+      // Do not allocate validator users here, as we deal with all of them manually
+      .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq(""))
       .withManualStart
   }
 
@@ -65,14 +65,11 @@ class XNodeWalletSurviveCantonRestartIntegrationTest
       aliceValidator.start()
       clue("First run of Canton participant") {
         Using.resource(startCanton(cantonArgs, "wallet-survives-canton-restarts-1")) { _ =>
-          clue("Connect new participant to global domain") {
-            eventuallySucceeds(timeUntilSuccess = 40.seconds) {
-              aliceValidator.participantClient.domains
-                .connect(DomainAlias.tryCreate("global"), "http://localhost:5008")
-            }
-          }
           clue("Wait for validator initialization") {
-            CNNodeEnvironmentDefinition.withAllocatedValidator(aliceValidator)
+            // Need to wait for the participant node to startup for the user allocation to go through
+            eventuallySucceeds(timeUntilSuccess = 40.seconds) {
+              CNNodeEnvironmentDefinition.withAllocatedValidatorUser(aliceValidator)
+            }
             aliceValidator.waitForInitialization()
           }
           actAndCheck(

@@ -32,7 +32,7 @@ class XNodeWalletIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         config.copy(akkaConfig =
           Some(

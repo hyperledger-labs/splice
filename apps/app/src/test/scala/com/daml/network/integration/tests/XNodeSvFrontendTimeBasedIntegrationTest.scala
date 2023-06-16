@@ -19,8 +19,9 @@ class XNodeSvFrontendTimeBasedIntegrationTest
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+    CNNodeEnvironmentDefinition.simpleTopologyXCentralizedDomainWithSimTime(
+      this.getClass.getSimpleName
+    )
 
   def assertRowContentsMatch(key: String, value: String)(implicit webDriver: WebDriver): Unit = {
     val queryResult = find(id(key))

@@ -15,6 +15,8 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
+import scala.jdk.OptionConverters.*
+
 class XNodeDistributedDomainIntegrationTest
     extends CNNodeIntegrationTest
     with SvTestUtil
@@ -23,7 +25,7 @@ class XNodeDistributedDomainIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXDistributedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")
@@ -113,18 +115,18 @@ class XNodeDistributedDomainIntegrationTest
 
     // Check that SVs can all submit transactions through their own sequencers
     // and observe each other’s transactions.
+    val newPrice = BigDecimal(42)
     actAndCheck(
       "SVs can change their coin price",
-      Seq(sv1, sv2, sv3, sv4).foreach(_.updateCoinPriceVote(42)),
-    )
-    (
+      Seq(sv1, sv2, sv3, sv4).foreach(_.updateCoinPriceVote(newPrice)),
+    )(
       "SVs observe each others coin price changes",
       (_: Unit) =>
         forAll(Seq(sv1, sv2, sv3, sv4)) { sv =>
           val votes = sv.listCoinPriceVotes()
           votes should have size 4
           forAll(votes) { vote =>
-            vote.payload.coinPrice shouldBe Some(42)
+            vote.payload.coinPrice.toScala.map(BigDecimal(_)) shouldBe Some(newPrice)
           }
         },
     )

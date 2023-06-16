@@ -8,6 +8,7 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.pretty.Pretty
@@ -15,6 +16,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
 import java.time.Instant
@@ -164,6 +166,22 @@ abstract class HttpAppConnection(
   @SuppressWarnings(Array("org.wartremover.warts.Product"))
   implicit private val versionInfoPretty: Pretty[HttpAdminAppClient.VersionInfo] =
     Pretty.adHocPrettyInstance
+
+  def getStatus(): Future[NodeStatus[CNNodeStatus]] =
+    runHttpCmd(
+      config.url,
+      HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromJsonV0),
+    )
+
+  // Fails the future if the node is not active for easy use in waitUntil
+  def checkActive(): Future[Unit] =
+    getStatus().map { status =>
+      if (!status.isActive.getOrElse(false)) {
+        throw Status.FAILED_PRECONDITION
+          .withDescription(show"Node is not active, current status $status")
+          .asRuntimeException()
+      }
+    }
 
   private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] =
     retryProvider.getValueWithRetries(

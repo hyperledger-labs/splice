@@ -51,7 +51,7 @@ class XNodeSvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .withManualStart
       .withAdditionalSetup(implicit env => {
         // Some tests rely on those DARs being present without starting the SV/validator app which usually upload these.

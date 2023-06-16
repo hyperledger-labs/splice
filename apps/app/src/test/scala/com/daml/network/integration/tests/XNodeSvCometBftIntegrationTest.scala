@@ -23,7 +23,7 @@ class XNodeSvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUt
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomain(this.getClass.getSimpleName)
+      .simpleTopologyX(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppConfigs_ { config =>
           config
