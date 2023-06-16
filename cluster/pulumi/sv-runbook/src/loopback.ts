@@ -46,7 +46,7 @@ export function installLoopback(
             ingressPort('cometbft-2', 26666),
             ingressPort('cometbft-3', 26676),
             ingressPort('cometbft-4', 26686),
-            ingressPort('cometbft-5', 26696),
+            ingressPort('cometbft-sv', 26696),
           ],
         },
       },

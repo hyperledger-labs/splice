@@ -11,7 +11,7 @@ const sv1NodeConfig = {
   privateKey:
     '/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==',
   identifier: 'cometbft-sv-1',
-  externalAddress: p2pExternalAddress('cometbft-sv-1', 26656),
+  externalAddress: p2pExternalAddress(26656),
   istioPort: 26656,
   validator: {
     keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
@@ -37,7 +37,7 @@ const nodeConfigs: {
     privateKey:
       '1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==',
     identifier: 'cometbft-sv-2',
-    externalAddress: p2pExternalAddress('cometbft-sv-2', 26666),
+    externalAddress: p2pExternalAddress(26666),
     istioPort: 26666,
     validator: {
       keyAddress: '04A57312179F1E0C93B868779EE4C7FAC41666F0',
@@ -51,7 +51,7 @@ const nodeConfigs: {
     privateKey:
       'DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==',
     identifier: 'cometbft-sv-3',
-    externalAddress: p2pExternalAddress('cometbft-sv-3', 26676),
+    externalAddress: p2pExternalAddress(26676),
     istioPort: 26676,
     validator: {
       keyAddress: 'FFF137F42421B0257CDC8B2E41F777B81A081E80',
@@ -65,7 +65,7 @@ const nodeConfigs: {
     privateKey:
       'xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==',
     identifier: 'cometbft-sv-4',
-    externalAddress: p2pExternalAddress('cometbft-sv-4', 26686),
+    externalAddress: p2pExternalAddress(26686),
     istioPort: 26686,
     validator: {
       keyAddress: 'DE36D23DE022948A11200ABB9EE07F049D17D903',
@@ -133,8 +133,8 @@ type NodeConfig = {
   id: Output<string> | string;
 };
 
-function p2pExternalAddress(nodename: string, port: number): string {
-  return `${nodename}.svc.${CLUSTER_DNS_NAME}:${port}`;
+function p2pExternalAddress(port: number): string {
+  return `${CLUSTER_DNS_NAME}:${port}`;
 }
 
 function p2pServiceAddress(nodename: string, namespace: string): string {

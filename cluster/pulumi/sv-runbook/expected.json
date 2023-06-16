@@ -303,11 +303,8 @@
       "name": "cometbft",
       "namespace": "sv",
       "values": {
-        "cluster": {
-          "basename": "svrun"
-        },
         "founder": {
-          "externalAddress": "cometbft-sv-1.svc.svrun.network.com.network.canton.global:26656"
+          "externalAddress": "svrun.network.com.network.canton.global:26656"
         },
         "genesis": {
           "chainId": "svrun.network.com.canton"
@@ -417,7 +414,7 @@
               "targetPort": 26686
             },
             {
-              "name": "cometbft-5",
+              "name": "cometbft-sv",
               "port": 26696,
               "protocol": "TCP",
               "targetPort": 26696

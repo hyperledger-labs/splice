@@ -1,7 +1,7 @@
 nodeName: "YOUR_SV_NAME"
 
 founder:
-  externalAddress: cometbft-sv-1.svc.TARGET_CLUSTER.network.canton.global:26656
+  externalAddress: TARGET_CLUSTER.network.canton.global:26656
 
 node:
   id: YOUR_COMETBFT_NODE_ID

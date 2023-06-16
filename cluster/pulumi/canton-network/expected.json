@@ -1342,7 +1342,7 @@
           "port": 26656
         },
         "node": {
-          "externalAddress": "cometbft-sv-1.svc.mock.network.canton.global:26656",
+          "externalAddress": "mock.network.canton.global:26656",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "cometbft-sv-1",
           "istioPort": 26656,
@@ -1802,7 +1802,7 @@
           "port": 26666
         },
         "node": {
-          "externalAddress": "cometbft-sv-2.svc.mock.network.canton.global:26666",
+          "externalAddress": "mock.network.canton.global:26666",
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
           "identifier": "cometbft-sv-2",
           "istioPort": 26666,
@@ -2184,7 +2184,7 @@
           "port": 26676
         },
         "node": {
-          "externalAddress": "cometbft-sv-3.svc.mock.network.canton.global:26676",
+          "externalAddress": "mock.network.canton.global:26676",
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
           "identifier": "cometbft-sv-3",
           "istioPort": 26676,
@@ -2566,7 +2566,7 @@
           "port": 26686
         },
         "node": {
-          "externalAddress": "cometbft-sv-4.svc.mock.network.canton.global:26686",
+          "externalAddress": "mock.network.canton.global:26686",
           "id": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8",
           "identifier": "cometbft-sv-4",
           "istioPort": 26686,

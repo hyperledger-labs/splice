@@ -21,10 +21,10 @@ class CometBftPreflightSvIntegrationTest extends CNNodeIntegrationTest {
     )
 
   "p2p port for the CometBft node is accessible" in { _ =>
-    val cometBftP2pUrl = s"cometbft.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}";
+    val cometBftP2pHost = sys.env("NETWORK_APPS_ADDRESS");
     // All we care about is the p2p port for CometBFT being accessible by other nodes
     // The socket connects in the constructor, therefore if no error is thrown during the initialization then a successful TCP connection is established
-    val socket = new Socket(cometBftP2pUrl, 26696)
+    val socket = new Socket(cometBftP2pHost, 26696)
     socket.close()
   }
 

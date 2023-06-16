@@ -24,3 +24,8 @@
 
 {{ $_ := required ".Values.genesis.chainId is required." (.Values.genesis).chainId }}
 {{ $_ := required ".Values.db.volumeSize is required." (.Values.db).volumeSize }}
+
+{{- if (.Values.istioVirtualService).enabled }}
+{{ $_ := required "(.Values.istioVirtualService).port is required." (.Values.istioVirtualService).port }}
+{{ $_ := required "(.Values.istioVirtualService).gateway is required." (.Values.istioVirtualService).gateway }}
+{{- end}}

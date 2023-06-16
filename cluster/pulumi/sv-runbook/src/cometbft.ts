@@ -60,9 +60,6 @@ export function installCometBftNode(xns: ExactNamespace): void {
         gateway: 'cluster-ingress/apps-gateway',
         port: 26696,
       },
-      cluster: {
-        basename: CLUSTER_BASENAME,
-      },
     }),
     true
   );

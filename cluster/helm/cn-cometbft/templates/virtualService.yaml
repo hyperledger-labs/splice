@@ -9,8 +9,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "{{ .Values.node.identifier }}.svc.{{ (.Values.cluster).basename }}.network.canton.global"
-    - "{{ .Values.node.identifier }}.sv.svc.{{ (.Values.cluster).basename }}.network.canton.global"
+    # While documentation says that hosts are optional, leaving this out does not work.
+    - "*"
   gateways:
     - {{ .Values.istioVirtualService.gateway }}
   tcp:

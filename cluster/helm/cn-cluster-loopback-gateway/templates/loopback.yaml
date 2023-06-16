@@ -86,7 +86,8 @@ spec:
       name: cometbft{{ add $index 1 }}-p2p
       protocol: TCP
     hosts:
-      - "cometbft-sv-{{ add $index 1 }}.svc.{{ ($.Values.cluster).basename }}.network.canton.global"
+      # We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
+      - "*"
   {{- end }}
 ---
 apiVersion: networking.istio.io/v1alpha3
