@@ -105,7 +105,7 @@ class SvNodePreflightSvIntegrationTest
     val directoryUrl = s"https://directory.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
     val svUsername = s"admin@sv.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
-    val cnsName = Random.alphanumeric.take(10).mkString
+    val cnsName = s"da-test-${Random.alphanumeric.take(10).mkString}.cns"
 
     withFrontEnd("sv") { implicit webDriver =>
       def login(): Unit = {
@@ -126,16 +126,13 @@ class SvNodePreflightSvIntegrationTest
         )
 
       }
-
-      eventually(3.minutes) {
-        reserveDirectoryNameFor(
-          () => login(),
-          cnsName,
-          "1.0",
-          "USD",
-          "90 days",
-        )
-      }
+      reserveDirectoryNameFor(
+        () => login(),
+        cnsName,
+        "1.0",
+        "USD",
+        "90 days",
+      )
     }
   }
 }

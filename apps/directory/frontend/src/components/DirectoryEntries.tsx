@@ -11,7 +11,7 @@ const DirectoryEntries: React.FC = () => {
   return (
     <div>
       <Typography variant="h5">Your Directory Entries</Typography>
-      <Table sx={{ marginTop: '16px' }}>
+      <Table sx={{ marginTop: '16px' }} id="entries-table">
         <TableHead>
           <TableRow>
             <TableCell>Name</TableCell>

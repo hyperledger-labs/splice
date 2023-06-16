@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
+
 import scala.concurrent.duration.*
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.scalatest.compatible.Assertion
@@ -49,6 +50,7 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
       eventually() {
         findAll(className("sub-request-accept-button")) should have size 1
       }
+
       click on className("sub-request-accept-button")
 
       // And then back to directory, where they are already logged in
@@ -60,31 +62,32 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
       click on goToDirectoryEntriesButton
 
       eventually() {
-        findAll(className("entries-table-row")) should have size 1
+        val row = findAll(className("entries-table-row"))
+          .find(
+            _.childElement(className("entries-table-name")).text == expectedName
+          )
+          .value
+
+        val name = row.childElement(className("entries-table-name")).text
+        val amount = row.childElement(className("entries-table-amount")).text
+        val currency = row.childElement(className("entries-table-currency")).text
+        val interval = row.childElement(className("entries-table-payment-interval")).text
+        val expiresAt = row.childElement(className("entries-table-expires-at")).text
+
+        name should be(expectedName)
+        amount should be(expectedAmount)
+        currency should be(expectedCurrency)
+        interval should be(expectedInterval)
+
+        // only compare date and not time to avoid test flakes when running the test right when the hour changes
+        // We accept the flake when running this test right at the change of the date.
+        val expiry = LocalDateTime.now().plus(Duration.ofDays(90))
+        val expectedExpiry =
+          DateTimeFormatter
+            .ofPattern("MM/dd/yyyy")
+            .format(expiry)
+        expiresAt should startWith(expectedExpiry)
       }
-      val row: Element = inside(findAll(className("entries-table-row")).toList) { case Seq(row) =>
-        row
-      }
-
-      val name = row.childElement(className("entries-table-name")).text
-      val amount = row.childElement(className("entries-table-amount")).text
-      val currency = row.childElement(className("entries-table-currency")).text
-      val interval = row.childElement(className("entries-table-payment-interval")).text
-      val expiresAt = row.childElement(className("entries-table-expires-at")).text
-
-      name should be(expectedName)
-      amount should be(expectedAmount)
-      currency should be(expectedCurrency)
-      interval should be(expectedInterval)
-
-      // only compare date and not time to avoid test flakes when running the test right when the hour changes
-      // We accept the flake when running this test right at the change of the date.
-      val expiry = LocalDateTime.now().plus(Duration.ofDays(90))
-      val expectedExpiry =
-        DateTimeFormatter
-          .ofPattern("MM/dd/yyyy")
-          .format(expiry)
-      expiresAt should startWith(expectedExpiry)
     }
   }
 }
