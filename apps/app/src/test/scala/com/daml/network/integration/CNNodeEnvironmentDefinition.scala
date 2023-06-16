@@ -9,6 +9,7 @@ import com.daml.network.environment.{
   CNNodeEnvironmentImpl,
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.util.CommonCNNodeAppInstanceReferences
 import com.digitalasset.canton.admin.api.client.data.User
 import com.digitalasset.canton.config.{ClockConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.TestConsoleOutput
@@ -204,11 +205,30 @@ case class CNNodeEnvironmentDefinition(
     }
 }
 
-object CNNodeEnvironmentDefinition {
+object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
 
   def simpleTopologyX(testName: String): CNNodeEnvironmentDefinition =
     fromResources(Seq("simple-topology.conf"), testName)
       .withAllocatedUsers()
+      // TODO(#5383) Switch back to starting nodes in parallel once domain onboarding
+      // doesn't break Canton as badly.
+      .withManualStart
+      .withThisSetup { implicit env =>
+        import env.*
+        sv1.start()
+        sv1Scan.start()
+        sv1.waitForInitialization()
+        sv1Scan.waitForInitialization()
+        svs.local.foreach(n =>
+          n.participantClient.domains
+            .connect(n.config.domains.global.alias, n.config.domains.global.url)
+        )
+        validators.local.foreach(n =>
+          n.participantClient.domains
+            .connect(n.config.domains.global.alias, n.config.domains.global.url)
+        )
+        coinNodes.local.start()
+      }
       .withInitializedNodes()
 
   def simpleTopologyXDistributedDomainWithSimTime(testName: String): CNNodeEnvironmentDefinition =

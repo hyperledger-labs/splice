@@ -13,6 +13,8 @@ import scala.jdk.CollectionConverters.*
 trait SvTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences =>
 
+  protected def svs(implicit env: CNNodeTestConsoleEnvironment) = Seq(sv1, sv2, sv3, sv4)
+
   def allocateRandomSvParty(name: String)(implicit env: CNNodeTestConsoleEnvironment) = {
     val id = (new scala.util.Random).nextInt().toHexString
     svc.participantClient.ledger_api.parties.allocate(s"$name-$id", name).party

@@ -35,9 +35,6 @@ trait CommonCNNodeAppInstanceReferences {
       )
     )
 
-  def svs(implicit env: CNNodeTestConsoleEnvironment): Seq[SvAppBackendReference] =
-    Seq(sv1, sv2, sv3, sv4)
-
   def sv1(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
 
   def sv1Onboarded(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb(
