@@ -17,16 +17,17 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
 }
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.time.{Clock, WallClock, RemoteClock}
+import com.digitalasset.canton.time.{Clock, RemoteClock, WallClock}
 import com.digitalasset.canton.topology.{
   DomainId,
   MediatorId,
+  Member,
   Namespace,
   ParticipantId,
   PartyId,
@@ -45,16 +46,17 @@ import com.digitalasset.canton.topology.transaction.{
   PartyToParticipantX,
   RequestSide,
   SequencerDomainStateX,
+  SignedTopologyTransactionX,
   TopologyChangeOp,
   TopologyChangeOpX,
   TopologyMappingX,
+  TrafficControlStateX,
   UnionspaceDefinitionX,
 }
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   NamespaceDelegationX,
   OwnerToKeyMappingX,
 }
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -296,6 +298,37 @@ class TopologyAdminConnection(
       )
     ).map(_ => ())
 
+  def lookupTrafficControlState(
+      domainId: DomainId,
+      member: Member,
+  )(implicit traceContext: TraceContext): Future[Option[TopologyResult[TrafficControlStateX]]] = {
+    runCmd(
+      TopologyAdminCommandsX.Read.ListTrafficControlState(
+        BaseQueryX(
+          filterStore = domainId.filterString,
+          proposals = false,
+          timeQuery = TimeQueryX.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterMember = member.filterString,
+      )
+    ).map(_.headOption.map(tx => TopologyResult(tx.context, tx.item)))
+  }
+
+  def getTrafficControlState(domainId: DomainId, member: Member)(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[TrafficControlStateX]] = {
+    lookupTrafficControlState(domainId, member).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(s"No traffic control state for $member on domain $domainId")
+          .asRuntimeException
+      )
+    )
+  }
+
   def proposeMapping[M <: TopologyMappingX: ClassTag](
       mapping: M,
       signedBy: Fingerprint,
@@ -523,6 +556,35 @@ class TopologyAdminConnection(
           previous.owners.incl(newOwner),
         ),
       signedBy,
+    )
+
+  def ensureTrafficControlState(
+      domainId: DomainId,
+      member: Member,
+      newTotalExtraTrafficLimit: Long,
+      signedBy: Fingerprint,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    retryProvider.ensureThat[Option[TopologyResult[TrafficControlStateX]], Unit](
+      s"Extra traffic limit for $member on domain $domainId set to $newTotalExtraTrafficLimit",
+      lookupTrafficControlState(domainId, member).map(result =>
+        Either.cond(
+          result.fold(0L)(_.mapping.totalExtraTrafficLimit.value) >= newTotalExtraTrafficLimit,
+          (),
+          result,
+        )
+      ),
+      previousOrNone =>
+        proposeMapping(
+          TrafficControlStateX
+            .create(
+              domainId,
+              member,
+              PositiveLong.tryCreate(newTotalExtraTrafficLimit),
+            ),
+          signedBy,
+          serial = previousOrNone.fold(PositiveInt.one)(_.base.serial + PositiveInt.one),
+        ).map(_ => ()),
+      logger,
     )
 
   def proposeInitialDomainParameters(

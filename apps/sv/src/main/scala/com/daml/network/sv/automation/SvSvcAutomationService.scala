@@ -2,7 +2,7 @@ package com.daml.network.sv.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
@@ -18,6 +18,7 @@ class SvSvcAutomationService(
     svStore: SvSvStore,
     svcStore: SvSvcStore,
     ledgerClient: CNLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
     override protected val loggerFactory: NamedLoggerFactory,
@@ -58,6 +59,13 @@ class SvSvcAutomationService(
     }
   }
 
+  registerTrigger(
+    new ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
+      triggerContext,
+      svcStore,
+      participantAdminConnection,
+    )
+  )
   registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
 
   registerTrigger(

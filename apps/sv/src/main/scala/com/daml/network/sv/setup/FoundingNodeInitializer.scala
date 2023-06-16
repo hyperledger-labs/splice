@@ -451,6 +451,7 @@ class FoundingNodeInitializer(
       svStore,
       svcStore,
       ledgerClient,
+      participantAdminConnection,
       retryProvider,
       cometBftNode,
       loggerFactory,
