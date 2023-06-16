@@ -824,7 +824,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val party = Codec.decode(Codec.Party)(wallet.userStatus().party).value
     actAndCheck(
       "Self-grant a featured app right",
-      // We need to retry as the command might failed due to inactive cached CoinRules contract
+      // We need to retry as the command might fail due to inactive cached CoinRules contract
       // The failed command submission will triggers a cache invalidation
       retryCommandSubmission(wallet.selfGrantFeaturedAppRight()),
     )(
@@ -834,6 +834,22 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         // store (to attach to wallet batch operations). We therefore wait for both to be ingested here.
         sv1Scan.lookupFeaturedAppRight(party).value
         wallet.userStatus().hasFeaturedAppRight shouldBe true
+      },
+    )
+  }
+
+  protected def cancelFeaturedAppRight(wallet: WalletAppClientReference)(implicit
+      env: CNNodeTestConsoleEnvironment
+  ) = {
+    val party = Codec.decode(Codec.Party)(wallet.userStatus().party).value
+    actAndCheck(
+      "Cancel a featured app right",
+      retryCommandSubmission(wallet.cancelFeaturedAppRight()),
+    )(
+      "Wait for right to be ingested",
+      _ => {
+        sv1Scan.lookupFeaturedAppRight(party).value
+        wallet.userStatus().hasFeaturedAppRight shouldBe false
       },
     )
   }

@@ -2,17 +2,10 @@ package com.daml.network.svc.admin.api.client.commands
 
 import com.daml.ledger.api.v1.value as scalaValue
 import com.daml.ledger.javaapi.data.Timestamp
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.svc.v0
-import com.daml.network.svc.v0.{
-  GetDebugInfoResponse,
-  GrantFeaturedAppRightRequest,
-  GrantFeaturedAppRightResponse,
-  SetConfigScheduleRequest,
-  WithdrawFeaturedAppRightRequest,
-}
+import com.daml.network.svc.v0.{GetDebugInfoResponse, SetConfigScheduleRequest}
 import com.daml.network.svc.v0.SvcServiceGrpc.SvcServiceStub
 import com.daml.network.util.Codec
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
@@ -54,49 +47,6 @@ object GrpcSvcAppClient {
           svcParty = svc,
         )
       }
-  }
-
-  case class GrantFeaturedAppRight(provider: PartyId)
-      extends BaseCommand[
-        GrantFeaturedAppRightRequest,
-        GrantFeaturedAppRightResponse,
-        FeaturedAppRight.ContractId,
-      ] {
-
-    override def submitRequest(
-        service: SvcServiceStub,
-        request: GrantFeaturedAppRightRequest,
-    ): Future[GrantFeaturedAppRightResponse] = service.grantFeaturedAppRight(request)
-
-    override def createRequest(): Either[String, GrantFeaturedAppRightRequest] = Right(
-      GrantFeaturedAppRightRequest(Codec.encode(provider))
-    )
-
-    override def handleResponse(
-        response: GrantFeaturedAppRightResponse
-    ): Either[String, FeaturedAppRight.ContractId] =
-      Codec.decodeJavaContractId(FeaturedAppRight.COMPANION)(response.featuredAppRightContractId)
-  }
-
-  case class WithdrawFeaturedAppRight(provider: PartyId)
-      extends BaseCommand[
-        WithdrawFeaturedAppRightRequest,
-        Empty,
-        Unit,
-      ] {
-
-    override def submitRequest(
-        service: SvcServiceStub,
-        request: WithdrawFeaturedAppRightRequest,
-    ): Future[Empty] = service.withdrawFeaturedAppRight(request)
-
-    override def createRequest(): Either[String, WithdrawFeaturedAppRightRequest] = Right(
-      WithdrawFeaturedAppRightRequest(Codec.encode(provider))
-    )
-
-    /** Handle the response the service has provided
-      */
-    override def handleResponse(response: Empty): Either[String, Unit] = Right(())
   }
 
   case class SetConfigSchedule(configSchedule: Schedule[Instant, CoinConfig[USD]])

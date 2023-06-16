@@ -1,7 +1,6 @@
 package com.daml.network.console
 
 import akka.actor.ActorSystem
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -9,7 +8,6 @@ import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
 
@@ -34,20 +32,6 @@ class SvcAppClientReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SVC Client"
-
-  @Help.Summary("Grant a featured app right to an app provider")
-  def grantFeaturedAppRight(provider: PartyId): FeaturedAppRight.ContractId = {
-    consoleEnvironment.run {
-      adminCommand(GrpcSvcAppClient.GrantFeaturedAppRight(provider))
-    }
-  }
-
-  @Help.Summary("Withdraw a featured app right from an app provider")
-  def withdrawFeaturedAppRight(provider: PartyId): Unit = {
-    consoleEnvironment.run {
-      adminCommand(GrpcSvcAppClient.WithdrawFeaturedAppRight(provider))
-    }
-  }
 
   @Help.Summary("Set config schedule for the CoinRules.")
   def setConfigSchedule(configSchedule: Schedule[Instant, CoinConfig[USD]]): Unit =

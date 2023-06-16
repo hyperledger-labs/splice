@@ -4,24 +4,14 @@ import com.daml.ledger.api.v1.value.Record.toJavaProto
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.store.CNNodeAppStoreWithIngestion
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.environment.ledger.api.DedupOffset
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0
-import com.daml.network.svc.v0.{
-  GrantFeaturedAppRightRequest,
-  GrantFeaturedAppRightResponse,
-  SetConfigScheduleRequest,
-  SvcServiceGrpc,
-  WithdrawFeaturedAppRightRequest,
-}
+import com.daml.network.svc.v0.{SetConfigScheduleRequest, SvcServiceGrpc}
 import com.daml.network.util.Codec
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
@@ -51,65 +41,6 @@ class GrpcSvcAppService(
           svcPartyId = Codec.encode(svcStore.svcParty),
         )
       )
-    }
-
-  /** Grant a featured app right to an app provider
-    */
-  override def grantFeaturedAppRight(
-      request: GrantFeaturedAppRightRequest
-  ): Future[GrantFeaturedAppRightResponse] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      val svcParty = svcStore.svcParty
-      val providerParty = PartyId.tryFromProtoPrimitive(request.appProvider)
-      for {
-        result <- svcStore.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
-          case QueryResult(offset, None) =>
-            svcStoreWithIngestion.connection.submitWithResult(
-              actAs = Seq(svcParty),
-              readAs = Seq.empty,
-              update = new FeaturedAppRight(
-                svcStore.svcParty.toProtoPrimitive,
-                request.appProvider,
-              ).create(),
-              commandId = CNLedgerConnection.CommandId(
-                "com.daml.network.svc.grantFeaturedAppRight",
-                Seq(svcParty, providerParty),
-              ),
-              deduplicationConfig = DedupOffset(offset),
-              domainId = globalDomain,
-            )
-          case QueryResult(_, Some(_)) =>
-            logger.info("Rejecting duplicate featured app requests")
-            throw new StatusRuntimeException(
-              Status.ALREADY_EXISTS.withDescription(
-                s"App provider ${request.appProvider} already has a featured app right"
-              )
-            )
-        }
-      } yield GrantFeaturedAppRightResponse(Codec.encodeContractId(result.contractId))
-    }
-
-  /** Withdraw a featured app right from an app provider, with a textual reasoning
-    */
-  override def withdrawFeaturedAppRight(request: WithdrawFeaturedAppRightRequest): Future[Empty] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      for {
-        _ <- svcStore.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
-          case QueryResult(_, None) =>
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(
-                s"No featured app right found for provider ${request.appProvider}"
-              )
-            )
-          case QueryResult(_, Some(c)) =>
-            svcStoreWithIngestion.connection.submitWithResultNoDedup(
-              actAs = Seq(svcStore.svcParty),
-              readAs = Seq.empty,
-              update = c.contractId.exerciseFeaturedAppRight_Withdraw(request.reason),
-              domainId = globalDomain,
-            )
-        }
-      } yield Empty()
     }
 
   override def setConfigSchedule(request: SetConfigScheduleRequest): Future[Empty] =

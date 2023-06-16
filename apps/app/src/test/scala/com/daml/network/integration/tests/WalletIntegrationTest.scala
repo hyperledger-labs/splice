@@ -304,7 +304,7 @@ class WalletIntegrationTest
 
       clue("grant a featured app right to splitwell provider") {
         eventually() {
-          noException should be thrownBy svcClient.grantFeaturedAppRight(splitwellProvider)
+          noException should be thrownBy grantFeaturedAppRight(splitwellProviderWallet)
         }
       }
 
