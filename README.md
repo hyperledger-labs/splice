@@ -82,7 +82,7 @@ clusters.)
    You can create an artifactory API key [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    If you need permissions - please email help@digitalasset.com and ask for artifactory permissions.
-   1. For Nix can download `canton-research`.
+   1. For Nix can download `canton`.
       To do so, add the following to `/etc/nix/netrc` (you might need to create that directory as root):
       ```
       machine digitalasset.jfrog.io
@@ -104,14 +104,14 @@ clusters.)
 7. If you get an authorization exception, like the following:
    ```
    direnv: using nix
-   error: unable to download 'https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-20230106.tar.gz': HTTP error 401 ('Unauthorized')
+   error: unable to download 'https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz': HTTP error 401 ('Unauthorized')
    ```
    1. Check that your access token is valid by running the following sample command:
       ```
-      curl -vvv -L -u<yourartifactoryusername>:<yourartifactoryapikey> "https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-20230106.tar.gz" -o canton-research-20230106.tar.gz
+      curl -vvv -L -u<yourartifactoryusername>:<yourartifactoryapikey> "https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz" -o canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz
       ```
       If the download fails, check that your access token matches what is set in [Artifactory](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
-      Also, check you have visability via the UI [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-research/snapshot) (ie., the `canton-research` snapshot folder).
+      Also, check you have visability via the UI [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-enterprise).
       If you don't have visability via the UI then check with [helpdesk](help@digitalasset.com).
    2. If the artifact successfully downloaded, check the access rights of the file `/etc/nix/netrc`.
       If the access rights are more restrictive than `-rw-rw-r--`, update them:
@@ -722,8 +722,8 @@ you will need to install ncurses and setup terminfo following the instructions [
 When debugging and fixing issues in Canton itself, it can be useful to run a local build of Canton.
 You can do so as follows:
 1. Checkout `https://github.com/DACH-NY/canton` and follow its `contributing/README.md` to get it to build.
-2. Call `sbt bundle` to build a **research** release in `<YOUR_CANTON_REPO>/research/app/target/release`.
-3. Call `start-canton.sh -c <YOUR_CANTON_REPO>/research/app/target/release/canton-research-<VERSION>-SNAPSHOT/bin/canton`
+2. Call `sbt bundle` to build a Canton enterprise release in `<YOUR_CANTON_REPO>/enterprise/app/target/release`.
+3. Call `start-canton.sh -c <YOUR_CANTON_REPO>/enterprise/app/target/release/canton-enterprise-<VERSION>-SNAPSHOT/bin/canton`
 
 ### Managing Frontends for Tests
 

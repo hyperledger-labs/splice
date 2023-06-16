@@ -97,7 +97,7 @@ html_js_files = ['script.js']
 
 with open("../../../../nix/canton-sources.json") as f:
     obj = json.load(f)
-    canton_research_version = obj['version']
+    canton_version = obj['version']
     daml_sdk_version = obj['daml_version']
 
 with open(os.path.join(os.getenv("CANTON"), "SUBDIR")) as f:
@@ -117,7 +117,7 @@ rst_prolog = f"""
 
 .. |version_literal| replace:: ``{version}``
 .. |chart_version_literal| replace:: ``{chart_version}``
-.. |canton_version| replace:: {canton_research_version}
+.. |canton_version| replace:: {canton_version}
 .. |canton_subdir| replace:: {canton_subdir}
 .. |daml_sdk_version| replace:: {daml_sdk_version}
 
@@ -125,5 +125,5 @@ rst_prolog = f"""
 
 .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/release-bundles/{version}_cn-node-0.1.0-SNAPSHOT.tar.gz">Download Bundle</a>`
 
-.. |canton_research_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-research/snapshot/canton-research-{canton_research_version}.tar.gz">Download Canton research</a>`
+.. |canton_download_link| replace:: :raw-html:`<a class="reference external" href="https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-{canton_version}.tar.gz">Download Canton enterprise</a>`
 """

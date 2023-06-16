@@ -21,7 +21,7 @@ Following the :ref:`recommended topology <topology_image>` for
 deploying Canton network applications, we run a separate validator
 node for our application.
 
-To start the validator node, first start the validator participant using the Canton research binary and connect it to the domain:
+To start the validator node, first start the validator participant using the Canton binary and connect it to the domain:
 
 .. parsed-literal::
 
