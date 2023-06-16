@@ -241,7 +241,11 @@ max_num_inbound_peers = 40
 max_num_outbound_peers = 10
 
 # List of node IDs, to which a connection will be (re)established ignoring any existing limits
+{{- if ne .Values.founder.nodeId .Values.node.id }}
+unconditional_peer_ids = "{{ .Values.founder.nodeId }}"
+{{- else }}
 unconditional_peer_ids = ""
+{{- end }}
 
 # Maximum pause when redialing a persistent peer (if zero, exponential backoff is used)
 persistent_peers_max_dial_period = "0s"
