@@ -7,7 +7,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 /** Attempts to hold a valid authentication token.
@@ -38,13 +38,12 @@ class AuthTokenManager(
     * If there is a refresh already in progress it will be completed with this refresh.
     * If a scheduled refresh occurs while a refresh is in progress, the result of the scheduled refresh will be returned.
     */
-  def getToken: Future[Option[AuthToken]] = blocking {
+  def getToken: Future[Option[AuthToken]] =
     state.get() match {
       case HaveToken(token) => Future.successful(Some(token))
       case NoToken => tokenO(refreshState())
       case Refreshing(pending) => tokenO(pending)
     }
-  }
 
   private def tokenO(pending: Future[ResultState]): Future[Option[AuthToken]] = pending.map {
     case HaveToken(token) => Some(token)
