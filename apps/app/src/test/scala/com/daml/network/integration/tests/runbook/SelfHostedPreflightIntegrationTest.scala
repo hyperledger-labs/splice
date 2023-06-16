@@ -67,9 +67,9 @@ class SelfHostedPreflightIntegrationTest
       "-c",
       (validatorPath / "validator-participant.conf").toString,
       "-C",
-      "canton.participants.validatorParticipant.ledger-api.port=6001",
+      "canton.participants-x.validatorParticipant.ledger-api.port=6001",
       "-C",
-      "canton.participants.validatorParticipant.admin-api.port=6002",
+      "canton.participants-x.validatorParticipant.admin-api.port=6002",
       "--bootstrap",
       (validatorPath / "validator-participant.sc").toString,
     )

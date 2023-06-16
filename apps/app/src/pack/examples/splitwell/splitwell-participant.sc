@@ -2,6 +2,7 @@ val validatorUserName = sys.env.get("VALIDATOR_USER_NAME").getOrElse("validator_
 
 println("Starting participant node")
 splitwellParticipant.start()
+
 println(s"Creating validator user:" + validatorUserName)
 splitwellParticipant.ledger_api.users.create(
   id = validatorUserName,
@@ -10,3 +11,4 @@ splitwellParticipant.ledger_api.users.create(
   primaryParty = None,
   participantAdmin = true,
 )
+logger.info("Splitwell participant bootstrap finished")

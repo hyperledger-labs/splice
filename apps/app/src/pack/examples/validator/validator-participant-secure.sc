@@ -12,6 +12,7 @@ validatorParticipant.start()
 
 println("Secure validator participant bootstrap finished")
 
+println(s"Creating validator user: " + validatorUserName)
 validatorParticipant.ledger_api.users.create(
   id = validatorUserName,
   actAs = Set.empty,

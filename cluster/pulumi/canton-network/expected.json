@@ -834,7 +834,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-cluster-ingress-cluster-ingress",
@@ -898,7 +898,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-docs-docs",
@@ -973,7 +973,7 @@
             "memory": "4Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-splitwell-domain",
@@ -1068,7 +1068,7 @@
             "memory": "32Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-splitwell-participant",
@@ -1144,7 +1144,7 @@
             "memory": "1536Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-splitwell-splitwell-app",
@@ -1238,7 +1238,7 @@
             "memory": "4096Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-splitwell-splitwell",
@@ -1350,7 +1350,7 @@
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-1-sv-1-cometbft",
@@ -1434,7 +1434,7 @@
             "memory": "4096Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-1-sv-1-sv-app",
@@ -1514,7 +1514,7 @@
           }
         },
         "validatorWalletUser": "auth0|64529b128448ded6aa68048f",
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-1-validator-sv-1",
@@ -1609,7 +1609,7 @@
             "memory": "32Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-2-participant",
@@ -1683,7 +1683,7 @@
             "memory": "1536Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-2-scan-sv-2",
@@ -1791,7 +1791,7 @@
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-2-sv-2-cometbft",
@@ -1878,7 +1878,7 @@
             "memory": "4096Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-2-sv-2-sv-app",
@@ -1958,7 +1958,7 @@
           }
         },
         "validatorWalletUser": "auth0|64529b6852dd694167351045",
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-2-validator-sv-2",
@@ -2053,7 +2053,7 @@
             "memory": "32Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-3-participant",
@@ -2161,7 +2161,7 @@
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-3-sv-3-cometbft",
@@ -2248,7 +2248,7 @@
             "memory": "4096Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-3-sv-3-sv-app",
@@ -2328,7 +2328,7 @@
           }
         },
         "validatorWalletUser": "auth0|64529bb10c1aee4f2c819218",
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-3-validator-sv-3",
@@ -2423,7 +2423,7 @@
             "memory": "32Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-4-participant",
@@ -2531,7 +2531,7 @@
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           }
         ],
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-4-sv-4-cometbft",
@@ -2618,7 +2618,7 @@
             "memory": "4096Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-4-sv-4-sv-app",
@@ -2698,7 +2698,7 @@
           }
         },
         "validatorWalletUser": "auth0|64529bc58d30358eacae5611",
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-sv-4-validator-sv-4",
@@ -2773,7 +2773,7 @@
             "memory": "4Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-svc-global-domain",
@@ -2868,7 +2868,7 @@
             "memory": "32Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-svc-participant",
@@ -2944,7 +2944,7 @@
             "memory": "1536Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-svc-svc",
@@ -3039,7 +3039,7 @@
             "memory": "32Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-validator1-participant",
@@ -3113,7 +3113,7 @@
             "memory": "1536Mi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-validator1-splitwell-web-ui",
@@ -3198,7 +3198,7 @@
         },
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5",
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "helm-validator1-validator-validator1",
@@ -3282,7 +3282,7 @@
             "memory": "8Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "splitwell-postgres",
@@ -3384,7 +3384,7 @@
             "memory": "8Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "sv-2-postgres",
@@ -3472,7 +3472,7 @@
             "memory": "8Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "sv-3-postgres",
@@ -3560,7 +3560,7 @@
             "memory": "8Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "sv-4-postgres",
@@ -3648,7 +3648,7 @@
             "memory": "8Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "svc-postgres",
@@ -3736,7 +3736,7 @@
             "memory": "8Gi"
           }
         },
-        "xNodes": false
+        "xNodes": true
       }
     },
     "name": "validator1-postgres",

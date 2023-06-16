@@ -72,9 +72,9 @@ class SvOnboardingPreflightIntegrationTest
           "-c",
           (testResourcesPath / "include" / "storage-postgres.conf").toString,
           "-C",
-          "canton.participants.svParticipant.ledger-api.port=6001",
+          "canton.participants-x.svParticipant.ledger-api.port=6001",
           "-C",
-          "canton.participants.svParticipant.admin-api.port=6002",
+          "canton.participants-x.svParticipant.admin-api.port=6002",
           "--bootstrap",
           (svPath / "sv-participant.sc").toString,
         )

@@ -5,7 +5,6 @@ logger.info("Starting participant node")
 validatorParticipant.start()
 
 logger.info(s"Creating validator user: " + validatorUserName)
-
 validatorParticipant.ledger_api.users.create(
   id = validatorUserName,
   actAs = Set.empty,

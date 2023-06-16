@@ -26,7 +26,7 @@ class XNodeWalletSurviveCantonRestartIntegrationTest
 
   val cantonArgs: Seq[String] = Seq(
     "-c",
-    (validatorPath / "validator-participant-x.conf").toString,
+    (validatorPath / "validator-participant.conf").toString,
     "-c",
     (testResourcesPath / "self-hosted-validator-participant-postgres-storage-x.conf").toString,
     "-c",

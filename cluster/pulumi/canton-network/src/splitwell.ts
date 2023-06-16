@@ -49,7 +49,7 @@ export async function installSplitwell(
     {
       postgres: postgresDb,
     },
-    [participant]
+    [svc, participant]
   );
 
   const dependsOn = [

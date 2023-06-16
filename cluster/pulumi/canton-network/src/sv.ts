@@ -138,6 +138,7 @@ export async function installSvNode(
         'scan-' + xns.logicalName,
         'cn-scan',
         {},
+        // TODO(#5597) this really should depend on sv2
         dependsOn.concat([participant])
       );
     }
@@ -164,6 +165,7 @@ export async function installSvNode(
     };
   }
 
+  // TODO(#5597) this really should depend on the sv's participant
   const svApp = installCNHelmChart(xns, nodename + '-sv-app', 'cn-sv-node', svValues, dependsOn);
 
   installCNHelmChart(

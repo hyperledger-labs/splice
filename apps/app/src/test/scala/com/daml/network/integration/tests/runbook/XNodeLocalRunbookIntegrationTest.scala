@@ -97,7 +97,7 @@ class XNodeLocalRunbookIntegrationTest
     val process = startCanton(
       Seq(
         "-c",
-        (validatorPath / "validator-participant-x.conf").toString,
+        (validatorPath / "validator-participant.conf").toString,
         "-c",
         (svcParticipantPath / "canton.conf").toString,
         "-c",

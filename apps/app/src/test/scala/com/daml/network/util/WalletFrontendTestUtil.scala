@@ -8,7 +8,9 @@ import org.scalatest.Assertion
 trait WalletFrontendTestUtil { self: FrontendTestCommon =>
 
   protected def tapCoins(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
-    val transactionsBefore = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
+    // The eventually makes this robust against `StaleElementReferenceException` errors
+    val transactionsBefore =
+      eventually()(findAll(className("tx-row")).toSeq.map(readTransactionFromRow))
 
     click on "tap-amount-field"
     numberField("tap-amount-field").underlying.clear()

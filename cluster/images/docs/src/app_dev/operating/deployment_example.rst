@@ -79,11 +79,10 @@ again until you have onboarded ``alice`` and ``bob``.
 
 Before Alice and Bob can use splitwell, you need to upload the DAR to
 their participant. For that, go to the terminal in which you started
-the Canton participant (configured using
-``examples/validator/validator-participant.conf``) and run the
-following command: ::
+their validator (configured using ``examples/validator/validator.conf``)
+and run the following command: ::
 
-  @ validatorParticipant.dars.upload("dars/splitwell-0.1.0.dar")
+  @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-0.1.0.dar")
 
 
 To interact with splitwell, the release includes an example configuration that
@@ -161,9 +160,9 @@ in the runbook for :ref:`hosting your own validator
 If you stopped the participant and validator, go through the runbook
 again until you have onboarded ``alice`` and ``bob``.
 
-Upload the DAR to their participant: ::
+Upload the DAR to their participant, via their validator: ::
 
-  @ validatorParticipant.dars.upload("dars/splitwell-0.1.0.dar")
+  @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-0.1.0.dar")
 
 And connect their participant to the domain you setup above: ::
 
