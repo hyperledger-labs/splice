@@ -25,9 +25,10 @@ class AuthTokenManager(
     extends NamedLogging {
 
   sealed trait State
-  case object NoToken extends State
-  case class Refreshing(pending: Future[Option[AuthToken]]) extends State
-  case class HaveToken(token: AuthToken) extends State
+  private sealed trait ResultState extends State
+  private case object NoToken extends ResultState
+  private case class HaveToken(token: AuthToken) extends ResultState
+  private case class Refreshing(pending: Future[ResultState]) extends State
 
   private val state = new AtomicReference[State](NoToken)
 
@@ -35,56 +36,57 @@ class AuthTokenManager(
     * If a token is immediately available the returned future will be immediately completed.
     * If there is no token it will cause a token refresh to start and be completed once obtained.
     * If there is a refresh already in progress it will be completed with this refresh.
+    * If a scheduled refresh occurs while a refresh is in progress, the result of the scheduled refresh will be returned.
     */
   def getToken: Future[Option[AuthToken]] = blocking {
-    // updates must be synchronized, as we are triggering refreshes from here
-    // and the AtomicReference.updateAndGet requires the update to be side-effect free
-    synchronized {
-      state.get() match {
-        // we are already refreshing, so pass future result
-        case Refreshing(pending) => pending
-        // we have a token, so share it
-        case HaveToken(token) => Future.successful(Some(token))
-        // there is no token yet, so start refreshing and return pending result
-        case NoToken =>
-          createRefreshTokenFuture()
-      }
+    state.get() match {
+      case HaveToken(token) => Future.successful(Some(token))
+      case NoToken => tokenO(refreshState())
+      case Refreshing(pending) => tokenO(pending)
     }
   }
 
-  private def createRefreshTokenFuture(): Future[Option[AuthToken]] = {
+  private def tokenO(pending: Future[ResultState]): Future[Option[AuthToken]] = pending.map {
+    case HaveToken(token) => Some(token)
+    case NoToken => None
+  }
+
+  private def refreshState(): Future[ResultState] = {
+    val promise = Promise[ResultState]()
+    val resultF = promise.future
+    val prevState = state.compareAndExchange(NoToken, Refreshing(resultF))
+    if (prevState == NoToken) {
+      refreshToken(promise)
+    } else {
+      prevState match {
+        case r: ResultState => promise.success(r)
+        case _ => promise.failure(new Exception("prevState == NoToken"))
+      }
+    }
+    resultF
+  }
+
+  private def refreshToken(
+      promise: Promise[ResultState]
+  ): Unit = {
     import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.*
 
-    val syncP = Promise[Unit]()
-    val refresh = syncP.future.flatMap(_ => obtainToken())
-
     logger.debug("Refreshing authentication token")
-
-    def completeRefresh(result: State): Unit = {
-      state.updateAndGet {
-        case Refreshing(_) => result
-        case other => other
-      }.discard
-    }
-
-    // asynchronously update the state once completed, one way or another
-    val refreshTransformed = refresh.andThen {
+    obtainToken().onComplete {
       case Failure(exception) =>
         logger.warn("Token refresh failed", exception)
-        completeRefresh(NoToken)
+        state.set(NoToken)
+        promise.failure(exception)
       case Success(None) =>
-        completeRefresh(NoToken)
+        state.set(NoToken)
+        promise.success(NoToken)
       case Success(Some(authToken)) =>
+        val nextState = HaveToken(authToken)
+        state.set(nextState)
         logger.debug("Token refresh complete")
         scheduleRefreshBefore(authToken.expiresAt)
-        completeRefresh(HaveToken(authToken))
+        promise.success(nextState)
     }
-
-    val res = Refreshing(refresh)
-    state.set(res)
-    // only kick off computation once the state is set
-    syncP.success(())
-    refreshTransformed
   }
 
   private def scheduleRefreshBefore(expiresAt: CantonTimestamp): Unit = {
@@ -100,7 +102,14 @@ class AuthTokenManager(
 
   private def backgroundRefreshToken(_now: CantonTimestamp): Unit = if (!isClosed) {
     _now.discard
-    blocking(synchronized(createRefreshTokenFuture().discard))
+    val promise = Promise[ResultState]()
+    val future = promise.future
+    state.get() match {
+      // if a pending refresh is already occurring, overwrite the result with the scheduled refresh token
+      case Refreshing(pending) => pending.foreach(_ => future)
+      // getToken calls, that occur after the background refresh starts, will get the result of the background refresh
+      case _ => state.set(Refreshing(future))
+    }
+    refreshToken(promise)
   }
-
 }
