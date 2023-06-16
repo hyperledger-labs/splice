@@ -114,7 +114,7 @@ function configureGatewayService(
             ingressPort('sw-lg-gw', 6201),
             ingressPort('grpc-sw-api', 5213),
             ingressPort('sw-api-gw', 6213),
-// see notes when installing a CometBft node in the full deployment
+            // see notes when installing a CometBft node in the full deployment
             ingressPort('cometbft1-gw', 26656),
             ingressPort('cometbft2-gw', 26666),
             ingressPort('cometbft3-gw', 26676),
