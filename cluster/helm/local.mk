@@ -13,7 +13,6 @@ app_charts := \
 	cn-splitwell-app \
 	cn-splitwell-web-ui \
 	cn-sv-node \
-	cn-svc \
 	cn-validator
 
 all_charts := $(app_charts) cn-util-lib

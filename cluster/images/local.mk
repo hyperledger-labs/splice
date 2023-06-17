@@ -8,7 +8,6 @@ images := \
 	cn-app \
 	sv-app \
 	sv-web-ui \
-	svc-app \
 	scan-app \
 	scan-web-ui \
 	directory-app \

@@ -26,7 +26,7 @@ spec:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
         - name: CN_APP_DIRECTORY_PARTICIPANT_ADDRESS
-          value: {{ .Values.participantAddress }}
+          value: {{ .Values.participantAddress | default "participant" | quote }}
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "directory" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         ports:
         - containerPort: 5010

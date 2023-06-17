@@ -1,3 +1,4 @@
+import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import type { Auth0Client } from 'cn-pulumi-common';
 import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
@@ -5,7 +6,7 @@ import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
 import { installDocs } from './docs';
 import { installClusterIngress } from './ingress';
 import { installSplitwell } from './splitwell';
-import { installSVC, installSvNode } from './sv';
+import { installSvNode, SvOnboarding } from './sv';
 import { installValidator } from './validator';
 
 /// Toplevel Chart Installs
@@ -31,47 +32,57 @@ const SV4_KEY = {
     'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ',
 };
 
-export async function installCluster(auth0Client: Auth0Client): Promise<void> {
-  const svc = await installSVC(auth0Client);
-  const validator = await installValidator(
-    auth0Client,
-    svc,
-    'validator1',
-    'auth0|63e3d75ff4114d87a2c1e4f5'
-  );
-  const splitwell = await installSplitwell(auth0Client, svc, 'auth0|63e12e0415ad881ffe914e61');
+function joinViaSv1(
+  sv1: k8s.helm.v3.Release,
+  keys: { publicKey: string; privateKey: string }
+): SvOnboarding {
+  return {
+    type: 'join-with-key',
+    sponsorApiUrl: 'http://sv-app.sv-1:5014',
+    sponsorRelease: sv1,
+    ...keys,
+  };
+}
 
-  await installSvNode(
+export async function installCluster(auth0Client: Auth0Client): Promise<void> {
+  const sv1 = await installSvNode(
     auth0Client,
-    svc,
     'sv-1',
     'Canton-Foundation-1',
-    'auth0|64529b128448ded6aa68048f'
+    'auth0|64529b128448ded6aa68048f',
+    { type: 'found-collective' },
+    true
   );
   await installSvNode(
     auth0Client,
-    svc,
     'sv-2',
     'Canton-Foundation-2',
     'auth0|64529b6852dd694167351045',
-    SV2_KEY
+    joinViaSv1(sv1, SV2_KEY),
+    true
   );
   await installSvNode(
     auth0Client,
-    svc,
     'sv-3',
     'Canton-Foundation-3',
     'auth0|64529bb10c1aee4f2c819218',
-    SV3_KEY
+    joinViaSv1(sv1, SV3_KEY)
   );
   await installSvNode(
     auth0Client,
-    svc,
     'sv-4',
     'Canton-Foundation-4',
     'auth0|64529bc58d30358eacae5611',
-    SV4_KEY
+    joinViaSv1(sv1, SV4_KEY)
   );
+
+  const validator = await installValidator(
+    auth0Client,
+    sv1,
+    'validator1',
+    'auth0|63e3d75ff4114d87a2c1e4f5'
+  );
+  const splitwell = await installSplitwell(auth0Client, sv1, 'auth0|63e12e0415ad881ffe914e61');
 
   const docs = installDocs();
 

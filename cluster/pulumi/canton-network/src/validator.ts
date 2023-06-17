@@ -65,7 +65,7 @@ export async function installValidator(
         'cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar',
         'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar',
       ],
-      globalDomainUrl: 'http://global-domain.svc:5008',
+      globalDomainUrl: 'http://global-domain.sv-1:5008',
       validatorWalletUser,
     },
     dependsOn

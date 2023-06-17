@@ -10,4 +10,4 @@ resources:
     cpu: "1"
     memory: 4Gi
 
-postgres: postgres.svc.svc.cluster.local
+postgres: postgres.sv-1.svc.cluster.local

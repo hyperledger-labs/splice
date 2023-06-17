@@ -12,9 +12,6 @@ resources:
     cpu: "1"
     memory: 32Gi
 
-postgres: postgres.svc.svc.cluster.local
-postgresSchema: svc_participant
-
 auth:
   jwksUrl: "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
   targetAudience: "https://canton.network.global"
