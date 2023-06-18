@@ -11,7 +11,7 @@ LOGFILE_BEFORE="$2"
 LOGFILE_AFTER="$3"
 
 # We're using this rather specific pattern to avoid skipping over logs.
-SHUTDOWN_MESSAGE_PATTERN='"message":"Shutting down\.\.\.","logger_name":"c.d.canton.CantonResearchApp$"'
+SHUTDOWN_MESSAGE_PATTERN='"message":"Shutting down\.\.\.","logger_name":"c\.d\..*\.Canton.*App$"'
 
 # Succeed if logfile does not exist
 if [[ ! -f "$LOGFILE" ]]
@@ -22,7 +22,7 @@ then
 fi
 
 # Fail if the shutdown pattern is present more than once
-NUM_SHUTDOWN_PATTERNS=$(grep --count --max-count=2 "$SHUTDOWN_MESSAGE_PATTERN" "$LOGFILE" || true)
+NUM_SHUTDOWN_PATTERNS=$(grep --count --max-count=2 -E "$SHUTDOWN_MESSAGE_PATTERN" "$LOGFILE" || true)
 if [[ "2" == "$NUM_SHUTDOWN_PATTERNS" ]]
 then
   # This error will be picked up by the sbt output checker
