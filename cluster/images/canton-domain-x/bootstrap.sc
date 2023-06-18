@@ -1,7 +1,8 @@
 import cats.syntax.either._
-import com.digitalasset.canton.domain.config.DomainParametersConfig
-import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 import com.digitalasset.canton.console.LocalInstanceReferenceX
+import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
 def main() {
   val domainParametersConfig = DomainParametersConfig(
@@ -14,13 +15,25 @@ def main() {
       .toStaticDomainParameters(sequencer.config.crypto)
       .flatMap(StaticDomainParameters(_).leftMap(_.toString))
       .getOrElse(sys.error("whatever"))
-  logger.info("Bootstrapping domain")
-  sequencer.domain.bootstrap(
-    "domain",
-    staticParameters(sequencer),
-    domainOwners = Seq(sequencer, mediator),
-    sequencers = Seq(sequencer),
-    mediators = Seq(mediator),
-  )
-  logger.info("Bootstrapped domain")
+  utils.retry_until_true {
+    sequencer.health.status match {
+      case NodeStatus.Failure(msg) =>
+        logger.info(s"Failed to query sequencer status: $msg")
+        false
+      case NodeStatus.NotInitialized(_) =>
+        logger.info("Initializing domain")
+        sequencer.domain.bootstrap(
+          "domain",
+          staticParameters(sequencer),
+          domainOwners = Seq(sequencer),
+          sequencers = Seq(sequencer),
+          mediators = Seq(mediator),
+        )
+        logger.info("Domain initialized")
+        true
+      case NodeStatus.Success(_) =>
+        logger.info(s"Domain is already initialized")
+        true
+    }
+  }
 }
