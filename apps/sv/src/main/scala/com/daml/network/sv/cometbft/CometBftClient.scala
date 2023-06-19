@@ -44,7 +44,7 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
   ): EitherT[Future, CometBftHttpRpcClient.CometBftError, Unit] = {
     val updateRequest = CometBftTx(CometBftTx.Message.UpdateNetworkConfigRequest(request))
     client
-      .send(updateRequest.toByteArray)
+      .sendAndWaitForCommit(updateRequest.toByteArray)
       .recover {
         case cometBftError if cometBftError.message.contains("tx already exists in cache") =>
           logger.info(

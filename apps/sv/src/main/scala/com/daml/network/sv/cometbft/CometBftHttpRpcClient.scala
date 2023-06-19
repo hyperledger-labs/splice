@@ -65,13 +65,15 @@ class CometBftHttpRpcClient(
     )
   }
 
-  def send(
+  def sendAndWaitForCommit(
       message: Array[Byte]
   ): EitherT[Future, CometBftError, Unit] = {
     val encodedRequest =
       Base64.getEncoder.encodeToString(message)
+
+    // TODO(#5890): switch to broadcast_tx_commit
     callCometBftJsonHttp[CometBftBroadcastResult](
-      "broadcast_tx_async",
+      "broadcast_tx_sync",
       Map("tx" -> encodedRequest.asJson),
     ).map(_ => {})
   }

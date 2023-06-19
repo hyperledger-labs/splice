@@ -8,6 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn as daml
+import com.daml.network.codegen.java.cn.cometbft.SequencingKeyConfig
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.automation.PublishLocalCometBftNodeConfigTrigger.*
 import com.daml.network.sv.cometbft.CometBftNode
@@ -123,6 +124,7 @@ object PublishLocalCometBftNodeConfigTrigger {
       param("localSvNodeConfig", _.localSvNodeConfig),
     )
 
+    // TODO(#5889): unify or align with CometBftNode.getLocalNodeConfig and the functions backing `diffNetworkConfig`
     val damlSvNodeConfig: daml.svc.globaldomain.DomainNodeConfig =
       new daml.svc.globaldomain.DomainNodeConfig(
         new daml.cometbft.CometBftConfig(
@@ -135,8 +137,10 @@ object PublishLocalCometBftNodeConfigTrigger {
               ),
             )
           }.asJava,
-          Seq[daml.cometbft.GovernanceKeyConfig]().asJava,
-          Seq[daml.cometbft.SequencingKeyConfig]().asJava,
+          localSvNodeConfig.governanceKeys
+            .map(key => new daml.cometbft.GovernanceKeyConfig(key.pubKey))
+            .asJava,
+          localSvNodeConfig.sequencingKeys.map(key => new SequencingKeyConfig(key.pubKey)).asJava,
         )
       )
   }

@@ -55,6 +55,6 @@ object Dependencies {
   lazy val better_files = CantonDependencies.better_files
 
   lazy val comet_bft_proto =
-    "com.digitalasset.canton.drivers" % "canton-drivers-proto" % "0.1.4"
+    "com.digitalasset.canton.drivers" % "canton-drivers-proto" % "0.1.6"
 
 }

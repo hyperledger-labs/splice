@@ -15,7 +15,6 @@ import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftError
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
-
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.EnrichedDurations.*
 
@@ -83,9 +82,12 @@ object SvUtil {
                   )
                   .toMap
                   .asJava,
-                // TODO(M3-47) - Add support for governance and sequencer keys
-                List.empty.asJava,
-                List.empty.asJava,
+                nodeConfig.governanceKeys
+                  .map(key => new cometbft.GovernanceKeyConfig(key.pubKey))
+                  .asJava,
+                nodeConfig.sequencingKeys
+                  .map(key => new cometbft.SequencingKeyConfig(key.pubKey))
+                  .asJava,
               )
             )
           ).asJava

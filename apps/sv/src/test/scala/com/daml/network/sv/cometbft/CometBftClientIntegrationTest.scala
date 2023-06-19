@@ -5,7 +5,9 @@ package com.daml.network.sv.cometbft
 import com.daml.network.sv.cometbft.CometBftClientIntegrationTest.{
   InitialVotingPower,
   PubKey2,
+  SvNode1,
   SvNode2,
+  SvNode2CometId,
   createUpdateNetworkConfigRequest,
 }
 import com.digitalasset.canton.BaseTest
@@ -20,7 +22,6 @@ import com.digitalasset.canton.drivers.cometbft.{
   UpdateNetworkConfigRequest,
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.ExecutionContext
@@ -40,7 +41,7 @@ class CometBftClientIntegrationTest
         .readNetworkConfig()
         .map { networkConfig =>
           networkConfig.chainId should startWith("test-chain-")
-          val initialState = networkConfig.svNodeConfigStates.get("initial").value
+          val initialState = networkConfig.svNodeConfigStates.get(SvNode1).value
           initialState.currentConfigRevision shouldBe 1
           initialState.pendingChanges shouldBe empty
           val currentConfig = initialState.currentConfig.value
@@ -61,7 +62,7 @@ class CometBftClientIntegrationTest
           .updateNetworkConfig(
             createUpdateNetworkConfigRequest(
               chainId = chainId,
-              submitterSvNodeId = SvNode2,
+              submitterSvNodeId = SvNode1,
               changedSvNodeId = SvNode2,
               pubKey = PubKey2,
             )
@@ -78,7 +79,7 @@ class CometBftClientIntegrationTest
               val currentConfig = newState.currentConfig.value
               val nodes = currentConfig.cometbftNodes
               nodes shouldNot be(empty)
-              val node = nodes.get("nodeId").value
+              val node = nodes.get(SvNode2CometId).value
               node.validatorPubKey shouldBe PubKey2
               node.votingPower shouldBe 1
             }
@@ -120,36 +121,42 @@ class CometBftClientIntegrationTest
 object CometBftClientIntegrationTest {
   private val InitialVotingPower = 10L
 
-  private val PubKey2 = "pubKey2"
+  private val SvNode1 = "initial"
+  private val PubKey2 = "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
   private val SvNode2 = "svNode2"
+  private val SvNode2CometId = "8A931AB5F957B8331BDEF3A0A081BD9F017A777F"
 
   private def createUpdateNetworkConfigRequest(
       chainId: String,
       submitterSvNodeId: String,
       changedSvNodeId: String,
       pubKey: String,
-  ) =
-    UpdateNetworkConfigRequest.of(
-      changeRequestBytes = NetworkConfigChangeRequest(
-        chainId,
-        submitterSvNodeId,
-        NodeConfigChangeRequest(
-          SvNodeConfigChangeRequest.of(
-            changedSvNodeId,
-            currentConfigRevision = 0L,
-            change = Some(
-              SvNodeConfigChange.of(
-                SetConfig(
-                  SvNodeConfig(
-                    Map("nodeId" -> CometBftNodeConfig.of(pubKey, votingPower = 1))
-                  )
+  ) = {
+    val request = NetworkConfigChangeRequest(
+      chainId,
+      submitterSvNodeId,
+      NodeConfigChangeRequest(
+        SvNodeConfigChangeRequest.of(
+          changedSvNodeId,
+          currentConfigRevision = 0L,
+          change = Some(
+            SvNodeConfigChange.of(
+              SetConfig(
+                SvNodeConfig(
+                  Map(SvNode2CometId -> CometBftNodeConfig.of(pubKey, votingPower = 1))
                 )
               )
-            ),
-          )
-        ),
-      ).toByteString,
-      signature = ByteString.copyFromUtf8("signature"),
+            )
+          ),
+        )
+      ),
     )
+
+    UpdateNetworkConfigRequest.of(
+      changeRequestBytes = request.toByteString,
+      signature =
+        com.google.protobuf.ByteString.copyFrom(CometBftRequestSigner.signRequest(request)),
+    )
+  }
 
 }

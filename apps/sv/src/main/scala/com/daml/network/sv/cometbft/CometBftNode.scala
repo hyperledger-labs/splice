@@ -1,14 +1,15 @@
 package com.daml.network.sv.cometbft
 
+import cats.Show.Shown
 import cats.data.EitherT
 import cats.implicits.toTraverseOps
 import com.daml.network.codegen.java.cn as daml
-import com.daml.network.sv.util.SvUtil
 import com.daml.network.codegen.java.cn.svcrules.{MemberInfo, SvcRules}
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftError
 import com.daml.network.sv.config.CometBftConfig
+import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.drivers as proto
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyUtil}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -43,6 +44,16 @@ class CometBftNode(
     networkConfigChanges = diffNetworkConfig(owningSvNode, target.members, actualConfig, logger)
     // We minimize latency by issuing updates and deletes in parallel, which is safe as we expect <= 16 SV nodes
     // TODO(M3-47): consider moving `diffNetworkConfig` into this class to minimize the parameter passing; it's currently kept outside for ease of unit testing
+    _ = if (networkConfigChanges.requests.nonEmpty) {
+      val summary = CometBftNode.NetworkDiffSummary(
+        actualConfig,
+        target.members,
+        networkConfigChanges.requests,
+      )
+      logger.debug(
+        show"Applying changes to reconcile difference in CometBft network configuration: $summary"
+      )
+    }
     _ <- networkConfigChanges.requests.traverse(
       submitChangeRequest
     )
@@ -51,15 +62,21 @@ class CometBftNode(
   private def submitChangeRequest(
       changeRequest: proto.cometbft.NetworkConfigChangeRequest
   )(implicit tc: TraceContext) = {
-    logger.debug(s"Updating network config $changeRequest")
+    @SuppressWarnings(Array("org.wartremover.warts.Product"))
+    implicit val prettyNetworkConfigChangeRequest
+        : Pretty[proto.cometbft.NetworkConfigChangeRequest] =
+      PrettyUtil.adHocPrettyInstance
+
+    logger.debug(show"Applying CometBft network change: $changeRequest")
     val request = proto.cometbft.UpdateNetworkConfigRequest(
       changeRequestBytes = changeRequest.toByteString,
-      signature = com.google.protobuf.ByteString.EMPTY, // TODO(M3-47): actually sign :)
+      signature =
+        com.google.protobuf.ByteString.copyFrom(CometBftRequestSigner.signRequest(changeRequest)),
     )
     cometBftClient
       .updateNetworkConfig(request)
       .map { _ =>
-        logger.debug(s"Updated network config $changeRequest")
+        logger.info(show"Applied CometBft network change: $changeRequest")
       }
   }
 
@@ -76,7 +93,13 @@ class CometBftNode(
                 validatorPubKey = status.validatorInfo.publicKey.value,
                 votingPower = 1, // hard-coded to one for now, as we only have one node at most
               )
-          )
+          ),
+          // TODO(#4925) use a per-node key, instead of this static one
+          governanceKeys = List(
+            proto.cometbft.GovernanceKey(CometBftRequestSigner.GenesisPubKeyBase64)
+          ),
+          // TODO(#5882): add support for sequencing keys
+          sequencingKeys = List.empty,
         )
       }
   }
@@ -226,12 +249,16 @@ object CometBftNode {
     )
 
   def svNodeConfigToProto(config: daml.cometbft.CometBftConfig): proto.cometbft.SvNodeConfig =
-    proto.cometbft.SvNodeConfig(cometbftNodes =
-      config.nodes.asScala
+    proto.cometbft.SvNodeConfig(
+      cometbftNodes = config.nodes.asScala
         .map({ case (nodeId, nodeConfig) =>
           (nodeId, cometBftNodeConfigToProto(nodeConfig))
         })
-        .toMap
+        .toMap,
+      governanceKeys =
+        config.governanceKeys.asScala.map(key => proto.cometbft.GovernanceKey(key.pubKey)).toSeq,
+      sequencingKeys =
+        config.sequencingKeys.asScala.map(key => proto.cometbft.SequencingKey(key.pubKey)).toSeq,
     )
 
   private def memberInfosToNetworkConfig(
@@ -252,6 +279,37 @@ object CometBftNode {
     info.domainNodes.asScala.get(
       SvUtil.defaultSvcDomainNumber
     )
+  }
+
+  /** Used only for pretty-printing a summary. */
+
+  @SuppressWarnings(Array("org.wartremover.warts.Product"))
+  private case class NetworkDiffSummary(
+      actualConfig: proto.cometbft.GetNetworkConfigResponse,
+      memberInfos: java.util.Map[String, daml.svcrules.MemberInfo],
+      changes: Seq[proto.cometbft.NetworkConfigChangeRequest],
+  ) extends PrettyPrinting {
+    implicit val prettyGetNetworkConfigResponse: Pretty[proto.cometbft.GetNetworkConfigResponse] =
+      PrettyUtil.adHocPrettyInstance
+
+    implicit val prettySvNodeConfig: Pretty[proto.cometbft.SvNodeConfig] =
+      PrettyUtil.adHocPrettyInstance
+
+    implicit val prettyNetworkConfigChangeRequest
+        : Pretty[proto.cometbft.NetworkConfigChangeRequest] =
+      PrettyUtil.adHocPrettyInstance
+
+    private val targetConfig: Seq[(Shown, proto.cometbft.SvNodeConfig)] =
+      memberInfosToNetworkConfig(memberInfos).view.map { case (memberId, config) =>
+        (memberId.singleQuoted, config)
+      }.toSeq
+    override def pretty: Pretty[this.type] = {
+      prettyOfClass(
+        param("actual", _.actualConfig),
+        param("target", x => (x.targetConfig)),
+        param("changes", _.changes),
+      )
+    }
   }
 
 }

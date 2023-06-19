@@ -72,6 +72,8 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     forAll(env.svs.local) { sv =>
       eventually(timeUntilSuccess = 2.minute) {
         withClue(s"CometBFT node for ${sv.name} becomes a validator") {
+          val dump = sv.cometBftNodeDump()
+          logger.debug(s"Node dump for ${sv.name}: $dump")
           sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
         }
       }

@@ -36,12 +36,12 @@
     "sv_node_id": "Canton-Foundation-1",
     "governance_keys": [
       {
-        "pub_key": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        "pub_key": "m16haLzv/d/Ok04Sm39ABk0f0HsSWYNZxrIUiyQ+cK8="
       }
     ],
     "sequencing_keys": [
       {
-        "pub_key": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
+        "pub_key": "dummy/key/here/replace/with/real/oneiyQ+cK8="
       }
     ]
   }
