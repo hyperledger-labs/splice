@@ -105,7 +105,7 @@ function usage() {
   echo "  -a   run all frontends with canton-network-test auth0 tenant and no test auth"
   echo "  -p   run the frontends needed for the preflight self-hosted directory UI test"
   echo "  -e   run frontends with dedicated validator for users"
-  echo "  -s   run frontends with multiple super validators for SvIntegrationTest in CI"
+  echo "  -s   run frontends with multiple super validators for Sv*IntegrationTest in CI"
 }
 
 # default values
