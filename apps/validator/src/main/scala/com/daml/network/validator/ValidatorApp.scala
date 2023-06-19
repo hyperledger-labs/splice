@@ -310,6 +310,12 @@ class ValidatorApp(
           scanConnection,
           loggerFactory,
         )
+      participantAdminConnection = new ParticipantAdminConnection(
+        config.participantClient.adminApi,
+        loggerFactory,
+        retryProvider,
+        clock,
+      )
       automation = new ValidatorAutomationService(
         config.automation,
         config.domains.global.buyExtraTraffic,
@@ -318,6 +324,7 @@ class ValidatorApp(
         store,
         scanConnection,
         ledgerClient,
+        participantAdminConnection,
         retryProvider,
         loggerFactory,
       )
@@ -439,6 +446,7 @@ class ValidatorApp(
     } yield {
       ValidatorApp.State(
         scanConnection,
+        participantAdminConnection,
         storage,
         store,
         automation,
@@ -458,6 +466,7 @@ class ValidatorApp(
 object ValidatorApp {
   case class State(
       scanConnection: ScanConnection,
+      participantAdminConnection: ParticipantAdminConnection,
       storage: Storage,
       store: ValidatorStore,
       automation: ValidatorAutomationService,
@@ -482,6 +491,7 @@ object ValidatorApp {
         store,
         storage,
         scanConnection,
+        participantAdminConnection,
       )(logger)
   }
 }

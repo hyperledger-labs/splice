@@ -13,10 +13,9 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types as damlTypes
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection}
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorTrafficBalance
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{CoinConfigSchedule, Contract}
 import com.daml.network.validator.config.BuyExtraTrafficConfig
@@ -24,6 +23,7 @@ import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.treasury.TreasuryService
+import com.digitalasset.canton.participant.traffic.TrafficStateController.ParticipantTrafficState
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -37,6 +37,7 @@ class TopupValidatorTrafficBalanceTrigger(
     override protected val context: TriggerContext,
     store: ValidatorStore,
     connection: CNLedgerConnection,
+    participantAdminConnection: ParticipantAdminConnection,
     buyExtraTrafficConfig: BuyExtraTrafficConfig,
     clock: Clock,
     walletManager: UserWalletManager,
@@ -58,16 +59,14 @@ class TopupValidatorTrafficBalanceTrigger(
         .globalDomain
       activeDomainId = DomainId.tryFromString(globalDomainConfig.activeDomain)
       currentValidatorTraffic <- store.lookupValidatorTrafficWithOffset(activeDomainId)
-      currentTrafficBalance <- scanConnection.getValidatorTrafficBalance(
-        store.key.validatorParty
-      )
+      currentTrafficState <- participantAdminConnection.getParticipantTrafficState(activeDomainId)
       topupParameters = ExtraTrafficTopupParameters(
         globalDomainConfig.fees,
         buyExtraTrafficConfig,
         context.config.pollingInterval,
       )
       result <-
-        if (shouldTopup(currentTrafficBalance, currentValidatorTraffic.value, topupParameters))
+        if (shouldTopup(currentTrafficState, currentValidatorTraffic.value, topupParameters))
           topUpValidatorTraffic(
             validatorTreasury,
             activeDomainId,
@@ -105,7 +104,7 @@ class TopupValidatorTrafficBalanceTrigger(
   }
 
   private def shouldTopup(
-      currentTrafficBalance: ValidatorTrafficBalance,
+      currentTrafficState: ParticipantTrafficState,
       validatorTraffic: Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]],
       topupParameters: ExtraTrafficTopupParameters,
   )(implicit traceContext: TraceContext): Boolean = {
@@ -117,17 +116,15 @@ class TopupValidatorTrafficBalanceTrigger(
       val lastPurchasedAt = validatorTraffic.fold(Instant.MIN)(_.payload.lastPurchasedAt)
       logger.debug(s"Trying to top-up too soon after previous top-up at ${lastPurchasedAt}")
       false
-    } else if (currentTrafficBalance.totalPurchased < totalPurchasedTraffic) {
+    } else if (
+      currentTrafficState.totalExtraTrafficLimit.fold(0L)(_.value) < totalPurchasedTraffic
+    ) {
       logger.info(s"There is another top-up already in progress. Retry in some time.")
-      logger.debug(
-        s"Total purchased traffic from scan: ${currentTrafficBalance.totalPurchased}, " +
-          s"Total purchased traffic ingested from ledger: ${totalPurchasedTraffic}"
-      )
       false
-    } else if (currentTrafficBalance.remainingBalance >= topupParameters.topupAmount) {
+    } else if (currentTrafficState.extraTrafficRemainder.value >= topupParameters.topupAmount) {
       logger.debug(
         s"Skipping top-up because sufficient traffic balance remains. " +
-          s"Current traffic balance: ${currentTrafficBalance.remainingBalance / 1e6} MB"
+          s"Current traffic balance: ${currentTrafficState.extraTrafficRemainder.value / 1e6} MB"
       )
       false
     } else {

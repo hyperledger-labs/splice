@@ -3,7 +3,7 @@ package com.daml.network.validator.automation
 import akka.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.daml.network.validator.store.ValidatorStore
@@ -23,6 +23,7 @@ class ValidatorAutomationService(
     store: ValidatorStore,
     scanConnection: ScanConnection,
     ledgerClient: CNLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -44,6 +45,7 @@ class ValidatorAutomationService(
         triggerContext,
         store,
         connection,
+        participantAdminConnection,
         buyExtraTrafficConfig,
         clock,
         walletManager,
