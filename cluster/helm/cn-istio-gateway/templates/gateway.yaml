@@ -87,16 +87,6 @@ spec:
     - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
   - port:
-      number: 5010
-      name: directory-api
-      protocol: HTTPS
-    tls:
-      mode: SIMPLE
-      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
-    hosts:
-    - "{{ (.Values.cluster).hostname }}"
-    - "*.{{ (.Values.cluster).hostname }}"
-  - port:
       number: 5005
       name: grpc-svc-adm
       protocol: GRPC
