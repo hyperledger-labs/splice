@@ -41,6 +41,8 @@ object SvOnboardingConfig {
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,
+      // TODO(#5855) remove this again
+      globalLockTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(120),
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

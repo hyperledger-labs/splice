@@ -74,6 +74,14 @@ abstract class SvAppReference(
         )
       )
     }
+
+  def acquireGlobalLock() = consoleEnvironment.run {
+    httpCommand(HttpSvAppClient.AcquireGlobalLock)
+  }
+
+  def releaseGlobalLock() = consoleEnvironment.run {
+    httpCommand(HttpSvAppClient.ReleaseGlobalLock)
+  }
 }
 
 class SvAppClientReference(

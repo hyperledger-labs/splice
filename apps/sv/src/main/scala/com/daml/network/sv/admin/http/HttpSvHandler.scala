@@ -19,7 +19,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.setup.SvcPartyHosting
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock, ExpiringLock}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -33,9 +33,9 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.Base64
-import java.util.concurrent.Semaphore
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import com.daml.network.sv.config.SvOnboardingConfig
 
 class HttpSvHandler(
     globalDomain: DomainId,
@@ -49,7 +49,8 @@ class HttpSvHandler(
     localDomainNode: Option[LocalDomainNode],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
-    isFounder: Boolean,
+    // TODO(#5755) likely needed only for our locking workaround
+    foundingConfig: Option[SvOnboardingConfig.FoundCollective],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -71,36 +72,44 @@ class HttpSvHandler(
   // This avoids a bunch of issues where Canton
   // does not handle concurrency for those operations
   // correctly.
-  private val globalLock = new Semaphore(1)
+  private val globalLockO = foundingConfig.map(c => new ExpiringLock(c.globalLockTimeout, logger))
 
-  def founderOnly[T](f: => Future[T]): Future[T] =
-    if (isFounder) f
-    else Future.failed(HttpErrorHandler.notFound("Global lock is only available on founding SV"))
+  private def withGlobalLock[T](f: ExpiringLock => Future[T]): Future[T] =
+    globalLockO match {
+      case Some(globalLock) => f(globalLock)
+      case None =>
+        Future.failed(
+          HttpErrorHandler.notFound("Global lock is only available on founding SV")
+        )
+    }
+
+  private def withAcquiredGlobalLock[T](f: => Future[T]): Future[T] =
+    acquireGlobalLock(v0.SvResource.AcquireGlobalLockResponse)()(()).flatMap { _ =>
+      f.andThen(_ => releaseGlobalLock(v0.SvResource.ReleaseGlobalLockResponse)()(()))
+    }
 
   override def acquireGlobalLock(
       respond: v0.SvResource.AcquireGlobalLockResponse.type
-  )()(fake: Unit): Future[v0.SvResource.AcquireGlobalLockResponse] = {
-    founderOnly {
-      val success = globalLock.tryAcquire()
-      if (success) {
-        Future.successful(v0.SvResource.AcquireGlobalLockResponseOK)
-      } else {
-        Future.failed(HttpErrorHandler.serviceUnavailable("Lock is not free"))
+  )()(fake: Unit): Future[v0.SvResource.AcquireGlobalLockResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      withGlobalLock { globalLock =>
+        val success = globalLock.tryAcquire()
+        if (success) {
+          Future.successful(v0.SvResource.AcquireGlobalLockResponseOK)
+        } else {
+          Future.failed(HttpErrorHandler.serviceUnavailable("Lock is not free"))
+        }
       }
     }
-  }
 
   override def releaseGlobalLock(
       respond: v0.SvResource.ReleaseGlobalLockResponse.type
   )()(fake: Unit): Future[v0.SvResource.ReleaseGlobalLockResponse] =
-    founderOnly {
-      globalLock.release()
-      Future.successful(v0.SvResource.ReleaseGlobalLockResponseOK)
-    }
-
-  private def withSvLock[T](f: => Future[T]): Future[T] =
-    acquireGlobalLock(v0.SvResource.AcquireGlobalLockResponse)()(()).flatMap { _ =>
-      f.andThen(_ => releaseGlobalLock(v0.SvResource.ReleaseGlobalLockResponse)()(()))
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      withGlobalLock { globalLock =>
+        globalLock.release()
+        Future.successful(v0.SvResource.ReleaseGlobalLockResponseOK)
+      }
     }
 
   def onboardValidator(
@@ -388,7 +397,7 @@ class HttpSvHandler(
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
       // We need both locks here to prevent topology transactions and Daml transactions.
       // This is the only place that calls svcRulesLock.lock() so there is no chance of a deadlock.
-      authorizedAt <- withSvLock {
+      authorizedAt <- withAcquiredGlobalLock {
         for {
           _ <- svcRulesLock.lock()
           _ = logger.info(

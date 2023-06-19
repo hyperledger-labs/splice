@@ -171,7 +171,7 @@ class SvApp(
           svcAutomation,
           svcRulesLock,
         ),
-        isFounder,
+        foundingConfig,
       ) <-
       // We branch here on the type of onboarding config, as bootstrapping
       // a fresh collective is fundamentally different from joining an existing collective
@@ -191,7 +191,7 @@ class SvApp(
             storage,
             localDomainNode,
           )
-          initializer.bootstrapCollective().map((_, true))
+          initializer.bootstrapCollective().map((_, Some(foundingConfig)))
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           val initializer = new JoiningNodeInitializer(
             config,
@@ -207,7 +207,7 @@ class SvApp(
             storage,
             localDomainNode,
           )
-          initializer.joinCollectiveAndOnboardNodes().map((_, false))
+          initializer.joinCollectiveAndOnboardNodes().map((_, None))
         case None =>
           val initializer = new JoiningNodeInitializer(
             config,
@@ -223,7 +223,7 @@ class SvApp(
             storage,
             localDomainNode,
           )
-          initializer.joinCollectiveAndOnboardNodes().map((_, false))
+          initializer.joinCollectiveAndOnboardNodes().map((_, None))
       }
 
       // TODO(#5141) Remove the comment about DAR uploads.
@@ -283,7 +283,7 @@ class SvApp(
         localDomainNode,
         retryProvider,
         svcPartyHosting,
-        isFounder,
+        foundingConfig,
         loggerFactory,
       )
 
