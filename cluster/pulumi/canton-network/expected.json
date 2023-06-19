@@ -773,7 +773,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -841,7 +840,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -908,7 +906,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -922,7 +919,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
@@ -990,7 +987,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1084,7 +1080,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1180,7 +1175,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1260,7 +1254,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1274,7 +1267,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.sv-1.svc.cluster.local",
         "resources": {
@@ -1342,7 +1335,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1436,7 +1428,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1513,7 +1504,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1628,7 +1618,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1716,7 +1705,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1800,7 +1788,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1894,7 +1881,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -1971,7 +1957,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2082,7 +2067,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2173,7 +2157,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2257,7 +2240,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2351,7 +2333,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2462,7 +2443,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2553,7 +2533,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2637,7 +2616,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2731,7 +2709,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2842,7 +2819,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -2933,7 +2909,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3017,7 +2992,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3111,7 +3085,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3193,7 +3166,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3286,7 +3258,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3377,7 +3348,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3468,7 +3438,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3559,7 +3528,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3650,7 +3618,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
@@ -3741,7 +3708,6 @@
               "34.173.27.241/32",
               "3.114.35.109/32"
             ],
-            "jvmHeapMemoryFactor": 0.75,
             "ledgerDatabaseGib": 40,
             "numberOfSvNodes": 4,
             "participantCpu": 1,
