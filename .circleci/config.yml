@@ -1652,7 +1652,7 @@ workflows:
           - slack-context
         name: "scala_test wall clock time"
         test_names_file: "test-full-class-names.log"
-        start_canton_options: "-d -p external -w -b"
+        start_canton_options: "-d -p external -w"
         resource_class: "2xlarge"
         parallelism: 8
     - scala_test:
@@ -1674,7 +1674,7 @@ workflows:
           - slack-context
         name: "scala_test frontend wall clock time"
         test_names_file: "test-full-class-names-frontend.log"
-        start_canton_options: "-d -p external -w -b"
+        start_canton_options: "-d -p external -w"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"

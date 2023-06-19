@@ -17,7 +17,7 @@ class ScanFrontendTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withCoinPrice(coinPrice)
 

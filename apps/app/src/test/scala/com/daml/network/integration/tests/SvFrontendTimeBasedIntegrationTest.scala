@@ -19,7 +19,7 @@ class SvFrontendTimeBasedIntegrationTest
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition.simpleTopologyXCentralizedDomainWithSimTime(
+    CNNodeEnvironmentDefinition.simpleTopologyXWithSimTime(
       this.getClass.getSimpleName
     )
 

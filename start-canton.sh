@@ -9,7 +9,6 @@ function usage() {
   echo "  -p postgres_mode postgres mode used in scripts/postgres.sh, default 'docker'"
   echo "  -w               only start canton instance with wall clock time"
   echo "  -s               only start canton instance with simulated time"
-  echo "  -b               start canton to test BFT domain operations. In that case, the participants are not automatically connected to the domain"
   echo "  -t               start canton with traffic control enabled"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
@@ -20,7 +19,6 @@ wallclocktime=1
 simtime=1
 POSTGRES_MODE=docker
 CANTON=canton
-bft=0
 trafficQoS=0
 bootstrapScriptPath=bootstrap-canton.sc
 
@@ -47,10 +45,6 @@ while getopts "hdap:c:wsbt" arg; do
     c)
       CANTON="${OPTARG}"
       echo "using custom canton binary: $CANTON"
-      ;;
-    b)
-      bft=1
-      echo "start canton to test bft domain, not connecting participants to global domain"
       ;;
     t)
       trafficQoS=1
@@ -163,7 +157,7 @@ fi
 
 if [ $wallclocktime -eq 1 ]; then
  tmux_cmd canton \
-   "CANTON_TOKEN_FILENAME=canton.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+   "CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
      -c ./apps/app/src/test/resources/simple-topology-canton.conf $config_overrides \
      --log-level-canton=DEBUG \
      --log-encoder json \
@@ -173,7 +167,7 @@ fi
 
 if [ $simtime -eq 1 ]; then
  tmux_cmd canton-simtime \
-   "CANTON_TOKEN_FILENAME=canton-simtime.tokens BFT=\"$bft\" JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+   "CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
      -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf $config_overrides \
      --log-level-canton=DEBUG \
      --log-encoder json \

@@ -18,7 +18,7 @@ class DomainFeesTimeBasedConnectivityIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXWithSimTime(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withHttpSettingsForHigherThroughput
       // TODO(#5372): remove this or add an explicit test for domain fees on a decentralized domain

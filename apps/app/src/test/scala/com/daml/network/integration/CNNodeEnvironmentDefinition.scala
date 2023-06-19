@@ -212,17 +212,8 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
       .withAllocatedUsers()
       .withInitializedNodes()
 
-  def simpleTopologyXDistributedDomainWithSimTime(testName: String): CNNodeEnvironmentDefinition =
+  def simpleTopologyXWithSimTime(testName: String): CNNodeEnvironmentDefinition =
     simpleTopologyX(testName).withSimTime(useXNodes = true)
-
-  private def simpleTopologyXCentralizedDomain(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopologyX(testName)
-      .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.disableDistributedDomain(conf)
-      )
-
-  def simpleTopologyXCentralizedDomainWithSimTime(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopologyXCentralizedDomain(testName).withSimTime(useXNodes = true)
 
   def preflightTopology(testName: String): CNNodeEnvironmentDefinition = {
     fromResource("preflight-topology.conf", testName)

@@ -23,7 +23,7 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform(CNNodeConfigTransforms.onlySv1)
       .addConfigTransform((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppConfigs((_, c) =>

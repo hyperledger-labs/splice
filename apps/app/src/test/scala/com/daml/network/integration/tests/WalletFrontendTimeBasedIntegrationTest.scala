@@ -26,7 +26,7 @@ class WalletFrontendTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyXCentralizedDomainWithSimTime(this.getClass.getSimpleName)
+      .simpleTopologyXWithSimTime(this.getClass.getSimpleName)
       .withCoinPrice(coinPrice)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
 
