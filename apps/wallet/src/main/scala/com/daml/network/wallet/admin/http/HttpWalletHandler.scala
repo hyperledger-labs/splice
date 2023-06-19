@@ -539,6 +539,8 @@ class HttpWalletHandler(
       user: String
   ): Future[r0.TapResponse] = withNewTrace(workflowId) { implicit traceContext => _ =>
     val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
+    // Note that we're passing a custom retryable here because blindly retrying
+    // on failed taps would be incorrect (tap is not idempotent).
     retryProvider.retryForClientCalls(
       "Tap",
       for {
@@ -767,6 +769,12 @@ object HttpWalletHandler {
           s"The operation $operationName failed with a ${InactiveContracts.id} error $ex."
         )
         TransientErrorKind
+      // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
+      case Failure(ex: io.grpc.StatusRuntimeException) if isNonspecificInvalidArgument(ex) =>
+        logger.info(
+          s"The operation $operationName failed with a nonspecifc INVALID_ARGUMENT error $ex."
+        )
+        TransientErrorKind
       case Failure(ex) =>
         logThrowable(ex, logger)
         FatalErrorKind
@@ -780,5 +788,11 @@ object HttpWalletHandler {
       case ErrorInfoDetail(InactiveContracts.id, _) => true
       case _ => false
     }
+  }
+
+  private def isNonspecificInvalidArgument(ex: io.grpc.StatusRuntimeException): Boolean = {
+    ex.getStatus.getCode == Status.Code.INVALID_ARGUMENT && ex.getStatus.getDescription.contains(
+      "An error occurred. Please contact the operator and inquire about the request"
+    )
   }
 }
