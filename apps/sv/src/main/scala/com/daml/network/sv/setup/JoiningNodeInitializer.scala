@@ -54,6 +54,17 @@ class JoiningNodeInitializer(
     tracer: Tracer,
 ) extends NamedLogging {
 
+  def withSvLock[A, B](f: ((() => Future[A]) => Future[A]) => Future[B]) =
+    joiningConfig match {
+      // This isn't right but we can't do anything if we don't have the SV
+      // config. We may want to make at least that part of the onboarding
+      // config mandatory again. For now we rely on the fact that our helm charts
+      // and tests don't use this.
+      case None => f(g => g())
+      case Some(conf) =>
+        withSvConnection(conf.svClient.adminApi)(svConnection => f(svConnection.withGlobalLock(_)))
+    }
+
   def joinCollectiveAndOnboardNodes(): Future[
     (
         DomainId,
@@ -86,8 +97,15 @@ class JoiningNodeInitializer(
           logger,
         )
       }
-      _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
-      svParty <- SetupUtil.setupSvParty(initConnection, config)
+      svParty <- withSvLock[PartyId, PartyId](lock =>
+        lock(() =>
+          for {
+            _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
+            // We lock through the outer lock here so we don't lock within this.
+            svParty <- SetupUtil.setupSvParty(initConnection, config, f => f())
+          } yield svParty
+        )
+      )
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -143,16 +161,20 @@ class JoiningNodeInitializer(
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
-          _ <- localDomainNode.onboardLocalSequencerIfRequired(
-            config.domains.global.alias,
-            globalDomain,
-            participantAdminConnection,
-            svConnection,
-          )
-          _ <- localDomainNode.onboardLocalMediatorIfRequired(
-            globalDomain,
-            participantAdminConnection,
-            svConnection,
+          _ <- svConnection.withGlobalLock(() =>
+            for {
+              _ <- localDomainNode.onboardLocalSequencerIfRequired(
+                config.domains.global.alias,
+                globalDomain,
+                participantAdminConnection,
+                svConnection,
+              )
+              _ <- localDomainNode.onboardLocalMediatorIfRequired(
+                globalDomain,
+                participantAdminConnection,
+                svConnection,
+              )
+            } yield ()
           )
         } yield ()
       }
@@ -292,7 +314,10 @@ class JoiningNodeInitializer(
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
               for {
-                _ <- svStoreWithIngestion.connection.uploadDarFiles(requiredDars)
+                _ <- withSvConnection(svClient.adminApi)(connection =>
+                  svStoreWithIngestion.connection
+                    .uploadDarFiles(requiredDars, connection.withGlobalLock(_))
+                )
                 _ <- requestOnboarding(
                   svClient.adminApi,
                   name,

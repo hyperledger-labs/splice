@@ -8,7 +8,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 private[setup] object SetupUtil {
 
-  def setupSvParty(connection: CNLedgerConnection, config: SvAppBackendConfig): Future[PartyId] = {
+  def setupSvParty(
+      connection: CNLedgerConnection,
+      config: SvAppBackendConfig,
+      lock: (() => Future[PartyId]) => Future[PartyId],
+  ): Future[PartyId] = {
     val partyHint = config.svPartyHint.getOrElse(
       config.onboarding
         .getOrElse(
@@ -19,6 +23,7 @@ private[setup] object SetupUtil {
     connection.ensureUserPrimaryPartyIsAllocated(
       config.ledgerApiUser,
       partyHint,
+      lock,
     )
   }
 

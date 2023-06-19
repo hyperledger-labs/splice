@@ -72,6 +72,7 @@ private[validator] object ValidatorUtil {
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       domainId: DomainId,
+      lock: (() => Future[PartyId]) => Future[PartyId],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
@@ -88,6 +89,7 @@ private[validator] object ValidatorUtil {
           storeWithIngestion.connection.getOrAllocateParty(
             endUserName,
             Seq(),
+            lock,
           )
       }
       _ <- storeWithIngestion.connection.grantUserRights(

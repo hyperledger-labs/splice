@@ -12,8 +12,6 @@ import com.daml.network.console.{
   LedgerApiExtensions,
   SplitwellAppClientReference,
   WalletAppClientReference,
-  ValidatorAppBackendReference,
-  SvAppBackendReference,
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
@@ -70,45 +68,17 @@ object CNNodeTests {
       CNNodeEnvironmentDefinition
         .simpleTopologyX(this.getClass.getSimpleName)
 
-    // TODO(#5383) Switch back to starting nodes in parallel and letting the apps
-    // initiate domains connections once domain onboarding
-    // doesn't break Canton as badly.
-    private def connectDomains(nodes: Seq[CNNodeAppBackendReference]): Unit =
-      nodes.foreach {
-        _ match {
-          case n: SvAppBackendReference =>
-            n.participantClient.domains
-              .connect(n.config.domains.global.alias, n.config.domains.global.url)
-          case n: ValidatorAppBackendReference =>
-            n.participantClient.domains
-              .connect(n.config.domains.global.alias, n.config.domains.global.url)
-          case _ =>
-        }
-      }
-
     protected def initSvc()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-      sv1.startSync()
-      connectDomains(env.fullSvcApps.local)
       env.fullSvcApps.local.foreach(_.start())
       env.fullSvcApps.local.foreach(_.waitForInitialization())
     }
 
     protected def initSvcWithSv1Only()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-      sv1.startSync()
-      connectDomains(env.minimalSvcApps.local)
       env.minimalSvcApps.local.foreach(_.start())
       env.minimalSvcApps.local.foreach(_.waitForInitialization())
     }
 
     protected def startAllSync(nodes: CNNodeAppBackendReference*): Unit = {
-      nodes.foreach {
-        _ match {
-          case n: SvAppBackendReference if n.name == "sv1" => n.startSync()
-          case _ =>
-        }
-      }
-
-      connectDomains(nodes)
       nodes.foreach(_.start())
       nodes.foreach(_.waitForInitialization())
     }

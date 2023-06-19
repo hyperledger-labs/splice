@@ -6,7 +6,7 @@ import com.daml.network.http.v0.{definitions, validator as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
@@ -17,6 +17,7 @@ class HttpValidatorHandler(
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
     validatorUserName: String,
     domainId: DomainId,
+    lock: (() => Future[PartyId]) => Future[PartyId],
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -58,6 +59,7 @@ class HttpValidatorHandler(
         storeWithIngestion,
         validatorUserName,
         domainId,
+        lock,
         retryProvider,
         logger,
       )

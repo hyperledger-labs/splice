@@ -85,6 +85,18 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
+  def withSvLock[A, B](f: ((() => Future[A]) => Future[A]) => Future[B]) =
+    config.onboarding match {
+      // We can't do locking if the onboarding config doesn't
+      // provide the SV connection. For now, we rely on the fact
+      // that our runbooks and tests don't make use of it.
+      // We may want to make at least this part of the onboarding config
+      // mandatory.
+      case None => f(g => g())
+      case Some(conf) =>
+        withSvConnection(conf.svClient.adminApi)(svConnection => f(svConnection.withGlobalLock(_)))
+    }
+
   // Note that for the validator of an SV app, the user will be created by the SV app with a
   // primary party set to the SV app already so this is a noop.
   // For regular validators, this allocates a new user.
@@ -93,37 +105,40 @@ class ValidatorApp(
       // TODO(#5803) Consider removing this once Canton stops falling apart.
       // Wait for the sponsoring SV which also ensures the domain is initialized.
       _ <- config.onboarding.traverse_(waitUntilSponsorIsActive(_))
-      _ <- ensureGlobalDomainRegistered()
-      _ <- connection.ensureUserPrimaryPartyIsAllocated(
-        config.ledgerApiUser,
-        config.validatorPartyHint
-          .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
+      _ <- withSvLock[Unit, Unit](lock =>
+        lock(() =>
+          for {
+            _ <- ensureGlobalDomainRegistered()
+            _ <- connection.ensureUserPrimaryPartyIsAllocated(
+              config.ledgerApiUser,
+              config.validatorPartyHint
+                .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
+              // We have an outer lock around both here so we don't need to lock here.
+              f => f(),
+            )
+          } yield ()
+        )
       )
     } yield ()
 
   private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
+    val darFiles = new UploadablePackage {
+      lazy val packageId: String =
+        installCodegen.WalletAppInstall.TEMPLATE_ID.getPackageId
+
+      // See `Compile / resourceGenerators` in build.sbt
+      lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
+    } +: Seq(new UploadablePackage {
+      // should be the same as package dependency in wallet app
+      lazy val packageId: String =
+        ccV1Test.coin.CoinRulesV1Test.COMPANION.TEMPLATE_ID.getPackageId
+
+      // See `Compile / resourceGenerators` in build.sbt
+      lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
+    }).filter(_ => config.enableCoinRulesUpgrade)
     for {
-      _ <- connection.uploadDarFile(new UploadablePackage {
-        // should be the same as package dependency in wallet app
-        lazy val packageId: String =
-          installCodegen.WalletAppInstall.TEMPLATE_ID.getPackageId
-
-        // See `Compile / resourceGenerators` in build.sbt
-        lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
-      })
-      _ <-
-        if (config.enableCoinRulesUpgrade) {
-          logger.info("Upgrades enabled on this validator, uploading also cc v1test")
-          connection.uploadDarFile(new UploadablePackage {
-            // should be the same as package dependency in wallet app
-            lazy val packageId: String =
-              ccV1Test.coin.CoinRulesV1Test.COMPANION.TEMPLATE_ID.getPackageId
-
-            // See `Compile / resourceGenerators` in build.sbt
-            lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
-          })
-        } else Future.successful(())
+      _ <- withSvLock[Unit, Unit](connection.uploadDarFiles(darFiles, _))
     } yield {
       logger.info(
         s"Finished wallet setup"
@@ -141,20 +156,30 @@ class ValidatorApp(
     logger.info(s"Attempting to setup app $name...")
     for {
       _ <- instance.dars.traverse_(dar => storeWithIngestion.connection.uploadDarFile(dar))
-      party <- storeWithIngestion.connection.getOrAllocateParty(
-        instance.serviceUser,
-        Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
-      )
-      _ <- ValidatorUtil
-        .onboard(
-          instance.walletUser.getOrElse(instance.serviceUser),
-          Some(party),
-          storeWithIngestion,
-          validatorUserName = config.ledgerApiUser,
-          domainId,
-          retryProvider,
-          logger,
+      party <- withSvLock[PartyId, PartyId](lock =>
+        lock(() =>
+          for {
+            party <- storeWithIngestion.connection.getOrAllocateParty(
+              instance.serviceUser,
+              Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
+              // We rely on the outer lock so we don't need to lock here.
+              f => f(),
+            )
+            _ <- ValidatorUtil
+              .onboard(
+                instance.walletUser.getOrElse(instance.serviceUser),
+                Some(party),
+                storeWithIngestion,
+                validatorUserName = config.ledgerApiUser,
+                domainId,
+                // We rely on the outer lock so we don't need to lock here.
+                f => f(),
+                retryProvider,
+                logger,
+              )
+          } yield party
         )
+      )
     } yield {
       logger.info(
         s"Setup app $name with service user ${instance.serviceUser}, wallet user ${instance.walletUser}  primary party $party, and uploaded ${instance.dars}."
@@ -309,14 +334,17 @@ class ValidatorApp(
           domainId,
         )
       })
-      _ <- ValidatorUtil.onboard(
-        endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
-        knownParty = Some(validatorParty),
-        automation,
-        validatorUserName = config.ledgerApiUser,
-        domainId,
-        retryProvider,
-        logger,
+      _ <- withSvLock[PartyId, PartyId](
+        ValidatorUtil.onboard(
+          endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
+          knownParty = Some(validatorParty),
+          automation,
+          validatorUserName = config.ledgerApiUser,
+          domainId,
+          _,
+          retryProvider,
+          logger,
+        )
       )
       _ <- ensureOnboarded(store, validatorParty, config.onboarding)
       verifier = config.auth match {
@@ -324,20 +352,30 @@ class ValidatorApp(
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
-      handler = new HttpValidatorHandler(
-        automation,
-        validatorUserName = config.ledgerApiUser,
-        domainId = domainId,
-        retryProvider = retryProvider,
-        loggerFactory,
+      handler <- withSvLock[PartyId, HttpValidatorHandler](lock =>
+        Future.successful(
+          new HttpValidatorHandler(
+            automation,
+            validatorUserName = config.ledgerApiUser,
+            domainId = domainId,
+            lock,
+            retryProvider,
+            loggerFactory,
+          )
+        )
       )
 
-      adminHandler = new HttpValidatorAdminHandler(
-        automation,
-        validatorUserName = config.ledgerApiUser,
-        domainId = domainId,
-        retryProvider = retryProvider,
-        loggerFactory,
+      adminHandler <- withSvLock[PartyId, HttpValidatorAdminHandler](lock =>
+        Future.successful(
+          new HttpValidatorAdminHandler(
+            automation,
+            validatorUserName = config.ledgerApiUser,
+            domainId = domainId,
+            lock,
+            retryProvider = retryProvider,
+            loggerFactory,
+          )
+        )
       )
 
       commonAdminHandler = new HttpAdminHandler(

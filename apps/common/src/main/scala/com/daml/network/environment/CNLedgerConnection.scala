@@ -358,10 +358,15 @@ class CNLedgerConnection(
   def allocatePartyViaLedgerApi(
       hint: Option[String],
       displayName: Option[String],
+      lock: (() => Future[PartyId]) => Future[PartyId],
   ): Future[PartyId] =
-    client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive)
+    lock(() => client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive))
 
-  def ensureUserPrimaryPartyIsAllocated(userId: String, hint: String): Future[PartyId] =
+  def ensureUserPrimaryPartyIsAllocated(
+      userId: String,
+      hint: String,
+      lock: (() => Future[PartyId]) => Future[PartyId],
+  ): Future[PartyId] =
     retryProvider.ensureThatO(
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
@@ -369,6 +374,7 @@ class CNLedgerConnection(
         party <- allocatePartyViaLedgerApi(
           Some(hint),
           Some(hint),
+          lock,
         )
         _ <- setUserPrimaryParty(userId, party)
         _ <- grantUserRights(userId, actAsParties = Seq(party), readAsParties = Seq.empty)
@@ -380,6 +386,7 @@ class CNLedgerConnection(
       hint: String,
       namespace: Namespace,
       participantAdminConnection: ParticipantAdminConnection,
+      lock: (() => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext) =
     for {
       participantId <- participantAdminConnection.getParticipantId()
@@ -389,16 +396,18 @@ class CNLedgerConnection(
           namespace,
         )
       )
-      _ <- retryProvider.ensureThatB(
-        s"Party $partyId is allocated",
-        client.getParties(Seq(partyId)).map(_.nonEmpty),
-        participantAdminConnection
-          .proposeInitialPartyToParticipant(
-            partyId,
-            participantId,
-            participantId.uid.namespace.fingerprint,
-          ),
-        logger,
+      _ <- lock(() =>
+        retryProvider.ensureThatB(
+          s"Party $partyId is allocated",
+          client.getParties(Seq(partyId)).map(_.nonEmpty),
+          participantAdminConnection
+            .proposeInitialPartyToParticipant(
+              partyId,
+              participantId,
+              participantId.uid.namespace.fingerprint,
+            ),
+          logger,
+        )
       )
     } yield partyId
 
@@ -422,11 +431,13 @@ class CNLedgerConnection(
   private def createPartyAndUser(
       user: String,
       userRights: Seq[User.Right],
+      lock: (() => Future[PartyId]) => Future[PartyId],
   ): Future[PartyId] =
     for {
       party <- allocatePartyViaLedgerApi(
         Some(sanitizeUserIdToPartyString(user)),
         Some(user),
+        lock,
       )
       partyId <- createUserWithPrimaryParty(user, party, userRights)
     } yield partyId
@@ -515,6 +526,7 @@ class CNLedgerConnection(
   def getOrAllocateParty(
       username: String,
       userRights: Seq[User.Right] = Seq.empty,
+      lock: (() => Future[PartyId]) => Future[PartyId],
   ): Future[PartyId] = {
     for {
       existingPartyId <- getOptionalPrimaryParty(username).recover {
@@ -522,7 +534,7 @@ class CNLedgerConnection(
           None
       }
       partyId <- existingPartyId.fold[Future[PartyId]](
-        createPartyAndUser(username, userRights)
+        createPartyAndUser(username, userRights, lock)
       )(
         Future.successful
       )
@@ -630,20 +642,28 @@ class CNLedgerConnection(
     } yield ()
   }
 
-  def uploadDarFiles(pkgs: Seq[UploadablePackage])(implicit
-      traceContext: TraceContext
+  def uploadDarFiles(pkgs: Seq[UploadablePackage], withLock: (() => Future[Unit]) => Future[Unit])(
+      implicit traceContext: TraceContext
   ): Future[Unit] =
     // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-    pkgs.foldLeft(Future.unit)((previous, dar) => previous.flatMap(_ => uploadDarFile(dar)))
+    withLock(() =>
+      pkgs.foldLeft(Future.unit)((previous, dar) =>
+        previous.flatMap(_ => uploadDarFile(dar, f => f()))
+      )
+    )
 
   def uploadDarFile(
-      pkg: UploadablePackage
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    uploadDarFileInternal(
-      pkg.packageId,
-      pkg.resourcePath,
-      ByteString.readFrom(pkg.inputStream()),
+      pkg: UploadablePackage,
+      withLock: (() => Future[Unit]) => Future[Unit],
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    withLock(() =>
+      uploadDarFileInternal(
+        pkg.packageId,
+        pkg.resourcePath,
+        ByteString.readFrom(pkg.inputStream()),
+      )
     )
+  }
 
   def uploadDarFile(
       path: Path

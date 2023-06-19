@@ -33,6 +33,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.Base64
+import java.util.concurrent.Semaphore
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -48,6 +49,7 @@ class HttpSvHandler(
     localDomainNode: Option[LocalDomainNode],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
+    isFounder: Boolean,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -60,6 +62,41 @@ class HttpSvHandler(
   private val svcStore = svcStoreWithIngestion.store
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
+
+  // TODO(#5855) Remove this lock
+  // For now, we lock around all operations that somehow affect topology state.
+  // Specifically, we lock around mediator/sequencer onboarding,
+  // participant onboarding (i.e. domain connections),
+  // party allocations and package uploads.
+  // This avoids a bunch of issues where Canton
+  // does not handle concurrency for those operations
+  // correctly.
+  private val globalLock = new Semaphore(1)
+
+  def founderOnly[T](f: => Future[T]): Future[T] =
+    if (isFounder) f
+    else Future.failed(HttpErrorHandler.notFound("Global lock is only available on founding SV"))
+
+  override def acquireGlobalLock(
+      respond: v0.SvResource.AcquireGlobalLockResponse.type
+  )()(fake: Unit): Future[v0.SvResource.AcquireGlobalLockResponse] = {
+    founderOnly {
+      val success = globalLock.tryAcquire()
+      if (success) {
+        Future.successful(v0.SvResource.AcquireGlobalLockResponseOK)
+      } else {
+        Future.failed(HttpErrorHandler.serviceUnavailable("Lock is not free"))
+      }
+    }
+  }
+
+  override def releaseGlobalLock(
+      respond: v0.SvResource.ReleaseGlobalLockResponse.type
+  )()(fake: Unit): Future[v0.SvResource.ReleaseGlobalLockResponse] =
+    founderOnly {
+      globalLock.release()
+      Future.successful(v0.SvResource.ReleaseGlobalLockResponseOK)
+    }
 
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
@@ -429,10 +466,12 @@ class HttpSvHandler(
   private def dummyTopologyTransaction(
       sequencerAdminConnection: SequencerAdminConnection
   )(implicit traceContext: TraceContext): Future[Unit] = {
+
     for {
       party <- svcStoreWithIngestion.connection.allocatePartyViaLedgerApi(
         hint = None,
         displayName = None,
+        f => f(), // Don't lock here, the candidate SV locks around the whole sequencer onboarding.
       )
       msg = "Wait for sequencer to observe party allocation"
       _ = logger.info(msg)

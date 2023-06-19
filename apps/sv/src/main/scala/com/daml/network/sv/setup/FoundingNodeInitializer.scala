@@ -101,7 +101,8 @@ class FoundingNodeInitializer(
       )
       _ = logger.info("Participant connected to domain")
       svcParty <- setupSvcParty(initConnection, namespace)
-      svParty <- SetupUtil.setupSvParty(initConnection, config)
+      // founder does not need to lock here
+      svParty <- SetupUtil.setupSvParty(initConnection, config, f => f())
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -165,6 +166,8 @@ class FoundingNodeInitializer(
         foundingConfig.svcPartyHint,
         namespace,
         participantAdminConnection,
+        // founder does not need to lock here.
+        f => f(),
       )
       // this is idempotent
       _ <- connection.grantUserRights(
@@ -284,7 +287,8 @@ class FoundingNodeInitializer(
     /** The one and only entry-point: found a fresh collective, given a properly allocated SVC party */
     def foundCollective(): Future[Unit] = {
       for {
-        _ <- svcStoreWithIngestion.connection.uploadDarFiles(requiredDars)
+        // Founder does not need to lock
+        _ <- svcStoreWithIngestion.connection.uploadDarFiles(requiredDars, f => f())
         _ <- retryProvider.retryForAutomation(
           "bootstrapping SVC",
           bootstrapSvc(),

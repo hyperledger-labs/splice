@@ -415,6 +415,24 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+  /global-topology-lock/lock:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "acquireGlobalLock"
+      responses:
+        "200":
+          description: ok
+        "503":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/503"
+  /global-topology-lock/unlock:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "releaseGlobalLock"
+      responses:
+        "200":
+          description: ok
   /devnet/onboard/validator/prepare:
     post:
       tags: [sv]

@@ -105,6 +105,40 @@ final class SvConnection private (
       config.url,
       HttpSvAppClient.GetSvcInfo,
     )
+
+  def acquireGlobalLock(): Future[Unit] =
+    runHttpCmd(
+      config.url,
+      HttpSvAppClient.AcquireGlobalLock,
+    )
+
+  def releaseGlobalLock(): Future[Unit] =
+    runHttpCmd(
+      config.url,
+      HttpSvAppClient.ReleaseGlobalLock,
+    )
+
+  def withGlobalLock[T](f: () => Future[T]): Future[T] = {
+    retryProvider
+      .retryForAutomation(
+        "Acquire global lock",
+        acquireGlobalLock(),
+        logger,
+      )
+      .flatMap(_ =>
+        f().transformWith(result =>
+          retryProvider
+            .retryForAutomation(
+              "Release global lock",
+              releaseGlobalLock(),
+              logger,
+            )
+            .transform {
+              _.flatMap(_ => result)
+            }
+        )
+      )
+  }
 }
 
 object SvConnection {

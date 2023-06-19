@@ -324,4 +324,28 @@ object HttpSvAppClient {
         decoder: TemplateJsonDecoder
     ) = _ => Right(())
   }
+
+  case object AcquireGlobalLock extends BaseCommand[http.AcquireGlobalLockResponse, Unit] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.AcquireGlobalLockResponse] =
+      client.acquireGlobalLock(headers = headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.AcquireGlobalLockResponse.OK => Right(())
+    }
+  }
+
+  case object ReleaseGlobalLock extends BaseCommand[http.ReleaseGlobalLockResponse, Unit] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ReleaseGlobalLockResponse] =
+      client.releaseGlobalLock(headers = headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ReleaseGlobalLockResponse.OK => Right(())
+    }
+  }
 }

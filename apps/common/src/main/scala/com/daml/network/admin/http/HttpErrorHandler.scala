@@ -54,6 +54,10 @@ object HttpErrorHandler {
   def notImplemented(message: String) =
     HttpErrorWithHttpCode(StatusCodes.NotImplemented, message);
 
+  // 503
+  def serviceUnavailable(message: String) =
+    HttpErrorWithHttpCode(StatusCodes.ServiceUnavailable, message);
+
   private def grpcErrorCatcher[T](
       grpcCondition: (Status.Code => Boolean),
       message: String,
