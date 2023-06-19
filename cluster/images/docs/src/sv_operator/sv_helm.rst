@@ -131,11 +131,12 @@ If this is not true for your OIDC provider, pay extra attention when configuring
 For user-facing authentication - allowing users to access the various web UIs hosted on your SV node,
 your OIDC provider must support the `OAuth 2.0 Authorization Code Grant <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1>`_ flow
 and allow you to obtain client identifiers for the web UIs your SV node will be hosting.
-Currently, these are the SV web UI and the Wallet web UI.
+Currently, these are the SV web UI, the Wallet web UI and the Directory web UI.
 You might be required to whitelist a range of URLs on your OIDC provider, such as "Allowed Callback URLs", "Allowed Logout URLs", "Allowed Web Origins", and "Allowed Origins (CORS)".
 If you are using the ingress configuration of this runbook, the correct URLs to configure here are
-``https://sv.sv.svc.YOUR_HOSTNAME`` (for the SV web UI) and
-``https://wallet.sv.svc.YOUR_HOSTNAME`` (for the Wallet web UI).
+``https://sv.sv.svc.YOUR_HOSTNAME`` (for the SV web UI) ,
+``https://wallet.sv.svc.YOUR_HOSTNAME`` (for the Wallet web UI) and
+``https://directory.sv.svc.YOUR_HOSTNAME`` (for the Directory web UI).
 An identifier that is unique to the user must be set via the `sub` field of the issued JWT.
 On some occasions, this identifier will be used as a user name for that user on your SV node's Canton participant.
 In :ref:`helm-sv-install`, you will be required to configure a user identifier as the ``validatorWalletUser`` -
@@ -161,6 +162,7 @@ SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
 SV_CLIENT_SECRET        The client secret of the Auth0 app for the SV app backend
 WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
 SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
+DIRECTORY_UI_CLIENT_ID  The client id of the Auth0 app for the directory UI.
 ======================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
@@ -321,6 +323,10 @@ To setup the wallet and SV UI, create the following two secrets.
     kubectl create --namespace sv secret generic cn-app-sv-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${SV_UI_CLIENT_ID}"
+
+    kubectl create --namespace sv secret generic cn-app-directory-ui-auth \
+        "--from-literal=url=${OIDC_AUTHORITY_URL}" \
+        "--from-literal=client-id=${DIRECTORY_UI_CLIENT_ID}"
 
 .. _helm-sv-install:
 
@@ -555,7 +561,7 @@ Logging into the directory UI
 -----------------------------
 
 You can open your browser at
-https://wallet.sv.svc.YOUR_HOSTNAME and login using the
+https://directory.sv.svc.YOUR_HOSTNAME and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to register a name on the
 Canton Name Service.
