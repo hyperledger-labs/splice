@@ -1,0 +1,17 @@
+{ stdenv }:
+
+let sources = builtins.fromJSON (builtins.readFile ./cometbft-driver-sources.json);
+in
+stdenv.mkDerivation rec {
+  name = "cometbft-driver";
+  version = sources.version;
+  src = builtins.fetchurl {
+    url = "https://digitalasset.jfrog.io/artifactory/canton-drivers/com/digitalasset/canton/drivers/canton-drivers/${sources.version}/canton-drivers-${sources.version}-all.jar";
+    sha256 = sources.sha256;
+  };
+  dontUnpack = true;
+  installPhase = ''
+    mkdir -p $out
+    cp $src $out/driver.jar
+  '';
+}

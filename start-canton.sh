@@ -9,6 +9,7 @@ function usage() {
   echo "  -p postgres_mode postgres mode used in scripts/postgres.sh, default 'docker'"
   echo "  -w               only start canton instance with wall clock time"
   echo "  -s               only start canton instance with simulated time"
+  echo "  -f               start canton using the CometBFT driver for the global sequencers"
   echo "  -t               start canton with traffic control enabled"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
@@ -21,8 +22,9 @@ POSTGRES_MODE=docker
 CANTON=canton
 trafficQoS=0
 bootstrapScriptPath=bootstrap-canton.sc
+global_cometbft=0
 
-while getopts "hdap:c:wsbt" arg; do
+while getopts "hdap:c:wsbtf" arg; do
   case ${arg} in
     h)
       usage
@@ -45,6 +47,10 @@ while getopts "hdap:c:wsbt" arg; do
     c)
       CANTON="${OPTARG}"
       echo "using custom canton binary: $CANTON"
+      ;;
+    f)
+      global_cometbft=1
+      echo "start canton with the cometbft driver"
       ;;
     t)
       trafficQoS=1
@@ -69,6 +75,11 @@ rm -f canton*.tokens
 
 # Start Postgres
 ./scripts/postgres.sh "$POSTGRES_MODE" start
+
+# Start CometBFT
+if [[ $global_cometbft -eq 1 ]]; then
+  ./scripts/cometbft.sh start
+fi;
 
 db_names=()
 if [ $wallclocktime -eq 1 ]; then
@@ -154,10 +165,14 @@ config_overrides=""
 if [ $trafficQoS -eq 1 ]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/domain-fees-overrides.conf"
 fi
+if [[ $global_cometbft -eq 1 ]]; then
+  config_overrides="$config_overrides -c ./apps/app/src/test/resources/cometbft-sequencer-global-domain-overrides.conf"
+fi;
 
 if [ $wallclocktime -eq 1 ]; then
  tmux_cmd canton \
-   "CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+   "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
+    CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
      -c ./apps/app/src/test/resources/simple-topology-canton.conf $config_overrides \
      --log-level-canton=DEBUG \
      --log-encoder json \
@@ -167,7 +182,8 @@ fi
 
 if [ $simtime -eq 1 ]; then
  tmux_cmd canton-simtime \
-   "CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+   "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
+    CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
      -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf $config_overrides \
      --log-level-canton=DEBUG \
      --log-encoder json \

@@ -2,6 +2,7 @@
 let
   inherit (pkgs) stdenv fetchzip;
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
+  cometbftDriverSources = builtins.fromJSON (builtins.readFile ./cometbft-driver-sources.json);
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox iproute2 util-linux ];
@@ -70,4 +71,7 @@ in pkgs.mkShell {
   DAML_PROTOBUFS = "${pkgs.daml_pbs}";
   CANTON = "${pkgs.canton}";
   SDK_VERSION = "${pkgs.daml_pbs.sdk_version}";
+  # If you update the CometBFT version here make sure to also update the CircleCI image version
+  COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
+  COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
 }

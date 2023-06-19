@@ -1137,16 +1137,8 @@ printTests := {
     ),
   ).foreach { case (testSet, pw, predicate) =>
     printTestNames(testSet, allTestNames, pw, predicate)
+    pw.close()
   }
-
-  pw.close()
-  pwPreflight.close()
-  pwPreflightSv.close()
-  pw.close()
-  pwSimTime.close()
-  pwFrontEnd.close()
-  pwFrontEndSimTime.close()
-  pwDomainFeesSimTIme.close()
 }
 
 Global / excludeLintKeys += `root` / wartremoverErrors

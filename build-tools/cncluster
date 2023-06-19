@@ -684,7 +684,7 @@ function subcmd_preflight() {
         _error "CN Frontends are already running. Please run \`stop-frontends.sh\` from the root and try again."
     fi;
 
-    postgres=$(docker ps -q -f name=postgres-for-canton-coin)
+    postgres=$(docker ps -q -f name=postgres-for-cn-node)
 
     if [ -n "$postgres" ]; then
         _error "postgres container is already running. Please run \`stop-canton.sh\` from the root and try again."

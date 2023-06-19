@@ -20,8 +20,10 @@
     1. [Daml Numerics](#daml-numerics)
     1. [Protobuf and GRPC Guidelines](#protobuf-and-grpc-guidelines)
     1. [Editing Daml](#editing-daml)
-    1. [Bumping Our Canton fork](#bumping-our-canton-fork)
-        1. [Message Definitions](#message-definitions)
+    1. [Bumping External Dependencies](#bumping-external-dependencies)
+       1. [Bumping CometBFT](#bumping-cometbft)
+       1. [Bumping Our Canton fork](#bumping-our-canton-fork)
+            1. [Message Definitions](#message-definitions)
     1. [Code Layout](#code-layout)
     1. [Domain Specific Naming](#domain-specific-naming)
     1. [App Architecture - Initialization](#app-architecture---initialization)
@@ -463,7 +465,14 @@ in daml/dars.lock. CI verifies that those package IDs are correct. If you intent
 changes in daml code, please run `sbt damlDarsLockFileUpdate` and commit the updated `dars.lock`
 file along with your dar changes.
 
-### Bumping Our Canton fork
+### Bumping External Dependencies
+
+#### Bumping CometBFT
+
+1. Update the version in the `nix/cometbft-driver-sources.json` file
+2. Update the version used for the CometBFT docker image in the `.circleci/config.yml` file
+
+#### Bumping Our Canton fork
 
 Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
 
@@ -527,7 +536,7 @@ Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 
 
-#### Updating Canton build dependencies
+##### Updating Canton build dependencies
 
 The relevant files defining our build are:
 - `CantonDependencies.scala` - contains named constants for the various libraries used by Canton.

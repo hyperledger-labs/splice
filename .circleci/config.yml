@@ -1025,6 +1025,12 @@ jobs:
           POSTGRES_INITDB_ARGS: -A scram-sha-256
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
+      # When updating this image version make sure to also update the nix version for cometbft
+      - image: digitalasset-canton-enterprise-docker.jfrog.io/cometbft-canton-network:0.1.6
+        entrypoint: testing-entrypoint.sh
+        auth:
+          username: $ARTIFACTORY_USER
+          password: $ARTIFACTORY_PASSWORD
     parameters:
       test_names_file:
         type: string
@@ -1652,7 +1658,7 @@ workflows:
           - slack-context
         name: "scala_test wall clock time"
         test_names_file: "test-full-class-names.log"
-        start_canton_options: "-d -p external -w"
+        start_canton_options: "-d -p external -w -f"
         resource_class: "2xlarge"
         parallelism: 8
     - scala_test:

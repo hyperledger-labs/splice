@@ -3,6 +3,7 @@
   openapi-generator-cli = super.openapi-generator-cli.override { jre = super.openjdk11; };
   lnav = super.callPackage ./lnav.nix {};
   canton = super.callPackage ./canton.nix {};
+  cometbft_driver = super.callPackage ./cometbft-driver.nix {};
   jsonapi = super.callPackage ./jsonapi.nix {};
   daml_pbs = super.callPackage ./daml_pbs.nix {};
   haskellPackages = super.haskellPackages.override {

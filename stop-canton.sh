@@ -20,4 +20,8 @@ fi
 
 rm -f canton.tokens canton-simtime.tokens
 
+echo "Stopping cometbft"
+./scripts/cometbft.sh stop
+
+echo "Stopping postgres"
 ./scripts/postgres.sh "$POSTGRES_MODE" stop

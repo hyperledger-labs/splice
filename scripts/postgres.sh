@@ -3,7 +3,7 @@
 set -eou pipefail
 
 # Postgres settings
-DOCKER_POSTGRES_CONTAINER_NAME="postgres-for-canton-coin"
+DOCKER_POSTGRES_CONTAINER_NAME="postgres-for-cn-node"
 LOCAL_POSTGRES_DATA_DIRECTORY="$REPO_ROOT/temp/postgres"
 LOCAL_POSTGRES_LOG_FILE="$REPO_ROOT/log/postgres.log"
 
