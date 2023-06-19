@@ -98,6 +98,11 @@ class HttpSvHandler(
       Future.successful(v0.SvResource.ReleaseGlobalLockResponseOK)
     }
 
+  private def withSvLock[T](f: => Future[T]): Future[T] =
+    acquireGlobalLock(v0.SvResource.AcquireGlobalLockResponse)()(()).flatMap { _ =>
+      f.andThen(_ => releaseGlobalLock(v0.SvResource.ReleaseGlobalLockResponse)()(()))
+    }
+
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
   )(
@@ -381,22 +386,29 @@ class HttpSvHandler(
     for {
       // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-      _ <- svcRulesLock.lock()
-      _ = logger.info(
-        s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
-      )
+      // We need both locks here to prevent topology transactions and Daml transactions.
+      // This is the only place that calls svcRulesLock.lock() so there is no chance of a deadlock.
+      authorizedAt <- withSvLock {
+        for {
+          _ <- svcRulesLock.lock()
+          _ = logger.info(
+            s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
+          )
 
-      // this will wait until the PartyToParticipant state change completed
-      authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
-        globalDomain,
-        participantId,
-      )
-      _ = logger
-        .info(s"Sponsor SV finished authorizing svc party to participant $participantId")
-      _ <- svcRulesLock.unlock()
-
+          // this will wait until the PartyToParticipant state change completed
+          authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
+            globalDomain,
+            participantId,
+          )
+          _ = logger
+            .info(
+              s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
+            )
+          _ <- svcRulesLock.unlock()
+        } yield authorizedAt
+      }
       _ = logger.info(
-        s"svc party to participant authorization completed, unlock SvcRules and CoinRules contracts"
+        s"svc party to participant authorization completed, unlocked SvcRules and CoinRules contracts"
       )
       ourParticipant <- participantAdminConnection.getParticipantId()
       // TODO(#5636) Always make SVC party a unionspace and get rid of this slightly hacky
