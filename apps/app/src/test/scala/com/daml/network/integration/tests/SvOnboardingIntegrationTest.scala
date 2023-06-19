@@ -351,6 +351,8 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         }
       })
     }
+    sv4.waitForInitialization()
+    sv4Validator.waitForInitialization()
   }
 
   // remaining states are tested as part of "SVs can onboard new SVs"
