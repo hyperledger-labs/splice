@@ -55,10 +55,7 @@ export function installCNSVHelmChart(
     ns.ns.metadata.name,
     name,
     chartName,
-    {
-      ...values,
-      xNodes: true,
-    },
+    values,
     local,
     version,
     dependsOn.concat([ns.ns])

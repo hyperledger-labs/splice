@@ -787,8 +787,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "xNodes": true
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
     },
     "name": "helm-cluster-ingress-cluster-ingress",
@@ -853,8 +852,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "xNodes": true
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
     },
     "name": "helm-docs-docs",
@@ -930,8 +928,7 @@
             "cpu": "1",
             "memory": "4Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-splitwell-domain",
@@ -1027,8 +1024,7 @@
             "cpu": "1",
             "memory": "32Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-splitwell-participant",
@@ -1105,8 +1101,7 @@
             "cpu": "1",
             "memory": "1536Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-splitwell-splitwell-app",
@@ -1201,8 +1196,7 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-splitwell-splitwell",
@@ -1278,8 +1272,7 @@
             "cpu": "1",
             "memory": "4Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-1-global-domain",
@@ -1375,8 +1368,7 @@
             "cpu": "1",
             "memory": "32Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-1-participant",
@@ -1451,8 +1443,7 @@
             "cpu": "1",
             "memory": "1536Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-1-scan-sv-1",
@@ -1565,8 +1556,7 @@
             "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
-        ],
-        "xNodes": true
+        ]
       }
     },
     "name": "helm-sv-1-sv-1-cometbft",
@@ -1650,8 +1640,7 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-1-sv-1-sv-app",
@@ -1731,8 +1720,7 @@
             "memory": "4096Mi"
           }
         },
-        "validatorWalletUser": "auth0|64529b128448ded6aa68048f",
-        "xNodes": true
+        "validatorWalletUser": "auth0|64529b128448ded6aa68048f"
       }
     },
     "name": "helm-sv-1-validator-sv-1",
@@ -1828,8 +1816,7 @@
             "cpu": "1",
             "memory": "32Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-2-participant",
@@ -1904,8 +1891,7 @@
             "cpu": "1",
             "memory": "1536Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-2-scan-sv-2",
@@ -2014,8 +2000,7 @@
             "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
-        ],
-        "xNodes": true
+        ]
       }
     },
     "name": "helm-sv-2-sv-2-cometbft",
@@ -2102,8 +2087,7 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-2-sv-2-sv-app",
@@ -2183,8 +2167,7 @@
             "memory": "4096Mi"
           }
         },
-        "validatorWalletUser": "auth0|64529b6852dd694167351045",
-        "xNodes": true
+        "validatorWalletUser": "auth0|64529b6852dd694167351045"
       }
     },
     "name": "helm-sv-2-validator-sv-2",
@@ -2280,8 +2263,7 @@
             "cpu": "1",
             "memory": "32Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-3-participant",
@@ -2390,8 +2372,7 @@
             "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
-        ],
-        "xNodes": true
+        ]
       }
     },
     "name": "helm-sv-3-sv-3-cometbft",
@@ -2478,8 +2459,7 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-3-sv-3-sv-app",
@@ -2559,8 +2539,7 @@
             "memory": "4096Mi"
           }
         },
-        "validatorWalletUser": "auth0|64529bb10c1aee4f2c819218",
-        "xNodes": true
+        "validatorWalletUser": "auth0|64529bb10c1aee4f2c819218"
       }
     },
     "name": "helm-sv-3-validator-sv-3",
@@ -2656,8 +2635,7 @@
             "cpu": "1",
             "memory": "32Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-4-participant",
@@ -2766,8 +2744,7 @@
             "externalAddress": "cometbft-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           }
-        ],
-        "xNodes": true
+        ]
       }
     },
     "name": "helm-sv-4-sv-4-cometbft",
@@ -2854,8 +2831,7 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-sv-4-sv-4-sv-app",
@@ -2935,8 +2911,7 @@
             "memory": "4096Mi"
           }
         },
-        "validatorWalletUser": "auth0|64529bc58d30358eacae5611",
-        "xNodes": true
+        "validatorWalletUser": "auth0|64529bc58d30358eacae5611"
       }
     },
     "name": "helm-sv-4-validator-sv-4",
@@ -3032,8 +3007,7 @@
             "cpu": "1",
             "memory": "32Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-validator1-participant",
@@ -3108,8 +3082,7 @@
             "cpu": "1",
             "memory": "1536Mi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "helm-validator1-splitwell-web-ui",
@@ -3195,8 +3168,7 @@
           }
         },
         "validatorPartyHint": "validator1_validator_service_user",
-        "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5",
-        "xNodes": true
+        "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       }
     },
     "name": "helm-validator1-validator-validator1",
@@ -3281,8 +3253,7 @@
             "cpu": "2",
             "memory": "8Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "splitwell-postgres",
@@ -3371,8 +3342,7 @@
             "cpu": "2",
             "memory": "8Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "sv-1-postgres",
@@ -3461,8 +3431,7 @@
             "cpu": "2",
             "memory": "8Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "sv-2-postgres",
@@ -3551,8 +3520,7 @@
             "cpu": "2",
             "memory": "8Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "sv-3-postgres",
@@ -3641,8 +3609,7 @@
             "cpu": "2",
             "memory": "8Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "sv-4-postgres",
@@ -3731,8 +3698,7 @@
             "cpu": "2",
             "memory": "8Gi"
           }
-        },
-        "xNodes": true
+        }
       }
     },
     "name": "validator1-postgres",

@@ -69,12 +69,6 @@ spec:
             {{- end }}
             - name: CN_APP_SV_GLOBAL_DOMAIN_URL
               value: {{ .Values.globalDomainUrl | quote }}
-            {{- if .Values.xNodes }}
-            - name: ADDITIONAL_CONFIG_SV_XNODE
-              value: |
-                canton.sv-apps.sv.x-nodes {
-                }
-            {{- end }}
             {{- if (.Values.cometBFT).enabled }}
             - name: CN_APP_SV_COMETBFT_ENABLED
               value: {{ (.Values.cometBFT).enabled | quote }}

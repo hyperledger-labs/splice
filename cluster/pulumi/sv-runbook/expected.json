@@ -321,8 +321,7 @@
           "identifier": "cometbft",
           "keysSecret": "cometbft-keys"
         },
-        "nodeName": "DA-Helm-Test-Node",
-        "xNodes": true
+        "nodeName": "DA-Helm-Test-Node"
       }
     },
     "name": "cometbft",
@@ -450,8 +449,7 @@
         "cluster": {
           "basename": "svrun"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "xNodes": true
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
     },
     "name": "loopback",
@@ -478,8 +476,7 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres",
-        "postgresSchema": "sv_participant",
-        "xNodes": true
+        "postgresSchema": "sv_participant"
       }
     },
     "name": "participant",
@@ -495,8 +492,7 @@
       "name": "postgres",
       "namespace": "sv",
       "values": {
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "xNodes": true
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
     },
     "name": "postgres",
@@ -512,8 +508,7 @@
       "name": "scan",
       "namespace": "sv",
       "values": {
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "xNodes": true
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
     },
     "name": "scan",
@@ -543,8 +538,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv"
         },
-        "onboardingName": "DA-Helm-Test-Node",
-        "xNodes": true
+        "onboardingName": "DA-Helm-Test-Node"
       }
     },
     "name": "sv-app",
@@ -604,8 +598,7 @@
         "scanAddress": "https://svrun.network.com.network.canton.global",
         "scanPort": "5012",
         "svSponsorAddress": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",
-        "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e",
-        "xNodes": true
+        "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       }
     },
     "name": "validator",
