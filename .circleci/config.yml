@@ -1452,9 +1452,11 @@ jobs:
       <<: *env
     steps:
       - checkout
-      - run:
-         name: Update CircleCI pipeline configuration (incl. schedule triggers)
-         command: |
+      - setup_nix
+      - run_bash_command_in_nix:
+         cmd_name: Update CircleCI pipeline configuration (incl. schedule triggers)
+         additional_nix_args: --keep CIRCLECI_TOKEN
+         cmd: |
            set -euo pipefail
 
            . .envrc.vars
