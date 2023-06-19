@@ -14,6 +14,10 @@ Release Notes
      environment variable matching the SV app and the validator app. The helm charts set the right default so
      if you are using them, there is no need to configure anything.
 
+* Bugfixes
+
+  * Fix a bug where the Directory UI does not connect correctly to the directory backend.
+
 2023-06-18
 ----------
 

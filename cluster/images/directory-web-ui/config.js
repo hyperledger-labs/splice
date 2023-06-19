@@ -1,10 +1,5 @@
 const host = window.location.hostname;
-const hostParts = host.split(".");
-// Strip everything after the last 4 components so we get only the cluster name.
-if (hostParts.length < 4) {
-  console.error(`Unexpected hostname: ${hostParts}`);
-}
-const cluster = hostParts.slice(-4).join(".");
+const cluster = "${CN_APP_DIRECTORY_UI_CLUSTER}";
 window.canton_network_config = {
   auth: {
     algorithm: "rs-256",

@@ -34,6 +34,8 @@ spec:
               key: url
               name: cn-app-directory-ui-auth
               optional: false
+        - name: CN_APP_DIRECTORY_UI_CLUSTER
+          value: {{ .Values.clusterUrl | quote }}
         ports:
         - containerPort: 80
           name: http
