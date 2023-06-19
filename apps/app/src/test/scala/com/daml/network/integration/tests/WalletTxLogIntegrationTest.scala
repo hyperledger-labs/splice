@@ -932,7 +932,8 @@ class WalletTxLogIntegrationTest
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            // Depending on timing we may have incurred holding fees at this point.
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           checkSubscriptionPaymentTransfer(
