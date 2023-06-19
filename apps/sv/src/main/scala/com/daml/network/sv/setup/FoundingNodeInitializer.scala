@@ -301,7 +301,6 @@ class FoundingNodeInitializer(
     private def bootstrapSvc(): Future[Unit] = {
       for {
         coinRules <- svcStore.lookupCoinRules()
-        // TODO(#5428): retry on failure
         founderDomainNodes <- SvUtil
           .getFounderDomainNodeConfig(cometBftNode)
           .fold(error => sys.error(s"Failed to initialize the domain nodes: $error"), identity)
