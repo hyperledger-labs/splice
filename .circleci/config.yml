@@ -268,7 +268,6 @@ commands:
           additional_nix_args: "--keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
-            set -eou pipefail
             export KUBECONFIG=$PWD/.kubecfg
 
             cncluster activate
@@ -526,7 +525,10 @@ commands:
                     # despite us using this in a tested context below where they would usually be disabled.
                     # See https://gist.github.com/cocreature/9c345b75b7dad05ed32865b21c1b0460 for a minimal example
                     # of what happens if we just call parameters.cmd directly.
+                    # We enforce set -euo pipefail by including it in all the commands. Even if the command has already set it, then it will have no effect
+                    # but this way we ensure all the commands will fail on error and no lead to confusing behaviour
                     cat \<<'EOF2' > cmd.sh
+                    set -euo pipefail
                     << parameters.cmd >>
             EOF2
                     bash cmd.sh
@@ -765,7 +767,6 @@ commands:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           cmd: |
-            set -eou pipefail
             export KUBECONFIG=$PWD/.kubecfg
             cncluster activate
           cmd_retry_count: 5
@@ -971,7 +972,6 @@ commands:
           # Retrying as network stuff can be flaky
           cmd_retry_count: 5
           cmd: |
-            set -eou pipefail
             docker pull ${COMETBFT_DOCKER_IMAGE}
             docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
 
@@ -1149,7 +1149,6 @@ jobs:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
-            set -eou pipefail
             make cluster/build
       - run_bash_command_in_nix:
           cmd_name: Apply SV-runbook Kubernetes manifest to cluster
@@ -1157,7 +1156,6 @@ jobs:
           additional_nix_args: "--keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
-            set -eou pipefail
             cncluster activate
             export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
             export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
@@ -1186,7 +1184,6 @@ jobs:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
-            set -eou pipefail
             make cluster/build
           cmd_retry_count: 2
       - run_bash_command_in_nix:
@@ -1195,7 +1192,6 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET  --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
-            set -eou pipefail
             cncluster activate
             export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
             export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
@@ -1224,8 +1220,6 @@ jobs:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
           cmd: |
-            set -eou pipefail
-
             git checkout testnet-next
 
             make cluster/build
@@ -1235,8 +1229,6 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET  --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
-            set -eou pipefail
-
             cncluster activate
 
             export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
@@ -1473,7 +1465,6 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Build docs
          cmd: |
-           set -eou pipefail
            make cluster/images/docs/html
            tar -zcf cluster/images/docs/docs.tar.gz --exclude-vcs  cluster/images/docs/target
       - store_artifacts:
