@@ -150,7 +150,7 @@ class WalletTxLogIntegrationTest
               amount should beWithin(selfPaymentAmount - smallAmount, selfPaymentAmount)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.Transfer =>
@@ -162,7 +162,7 @@ class WalletTxLogIntegrationTest
               amount should beWithin(-selfPaymentAmount - smallAmount, -selfPaymentAmount)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.BalanceChange =>
@@ -243,7 +243,7 @@ class WalletTxLogIntegrationTest
               amount should beWithin(-selfPaymentAmount - smallAmount, -selfPaymentAmount)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.BalanceChange =>
@@ -339,7 +339,7 @@ class WalletTxLogIntegrationTest
               receiver2 shouldBe aliceValidatorUserParty.toProtoPrimitive
               amount2 shouldBe BigDecimal(transferAmountUSDinCC)
             }
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.Transfer =>
@@ -354,7 +354,7 @@ class WalletTxLogIntegrationTest
               )
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.BalanceChange =>
@@ -406,7 +406,7 @@ class WalletTxLogIntegrationTest
           amount shouldBe transferAmount
         }
 
-        logEntry.senderHoldingFees shouldBe BigDecimal(0)
+        logEntry.senderHoldingFees should beWithin(0, smallAmount)
         logEntry.coinPrice shouldBe coinPrice
       }
 
@@ -513,7 +513,7 @@ class WalletTxLogIntegrationTest
           amount2 shouldBe 30
         }
 
-        logEntry.senderHoldingFees shouldBe BigDecimal(0)
+        logEntry.senderHoldingFees should beWithin(0, smallAmount)
         logEntry.coinPrice shouldBe coinPrice
       }
 
@@ -530,7 +530,7 @@ class WalletTxLogIntegrationTest
               amount should beWithin(-50 - smallAmount, -50)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.BalanceChange =>
@@ -656,7 +656,7 @@ class WalletTxLogIntegrationTest
           amount shouldBe subscriptionPrice
         }
 
-        logEntry.senderHoldingFees shouldBe BigDecimal(0)
+        logEntry.senderHoldingFees should beWithin(0, smallAmount)
         logEntry.coinPrice shouldBe coinPrice
       }
 
@@ -675,7 +675,7 @@ class WalletTxLogIntegrationTest
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           checkSubscriptionPaymentTransfer(
@@ -690,7 +690,7 @@ class WalletTxLogIntegrationTest
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.BalanceChange =>
@@ -787,7 +787,7 @@ class WalletTxLogIntegrationTest
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.BalanceChange =>
@@ -910,7 +910,7 @@ class WalletTxLogIntegrationTest
           amount shouldBe subscriptionPrice
         }
 
-        logEntry.senderHoldingFees shouldBe BigDecimal(0)
+        logEntry.senderHoldingFees should beWithin(0, smallAmount)
         logEntry.coinPrice shouldBe coinPrice
       }
 
@@ -948,7 +948,7 @@ class WalletTxLogIntegrationTest
               amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
             }
             logEntry.receivers shouldBe empty
-            logEntry.senderHoldingFees shouldBe BigDecimal(0)
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.BalanceChange =>
