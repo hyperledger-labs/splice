@@ -58,8 +58,8 @@ class AuthTokenManager(
       refreshToken(promise)
     } else {
       prevState match {
+        case Refreshing(pending) => promise.completeWith(pending)
         case r: ResultState => promise.success(r)
-        case _ => promise.failure(new Exception("prevState == NoToken"))
       }
     }
     resultF
