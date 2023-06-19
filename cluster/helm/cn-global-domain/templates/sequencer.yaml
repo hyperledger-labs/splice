@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Release.Name }}-sequencer
+  name: {{ .Release.Name }}-sequencer
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-sequencer
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-sequencer
+    spec:
+      containers:
+      - name: {{ .Release.Name }}-sequencer
+        image: "{{ .Values.imageRepo }}/canton-sequencer:{{ .Values.cluster.imageTag }}"
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: {{ .Values.defaultJvmOptions }}
+        - name: CANTON_DOMAIN_POSTGRES_SERVER
+          value: {{ .Values.postgres }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5008
+          name: cs-pub-api
+          protocol: TCP
+        - containerPort: 5009
+          name: cs-adm-api
+          protocol: TCP
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cs-pub-api
+          timeoutSeconds: 1
+        livenessProbe:
+          failureThreshold: 5
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cs-pub-api
+          timeoutSeconds: 1
+        startupProbe:
+          failureThreshold: 20
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: cs-pub-api
+          timeoutSeconds: 1
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-sequencer
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: {{ .Release.Name }}-sequencer
+  ports:
+  - name: cs-pub-api
+    port: 5008
+    protocol: TCP
+  - name: cs-adm-api
+    port: 5009
+    protocol: TCP
+  - name: cs-metrics
+    port: 10013
+    protocol: TCP

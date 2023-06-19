@@ -1185,7 +1185,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
@@ -1207,7 +1207,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-domain/",
+      "chart": "/cluster/helm/cn-global-domain/",
       "compat": "true",
       "name": "global-domain",
       "namespace": "sv-1",
@@ -1628,7 +1628,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingName": "Canton-Foundation-1",
         "onboardingType": "found-collective",
@@ -1709,7 +1709,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
@@ -2072,7 +2072,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -2156,7 +2156,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
@@ -2444,7 +2444,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -2528,7 +2528,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
@@ -2816,7 +2816,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -2900,7 +2900,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
@@ -3154,7 +3154,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "postgres": "postgres.validator1.svc.cluster.local",

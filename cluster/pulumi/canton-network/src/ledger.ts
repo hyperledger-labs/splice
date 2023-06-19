@@ -12,6 +12,16 @@ export function installDomain(
   });
 }
 
+export function installGlobalDomain(
+  xns: ExactNamespace,
+  name: string,
+  postgresDb: pulumi.Output<string>
+): k8s.helm.v3.Release {
+  return installCNHelmChart(xns, name, 'cn-global-domain', {
+    postgres: postgresDb,
+  });
+}
+
 export function installParticipant(
   xns: ExactNamespace,
   name: string,

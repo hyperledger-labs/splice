@@ -2,6 +2,8 @@ images := \
 	canton \
 	canton-participant \
 	canton-domain \
+	canton-sequencer \
+	canton-mediator \
 	\
 	cn-app \
 	sv-app \

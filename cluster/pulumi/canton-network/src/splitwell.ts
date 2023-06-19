@@ -80,7 +80,7 @@ export async function installSplitwell(
         auth0UserNameEnvVar('splitwell'),
         { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },
       ],
-      globalDomainUrl: 'http://global-domain.sv-1:5008',
+      globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
       additionalConfig: [
         ...fixedTokenConfig,
         'canton.validator-apps.validator_backend.app-instances.splitwise = {',

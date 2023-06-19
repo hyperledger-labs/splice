@@ -5,6 +5,7 @@ app_charts := \
 	cn-cometbft \
 	cn-docs \
 	cn-domain \
+	cn-global-domain \
 	cn-istio-fwd \
 	cn-istio-gateway \
 	cn-participant \

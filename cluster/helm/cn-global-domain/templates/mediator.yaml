@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Release.Name }}-mediator
+  name: {{ .Release.Name }}-mediator
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-mediator
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-mediator
+    spec:
+      containers:
+      - name: {{ .Release.Name }}
+        image: "{{ .Values.imageRepo }}/canton-mediator:{{ .Values.cluster.imageTag }}"
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          value: {{ .Values.defaultJvmOptions }}
+        - name: CANTON_DOMAIN_POSTGRES_SERVER
+          value: {{ .Values.postgres }}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5007
+          name: cm-adm-api
+          protocol: TCP
+        - containerPort: 10013
+          name: cm-metrics
+          protocol: TCP
+        {{- with .Values.resources }}
+        resources: {{- toYaml . | nindent 10 }}
+        {{- end }}
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-mediator
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: {{ .Release.Name }}-mediator
+  ports:
+  - name: cm-adm-api
+    port: 5007
+    protocol: TCP
+  - name: cd-metrics
+    port: 10013
+    protocol: TCP

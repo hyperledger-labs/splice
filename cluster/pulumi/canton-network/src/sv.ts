@@ -13,7 +13,7 @@ import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { installCometBftNode } from './cometbft';
-import { installDomain, installParticipant } from './ledger';
+import { installGlobalDomain, installParticipant } from './ledger';
 
 // btoa is only available in DOM so inline the definition here.
 const btoa = (s: string) => Buffer.from(s).toString('base64');
@@ -86,7 +86,9 @@ export async function installSvNode(
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
   const domain =
-    onboarding.type == 'found-collective' ? [installDomain(xns, 'global-domain', postgresDb)] : [];
+    onboarding.type == 'found-collective'
+      ? [installGlobalDomain(xns, 'global-domain', postgresDb)]
+      : [];
 
   const participant = installParticipant(
     xns,
@@ -116,7 +118,7 @@ export async function installSvNode(
       automationEnabled: false,
       connectionUri: `http://cometbft-${nodename}-cometbft-rpc:26657`,
     },
-    globalDomainUrl: 'http://global-domain.sv-1:5008',
+    globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
   } as ChartValues;
 
   if (onboarding.type == 'join-with-key') {
@@ -141,7 +143,7 @@ export async function installSvNode(
       additionalUsers: [],
       appDars: [],
       validatorWalletUser,
-      globalDomainUrl: 'http://global-domain.sv-1:5008',
+      globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
     },
     [svApp]
   );
