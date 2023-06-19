@@ -52,6 +52,23 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
           />
         );
       }
+      case 'SRARC_SetConfig': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={svcAction.tag}
+            valuesMap={{
+              NewConfig: (
+                <pre
+                  style={{ whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                >
+                  {JSON.stringify(svcAction.value.newConfig, null, 2)}
+                </pre>
+              ),
+            }}
+          />
+        );
+      }
     }
   }
   return <p>Not yet implemented for this action</p>;

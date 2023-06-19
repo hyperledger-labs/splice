@@ -568,7 +568,7 @@ components:
         requester:
           type: string
         action:
-          type: string
+          type: object
         url:
           type: string
         description:

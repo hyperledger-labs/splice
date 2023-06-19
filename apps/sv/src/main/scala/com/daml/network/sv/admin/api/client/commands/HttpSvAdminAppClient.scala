@@ -3,11 +3,13 @@ package com.daml.network.sv.admin.api.client.commands
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
-import cats.implicits.{toBifunctorOps, toTraverseOps}
+import cats.implicits.toTraverseOps
+import cats.syntax.either.*
+import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
-import com.daml.network.codegen.java.cn.svcrules.{Vote, VoteRequest}
+import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, Vote, VoteRequest}
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.environment.CNNodeStatus
 import com.daml.network.http.v0.definitions.{CometBftNodeDumpResponse, CometBftNodeStatusResponse}
@@ -18,6 +20,7 @@ import com.daml.network.http.v0.svAdmin.{
 import com.daml.network.http.v0.{definitions, svAdmin as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.duration.FiniteDuration
@@ -167,17 +170,29 @@ object HttpSvAdminAppClient {
 
   case class CreateVoteRequest(
       requester: String,
-      action: String,
+      action: ActionRequiringConfirmation,
       reasonUrl: String,
       reasonDescription: String,
-  ) extends BaseCommand[http.CreateVoteRequestResponse, Unit] {
+  )(implicit elc: ErrorLoggingContext)
+      extends BaseCommand[http.CreateVoteRequestResponse, Unit] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.CreateVoteRequestResponse] =
       client.createVoteRequest(
-        body = definitions.CreateVoteRequest(requester, action, reasonUrl, reasonDescription),
+        body = definitions.CreateVoteRequest(
+          requester,
+          io.circe.parser
+            .parse(
+              ApiCodecCompressed
+                .apiValueToJsValue(Contract.javaValueToLfValue(action.toValue))
+                .compactPrint
+            )
+            .valueOr(error => throw new IllegalArgumentException(error)),
+          reasonUrl,
+          reasonDescription,
+        ),
         headers = headers,
       )
 

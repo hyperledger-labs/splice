@@ -24,6 +24,8 @@ import {
   BatchListVotesByVoteRequestsRequest,
 } from 'sv-openapi';
 
+import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);
 
 export interface SvAdminProps {
@@ -34,7 +36,7 @@ export interface SvAdminClient {
   isAuthorized: () => Promise<void>;
   createVoteRequest: (
     requester: string,
-    action: string,
+    action: ActionRequiringConfirmation,
     url: string,
     description: string
   ) => Promise<void>;
@@ -85,8 +87,18 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       isAuthorized: async (): Promise<void> => {
         return await svAdminClient.isAuthorized();
       },
-      createVoteRequest: async (requester, action, url, description): Promise<void> => {
-        const request: CreateVoteRequest = { requester, action, url, description };
+      createVoteRequest: async (
+        requester,
+        action: ActionRequiringConfirmation,
+        url,
+        description
+      ): Promise<void> => {
+        const request: CreateVoteRequest = {
+          requester,
+          action: ActionRequiringConfirmation.encode(action),
+          url,
+          description,
+        };
         return await svAdminClient.createVoteRequest(request);
       },
       listSvcRulesVoteRequests: async (): Promise<ListSvcRulesVoteRequestsResponse> => {

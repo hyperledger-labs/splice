@@ -8,6 +8,9 @@ import { CometBftNodeDumpOrErrorResponse } from 'sv-openapi';
 import { Box, Tab, TableBody, TableRow, Tabs } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 
+import { CoinRules } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
+import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+
 import { useSvcInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';
 import { config } from '../utils';
@@ -172,7 +175,7 @@ const SvcViewPrettyJSON = () => {
         <JSONPretty
           id="svc-rules-information"
           style={{ fontSize: '10pt' }}
-          data={svcInfoData?.svcRules}
+          data={SvcRules.encode(svcInfoData?.svcRules.payload!)}
           theme={JSONPrettyMon}
         />
       </TabPanel>
@@ -180,7 +183,7 @@ const SvcViewPrettyJSON = () => {
         <JSONPretty
           id="coin-rules-information"
           style={{ fontSize: '10pt' }}
-          data={svcInfoData?.coinRules}
+          data={CoinRules.encode(svcInfoData?.coinRules.payload!)}
           theme={JSONPrettyMon}
         />
       </TabPanel>

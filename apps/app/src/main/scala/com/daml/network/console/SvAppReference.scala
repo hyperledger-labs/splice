@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.round as cr
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
-import com.daml.network.codegen.java.cn.svcrules.{Vote, VoteRequest}
+import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, Vote, VoteRequest}
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
@@ -164,7 +164,7 @@ class SvAppBackendReference(
   @Help.Summary("Create a vote request (via admin API)")
   def createVoteRequest(
       requester: String,
-      action: String,
+      action: ActionRequiringConfirmation,
       reasonUrl: String,
       reasonDescription: String,
   ): Unit = {

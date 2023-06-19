@@ -620,6 +620,63 @@ class SvFrontendIntegrationTest
         }
     }
 
+    "can create a valid SRARC_SetConfig (new SvcRules Configuration) vote request" in {
+      implicit env =>
+        val requestNewNumUnclaimedRewardsThreshold = "42"
+        val requestReasonUrl = "This is a request reason url."
+        val requestReasonBody = "This is a request reason."
+
+        withFrontEnd("sv1") { implicit webDriver =>
+          actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1Port/votes"
+              loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+            },
+          )(
+            "sv1 can see the create vote request button",
+            _ => {
+              find(id("create-voterequest-submit-button")) should not be empty
+            },
+          )
+
+          val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
+            "sv1 operator can create a new vote request", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("SRARC_SetConfig")
+
+              inside(find(id("numUnclaimedRewardsThreshold-value"))) { case Some(element) =>
+                element.underlying.sendKeys(requestNewNumUnclaimedRewardsThreshold)
+              }
+              inside(find(id("create-reason-url"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonUrl)
+              }
+              inside(find(id("create-reason-description"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonBody)
+              }
+
+              click on "update-json-submit-button"
+
+              click on "create-voterequest-submit-button"
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              inside(tbody) { case Some(tb) =>
+                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                rows should have size 1
+                (
+                  rows.head.childElement(className("vote-row-action")).text,
+                  rows.head.childElement(className("vote-row-requester")).text,
+                )
+              }
+            },
+          )
+          (createdVoteRequestAction, createdVoteRequestRequester)
+        }
+
+    }
+
   }
 
   private def svCoinPriceShouldMatch(

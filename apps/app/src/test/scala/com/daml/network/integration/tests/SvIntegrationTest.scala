@@ -9,11 +9,15 @@ import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.api.v1.round.Round
+import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSvOnboarding}
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+  SRARC_ConfirmSvOnboarding,
+  SRARC_RemoveMember,
+  SRARC_SetConfig,
+}
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.{
   CNParticipantClientReference,
   ScanAppBackendReference,
@@ -33,7 +37,6 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
-import com.fasterxml.jackson.databind.ObjectMapper
 
 import java.time.Instant
 import scala.concurrent.duration.*
@@ -1010,11 +1013,8 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
     val (_, voteRequestCid) = actAndCheck(
       "SV1 create a vote request to remove sv5", {
-        val objectMapper = new ObjectMapper()
-        val jsonObject = objectMapper.createObjectNode()
-        jsonObject.put("action", "SRARC_RemoveMember")
-        jsonObject.put("member", sv5Party)
-        val action = objectMapper.writeValueAsString(jsonObject)
+        val action: ActionRequiringConfirmation =
+          new ARC_SvcRules(new SRARC_RemoveMember(new SvcRules_RemoveMember(sv5Party)))
         sv1.createVoteRequest(
           sv1.getSvcInfo().svParty.toProtoPrimitive,
           action,
@@ -1062,6 +1062,100 @@ class SvIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       "The majority accepts, the trigger should remove sv5",
       _ => {
         sv4.getSvcInfo().svcRules.payload.members should have size 4
+      },
+    )
+
+  }
+
+  "At least 3 SVs can vote on changing the SvcRules Configuration" in { implicit env =>
+    val newNumUnclaimedRewardsThreshold = 42
+
+    clue("Initialize SVC with 4 SVs") {
+      initSvc()
+      eventually() {
+        sv1.getSvcInfo().svcRules.payload.members should have size 4
+      }
+    }
+
+    val (_, (voteRequestCid, initialNumUnclaimedRewardsThreshold)) = actAndCheck(
+      "SV1 create a vote request for a new SvcRules Configuration", {
+        val newConfig = new SvcRulesConfig(
+          newNumUnclaimedRewardsThreshold,
+          sv1.getSvcInfo().svcRules.payload.config.actionConfirmationTimeout,
+          sv1.getSvcInfo().svcRules.payload.config.svOnboardingRequestTimeout,
+          sv1.getSvcInfo().svcRules.payload.config.svOnboardingConfirmedTimeout,
+          sv1.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+          sv1.getSvcInfo().svcRules.payload.config.leaderInactiveTimeout,
+          sv1.getSvcInfo().svcRules.payload.config.domainNodeConfigLimits,
+          sv1.getSvcInfo().svcRules.payload.config.maxTextLength,
+          sv1.getSvcInfo().svcRules.payload.config.globalDomain,
+        )
+
+        val action: ActionRequiringConfirmation =
+          new ARC_SvcRules(new SRARC_SetConfig(new SvcRules_SetConfig(newConfig)))
+
+        sv1.createVoteRequest(
+          sv1.getSvcInfo().svParty.toProtoPrimitive,
+          action,
+          "url",
+          "description",
+        )
+      },
+    )(
+      "The vote request has been created and SV1 accepts as he created it",
+      _ => {
+        sv1.listVoteRequests() should not be empty
+        val head = sv1.listVoteRequests().head.contractId
+        sv1.listVotes(Vector(head.contractId)) should have size 1
+        (head, sv1.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold)
+      },
+    )
+
+    actAndCheck(
+      "SV2 votes on accepting the new configuration", {
+        sv2.castVote(voteRequestCid, true, "url", "description")
+      },
+    )(
+      "The majority did not vote yet, thus the trigger should not change the svcRules",
+      _ => {
+        sv2
+          .getSvcInfo()
+          .svcRules
+          .payload
+          .config
+          .numUnclaimedRewardsThreshold shouldBe initialNumUnclaimedRewardsThreshold
+      },
+    )
+
+    actAndCheck(
+      "SV3 refuses the new configuration", {
+        sv3.castVote(voteRequestCid, false, "url", "description")
+      },
+    )(
+      "The majority has voted but without an acceptance majority, the trigger should not change the svcRules",
+      _ => {
+        sv3
+          .getSvcInfo()
+          .svcRules
+          .payload
+          .config
+          .numUnclaimedRewardsThreshold shouldBe initialNumUnclaimedRewardsThreshold
+      },
+    )
+
+    actAndCheck(
+      "SV4 votes on accepting the new configuration", {
+        sv4.castVote(voteRequestCid, true, "url", "description")
+      },
+    )(
+      "The majority accepts, the trigger should change the svcRules accordingly",
+      _ => {
+        sv4
+          .getSvcInfo()
+          .svcRules
+          .payload
+          .config
+          .numUnclaimedRewardsThreshold shouldBe newNumUnclaimedRewardsThreshold
       },
     )
 

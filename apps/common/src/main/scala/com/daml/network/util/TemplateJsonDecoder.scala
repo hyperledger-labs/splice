@@ -31,6 +31,13 @@ abstract class TemplateJsonDecoder {
   def decodeInterface[ICid <: ContractId[Marker], Marker, View](
       companion: InterfaceCompanion[Marker, ICid, View]
   )(json: Json): View
+
+  def decodeValue[T](
+      valueDecoder: ValueDecoder[T],
+      packageId: String,
+      moduleName: String,
+      entityName: String,
+  )(json: Json): T
 }
 
 /** Template decoder constructed from loading DAR files of the resources of our apps.
@@ -59,6 +66,20 @@ class ResourceTemplateDecoder(
     )
 
     decode(ContractCompanion.valueDecoder[T](companion), lfIdentifier, json)
+  }
+
+  override def decodeValue[T](
+      valueDecoder: ValueDecoder[T],
+      packageId: String,
+      moduleName: String,
+      entityName: String,
+  )(json: Json): T = {
+
+    val lfIdentifier = Ref.Identifier.assertFromString(
+      s"${packageId}:${moduleName}:${entityName}"
+    )
+
+    decode(valueDecoder, lfIdentifier, json)
   }
 
   override def decodeInterface[ICid <: ContractId[Marker], Marker, View](
@@ -102,6 +123,7 @@ class ResourceTemplateDecoder(
 }
 
 object ResourceTemplateDecoder {
+
   def loadPackageSignaturesFromResource(
       resourcePath: String
   ): Map[PackageId, typesig.PackageSignature] = {

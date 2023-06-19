@@ -3,13 +3,17 @@ import React, { useState } from 'react';
 
 import { FormControl, NativeSelect, Stack, Typography } from '@mui/material';
 
+import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+
 import { useSvcInfos } from '../../../contexts/SvContext';
 
 function createRow(key: string, value: string, isParty: boolean = false) {
   return { key, value, isParty };
 }
 
-const RemoveMember: React.FC<{ chooseAction: (action: object) => void }> = ({ chooseAction }) => {
+const RemoveMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmation) => void }> = ({
+  chooseAction,
+}) => {
   const svcInfosQuery = useSvcInfos();
   const [member, setMember] = useState<string | undefined>(undefined);
 
@@ -27,8 +31,15 @@ const RemoveMember: React.FC<{ chooseAction: (action: object) => void }> = ({ ch
   );
   function setMemberAction(member: string) {
     setMember(member);
-    console.log(member);
-    chooseAction({ action: 'SRARC_RemoveMember', member: member });
+    chooseAction({
+      tag: 'ARC_SvcRules',
+      value: {
+        svcAction: {
+          tag: 'SRARC_RemoveMember',
+          value: { member: member },
+        },
+      },
+    });
   }
 
   return (

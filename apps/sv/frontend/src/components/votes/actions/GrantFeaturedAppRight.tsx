@@ -3,11 +3,13 @@ import React, { useState } from 'react';
 
 import { FormControl, Stack, TextField, Typography } from '@mui/material';
 
+import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+
 import { useSvcInfos } from '../../../contexts/SvContext';
 
-const GrantFeaturedAppRight: React.FC<{ chooseAction: (action: object) => void }> = ({
-  chooseAction,
-}) => {
+const GrantFeaturedAppRight: React.FC<{
+  chooseAction: (action: ActionRequiringConfirmation) => void;
+}> = ({ chooseAction }) => {
   const svcInfosQuery = useSvcInfos();
   const [provider, setProvider] = useState<string>('');
 
@@ -21,7 +23,15 @@ const GrantFeaturedAppRight: React.FC<{ chooseAction: (action: object) => void }
 
   function setProviderAction(provider: string) {
     setProvider(provider);
-    chooseAction({ action: 'SRARC_GrantFeaturedAppRight', provider: provider });
+    chooseAction({
+      tag: 'ARC_SvcRules',
+      value: {
+        svcAction: {
+          tag: 'SRARC_GrantFeaturedAppRight',
+          value: { provider: provider },
+        },
+      },
+    });
   }
 
   return (

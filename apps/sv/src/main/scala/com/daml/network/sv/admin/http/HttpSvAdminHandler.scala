@@ -25,7 +25,7 @@ import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
-import com.daml.network.util.Codec
+import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -46,6 +46,7 @@ class HttpSvAdminHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
+    templateJsonDecoder: TemplateJsonDecoder,
 ) extends v0.SvAdminHandler[String]
     with Spanning
     with NamedLogging {

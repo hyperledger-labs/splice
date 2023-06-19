@@ -13,21 +13,8 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AuthConfig, HMACVerifier, RSAVerifier}
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
-  SRARC_GrantFeaturedAppRight,
-  SRARC_RemoveMember,
-  SRARC_RevokeFeaturedAppRight,
-}
-import com.daml.network.codegen.java.cn.svcrules.{
-  Reason,
-  SvcRules_GrantFeaturedAppRight,
-  SvcRules_RemoveMember,
-  SvcRules_RequestVote,
-  SvcRules_RevokeFeaturedAppRight,
-}
+import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
@@ -50,7 +37,7 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.setup.{FoundingNodeInitializer, JoiningNodeInitializer}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
-import com.daml.network.util.{Contract, HasHealth, UploadablePackage}
+import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{
@@ -71,6 +58,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -642,82 +630,55 @@ object SvApp {
     }
   }
 
-  private def parseVoteRequestAction(value: String): Either[String, ARC_SvcRules] = {
-    val jsonDic = ujson.read(value)
-    jsonDic("action").str match {
-      case "SRARC_RemoveMember" =>
-        Right(
-          new ARC_SvcRules(new SRARC_RemoveMember(new SvcRules_RemoveMember(jsonDic("member").str)))
-        )
-      case "SRARC_GrantFeaturedAppRight" =>
-        // TODO(M3-56): validate application provider such that users can't create non-sense requests
-        Right(
-          new ARC_SvcRules(
-            new SRARC_GrantFeaturedAppRight(
-              new SvcRules_GrantFeaturedAppRight(jsonDic("provider").str)
-            )
-          )
-        )
-      case "SRARC_RevokeFeaturedAppRight" =>
-        // TODO(M3-56): validate that the application provider is already featured
-        Right(
-          new ARC_SvcRules(
-            new SRARC_RevokeFeaturedAppRight(
-              new SvcRules_RevokeFeaturedAppRight(
-                new FeaturedAppRight.ContractId(jsonDic("rightCid").str)
-              )
-            )
-          )
-        )
-      case _ => Left("Action not defined")
-    }
-  }
-
   def createVoteRequest(
       requester: String,
-      action: String,
+      action: Json,
       reasonUrl: String,
       reasonDescription: String,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
-    parseVoteRequestAction(action) match {
-      case Left(_) =>
-        Future.successful(
-          Left(
-            s"The action could not be created."
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+  ): Future[Either[String, Unit]] = {
+    val decodedAction = templateJsonDecoder.decodeValue(
+      ActionRequiringConfirmation.valueDecoder(),
+      ActionRequiringConfirmation._packageId,
+      "CN.SvcRules",
+      "ActionRequiringConfirmation",
+    )(action)
+    svcStoreWithIngestion.store
+      .lookupVoteRequestByThisSvAndActionWithOffset(decodedAction)
+      .flatMap {
+        case QueryResult(_, Some(vote)) =>
+          Future.successful(
+            Left(s"This vote request has already been created ${vote.contractId}.")
           )
-        )
-      case Right(action) =>
-        svcStoreWithIngestion.store.lookupVoteRequestByThisSvAndActionWithOffset(action).flatMap {
-          case QueryResult(_, Some(vote)) =>
-            Future.successful(
-              Left(s"This vote request has already been created ${vote.contractId}.")
-            )
-          case QueryResult(offset, None) =>
-            for {
-              svcRules <- svcStoreWithIngestion.store.getSvcRules()
-              reason = new Reason(reasonUrl, reasonDescription)
-              request = new SvcRules_RequestVote(requester, action, reason)
-              cmd = svcRules.contractId.exerciseSvcRules_RequestVote(request)
-              _ <- svcStoreWithIngestion.connection.submitCommands(
-                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
-                commands = cmd.commands().asScala.toSeq,
-                commandId = CNLedgerConnection.CommandId(
-                  "com.daml.network.sv.requestVote",
-                  Seq(
-                    svcStoreWithIngestion.store.key.svcParty,
-                    svcStoreWithIngestion.store.key.svParty,
-                  ),
-                  action.toString,
+        case QueryResult(offset, None) =>
+          for {
+            svcRules <- svcStoreWithIngestion.store.getSvcRules()
+            reason = new Reason(reasonUrl, reasonDescription)
+            request = new SvcRules_RequestVote(requester, decodedAction, reason)
+            cmd = svcRules.contractId.exerciseSvcRules_RequestVote(request)
+            _ <- svcStoreWithIngestion.connection.submitCommands(
+              actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+              readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+              commands = cmd.commands().asScala.toSeq,
+              commandId = CNLedgerConnection.CommandId(
+                "com.daml.network.sv.requestVote",
+                Seq(
+                  svcStoreWithIngestion.store.key.svcParty,
+                  svcStoreWithIngestion.store.key.svParty,
                 ),
-                deduplicationOffset = offset,
-                domainId = globalDomain,
-              )
-            } yield Right(())
-        }
-    }
+                action.toString,
+              ),
+              deduplicationOffset = offset,
+              domainId = globalDomain,
+            )
+          } yield Right(())
+      }
+
   }
 
   def castVote(

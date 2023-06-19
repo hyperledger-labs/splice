@@ -3,11 +3,15 @@ import React, { useState } from 'react';
 
 import { FormControl, Stack, TextField, Typography } from '@mui/material';
 
+import { FeaturedAppRight } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
+import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ContractId } from '@daml/types';
+
 import { useSvcInfos } from '../../../contexts/SvContext';
 
-const RevokeFeaturedAppRight: React.FC<{ chooseAction: (action: object) => void }> = ({
-  chooseAction,
-}) => {
+const RevokeFeaturedAppRight: React.FC<{
+  chooseAction: (action: ActionRequiringConfirmation) => void;
+}> = ({ chooseAction }) => {
   const svcInfosQuery = useSvcInfos();
   const [rightCid, setRightCid] = useState<string>('');
 
@@ -21,7 +25,15 @@ const RevokeFeaturedAppRight: React.FC<{ chooseAction: (action: object) => void 
 
   function setRightCidAction(rightCid: string) {
     setRightCid(rightCid);
-    chooseAction({ action: 'SRARC_RevokeFeaturedAppRight', rightCid: rightCid });
+    chooseAction({
+      tag: 'ARC_SvcRules',
+      value: {
+        svcAction: {
+          tag: 'SRARC_RevokeFeaturedAppRight',
+          value: { rightCid: rightCid as ContractId<FeaturedAppRight> },
+        },
+      },
+    });
   }
 
   return (

@@ -14,6 +14,8 @@ import {
   Typography,
 } from '@mui/material';
 
+import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useSvcInfos } from '../../contexts/SvContext';
 import { config } from '../../utils';
@@ -21,6 +23,7 @@ import ListVoteRequests from './ListVoteRequests';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import RemoveMember from './actions/RemoveMember';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
+import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 
 const VoteRequest: React.FC = () => {
   const [actionName, setActionName] = useState('SRARC_RemoveMember');
@@ -32,10 +35,11 @@ const VoteRequest: React.FC = () => {
     { name: 'Remove Member', value: 'SRARC_RemoveMember' },
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
+    { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
   ];
 
-  const [action, setAction] = useState<object | undefined>(undefined);
-  const chooseAction = (action: object) => {
+  const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
+  const chooseAction = (action: ActionRequiringConfirmation) => {
     setAction(action);
   };
 
@@ -44,7 +48,7 @@ const VoteRequest: React.FC = () => {
     mutationFn: async () => {
       const requester = svcInfosQuery.data?.svPartyId!;
       if (actionNameOptions.map(e => e.value).includes(actionName)) {
-        return await createVoteRequest(requester, JSON.stringify(action), url, description);
+        return await createVoteRequest(requester, action!, url, description);
       }
     },
 
@@ -85,6 +89,7 @@ const VoteRequest: React.FC = () => {
           {actionName === 'SRARC_RevokeFeaturedAppRight' && (
             <RevokeFeaturedAppRight chooseAction={chooseAction} />
           )}
+          {actionName === 'SRARC_SetConfig' && <SetSvcRulesConfig chooseAction={chooseAction} />}
           <Typography variant="h5">Reason</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>

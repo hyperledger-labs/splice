@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2023-06-25
+----------
+
+* Frontend updates:
+   * The SV web UI allows operators to create vote requests to propose a new SV Collective configuration.
+     Others can vote on these. Once the majority is reached the new configuration is applied.
+
 2023-06-18
 ----------
 

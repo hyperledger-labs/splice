@@ -90,6 +90,9 @@ const ListVoteRequests: React.FC = () => {
         case 'SRARC_RevokeFeaturedAppRight': {
           return `${svcRulesAction.tag} : ${svcRulesAction.value.rightCid}`;
         }
+        case 'SRARC_SetConfig': {
+          return `${svcRulesAction.tag}`;
+        }
       }
     }
     return 'Action tag not defined.';
