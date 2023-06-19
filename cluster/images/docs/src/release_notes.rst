@@ -9,6 +9,10 @@ Release Notes
 * Frontend updates:
    * The SV web UI allows operators to create vote requests to propose a new SV Collective configuration.
      Others can vote on these. Once the majority is reached the new configuration is applied.
+* Deployment updates:
+   * The container for scan now accepts the address to the participant through the ``CN_APP_SCAN_PARTICIPANT_ADDRESS``
+     environment variable matching the SV app and the validator app. The helm charts set the right default so
+     if you are using them, there is no need to configure anything.
 
 2023-06-18
 ----------
