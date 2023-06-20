@@ -36,7 +36,7 @@ class AuthTokenManager(
     * If a token is immediately available the returned future will be immediately completed.
     * If there is no token it will cause a token refresh to start and be completed once obtained.
     * If there is a refresh already in progress it will be completed with this refresh.
-    * If a scheduled refresh occurs while a refresh is in progress, the result of the scheduled refresh will be returned.
+    * If a scheduled refresh occurs while a refresh is in progress, eventually the last completing refresh will be returned.
     */
   def getToken: Future[Option[AuthToken]] =
     state.get() match {
@@ -103,12 +103,8 @@ class AuthTokenManager(
     _now.discard
     val promise = Promise[ResultState]()
     val future = promise.future
-    state.get() match {
-      // if a pending refresh is already occurring, overwrite the result with the scheduled refresh token
-      case Refreshing(pending) => pending.foreach(_ => future)
-      // getToken calls, that occur after the background refresh starts, will get the result of the background refresh
-      case _ => state.set(Refreshing(future))
-    }
+    // overwrite any existing state with this background refresh
+    state.set(Refreshing(future))
     refreshToken(promise)
   }
 }
