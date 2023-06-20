@@ -43,19 +43,35 @@ class CometBftNode(
     networkConfigChanges = diffNetworkConfig(owningSvNode, target.members, actualConfig, logger)
     // We minimize latency by issuing updates and deletes in parallel, which is safe as we expect <= 16 SV nodes
     // TODO(M3-47): consider moving `diffNetworkConfig` into this class to minimize the parameter passing; it's currently kept outside for ease of unit testing
-    _ = if (networkConfigChanges.requests.nonEmpty) {
-      val summary = CometBftNode.NetworkDiffSummary(
-        actualConfig,
-        target.members,
-        networkConfigChanges.requests,
-      )
-      logger.debug(
-        show"Applying changes to reconcile difference in CometBft network configuration: $summary"
-      )
-    }
-    _ <- networkConfigChanges.requests.traverse(
-      submitChangeRequest
-    )
+    _ <-
+      if (networkConfigChanges.requests.nonEmpty) {
+        val summary = CometBftNode.NetworkDiffSummary(
+          actualConfig,
+          target.members,
+          networkConfigChanges.requests,
+        )
+        // TODO(#4925): select the governance key to use for submitting the change requests comparing the KMS (Canton ;-)) against the configured state
+        val ourGovernanceKey =
+          proto.cometbft.GovernanceKey(CometBftRequestSigner.GenesisPubKeyBase64)
+        val ourKeyIsRegistered = actualConfig.svNodeConfigStates
+          .get(owningSvNode)
+          .exists(state =>
+            state.currentConfig.exists(config => config.governanceKeys.contains(ourGovernanceKey))
+          )
+        if (ourKeyIsRegistered) {
+          logger.debug(
+            show"Reconciling difference in CometBft network configuration: $summary"
+          )
+          networkConfigChanges.requests.traverse(
+            submitChangeRequest
+          )
+        } else {
+          logger.info(
+            show"Skipping reconciling difference in CometBft network configuration, as our governance public key ${ourGovernanceKey.toString.singleQuoted} is not yet registered: $summary"
+          )
+          Future.unit
+        }
+      } else Future.unit
   } yield ()
 
   private def submitChangeRequest(
