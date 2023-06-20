@@ -1,4 +1,4 @@
-import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import {
   auth0UserNameEnvVar,
   installAuth0Secret,
@@ -14,9 +14,9 @@ import { installDomain, installParticipant } from './ledger';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,
-  svc: k8s.helm.v3.Release,
+  svc: pulumi.Resource,
   providerWalletUser: string
-): Promise<k8s.helm.v3.Release> {
+): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell');
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');

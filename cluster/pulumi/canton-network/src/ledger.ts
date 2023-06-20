@@ -6,7 +6,7 @@ export function installDomain(
   xns: ExactNamespace,
   name: string,
   postgresDb: pulumi.Output<string>
-): k8s.helm.v3.Release {
+): pulumi.Resource {
   return installCNHelmChart(xns, name, 'cn-domain', {
     postgres: postgresDb,
   });
@@ -16,7 +16,7 @@ export function installGlobalDomain(
   xns: ExactNamespace,
   name: string,
   postgresDb: pulumi.Output<string>
-): k8s.helm.v3.Release {
+): pulumi.Resource {
   return installCNHelmChart(xns, name, 'cn-global-domain', {
     postgres: postgresDb,
     sequencerDriver: {
@@ -33,7 +33,7 @@ export function installParticipant(
   participantUsers: ParticipantUser[],
   extraEnvVars: k8s.types.input.core.v1.EnvVar[],
   dependsOn: pulumi.Resource[] = []
-): k8s.helm.v3.Release {
+): pulumi.Resource {
   return installCNHelmChart(
     xns,
     name,

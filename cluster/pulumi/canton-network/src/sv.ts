@@ -49,7 +49,7 @@ export type SvOnboarding =
       type: 'join-with-key';
       publicKey: string;
       privateKey: string;
-      sponsorRelease?: k8s.helm.v3.Release;
+      sponsorRelease?: pulumi.Resource;
       sponsorApiUrl: string;
     };
 
@@ -60,7 +60,7 @@ export async function installSvNode(
   validatorWalletUser: string,
   onboarding: SvOnboarding,
   withScan = false
-): Promise<k8s.helm.v3.Release> {
+): Promise<pulumi.Resource> {
   const xns = exactNamespace(nodename);
 
   const dependsOn = (

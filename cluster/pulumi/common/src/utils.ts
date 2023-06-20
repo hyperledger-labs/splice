@@ -135,7 +135,7 @@ export function installCNHelmChartByNamespaceName(
   chartName: string,
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
-): k8s.helm.v3.Release {
+): pulumi.Resource {
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
     {
@@ -157,7 +157,7 @@ export function installCNHelmChart(
   chartName: string,
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
-): k8s.helm.v3.Release {
+): pulumi.Resource {
   return installCNHelmChartByNamespaceName(
     xns.logicalName,
     xns.ns.metadata.name,

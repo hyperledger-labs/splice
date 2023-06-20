@@ -1,4 +1,4 @@
-import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import {
   auth0UserNameEnvVar,
   installAuth0Secret,
@@ -13,10 +13,10 @@ import { installParticipant } from './ledger';
 
 export async function installValidator(
   auth0Client: Auth0Client,
-  svc: k8s.helm.v3.Release,
+  svc: pulumi.Resource,
   name: string,
   validatorWalletUser?: string
-): Promise<k8s.helm.v3.Release> {
+): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');

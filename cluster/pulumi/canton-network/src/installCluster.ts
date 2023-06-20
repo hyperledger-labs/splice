@@ -1,4 +1,3 @@
-import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import type { Auth0Client } from 'cn-pulumi-common';
 import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
@@ -33,7 +32,7 @@ const SV4_KEY = {
 };
 
 function joinViaSv1(
-  sv1: k8s.helm.v3.Release,
+  sv1: pulumi.Resource,
   keys: { publicKey: string; privateKey: string }
 ): SvOnboarding {
   return {
