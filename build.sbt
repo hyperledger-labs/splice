@@ -991,20 +991,6 @@ lazy val printTests = taskKey[Unit](
 printTests := {
   import java.io._
   println("Appending full class names of tests.")
-  val pwPreflight = new PrintWriter(new FileWriter(s"test-full-class-names-preflight.log", true))
-  val pwPreflightSv =
-    new PrintWriter(new FileWriter(s"test-full-class-names-preflight-sv.log", true))
-  val pw = new PrintWriter(new FileWriter(s"test-full-class-names.log", true))
-  val pwSimTime =
-    new PrintWriter(new FileWriter(s"test-full-class-names-sim-time.log", true))
-  val pwFrontEnd =
-    new PrintWriter(new FileWriter(s"test-full-class-names-frontend.log", true))
-  val pwFrontEndSimTime =
-    new PrintWriter(new FileWriter(s"test-full-class-names-frontend-sim-time.log", true))
-  val pwDomainFees =
-    new PrintWriter(new FileWriter(s"test-full-class-names-domain-fees.log", true))
-  val pwGlobalUpgradeSimTime =
-    new PrintWriter(new FileWriter(s"test-full-class-names-global-upgrade-sim-time.log", true))
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
@@ -1014,19 +1000,6 @@ printTests := {
   def isDomainFeesTest(name: String): Boolean = name.contains(".DF")
   def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
 
-  def printTestNames(
-      testSet: String,
-      testNames: Seq[String],
-      writer: PrintWriter,
-      predicate: String => Boolean,
-  ): Unit = {
-    val filtered = testNames.filter(predicate)
-    println(s"There are ${filtered.length} $testSet.")
-    filtered.sorted.foreach { testName =>
-      writer.println(testName)
-    }
-  }
-
   val allTestNames =
     definedTests
       .all(ScopeFilter(inAggregates(root), inConfigurations(Test)))
@@ -1034,65 +1007,79 @@ printTests := {
       .flatten
       .map(_.name)
 
-  Seq(
+  val testSplitRules = Seq(
     (
       "Preflight tests",
-      pwPreflight,
+      "test-full-class-names-preflight.log",
       (t: String) => isPreflightIntegrationTest(t),
     ),
     (
       "Preflight SV tests",
-      pwPreflightSv,
+      "test-full-class-names-preflight-sv.log",
       (t: String) => isPreflightSvIntegrationTest(t),
     ),
     (
-      "tests with wall clock time",
-      pw,
-      (t: String) =>
-        !isTimeBasedTest(t) && !isFrontEndTest(t) && !isDomainFeesTest(
-          t
-        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
-    ),
-    (
-      "tests with simulated time",
-      pwSimTime,
-      (t: String) =>
-        isTimeBasedTest(t) && !isFrontEndTest(t) && !isDomainFeesTest(
-          t
-        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(
-          t
-        ) && !isGlobalUpgradeTest(t),
-    ),
-    (
-      "frontend tests with wall clock time",
-      pwFrontEnd,
-      (t: String) =>
-        !isTimeBasedTest(t) && isFrontEndTest(t)
-          && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
-    ),
-    (
-      "frontend tests with simulated time",
-      pwFrontEndSimTime,
-      (t: String) =>
-        isTimeBasedTest(t) && isFrontEndTest(t) && !isPreflightIntegrationTest(
-          t
-        ) && !isPreflightSvIntegrationTest(t),
-    ),
-    (
       "domain fees enabled tests with wall clock time",
-      pwDomainFees,
-      (t: String) =>
-        !isTimeBasedTest(t) && isDomainFeesTest(t) &&
-          !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
+      "test-full-class-names-domain-fees.log",
+      (t: String) => !isTimeBasedTest(t) && isDomainFeesTest(t),
     ),
     (
       "global domain upgrade test",
-      pwGlobalUpgradeSimTime,
+      "test-full-class-names-global-upgrade-sim-time.log",
       (t: String) => isTimeBasedTest(t) && isGlobalUpgradeTest(t),
     ),
-  ).foreach { case (testSet, pw, predicate) =>
-    printTestNames(testSet, allTestNames, pw, predicate)
-    pw.close()
+    (
+      "tests with wall clock time",
+      "test-full-class-names.log",
+      (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t),
+    ),
+    (
+      "tests with simulated time",
+      "test-full-class-names-sim-time.log",
+      (t: String) => isTimeBasedTest(t) && !isFrontEndTest(t),
+    ),
+    (
+      "frontend tests with wall clock time",
+      "test-full-class-names-frontend.log",
+      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t),
+    ),
+    (
+      "frontend tests with simulated time",
+      "test-full-class-names-frontend-sim-time.log",
+      (t: String) => isTimeBasedTest(t) && isFrontEndTest(t),
+    ),
+  )
+
+  val rulesWithOpenFiles = testSplitRules.map { case (t, fileName, p) =>
+    (t, new PrintWriter(new FileWriter(fileName, true)), p)
+  }.zipWithIndex
+
+  val (testCounts, unmatchedTestNames) =
+    allTestNames.sorted.foldLeft((Map.empty[Int, Int], Vector.empty[String])) {
+      case ((counts, unmatched), testName) =>
+        rulesWithOpenFiles
+          .collectFirst {
+            case ((testSet, writer, predicate), countIx) if predicate(testName) =>
+              (writer, countIx)
+          }
+          .map { case (writer, countIx) =>
+            writer.println(testName)
+            (counts.updated(countIx, counts.getOrElse(countIx, 0) + 1), unmatched)
+          }
+          .getOrElse {
+            (counts, unmatched :+ testName)
+          }
+    }
+
+  if (unmatchedTestNames.nonEmpty)
+    sys.error(
+      s"Could not find a matching CI category for tests ${unmatchedTestNames mkString ", "}"
+    )
+
+  rulesWithOpenFiles.foreach { case ((testSet, writer, _), countIx) =>
+    val filteredLength = testCounts.getOrElse(countIx, 0)
+    println(s"There are $filteredLength $testSet.")
+    writer.close()
   }
 }
 
