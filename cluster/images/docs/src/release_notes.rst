@@ -9,6 +9,8 @@ Release Notes
 * Frontend updates:
    * The SV web UI allows operators to create vote requests to propose a new SV Collective configuration.
      Others can vote on these. Once the majority is reached the new configuration is applied.
+   * The SV web UI has a new tab to display the status of your sequencer and mediator. Note that the mediator and sequencer are not yet deployed
+     as part of the runbook so you will see an error on the status page.
 * Deployment updates:
    * The container for scan now accepts the address to the participant through the ``CN_APP_SCAN_PARTICIPANT_ADDRESS``
      environment variable matching the SV app and the validator app. The helm charts set the right default so

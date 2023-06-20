@@ -59,14 +59,14 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "have three information tabs" in { implicit env =>
+    "have 5 information tabs" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "svc and coin infos are displayed in pretty json", {
             login(sv1Port, sv1.config.ledgerApiUser)
           },
         )(
-          "We see the three tab panels",
+          "We see the 5 tab panels",
           _ => {
             inside(find(id("information-tab-general"))) { case Some(e) =>
               e.text shouldBe "General"
@@ -77,7 +77,17 @@ class SvFrontendIntegrationTest
             inside(find(id("information-tab-cc-configuration"))) { case Some(e) =>
               e.text shouldBe "Canton Coin Configuration"
             }
-            click on "information-tab-general"
+            inside(find(id("information-tab-cometBft-debug"))) { case Some(e) =>
+              e.text shouldBe "CometBFT Debug Info"
+            }
+            inside(find(id("information-tab-canton-domain-status"))) { case Some(e) =>
+              e.text shouldBe "Domain Node Status"
+            }
+          },
+        )
+        actAndCheck("Click on general information tab", click on "information-tab-general")(
+          "observe information on party information",
+          _ => {
             val valueCells = findAll(className("general-svc-value-name")).toSeq
             valueCells should have length 9
             forExactly(1, valueCells)(
@@ -86,6 +96,14 @@ class SvFrontendIntegrationTest
             forExactly(3, valueCells)(
               _.text should matchText(sv1.getSvcInfo().svParty.toProtoPrimitive)
             )
+          },
+        )
+        actAndCheck("Click on domain status tab", click on "information-tab-canton-domain-status")(
+          "Observe sequencer and mediator as active",
+          _ => {
+            val activeCells = findAll(className("active-value")).toSeq
+            activeCells should have length 2
+            forAll(activeCells)(_.text shouldBe "true")
           },
         )
       }

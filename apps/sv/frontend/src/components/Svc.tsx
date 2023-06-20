@@ -1,11 +1,11 @@
 import { UseQueryResult } from '@tanstack/react-query';
-import { Loading, PartyId, SvClientProvider, TitledTable } from 'common-frontend';
+import { ErrorDisplay, Loading, PartyId, SvClientProvider, TitledTable } from 'common-frontend';
 import React from 'react';
 import JSONPretty from 'react-json-pretty';
 import 'react-json-pretty/themes/monikai.css';
-import { CometBftNodeDumpOrErrorResponse } from 'sv-openapi';
+import { CometBftNodeDumpOrErrorResponse, NodeStatus } from 'sv-openapi';
 
-import { Box, Tab, TableBody, TableRow, Tabs } from '@mui/material';
+import { Box, Tab, Table, TableBody, TableRow, Tabs, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 
 import { CoinRules } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
@@ -13,6 +13,8 @@ import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';
+import { useMediatorStatus } from '../hooks/useMediatorStatus';
+import { useSequencerStatus } from '../hooks/useSequencerStatus';
 import { config } from '../utils';
 
 function getInfoTable(title: string, rows: { key: string; value: string; isParty: boolean }[]) {
@@ -134,6 +136,65 @@ function getCometBftDebugData(
   );
 }
 
+const StatusDisplay: React.FC<{ status: UseQueryResult<NodeStatus> }> = ({ status }) => {
+  if (status.isLoading) {
+    return <Loading />;
+  }
+  if (status.isError) {
+    return <ErrorDisplay message={`Failed to fetch status: ${JSON.stringify(status.error)}`} />;
+  }
+
+  const data = status.data;
+
+  if (data.notInitialized) {
+    return <div>Not initialized</div>;
+  }
+
+  const success = data.success!;
+  return (
+    <Table>
+      <TableBody>
+        <TableRow>
+          <TableCell>active</TableCell>
+          <TableCell className="active-value">{success.active.toString()}</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>uptime</TableCell>
+          <TableCell className="uptime-value">{success.uptime}</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
+  );
+};
+
+function cantonDomainTab(
+  sequencerStatus: UseQueryResult<NodeStatus>,
+  mediatorStatus: UseQueryResult<NodeStatus>
+) {
+  const sequencerSection = (
+    <div>
+      <Typography mt={6} variant="h4">
+        Sequencer status
+      </Typography>
+      <StatusDisplay status={sequencerStatus} />
+    </div>
+  );
+  const mediatorSection = (
+    <div>
+      <Typography mt={6} variant="h4">
+        Mediator status
+      </Typography>
+      <StatusDisplay status={mediatorStatus} />
+    </div>
+  );
+  return (
+    <div>
+      {sequencerSection}
+      {mediatorSection}
+    </div>
+  );
+}
+
 function tabProps(info: string) {
   return {
     id: `information-tab-${info}`,
@@ -149,6 +210,8 @@ const SvcViewPrettyJSON = () => {
 
   const svcInfoResp = useSvcInfos();
   const cometBftNodeDebugQuery = useCometBftDebug();
+  const sequencerStatusQuery = useSequencerStatus();
+  const mediatorStatusQuery = useMediatorStatus();
 
   if (svcInfoResp.isLoading) {
     return <Loading />;
@@ -166,6 +229,7 @@ const SvcViewPrettyJSON = () => {
           <Tab label="SVC Configuration" {...tabProps('svc-configuration')} />
           <Tab label="Canton Coin Configuration" {...tabProps('cc-configuration')} />
           <Tab label="CometBFT Debug Info" {...tabProps('cometBft-debug')} />
+          <Tab label="Domain Node Status" {...tabProps('canton-domain-status')} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
@@ -189,6 +253,9 @@ const SvcViewPrettyJSON = () => {
       </TabPanel>
       <TabPanel value={value} index={3}>
         {cometBftDebugTab}
+      </TabPanel>
+      <TabPanel value={value} index={4}>
+        {cantonDomainTab(sequencerStatusQuery, mediatorStatusQuery)}
       </TabPanel>
     </>
   );
