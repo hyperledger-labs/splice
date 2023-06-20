@@ -64,19 +64,19 @@ of which are accessible only through VPN:
 | TestNet        | http://test.network.canton.global        | Weekly, Midnight UTC Sunday      | Longer Running Tests               |
 | DevNet         | http://dev.network.canton.global         | Nightly, 6AM UTC                 | Current, Tested `main`             |
 | Staging        | http://staging.network.canton.global     | After every push to `main`       | Latest `main`                      |
-| ScratchNet     | http://scratch.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development  |
+| ScratchNetA    | http://scratcha.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
 | ScratchNetB    | http://scratchb.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
 | ScratchNetC    | http://scratchc.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
-| SqlScratchNet  | http://sqlscratch.network.canton.global  | Ad hoc, manual                   | CloudSQL Configuration Prototype   |
+| ScratchNetD    | http://scratchd.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
 
 The automatic deployments are configured as
 [Scheduled](https://app.circleci.com/settings/project/github/DACH-NY/canton-network-node/triggers?return-to=https%3A%2F%2Fapp.circleci.com%2Fpipelines%2Fgithub%2FDACH-NY%2Fcanton-network-node)
 [CI/CD](/.circleci/config.yml) in CircleCI.
 
-The ScratchNet, ScratchNetB, ScratchNetC, and SqlScratchNet clusters
-are manually managed and intended to be test beds for new code,
-deployment process updates, and CloudSQL integration. These are a
-shared resource, so please coordinate with the team prior to making
+The `ScratchNetA`, `ScratchNetB`, `ScratchNetC`, and `ScratchNetD`
+clusters are manually managed and intended to be test beds for new
+code, deployment process updates, and CloudSQL integration. These are
+a shared resource, so please coordinate with the team prior to making
 changes.
 
 ## Connecting to a Cluster
@@ -410,8 +410,8 @@ cncluster reset
 #### Kubectl and `cncluster` operations.
 
 Run the following commands in the deployment directory of the cluster
-you want to observe. For ScratchNet, this is
-`cluster/deployment/scratchnet`, and similar for other clsuters.
+you want to observe. For `ScratchNetA`, this is
+`cluster/deployment/scratchneta`, and similar for other clsuters.
 
 1. Run `kubectl get pods` to get the status of all pods in the default namespace
    1. `kubectl get pods --all-namespaces` to get the status of all pods, regardless of namespace
@@ -662,10 +662,11 @@ cover the typical lifecycle of a Canton Network cluster.
 
 ### Deploy a Build to a Cluster
 
-1. Scratchnet is used for ad-hoc testing, and we have a limited number
-   of shared instances. To claim a cluster for your use, run `cncluster lock`
-   from the cluster's deployment directory, which will then assert a lock on
-   the cluster in your name (unless somebody else has it already).
+1. The scratchnet clusters are used for ad-hoc testing, and we have a limited
+   number of instances, shared across the team. To claim a cluster for your use,
+   run `cncluster lock`  from the cluster's deployment directory, which will
+   then assert a lock on the cluster in your name (unless somebody else has
+   it already).
 1. Build and upload all docker images
     1. Clean and build the main application, by invoking `make clean`
        and `make build` from the project root.
@@ -683,6 +684,12 @@ cover the typical lifecycle of a Canton Network cluster.
 1. If you do not release the lock on a cluster, the lock reaper will
    automatically do so once it notices a lock has been held for more
    than six hours. The reaper process is run hourly.
+1. If you are confident a cluster is no longer in use, it is also
+   possible to forcibly remove someone else's lock with
+   `cncluster unlock_force`. This should be done only as a last
+   resort, and only in the event you are absolutely sure the cluster
+   is no longer in use. If you do forcibly remove a cluster lock,
+   please be sure to let the former lockholder know.
 
 ### Add a Component to the Build
 
