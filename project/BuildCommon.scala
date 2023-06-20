@@ -883,32 +883,6 @@ object BuildCommon {
       )
   }
 
-  // TODO(#5178) We can remove this in favor of our fork.
-  // However, at the moment we want to be able to iterate on multi-domain changes
-  // more frequently than upgrading our fork so we will keep our copy.
-  lazy val `aaa-canton-research-services` = {
-    sbt
-      // TODO(#5178): prefixed with 'aaa', as IntelliJ creates the classpath in alphabetic order, and we need these classes to come first
-      .Project("aaa-canton-research-services", file("canton/research/app"))
-      .disablePlugins(ScalafmtPlugin, WartRemover)
-      .dependsOn(
-      )
-      .settings(
-        removeTestSources,
-        sharedCantonSettings,
-        libraryDependencies ++= Seq(
-          CantonDependencies.google_common_protos % "protobuf",
-          daml_ledger_api_scalapb,
-          daml_ledger_api_proto % "protobuf",
-          scalapb_runtime_grpc,
-          scalapb_runtime,
-        ),
-        Compile / PB.targets := Seq(
-          scalapb.gen(flatPackage = false) -> (Compile / sourceManaged).value / "protobuf"
-        ),
-      )
-  }
-
   lazy val `canton-blake2b` = {
     import CantonDependencies._
     sbt.Project

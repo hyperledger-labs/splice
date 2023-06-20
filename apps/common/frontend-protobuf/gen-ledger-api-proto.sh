@@ -15,23 +15,6 @@ rm -rf "$DIR/protos-$SDK_VERSION/com/daml"/daml_lf_*
 
 cp -r "${REPO_ROOT}/3rdparty/protobuf/google" "$DIR/protos-$SDK_VERSION/google"
 
-mkdir -p "$DIR/protos-$SDK_VERSION/scalapb"
-cp "${REPO_ROOT}/canton/research/app/target/protobuf_external/scalapb/scalapb.proto" "$DIR/protos-$SDK_VERSION/scalapb/scalapb.proto"
-
-mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/crypto/v0"
-mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/protocol/v0"
-mkdir -p "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/v0"
-cp "$CANTON/protobuf/community/com/digitalasset/canton/crypto/v0/crypto.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/crypto/v0/crypto.proto"
-cp "$CANTON/protobuf/community/com/digitalasset/canton/protocol/v0/topology.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/protocol/v0/topology.proto"
-cp "$CANTON/protobuf/community/com/digitalasset/canton/protocol/v0/sequencing.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/protocol/v0/sequencing.proto"
-cp "$CANTON/protobuf/community/com/digitalasset/canton/v0/trace_context.proto" "$DIR/protos-$SDK_VERSION/com/digitalasset/canton/v0/trace_context.proto"
-
-mkdir -p "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2"
-cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/daml/ledger/api/v2/participant_offset.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2/participant_offset.proto"
-cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/daml/ledger/api/v2/reassignment.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2/reassignment.proto"
-cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/daml/ledger/api/v2/state_service.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2/state_service.proto"
-cp "$REPO_ROOT/canton/research/app/src/main/protobuf/com/daml/ledger/api/v2/transaction_filter.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v2/transaction_filter.proto"
-
 mkdir "$DIR/ts"
 
 readarray -t PROTOS < <(cd "$DIR/protos-$SDK_VERSION" && find . -name '*.proto' | sed 's|^\./||')

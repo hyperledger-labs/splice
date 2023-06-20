@@ -19,7 +19,6 @@ lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
 lazy val `canton-community-participant` = BuildCommon.`canton-community-participant`
 lazy val `canton-community-integration-testing` = BuildCommon.`canton-community-integration-testing`
 lazy val `canton-community-testing` = BuildCommon.`canton-community-testing`
-lazy val `aaa-canton-research-services` = BuildCommon.`aaa-canton-research-services`
 lazy val `canton-blake2b` = BuildCommon.`canton-blake2b`
 lazy val `canton-slick-fork` = BuildCommon.`canton-slick-fork`
 lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extension`
@@ -73,7 +72,6 @@ lazy val root = (project in file("."))
     `canton-community-common`,
     `canton-community-integration-testing`,
     `canton-community-testing`,
-    `aaa-canton-research-services`,
     `canton-blake2b`,
     `canton-slick-fork`,
     `canton-wartremover-extension`,
@@ -279,14 +277,12 @@ lazy val `apps-common` =
   project
     .in(file("apps/common"))
     .dependsOn(
-      `aaa-canton-research-services`,
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",
       `canton-coin-daml`,
       `canton-coin-v1test-daml`,
       `canton-coin-v2test-daml`,
-      `aaa-canton-research-services`,
       `wallet-daml` % "test",
       `wallet-v1test-daml` % "test",
       `splitwell-daml` % "test",
@@ -638,7 +634,6 @@ lazy val `apps-common-frontend-protobuf` = {
     .settings(
       Compile / sourceGenerators += Def.task {
         val log = streams.value.log
-        (`aaa-canton-research-services` / Compile / compile).value
         runCommand(Seq(s"${baseDirectory.value}/gen-ledger-api-proto.sh"), log)
         Seq()
       }.taskValue,
@@ -777,45 +772,6 @@ lazy val pulumi =
       },
     )
 
-// TODO(#5178) Remove this once we no longer have a copy of the protobufs.
-val multiDomainsMergeStrategy = new MergeStrategy {
-  // Copied from SBT because they forgot to make it public
-  // https://github.com/sbt/sbt-assembly/issues/435
-  val PathRE = "([^/]+)/(.*)".r
-
-  def sourceOfFileForMerge(tempDir: File, f: File): (File, File, String, Boolean) = {
-    val baseURI = tempDir.getCanonicalFile.toURI
-    val otherURI = f.getCanonicalFile.toURI
-    val relative = baseURI.relativize(otherURI)
-    val PathRE(head, tail) = relative.getPath
-    val base = tempDir / head
-
-    if ((tempDir / (head + ".jarName")) exists) {
-      val jarName = IO.read(tempDir / (head + ".jarName"), IO.utf8)
-      (new File(jarName), base, tail, true)
-    } else {
-      val dirName = IO.read(tempDir / (head + ".dir"), IO.utf8)
-      (new File(dirName), base, tail, false)
-    } // if-else
-  }
-
-  val name = "multi-domains strat"
-
-  def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
-    val result =
-      if (files.size == 1)
-        files.headOption
-      else
-        files.collectFirst {
-          case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("research") => f
-        }
-    result match {
-      case None => Left(s"None of the multi-domains files originate from research: ${files}")
-      case Some(f) => Right(Seq((f, path)))
-    }
-  }
-}
-
 // Copied from Canton. Can probably be removed once we use Canton as a library.
 def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy = {
   {
@@ -847,17 +803,6 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     // Dedup between ledger-api-java-proto (pulled in via Scala bindings)
     // and the copy of that inlined into bindings-java.
     case PathList("com", "daml", "ledger", "api", "v1" | "v2", _*) => MergeStrategy.first
-    case PathList(
-          "com",
-          "digitalasset",
-          "canton",
-          "participant",
-          "protocol",
-          "v0",
-          "multidomain",
-          _*,
-        ) =>
-      multiDomainsMergeStrategy
     case x => oldStrategy(x)
   }
 }

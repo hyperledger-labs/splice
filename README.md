@@ -509,6 +509,8 @@ Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
          to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
          Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
       6.  Repeat the same with the sha256 of the protobufs in `daml_pbs.nix`.
+      7. You might also want to bump ``ledgerApiVersion`` in ``Dependencies.scala``. However, in general this must be kept in sync with the ledger API version
+         server by the Canton binary not the Canton fork.
    6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions"`
 5. Test whether things compile using `sbt Test/compile`.
    In case of problems, here are some tips that help:

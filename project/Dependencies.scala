@@ -11,6 +11,10 @@ object Dependencies {
 
   lazy val scalatestScalacheck = CD.scalatestScalacheck
 
+  // We may want to remove this in favor of CantonDependencies.daml_libraries_version
+  // at some point but they can also be decoupled.
+  lazy val ledgerApiVersion = "2.7.0-snapshot.20230612.11864.0.v3514a4a0"
+
   // Picked up automatically by the scalapb compiler. Contains common dependencies such as protocol buffers like google/protobuf/timestamp.proto
   lazy val scalapb_runtime =
     "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
@@ -18,10 +22,10 @@ object Dependencies {
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
 
   lazy val daml_ledger_api_scalapb =
-    "com.daml" %% "ledger-api-scalapb" % CantonDependencies.daml_libraries_version
+    "com.daml" %% "ledger-api-scalapb" % ledgerApiVersion
 
   lazy val daml_ledger_api_proto =
-    "com.daml" % "ledger-api-proto" % CantonDependencies.daml_libraries_version
+    "com.daml" % "ledger-api-proto" % ledgerApiVersion
 
   lazy val auth0 = "com.auth0" % "auth0" % "1.44.1"
 
