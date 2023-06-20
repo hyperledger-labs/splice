@@ -1660,7 +1660,7 @@ workflows:
           - slack-context
         name: "scala_test wall clock time"
         test_names_file: "test-full-class-names.log"
-        start_canton_options: "-d -p external -w -f"
+        start_canton_options: "-d -p external -w"
         resource_class: "2xlarge"
         parallelism: 10
     - scala_test:
