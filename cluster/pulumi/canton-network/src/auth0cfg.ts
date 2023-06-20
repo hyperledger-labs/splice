@@ -30,6 +30,6 @@ export const auth0Cfg: Auth0Config = {
 
   // TODO(#5836): the naming we have for this vs those for sv-runbook tenant is terrible!!
   auth0Domain: `${auth0Account}.auth0.com`,
-  auth0MgtClientId: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_ID'),
-  auth0MgtClientSecret: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_SECRET'),
+  auth0MgtClientId: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
+  auth0MgtClientSecret: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
 };

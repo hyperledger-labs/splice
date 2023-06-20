@@ -796,8 +796,8 @@ To switch tenants, run `sbt -DAUTH0_TENANT=dev`. The tests will then read the en
 so in most cases you should not have to do this manually.
 
 ```
-export AUTH0_MANAGEMENT_API_CLIENT_ID=…
-export AUTH0_MANAGEMENT_API_CLIENT_SECRET=…
+export AUTH0_CN_MANAGEMENT_API_CLIENT_ID=…
+export AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET=…
 ```
 
 ### Running The Preflight Check
@@ -837,8 +837,13 @@ to the Auth0 [API Explorer Application](https://manage.auth0.com/dashboard/us/ca
 
 Copy the Client ID and Client Secret into the following environment variables, respectively:
 
-- `AUTH0_MANAGEMENT_API_CLIENT_ID`
-- `AUTH0_MANAGEMENT_API_CLIENT_SECRET`
+- `AUTH0_CN_MANAGEMENT_API_CLIENT_ID`
+- `AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET`
+
+Similarly, the SV preflight tests require similar secrets for the canton-network-sv-test tenant, from [here](https://manage.auth0.com/dashboard/us/canton-network-sv-test/applications/OjD90OemoxGYTLqzmbSTDJlmCi6nbUnu/settings), in these environment variables:
+
+- `AUTH0_SV_MANAGEMENT_API_CLIENT_ID`
+- `AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET`
 
 For convenience, you can `export` these from your `.envrc.private` which is ignored by git, to always be available for subsequent runs.
 
@@ -988,10 +993,11 @@ Required by some of our tests to access the auth0 admin APIs.
 
 We have:
 
-- `AUTH0_MANAGEMENT_API_CLIENT_ID` and `_SECRET` which are used for tests against our clusters and currently correspond to the `API Explorer Application` configured in our `canton-network-dev` auth0 tenant
+- `AUTH0_CN_MANAGEMENT_API_CLIENT_ID` and `_SECRET` which are used for tests against our clusters and currently correspond to the `API Explorer Application` configured in our `canton-network-dev` auth0 tenant
 - `AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID` and `_SECRET` which are used for integration tests and currently correspond to the `API Explorer Application` configured in our `canton-test-dev` auth0 tenant
+- `AUTH0_SV_MANAGEMENT_API_CLIENT_ID` and `_SECRET` which are used for tests against an SV deployment in our clusters and currently correspond to the `API Explorer Application` configured in our `canton-network-sv-test` auth0 tenant
 
-For both, you can get the ID and the secret from the settings page of the respective auth0 application,
+For all three, you can get the ID and the secret from the settings page of the respective auth0 application,
 where you can also rotate the secret (bottom of the page).
 
 An important note on security:

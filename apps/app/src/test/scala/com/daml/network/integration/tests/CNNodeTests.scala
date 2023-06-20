@@ -348,7 +348,7 @@ object CNNodeTests {
       val tenant = System.getProperty("AUTH0_TENANT")
       val prefix = tenant match {
         // Used for preflight checks
-        case "dev" => "AUTH0"
+        case "dev" => "AUTH0_CN"
         // Used locally
         case "test" | "" | null => "AUTH0_TESTS"
         case _ => fail(s"Invalid value for AUTH0_TENANT property: $tenant")

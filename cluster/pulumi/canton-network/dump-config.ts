@@ -77,8 +77,8 @@ async function main() {
   pulumi.runtime.setConfig('test-project:VERSION_NUMBER', '0.0.1');
   pulumi.runtime.setConfig('test-project:IMAGE_TAG', '0.0.1-deadbeef');
 
-  process.env.AUTH0_MANAGEMENT_API_CLIENT_ID = 'mgmt';
-  process.env.AUTH0_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
+  process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
+  process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
 
   const installCluster = await import('./src/installCluster');
   const auth0Cfg = await import('./src/auth0cfg');

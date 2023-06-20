@@ -23,7 +23,7 @@ AUTH0_MANAGEMENT_API_URL=https://canton-network-dev.us.auth0.com/api/v2
 MANAGEMENT_TOKEN=$(curl -sSL --fail-with-body \
     --url https://canton-network-dev.us.auth0.com/oauth/token \
     -H 'Content-Type: application/json' \
-    -d "{\"client_id\": \"$AUTH0_MANAGEMENT_API_CLIENT_ID\",\"client_secret\": \"$AUTH0_MANAGEMENT_API_CLIENT_SECRET\",\"audience\": \"$AUTH0_MANAGEMENT_API_URL/\",\"grant_type\":\"client_credentials\"}" | jq -r '.access_token')
+    -d "{\"client_id\": \"$AUTH0_CN_MANAGEMENT_API_CLIENT_ID\",\"client_secret\": \"$AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET\",\"audience\": \"$AUTH0_MANAGEMENT_API_URL/\",\"grant_type\":\"client_credentials\"}" | jq -r '.access_token')
 
 ALL_APPS="$(curl -sSL --fail-with-body -H "Authorization: Bearer $MANAGEMENT_TOKEN" ${AUTH0_MANAGEMENT_API_URL}/clients)"
 

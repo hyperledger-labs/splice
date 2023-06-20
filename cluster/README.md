@@ -182,7 +182,7 @@ proxies from Web gRPC to gRPC.
 This repository also contains tools for managing clusters hosted in
 Google Cloud, running Google's GKE implementation of Kubernetes.  The
 specific configuration for these clusters is defined in a combination of
-[Pulumi scripts](/cluster/pulumi) and [Helm charts](/cluster/helm). 
+[Pulumi scripts](/cluster/pulumi) and [Helm charts](/cluster/helm).
 
 All cluster management commands are defined as subcommands of the
 `cncluster` script, and are written in terms of Pulumi charts.
@@ -817,19 +817,6 @@ The tls certificate is configured in the infrastructure pulumi chart
 
 Note that these manual changes update an existing cluster, but you should make sure to update the pulumi chart consistently
 for those changes to also persist for future cluster deployments.
-
-## Auth0 secrets
-
-Our apps need some secrets in order to interact with auth0.
-In order to update these secrets, please set the environment variables `AUTH0_MANAGEMENT_API_CLIENT_ID`
-and `AUTH0_MANAGEMENT_API_CLIENT_SECRET` to the client id and secret of the
-[Auth0 Management API Explorer](https://manage.auth0.com/dashboard/us/canton-network-dev/apis/management/explorer).
-
-It is recommended you store these in `.envrc.private`.
-
-In order to update secrets on a deployed cluster, run `cncluster update_secrets`. It will fetch all
-relevant secrets from Auth0 using the management API token obtained above, and store them in
-kubernetes secrets.
 
 ## Participant User Configuration
 

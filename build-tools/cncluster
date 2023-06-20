@@ -62,13 +62,25 @@ function _cluster_ip() {
 }
 
 function _needs_auth0_management_api_creds() {
-    if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_ID-}" ]; then
-        _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+    if [ -z "${AUTH0_CN_MANAGEMENT_API_CLIENT_ID-}" ]; then
+        _error "Environment variable AUTH0_CN_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
       exit 1
     fi
 
-    if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
-      _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+    if [ -z "${AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
+      _error "Environment variable AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+      exit 1
+    fi
+}
+
+function _needs_auth0_sv_management_api_creds() {
+    if [ -z "${AUTH0_SV_MANAGEMENT_API_CLIENT_ID-}" ]; then
+        _error "Environment variable AUTH0_CN_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+      exit 1
+    fi
+
+    if [ -z "${AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
+      _error "Environment variable AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
       exit 1
     fi
 }
@@ -957,6 +969,8 @@ function subcmd_prefresh() {
 subcommand_whitelist[apply_sv]="Apply the sv-runbook Pulumi stack"
 
 function subcmd_apply_sv(){
+    _needs_auth0_sv_management_api_creds
+
     local -x TARGET_CLUSTER="${1-}"
     if [ -z "$TARGET_CLUSTER" ]; then
         _error "Usage: $SCRIPTNAME apply_sv <target-domain-cluster> [<charts-version>]"
@@ -983,6 +997,7 @@ function subcmd_apply_sv(){
 subcommand_whitelist[ci_apply_sv]='Run only by CircleCI'
 
 function subcmd_ci_apply_sv() {
+    _needs_auth0_sv_management_api_creds
     _assert_lock --for-ci
 
     # A CI-specific variant of 'cncluster apply_sv' that removes the need

@@ -80,8 +80,8 @@ async function main() {
   process.env.TARGET_CLUSTER = 'svrun.network.com';
   process.env.ARTIFACTORY_USER = 'artie';
   process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
-  process.env.AUTH0_CLIENT_ID = 'mgmt';
-  process.env.AUTH0_CLIENT_SECRET = 's3cr3t';
+  process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_ID = 'mgmt';
+  process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
 
   const installNode = await import('./src/installNode');
   const auth0Cfg = await import('./src/auth0cfg');
