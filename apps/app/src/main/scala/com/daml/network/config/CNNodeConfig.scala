@@ -40,6 +40,7 @@ import com.typesafe.config.{Config, ConfigRenderOptions}
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
+import pureconfig.error.FailureReason
 
 import java.io.File
 import scala.annotation.nowarn
@@ -361,10 +362,14 @@ case class CNNodeConfig(
 @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 object CNNodeConfig {
 
+  final case class ConfigValidationFailed(reason: String) extends FailureReason {
+    override def description: String = s"Config validation failed: $reason"
+  }
+
   lazy val empty = CNNodeConfig()
 
   private val logger: Logger = LoggerFactory.getLogger(classOf[CNNodeConfig])
-  private val elc = ErrorLoggingContext(
+  private[config] val elc = ErrorLoggingContext(
     TracedLogger(logger),
     NamedLoggerFactory.root.properties,
     TraceContext.empty,
@@ -373,11 +378,11 @@ object CNNodeConfig {
   import CantonConfig.*
   import pureconfig.generic.semiauto.*
 
-  @nowarn("cat=unused")
-  private implicit def cnNodeConfigReader(implicit
+  class ConfigReaders(implicit
+      private val
       elc: ErrorLoggingContext
-  ): ConfigReader[CNNodeConfig] = {
-    val configReaders: ConfigReaders = new ConfigReaders()
+  ) {
+    val configReaders: CantonConfig.ConfigReaders = new CantonConfig.ConfigReaders()
     import configReaders.*
     import DeprecatedConfigUtils.*
     import CantonDeprecationImplicits.*
@@ -469,7 +474,22 @@ object CNNodeConfig {
     implicit val svDomainConfigReader: ConfigReader[SvDomainConfig] =
       deriveReader[SvDomainConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
-      deriveReader[SvAppBackendConfig]
+      deriveReader[SvAppBackendConfig].emap { conf =>
+        // We support joining nodes without sequencers/mediators but
+        // the founding node must alway configure one to bootstrap the domain.
+        val foundingNodeHasDomainConfig = conf.onboarding.fold(true) {
+          _ match {
+            case _: SvOnboardingConfig.FoundCollective =>
+              conf.xNodes.domain.isDefined
+            case _: SvOnboardingConfig.JoinWithKey => true
+          }
+        }
+        Either.cond(
+          foundingNodeHasDomainConfig,
+          conf,
+          ConfigValidationFailed("Founding node must always specify a domain config"),
+        )
+      }
 
     implicit val cnNodeAppParametersReader: ConfigReader[SharedCNNodeAppParameters] =
       deriveReader[SharedCNNodeAppParameters]
@@ -511,7 +531,7 @@ object CNNodeConfig {
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
       deriveReader[CommunityParticipantConfig].applyDeprecations
 
-    deriveReader[CNNodeConfig]
+    implicit val cnNodeConfigReader = deriveReader[CNNodeConfig]
   }
 
   @nowarn("cat=unused")
@@ -664,6 +684,13 @@ object CNNodeConfig {
 
     implicit val cnNodeConfigWriter: ConfigWriter[CNNodeConfig] =
       deriveWriter[CNNodeConfig]
+  }
+
+  private implicit def configReader(implicit
+      elc: ErrorLoggingContext
+  ): ConfigReader[CNNodeConfig] = {
+    val readers = new ConfigReaders()(elc)
+    readers.cnNodeConfigReader
   }
 
   def load(config: Config)(implicit

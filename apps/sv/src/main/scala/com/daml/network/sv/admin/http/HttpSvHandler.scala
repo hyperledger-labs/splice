@@ -414,28 +414,19 @@ class HttpSvHandler(
               s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
             )
           _ <- svcRulesLock.unlock()
-        } yield authorizedAt
-      }
-      _ = logger.info(
-        s"svc party to participant authorization completed, unlocked SvcRules and CoinRules contracts"
-      )
-      ourParticipant <- participantAdminConnection.getParticipantId()
-      // TODO(#5636) Always make SVC party a unionspace and get rid of this slightly hacky
-      // check.
-      _ <-
-        if (svcParty.uid.namespace != ourParticipant.uid.namespace) {
-          logger.info("Adding candidate SV to unionspace")
-          participantAdminConnection.ensureUnionspaceDefinition(
+          _ = logger.info(
+            s"svc party to participant authorization completed, unlocked SvcRules and CoinRules contracts"
+          )
+          ourParticipant <- participantAdminConnection.getParticipantId()
+          _ = logger.info("Adding candidate SV to unionspace")
+          _ <- participantAdminConnection.ensureUnionspaceDefinition(
             globalDomain,
             svcParty.uid.namespace,
             participantId.uid.namespace,
             ourParticipant.uid.namespace.fingerprint,
           )
-        } else {
-          logger.info(s"SVC party is not allocated through a unionspace")
-          Future.unit
-        }
-
+        } yield authorizedAt
+      }
       acsBytes <- retryProvider.retryForAutomation(
         show"Download ACS snapshot for SVC at $authorizedAt",
         participantAdminConnection.downloadAcsSnapshot(

@@ -189,7 +189,9 @@ class SvApp(
             participantId,
             clock,
             storage,
-            localDomainNode,
+            localDomainNode.getOrElse(
+              sys.error("Founding node must always specify a domain config")
+            ),
           )
           initializer.bootstrapCollective().map((_, Some(foundingConfig)))
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>

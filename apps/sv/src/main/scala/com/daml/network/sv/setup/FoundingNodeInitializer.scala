@@ -61,7 +61,7 @@ class FoundingNodeInitializer(
     participantId: ParticipantId,
     clock: Clock,
     storage: Storage,
-    localDomainNode: Option[LocalDomainNode],
+    localDomainNode: LocalDomainNode,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
@@ -84,10 +84,7 @@ class FoundingNodeInitializer(
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     for {
-      namespace <- localDomainNode match {
-        case None => Future.successful(participantId.uid.namespace)
-        case Some(domainNode) => bootstrapDomain(domainNode)
-      }
+      namespace <- bootstrapDomain(localDomainNode)
       _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
       _ <- participantAdminConnection.ensureDomainRegistered(
         DomainConnectionConfig(
