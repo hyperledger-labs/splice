@@ -314,19 +314,14 @@ class HttpSvAdminHandler(
   ] = withNewTrace(workflowId) { implicit tc => _ =>
     withClientOrNotFound(respond.NotFound) {
       _.nodeStatus()
-        .fold(
-          error =>
-            CometBftStatusOrError(
-              error = ErrorResponse(error.message).some
-            ),
-          status =>
-            CometBftStatusOrError(
-              response = CometBftNodeStatusResponse(
-                status.nodeInfo.id,
-                status.syncInfo.catchingUp,
-                BigDecimal(status.validatorInfo.votingPower),
-              ).some
-            ),
+        .map(status =>
+          CometBftStatusOrError(
+            response = CometBftNodeStatusResponse(
+              status.nodeInfo.id,
+              status.syncInfo.catchingUp,
+              BigDecimal(status.validatorInfo.votingPower),
+            ).some
+          )
         )
     }
   }
@@ -338,20 +333,15 @@ class HttpSvAdminHandler(
     withClientOrNotFound(respond.NotFound) { client =>
       client
         .nodeDebugDump()
-        .fold(
-          err =>
-            definitions.CometBftNodeDumpOrErrorResponse(
-              error = ErrorResponse(err.message).some
-            ),
-          response =>
-            definitions.CometBftNodeDumpOrErrorResponse(
-              response = CometBftNodeDumpResponse(
-                status = response.status,
-                networkInfo = response.networkInfo,
-                abciInfo = response.abciInfo,
-                validators = response.validators,
-              ).some
-            ),
+        .map(response =>
+          definitions.CometBftNodeDumpOrErrorResponse(
+            response = CometBftNodeDumpResponse(
+              status = response.status,
+              networkInfo = response.networkInfo,
+              abciInfo = response.abciInfo,
+              validators = response.validators,
+            ).some
+          )
         )
     }
   }

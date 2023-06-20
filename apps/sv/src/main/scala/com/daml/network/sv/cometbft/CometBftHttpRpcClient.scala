@@ -116,28 +116,32 @@ class CometBftHttpRpcClient(
           response.leftMap(decodeError =>
             // Errors are sometimes propagated with status 200, so we try to decode the error as well
             decode[CometBftErrorResponse](responseBody)
-              .fold(
+              .fold[CometBftError](
                 errDecodingFailure =>
-                  CometBftError(
-                    s"Failed to decode response as success (${decodeError.toString}) or error (${errDecodingFailure.toString}). Full response: $responseBody",
+                  CometBftDecodeError(
+                    s"Failed to decode response as success (${decodeError.toString}) or error (${errDecodingFailure.toString}).",
+                    responseBody,
                     200,
                   ),
-                errorResponse =>
-                  CometBftError(
-                    s"CometBFT call failed with error: $errorResponse",
-                    200,
-                  ),
+                CometBftHttpError(
+                  200,
+                  _,
+                ),
               )
           )
         } else {
           decode[CometBftErrorResponse](responseBody)
-            .fold(
+            .fold[CometBftError](
               err =>
-                CometBftError(
-                  s"Failed to parse json response: $err. Original body response: $responseBody",
+                CometBftDecodeError(
+                  s"Failed to parse json response: $err.",
+                  responseBody,
                   response.statusCode(),
                 ),
-              res => CometBftError(res.error.noSpaces, response.statusCode()),
+              CometBftHttpError(
+                response.statusCode(),
+                _,
+              ),
             )
             .asLeft[CometBftCallResponse[T]]
         }
@@ -216,8 +220,11 @@ object CometBftHttpRpcClient {
 
   private[cometbft] case class CometBftBroadcastResult(code: Int, hash: String)
 
-  case class CometBftError(message: String, responseCode: Int)
-  case class QueryResponse(value: String)
+  sealed trait CometBftError
+
+  case class CometBftHttpError(code: Int, response: CometBftErrorResponse) extends CometBftError
+  case class CometBftDecodeError(message: String, body: String, status: Int) extends CometBftError
+  private[cometbft] case class QueryResponse(value: String)
 }
 
 class JavaExecutor(val ec: ExecutionContext) extends Executor {

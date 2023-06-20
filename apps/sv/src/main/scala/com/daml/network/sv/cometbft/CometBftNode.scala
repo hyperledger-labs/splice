@@ -1,14 +1,13 @@
 package com.daml.network.sv.cometbft
 
 import cats.Show.Shown
-import cats.data.EitherT
 import cats.implicits.toTraverseOps
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cn.svcrules.{MemberInfo, SvcRules}
-import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftError
 import com.daml.network.sv.config.CometBftConfig
 import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.drivers as proto
+import com.digitalasset.canton.drivers.cometbft.SvNodeConfig
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
@@ -39,7 +38,7 @@ class CometBftNode(
   def reconcileNetworkConfig(
       owningSvNode: String,
       target: daml.svcrules.SvcRules,
-  )(implicit tc: TraceContext): Future[Unit] = (for {
+  )(implicit tc: TraceContext): Future[Unit] = for {
     actualConfig <- cometBftClient.readNetworkConfig()
     networkConfigChanges = diffNetworkConfig(owningSvNode, target.members, actualConfig, logger)
     // We minimize latency by issuing updates and deletes in parallel, which is safe as we expect <= 16 SV nodes
@@ -57,7 +56,7 @@ class CometBftNode(
     _ <- networkConfigChanges.requests.traverse(
       submitChangeRequest
     )
-  } yield ()).leftMap(error => CometBftException(error)).rethrowT
+  } yield ()
 
   private def submitChangeRequest(
       changeRequest: proto.cometbft.NetworkConfigChangeRequest
@@ -82,7 +81,7 @@ class CometBftNode(
 
   def getLocalNodeConfig()(implicit
       tc: TraceContext
-  ): EitherT[Future, CometBftError, proto.cometbft.SvNodeConfig] = {
+  ): Future[SvNodeConfig] = {
     cometBftClient
       .nodeStatus()
       .map { status =>
@@ -113,8 +112,6 @@ object CometBftNode {
     members.get(svParty.toProtoPrimitive)
   }
 
-  private case class CometBftException(error: CometBftError)
-      extends RuntimeException(s"Failed to run CometBFT query with error $error")
   case class NetworkConfigDiff(
       deletes: Seq[proto.cometbft.NetworkConfigChangeRequest],
       updates: Seq[proto.cometbft.NetworkConfigChangeRequest],
@@ -306,7 +303,7 @@ object CometBftNode {
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
         param("actual", _.actualConfig),
-        param("target", x => (x.targetConfig)),
+        param("target", x => x.targetConfig),
         param("changes", _.changes),
       )
     }

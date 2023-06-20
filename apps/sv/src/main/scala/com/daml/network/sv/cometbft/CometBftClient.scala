@@ -1,10 +1,14 @@
 package com.daml.network.sv.cometbft
 
-import java.util.Base64
 import cats.data.EitherT
 import cats.implicits.catsSyntaxTuple4Semigroupal
 import com.daml.network.sv.cometbft.CometBftClient.{CometBftNodeDump, GovernanceAbciQueryParams}
-import com.daml.network.sv.cometbft.CometBftHttpRpcClient.NodeStatus
+import com.daml.network.sv.cometbft.CometBftHttpRpcClient.{
+  CometBftError,
+  CometBftErrorResponse,
+  CometBftHttpError,
+  NodeStatus,
+}
 import com.digitalasset.canton.drivers.cometbft.data.CometBftTx
 import com.digitalasset.canton.drivers.cometbft.{
   GetNetworkConfigResponse,
@@ -14,7 +18,9 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import io.circe.syntax.EncoderOps
+import io.grpc.Status
 
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
 class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLoggerFactory)
@@ -23,56 +29,38 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
   def readNetworkConfig()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftHttpRpcClient.CometBftError, GetNetworkConfigResponse] = {
-    client
-      .query(GovernanceAbciQueryParams)
-      .map { response =>
-        val byteValue = Base64.getDecoder.decode(response.value)
-        GetNetworkConfigResponse.parseFrom(byteValue)
-      }
-      .leftMap { error =>
-        logger.warn(s"Failed to read CometBFT network config: $error")
-        error
-      }
-  }
+  ): Future[GetNetworkConfigResponse] = client
+    .query(GovernanceAbciQueryParams)
+    .map { response =>
+      val byteValue = Base64.getDecoder.decode(response.value)
+      GetNetworkConfigResponse.parseFrom(byteValue)
+    }
+    .rethrowAsGrpcException("read network config")
 
   def updateNetworkConfig(
       request: UpdateNetworkConfigRequest
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftHttpRpcClient.CometBftError, Unit] = {
+  ): Future[Unit] = {
     val updateRequest = CometBftTx(CometBftTx.Message.UpdateNetworkConfigRequest(request))
     client
       .sendAndWaitForCommit(updateRequest.toByteArray)
-      .recover {
-        case cometBftError if cometBftError.message.contains("tx already exists in cache") =>
-          logger.info(
-            s"CometBFT network change request $request was identified as a duplicate, ignoring update."
-          )
-          ()
-      }
-      .leftMap { error =>
-        logger.warn(s"Failed to update CometBFT network config: $error")
-        error
-      }
+      .rethrowAsGrpcException("update network config")
   }
 
   def nodeStatus()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftHttpRpcClient.CometBftError, NodeStatus] =
+  ): Future[NodeStatus] =
     client
       .nodeStatus()
-      .leftMap { error =>
-        logger.warn(s"Failed to query CometBFT node status: $error")
-        error
-      }
+      .rethrowAsGrpcException("node status")
 
   def nodeDebugDump()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftHttpRpcClient.CometBftError, CometBftNodeDump] = {
+  ): Future[CometBftNodeDump] = {
     val FirstPageNumber = "1"
     val MaxAcceptedValidatorsPerPage = "100"
     (
@@ -96,10 +84,46 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
         validators,
         abciInfo,
       )
-    }.leftMap { error =>
-      logger.warn(s"Failed to generate CometBFT debug dump: $error")
-      error
+    }.rethrowAsGrpcException("node debug dump")
+  }
+
+  private def cometBftErrorToGrpcStatus(error: CometBftHttpRpcClient.CometBftError) = {
+    error match {
+      case CometBftHttpError(_, CometBftErrorResponse(error, _))
+          if error.noSpaces.contains("tx already exists in cache") =>
+        Status.ABORTED.withDescription(error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(code, error) if code > 500 =>
+        Status.UNAVAILABLE.withDescription(error.error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 500 =>
+        Status.UNKNOWN.withDescription(error.error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 429 =>
+        Status.ABORTED.withDescription(error.error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 404 =>
+        Status.NOT_FOUND.withDescription(error.error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 403 =>
+        Status.PERMISSION_DENIED.withDescription(error.error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 401 =>
+        Status.UNAUTHENTICATED.withDescription(error.error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(code, error) if code >= 400 =>
+        Status.FAILED_PRECONDITION.withDescription(error.error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(_, error) =>
+        Status.INTERNAL.withDescription(error.error.noSpaces)
+      case CometBftHttpRpcClient.CometBftDecodeError(message, _, _) =>
+        Status.INTERNAL.withDescription(message)
     }
+  }
+
+  implicit class CometBftRethrowExtension[T](response: EitherT[Future, CometBftError, T]) {
+
+    def rethrowAsGrpcException(
+        cometBftCall: String
+    )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
+      response.leftMap { error =>
+        logger.info(s"Failed to call CometBFT [$cometBftCall]: $error")
+        cometBftErrorToGrpcStatus(error).asRuntimeException()
+      }.rethrowT
+    }
+
   }
 }
 
@@ -122,4 +146,5 @@ object CometBftClient {
       validators: Json,
       abciInfo: Json,
   )
+
 }

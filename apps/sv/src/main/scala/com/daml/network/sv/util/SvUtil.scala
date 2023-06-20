@@ -1,6 +1,5 @@
 package com.daml.network.sv.util
 
-import cats.data.EitherT
 import com.daml.network.codegen.java.cn.cometbft.{CometBftConfig, CometBftConfigLimits}
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainConfig,
@@ -11,7 +10,6 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
 import com.daml.network.codegen.java.cn.{cometbft, svc}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftError
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
@@ -62,10 +60,10 @@ object SvUtil {
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): EitherT[Future, CometBftError, java.util.Map[java.lang.Long, DomainNodeConfig]] = {
+  ): Future[java.util.Map[java.lang.Long, DomainNodeConfig]] = {
     cometBftNode.fold {
       // No BFT node are configured
-      EitherT.rightT[Future, CometBftError](Map[java.lang.Long, DomainNodeConfig]().asJava)
+      Future.successful(Map[java.lang.Long, DomainNodeConfig]().asJava)
     } { node =>
       node
         .getLocalNodeConfig()

@@ -16,7 +16,6 @@ import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.Contract
 import com.digitalasset.canton.drivers as proto
-import com.digitalasset.canton.drivers.cometbft.SvNodeConfig
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -46,7 +45,7 @@ class PublishLocalCometBftNodeConfigTrigger(
       svNodeMemberInfo <- OptionT.fromOption[Future](
         CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
       )
-      localSvNodeConfig <- getLocalSvNodeConfig
+      localSvNodeConfig <- OptionT.liftF(cometBftNode.getLocalNodeConfig())
       // create a task if the local config is different than the one we have published to the SVC
       // or if no domain bft is configured
       if
@@ -78,31 +77,14 @@ class PublishLocalCometBftNodeConfigTrigger(
 
   override protected def isStaleTask(
       task: PublishLocalConfigTask
-  )(implicit tc: TraceContext): Future[Boolean] =
-    // not stale if the task's SvcRules contract is still active
-    OptionT(
-      store.multiDomainAcsStore
+  )(implicit tc: TraceContext): Future[Boolean] = {
+    for {
+      contract <- store.multiDomainAcsStore
         .lookupContractById(daml.svcrules.SvcRules.COMPANION)(task.svcRules.contractId)
-    ).foldF {
-      // stale if the contract is no longer active
-      Future.successful(true)
-    } { _ =>
-      // task stale if the local config has changed
-      getLocalSvNodeConfig
-        .map(_ != task.localSvNodeConfig)
-        // not stale if the current local config cannot be read
-        .getOrElse(false)
+      currentNodeConfig <- cometBftNode.getLocalNodeConfig()
+    } yield {
+      contract.isEmpty || task.localSvNodeConfig != currentNodeConfig
     }
-
-  private def getLocalSvNodeConfig(implicit
-      tc: TraceContext
-  ): OptionT[Future, SvNodeConfig] = {
-    cometBftNode
-      .getLocalNodeConfig()
-      .leftMap { failure =>
-        logger.warn(s"Failed to read local SV node config: $failure")
-      }
-      .toOption
   }
 
 }

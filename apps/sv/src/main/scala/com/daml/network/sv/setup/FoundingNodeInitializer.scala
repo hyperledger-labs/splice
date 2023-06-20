@@ -300,7 +300,6 @@ class FoundingNodeInitializer(
         coinRules <- svcStore.lookupCoinRules()
         founderDomainNodes <- SvUtil
           .getFounderDomainNodeConfig(cometBftNode)
-          .fold(error => sys.error(s"Failed to initialize the domain nodes: $error"), identity)
         _ <- svcStore.lookupSvcRulesWithOffset().flatMap {
           case QueryResult(offset, None) => {
             coinRules match {

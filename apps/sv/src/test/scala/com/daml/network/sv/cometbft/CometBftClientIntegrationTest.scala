@@ -56,7 +56,6 @@ class CometBftClientIntegrationTest
       for {
         networkConfig <- cometBftClient
           .readNetworkConfig()
-          .valueOrFail("Failed to read network config")
         chainId = networkConfig.chainId
         _ <- cometBftClient
           .updateNetworkConfig(
@@ -67,7 +66,6 @@ class CometBftClientIntegrationTest
               pubKey = PubKey2,
             )
           )
-          .valueOrFail("Failed to update network config")
       } yield {
         eventually() {
           cometBftClient
@@ -98,7 +96,6 @@ class CometBftClientIntegrationTest
           status.validatorInfo.votingPower.toDouble should be > 0d
           status.syncInfo.catchingUp shouldBe false
         }
-        .valueOrFail("Reading status")
     }
 
     "create dump" in {
@@ -111,7 +108,6 @@ class CometBftClientIntegrationTest
           dump.networkInfo.findAllByKey("n_peers") should not be empty
           dump.status.findAllByKey("latest_block_height") should not be empty
         }
-        .valueOrFail("Cannot create dump")
     }
 
   }
