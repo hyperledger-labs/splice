@@ -86,7 +86,7 @@ function _cluster_install_network_gateway() {
     # Spin up the canton-network-gateway pulumi stack
     _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
            --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
-           up -y
+           up -y --skip-preview
 }
 
 function _cluster_apply() {
@@ -111,7 +111,7 @@ function _cluster_apply() {
 
     _info "Applying Pulumi Stack"
 
-    subcmd_pulumi canton-network up --yes --show-sames "${args[@]}"
+    subcmd_pulumi canton-network up --yes --skip-preview --show-sames "${args[@]}"
 }
 
 function _cluster_show() {
@@ -990,7 +990,7 @@ function subcmd_ci_apply_sv() {
 
     local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
-    subcmd_pulumi sv-runbook up --yes
+    subcmd_pulumi sv-runbook up --yes --skip-preview
 }
 
 ###
