@@ -111,7 +111,9 @@ class DbMultiDomainAcsStoreTest
           contract.identifier.getEntityName,
         )
       ),
-      createArguments = contract.toJson.payload,
+      createArguments = io.circe.parser
+        .parse(payloadJsonFromContract(contract.payload).compactPrint)
+        .valueOrFail("circe couldn't parse spray json"),
       contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt),
       contractMetadataContractKeyHash = Some(contract.metadata.contractKeyHash.toStringUtf8),
       contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray,

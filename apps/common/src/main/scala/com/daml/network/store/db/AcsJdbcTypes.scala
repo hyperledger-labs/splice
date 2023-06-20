@@ -1,16 +1,21 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref.*
 import com.daml.lf.data.Time.Timestamp
+import com.daml.lf.value.Value
+import com.daml.lf.value.json.ApiCodecCompressed
+import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.CantonRequireTypes.String2066
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, SetParameter}
+import spray.json.{JsString, JsValue, JsonFormat, deserializationError}
 
 import java.sql.{PreparedStatement, ResultSet}
 
@@ -157,6 +162,47 @@ trait AcsJdbcTypes {
     (json: Json, pp: PositionedParameters) => {
       pp.setObject(json.noSpaces, java.sql.Types.OTHER)
     }
+
+  protected implicit lazy val jsValueGetResult: GetResult[JsValue] = GetResult { rs =>
+    val value = rs.nextString()
+    if (rs.wasNull())
+      throw new IllegalStateException("Tried to deserialize as Json, but the value was null.")
+    else
+      spray.json.JsonParser(value)
+  }
+
+  protected implicit lazy val jsValueSetParameter: SetParameter[JsValue] =
+    (jsValue: JsValue, pp: PositionedParameters) =>
+      pp.setObject(jsValue.compactPrint, java.sql.Types.OTHER)
+
+  private val contractCodec = {
+    // copied from JsonContractIdFormat
+    implicit val ContractIdFormat: JsonFormat[Value.ContractId] =
+      new JsonFormat[Value.ContractId] {
+        override def write(obj: Value.ContractId): JsValue =
+          JsString(obj.coid)
+
+        override def read(json: JsValue): Value.ContractId = json match {
+          case JsString(s) =>
+            Value.ContractId.fromString(s).fold(deserializationError(_), identity)
+          case _ => deserializationError("ContractId must be a string")
+        }
+      }
+
+    // DB *must not* use stringly ints or decimals;
+    // this output relies on a *big* invariant: comparing the raw JSON data
+    // with the built-in SQL operators <, >, &c, yields equal results to
+    // comparing the same data in a data-aware way. That's why we *must* use
+    // numbers-as-numbers in this codec, and why ISO-8601 strings
+    // for dates and timestamps are so important.
+    new ApiCodecCompressed(encodeDecimalAsString = false, encodeInt64AsString = false)
+  }
+
+  protected def payloadJsonFromContract(
+      payload: DamlRecord[_]
+  )(implicit elc: ErrorLoggingContext): JsValue = {
+    contractCodec.apiValueToJsValue(Contract.javaValueToLfValue(payload.toValue))
+  }
 
   /** The DB may truncate strings of unbounded length, so it's advised to use a LengthLimitedString instead.
     * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
