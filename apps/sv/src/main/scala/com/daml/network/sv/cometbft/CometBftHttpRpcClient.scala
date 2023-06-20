@@ -5,7 +5,7 @@ package com.daml.network.sv.cometbft
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftCallResponse.{
-  broadcastDecoder,
+  cometBftBroadcastResultDecoder,
   queryDecoder,
 }
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.NodeStatus.{
@@ -18,6 +18,7 @@ import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser.*
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Json}
+import io.grpc.Status
 
 import java.net.http.HttpClient
 import java.util.concurrent.Executor
@@ -71,11 +72,28 @@ class CometBftHttpRpcClient(
     val encodedRequest =
       Base64.getEncoder.encodeToString(message)
 
-    // TODO(#5890): switch to broadcast_tx_commit
+    def extractAppError(execResult: CometBftTxExecutionResult): Option[CometBftAbciAppError] =
+      Option.when(execResult.code != Status.Code.OK.value())(CometBftAbciAppError(execResult.log))
+
+    // We are using `broadcast_tx_commit` here despite the docs not recommending it, as we believe that the main problem with
+    // `broadcast_tx_commit` is performance: the implementation keeps a subscription open for each open request and
+    // there's a configured limit (default: max_subscription_clients = 100) for how many such subscriptions can be open
+    // at the same time. We believe this is OK for governance txs, as they are submitted at a low enough rate.
+    // The main benefit of using `broadcast_tx_commit` is that the reconciliation trigger waits for the complete
+    // submission before looping and errors are propagated properly.
     callCometBftJsonHttp[CometBftBroadcastResult](
-      "broadcast_tx_sync",
+      "broadcast_tx_commit",
       Map("tx" -> encodedRequest.asJson),
-    ).map(_ => {})
+    ).flatMap(response => {
+      // DeliverTx refers to the sequential tx processing within block commit. Errors there are more precise, than
+      // errors in CheckTx, which guards the mempool. See https://github.com/tendermint/tendermint/issues/2249
+      val optAppError = response.result.deliverTx
+        .flatMap(extractAppError)
+        .orElse(
+          extractAppError(response.result.checkTx)
+        )
+      EitherT.fromEither(optAppError.toLeft(()))
+    })
   }
 
   // TODO(#5428) add retries for failures
@@ -185,7 +203,10 @@ object CometBftHttpRpcClient {
     implicit val responseDecoder: Decoder[CometBftQueryResponse] =
       deriveDecoder[CometBftQueryResponse]
     implicit val queryDecoder: Decoder[CometBftQueryResult] = deriveDecoder
-    implicit val broadcastDecoder: Decoder[CometBftBroadcastResult] = deriveDecoder
+    implicit val txExecutionResultDecoder: Decoder[CometBftTxExecutionResult] = deriveDecoder
+
+    implicit val cometBftBroadcastResultDecoder: Decoder[CometBftBroadcastResult] =
+      Decoder.forProduct2("deliver_tx", "check_tx")(CometBftBroadcastResult.apply)
 
     @nowarn("cat=unused")
     implicit def successDecoder[T: Decoder]: Decoder[CometBftCallResponse[T]] = deriveDecoder
@@ -215,15 +236,22 @@ object CometBftHttpRpcClient {
 
   }
 
+  private[cometbft] case class CometBftTxExecutionResult(code: Int, log: String)
+
+  private[cometbft] case class CometBftBroadcastResult(
+      checkTx: CometBftTxExecutionResult,
+      deliverTx: Option[CometBftTxExecutionResult],
+  )
   private[cometbft] case class CometBftQueryResult(response: CometBftQueryResponse)
   private[cometbft] case class CometBftQueryResponse(value: String)
-
-  private[cometbft] case class CometBftBroadcastResult(code: Int, hash: String)
 
   sealed trait CometBftError
 
   case class CometBftHttpError(code: Int, response: CometBftErrorResponse) extends CometBftError
   case class CometBftDecodeError(message: String, body: String, status: Int) extends CometBftError
+
+  case class CometBftAbciAppError(message: String) extends CometBftError
+
   private[cometbft] case class QueryResponse(value: String)
 }
 
