@@ -81,6 +81,7 @@ async function main() {
   process.env.AUTH0_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
 
   const installCluster = await import('./src/installCluster');
+  const auth0Cfg = await import('./src/auth0cfg');
   const secrets = new SecretsFixtureMap();
 
   installCluster.installCluster({
@@ -88,6 +89,7 @@ async function main() {
     /* eslint-disable @typescript-eslint/no-unused-vars */
     getClientAccessToken: (clientId: string, clientSecret: string) =>
       Promise.resolve('access_token'),
+    getCfg: () => auth0Cfg.auth0Cfg,
   });
 }
 

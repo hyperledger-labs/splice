@@ -962,13 +962,20 @@ function subcmd_apply_sv(){
         _error "Usage: $SCRIPTNAME apply_sv <target-domain-cluster> [<charts-version>]"
     fi
 
+    args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
+    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
+        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
+    else
+        args+=(-c "FIXED_TOKENS=0")
+    fi
+
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
 
     local -x CHARTS_VERSION="${2-}"
 
-    subcmd_pulumi sv-runbook up --yes --skip-preview
+    subcmd_pulumi sv-runbook up --yes --skip-preview --show-sames "${args[@]}"
 }
 
 ###
@@ -986,11 +993,18 @@ function subcmd_ci_apply_sv() {
         _error "This subcommand is available to CI jobs only."
     fi
 
+    args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
+    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
+        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
+    else
+        args+=(-c "FIXED_TOKENS=0")
+    fi
+
     _cluster_show
 
     local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
-    subcmd_pulumi sv-runbook up --yes --skip-preview
+    subcmd_pulumi sv-runbook up --yes --skip-preview "${args[@]}"
 }
 
 ###

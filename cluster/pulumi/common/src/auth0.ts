@@ -9,8 +9,9 @@ import type {
   Auth0ClientAccessToken,
   Auth0ClientSecret,
   ClientIdMap,
+  Auth0Config,
 } from './auth0types';
-import { ExactNamespace, fixedTokens, requireEnv } from './utils';
+import { ExactNamespace, fixedTokens } from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
@@ -26,60 +27,36 @@ type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
  */
 const REQUIRED_TOKEN_LIFETIME = 8 * 86400;
 
-const AUTH0_FIXED_TOKEN_CACHE_NAME = 'auth0-fixed-token-cache';
-
 function addTimeSeconds(t: Date, seconds: number): Date {
   const t2 = new Date(t);
   t2.setSeconds(t2.getSeconds() + seconds);
   return t2;
 }
 
-const appToClientId = {
-  validator: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
-  splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
-  splitwell_validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
-  'sv-1': 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn',
-  'sv-2': 'rv4bllgKWAiW9tBtdvURMdHW42MAXghz',
-  'sv-3': 'SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk',
-  'sv-4': 'CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN',
-  sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
-  sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
-  sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
-  sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
-} as ClientIdMap;
-
-const namespaceToUiClientId = {
-  validator1: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
-  splitwell: 'eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL',
-  'sv-1': 'Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J',
-  'sv-2': 'G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6',
-  'sv-3': 'cgxHguMv32JLeew9S6wBDgNPHmPCIKaP',
-  'sv-4': 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
-} as ClientIdMap;
-
-/// Auth0
-
-const auth0Account = 'canton-network-dev.us';
-const auth0Domain = `${auth0Account}.auth0.com`;
-
 export class Auth0Fetch implements Auth0Client {
   private secrets: Auth0SecretMap | undefined;
   private auth0Cache: Auth0CacheMap | undefined;
 
   private k8sApi: CoreV1Api;
+  private cfg: Auth0Config;
 
-  constructor() {
+  constructor(cfg: Auth0Config) {
     const kc = new KubeConfig();
     kc.loadFromDefault();
 
     this.k8sApi = kc.makeApiClient(CoreV1Api);
+    this.cfg = cfg;
+  }
+
+  public getCfg(): Auth0Config {
+    return this.cfg;
   }
 
   private async loadSecrets(): Promise<Auth0SecretMap> {
     const client = new ManagementClient({
-      domain: auth0Domain,
-      clientId: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_ID'),
-      clientSecret: requireEnv('AUTH0_MANAGEMENT_API_CLIENT_SECRET'),
+      domain: this.cfg.auth0Domain,
+      clientId: this.cfg.auth0MgtClientId,
+      clientSecret: this.cfg.auth0MgtClientSecret,
       scope: 'read:clients read:client_keys',
     });
 
@@ -100,7 +77,7 @@ export class Auth0Fetch implements Auth0Client {
 
     try {
       const cacheSecret = await this.k8sApi.readNamespacedSecret(
-        AUTH0_FIXED_TOKEN_CACHE_NAME,
+        this.cfg.fixedTokenCacheName,
         'default'
       );
 
@@ -138,21 +115,21 @@ export class Auth0Fetch implements Auth0Client {
         apiVersion: 'v1',
         kind: 'Secret',
         metadata: {
-          name: AUTH0_FIXED_TOKEN_CACHE_NAME,
+          name: this.cfg.fixedTokenCacheName,
         },
         data,
       });
     } catch (_) {
       try {
         console.log('Deleting existing secret');
-        await this.k8sApi.deleteNamespacedSecret(AUTH0_FIXED_TOKEN_CACHE_NAME, 'default');
+        await this.k8sApi.deleteNamespacedSecret(this.cfg.fixedTokenCacheName, 'default');
 
         console.log('Creating new secret');
         await this.k8sApi.createNamespacedSecret('default', {
           apiVersion: 'v1',
           kind: 'Secret',
           metadata: {
-            name: AUTH0_FIXED_TOKEN_CACHE_NAME,
+            name: this.cfg.fixedTokenCacheName,
           },
           data,
         });
@@ -192,7 +169,7 @@ export class Auth0Fetch implements Auth0Client {
 
     pulumi.log.info('Querying access token for Auth0 client: ' + clientId);
     const auth0 = new AuthenticationClient({
-      domain: `${auth0Account}.auth0.com`,
+      domain: this.cfg.auth0Domain,
       clientId: clientId,
       clientSecret: clientSecret,
     });
@@ -204,10 +181,11 @@ export class Auth0Fetch implements Auth0Client {
 
     if (expires_in < REQUIRED_TOKEN_LIFETIME) {
       /* If you see this error, you either need to decrease the required token
-       * lifetime or extend the length of the tokens issued by Auth0.
+       * lifetime or extend the length of the tokens issued by Auth0
+       * (configured in the configuration of the ledger-api API in auth0).
        */
       console.error(
-        'Auth0 access token issued with expiry too short to meet REQUIRED_TOKEN_LIFETIME'
+        `Auth0 access token issued with expiry (${expires_in}) too short to meet REQUIRED_TOKEN_LIFETIME (${REQUIRED_TOKEN_LIFETIME})`
       );
       process.exit(1);
     }
@@ -262,7 +240,8 @@ async function auth0Secret(
   allSecrets: Auth0SecretMap,
   clientName: string
 ): Promise<{ [key: string]: string }> {
-  const clientSecrets = lookupClientSecrets(allSecrets, appToClientId, clientName);
+  const cfg = auth0Client.getCfg();
+  const clientSecrets = lookupClientSecrets(allSecrets, cfg.appToClientId, clientName);
 
   const clientId = clientSecrets.client_id;
   const clientSecret = clientSecrets.client_secret;
@@ -275,7 +254,7 @@ async function auth0Secret(
     };
   } else {
     return {
-      url: `https://${auth0Domain}/.well-known/openid-configuration`,
+      url: `https://${cfg.auth0Domain}/.well-known/openid-configuration`,
       'client-id': clientId,
       'client-secret': clientSecret,
       'ledger-api-user': clientId + '@clients',
@@ -304,11 +283,16 @@ export async function installAuth0Secret(
   );
 }
 
-function auth0UISecret(allSecrets: Auth0SecretMap, clientName: string, namespaceName: string) {
-  const clientSecrets = lookupClientSecrets(allSecrets, namespaceToUiClientId, namespaceName);
+function auth0UISecret(
+  allSecrets: Auth0SecretMap,
+  clientName: string,
+  namespaceName: string,
+  cfg: Auth0Config
+) {
+  const clientSecrets = lookupClientSecrets(allSecrets, cfg.namespaceToUiClientId, namespaceName);
 
   return {
-    url: `https://${auth0Domain}`,
+    url: `https://${cfg.auth0Domain}`,
     'client-id': clientSecrets.client_id,
   };
 }
@@ -326,7 +310,12 @@ export async function installAuth0UISecret(
         name: 'cn-app-' + secretNameApp + '-ui-auth',
         namespace: xns.ns.metadata.name,
       },
-      stringData: auth0UISecret(await auth0Client.getSecrets(), clientName, xns.logicalName),
+      stringData: auth0UISecret(
+        await auth0Client.getSecrets(),
+        clientName,
+        xns.logicalName,
+        auth0Client.getCfg()
+      ),
     },
     {
       dependsOn: xns.ns,

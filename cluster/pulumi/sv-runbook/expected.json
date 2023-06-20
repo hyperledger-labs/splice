@@ -3,6 +3,54 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
+          "client-secret": "***",
+          "ledger-api-user": "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn@clients",
+          "url": "https://canton-network-sv-test.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-sv",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr",
+          "client-secret": "***",
+          "ledger-api-user": "uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr@clients",
+          "url": "https://canton-network-sv-test.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-sv/",
       "compat": "true",
       "name": "cluster-ingress-sv",
@@ -50,7 +98,7 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "client-id": "aXdaZ3VkMzBhRE1NVVlwWmM1Y2FTbmpOQVRXd0lUenA=",
-          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWlu"
+          "url": "aHR0cHM6Ly9jYW50b24tbmV0d29yay1zdi10ZXN0LnVzLmF1dGgwLmNvbQ=="
         }
       },
       "kind": "Secret",
@@ -117,33 +165,8 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "YlVmRlJwbDJ0RWZaQkI3d3pJbzlpUk5HVGo4d01lSW4=",
-          "client-secret": "dW5kZWZpbmVk",
-          "ledger-api-user": "YlVmRlJwbDJ0RWZaQkI3d3pJbzlpUk5HVGo4d01lSW5AY2xpZW50cw==",
-          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWluLy53ZWxsLWtub3duL29wZW5pZC1jb25maWd1cmF0aW9u"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-sv-ledger-api-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-ledger-api-auth",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "client-id": "OFM4bzRVNk9ZV1d1dzV2UENJcEZRR3p6V00ySXBIa3g=",
-          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWlu"
+          "url": "aHR0cHM6Ly9jYW50b24tbmV0d29yay1zdi10ZXN0LnVzLmF1dGgwLmNvbQ=="
         }
       },
       "kind": "Secret",
@@ -231,33 +254,8 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "dXhlUUdJQkt1ZU5EbXVnVnMxUmxNV0VVWmhacXlMeXI=",
-          "client-secret": "dW5kZWZpbmVk",
-          "ledger-api-user": "dXhlUUdJQkt1ZU5EbXVnVnMxUmxNV0VVWmhacXlMeXJAY2xpZW50cw==",
-          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWluLy53ZWxsLWtub3duL29wZW5pZC1jb25maWd1cmF0aW9u"
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-validator-ledger-api-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-validator-ledger-api-auth",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "client-id": "bDlNUzExUE90YnZQYVZ2Z3puczNUZGo5SURub3NMd2w=",
-          "url": "aHR0cHM6Ly9hdXRoMC50ZW5hbnQuZG9tYWlu"
+          "url": "aHR0cHM6Ly9jYW50b24tbmV0d29yay1zdi10ZXN0LnVzLmF1dGgwLmNvbQ=="
         }
       },
       "kind": "Secret",
@@ -330,11 +328,11 @@
   },
   {
     "custom": false,
-    "id": "infra.svrun",
+    "id": "infra.mock",
     "inputs": {
-      "name": "infra.svrun"
+      "name": "infra.mock"
     },
-    "name": "infra.svrun",
+    "name": "infra.mock",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
@@ -466,7 +464,7 @@
       "namespace": "sv",
       "values": {
         "auth": {
-          "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json",
+          "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
         },
         "enableHealthProbes": true,
@@ -526,7 +524,7 @@
       "values": {
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
         "cometBFT": {
           "automationEnabled": false,
@@ -547,14 +545,6 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
-    "custom": false,
-    "id": "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
-    "inputs": {},
-    "name": "sv1",
-    "provider": "",
-    "type": "auth0:index/client:Client"
-  },
-  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -572,14 +562,6 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
-    "custom": false,
-    "id": "uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr",
-    "inputs": {},
-    "name": "validator",
-    "provider": "",
-    "type": "auth0:index/client:Client"
-  },
-  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -590,7 +572,7 @@
       "values": {
         "auth": {
           "audience": "https://canton.network.global",
-          "jwksUrl": "https://auth0.tenant.domain/.well-known/jwks.json"
+          "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
         "foundingSvApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",

@@ -1,5 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as sinon from 'sinon';
+import { Auth0ClientSecret } from 'cn-pulumi-common';
 
 // TODO(#4584) Reduce code duplication throughout Pulumi projects
 export enum PulumiFunction {
@@ -63,15 +64,36 @@ pulumi.runtime.setMocks(
   stackName
 );
 
+class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
+  override get(key: string) {
+    return { client_id: key, client_secret: '***' };
+  }
+}
+
 async function main() {
+  pulumi.runtime.setConfig(`${projectName}:CLUSTER_BASENAME`, 'mock');
+  pulumi.runtime.setConfig(`${projectName}:FIXED_TOKENS`, '0');
+  pulumi.runtime.setConfig(`${projectName}:VERSION_NUMBER`, '0.0.1');
+  pulumi.runtime.setConfig(`${projectName}:IMAGE_TAG`, '0.0.1-deadbeef');
+
   process.env.GCP_CLUSTER_BASENAME = 'svrun';
-  process.env.AUTH0_DOMAIN = 'auth0.tenant.domain';
   process.env.TARGET_CLUSTER = 'svrun.network.com';
   process.env.ARTIFACTORY_USER = 'artie';
   process.env.ARTIFACTORY_PASSWORD = 's3cr3t';
+  process.env.AUTH0_CLIENT_ID = 'mgmt';
+  process.env.AUTH0_CLIENT_SECRET = 's3cr3t';
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const infra: typeof import('./src/index') = await import('./src/index');
+  const installNode = await import('./src/installNode');
+  const auth0Cfg = await import('./src/auth0cfg');
+  const secrets = new SecretsFixtureMap();
+
+  installNode.installNode({
+    getSecrets: () => Promise.resolve(secrets),
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    getClientAccessToken: (clientId: string, clientSecret: string) =>
+      Promise.resolve('access_token'),
+    getCfg: () => auth0Cfg.auth0Cfg,
+  });
 }
 
 main();

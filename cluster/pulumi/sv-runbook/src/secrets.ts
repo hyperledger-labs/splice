@@ -1,17 +1,11 @@
-import * as auth0 from '@pulumi/auth0';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { Auth0Client, installAuth0Secret } from 'cn-pulumi-common';
 
 import { ExactNamespace, requiredEnv } from './utils';
 
-// For now, uses canton-network-sv-test tenant, and assumes env variables AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET
-// With AUTH0_DOMAIN=canton-network-sv-test.us.auth0.com
-// and ClientID and Secret copied from: https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
-
 const sv1Auth0ClientId = 'bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn';
-const sv1Auth0Secret = auth0.Client.get('sv1', sv1Auth0ClientId).clientSecret;
 const validatorAuth0ClientId = 'uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr';
-const validatorAuth0Secret = auth0.Client.get('validator', validatorAuth0ClientId).clientSecret;
 const walletUIClientId = 'l9MS11POtbvPaVvgzns3Tdj9IDnosLwl';
 const svUIClientId = '8S8o4U6OYWWuw5vPCIpFQGzzWM2IpHkx';
 const directoryClientId = 'iwZgud30aDMMUYpZc5caSnjNATWwITzp';
@@ -40,39 +34,13 @@ function participantSecret(
   );
 }
 
-function appSecret(
+// TODO(#4584): use the version from common-pulumi
+function uiSecret(
   ns: ExactNamespace,
   appName: string,
-  appAuth0ClientId: string,
-  appAuth0Secret: pulumi.Output<string>
+  clientId: string,
+  auth0_domain: string
 ): k8s.core.v1.Secret {
-  const secretName = 'cn-app-' + appName + '-ledger-api-auth';
-  return new k8s.core.v1.Secret(
-    secretName,
-    {
-      metadata: {
-        name: secretName,
-        namespace: ns.logicalName,
-      },
-      type: 'Opaque',
-      data: {
-        'ledger-api-user': btoa(appAuth0ClientId + '@clients'),
-        url: btoa(
-          'https://' +
-            requiredEnv('AUTH0_DOMAIN', 'domain of your auth0 tenant') +
-            '/.well-known/openid-configuration'
-        ),
-        'client-id': btoa(appAuth0ClientId),
-        'client-secret': appAuth0Secret.apply(s => btoa(s)),
-      },
-    },
-    {
-      dependsOn: [ns.ns],
-    }
-  );
-}
-
-function uiSecret(ns: ExactNamespace, appName: string, clientId: string): k8s.core.v1.Secret {
   const secretName = 'cn-app-' + appName + '-auth';
   return new k8s.core.v1.Secret(
     secretName,
@@ -83,7 +51,7 @@ function uiSecret(ns: ExactNamespace, appName: string, clientId: string): k8s.co
       },
       type: 'Opaque',
       data: {
-        url: btoa('https://' + requiredEnv('AUTH0_DOMAIN', 'domain of your auth0 tenant')),
+        url: btoa('https://' + auth0_domain),
         'client-id': btoa(clientId),
       },
     },
@@ -155,21 +123,30 @@ type AppAndUiSecrets = {
   uiSecret: k8s.core.v1.Secret;
 };
 
-export function createSvValidatorSecrets(ns: ExactNamespace): AppAndUiSecrets {
+export async function createSvValidatorSecrets(
+  ns: ExactNamespace,
+  auth0Client: Auth0Client
+): Promise<AppAndUiSecrets> {
   return {
-    appSecret: appSecret(ns, 'validator', validatorAuth0ClientId, validatorAuth0Secret),
-    uiSecret: uiSecret(ns, 'wallet-ui', walletUIClientId),
+    appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
+    uiSecret: uiSecret(ns, 'wallet-ui', walletUIClientId, auth0Client.getCfg().auth0Domain),
   };
 }
 
-export function createSvDirectoryUiSecrets(ns: ExactNamespace): k8s.core.v1.Secret {
-  return uiSecret(ns, 'directory-ui', directoryClientId);
+export function createSvDirectoryUiSecrets(
+  ns: ExactNamespace,
+  auth0Domain: string
+): k8s.core.v1.Secret {
+  return uiSecret(ns, 'directory-ui', directoryClientId, auth0Domain);
 }
 
-export function createSvAppSecrets(ns: ExactNamespace): AppAndUiSecrets {
+export async function createSvAppSecrets(
+  ns: ExactNamespace,
+  auth0Client: Auth0Client
+): Promise<AppAndUiSecrets> {
   return {
-    appSecret: appSecret(ns, 'sv', sv1Auth0ClientId, sv1Auth0Secret),
-    uiSecret: uiSecret(ns, 'sv-ui', svUIClientId),
+    appSecret: await installAuth0Secret(auth0Client, ns, 'sv', 'sv'),
+    uiSecret: uiSecret(ns, 'sv-ui', svUIClientId, auth0Client.getCfg().auth0Domain),
   };
 }
 
