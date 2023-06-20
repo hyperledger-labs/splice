@@ -67,23 +67,25 @@ spec:
                   name: "cn-app-sv-key"
                   optional: false
             {{- end }}
-            {{- if eq .Values.onboardingType "found-collective" }}
+            # Checking .Values.domain does not differentiate between
+            # it being unset and set to an empty object
+            {{- with .Values.domain }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
               value: |
                 canton.sv-apps.sv.x-nodes.domain {
                   sequencer {
                     admin-api {
-                      address = "global-domain-sequencer"
+                      address = {{ .sequencerAddress | default "global-domain-sequencer" | quote }}
                       port = 5009
                     }
                     public-api {
-                      address = "global-domain-sequencer"
+                      address = {{ .sequencerAddress | default "global-domain-sequencer" | quote }}
                       port = 5008
                     }
                   }
                   mediator {
                     admin-api {
-                      address = "global-domain-mediator"
+                      address = {{ .mediatorAddress | default "global-domain-mediator" | quote }}
                       port = 5007
                     }
                   }

@@ -85,10 +85,7 @@ export async function installSvNode(
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
-  const domain =
-    onboarding.type == 'found-collective'
-      ? [installGlobalDomain(xns, 'global-domain', postgresDb)]
-      : [];
+  const domain = installGlobalDomain(xns, 'global-domain', postgresDb);
 
   const participant = installParticipant(
     xns,
@@ -106,7 +103,7 @@ export async function installSvNode(
       },
     ],
     [auth0UserNameEnvVar('sv')],
-    dependsOn.concat(domain)
+    dependsOn.concat([domain])
   );
   installCometBftNode(xns, nodename, onboardingName);
 
@@ -120,6 +117,11 @@ export async function installSvNode(
     },
     globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
     foundingSvApiUrl: 'http://sv-app.sv-1:5014',
+    domain:
+      // defaults for ports and address are fine,
+      // we need to include a dummy value though
+      // because helm does not distinguish between an empty object and unset.
+      { enable: true },
   } as ChartValues;
 
   if (onboarding.type == 'join-with-key') {

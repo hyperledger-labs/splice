@@ -19,6 +19,9 @@ export function installGlobalDomain(
 ): k8s.helm.v3.Release {
   return installCNHelmChart(xns, name, 'cn-global-domain', {
     postgres: postgresDb,
+    sequencerDriver: {
+      address: 'postgres.sv-1',
+    },
   });
 }
 

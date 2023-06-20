@@ -15,6 +15,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
       svPassword: String,
       svInfo: Option[SvcInfo],
       votedSvParties: Seq[PartyId],
+      extraChecks: => Unit = (),
   )(implicit webDriver: WebDriverType) = {
 
     clue(s"We can log in to the SV UI") {
@@ -101,6 +102,8 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
           )
         }
       }
+
+      extraChecks
 
       clue(s"We can log out of this SV's UI") {
         click on "logout-button"

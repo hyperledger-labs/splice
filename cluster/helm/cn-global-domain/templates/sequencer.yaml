@@ -25,6 +25,8 @@ spec:
           value: {{ .Values.defaultJvmOptions }}
         - name: CANTON_DOMAIN_POSTGRES_SERVER
           value: {{ .Values.postgres }}
+        - name: SEQUENCER_DRIVER_DATABASE_ADDRESS
+          value: {{ .Values.sequencerDriver.address }}
         imagePullPolicy: Always
         ports:
         - containerPort: 5008
