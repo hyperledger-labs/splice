@@ -79,10 +79,6 @@ class WalletSubscriptionsIntegrationTest
     "allow a user to list and accept subscription requests, " +
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
-        val transferContext = sv1Scan.getTransferContextWithInstances(CantonTimestamp.now())
-        val appTransferContext = transferContext.toUnfeaturedAppTransferContext()
-        val openRound = transferContext.latestOpenMiningRound
-        val coinRules = transferContext.coinRules
         val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
@@ -113,7 +109,7 @@ class WalletSubscriptionsIntegrationTest
           aliceWallet.tap(50)
         }
 
-        val (initialPaymentId, _) = actAndCheck(
+        val (initialPaymentId, initialPaymentRound) = actAndCheck(
           "Accept the subscription request, which initiates the first subscription payment",
           aliceWallet.acceptSubscriptionRequest(requestId),
         )(
@@ -124,12 +120,21 @@ class WalletSubscriptionsIntegrationTest
               r.contractId shouldBe initialPaymentId
               r.payload.subscriptionData should equal(request.subscriptionData)
               r.payload.payData should equal(request.payData)
+              r.payload.round
             }
           },
         )
 
-        val (_, paymentId) = actAndCheck(
+        val (_, (paymentId, paymentRound)) = actAndCheck(
           "Collect the initial payment (as the receiver), which creates the subscription", {
+            val transferContext = sv1Scan.getTransferContextWithInstances(
+              CantonTimestamp.now(),
+              Some(initialPaymentRound),
+            )
+            val appTransferContext = transferContext.toUnfeaturedAppTransferContext()
+            val roundContract = transferContext.openMiningRounds
+              .find(c => c.contract.payload.round == initialPaymentRound)
+              .value
             val collectCommand = initialPaymentId
               .exerciseSubscriptionInitialPayment_Collect(appTransferContext)
               .commands
@@ -141,8 +146,10 @@ class WalletSubscriptionsIntegrationTest
                 readAs = Seq(aliceValidatorParty),
                 optTimeout = None,
                 commands = collectCommand,
-                disclosedContracts =
-                  DisclosedContracts(coinRules, openRound).toLedgerApiDisclosedContracts,
+                disclosedContracts = DisclosedContracts(
+                  transferContext.coinRules,
+                  roundContract,
+                ).toLedgerApiDisclosedContracts,
               )
           },
         )(
@@ -155,13 +162,19 @@ class WalletSubscriptionsIntegrationTest
               inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
                 state.payload.subscription shouldBe sub.subscription.contractId
                 state.payload.payData should equal(request.payData)
-                state.contractId
+                (state.contractId, state.payload.round)
               }
             },
         )
 
         val (_, subscriptionStateId2) = actAndCheck(
           "Collect the second payment (as the receiver), which sets the subscription back to idle", {
+            val transferContext =
+              sv1Scan.getTransferContextWithInstances(CantonTimestamp.now(), Some(paymentRound))
+            val appTransferContext = transferContext.toUnfeaturedAppTransferContext()
+            val roundContract = transferContext.openMiningRounds
+              .find(c => c.contract.payload.round == paymentRound)
+              .value
             val collectCommand2 = paymentId
               .exerciseSubscriptionPayment_Collect(appTransferContext)
               .commands
@@ -173,8 +186,10 @@ class WalletSubscriptionsIntegrationTest
                 readAs = Seq(aliceValidatorParty),
                 optTimeout = None,
                 commands = collectCommand2,
-                disclosedContracts =
-                  DisclosedContracts(coinRules, openRound).toLedgerApiDisclosedContracts,
+                disclosedContracts = DisclosedContracts(
+                  transferContext.coinRules,
+                  roundContract,
+                ).toLedgerApiDisclosedContracts,
               )
           },
         )(
