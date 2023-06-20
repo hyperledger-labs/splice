@@ -11,7 +11,7 @@ private[setup] object SetupUtil {
   def setupSvParty(
       connection: CNLedgerConnection,
       config: SvAppBackendConfig,
-      lock: (() => Future[PartyId]) => Future[PartyId],
+      lock: (String, () => Future[PartyId]) => Future[PartyId],
   ): Future[PartyId] = {
     val partyHint = config.svPartyHint.getOrElse(
       config.onboarding

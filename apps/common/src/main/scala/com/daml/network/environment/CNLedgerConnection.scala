@@ -358,14 +358,17 @@ class CNLedgerConnection(
   def allocatePartyViaLedgerApi(
       hint: Option[String],
       displayName: Option[String],
-      lock: (() => Future[PartyId]) => Future[PartyId],
+      lock: (String, () => Future[PartyId]) => Future[PartyId],
   ): Future[PartyId] =
-    lock(() => client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive))
+    lock(
+      s"Allocate party with hint $hint",
+      () => client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive),
+    )
 
   def ensureUserPrimaryPartyIsAllocated(
       userId: String,
       hint: String,
-      lock: (() => Future[PartyId]) => Future[PartyId],
+      lock: (String, () => Future[PartyId]) => Future[PartyId],
   ): Future[PartyId] =
     retryProvider.ensureThatO(
       s"User $userId has primary party",
@@ -386,7 +389,7 @@ class CNLedgerConnection(
       hint: String,
       namespace: Namespace,
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (() => Future[Unit]) => Future[Unit],
+      lock: (String, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext) =
     for {
       participantId <- participantAdminConnection.getParticipantId()
@@ -396,18 +399,20 @@ class CNLedgerConnection(
           namespace,
         )
       )
-      _ <- lock(() =>
-        retryProvider.ensureThatB(
-          s"Party $partyId is allocated",
-          client.getParties(Seq(partyId)).map(_.nonEmpty),
-          participantAdminConnection
-            .proposeInitialPartyToParticipant(
-              partyId,
-              participantId,
-              participantId.uid.namespace.fingerprint,
-            ),
-          logger,
-        )
+      _ <- lock(
+        s"Ensure that party $partyId is allocated",
+        () =>
+          retryProvider.ensureThatB(
+            s"Party $partyId is allocated",
+            client.getParties(Seq(partyId)).map(_.nonEmpty),
+            participantAdminConnection
+              .proposeInitialPartyToParticipant(
+                partyId,
+                participantId,
+                participantId.uid.namespace.fingerprint,
+              ),
+            logger,
+          ),
       )
     } yield partyId
 
@@ -431,7 +436,7 @@ class CNLedgerConnection(
   private def createPartyAndUser(
       user: String,
       userRights: Seq[User.Right],
-      lock: (() => Future[PartyId]) => Future[PartyId],
+      lock: (String, () => Future[PartyId]) => Future[PartyId],
   ): Future[PartyId] =
     for {
       party <- allocatePartyViaLedgerApi(
@@ -526,7 +531,7 @@ class CNLedgerConnection(
   def getOrAllocateParty(
       username: String,
       userRights: Seq[User.Right] = Seq.empty,
-      lock: (() => Future[PartyId]) => Future[PartyId],
+      lock: (String, () => Future[PartyId]) => Future[PartyId],
   ): Future[PartyId] = {
     for {
       existingPartyId <- getOptionalPrimaryParty(username).recover {
@@ -642,14 +647,19 @@ class CNLedgerConnection(
     } yield ()
   }
 
-  def uploadDarFiles(pkgs: Seq[UploadablePackage], withLock: (() => Future[Unit]) => Future[Unit])(
-      implicit traceContext: TraceContext
+  def uploadDarFiles(
+      pkgs: Seq[UploadablePackage],
+      withLock: (String, () => Future[Unit]) => Future[Unit],
+  )(implicit
+      traceContext: TraceContext
   ): Future[Unit] =
     // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-    withLock(() =>
-      pkgs.foldLeft(Future.unit)((previous, dar) =>
-        previous.flatMap(_ => uploadDarFile(dar, f => f()))
-      )
+    withLock(
+      "DAR upload",
+      () =>
+        pkgs.foldLeft(Future.unit)((previous, dar) =>
+          previous.flatMap(_ => uploadDarFile(dar, f => f()))
+        ),
     )
 
   def uploadDarFile(

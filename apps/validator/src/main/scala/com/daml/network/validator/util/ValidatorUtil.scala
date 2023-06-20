@@ -72,7 +72,7 @@ private[validator] object ValidatorUtil {
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       domainId: DomainId,
-      lock: (() => Future[PartyId]) => Future[PartyId],
+      lock: (String, () => Future[PartyId]) => Future[PartyId],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {

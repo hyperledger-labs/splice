@@ -420,6 +420,12 @@ paths:
       tags: [sv]
       x-jvm-package: sv
       operationId: "acquireGlobalLock"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AcquireGlobalLockRequest"
       responses:
         "200":
           description: ok
@@ -430,6 +436,12 @@ paths:
       tags: [sv]
       x-jvm-package: sv
       operationId: "releaseGlobalLock"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ReleaseGlobalLockRequest"
       responses:
         "200":
           description: ok
@@ -804,3 +816,25 @@ components:
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+
+    AcquireGlobalLockRequest:
+      type: object
+      required:
+        - reason
+        - trace_id
+      properties:
+        reason:
+          type: string
+        trace_id:
+          type: string
+
+    ReleaseGlobalLockRequest:
+      type: object
+      required:
+        - reason
+        - trace_id
+      properties:
+        reason:
+          type: string
+        trace_id:
+          type: string

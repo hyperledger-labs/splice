@@ -32,7 +32,7 @@ import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.Base64
+import java.util.{Base64, UUID}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import com.daml.network.sv.config.SvOnboardingConfig
@@ -83,20 +83,33 @@ class HttpSvHandler(
         )
     }
 
-  private def withAcquiredGlobalLock[T](f: => Future[T]): Future[T] =
-    acquireGlobalLock(v0.SvResource.AcquireGlobalLockResponse)()(()).flatMap { _ =>
-      f.andThen(_ => releaseGlobalLock(v0.SvResource.ReleaseGlobalLockResponse)()(()))
+  private def withAcquiredGlobalLock[T](reason: String, f: => Future[T]): Future[T] = {
+    val traceId = UUID.randomUUID
+    acquireGlobalLock(v0.SvResource.AcquireGlobalLockResponse)(
+      definitions.AcquireGlobalLockRequest(reason, traceId.toString)
+    )(()).flatMap { _ =>
+      f.andThen(_ =>
+        releaseGlobalLock(v0.SvResource.ReleaseGlobalLockResponse)(
+          definitions.ReleaseGlobalLockRequest(reason, traceId.toString)
+        )(())
+      )
     }
+  }
 
   override def acquireGlobalLock(
       respond: v0.SvResource.AcquireGlobalLockResponse.type
-  )()(fake: Unit): Future[v0.SvResource.AcquireGlobalLockResponse] =
+  )(
+      body: definitions.AcquireGlobalLockRequest
+  )(fake: Unit): Future[v0.SvResource.AcquireGlobalLockResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       withGlobalLock { globalLock =>
+        logger.debug(s"Trying to acquire lock for $body.reason ($body.traceId)")
         val success = globalLock.tryAcquire()
         if (success) {
+          logger.debug(s"Acquired lock ($body.traceId)")
           Future.successful(v0.SvResource.AcquireGlobalLockResponseOK)
         } else {
+          logger.debug(s"Failed to acquire lock ($body.traceId)")
           Future.failed(HttpErrorHandler.serviceUnavailable("Lock is not free"))
         }
       }
@@ -104,10 +117,13 @@ class HttpSvHandler(
 
   override def releaseGlobalLock(
       respond: v0.SvResource.ReleaseGlobalLockResponse.type
-  )()(fake: Unit): Future[v0.SvResource.ReleaseGlobalLockResponse] =
+  )(
+      body: definitions.ReleaseGlobalLockRequest
+  )(fake: Unit): Future[v0.SvResource.ReleaseGlobalLockResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       withGlobalLock { globalLock =>
         globalLock.release()
+        logger.debug(s"Released lock for $body.reason ($body.traceId)")
         Future.successful(v0.SvResource.ReleaseGlobalLockResponseOK)
       }
     }
@@ -397,36 +413,38 @@ class HttpSvHandler(
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
       // We need both locks here to prevent topology transactions and Daml transactions.
       // This is the only place that calls svcRulesLock.lock() so there is no chance of a deadlock.
-      authorizedAt <- withAcquiredGlobalLock {
-        for {
-          _ <- svcRulesLock.lock()
-          _ = logger.info(
-            s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
-          )
-
-          // this will wait until the PartyToParticipant state change completed
-          authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
-            globalDomain,
-            participantId,
-          )
-          _ = logger
-            .info(
-              s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
+      authorizedAt <- withAcquiredGlobalLock(
+        s"Authorizing SVC party to participant $participantId", {
+          for {
+            _ <- svcRulesLock.lock()
+            _ = logger.info(
+              s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
             )
-          _ <- svcRulesLock.unlock()
-          _ = logger.info(
-            s"svc party to participant authorization completed, unlocked SvcRules and CoinRules contracts"
-          )
-          ourParticipant <- participantAdminConnection.getParticipantId()
-          _ = logger.info("Adding candidate SV to unionspace")
-          _ <- participantAdminConnection.ensureUnionspaceDefinition(
-            globalDomain,
-            svcParty.uid.namespace,
-            participantId.uid.namespace,
-            ourParticipant.uid.namespace.fingerprint,
-          )
-        } yield authorizedAt
-      }
+
+            // this will wait until the PartyToParticipant state change completed
+            authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
+              globalDomain,
+              participantId,
+            )
+            _ = logger
+              .info(
+                s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
+              )
+            _ <- svcRulesLock.unlock()
+            _ = logger.info(
+              s"svc party to participant authorization completed, unlocked SvcRules and CoinRules contracts"
+            )
+            ourParticipant <- participantAdminConnection.getParticipantId()
+            _ = logger.info("Adding candidate SV to unionspace")
+            _ <- participantAdminConnection.ensureUnionspaceDefinition(
+              globalDomain,
+              svcParty.uid.namespace,
+              participantId.uid.namespace,
+              ourParticipant.uid.namespace.fingerprint,
+            )
+          } yield authorizedAt
+        },
+      )
       acsBytes <- retryProvider.retryForAutomation(
         show"Download ACS snapshot for SVC at $authorizedAt",
         participantAdminConnection.downloadAcsSnapshot(
@@ -483,7 +501,9 @@ class HttpSvHandler(
       party <- svcStoreWithIngestion.connection.allocatePartyViaLedgerApi(
         hint = None,
         displayName = None,
-        f => f(), // Don't lock here, the candidate SV locks around the whole sequencer onboarding.
+        { case (_, f) =>
+          f()
+        }, // Don't lock here, the candidate SV locks around the whole sequencer onboarding.
       )
       msg = "Wait for sequencer to observe party allocation"
       _ = logger.info(msg)

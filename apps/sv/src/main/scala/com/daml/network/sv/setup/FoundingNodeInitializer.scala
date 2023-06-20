@@ -44,6 +44,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -70,6 +71,9 @@ class FoundingNodeInitializer(
     tc: TraceContext,
     tracer: Tracer,
 ) extends NamedLogging {
+
+  @nowarn("cat=unused")
+  private def noLock[T](reason: String, f: () => Future[T]): Future[T] = f()
 
   def bootstrapCollective(): Future[
     (
@@ -99,7 +103,7 @@ class FoundingNodeInitializer(
       _ = logger.info("Participant connected to domain")
       svcParty <- setupSvcParty(initConnection, namespace)
       // founder does not need to lock here
-      svParty <- SetupUtil.setupSvParty(initConnection, config, f => f())
+      svParty <- SetupUtil.setupSvParty(initConnection, config, noLock)
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -164,7 +168,7 @@ class FoundingNodeInitializer(
         namespace,
         participantAdminConnection,
         // founder does not need to lock here.
-        f => f(),
+        noLock,
       )
       // this is idempotent
       _ <- connection.grantUserRights(
@@ -285,7 +289,7 @@ class FoundingNodeInitializer(
     def foundCollective(): Future[Unit] = {
       for {
         // Founder does not need to lock
-        _ <- svcStoreWithIngestion.connection.uploadDarFiles(requiredDars, f => f())
+        _ <- svcStoreWithIngestion.connection.uploadDarFiles(requiredDars, noLock)
         _ <- retryProvider.retryForAutomation(
           "bootstrapping SVC",
           bootstrapSvc(),

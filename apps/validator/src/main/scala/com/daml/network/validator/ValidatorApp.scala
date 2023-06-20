@@ -58,6 +58,7 @@ import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import scala.annotation.nowarn
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -86,9 +87,13 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  def withGlobalLock[A, B](f: ((() => Future[A]) => Future[A]) => Future[B]) = withSvConnection(
-    config.foundingSvClient.adminApi
-  )(svConnection => f(svConnection.withGlobalLock(_)))
+  @nowarn("cat=unused")
+  private def noLock[T](reason: String, f: () => Future[T]): Future[T] = f()
+
+  def withGlobalLock[A, B](f: ((String, () => Future[A]) => Future[A]) => Future[B]) =
+    withSvConnection(
+      config.foundingSvClient.adminApi
+    )(svConnection => f(svConnection.withGlobalLock(_, _)))
 
   // Note that for the validator of an SV app, the user will be created by the SV app with a
   // primary party set to the SV app already so this is a noop.
@@ -99,17 +104,19 @@ class ValidatorApp(
       // Wait for the sponsoring SV which also ensures the domain is initialized.
       _ <- config.onboarding.traverse_(waitUntilSponsorIsActive(_))
       _ <- withGlobalLock[Unit, Unit](lock =>
-        lock(() =>
-          for {
-            _ <- ensureGlobalDomainRegistered()
-            _ <- connection.ensureUserPrimaryPartyIsAllocated(
-              config.ledgerApiUser,
-              config.validatorPartyHint
-                .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
-              // We have an outer lock around both here so we don't need to lock here.
-              f => f(),
-            )
-          } yield ()
+        lock(
+          "Domain connection and primary party allocation of validatior",
+          () =>
+            for {
+              _ <- ensureGlobalDomainRegistered()
+              _ <- connection.ensureUserPrimaryPartyIsAllocated(
+                config.ledgerApiUser,
+                config.validatorPartyHint
+                  .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
+                // We have an outer lock around both here so we don't need to lock here.
+                noLock,
+              )
+            } yield (),
         )
       )
     } yield ()
@@ -150,27 +157,29 @@ class ValidatorApp(
     for {
       _ <- instance.dars.traverse_(dar => storeWithIngestion.connection.uploadDarFile(dar))
       party <- withGlobalLock[PartyId, PartyId](lock =>
-        lock(() =>
-          for {
-            party <- storeWithIngestion.connection.getOrAllocateParty(
-              instance.serviceUser,
-              Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
-              // We rely on the outer lock so we don't need to lock here.
-              f => f(),
-            )
-            _ <- ValidatorUtil
-              .onboard(
-                instance.walletUser.getOrElse(instance.serviceUser),
-                Some(party),
-                storeWithIngestion,
-                validatorUserName = config.ledgerApiUser,
-                domainId,
+        lock(
+          s"Allocate party for user ${instance.serviceUser}",
+          () =>
+            for {
+              party <- storeWithIngestion.connection.getOrAllocateParty(
+                instance.serviceUser,
+                Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
                 // We rely on the outer lock so we don't need to lock here.
-                f => f(),
-                retryProvider,
-                logger,
+                noLock,
               )
-          } yield party
+              _ <- ValidatorUtil
+                .onboard(
+                  instance.walletUser.getOrElse(instance.serviceUser),
+                  Some(party),
+                  storeWithIngestion,
+                  validatorUserName = config.ledgerApiUser,
+                  domainId,
+                  // We rely on the outer lock so we don't need to lock here.
+                  noLock,
+                  retryProvider,
+                  logger,
+                )
+            } yield party,
         )
       )
     } yield {

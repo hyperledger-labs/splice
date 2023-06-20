@@ -75,12 +75,12 @@ abstract class SvAppReference(
       )
     }
 
-  def acquireGlobalLock() = consoleEnvironment.run {
-    httpCommand(HttpSvAppClient.AcquireGlobalLock)
+  def acquireGlobalLock(reason: String, traceId: String) = consoleEnvironment.run {
+    httpCommand(HttpSvAppClient.AcquireGlobalLock(reason, traceId))
   }
 
-  def releaseGlobalLock() = consoleEnvironment.run {
-    httpCommand(HttpSvAppClient.ReleaseGlobalLock)
+  def releaseGlobalLock(reason: String, traceId: String) = consoleEnvironment.run {
+    httpCommand(HttpSvAppClient.ReleaseGlobalLock(reason, traceId))
   }
 }
 
