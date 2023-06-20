@@ -3,6 +3,7 @@ package com.daml.network.sv.automation
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_MergeUnclaimedRewards}
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
@@ -72,7 +73,7 @@ class MergeUnclaimedRewardsTrigger(
         case None =>
           logger.debug("SvcRules contract not found")
           Future.successful(false)
-        case Some(svcRules) =>
+        case Some(ReadyContract(svcRules, _)) =>
           store
             .svIsLeader()
             .flatMap(if (_) {

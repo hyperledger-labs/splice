@@ -1711,6 +1711,17 @@ workflows:
         start_canton_options: "-d -p external -w -t"
         resource_class: "2xlarge+"
         parallelism: 1
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test global upgrade sim time"
+        test_names_file: "test-full-class-names-global-upgrade-sim-time.log"
+        start_canton_options: "-d -p external -s -g"
+        resource_class: "2xlarge"
+        parallelism: 1
     - bundle:
         <<: *notify-fail
         context:

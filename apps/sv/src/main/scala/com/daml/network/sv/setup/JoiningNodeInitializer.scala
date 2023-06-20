@@ -509,7 +509,9 @@ class JoiningNodeInitializer(
 
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()
-  } yield svcRules.exists(_.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive))
+  } yield svcRules.exists(
+    _.contract.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
+  )
 
   private def withLocalDomainNode[A](
       localDomainNodeO: Option[LocalDomainNode]
@@ -535,7 +537,7 @@ class JoiningNodeInitializer(
         svcRules <- svcStore.lookupSvcRules()
         _ <- svcRules match {
           case Some(c) =>
-            if (SvApp.isSvcMemberParty(svcStore.key.svParty, c)) {
+            if (SvApp.isSvcMemberParty(svcStore.key.svParty, c.contract)) {
               Future.successful(())
             } else {
               throw new StatusRuntimeException(

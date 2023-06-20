@@ -190,6 +190,7 @@ object CNNodeUtil {
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
+      nextDomainId: Option[DomainId] = None,
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = new cc.coinconfig.CoinConfig(
     // transferConfig
     defaultTransferConfig(initialMaxNumInputs, holdingFee),
@@ -198,19 +199,27 @@ object CNNodeUtil {
     defaultIssuanceCurve,
 
     // domainFeesConfig
-    defaultGlobalDomainConfig(initialDomainId),
+    defaultGlobalDomainConfig(initialDomainId, nextDomainId),
 
     // tick duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
   )
 
-  private def defaultGlobalDomainConfig(initialDomainId: DomainId): GlobalDomainConfig = {
+  private def defaultGlobalDomainConfig(
+      initialDomainId: DomainId,
+      nextDomainId: Option[DomainId],
+  ): GlobalDomainConfig = {
     val domainId = initialDomainId.toProtoPrimitive
+    val next = nextDomainId.map(_.toProtoPrimitive)
     new GlobalDomainConfig(
       // requiredDomains
-      new DamlSet(Map(domainId -> DamlUnit.getInstance).asJava),
+      new DamlSet(
+        (Map(domainId -> DamlUnit.getInstance) ++ next
+          .map(_ -> DamlUnit.getInstance)
+          .toList).asJava
+      ),
       // activeDomain
-      domainId,
+      next getOrElse domainId,
       // fees
       defaultDomainFeesConfig,
     )

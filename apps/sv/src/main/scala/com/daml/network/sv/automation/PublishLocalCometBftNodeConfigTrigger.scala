@@ -41,7 +41,8 @@ class PublishLocalCometBftNodeConfigTrigger(
       tc: TraceContext
   ): Future[Seq[PublishLocalConfigTask]] =
     (for {
-      svcRules <- OptionT(store.lookupSvcRules())
+      svcRulesRC <- OptionT(store.lookupSvcRules())
+      svcRules = svcRulesRC.contract
       svNodeMemberInfo <- OptionT.fromOption[Future](
         CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
       )

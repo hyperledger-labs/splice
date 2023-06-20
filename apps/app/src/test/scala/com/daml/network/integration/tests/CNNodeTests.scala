@@ -216,6 +216,7 @@ object CNNodeTests {
         tickDuration: NonNegativeFiniteDuration,
         maxNumInputs: Int = 100,
         holdingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
+        nextDomainId: Option[DomainId] = None,
     )(implicit env: CNNodeTestConsoleEnvironment): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
       val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
       val activeDomainId =
@@ -225,6 +226,7 @@ object CNNodeTests {
         maxNumInputs,
         DomainId.tryFromString(activeDomainId),
         holdingFee,
+        nextDomainId = nextDomainId,
       )
     }
 

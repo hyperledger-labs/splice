@@ -25,11 +25,13 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.util.DisclosedContracts
+import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.logging.pretty.Pretty
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -609,6 +611,17 @@ object LedgerClient {
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
         )
+    }
+
+    object Out {
+      implicit val pretty: Pretty[Out] = {
+        import Pretty.*
+        prettyOfClass[Out](
+          param("contractId", t => t.contractId),
+          param("source", _.source),
+          param("target", _.target),
+        )
+      }
     }
 
     final case class In(

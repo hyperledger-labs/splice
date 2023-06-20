@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.CNNodeAppAutomationService
+import com.daml.network.automation.{CNNodeAppAutomationService, TransferInTrigger}
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -78,4 +78,7 @@ class SvSvcAutomationService(
       retryProvider,
     )
   )
+
+  registerTrigger(new SvcRulesTransferTrigger(triggerContext, svcStore, connection))
+  registerTrigger(new TransferInTrigger(triggerContext, svcStore, connection, store.key.svcParty))
 }

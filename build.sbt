@@ -1003,6 +1003,8 @@ printTests := {
     new PrintWriter(new FileWriter(s"test-full-class-names-frontend-sim-time.log", true))
   val pwDomainFees =
     new PrintWriter(new FileWriter(s"test-full-class-names-domain-fees.log", true))
+  val pwGlobalUpgradeSimTime =
+    new PrintWriter(new FileWriter(s"test-full-class-names-global-upgrade-sim-time.log", true))
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
@@ -1010,6 +1012,7 @@ printTests := {
   def isPreflightSvIntegrationTest(name: String): Boolean =
     name.contains("PreflightSvIntegrationTest")
   def isDomainFeesTest(name: String): Boolean = name.contains(".DF")
+  def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
 
   def printTestNames(
       testSet: String,
@@ -1056,7 +1059,9 @@ printTests := {
       (t: String) =>
         isTimeBasedTest(t) && !isFrontEndTest(t) && !isDomainFeesTest(
           t
-        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
+        ) && !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(
+          t
+        ) && !isGlobalUpgradeTest(t),
     ),
     (
       "frontend tests with wall clock time",
@@ -1079,6 +1084,11 @@ printTests := {
       (t: String) =>
         !isTimeBasedTest(t) && isDomainFeesTest(t) &&
           !isPreflightIntegrationTest(t) && !isPreflightSvIntegrationTest(t),
+    ),
+    (
+      "global domain upgrade test",
+      pwGlobalUpgradeSimTime,
+      (t: String) => isTimeBasedTest(t) && isGlobalUpgradeTest(t),
     ),
   ).foreach { case (testSet, pw, predicate) =>
     printTestNames(testSet, allTestNames, pw, predicate)

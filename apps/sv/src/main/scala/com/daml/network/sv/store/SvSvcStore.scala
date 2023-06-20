@@ -63,17 +63,17 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   def lookupSvcRulesWithOffset(
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[
-      Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+      ReadyContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
     ]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore
-        .findContractOnDomainWithOffset(cn.svcrules.SvcRules.COMPANION)(_, (_: Any) => true)
-    )
+  ] = for {
+    domain <- defaultAcsDomainIdF
+    c <- multiDomainAcsStore
+      .findContractOnDomainWithOffset(cn.svcrules.SvcRules.COMPANION)(domain, (_: Any) => true)
+  } yield c.map(_.map(ReadyContract(_, domain)))
 
   def lookupSvcRules()(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
+  ): Future[Option[ReadyContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     lookupSvcRulesWithOffset().map(_.value)
 
   def getSvcRules(
@@ -81,7 +81,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       tc: TraceContext
   ): Future[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
     lookupSvcRules().map(
-      _.getOrElse(
+      _.map(_.contract).getOrElse(
         throw new StatusRuntimeException(
           Status.NOT_FOUND.withDescription("No active SvcRules contract")
         )

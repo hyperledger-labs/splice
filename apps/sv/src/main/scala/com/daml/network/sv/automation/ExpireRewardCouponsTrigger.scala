@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cc.coin.UnclaimedReward.ContractId
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
@@ -116,7 +117,7 @@ class ExpireRewardCouponsTrigger(
         case None =>
           logger.debug("SvcRules contract not found")
           Future.successful(false)
-        case Some(svcRules) =>
+        case Some(ReadyContract(svcRules, _)) =>
           store
             .svIsLeader()
             .flatMap(if (_) {

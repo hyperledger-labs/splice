@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.CNNodeAppStoreWithIngestion
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
@@ -344,7 +344,7 @@ class FoundingNodeInitializer(
                   )
             }
           }
-          case QueryResult(_, Some(svcRules)) =>
+          case QueryResult(_, Some(ReadyContract(svcRules, _))) =>
             coinRules match {
               case Some(coinRules) => {
                 if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
@@ -472,6 +472,8 @@ class FoundingNodeInitializer(
 
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()
-  } yield svcRules.exists(_.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive))
+  } yield svcRules.exists(
+    _.contract.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
+  )
 
 }

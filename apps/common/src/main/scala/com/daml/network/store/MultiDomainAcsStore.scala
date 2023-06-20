@@ -394,7 +394,9 @@ object MultiDomainAcsStore {
   final case class QueryResult[A](
       offset: String,
       value: A,
-  )
+  ) {
+    def map[B](f: A => B): QueryResult[B] = copy(value = f(value))
+  }
 
   object QueryResult {
     implicit def prettyQueryResult[T <: PrettyPrinting]: Pretty[QueryResult[T]] = {

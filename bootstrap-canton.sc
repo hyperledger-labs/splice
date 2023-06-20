@@ -4,7 +4,7 @@ import cats.syntax.either._
 import cats.syntax.functorFilter._
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
-import com.digitalasset.canton.console.LocalInstanceReferenceX
+import com.digitalasset.canton.console.{LocalInstanceReferenceX, LocalMediatorReferenceX, LocalSequencerNodeReferenceX}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
@@ -26,10 +26,7 @@ def staticParameters(sequencer: LocalInstanceReferenceX) =
     .flatMap(StaticDomainParameters(_).leftMap(_.toString))
     .getOrElse(sys.error("whatever"))
 
-Seq(
-  ("splitwell", splitwellSequencer, splitwellMediator),
-  ("splitwellUpgrade", splitwellUpgradeSequencer, splitwellUpgradeMediator),
-).foreach { case (name, sequencer, mediator) =>
+def bootstrapOtherDomain(name: String, sequencer: LocalSequencerNodeReferenceX, mediator: LocalMediatorReferenceX) =
   sequencer.domain.bootstrap(
     name,
     staticParameters(sequencer),
@@ -37,7 +34,11 @@ Seq(
     sequencers = Seq(sequencer),
     mediators = Seq(mediator),
   )
-}
+
+Seq(
+  ("splitwell", splitwellSequencer, splitwellMediator),
+  ("splitwellUpgrade", splitwellUpgradeSequencer, splitwellUpgradeMediator),
+).foreach((bootstrapOtherDomain _).tupled)
 
 println("Connecting splitwell, alice & bob participant to splitwell domain...")
 Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(
@@ -66,6 +67,8 @@ Seq(
     participantAdmin = true,
   )
 }
+
+// Inserting extra commands here (do not edit this line)
 
 println(s"Collecting admin tokens...")
 val adminTokensData = ListBuffer[(String, String)]()

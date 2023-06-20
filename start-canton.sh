@@ -11,6 +11,7 @@ function usage() {
   echo "  -s               only start canton instance with simulated time"
   echo "  -f               start canton using the CometBFT driver for the global sequencers"
   echo "  -t               start canton with traffic control enabled"
+  echo "  -g               start extra global upgrade domain"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
 
@@ -21,10 +22,11 @@ simtime=1
 POSTGRES_MODE=docker
 CANTON=canton
 trafficQoS=0
+globalUpgradeDomain=0
 bootstrapScriptPath=bootstrap-canton.sc
 global_cometbft=0
 
-while getopts "hdap:c:wsbtf" arg; do
+while getopts "hdap:c:wsbtfg" arg; do
   case ${arg} in
     h)
       usage
@@ -56,12 +58,21 @@ while getopts "hdap:c:wsbtf" arg; do
       trafficQoS=1
       echo "start canton with traffic control enabled"
       ;;
+    g)
+      globalUpgradeDomain=1
+      echo "start extra global upgrade domain"
+      ;;
     ?)
       usage
       exit 1
       ;;
   esac
 done
+
+if [ $globalUpgradeDomain -ne 0 ] && [ $wallclocktime -ne 0 ]; then
+  >&2 echo "-g requires -s to be passed as well"
+  exit 1
+fi
 
 tmux_session="canton"
 tmux_window=0
@@ -135,6 +146,14 @@ if [ $simtime -eq 1 ]; then
     "participant_bob_simtime"
     "participant_splitwell_simtime"
   )
+
+  if [ $globalUpgradeDomain -eq 1 ]; then
+    db_names+=(
+      "sequencer_driver_global_upgrade_simtime"
+      "sequencer_global_upgrade_simtime"
+      "mediator_global_upgrade_simtime"
+    )
+  fi
 fi
 
 # Create the DB's in parallel
@@ -162,6 +181,7 @@ tmux new-session -d -s "${tmux_session}"
 JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g -Dlogback.configurationFile=./scripts/canton-logback.xml"
 
 config_overrides=""
+config_overrides_simtime=""
 if [ $trafficQoS -eq 1 ]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/domain-fees-overrides.conf"
 fi
@@ -169,26 +189,36 @@ if [[ $global_cometbft -eq 1 ]]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/cometbft-sequencer-global-domain-overrides.conf"
 fi;
 
+if [ $globalUpgradeDomain -eq 1 ]; then
+  combinedBootstrapScriptPath="$(mktemp --suffix=.sc)"
+  sed -e '/Inserting extra commands here (do not edit this line)/r bootstrap-canton-global-upgrade.sc' \
+      "$bootstrapScriptPath" > "$combinedBootstrapScriptPath"
+  bootstrapScriptPath="$combinedBootstrapScriptPath"
+  config_overrides_simtime="$config_overrides_simtime -c ./apps/app/src/test/resources/global-upgrade-domain-simtime-overrides.conf"
+fi
+
+tmux_cmd_canton() {
+  local windowName="$1" tokensFile="$2" baseConfig="$3" confOverrides="$4" logFile="$5"
+  tmux_cmd "$windowName" \
+    "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
+     CANTON_TOKEN_FILENAME=$tokensFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+      -c $baseConfig $confOverrides \
+      --log-level-canton=DEBUG \
+      --log-encoder json \
+      --log-file-name $logFile \
+      --bootstrap $bootstrapScriptPath"
+}
+
 if [ $wallclocktime -eq 1 ]; then
- tmux_cmd canton \
-   "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
-    CANTON_TOKEN_FILENAME=canton.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
-     -c ./apps/app/src/test/resources/simple-topology-canton.conf $config_overrides \
-     --log-level-canton=DEBUG \
-     --log-encoder json \
-     --log-file-name log/canton.clog \
-     --bootstrap $bootstrapScriptPath"
+  tmux_cmd_canton canton canton.tokens \
+    ./apps/app/src/test/resources/simple-topology-canton.conf \
+    "$config_overrides" log/canton.clog
 fi
 
 if [ $simtime -eq 1 ]; then
- tmux_cmd canton-simtime \
-   "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
-    CANTON_TOKEN_FILENAME=canton-simtime.tokens JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
-     -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf $config_overrides \
-     --log-level-canton=DEBUG \
-     --log-encoder json \
-     --log-file-name log/canton-simtime.clog \
-     --bootstrap $bootstrapScriptPath"
+  tmux_cmd_canton canton-simtime canton-simtime.tokens \
+     ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
+     "$config_overrides $config_overrides_simtime" log/canton-simtime.clog
 fi
 
 
