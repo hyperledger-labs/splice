@@ -10,7 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-class SvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class DFSvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

@@ -1706,9 +1706,9 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-        name: "scala_test domain fees sim time"
-        test_names_file: "test-full-class-names-domain-fees-sim-time.log"
-        start_canton_options: "-d -p external -s -t"
+        name: "scala_test domain fees wall clock time"
+        test_names_file: "test-full-class-names-domain-fees.log"
+        start_canton_options: "-d -p external -w -t"
         resource_class: "2xlarge+"
         parallelism: 1
     - bundle:

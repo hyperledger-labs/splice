@@ -25,7 +25,7 @@ import org.slf4j.event.Level
 import scala.concurrent.Future
 import scala.util.Try
 
-class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

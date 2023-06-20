@@ -27,9 +27,9 @@ import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
-class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
-  import DirectoryIntegrationTest.*
+  import DFDirectoryIntegrationTest.*
 
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -385,7 +385,7 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 }
 
-object DirectoryIntegrationTest {
+object DFDirectoryIntegrationTest {
 
   // Helper classes to make it easier to write test code interacting with a users' services
   case class StaticUserRefs(

@@ -15,7 +15,10 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.jdk.CollectionConverters.*
 
 // TODO(tech-debt): Add tests that cover all possible CoinEvents
-class ScanIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with CNNodeTestCommon {
+class DFScanIntegrationTest
+    extends CNNodeIntegrationTest
+    with WalletTestUtil
+    with CNNodeTestCommon {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
