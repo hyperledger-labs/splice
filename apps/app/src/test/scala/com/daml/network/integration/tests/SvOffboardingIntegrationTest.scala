@@ -40,9 +40,11 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
         )
       },
     )(
-      "The vote request has been created and SV1 accepts as he created it",
+      "The vote request has been created and SV1 accepts as he created it and all other SVs observe it",
       _ => {
-        sv1.listVoteRequests() should not be empty
+        svs.foreach { sv =>
+          sv.listVoteRequests() should not be empty
+        }
         val head = sv1.listVoteRequests().head.contractId
         sv1.listVotes(Vector(head.contractId)) should have size 1
         head
