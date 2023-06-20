@@ -16,14 +16,21 @@ const Root: React.FC = () => {
   const { logout } = useUserState();
   const primaryPartyQuery = usePrimaryParty();
   const primaryPartyId = primaryPartyQuery.data;
-  const { data: directoryInstallContract } = useDirectoryInstall();
+  const { data: directoryInstallContract, isLoading: isDirectoryInstallContractLoading } =
+    useDirectoryInstall();
   const { data: providerPartyId } = useProviderParty();
 
   const ledgerApiClient = useLedgerApiClient();
   const requestDirectoryInstall = useRequestDirectoryInstall();
 
   useEffect(() => {
-    if (requestDirectoryInstall.isIdle && primaryPartyId && providerPartyId && ledgerApiClient) {
+    if (
+      requestDirectoryInstall.isIdle &&
+      !isDirectoryInstallContractLoading &&
+      primaryPartyId &&
+      providerPartyId &&
+      ledgerApiClient
+    ) {
       if (directoryInstallContract) {
         console.debug('DirectoryInstall found');
       } else {
@@ -33,6 +40,7 @@ const Root: React.FC = () => {
     }
   }, [
     directoryInstallContract,
+    isDirectoryInstallContractLoading,
     ledgerApiClient,
     primaryPartyId,
     providerPartyId,

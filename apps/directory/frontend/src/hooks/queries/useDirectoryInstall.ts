@@ -6,8 +6,9 @@ import { DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 import { useProviderParty, usePrimaryParty } from '..';
 import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
 
-const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall>> => {
-  const operationName = 'queryDirectoryInstall';
+export const QueryDirectoryInstallOperationName = 'queryDirectoryInstall';
+const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall> | null> => {
+  const operationName = QueryDirectoryInstallOperationName;
   const ledgerApi = useLedgerApiClient();
   const { data: primaryPartyId } = usePrimaryParty();
   const { data: providerPartyId } = useProviderParty();
@@ -23,8 +24,8 @@ const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall>> => {
       if (directoryInstall) {
         return directoryInstall;
       } else {
-        // react-query blows up if queryFn returns undefined; throw error to trigger retries
-        throw new Error('Directory install contract not found');
+        // react-query blows up if queryFn returns undefined
+        return null;
       }
     },
     enabled: !!ledgerApi && !!primaryPartyId && !!providerPartyId, // wait for dependencies to be defined

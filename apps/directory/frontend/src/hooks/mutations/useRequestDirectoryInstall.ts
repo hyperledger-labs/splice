@@ -1,8 +1,9 @@
-import { UseMutationResult, useMutation } from '@tanstack/react-query';
+import { UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
 
 import { LedgerApiClient } from '../../contexts/LedgerApiContext';
+import { QueryDirectoryInstallOperationName } from '../queries/useDirectoryInstall';
 
 interface RequestDirectoryInstallArgs {
   primaryPartyId: string;
@@ -15,6 +16,7 @@ const useRequestDirectoryInstall: () => UseMutationResult<
   unknown,
   RequestDirectoryInstallArgs
 > = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ primaryPartyId, providerPartyId, ledgerApiClient }) => {
       console.debug('DirectoryInstall not found, creating DirectoryInstallRequest');
@@ -26,6 +28,9 @@ const useRequestDirectoryInstall: () => UseMutationResult<
     },
     onError: (error: unknown) => {
       console.error('Failed to setup install contract: ', error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QueryDirectoryInstallOperationName] });
     },
   });
 };
