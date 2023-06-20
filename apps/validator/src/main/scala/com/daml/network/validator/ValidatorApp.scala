@@ -58,6 +58,7 @@ import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Class representing a Validator app instance. */
@@ -408,7 +409,16 @@ class ValidatorApp(
               concat(
                 ValidatorResource.routes(
                   handler,
-                  AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
+                  operationId =>
+                    (operationId match {
+                      // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
+                      case "register" => withRequestTimeout(60.seconds)
+                      case _ => pass
+                    }).tflatMap(_ =>
+                      AuthExtractor(verifier, loggerFactory, "canton network validator realm")(
+                        operationId
+                      )
+                    ),
                 ),
                 WalletResource.routes(
                   walletHandler,
@@ -416,7 +426,12 @@ class ValidatorApp(
                 ),
                 ValidatorAdminResource.routes(
                   adminHandler,
-                  _ => provide(()),
+                  operationId =>
+                    (operationId match {
+                      // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
+                      case "onboardUser" => withRequestTimeout(60.seconds)
+                      case _ => pass
+                    }).tflatMap(_ => provide(())),
                 ),
                 CommonAdminResource.routes(commonAdminHandler),
               )

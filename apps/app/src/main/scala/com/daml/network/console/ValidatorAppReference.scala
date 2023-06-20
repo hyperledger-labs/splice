@@ -43,7 +43,7 @@ abstract class ValidatorAppReference(
                       |Return the newly set up partyId.""".stripMargin)
   def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
-      httpCommand(
+      longRunningHttpCommand(
         HttpValidatorAdminAppClient.OnboardUser(user)
       )
     }
@@ -56,7 +56,7 @@ abstract class ValidatorAppReference(
   )
   def register(): PartyId = {
     consoleEnvironment.run {
-      httpCommand(
+      longRunningHttpCommand(
         HttpValidatorAppClient.Register
       )
     }
