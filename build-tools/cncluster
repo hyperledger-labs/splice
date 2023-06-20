@@ -744,7 +744,7 @@ function subcmd_info() {
 
     kubectl get po -o json \
             --all-namespaces \
-            -l clusterName="${GCP_CLUSTER_NAME}" \
+            --field-selector metadata.namespace!=kube-system \
         | jq -r '(["NAMESPACE", "POD-NAME", "CONTAINER", "IMAGE", "MEM-LIMIT", "CPU-REQ", "CPU-LIMIT"],(.items[] | .metadata as $pod | .spec.containers[] as $c | $c.resources as $r | [$pod.namespace, $pod.name, $c.name, ($c.image | split(":")[1]), $r.limits.memory, $r.requests.cpu, $r.limits.cpu]))|@tsv' \
         | sort \
         | column -t
