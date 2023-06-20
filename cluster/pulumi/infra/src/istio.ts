@@ -1,7 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as fs from 'fs';
-import { PathLike } from 'fs';
+import { loadJsonFromFile } from 'cn-pulumi-common';
 
 import { clusterBasename } from './config';
 
@@ -168,23 +167,4 @@ export function configureIstio(
   const gwSvc = configureGatewayService(ingressNs, ingressIp, istiod);
   const gw = configureGateway(ingressNs, gwSvc);
   return gw;
-}
-
-// TODO(#4584): copied from canton-network pulumi project, we should really have shared utils instead
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function loadJsonFromFile(path: PathLike): any {
-  try {
-    const content = stripJsonComments(fs.readFileSync(path, 'utf8'));
-
-    return JSON.parse(content);
-  } catch (e) {
-    pulumi.log.error(`could not read JSON from: ${path}`);
-    throw e;
-  }
-}
-
-function stripJsonComments(rawText: string): string {
-  const JSON_COMMENT_REGEX = /\\"|"(?:\\"|[^"])*"|(\/\/.*|\/\*[\s\S]*?\*\/|#.*)/g;
-
-  return rawText.replace(JSON_COMMENT_REGEX, (m, g) => (g ? '' : m));
 }

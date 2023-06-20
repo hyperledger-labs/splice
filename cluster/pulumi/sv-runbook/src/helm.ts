@@ -1,7 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-
-import { ChartValues, ExactNamespace, requiredEnv } from './utils';
+import { ChartValues, ExactNamespace, requireEnv } from 'cn-pulumi-common';
 
 export function installCNSVHelmChartByNamespaceName(
   ns: pulumi.Output<string> | string,
@@ -12,11 +11,11 @@ export function installCNSVHelmChartByNamespaceName(
   version = '',
   dependsOn: pulumi.Resource[] = []
 ): k8s.helm.v3.Release {
-  const repo_root = requiredEnv('REPO_ROOT', 'root directory of the repo');
-  const username = local ? '' : requiredEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
+  const repo_root = requireEnv('REPO_ROOT', 'root directory of the repo');
+  const username = local ? '' : requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
   const password = local
     ? ''
-    : requiredEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
+    : requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
   return new k8s.helm.v3.Release(
     name,
     {

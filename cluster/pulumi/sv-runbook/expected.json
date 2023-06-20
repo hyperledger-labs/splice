@@ -51,6 +51,72 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ui-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "iwZgud30aDMMUYpZc5caSnjNATWwITzp",
+          "url": "https://canton-network-sv-test.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ui-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "8S8o4U6OYWWuw5vPCIpFQGzzWM2IpHkx",
+          "url": "https://canton-network-sv-test.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-sv",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "l9MS11POtbvPaVvgzns3Tdj9IDnosLwl",
+          "url": "https://canton-network-sv-test.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-sv/",
       "compat": "true",
       "name": "cluster-ingress-sv",
@@ -97,29 +163,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "aXdaZ3VkMzBhRE1NVVlwWmM1Y2FTbmpOQVRXd0lUenA=",
-          "url": "aHR0cHM6Ly9jYW50b24tbmV0d29yay1zdi10ZXN0LnVzLmF1dGgwLmNvbQ=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-directory-ui-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-directory-ui-auth",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "ledger-api-user": "ZHVtbXlAY2xpZW50cw=="
         }
       },
@@ -154,29 +197,6 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-key",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "OFM4bzRVNk9ZV1d1dzV2UENJcEZRR3p6V00ySXBIa3g=",
-          "url": "aHR0cHM6Ly9jYW50b24tbmV0d29yay1zdi10ZXN0LnVzLmF1dGgwLmNvbQ=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-sv-ui-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-ui-auth",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -243,29 +263,6 @@
       "type": "Opaque"
     },
     "name": "cn-app-svc-ledger-api-auth",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "client-id": "bDlNUzExUE90YnZQYVZ2Z3puczNUZGo5SURub3NMd2w=",
-          "url": "aHR0cHM6Ly9jYW50b24tbmV0d29yay1zdi10ZXN0LnVzLmF1dGgwLmNvbQ=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-wallet-ui-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-wallet-ui-auth",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

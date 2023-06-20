@@ -1,16 +1,10 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as fs from 'fs';
 import * as _ from 'lodash';
+import { ExactNamespace, loadYamlFromFile } from 'cn-pulumi-common';
 
 import { installCNSVHelmChart } from './helm';
-import {
-  CLUSTER_BASENAME,
-  ExactNamespace,
-  loadYamlFromFile,
-  REPO_ROOT,
-  SV_NAME,
-  TARGET_CLUSTER,
-} from './utils';
+import { CLUSTER_BASENAME, REPO_ROOT, SV_NAME, TARGET_CLUSTER } from './utils';
 
 const cometBftValues = loadYamlFromFile(
   `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,

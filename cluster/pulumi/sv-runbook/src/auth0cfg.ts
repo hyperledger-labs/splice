@@ -8,6 +8,7 @@ export const auth0Cfg: Auth0Config = {
     validator: 'uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr',
   },
 
+  // For the SV runbook, we use dedicated auth0 applications for each UI app, so we don't use the namespaceToUiCliendId mapping
   namespaceToUiClientId: {},
 
   fixedTokenCacheName: 'auth0-fixed-token-cache-sv-test',

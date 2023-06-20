@@ -207,16 +207,22 @@ export class Auth0Fetch implements Auth0Client {
   }
 }
 
-function lookupClientSecrets(
-  allSecrets: Auth0SecretMap,
-  clientIdMap: ClientIdMap,
-  clientName: string
-): Auth0ClientSecret {
+export function requireAuth0ClientId(clientIdMap: ClientIdMap, clientName: string): string {
   const appClientId = clientIdMap[clientName];
 
   if (!appClientId) {
     throw new Error(`Unknown Auth0 client ID for client: ${clientName}`);
   }
+
+  return appClientId;
+}
+
+function lookupClientSecrets(
+  allSecrets: Auth0SecretMap,
+  clientIdMap: ClientIdMap,
+  clientName: string
+): Auth0ClientSecret {
+  const appClientId = requireAuth0ClientId(clientIdMap, clientName);
 
   const clientSecret = allSecrets.get(appClientId);
 
@@ -283,26 +289,29 @@ export async function installAuth0Secret(
   );
 }
 
-function auth0UISecret(
-  allSecrets: Auth0SecretMap,
-  clientName: string,
-  namespaceName: string,
-  cfg: Auth0Config
-) {
-  const clientSecrets = lookupClientSecrets(allSecrets, cfg.namespaceToUiClientId, namespaceName);
-
-  return {
-    url: `https://${cfg.auth0Domain}`,
-    'client-id': clientSecrets.client_id,
-  };
-}
-
 export async function installAuth0UISecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
 ): Promise<k8s.core.v1.Secret> {
+  const clientSecrets = lookupClientSecrets(
+    await auth0Client.getSecrets(),
+    auth0Client.getCfg().namespaceToUiClientId,
+    xns.logicalName
+  );
+  const clientId = clientSecrets.client_id;
+
+  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, clientId);
+}
+
+export function installAuth0UiSecretWithClientId(
+  auth0Client: Auth0Client,
+  xns: ExactNamespace,
+  secretNameApp: string,
+  clientName: string,
+  clientId: string
+): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(
     'auth0-ui-secret-' + xns.logicalName + '-' + clientName,
     {
@@ -310,12 +319,10 @@ export async function installAuth0UISecret(
         name: 'cn-app-' + secretNameApp + '-ui-auth',
         namespace: xns.ns.metadata.name,
       },
-      stringData: auth0UISecret(
-        await auth0Client.getSecrets(),
-        clientName,
-        xns.logicalName,
-        auth0Client.getCfg()
-      ),
+      stringData: {
+        url: `https://${auth0Client.getCfg().auth0Domain}`,
+        'client-id': clientId,
+      },
     },
     {
       dependsOn: xns.ns,

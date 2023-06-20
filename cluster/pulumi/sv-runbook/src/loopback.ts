@@ -1,20 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
+import { ExactNamespace, ingressPort } from 'cn-pulumi-common';
 
 import { installCNSVHelmChart } from './helm';
-import { ExactNamespace } from './utils';
-
-// TODO(#4584): stop copying code around.
-function ingressPort(
-  name: string,
-  port: number
-): { name: string; port: number; targetPort: number; protocol: string } {
-  return {
-    name: name,
-    port: port,
-    targetPort: port,
-    protocol: 'TCP',
-  };
-}
 
 export function installLoopback(
   namespace: ExactNamespace,

@@ -1,11 +1,15 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0Client, installAuth0Secret } from 'cn-pulumi-common';
+import {
+  Auth0Client,
+  Auth0Config,
+  ExactNamespace,
+  installAuth0Secret,
+  installAuth0UiSecretWithClientId,
+  requireAuth0ClientId,
+  requireEnv,
+} from 'cn-pulumi-common';
 
-import { ExactNamespace, requiredEnv } from './utils';
-
-const sv1Auth0ClientId = 'bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn';
-const validatorAuth0ClientId = 'uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr';
 const walletUIClientId = 'l9MS11POtbvPaVvgzns3Tdj9IDnosLwl';
 const svUIClientId = '8S8o4U6OYWWuw5vPCIpFQGzzWM2IpHkx';
 const directoryClientId = 'iwZgud30aDMMUYpZc5caSnjNATWwITzp';
@@ -34,39 +38,21 @@ function participantSecret(
   );
 }
 
-// TODO(#4584): use the version from common-pulumi
 function uiSecret(
+  auth0Client: Auth0Client,
   ns: ExactNamespace,
   appName: string,
-  clientId: string,
-  auth0_domain: string
+  clientId: string
 ): k8s.core.v1.Secret {
-  const secretName = 'cn-app-' + appName + '-auth';
-  return new k8s.core.v1.Secret(
-    secretName,
-    {
-      metadata: {
-        name: secretName,
-        namespace: ns.logicalName,
-      },
-      type: 'Opaque',
-      data: {
-        url: btoa('https://' + auth0_domain),
-        'client-id': btoa(clientId),
-      },
-    },
-    {
-      dependsOn: [ns.ns],
-    }
-  );
+  return installAuth0UiSecretWithClientId(auth0Client, ns, appName, appName, clientId);
 }
 
 const k8sProvider = new k8s.Provider('k8s', { enableServerSideApply: true });
 
 export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
   const artifactory = 'digitalasset-canton-network-docker.jfrog.io';
-  const username = requiredEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
-  const password = requiredEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
+  const username = requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
+  const password = requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
   const secret = new k8s.core.v1.Secret(ns + '-docker-reg-cred', {
     metadata: {
       name: 'docker-reg-cred',
@@ -110,12 +96,22 @@ export function imagePullSecret(ns: ExactNamespace): pulumi.Resource[] {
   return imagePullSecretByNamespaceName(ns.logicalName);
 }
 
-export function sv1UserParticipantSecret(ns: ExactNamespace): k8s.core.v1.Secret {
-  return participantSecret(ns, 'sv1', sv1Auth0ClientId);
+export function sv1UserParticipantSecret(
+  ns: ExactNamespace,
+  auth0Cfg: Auth0Config
+): k8s.core.v1.Secret {
+  return participantSecret(ns, 'sv1', requireAuth0ClientId(auth0Cfg.appToClientId, 'sv'));
 }
 
-export function sv1UserValidatorParticipantSecret(ns: ExactNamespace): k8s.core.v1.Secret {
-  return participantSecret(ns, 'sv1-validator', validatorAuth0ClientId);
+export function sv1UserValidatorParticipantSecret(
+  ns: ExactNamespace,
+  auth0Cfg: Auth0Config
+): k8s.core.v1.Secret {
+  return participantSecret(
+    ns,
+    'sv1-validator',
+    requireAuth0ClientId(auth0Cfg.appToClientId, 'validator')
+  );
 }
 
 type AppAndUiSecrets = {
@@ -129,15 +125,15 @@ export async function createSvValidatorSecrets(
 ): Promise<AppAndUiSecrets> {
   return {
     appSecret: await installAuth0Secret(auth0Client, ns, 'validator', 'validator'),
-    uiSecret: uiSecret(ns, 'wallet-ui', walletUIClientId, auth0Client.getCfg().auth0Domain),
+    uiSecret: uiSecret(auth0Client, ns, 'wallet', walletUIClientId),
   };
 }
 
 export function createSvDirectoryUiSecrets(
   ns: ExactNamespace,
-  auth0Domain: string
+  auth0Client: Auth0Client
 ): k8s.core.v1.Secret {
-  return uiSecret(ns, 'directory-ui', directoryClientId, auth0Domain);
+  return uiSecret(auth0Client, ns, 'directory', directoryClientId);
 }
 
 export async function createSvAppSecrets(
@@ -146,7 +142,7 @@ export async function createSvAppSecrets(
 ): Promise<AppAndUiSecrets> {
   return {
     appSecret: await installAuth0Secret(auth0Client, ns, 'sv', 'sv'),
-    uiSecret: uiSecret(ns, 'sv-ui', svUIClientId, auth0Client.getCfg().auth0Domain),
+    uiSecret: uiSecret(auth0Client, ns, 'sv', svUIClientId),
   };
 }
 

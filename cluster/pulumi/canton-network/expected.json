@@ -721,6 +721,7 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {},
         "name": "docs"
       }
     },
@@ -3529,6 +3530,7 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {},
         "name": "splitwell"
       }
     },
@@ -3618,6 +3620,7 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {},
         "name": "sv-1"
       }
     },
@@ -3707,6 +3710,7 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {},
         "name": "sv-2"
       }
     },
@@ -3796,6 +3800,7 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {},
         "name": "sv-3"
       }
     },
@@ -3885,6 +3890,7 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {},
         "name": "sv-4"
       }
     },
@@ -3974,6 +3980,7 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
+        "labels": {},
         "name": "validator1"
       }
     },

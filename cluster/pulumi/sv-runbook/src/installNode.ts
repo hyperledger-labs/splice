@@ -1,5 +1,12 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0Client, ChartValues, fixedTokens, infraStack } from 'cn-pulumi-common';
+import {
+  Auth0Client,
+  ChartValues,
+  exactNamespace,
+  fixedTokens,
+  infraStack,
+  loadYamlFromFile,
+} from 'cn-pulumi-common';
 
 import { auth0Cfg } from './auth0cfg';
 import { installCometBftNode } from './cometbft';
@@ -18,14 +25,7 @@ import {
   svKeySecret,
   svcUserParticipantSecret,
 } from './secrets';
-import {
-  exactNamespace,
-  loadYamlFromFile,
-  CLUSTER_BASENAME,
-  TARGET_CLUSTER,
-  REPO_ROOT,
-  SV_NAME,
-} from './utils';
+import { CLUSTER_BASENAME, TARGET_CLUSTER, REPO_ROOT, SV_NAME } from './utils';
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const version = process.env.CHARTS_VERSION;
@@ -81,8 +81,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     svImagePullDeps.concat([
       postgres,
       loopback,
-      sv1UserParticipantSecret(svNamespace),
-      sv1UserValidatorParticipantSecret(svNamespace),
+      sv1UserParticipantSecret(svNamespace, auth0Cfg),
+      sv1UserValidatorParticipantSecret(svNamespace, auth0Cfg),
       scanUserParticipantSecret(svNamespace),
       directoryUserParticipantSecret(svNamespace),
       svcUserParticipantSecret(svNamespace),
@@ -147,7 +147,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   };
 
   const svValidatorSecrets = await createSvValidatorSecrets(svNamespace, auth0Client);
-  const svDirectoryUiSecrets = createSvDirectoryUiSecrets(svNamespace, auth0Cfg.auth0Domain);
+  const svDirectoryUiSecrets = createSvDirectoryUiSecrets(svNamespace, auth0Client);
 
   const validator = installCNSVHelmChart(
     svNamespace,

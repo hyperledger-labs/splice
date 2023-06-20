@@ -32,12 +32,16 @@ export interface ExactNamespace {
   logicalName: string;
 }
 
-export function exactNamespace(name: string): ExactNamespace {
+export function exactNamespace(
+  name: string,
+  labels: { [key: string]: string } = {}
+): ExactNamespace {
   // Namespace with a fully specified name, exactly as it will
   // appear within Kubernetes. (No Pulumi suffix.)
   const ns = new k8s.core.v1.Namespace(name, {
     metadata: {
       name,
+      labels: labels,
     },
   });
 
@@ -50,9 +54,16 @@ export function exactNamespace(name: string): ExactNamespace {
 // world. To avoid fully declaring these external data types, these are
 // modeled as 'any', with the any warning disabled.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function loadYamlFromFile(path: PathLike): any {
-  return load(fs.readFileSync(path, 'utf-8'));
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export function loadYamlFromFile(
+  path: PathLike,
+  replaceStrings: { [template: string]: string } = {}
+): any {
+  let yamlStr = fs.readFileSync(path, 'utf-8');
+  for (const t in replaceStrings) {
+    yamlStr = yamlStr.replaceAll(t, replaceStrings[t]);
+  }
+  return load(yamlStr) as ChartValues;
 }
 
 function stripJsonComments(rawText: string): string {
@@ -62,7 +73,7 @@ function stripJsonComments(rawText: string): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function loadJsonFromFile(path: PathLike): any {
+export function loadJsonFromFile(path: PathLike): any {
   try {
     const content = stripJsonComments(fs.readFileSync(path, 'utf8'));
 
@@ -164,11 +175,13 @@ export type ChartValues = { [key: string]: any };
 
 /// Environment variables
 
-export function requireEnv(name: string): string {
+export function requireEnv(name: string, msg = ''): string {
   const value = process.env[name];
 
   if (!value) {
-    console.error(`Environment variable ${name} is undefined.`);
+    console.error(
+      `Environment variable ${name} is undefined.` + msg != '' ? `(should define: ${msg})` : ''
+    );
     process.exit(1);
   } else {
     return value;
