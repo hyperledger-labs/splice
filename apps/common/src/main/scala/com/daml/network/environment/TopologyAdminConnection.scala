@@ -309,8 +309,6 @@ class TopologyAdminConnection(
         ).map(_ => ())
       },
       logger,
-      // TODO(#5628) consider removing this
-      Seq(Status.Code.INTERNAL),
     )
 
   def proposeInitialPartyToParticipant(
