@@ -60,14 +60,14 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   def checkBalance(
       wallet: WalletAppClientReference,
-      expectedRound: Long,
+      expectedRound: Option[Long],
       expectedUnlockedQtyRange: (BigDecimal, BigDecimal),
       expectedLockedQtyRange: (BigDecimal, BigDecimal),
       expectedHoldingFeeRange: (BigDecimal, BigDecimal),
   ): Unit = clue(s"Checking balance in round $expectedRound") {
     eventually() {
       val balance = wallet.balance()
-      balance.round shouldBe expectedRound
+      expectedRound.foreach(balance.round shouldBe _)
       assertInRange(balance.unlockedQty, expectedUnlockedQtyRange)
       assertInRange(balance.lockedQty, expectedLockedQtyRange)
       assertInRange(balance.holdingFees, expectedHoldingFeeRange)

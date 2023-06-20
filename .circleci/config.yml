@@ -16,7 +16,7 @@ parameters:
   # old files don’t pollute your build.
   cache-version:
     type: string
-    default: "16"
+    default: "17"
   run-job:
     type: enum
     enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
@@ -1662,7 +1662,7 @@ workflows:
         test_names_file: "test-full-class-names.log"
         start_canton_options: "-d -p external -w -f"
         resource_class: "2xlarge"
-        parallelism: 8
+        parallelism: 10
     - scala_test:
         <<: *notify-fail
         context:

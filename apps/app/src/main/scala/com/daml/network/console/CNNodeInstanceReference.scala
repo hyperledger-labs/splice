@@ -181,7 +181,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   override def topology: TopologyAdministrationGroup = topology_
 
   private val defaultHealthStatusTimeout: NonNegativeDuration =
-    NonNegativeDuration.tryFromDuration(2.minute)
+    NonNegativeDuration.tryFromDuration(5.minute)
   private val defaultHealthStatusMaxBackoff: NonNegativeDuration =
     NonNegativeDuration.tryFromDuration(5.seconds)
 

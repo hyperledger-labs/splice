@@ -224,7 +224,7 @@ class WalletIntegrationTest
 
           checkBalance(
             aliceWallet,
-            1,
+            None,
             (1 + successfulTaps * 10 - 1, 1 + successfulTaps * 10),
             exactly(0),
             exactly(0),

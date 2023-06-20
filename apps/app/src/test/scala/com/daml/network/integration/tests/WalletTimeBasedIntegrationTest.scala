@@ -133,7 +133,7 @@ class WalletTimeBasedIntegrationTest
           val expectedUnlockedCoins = startingBalance.unlockedQty - lockedQty
           checkBalance(
             aliceWallet,
-            startingBalance.round + 1,
+            Some(startingBalance.round + 1),
             (expectedUnlockedCoins - 1, expectedUnlockedCoins),
             (lockedQty - 1, lockedQty),
             (0, 1),
@@ -441,7 +441,7 @@ class WalletTimeBasedIntegrationTest
             .listAppRewardCoupons() should be(empty)
           checkBalance(
             aliceValidatorWallet,
-            balanceBefore.round + 2,
+            Some(balanceBefore.round + 2),
             (balanceBefore.unlockedQty + 2.5, balanceBefore.unlockedQty + 3.0),
             (balanceBefore.lockedQty, balanceBefore.lockedQty),
             (0, 1),
@@ -490,7 +490,7 @@ class WalletTimeBasedIntegrationTest
             aliceValidatorWallet.listValidatorRewardCoupons() should be(empty)
             checkBalance(
               aliceValidatorWallet,
-              aliceValidatorStartBalance.round + 4,
+              Some(aliceValidatorStartBalance.round + 4),
               (
                 aliceValidatorStartBalance.unlockedQty,
                 aliceValidatorStartBalance.unlockedQty + 5.0,
@@ -500,7 +500,7 @@ class WalletTimeBasedIntegrationTest
             )
             checkBalance(
               splitwellProviderWallet,
-              providerStartBalance.round + 4,
+              Some(providerStartBalance.round + 4),
               (
                 providerStartBalance.unlockedQty + expectedAppRewardsRange._1,
                 providerStartBalance.unlockedQty + expectedAppRewardsRange._2,

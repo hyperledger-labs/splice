@@ -299,7 +299,7 @@ class RetryProvider(
     RetryConfig(
       // TODO(#5855) Reset this back to 35 once
       // we got rid of locking.
-      maxRetries = 50,
+      maxRetries = 100,
       initialDelay = 200.millis,
       maxDelay = 5.seconds,
       resetRetriesAfter = None,
@@ -315,7 +315,7 @@ class RetryProvider(
 
   private val retryForClientCallsConfig =
     RetryConfig(
-      maxRetries = 10,
+      maxRetries = 12,
       initialDelay = 100.millis,
       maxDelay = 1.seconds,
       resetRetriesAfter = None,

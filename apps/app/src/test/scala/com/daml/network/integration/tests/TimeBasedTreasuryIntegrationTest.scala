@@ -74,7 +74,7 @@ class TimeBasedTreasuryIntegrationTest
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
       aliceWallet.tap(110)
 
-      checkBalance(aliceWallet, 1, exactly(110), exactly(0), exactly(0))
+      checkBalance(aliceWallet, Some(1), exactly(110), exactly(0), exactly(0))
       // leads to archival of open round 0
       advanceRoundsByOneTick
 
@@ -89,7 +89,7 @@ class TimeBasedTreasuryIntegrationTest
       )
       checkBalance(
         aliceWallet,
-        2,
+        Some(2),
         (99, 100),
         exactly(10),
         // due to merge in this round, no holding fees.
@@ -101,7 +101,7 @@ class TimeBasedTreasuryIntegrationTest
 
       checkBalance(
         aliceWallet,
-        3,
+        Some(3),
         (99, 100),
         (9, 10),
         exactly(CNNodeUtil.defaultHoldingFee.rate),

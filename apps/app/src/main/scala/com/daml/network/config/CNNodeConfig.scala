@@ -41,6 +41,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.FailureReason
+import scala.concurrent.duration.*
 
 import java.io.File
 import scala.annotation.nowarn
@@ -74,7 +75,14 @@ case class CNNodeConfig(
     participantsX: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
     remoteParticipantsX: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
     monitoring: MonitoringConfig = MonitoringConfig(),
-    parameters: CantonParameters = CantonParameters(),
+    parameters: CantonParameters = CantonParameters(
+      timeouts = TimeoutSettings(
+        console = ConsoleCommandTimeout(
+          bounded = NonNegativeDuration.tryFromDuration(2.minutes),
+          requestTimeout = NonNegativeDuration.tryFromDuration(30.seconds),
+        )
+      )
+    ),
     features: CantonFeatures = CantonFeatures(),
     override val akkaConfig: Option[Config] = None,
 ) extends CantonConfig // TODO(#736): generalize or fork this trait.

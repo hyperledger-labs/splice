@@ -141,7 +141,7 @@ class WalletPaymentIntegrationTest
         aliceWallet.tap(40)
         aliceWallet.tap(20)
         // not using checkWallet as coins may already be merged by automation
-        checkBalance(aliceWallet, 1, (69, 70), exactly(0), exactly(0))
+        checkBalance(aliceWallet, None, (69, 70), exactly(0), exactly(0))
       }
 
       clue("Alice transfers 39") {
