@@ -54,6 +54,6 @@ Attempted to read Testcontainers configuration file at file:
 Invalid Status code=405 text=Method Not Allowed","logger_name":"o.o.s.remote.http.WebSocket"
 
 # TODO(#5946): remove once the decoder in CometBftHttpClient is smarter
-Failed to call CometBFT.*tx already exists in cache
+"stack_trace":"io.grpc.StatusRuntimeException: ABORTED: .*"tx already exists in cache.*
 
 # Make sure to have a trailing newline

@@ -191,7 +191,7 @@ object CometBftHttpRpcClient {
   private val AbciQueryMethod = "abci_query"
 
   // Ideally error should be a `String`, as defined by the API spec, but it seems that it's not really enforced and sometimes it's an object
-  private[cometbft] case class CometBftErrorResponse(error: Json, id: Int)
+  private[cometbft] case class CometBftErrorResponse(error: Json)
 
   private[cometbft] object CometBftErrorResponse {
     implicit val errorDecoder: Decoder[CometBftErrorResponse] =

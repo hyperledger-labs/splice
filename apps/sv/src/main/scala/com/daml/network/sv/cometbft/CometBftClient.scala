@@ -89,7 +89,7 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
 
   private def cometBftErrorToGrpcStatus(error: CometBftHttpRpcClient.CometBftError) = {
     error match {
-      case CometBftHttpError(_, CometBftErrorResponse(error, _))
+      case CometBftHttpError(_, CometBftErrorResponse(error))
           if error.noSpaces.contains("tx already exists in cache") =>
         Status.ABORTED.withDescription(error.noSpaces)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code > 500 =>

@@ -509,6 +509,7 @@ object RetryProvider {
               s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription error, $fatalBehavior:",
               s"category=$errorCategory",
               s"statusCode=$statusCode",
+              s"description=$description",
             )
               .appendedAll(errorDetails.map(_.toString))
               .mkString("\n"),
