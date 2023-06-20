@@ -54,16 +54,10 @@ class JoiningNodeInitializer(
     tracer: Tracer,
 ) extends NamedLogging {
 
-  def withSvLock[A, B](f: ((() => Future[A]) => Future[A]) => Future[B]) =
-    joiningConfig match {
-      // This isn't right but we can't do anything if we don't have the SV
-      // config. We may want to make at least that part of the onboarding
-      // config mandatory again. For now we rely on the fact that our helm charts
-      // and tests don't use this.
-      case None => f(g => g())
-      case Some(conf) =>
-        withSvConnection(conf.svClient.adminApi)(svConnection => f(svConnection.withGlobalLock(_)))
-    }
+  def withGlobalLock[A, B](f: ((() => Future[A]) => Future[A]) => Future[B]) =
+    withSvConnection(config.foundingSvClient.adminApi)(svConnection =>
+      f(svConnection.withGlobalLock(_))
+    )
 
   def joinCollectiveAndOnboardNodes(): Future[
     (
@@ -97,7 +91,7 @@ class JoiningNodeInitializer(
           logger,
         )
       }
-      svParty <- withSvLock[PartyId, PartyId](lock =>
+      svParty <- withGlobalLock[PartyId, PartyId](lock =>
         lock(() =>
           for {
             _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)

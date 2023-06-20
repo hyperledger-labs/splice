@@ -103,6 +103,8 @@ spec:
             - name: CN_APP_SV_COMETBFT_CONNECTION_URI
               value: {{ (.Values.cometBFT).connectionUri }}
             {{- end }}
+            - name: ADDITIONAL_CONFIG_FOUNDING_SV
+              value: canton.sv-apps.sv.founding-sv-client.admin-api.url = "{{ .Values.foundingSvApiUrl }}"
           ports:
             - name: sv-api
               containerPort: 5014

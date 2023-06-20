@@ -18,26 +18,27 @@ class SvOnboardingConfigIntegrationTest extends CNNodeIntegrationTest with SvTes
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .fromResources(
-        Seq("simple-topology.conf", "include/svs/sv1-onboarded.conf"),
+        Seq("simple-topology.conf", "include/svs/sv2-onboarded.conf"),
         this.getClass.getSimpleName,
       )
       .withAllocatedUsers()
       .withManualStart
 
   "start previously onboarded participant without onboarding config" in { implicit env =>
-    val svcInfoFromSv1 = clue("Start sv1 and get SvcInfo") {
-      startAllSync(sv1Scan, sv1Validator, sv1)
-      val svcInfo = sv1.getSvcInfo()
-      sv1.stop()
-      svcInfo
+    val svcInfoFromSv2 = clue("Start sv1, sv2 and get SvcInfo from sv2") {
+      startAllSync(sv1Scan, sv1Validator, sv1, sv2Validator, sv2)
+      sv2.getSvcInfo()
+    }
+    clue("stop sv2") {
+      sv2.stop()
     }
     clue(
-      "start an sv1 clone without the onboarding config and verify that it sees the same SvcInfo"
+      "start an sv2 clone without the onboarding config and verify that it sees the same SvcInfo"
     ) {
-      sv1Onboarded.start()
-      sv1Onboarded.waitForInitialization()
-      val svcInfoFromSv1Onboarded = sv1Onboarded.getSvcInfo()
-      svcInfoFromSv1Onboarded shouldBe svcInfoFromSv1
+      sv2Onboarded.start()
+      sv2Onboarded.waitForInitialization()
+      val svcInfoFromSv2Onboarded = sv2Onboarded.getSvcInfo()
+      svcInfoFromSv2Onboarded shouldBe svcInfoFromSv2
     }
   }
 }

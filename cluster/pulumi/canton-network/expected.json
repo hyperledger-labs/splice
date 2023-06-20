@@ -1185,6 +1185,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
@@ -1628,6 +1629,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingName": "Canton-Foundation-1",
@@ -1709,6 +1711,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
@@ -2072,6 +2075,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
@@ -2156,6 +2160,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
@@ -2444,6 +2449,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
@@ -2528,6 +2534,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
@@ -2816,6 +2823,7 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
@@ -2900,6 +2908,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
@@ -3154,6 +3163,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
+        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",

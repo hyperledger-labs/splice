@@ -5,3 +5,5 @@
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 {{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
+
+{{ $_ := required ".Values.foundingSvApiUrl is required." .Values.foundingSvApiUrl }}

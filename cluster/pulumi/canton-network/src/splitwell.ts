@@ -89,6 +89,7 @@ export async function installSplitwell(
         '  dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]',
         '}',
       ].join('\n'),
+      foundingSvApiUrl: 'http://sv-app.sv-1:5014',
     },
     dependsOn
   );

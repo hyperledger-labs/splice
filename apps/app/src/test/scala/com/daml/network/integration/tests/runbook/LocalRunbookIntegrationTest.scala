@@ -145,6 +145,7 @@ class LocalRunbookIntegrationTest
         (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(4000)(conf),
         (_, conf) => expectValidatorOnboarding(conf, "validatorsecret"),
         (_, conf) => localValidatorSvSponsorUrl(conf),
+        (_, conf) => localValidatorFoundingSvUrl(conf),
       )
       .withThisSetup(env => {
         setupAndStartCanton()
@@ -188,6 +189,12 @@ class LocalRunbookIntegrationTest
         .modify(onboarding =>
           onboarding.map(_.focus(_.svClient.adminApi.url).replace("http://localhost:5014"))
         )
+    )(conf)
+  }
+
+  private def localValidatorFoundingSvUrl(conf: CNNodeConfig): CNNodeConfig = {
+    CNNodeConfigTransforms.updateAllValidatorConfigs_(vc =>
+      vc.focus(_.foundingSvClient.adminApi.url).replace("http://localhost:5014")
     )(conf)
   }
 }

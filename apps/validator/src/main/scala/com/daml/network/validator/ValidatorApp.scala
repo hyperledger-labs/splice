@@ -85,17 +85,9 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  def withSvLock[A, B](f: ((() => Future[A]) => Future[A]) => Future[B]) =
-    config.onboarding match {
-      // We can't do locking if the onboarding config doesn't
-      // provide the SV connection. For now, we rely on the fact
-      // that our runbooks and tests don't make use of it.
-      // We may want to make at least this part of the onboarding config
-      // mandatory.
-      case None => f(g => g())
-      case Some(conf) =>
-        withSvConnection(conf.svClient.adminApi)(svConnection => f(svConnection.withGlobalLock(_)))
-    }
+  def withGlobalLock[A, B](f: ((() => Future[A]) => Future[A]) => Future[B]) = withSvConnection(
+    config.foundingSvClient.adminApi
+  )(svConnection => f(svConnection.withGlobalLock(_)))
 
   // Note that for the validator of an SV app, the user will be created by the SV app with a
   // primary party set to the SV app already so this is a noop.
@@ -105,7 +97,7 @@ class ValidatorApp(
       // TODO(#5803) Consider removing this once Canton stops falling apart.
       // Wait for the sponsoring SV which also ensures the domain is initialized.
       _ <- config.onboarding.traverse_(waitUntilSponsorIsActive(_))
-      _ <- withSvLock[Unit, Unit](lock =>
+      _ <- withGlobalLock[Unit, Unit](lock =>
         lock(() =>
           for {
             _ <- ensureGlobalDomainRegistered()
@@ -138,7 +130,7 @@ class ValidatorApp(
       lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
     }).filter(_ => config.enableCoinRulesUpgrade)
     for {
-      _ <- withSvLock[Unit, Unit](connection.uploadDarFiles(darFiles, _))
+      _ <- withGlobalLock[Unit, Unit](connection.uploadDarFiles(darFiles, _))
     } yield {
       logger.info(
         s"Finished wallet setup"
@@ -156,7 +148,7 @@ class ValidatorApp(
     logger.info(s"Attempting to setup app $name...")
     for {
       _ <- instance.dars.traverse_(dar => storeWithIngestion.connection.uploadDarFile(dar))
-      party <- withSvLock[PartyId, PartyId](lock =>
+      party <- withGlobalLock[PartyId, PartyId](lock =>
         lock(() =>
           for {
             party <- storeWithIngestion.connection.getOrAllocateParty(
@@ -341,7 +333,7 @@ class ValidatorApp(
           domainId,
         )
       })
-      _ <- withSvLock[PartyId, PartyId](
+      _ <- withGlobalLock[PartyId, PartyId](
         ValidatorUtil.onboard(
           endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
           knownParty = Some(validatorParty),
@@ -359,7 +351,7 @@ class ValidatorApp(
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
-      handler <- withSvLock[PartyId, HttpValidatorHandler](lock =>
+      handler <- withGlobalLock[PartyId, HttpValidatorHandler](lock =>
         Future.successful(
           new HttpValidatorHandler(
             automation,
@@ -372,7 +364,7 @@ class ValidatorApp(
         )
       )
 
-      adminHandler <- withSvLock[PartyId, HttpValidatorAdminHandler](lock =>
+      adminHandler <- withGlobalLock[PartyId, HttpValidatorAdminHandler](lock =>
         Future.successful(
           new HttpValidatorAdminHandler(
             automation,

@@ -96,6 +96,8 @@ case class SvAppBackendConfig(
     enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,
     xNodes: SvXNodesConfig,
+    // TODO(#5855) so we can lock; remove this again
+    foundingSvClient: SvAppClientConfig,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

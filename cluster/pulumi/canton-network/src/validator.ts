@@ -67,6 +67,7 @@ export async function installValidator(
       ],
       globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
       validatorWalletUser,
+      foundingSvApiUrl: 'http://sv-app.sv-1:5014',
     },
     dependsOn
   );

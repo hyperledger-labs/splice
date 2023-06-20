@@ -119,6 +119,7 @@ export async function installSvNode(
       connectionUri: `http://cometbft-${nodename}-cometbft-rpc:26657`,
     },
     globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
+    foundingSvApiUrl: 'http://sv-app.sv-1:5014',
   } as ChartValues;
 
   if (onboarding.type == 'join-with-key') {
@@ -144,6 +145,7 @@ export async function installSvNode(
       appDars: [],
       validatorWalletUser,
       globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
+      foundingSvApiUrl: 'http://sv-app.sv-1:5014',
     },
     [svApp]
   );

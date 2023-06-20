@@ -12,3 +12,5 @@
 {{- end }}
 
 {{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
+
+{{ $_ := required ".Values.foundingSvApiUrl is required." .Values.foundingSvApiUrl }}
