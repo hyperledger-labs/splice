@@ -32,7 +32,7 @@
             </matcher>
             <matcher>
               <Name>requestlogger_message</Name>
-              <regex>(UpdateService/GetLedgerEnd|TransactionService/GetLedgerEnd|StateService/GetConnectedDomains)</regex>
+              <regex>StateService/(GetLedgerEnd|GetConnectedDomains)</regex>
             </matcher>
             <expression>
                 level &lt;= INFO &amp;&amp;
@@ -129,7 +129,7 @@
                     </matcher>
                     <matcher>
                       <Name>requestlogger_message</Name>
-                      <regex>(StateService/GetLedgerEnd|TransactionService/GetLedgerEnd|StateService/GetConnectedDomains)</regex>
+                      <regex>StateService/(GetLedgerEnd|GetConnectedDomains)</regex>
                     </matcher>
                     <expression>
                         level &lt;= INFO &amp;&amp;
