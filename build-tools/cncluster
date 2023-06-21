@@ -865,7 +865,7 @@ function subcmd_pulumi() {
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
 
-    _pulumi --logflow --logtostderr -v=9 --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+    _pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
             "$pulumi_cmd" "$@"
 }
