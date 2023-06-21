@@ -15,7 +15,7 @@ Release Notes
    * The container for scan now accepts the address to the participant through the ``CN_APP_SCAN_PARTICIPANT_ADDRESS``
      environment variable matching the SV app and the validator app. The helm charts set the right default so
      if you are using them, there is no need to configure anything.
-   * The `audience` which defines the intended consumer of the token is now configurable in Participant, Validator app and SV app.
+   * The `audience` which defines the intended consumer of the token is now configurable in Participant, Validator app, Validator web UI, SV app, SV web UI and Directory web UI.
 * Validator apps and SV apps now configure the address of the founding SV app to allow for synchronization across nodes until all aspects of the BFT domain are robust under concurrent operations.
 
 * Bugfixes

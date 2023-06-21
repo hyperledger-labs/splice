@@ -166,6 +166,17 @@ DIRECTORY_UI_CLIENT_ID  The client id of the Auth0 app for the directory UI.
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
 
+(Optional) By default, all audience values are configured to be ``https://canton.network.global``.
+If you want to configure audience of your choice, your may do so for three APIs: the participant ledger API; the validator backend API; and the SV backend API. We will refer to these using the following configuration values:
+
+==================================== ===========================================================================
+Name                                 Value
+------------------------------------ ---------------------------------------------------------------------------
+OIDC_AUTHORITY_LEDGER_API_AUDIENCE   The audience for the participant ledger API. e.g. ``https://ledger_api.example.com``
+OIDC_AUTHORITY_VALIDATOR_AUDIENCE    The audience for the validator backend API. e.g. ``https://validator.example.com/api``
+OIDC_AUTHORITY_SV_AUDIENCE           The audience for the SV backend API. e.g. ``https://sv.example.com/api``
+==================================== ===========================================================================
+
 In case you are facing trouble with setting up your (non-Auth0) OIDC provider,
 it can be beneficial to skim the instructions in :ref:`helm-sv-auth0` as well, to check for functionality or configuration details that your OIDC provider setup might be missing.
 
@@ -184,7 +195,8 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
 2. Create an Auth0 API that controls access to the ledger API:
 
     a. Navigate to Applications > APIs and click "Create API". Set name to ``Daml Ledger API``,
-       set identifier to a audience of your choice for the ledger API. e.g. ``https://ledger_api.example.com``.
+       set identifier to ``https://canton.network.global``.
+       Alternatively, if you would like to configure your own audience, you can set the identifier here. e.g. ``https://ledger_api.example.com``.
     b. Under the Permissions tab in the new API, add a permission with scope ``daml_ledger_api``, and a description of your choice.
     c. On the Settings tab, scroll down to "Access Settings" and enable "Allow Offline Access", for automatic token refreshing.
 
@@ -225,12 +237,13 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
    - In steps c and d, use the URL for your SV's *directory* UI.
      If you're using the ingress configuration of this runbook, that would be ``https://directory.sv.svc.YOUR_CLUSTER_URL``.
 
-8. Create an Auth0 API that controls access to the CN apps backend API:
+8. (Optional) Similarly to the ledger API above, the default audience is set to ``https://canton.network.global``.
+    If you want to configure a different audience to your APIs, you can do so by creating new Auth0 APIs with an identifier set to the audience of your choice. For example,
 
     a. Navigate to Applications > APIs and click "Create API". Set name to ``SV App API``,
-       set identifier to an audience of your choice for the API e.g. ``https://sv.example.com/api``.
+       set identifier for the SV backend app API e.g. ``https://sv.example.com/api``.
     b. Create another API by setting name to ``Validator App API``,
-       set identifier to an audience of your choice for the API e.g. ``https://validator.example.com/api``.
+       set identifier for the Validator backend app e.g. ``https://validator.example.com/api``.
 
 Please refer to Auth0's `own documentation on user management <https://auth0.com/docs/manage-users>`_ for pointers on how to set up end-user accounts for the two web UI applications you created.
 Note that you will need to create at least one such user account for completing the steps in :ref:`helm-sv-install` - for being able to log in as your SV node's administrator.
@@ -239,19 +252,19 @@ It can be found in the Auth0 interface under User Management -> Users -> your us
 
 We will use the environment variables listed in the table below to refer to aspects of your Auth0 configuration:
 
-======================= ===========================================================================
-Name                    Value
------------------------ ---------------------------------------------------------------------------
-OIDC_AUTHORITY_URL      ``https://AUTH0_TENANT_NAME.us.auth0.com``
-OIDC_AUTHORITY_AUDIENCE The audience of your choice for Ledger API. e.g. ``https://ledger_api.example.com``
-VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
-VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
-SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
-SV_CLIENT_SECRET        The client secret of the Auth0 app for the SV app backend
-WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
-SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
-DIRECTORY_UI_CLIENT_ID  The client id of the Auth0 app for the directory UI.
-======================= ===========================================================================
+================================== ===========================================================================
+Name                               Value
+---------------------------------- ---------------------------------------------------------------------------
+OIDC_AUTHORITY_URL                 ``https://AUTH0_TENANT_NAME.us.auth0.com``
+OIDC_AUTHORITY_LEDGER_API_AUDIENCE The optional audience of your choice for Ledger API. e.g. ``https://ledger_api.example.com``
+VALIDATOR_CLIENT_ID                The client id of the Auth0 app for the validator app backend
+VALIDATOR_CLIENT_SECRET            The client secret of the Auth0 app for the validator app backend
+SV_CLIENT_ID                       The client id of the Auth0 app for the SV app backend
+SV_CLIENT_SECRET                   The client secret of the Auth0 app for the SV app backend
+WALLET_UI_CLIENT_ID                The client id of the Auth0 app for the wallet UI.
+SV_UI_CLIENT_ID                    The client id of the Auth0 app for the SV UI.
+DIRECTORY_UI_CLIENT_ID             The client id of the Auth0 app for the directory UI.
+================================== ===========================================================================
 
 The ``AUTH0_TENANT_NAME`` is the name of your Auth0 tenant as shown at the top left of your Auth0 project.
 You can obtain the client ID and secret of each Auth0 app from the settings pages of that app.
@@ -306,7 +319,7 @@ The SV app is configured with a secret as follows:
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
         "--from-literal=client-secret=${SV_CLIENT_SECRET}"
-        "--from-literal=audience=${OIDC_AUTHORITY_AUDIENCE}"
+        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}" # It is optional. uncomment it if you want to set audience for ledger API
 
 
 The validator app backend requires the following secret.
@@ -318,7 +331,7 @@ The validator app backend requires the following secret.
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
-        "--from-literal=audience=${OIDC_AUTHORITY_AUDIENCE}"
+        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}" # It is optional. uncomment it if you want to set audience for ledger API
 
 To setup the wallet and SV UI, create the following two secrets.
 
@@ -366,7 +379,7 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` as follows:
 
 - Replace ``TARGET_CLUSTER`` in the `globalDomain.url` entry with |cn_cluster|, per the cluster to which you are connecting.
-- If you want to configure the audience for the participant, replace ``OIDC_AUTHORITY_PARTICIPANT_TARGET_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``. Otherwise, remove `auth.targetAudience`.
+- If you want to configure the audience for the participant, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 
@@ -374,8 +387,8 @@ An SV node includes a validator app so you also need to configure
 that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
-- If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``. Otherwise, remove `auth.targetAudience`.
-- If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``. Otherwise, remove `auth.ledgerApiAudience`.
+- If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
+- If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``SV_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
@@ -396,7 +409,7 @@ idenitty.
 For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
-- If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``. Otherwise, remove `auth.audience`.
+- If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 

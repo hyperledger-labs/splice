@@ -69,16 +69,22 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-      OIDC_AUTHORITY_PARTICIPANT_TARGET_AUDIENCE:
-        auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     }
   );
+
+  const participantValuesWithSpecifiedAud: ChartValues = {
+    ...participantValues,
+    auth: {
+      ...participantValues.auth,
+      targetAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+    },
+  };
 
   const participant = installCNSVHelmChart(
     svNamespace,
     'participant',
     'cn-participant',
-    participantValues,
+    participantValuesWithSpecifiedAud,
     localCharts,
     version,
     svImagePullDeps.concat([
@@ -99,9 +105,16 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: SV_NAME,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-      OIDC_AUTHORITY_SV_AUDIENCE: auth0Cfg.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
     }
   );
+
+  const svValuesWithSpecifiedAud: ChartValues = {
+    ...svValues,
+    auth: {
+      ...svValues.auth,
+      audience: auth0Cfg.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
+    },
+  };
 
   const fixedTokensValue: ChartValues = {
     cluster: {
@@ -110,7 +123,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   };
 
   const svValuesWithFixedTokens = {
-    ...svValues,
+    ...svValuesWithSpecifiedAud,
     ...fixedTokensValue,
   };
 
@@ -120,7 +133,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     svNamespace,
     'sv-app',
     'cn-sv-node',
-    fixedTokens() ? svValuesWithFixedTokens : svValues,
+    fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
     localCharts,
     version,
     svImagePullDeps.concat([participant]).concat([svAppSecrets.appSecret, svAppSecrets.uiSecret])
@@ -142,14 +155,20 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       TARGET_CLUSTER: TARGET_CLUSTER,
       SV_WALLET_USER_ID: SV_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-      OIDC_AUTHORITY_VALIDATOR_AUDIENCE: auth0Cfg.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-      OIDC_AUTHORITY_LEDGER_API_AUDIENCE:
-        auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     }
   );
 
-  const validatorValuesWithFixedTokens = {
+  const validatorValuesWithSpecifiedAud: ChartValues = {
     ...validatorValues,
+    auth: {
+      ...validatorValues.auth,
+      audience: auth0Cfg.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      ledgerApiAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+    },
+  };
+
+  const validatorValuesWithFixedTokens = {
+    ...validatorValuesWithSpecifiedAud,
     ...fixedTokensValue,
   };
 
@@ -160,7 +179,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     svNamespace,
     'validator',
     'cn-validator',
-    fixedTokens() ? validatorValuesWithFixedTokens : validatorValues,
+    fixedTokens() ? validatorValuesWithFixedTokens : validatorValuesWithSpecifiedAud,
     localCharts,
     version,
     svImagePullDeps
