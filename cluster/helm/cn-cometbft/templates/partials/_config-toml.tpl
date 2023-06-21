@@ -247,8 +247,9 @@ unconditional_peer_ids = "{{ .Values.founder.nodeId }}"
 unconditional_peer_ids = ""
 {{- end }}
 
-# Maximum pause when redialing a persistent peer (if zero, exponential backoff is used)
-persistent_peers_max_dial_period = "0s"
+# Maximum pause when redialing a persistent peer
+# Until this value is reached exponential backoff is used.
+persistent_peers_max_dial_period = "1m"
 
 # Time to wait before flushing messages out on the connection
 flush_throttle_timeout = "100ms"
