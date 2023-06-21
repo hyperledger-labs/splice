@@ -16,8 +16,6 @@ import scala.jdk.CollectionConverters.*
 import com.daml.network.util.Codec
 import com.digitalasset.canton.topology.PartyId
 
-import java.time.Duration
-
 class ScanTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
     with WalletTestUtil
@@ -117,7 +115,12 @@ class ScanTimeBasedIntegrationTest
       aliceValidatorWallet.tap(100.0)
       bobValidatorWallet.tap(100.0)
     }
-
+    clue("No aggregate round data should be available yet")({
+      assertThrowsAndLogsCommandFailures(
+        sv1Scan.getRoundOfLatestData(),
+        _.errorMessage should include("No data has been made available yet"),
+      )
+    })
     clue("Transfer some CC, to generate reward coupons")({
       p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobUserParty, 40.0)
       p2pTransfer(bobValidator, bobWallet, aliceWallet, aliceUserParty, 100.0)
@@ -138,39 +141,34 @@ class ScanTimeBasedIntegrationTest
       p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
       p2pTransfer(bobValidator, bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
     })
-    clue("No aggregate round data should be available yet")({
-      assertThrowsAndLogsCommandFailures(
-        sv1Scan.getRoundOfLatestData(),
-        _.errorMessage should include("No data has been made available yet"),
-      )
-    })
-    actAndCheck("Advance one more tick for round 0 to close", advanceRoundsByOneTick)(
-      "Latest round with data should be updated",
-      _ => {
-        val ledgerTime = getLedgerTime.toInstant
-        advanceTime(Duration.ofMillis(1))
-        eventuallySucceeds() {
-          sv1Scan.getRoundOfLatestData() should be(
-            (0, ledgerTime)
-          )
-        }
-      },
-    )
     clue("Some more transfers collect more rewards in round 5 (issued in round 1)")({
+      advanceRoundsByOneTick
       p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
       p2pTransfer(bobValidator, bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
     })
-
+    val baseRoundWithLatestData = clue(
+      "Advance 1 more tick to make sure we capture at least one round change in the tx history"
+    ) {
+      advanceRoundsByOneTick
+      sv1Scan.getRoundOfLatestData()._1
+    }
+    clue("Advance one more tick to get to the next closed round") {
+      advanceRoundsByOneTick
+      val ledgerTime = getLedgerTime.toInstant
+      sv1Scan.getRoundOfLatestData() should be((baseRoundWithLatestData + 1, ledgerTime))
+    }
     clue("Data for a later round does not yet exist")({
+      val laterRound = baseRoundWithLatestData + 2
       assertThrowsAndLogsCommandFailures(
-        sv1Scan.getTopProvidersByAppRewards(4, 10),
-        _.errorMessage should include("Data for round 4 not yet computed"),
+        sv1Scan.getTopProvidersByAppRewards(laterRound, 10),
+        _.errorMessage should include(s"Data for round $laterRound not yet computed"),
       )
       assertThrowsAndLogsCommandFailures(
-        sv1Scan.getTopValidatorsByValidatorRewards(4, 10),
-        _.errorMessage should include("Data for round 4 not yet computed"),
+        sv1Scan.getTopValidatorsByValidatorRewards(laterRound, 10),
+        _.errorMessage should include(s"Data for round $laterRound not yet computed"),
       )
     })
+
     def compareLeaderboard(
         result: Seq[(PartyId, BigDecimal)],
         expected: Seq[(WalletAppClientReference, BigDecimal)],
@@ -181,43 +179,38 @@ class ScanTimeBasedIntegrationTest
     }
 
     actAndCheck(
-      "Advance five more rounds, for rounds 4&5 to close (where rewards were collected)",
-      Range(0, 5).foreach(_ => advanceRoundsByOneTick),
+      "Advance four more rounds, for the previous rounds to close (where rewards were collected)",
+      Range(0, 4).foreach(_ => advanceRoundsByOneTick),
     )(
-      "Test leaderboards for ends of rounds 4&5",
+      "Test leaderboards for ends of rounds 4 and 5",
       _ => {
         val ledgerTime = getLedgerTime.toInstant
-        advanceTime(Duration.ofMillis(1))
-        eventually() {
-          sv1Scan.getRoundOfLatestData() should be(
-            (5, ledgerTime)
-          )
-        }
+        sv1Scan.getRoundOfLatestData() should be((baseRoundWithLatestData + 5, ledgerTime))
 
         // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
         compareLeaderboard(
-          sv1Scan.getTopProvidersByAppRewards(4, 10),
+          sv1Scan.getTopProvidersByAppRewards(baseRoundWithLatestData + 3, 10),
           Seq(
             (bobValidatorWallet, BigDecimal(0.6180000000)),
             (aliceValidatorWallet, BigDecimal(0.2580000000)),
           ),
         )
         compareLeaderboard(
-          sv1Scan.getTopValidatorsByValidatorRewards(4, 10),
+          sv1Scan.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 3, 10),
           Seq(
             (bobValidatorWallet, BigDecimal(0.2060000000)),
             (aliceValidatorWallet, BigDecimal(0.0860000000)),
           ),
         )
         compareLeaderboard(
-          sv1Scan.getTopProvidersByAppRewards(5, 10),
+          sv1Scan.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
           Seq(
             (aliceValidatorWallet, BigDecimal(44.2580000000)),
             (bobValidatorWallet, BigDecimal(1.2366000000)),
           ),
         )
         compareLeaderboard(
-          sv1Scan.getTopValidatorsByValidatorRewards(5, 10),
+          sv1Scan.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 4, 10),
           Seq(
             (bobValidatorWallet, BigDecimal(0.4122000000)),
             (aliceValidatorWallet, BigDecimal(0.1740000000)),
