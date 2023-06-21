@@ -291,7 +291,6 @@ class FoundingNodeInitializer(
         // Founder does not need to lock
         _ <- participantAdminConnection.uploadDarFiles(
           requiredDars,
-          svcStoreWithIngestion.connection,
           noLock,
         )
         _ <- retryProvider.retryForAutomation(

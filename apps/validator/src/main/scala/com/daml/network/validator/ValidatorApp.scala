@@ -124,8 +124,7 @@ class ValidatorApp(
     } yield ()
 
   private def setupWalletDars(
-      participantAdminConnection: ParticipantAdminConnection,
-      ledgerConnection: CNLedgerConnection,
+      participantAdminConnection: ParticipantAdminConnection
   ): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
     val darFiles = new UploadablePackage {
@@ -144,7 +143,7 @@ class ValidatorApp(
     }).filter(_ => config.enableCoinRulesUpgrade)
     for {
       _ <- withGlobalLock[Unit, Unit](
-        participantAdminConnection.uploadDarFiles(darFiles, ledgerConnection, _)
+        participantAdminConnection.uploadDarFiles(darFiles, _)
       )
     } yield {
       logger.info(
@@ -171,7 +170,6 @@ class ValidatorApp(
               _ <- instance.dars.traverse_(dar =>
                 participantAdminConnection.uploadDarFile(
                   dar,
-                  storeWithIngestion.connection,
                   noLock_,
                 )
               )
@@ -300,10 +298,7 @@ class ValidatorApp(
         retryProvider,
         clock,
       )
-      _ <- setupWalletDars(
-        participantAdminConnection,
-        ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
-      )
+      _ <- setupWalletDars(participantAdminConnection)
       scanConnection <- ScanConnection(
         ledgerClient,
         config.scanClient,

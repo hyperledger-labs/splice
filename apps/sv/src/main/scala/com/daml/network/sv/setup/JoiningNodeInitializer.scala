@@ -311,7 +311,6 @@ class JoiningNodeInitializer(
                 _ <- withSvConnection(svClient.adminApi)(connection =>
                   participantAdminConnection.uploadDarFiles(
                     requiredDars,
-                    svStoreWithIngestion.connection,
                     connection.withGlobalLock(_, _),
                   )
                 )

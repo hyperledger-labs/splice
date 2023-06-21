@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import cats.implicits.*
 import com.daml.lf.archive.DarParser
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.{DomainAlias, DiscardOps}
@@ -185,7 +186,6 @@ class ParticipantAdminConnection(
 
   def uploadDarFiles(
       pkgs: Seq[UploadablePackage],
-      ledgerConnection: CNLedgerConnection,
       withLock: (String, () => Future[Unit]) => Future[Unit],
   )(implicit
       traceContext: TraceContext
@@ -195,13 +195,12 @@ class ParticipantAdminConnection(
       "DAR upload",
       () =>
         pkgs.foldLeft(Future.unit)((previous, dar) =>
-          previous.flatMap(_ => uploadDarFile(dar, ledgerConnection: CNLedgerConnection, f => f()))
+          previous.flatMap(_ => uploadDarFile(dar, f => f()))
         ),
     )
 
   def uploadDarFile(
       pkg: UploadablePackage,
-      ledgerConnection: CNLedgerConnection,
       withLock: (() => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[Unit] = {
     withLock(() =>
@@ -209,14 +208,12 @@ class ParticipantAdminConnection(
         pkg.packageId,
         pkg.resourcePath,
         ByteString.readFrom(pkg.inputStream()),
-        ledgerConnection: CNLedgerConnection,
       )
     )
   }
 
   def uploadDarFile(
       path: Path,
-      ledgerConnection: CNLedgerConnection,
       withLock: (() => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[Unit] = {
     withLock(() =>
@@ -225,7 +222,7 @@ class ParticipantAdminConnection(
           ByteString.readFrom(Files.newInputStream(path))
         }
         hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
-        _ <- uploadDarFileInternal(hash, path.toString, darFile, ledgerConnection)
+        _ <- uploadDarFileInternal(hash, path.toString, darFile)
       } yield ()
     )
   }
@@ -234,14 +231,14 @@ class ParticipantAdminConnection(
       packageId: String,
       path: String,
       darFile: => ByteString,
-      ledgerConnection: CNLedgerConnection,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     retryProvider
       .ensureThatB(
         s"DAR file $path with package-id $packageId has been uploaded.",
-        ledgerConnection.listPackages().map(_.contains(packageId)),
+        // TODO(#5141) and TODO(#5755): consider if we still need a check here
+        packageIsVetted(packageId),
         runCmd(
           ParticipantAdminCommands.Package.UploadDar(Some(path), true, true, logger, Some(darFile))
           // the DAR hashes used by the admin API are different from package IDs, so we ignore them
@@ -249,4 +246,31 @@ class ParticipantAdminConnection(
         logger,
       )
 
+  // TODO(tech-debt) consider removing this clunky code once Canton actually blocks on vetting (Canton issue #11255)
+  private def packageIsVetted(
+      packageId: String
+  )(implicit traceContext: TraceContext): Future[Boolean] = for {
+    participantId <- getParticipantId()
+    domains <- listConnectedDomains()
+    vettedPackagesResults <-
+      if (domains.isEmpty) {
+        Future.failed(
+          Status.FAILED_PRECONDITION
+            .withDescription(
+              s"We shouldn't check package vetting if we are not connected to any domains."
+            )
+            .asRuntimeException()
+        )
+      } else {
+        // TODO(tech-debt) we could also replace this with a single call to the API and filter by domains ourselves
+        domains.traverse(domain => listVettedPackages(participantId, domain.domainId))
+      }
+  } yield {
+    vettedPackagesResults.forall(
+      // there really should be just one result per domain, but let's not make too many assumptions about Canton
+      _.exists(vr =>
+        vr.mapping.participantId == participantId && vr.mapping.packageIds.contains(packageId)
+      )
+    )
+  }
 }

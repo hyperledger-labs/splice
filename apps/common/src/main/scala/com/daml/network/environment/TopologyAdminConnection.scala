@@ -45,6 +45,7 @@ import com.digitalasset.canton.topology.transaction.{
   TopologyMappingX,
   TrafficControlStateX,
   UnionspaceDefinitionX,
+  VettedPackagesX,
 }
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   NamespaceDelegationX,
@@ -563,6 +564,27 @@ class TopologyAdminConnection(
       case c => sys.error(s"Unknown clock config: $c")
     }
   }
+
+  def listVettedPackages(
+      participantId: ParticipantId,
+      domainId: DomainId,
+      timeQuery: TimeQueryX = TimeQueryX.HeadState,
+  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[VettedPackagesX]]] = {
+    runCmd(
+      TopologyAdminCommandsX.Read.ListVettedPackages(
+        BaseQueryX(
+          filterStore = domainId.filterString,
+          proposals = false,
+          timeQuery,
+          None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        participantId.filterString,
+      )
+    ).map(_.map(r => TopologyResult(r.context, r.item)))
+  }
+
 }
 
 object TopologyAdminConnection {
