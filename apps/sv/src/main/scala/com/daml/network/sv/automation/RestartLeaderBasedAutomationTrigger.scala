@@ -81,12 +81,11 @@ class RestartLeaderBasedAutomationTrigger(
             restartAutomation(currentEpoch, svcRules)
           case Some(state) =>
             if (state.epoch != currentEpoch) {
-              logger.debug(s"Epoch changed from ${state.epoch} to $currentEpoch")
+              logger.debug(
+                s"Restarting automation, as the epoch changed from ${state.epoch} to $currentEpoch"
+              )
               restartAutomation(currentEpoch, svcRules)
             } else {
-              logger.debug(
-                s"SvcRules changed, but the epoch stayed the same (epoch $lastKnownEpoch)"
-              )
               TaskSuccess(
                 s"SvcRules changed, but the epoch stayed the same (epoch $lastKnownEpoch)"
               )
@@ -97,11 +96,8 @@ class RestartLeaderBasedAutomationTrigger(
   }
 
   private def restartAutomation(epoch: Long, svcRules: SvcRulesContract)(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
+      ec: ExecutionContext
   ): TaskOutcome = {
-    logger.debug(s"Restarting triggers for new epoch: ${epoch}")
-
     val svTaskContext =
       new SvTaskBasedTrigger.Context(
         store,
