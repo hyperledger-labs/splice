@@ -918,16 +918,16 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
-            "memory": "4Gi"
+            "memory": "8Gi"
           },
           "requests": {
             "cpu": "1",
-            "memory": "4Gi"
+            "memory": "8Gi"
           }
         }
       }
@@ -1184,7 +1184,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
@@ -1192,11 +1192,11 @@
         "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
-            "memory": "4096Mi"
+            "memory": "8Gi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "4096Mi"
+            "memory": "8Gi"
           }
         }
       }
@@ -1716,18 +1716,18 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
-            "memory": "4096Mi"
+            "memory": "8Gi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "4096Mi"
+            "memory": "8Gi"
           }
         },
         "validatorWalletUser": "auth0|64529b128448ded6aa68048f"
@@ -2247,18 +2247,18 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
-            "memory": "4096Mi"
+            "memory": "8Gi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "4096Mi"
+            "memory": "8Gi"
           }
         },
         "validatorWalletUser": "auth0|64529b6852dd694167351045"
@@ -2703,18 +2703,18 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
-            "memory": "4096Mi"
+            "memory": "8Gi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "4096Mi"
+            "memory": "8Gi"
           }
         },
         "validatorWalletUser": "auth0|64529bb10c1aee4f2c819218"
@@ -3159,18 +3159,18 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
-            "memory": "4096Mi"
+            "memory": "8Gi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "4096Mi"
+            "memory": "8Gi"
           }
         },
         "validatorWalletUser": "auth0|64529bc58d30358eacae5611"
@@ -3414,7 +3414,7 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
@@ -3423,11 +3423,11 @@
         "postgres": "postgres.validator1.svc.cluster.local",
         "resources": {
           "limits": {
-            "memory": "4096Mi"
+            "memory": "8Gi"
           },
           "requests": {
             "cpu": 1,
-            "memory": "4096Mi"
+            "memory": "8Gi"
           }
         },
         "validatorPartyHint": "validator1_validator_service_user",
