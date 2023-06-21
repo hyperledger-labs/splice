@@ -90,6 +90,8 @@ class ValidatorApp(
   @nowarn("cat=unused")
   private def noLock[T](reason: String, f: () => Future[T]): Future[T] = f()
 
+  private def noLock_(f: () => Future[Unit]): Future[Unit] = f()
+
   def withGlobalLock[A, B](f: ((String, () => Future[A]) => Future[A]) => Future[B]) =
     withSvConnection(
       config.foundingSvClient.adminApi
@@ -121,7 +123,10 @@ class ValidatorApp(
       )
     } yield ()
 
-  private def setupWalletDars(connection: CNLedgerConnection): Future[Unit] = {
+  private def setupWalletDars(
+      participantAdminConnection: ParticipantAdminConnection,
+      ledgerConnection: CNLedgerConnection,
+  ): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
     val darFiles = new UploadablePackage {
       lazy val packageId: String =
@@ -138,7 +143,9 @@ class ValidatorApp(
       lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
     }).filter(_ => config.enableCoinRulesUpgrade)
     for {
-      _ <- withGlobalLock[Unit, Unit](connection.uploadDarFiles(darFiles, _))
+      _ <- withGlobalLock[Unit, Unit](
+        participantAdminConnection.uploadDarFiles(darFiles, ledgerConnection, _)
+      )
     } yield {
       logger.info(
         s"Finished wallet setup"
@@ -151,16 +158,23 @@ class ValidatorApp(
       instance: AppInstance,
       validatorParty: PartyId,
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+      participantAdminConnection: ParticipantAdminConnection,
       domainId: DomainId,
   ): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
     for {
-      _ <- instance.dars.traverse_(dar => storeWithIngestion.connection.uploadDarFile(dar))
       party <- withGlobalLock[PartyId, PartyId](lock =>
         lock(
           s"Allocate party for user ${instance.serviceUser}",
           () =>
             for {
+              _ <- instance.dars.traverse_(dar =>
+                participantAdminConnection.uploadDarFile(
+                  dar,
+                  storeWithIngestion.connection,
+                  noLock_,
+                )
+              )
               party <- storeWithIngestion.connection.getOrAllocateParty(
                 instance.serviceUser,
                 Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
@@ -279,6 +293,17 @@ class ValidatorApp(
       validatorParty: PartyId,
   ): Future[ValidatorApp.State] =
     for {
+      _ <- Future.successful(())
+      participantAdminConnection = new ParticipantAdminConnection(
+        config.participantClient.adminApi,
+        loggerFactory,
+        retryProvider,
+        clock,
+      )
+      _ <- setupWalletDars(
+        participantAdminConnection,
+        ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
+      )
       scanConnection <- ScanConnection(
         ledgerClient,
         config.scanClient,
@@ -287,7 +312,6 @@ class ValidatorApp(
         loggerFactory,
       )
       svcParty <- scanConnection.getSvcPartyIdWithRetries()
-      _ <- setupWalletDars(ledgerClient.connection(this.getClass.getSimpleName, loggerFactory))
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         svcParty = svcParty,
@@ -312,12 +336,6 @@ class ValidatorApp(
           scanConnection,
           loggerFactory,
         )
-      participantAdminConnection = new ParticipantAdminConnection(
-        config.participantClient.adminApi,
-        loggerFactory,
-        retryProvider,
-        clock,
-      )
       automation = new ValidatorAutomationService(
         config.automation,
         config.domains.global.buyExtraTraffic,
@@ -340,6 +358,7 @@ class ValidatorApp(
           instance,
           validatorParty,
           automation,
+          participantAdminConnection,
           domainId,
         )
       })

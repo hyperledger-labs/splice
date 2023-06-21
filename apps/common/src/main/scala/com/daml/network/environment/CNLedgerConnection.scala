@@ -6,7 +6,6 @@ import akka.stream.{KillSwitch, KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
-import com.daml.lf.archive.DarParser
 import com.daml.ledger.api.v1.admin.ObjectMetaOuterClass
 import com.daml.ledger.javaapi.data.{
   Command,
@@ -28,9 +27,8 @@ import com.daml.network.environment.ledger.api.{
   NoDedup,
 }
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
-import com.daml.network.util.{DisclosedContracts, UploadablePackage}
+import com.daml.network.util.DisclosedContracts
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.error.CantonErrorResource
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -48,10 +46,9 @@ import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyI
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.{ByteString, FieldMask}
+import com.google.protobuf.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
 
-import java.nio.file.{Files, Path}
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
@@ -621,71 +618,6 @@ class CNLedgerConnection(
         logger,
       )
   }
-
-  private def uploadDarFileInternal(packageId: String, path: String, darFile: => ByteString)(
-      implicit traceContext: TraceContext
-  ): Future[Unit] = {
-    for {
-      known <- client.listPackages()
-      _ <- {
-        if (known.contains(packageId)) {
-          logger.debug(
-            s"Skipping upload of dar file $path with package-id $packageId, as a package with that id has already been uploaded."
-          )
-          Future.successful(())
-        } else {
-          logger.debug(s"Uploading dar file $path with package-id ${packageId}")
-          client.uploadDarFile(darFile)
-        }
-      }
-      // TODO(tech-debt): The ledger API does not block until the package is vetted.
-      //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
-      _ = Threading.sleep(500)
-      _ = logger.info(
-        s"Dar file $path with package-id $packageId should now be uploaded"
-      )
-    } yield ()
-  }
-
-  def uploadDarFiles(
-      pkgs: Seq[UploadablePackage],
-      withLock: (String, () => Future[Unit]) => Future[Unit],
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit] =
-    // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-    withLock(
-      "DAR upload",
-      () =>
-        pkgs.foldLeft(Future.unit)((previous, dar) =>
-          previous.flatMap(_ => uploadDarFile(dar, f => f()))
-        ),
-    )
-
-  def uploadDarFile(
-      pkg: UploadablePackage,
-      withLock: (() => Future[Unit]) => Future[Unit],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    withLock(() =>
-      uploadDarFileInternal(
-        pkg.packageId,
-        pkg.resourcePath,
-        ByteString.readFrom(pkg.inputStream()),
-      )
-    )
-  }
-
-  def uploadDarFile(
-      path: Path
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    for {
-      darFile <- Future {
-        ByteString.readFrom(Files.newInputStream(path))
-      }
-      hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
-      _ <- uploadDarFileInternal(hash, path.toString, darFile)
-    } yield ()
-
   def submitTransferAndWaitNoDedup(
       submitter: PartyId,
       command: LedgerClient.TransferCommand,

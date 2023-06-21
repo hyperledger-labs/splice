@@ -289,7 +289,11 @@ class FoundingNodeInitializer(
     def foundCollective(): Future[Unit] = {
       for {
         // Founder does not need to lock
-        _ <- svcStoreWithIngestion.connection.uploadDarFiles(requiredDars, noLock)
+        _ <- participantAdminConnection.uploadDarFiles(
+          requiredDars,
+          svcStoreWithIngestion.connection,
+          noLock,
+        )
         _ <- retryProvider.retryForAutomation(
           "bootstrapping SVC",
           bootstrapSvc(),

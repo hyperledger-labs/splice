@@ -1,5 +1,7 @@
 package com.daml.network.environment
 
+import com.daml.lf.archive.DarParser
+import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.{DomainAlias, DiscardOps}
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
@@ -15,6 +17,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
 
+import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 
@@ -179,4 +182,69 @@ class ParticipantAdminConnection(
           setDomainConnectionConfig(config)
       }
     } yield ()
+
+  def uploadDarFiles(
+      pkgs: Seq[UploadablePackage],
+      ledgerConnection: CNLedgerConnection,
+      withLock: (String, () => Future[Unit]) => Future[Unit],
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
+    withLock(
+      "DAR upload",
+      () =>
+        pkgs.foldLeft(Future.unit)((previous, dar) =>
+          previous.flatMap(_ => uploadDarFile(dar, ledgerConnection: CNLedgerConnection, f => f()))
+        ),
+    )
+
+  def uploadDarFile(
+      pkg: UploadablePackage,
+      ledgerConnection: CNLedgerConnection,
+      withLock: (() => Future[Unit]) => Future[Unit],
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    withLock(() =>
+      uploadDarFileInternal(
+        pkg.packageId,
+        pkg.absolutePath(),
+        ledgerConnection: CNLedgerConnection,
+      )
+    )
+  }
+
+  def uploadDarFile(
+      path: Path,
+      ledgerConnection: CNLedgerConnection,
+      withLock: (() => Future[Unit]) => Future[Unit],
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    withLock(() =>
+      for {
+        darFile <- Future {
+          ByteString.readFrom(Files.newInputStream(path))
+        }
+        hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
+        _ <- uploadDarFileInternal(hash, path.toString, ledgerConnection)
+      } yield ()
+    )
+  }
+
+  private def uploadDarFileInternal(
+      packageId: String,
+      path: String,
+      ledgerConnection: CNLedgerConnection,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    retryProvider
+      .ensureThatB(
+        s"DAR file $path with package-id $packageId has been uploaded.",
+        ledgerConnection.listPackages().map(_.contains(packageId)),
+        runCmd(
+          ParticipantAdminCommands.Package.UploadDar(Some(path), true, true, logger)
+          // the DAR hashes used by the admin API are different from package IDs, so we ignore them
+        ).map(_ => ()),
+        logger,
+      )
+
 }

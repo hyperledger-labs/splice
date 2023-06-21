@@ -309,8 +309,11 @@ class JoiningNodeInitializer(
             case Right(privateKey_) =>
               for {
                 _ <- withSvConnection(svClient.adminApi)(connection =>
-                  svStoreWithIngestion.connection
-                    .uploadDarFiles(requiredDars, connection.withGlobalLock(_, _))
+                  participantAdminConnection.uploadDarFiles(
+                    requiredDars,
+                    svStoreWithIngestion.connection,
+                    connection.withGlobalLock(_, _),
+                  )
                 )
                 _ <- requestOnboarding(
                   svClient.adminApi,
