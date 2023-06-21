@@ -91,6 +91,11 @@ class WalletTxLogIntegrationTest
             logEntry.coinPrice shouldBe coinPrice
           }
         ),
+        ignore = {
+          case balanceChange: walletLogEntry.BalanceChange =>
+            balanceChange.transactionSubtype == walletLogEntry.BalanceChange.SvRewardCollected
+          case _ => false
+        },
       )
     }
 
