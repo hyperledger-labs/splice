@@ -15,7 +15,7 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withManualStart
 

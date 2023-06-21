@@ -24,7 +24,7 @@ class SvGlobalLockIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.

@@ -375,7 +375,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       )(
         "sv1 sees sv2 party",
         party =>
-          sv1.participantClientWithAdminToken.participantX.parties
+          sv1.participantClientWithAdminToken.parties
             .list(filterParty = party.toProtoPrimitive) should not be empty,
       )
 

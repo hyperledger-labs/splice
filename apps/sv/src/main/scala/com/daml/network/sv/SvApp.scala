@@ -100,7 +100,7 @@ class SvApp(
       retryProvider,
       clock,
     )
-    val localDomainNode = config.xNodes.domain
+    val localDomainNode = config.localDomainNode
       .map(config =>
         new LocalDomainNode(
           new SequencerAdminConnection(

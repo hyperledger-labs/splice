@@ -20,7 +20,6 @@ export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
 export function initDumpConfig(): void {
   pulumi.runtime.setConfig('test-project:CLUSTER_BASENAME', 'mock');
   pulumi.runtime.setConfig('test-project:FIXED_TOKENS', '0');
-  pulumi.runtime.setConfig('test-project:X_NODES', '0');
   pulumi.runtime.setConfig('test-project:VERSION_NUMBER', '0.0.1');
   pulumi.runtime.setConfig('test-project:IMAGE_TAG', '0.0.1-deadbeef');
 

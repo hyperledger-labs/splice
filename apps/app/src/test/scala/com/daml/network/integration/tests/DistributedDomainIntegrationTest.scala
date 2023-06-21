@@ -25,12 +25,12 @@ class DistributedDomainIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")
 
-  "SV onboarding on X nodes" in { implicit env =>
+  "SV onboarding on distributed domain" in { implicit env =>
     initSvc()
     clue("Sequencers are initialized") {
       sv1.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
@@ -92,15 +92,15 @@ class DistributedDomainIntegrationTest
     clue("SVC party is bootstrapped as a unionspace with SVs as owners") {
       val svcParty = sv1.getSvcInfo().svcParty
       val domainId =
-        sv1.participantClient.participantX.domains.id_of(globalDomain)
-      val unionspaces = sv1.participantClient.participantX.topology.unionspaces
+        sv1.participantClient.domains.id_of(globalDomain)
+      val unionspaces = sv1.participantClient.topology.unionspaces
         .list(
           filterStore = domainId.filterString,
           filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
         )
       inside(unionspaces) { case Seq(unionspace) =>
         unionspace.item.owners shouldBe Seq(sv1, sv2, sv3, sv4)
-          .map(_.participantClient.participantX.id.uid.namespace)
+          .map(_.participantClient.id.uid.namespace)
           .toSet
       }
     }

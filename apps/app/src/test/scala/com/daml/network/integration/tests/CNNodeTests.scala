@@ -66,7 +66,7 @@ object CNNodeTests {
     override def environmentDefinition
         : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
       CNNodeEnvironmentDefinition
-        .simpleTopologyX(this.getClass.getSimpleName)
+        .simpleTopology(this.getClass.getSimpleName)
 
     protected def initSvc()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
       env.fullSvcApps.local.foreach(_.start())
@@ -98,7 +98,7 @@ object CNNodeTests {
     override def environmentDefinition
         : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
       CNNodeEnvironmentDefinition
-        .simpleTopologyX(this.getClass.getSimpleName)
+        .simpleTopology(this.getClass.getSimpleName)
 
     // We append this to configured Daml user names for isolation across test cases.
     @SuppressWarnings(Array("org.wartremover.warts.Var"))

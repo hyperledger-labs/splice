@@ -17,7 +17,7 @@ class SvFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
 
   "SV UIs" should {
     val sv1Port = 3010

@@ -19,7 +19,7 @@ class WalletAuth0FrontendIntegrationTest
 
   override def environmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1

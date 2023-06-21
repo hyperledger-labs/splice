@@ -377,7 +377,6 @@ class RemoteClock(
     config: ClientConfig,
     timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
-    useXNodes: Boolean,
 )(implicit val ec: ExecutionContextExecutor)
     extends Clock
     with NamedLogging {
@@ -442,9 +441,7 @@ class RemoteClock(
   @tailrec
   private def getRemoteTime: CantonTimestamp = {
     val req = for {
-      pbTimestamp <- EitherT.right[ProtoDeserializationError](
-        if (useXNodes) serviceX.currentTime(Empty()) else service.currentTime(Empty())
-      )
+      pbTimestamp <- EitherT.right[ProtoDeserializationError](serviceX.currentTime(Empty()))
       timestamp <- EitherT.fromEither[Future](CantonTimestamp.fromProtoPrimitive(pbTimestamp))
     } yield timestamp
     import TraceContext.Implicits.Empty.*

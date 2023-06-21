@@ -72,7 +72,7 @@ spec:
             {{- with .Values.domain }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
               value: |
-                canton.sv-apps.sv.x-nodes.domain {
+                canton.sv-apps.sv.local-domain-node {
                   sequencer {
                     admin-api {
                       address = {{ .sequencerAddress | default "global-domain-sequencer" | quote }}

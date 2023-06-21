@@ -28,7 +28,7 @@ class WalletSurviveCantonRestartIntegrationTest
     "-c",
     (validatorPath / "validator-participant.conf").toString,
     "-c",
-    (testResourcesPath / "self-hosted-validator-participant-postgres-storage-x.conf").toString,
+    (testResourcesPath / "self-hosted-validator-participant-postgres-storage.conf").toString,
     "-c",
     (testResourcesPath / "storage-postgres.conf").toString,
     "-C",
@@ -45,7 +45,7 @@ class WalletSurviveCantonRestartIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1

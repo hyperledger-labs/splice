@@ -95,7 +95,7 @@ case class SvAppBackendConfig(
     initialCoinPriceVote: Option[BigDecimal] = None,
     enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,
-    xNodes: SvXNodesConfig,
+    localDomainNode: Option[SvDomainNodeConfig],
     // TODO(#5855) so we can lock; remove this again
     foundingSvClient: SvAppClientConfig,
 ) extends CNNodeBackendConfig {
@@ -125,14 +125,7 @@ final case class SvMediatorConfig(
     adminApi: ClientConfig
 )
 
-final case class SvXNodesConfig(
-    // Optional to support multiple SVs without a distributed domain.
-    // TODO(#5195) Consider making this mandatory once we only support
-    // decentralized domains in production setups.
-    domain: Option[SvXNodesDomainConfig]
-)
-
-final case class SvXNodesDomainConfig(
+final case class SvDomainNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
     parameters: DomainParametersConfig = DomainParametersConfig(

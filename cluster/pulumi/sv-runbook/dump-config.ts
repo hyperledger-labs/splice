@@ -5,7 +5,6 @@ import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-com
 initDumpConfig();
 
 async function main() {
-
   process.env.GCP_CLUSTER_BASENAME = 'svrun';
   process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_ID = 'mgmt-sv';
   process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t-sv';

@@ -30,11 +30,11 @@ class SplitwellUpgradeFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
         CNNodeEnvironmentDefinition
-          .simpleTopologyX(this.getClass.getSimpleName)
+          .simpleTopology(this.getClass.getSimpleName)
           .setup(env)
         for {
           validator <- Seq(aliceValidator, bobValidator)

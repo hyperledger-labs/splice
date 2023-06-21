@@ -161,7 +161,7 @@ case class CNNodeEnvironmentDefinition(
       ctx => (conf => transform(ctx, conf)) +: this.configTransformsWithContext(ctx)
     )
 
-  private def withSimTime(useXNodes: Boolean): CNNodeEnvironmentDefinition =
+  private def withSimTime: CNNodeEnvironmentDefinition =
     addConfigTransformsToFront((_, conf) =>
       conf
         .focus(_.parameters.clock)
@@ -171,8 +171,7 @@ case class CNNodeEnvironmentDefinition(
             conf.svcApp
               .getOrElse(throw new IllegalArgumentException("expected svc app to be configured"))
               .participantClient
-              .clientAdminApi,
-            useXNodes,
+              .clientAdminApi
           )
         )
     )
@@ -207,13 +206,13 @@ case class CNNodeEnvironmentDefinition(
 
 object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
 
-  def simpleTopologyX(testName: String): CNNodeEnvironmentDefinition =
+  def simpleTopology(testName: String): CNNodeEnvironmentDefinition =
     fromResources(Seq("simple-topology.conf"), testName)
       .withAllocatedUsers()
       .withInitializedNodes()
 
-  def simpleTopologyXWithSimTime(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopologyX(testName).withSimTime(useXNodes = true)
+  def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
+    simpleTopology(testName).withSimTime
 
   def preflightTopology(testName: String): CNNodeEnvironmentDefinition = {
     fromResource("preflight-topology.conf", testName)

@@ -16,7 +16,7 @@ trait DirectoryPersistenceIntegrationTest extends CNNodeIntegrationTest {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyX(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
 
   "Directory" should {
 

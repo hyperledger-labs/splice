@@ -39,7 +39,7 @@ class SvcPartyHosting(
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Boolean] =
     for {
-      mappings <- listActiveSvcPartyMappingsX(domainId, participantId)
+      mappings <- listActiveSvcPartyMappings(domainId, participantId)
     } yield {
       logger.info("SVC party mappings to our participant: " + mappings.map(_.mapping))
       mappings.nonEmpty
@@ -119,23 +119,23 @@ class SvcPartyHosting(
     )
   }
 
-  private def listActiveSvcPartyMappingsX(
+  private def listActiveSvcPartyMappings(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipantX]]] =
-    listActivePartyToParticipantMappingsX(svcParty, domain, Some(participantId))
+    listActivePartyToParticipantMappings(svcParty, domain, Some(participantId))
 
   /** Return the transaction that first added the participant to PartyToParticipant
     * if the participant is still included in the latest state.
     */
-  private def getSvcPartyToParticipantTransactionX(
+  private def getSvcPartyToParticipantTransaction(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Option[TopologyResult[PartyToParticipantX]]] =
     for {
       // We only fetch transactions for the svc party so one per SV on/offboarding which
       // we expect to be rare so we can fetch the entire history.
-      xs <- listActivePartyToParticipantMappingsX(
+      xs <- listActivePartyToParticipantMappings(
         svcParty,
         domain,
         None,
@@ -158,7 +158,7 @@ class SvcPartyHosting(
       }
     }
 
-  private def listActivePartyToParticipantMappingsX(
+  private def listActivePartyToParticipantMappings(
       party: PartyId,
       domain: DomainId,
       participantId: Option[ParticipantId],
@@ -178,19 +178,19 @@ class SvcPartyHosting(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Boolean] =
-    listActivePartyToParticipantMappingsX(party, domain, Some(participantId)).map(_.nonEmpty)
+    listActivePartyToParticipantMappings(party, domain, Some(participantId)).map(_.nonEmpty)
 
   def authorizeSvcPartyToParticipant(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Instant] =
     // check if svc party has already been authorized to be hosted by the participant
-    getSvcPartyToParticipantTransactionX(domain, participantId).flatMap {
+    getSvcPartyToParticipantTransaction(domain, participantId).flatMap {
       case None =>
         for {
           sourceParticipant <- participantAdminConnection.getParticipantId()
           // Get the existing mapping
-          mappings <- listActiveSvcPartyMappingsX(domain, sourceParticipant)
+          mappings <- listActiveSvcPartyMappings(domain, sourceParticipant)
           mapping = mappings match {
             case Seq(mapping) => mapping
             case _ => throw new IllegalStateException(s"Mappings are borked: $mappings")
@@ -223,7 +223,7 @@ class SvcPartyHosting(
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retryForClientCalls(
     "wait for svc party to participant authorization to complete",
-    listActiveSvcPartyMappingsX(domain, participantId).flatMap {
+    listActiveSvcPartyMappings(domain, participantId).flatMap {
       case Seq(mapping) =>
         val validFrom = mapping.base.validFrom
         logger.debug(show"the party to participant authorization $mapping has been observed")

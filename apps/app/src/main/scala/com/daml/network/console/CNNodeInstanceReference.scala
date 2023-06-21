@@ -23,7 +23,6 @@ import com.digitalasset.canton.console.{
   Help,
   InstanceReference,
   LocalInstanceReference,
-  RemoteParticipantReference,
   RemoteParticipantReferenceX,
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap
@@ -220,12 +219,7 @@ class CNParticipantClientReference(
     consoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
     override val config: RemoteParticipantConfig,
-) extends RemoteParticipantReference(consoleEnvironment, name) {
-  val config_ = config
-  // TODO (M3-47) Remove workaround once we have fully switched to CantonX nodes
-  val participantX = new RemoteParticipantReferenceX(consoleEnvironment, name) {
-    override val config = config_
-  }
+) extends RemoteParticipantReferenceX(consoleEnvironment, name) {
 
   // TODO(#5141) Consider removing this once Canton no longer explodes
   // when uploading the same DAR twice.

@@ -473,10 +473,8 @@ object CNNodeConfig {
       deriveReader[SvSequencerConfig]
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =
       deriveReader[SvMediatorConfig]
-    implicit val svXNodesDomainConfig: ConfigReader[SvXNodesDomainConfig] =
-      deriveReader[SvXNodesDomainConfig]
-    implicit val svXNodesConfig: ConfigReader[SvXNodesConfig] =
-      deriveReader[SvXNodesConfig]
+    implicit val svDomainNodeConfig: ConfigReader[SvDomainNodeConfig] =
+      deriveReader[SvDomainNodeConfig]
     implicit val svGlobalDomainConfigReader: ConfigReader[SvGlobalDomainConfig] =
       deriveReader[SvGlobalDomainConfig]
     implicit val svDomainConfigReader: ConfigReader[SvDomainConfig] =
@@ -487,8 +485,7 @@ object CNNodeConfig {
         // the founding node must alway configure one to bootstrap the domain.
         val foundingNodeHasDomainConfig = conf.onboarding.fold(true) {
           _ match {
-            case _: SvOnboardingConfig.FoundCollective =>
-              conf.xNodes.domain.isDefined
+            case _: SvOnboardingConfig.FoundCollective => conf.localDomainNode.isDefined
             case _: SvOnboardingConfig.JoinWithKey => true
           }
         }
@@ -634,10 +631,8 @@ object CNNodeConfig {
       deriveWriter[SvSequencerConfig]
     implicit val svMediatorConfig: ConfigWriter[SvMediatorConfig] =
       deriveWriter[SvMediatorConfig]
-    implicit val svXNodesDomainConfig: ConfigWriter[SvXNodesDomainConfig] =
-      deriveWriter[SvXNodesDomainConfig]
-    implicit val svXNodesConfig: ConfigWriter[SvXNodesConfig] =
-      deriveWriter[SvXNodesConfig]
+    implicit val svDomainNodeConfig: ConfigWriter[SvDomainNodeConfig] =
+      deriveWriter[SvDomainNodeConfig]
     implicit val svGlobalDomainConfigWriter: ConfigWriter[SvGlobalDomainConfig] =
       deriveWriter[SvGlobalDomainConfig]
     implicit val svDomainConfigWriter: ConfigWriter[SvDomainConfig] =

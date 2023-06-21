@@ -62,7 +62,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         val randomParty = allocateRandomSvParty("random")
         assertThrowsAndLogsCommandFailures(
           sv1.onboardSvPartyMigrationAuthorize(
-            sv4.participantClient.participantX.id,
+            sv4.participantClient.id,
             randomParty,
           ),
           _.errorMessage should include(
@@ -77,7 +77,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         val sv1Party = sv1.getSvcInfo().svParty
         assertThrowsAndLogsCommandFailures(
           sv1.onboardSvPartyMigrationAuthorize(
-            sv4.participantClient.participantX.id,
+            sv4.participantClient.id,
             sv1Party,
           ),
           _.errorMessage should include(
@@ -100,20 +100,20 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       }
 
       eventually() {
-        svcParticipant.participantX.topology.party_to_participant_mappings
+        svcParticipant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOpX.Replace),
             filterStore = globalDomainId.filterString,
             filterParty = svcPartyStr,
-            filterParticipant = sv4Participant.participantX.id.toProtoPrimitive,
+            filterParticipant = sv4Participant.id.toProtoPrimitive,
           ) should have size 1
 
-        sv4Participant.participantX.topology.party_to_participant_mappings
+        sv4Participant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOpX.Replace),
             filterStore = globalDomainId.filterString,
             filterParty = svcPartyStr,
-            filterParticipant = sv4Participant.participantX.id.toProtoPrimitive,
+            filterParticipant = sv4Participant.id.toProtoPrimitive,
           ) should have size 1
         val coinFromSv4Participant = getCoins(sv4Participant, svcParty)
         val coinFromSvcParticipant = getCoins(svcParticipant, svcParty)

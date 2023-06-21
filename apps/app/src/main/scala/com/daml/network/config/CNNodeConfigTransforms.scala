@@ -14,8 +14,7 @@ import com.daml.network.sv.config.{
   SvMediatorConfig,
   SvOnboardingConfig,
   SvSequencerConfig,
-  SvXNodesConfig,
-  SvXNodesDomainConfig,
+  SvDomainNodeConfig,
 }
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
@@ -335,8 +334,8 @@ object CNNodeConfigTransforms {
       updateAllSvAppConfigs_(
         _.focus(_.participantClient)
           .modify(portTransform(bump, _))
-          .focus(_.xNodes)
-          .modify(portTransform(bump, _))
+          .focus(_.localDomainNode)
+          .modify(_.map(portTransform(bump, _)))
       ),
       updateAllScanAppConfigs_(_.focus(_.participantClient).modify(portTransform(bump, _))),
       updateAllValidatorConfigs_(
@@ -404,14 +403,8 @@ object CNNodeConfigTransforms {
 
   private def portTransform(
       bump: Int,
-      c: SvXNodesConfig,
-  ): SvXNodesConfig =
-    c.focus(_.domain).modify(_.map(portTransform(bump, _)))
-
-  private def portTransform(
-      bump: Int,
-      c: SvXNodesDomainConfig,
-  ): SvXNodesDomainConfig =
+      c: SvDomainNodeConfig,
+  ): SvDomainNodeConfig =
     c.focus(_.sequencer)
       .modify(portTransform(bump, _))
       .focus(_.mediator)
@@ -483,13 +476,6 @@ object CNNodeConfigTransforms {
       )
     })
 
-  def disableDistributedDomain: CNNodeConfigTransform =
-    updateAllSvAppConfigs_(c =>
-      c.copy(
-        xNodes = SvXNodesConfig(None)
-      )
-    )
-
   /** Canton has a built in authorizer that accepts "canton admin tokens",
     * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]
     * These are 128 character random strings (not JWTs), generated independently for each local participant node at canton startup.
@@ -501,7 +487,7 @@ object CNNodeConfigTransforms {
     val tokens: mutable.Map[Int, String] = mutable.Map.empty
 
     val tokenDataSource = clockConfig match {
-      case ClockConfig.RemoteClock(_, _) => Source.fromFile("canton-simtime.tokens")
+      case ClockConfig.RemoteClock(_) => Source.fromFile("canton-simtime.tokens")
       case ClockConfig.WallClock(_) => Source.fromFile("canton.tokens")
       case ClockConfig.SimClock =>
         sys.error(
