@@ -171,12 +171,15 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         }
       },
     )
-    clue("try to reuse the same secret for a second onboarding, which should fail") {
+    clue("try to onboard with a wrong secret, which should still fail") {
       assertThrows[CommandFailure](
         loggerFactory.assertLogs(
-          sv.onboardValidator(candidate, "dummysecret")
+          sv.onboardValidator(candidate, "wrongsecret")
         )
       )
+    }
+    clue("try to reuse the same secret for a second onboarding, which should succeed") {
+      sv.onboardValidator(candidate, secret)
     }
   }
 

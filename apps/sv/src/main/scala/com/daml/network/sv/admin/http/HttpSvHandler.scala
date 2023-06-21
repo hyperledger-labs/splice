@@ -139,10 +139,17 @@ class HttpSvHandler(
           svStore.lookupValidatorOnboardingBySecret(body.secret).flatMap {
             case None =>
               svStore.lookupUsedSecret(body.secret).flatMap {
+                case Some(used) if used.payload.validator == body.partyId =>
+                  // This validator is already onboarded with the same secret - nothing to do
+                  Future.successful(v0.SvResource.OnboardValidatorResponseOK)
                 case Some(_) =>
-                  Future.failed(HttpErrorHandler.unauthorized("Secret has already been used."))
+                  Future.failed(
+                    HttpErrorHandler
+                      .unauthorized("Secret has already been used for a different validator.")
+                  )
                 case None => Future.failed(HttpErrorHandler.unauthorized("Unknown secret."))
               }
+
             case Some(vo) =>
               for {
                 // We retry here because this mutates the CoinRules and rounds contracts,
@@ -681,7 +688,6 @@ class HttpSvHandler(
       secret: String,
       validatorOnboarding: Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding],
   )(implicit tc: TraceContext): Future[Unit] =
-    // TODO(#4114) Make this idempotent
     for {
       svcRules <- svcStore.getSvcRules()
       cmds = (
