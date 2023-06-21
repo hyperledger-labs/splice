@@ -105,6 +105,8 @@ object ParticipantAdminCommands {
         vetAllPackages: Boolean,
         synchronizeVetting: Boolean,
         logger: TracedLogger,
+        // We sometimes want to upload DARs that are inside JARs, which is hard with just a path.
+        darDataO: Option[ByteString] = None,
     ) extends PackageCommand[UploadDarRequest, UploadDarResponse, String] {
 
       override def createRequest(): Either[String, UploadDarRequest] =
@@ -116,7 +118,9 @@ object ParticipantAdminCommands {
             "Provided DAR path is empty",
           )
           filename = Paths.get(nonEmptyPathValue).getFileName.toString
-          darData <- BinaryFileUtil.readByteStringFromFile(nonEmptyPathValue)
+          darData <- darDataO.fold(BinaryFileUtil.readByteStringFromFile(nonEmptyPathValue))(
+            Right(_)
+          )
         } yield UploadDarRequest(
           darData,
           filename,

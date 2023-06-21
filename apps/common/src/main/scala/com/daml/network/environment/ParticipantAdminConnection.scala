@@ -207,7 +207,8 @@ class ParticipantAdminConnection(
     withLock(() =>
       uploadDarFileInternal(
         pkg.packageId,
-        pkg.absolutePath(),
+        pkg.resourcePath,
+        ByteString.readFrom(pkg.inputStream()),
         ledgerConnection: CNLedgerConnection,
       )
     )
@@ -224,7 +225,7 @@ class ParticipantAdminConnection(
           ByteString.readFrom(Files.newInputStream(path))
         }
         hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
-        _ <- uploadDarFileInternal(hash, path.toString, ledgerConnection)
+        _ <- uploadDarFileInternal(hash, path.toString, darFile, ledgerConnection)
       } yield ()
     )
   }
@@ -232,6 +233,7 @@ class ParticipantAdminConnection(
   private def uploadDarFileInternal(
       packageId: String,
       path: String,
+      darFile: => ByteString,
       ledgerConnection: CNLedgerConnection,
   )(implicit
       traceContext: TraceContext
@@ -241,7 +243,7 @@ class ParticipantAdminConnection(
         s"DAR file $path with package-id $packageId has been uploaded.",
         ledgerConnection.listPackages().map(_.contains(packageId)),
         runCmd(
-          ParticipantAdminCommands.Package.UploadDar(Some(path), true, true, logger)
+          ParticipantAdminCommands.Package.UploadDar(Some(path), true, true, logger, Some(darFile))
           // the DAR hashes used by the admin API are different from package IDs, so we ignore them
         ).map(_ => ()),
         logger,
