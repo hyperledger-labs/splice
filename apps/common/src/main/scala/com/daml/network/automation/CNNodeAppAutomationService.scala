@@ -20,6 +20,7 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
     override val store: Store,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
+    ingestFromParticipantBegin: Boolean = false,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -40,6 +41,7 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
       connection,
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
+      ingestFromParticipantBegin,
     )
   )
 

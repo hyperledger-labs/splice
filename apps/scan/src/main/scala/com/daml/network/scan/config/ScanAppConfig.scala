@@ -19,6 +19,7 @@ case class ScanAppBackendConfig(
     domains: ScanDomainConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     enableCoinRulesUpgrade: Boolean = false,
+    ingestFromParticipantBegin: Boolean = false,
 ) extends CNNodeBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {

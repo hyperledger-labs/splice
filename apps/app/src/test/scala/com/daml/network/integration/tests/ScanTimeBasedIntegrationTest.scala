@@ -26,8 +26,9 @@ class ScanTimeBasedIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
-      .addConfigTransformToFront(
-        CNNodeConfigTransforms.onlySv1
+      .addConfigTransformsToFront(
+        CNNodeConfigTransforms.onlySv1,
+        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) },
       )
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.

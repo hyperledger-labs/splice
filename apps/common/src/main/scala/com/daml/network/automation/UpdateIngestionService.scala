@@ -28,6 +28,7 @@ class UpdateIngestionService(
     connection: CNLedgerConnection,
     override protected val retryProvider: RetryProvider,
     baseLoggerFactory: NamedLoggerFactory,
+    ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -47,14 +48,31 @@ class UpdateIngestionService(
       subscribeFrom <- lastIngestedOffset match {
         case None =>
           for {
-            offset <- connection.ledgerEnd().map(_.value)
-            _ <- ingestAcsAndInFlight(offset)
+            offset <-
+              if (ingestFromParticipantBegin) {
+                val participantBegin = ParticipantOffset(
+                  ParticipantOffset.Value.Boundary(
+                    ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN
+                  )
+                )
+                ingestionSink
+                  .ingestAcs(
+                    MultiDomainAcsStore.fromParticipantOffset(participantBegin),
+                    Seq.empty,
+                    Seq.empty,
+                  )
+                  .map(_ => participantBegin)
+              } else
+                for {
+                  acsOffset <- connection.ledgerEnd()
+                  _ <- ingestAcsAndInFlight(acsOffset.value)
+                } yield ParticipantOffset(acsOffset)
           } yield offset
         case Some(offset) =>
-          Future.successful(offset)
+          Future.successful(MultiDomainAcsStore.toParticipantOffset(offset))
       }
     } yield new CNLedgerSubscription(
-      source = updateSource(subscribeFrom),
+      source = connection.updates(subscribeFrom, filter.primaryParty),
       mapOperator = Flow[GetTreeUpdatesResponse].mapAsync(1)(process),
       retryProvider = retryProvider,
       loggerFactory = baseLoggerFactory.append("subsClient", this.getClass.getSimpleName),
@@ -73,12 +91,6 @@ class UpdateIngestionService(
       }
       _ <- ingestionSink.ingestUpdate(msg.domainId, msg.update)
     } yield ()
-  }
-
-  private def updateSource(subscribeFrom: String) = {
-    val participantOffset = ParticipantOffset(ParticipantOffset.Value.Absolute(subscribeFrom))
-
-    connection.updates(participantOffset, filter.primaryParty)
   }
 
   private def ingestAcsAndInFlight(

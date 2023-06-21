@@ -19,6 +19,7 @@ class ScanAutomationService(
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
+    ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -29,4 +30,5 @@ class ScanAutomationService(
       store,
       ledgerClient,
       retryProvider,
+      ingestFromParticipantBegin,
     ) {}

@@ -476,6 +476,13 @@ object CNNodeConfigTransforms {
       )
     })
 
+  def ingestFromParticipantBeginInScan: CNNodeConfigTransform =
+    updateAllScanAppConfigs_(c =>
+      c.copy(
+        ingestFromParticipantBegin = true
+      )
+    )
+
   /** Canton has a built in authorizer that accepts "canton admin tokens",
     * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]
     * These are 128 character random strings (not JWTs), generated independently for each local participant node at canton startup.

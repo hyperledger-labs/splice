@@ -3,6 +3,7 @@ package com.daml.network.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import cats.syntax.traverse.*
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction_filter.{TransactionFilter as LapiTransactionFilter}
 import com.daml.ledger.javaapi.data.{
   ContractMetadata,
@@ -633,4 +634,25 @@ object MultiDomainAcsStore {
         traceContext: TraceContext
     ): Future[Unit]
   }
+
+  // We use a synthetic 0 offset here. This is easier to manage than having to use ParticpantOffset
+  // in the store APIs everywhere instead of a plain string.
+  private val PARTICIPANT_BEGIN_OFFSET = "0"
+
+  def fromParticipantOffset(offset: ParticipantOffset): String =
+    offset.value match {
+      case ParticipantOffset.Value.Boundary(
+            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN
+          ) =>
+        PARTICIPANT_BEGIN_OFFSET
+      case ParticipantOffset.Value.Absolute(offset) => offset
+      case offset => throw new IllegalArgumentException(s"Cannot convert $offset to string")
+    }
+
+  def toParticipantOffset(offset: String): ParticipantOffset =
+    if (offset == PARTICIPANT_BEGIN_OFFSET)
+      ParticipantOffset(
+        ParticipantOffset.Value.Boundary(ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN)
+      )
+    else ParticipantOffset(ParticipantOffset.Value.Absolute(offset))
 }

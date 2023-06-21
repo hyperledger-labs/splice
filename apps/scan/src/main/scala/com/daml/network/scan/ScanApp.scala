@@ -90,6 +90,7 @@ class ScanApp(
         retryProvider,
         loggerFactory,
         store,
+        config.ingestFromParticipantBegin,
       )
       _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- retryProvider.waitUntil(
