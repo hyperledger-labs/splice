@@ -8,4 +8,9 @@ INDEX_DB_SQL_NON_TRANSIENT_ERROR.*\(this database is empty\)
 INDEX_DB_SQL_NON_TRANSIENT_ERROR.*Database is already closed
 Error while running indexer
 
+# shutdown can be slower than the timeouts
+Task closing ledger API server did not complete
+Closing .* failed
+Failed to shut down successfully
+
 # Make sure to have a trailing newline
