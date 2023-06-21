@@ -10,6 +10,11 @@ clusterUrl: "TARGET_CLUSTER.network.canton.global"
 globalDomainUrl: "http://TARGET_CLUSTER.network.canton.global:5008"
 foundingSvApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
 auth:
-  audience: https://canton.network.global
+  # If you want to configure audience, replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with audience for Validator app backend
+  # Otherwise, remove this line
+  audience: "OIDC_AUTHORITY_VALIDATOR_AUDIENCE"
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+  # If you want to configure audience, replace OIDC_AUTHORITY_LEDGER_API_AUDIENCE with audience ledger API
+  # Otherwise, remove this line
+  ledgerApiAudience: "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"

@@ -32,6 +32,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
   const SV_WALLET_USER_ID = process.env.SV_WALLET_USER_ID || 'auth0|64553aa683015a9687d9cc2e'; // Default to admin@sv.com at the sv-test tenant by default
   const SV_NAMESPACE = process.env.SV_NAMESPACE || 'sv';
+  const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
   console.error(
     localCharts
@@ -68,6 +69,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      OIDC_AUTHORITY_PARTICIPANT_TARGET_AUDIENCE:
+        auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     }
   );
 
@@ -96,6 +99,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: SV_NAME,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      OIDC_AUTHORITY_SV_AUDIENCE: auth0Cfg.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
     }
   );
 
@@ -138,6 +142,9 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       TARGET_CLUSTER: TARGET_CLUSTER,
       SV_WALLET_USER_ID: SV_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      OIDC_AUTHORITY_VALIDATOR_AUDIENCE: auth0Cfg.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      OIDC_AUTHORITY_LEDGER_API_AUDIENCE:
+        auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     }
   );
 

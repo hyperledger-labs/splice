@@ -149,7 +149,11 @@ export class Auth0Fetch implements Auth0Client {
     return this.secrets;
   }
 
-  public async getClientAccessToken(clientId: string, clientSecret: string): Promise<string> {
+  public async getClientAccessToken(
+    clientId: string,
+    clientSecret: string,
+    audience?: string
+  ): Promise<string> {
     pulumi.log.info('Getting access token for Auth0 client: ' + clientId);
 
     const now = new Date();
@@ -167,14 +171,19 @@ export class Auth0Fetch implements Auth0Client {
       }
     }
 
-    pulumi.log.info('Querying access token for Auth0 client: ' + clientId);
+    const aud = audience || 'https://canton.network.global';
+
+    pulumi.log.info(
+      'Querying access token for Auth0 client: ' + clientId + ' with audience ' + aud
+    );
     const auth0 = new AuthenticationClient({
       domain: this.cfg.auth0Domain,
       clientId: clientId,
       clientSecret: clientSecret,
     });
+
     const tokenResponse = await auth0.clientCredentialsGrant({
-      audience: 'https://canton.network.global',
+      audience: aud,
     });
 
     const { expires_in } = tokenResponse;
@@ -248,12 +257,13 @@ async function auth0Secret(
 ): Promise<{ [key: string]: string }> {
   const cfg = auth0Client.getCfg();
   const clientSecrets = lookupClientSecrets(allSecrets, cfg.appToClientId, clientName);
+  const audience = cfg.appToClientAudience[clientName];
 
   const clientId = clientSecrets.client_id;
   const clientSecret = clientSecrets.client_secret;
 
   if (fixedTokens()) {
-    const accessToken = await auth0Client.getClientAccessToken(clientId, clientSecret);
+    const accessToken = await auth0Client.getClientAccessToken(clientId, clientSecret, audience);
     return {
       token: accessToken,
       'ledger-api-user': clientId + '@clients',
@@ -264,6 +274,7 @@ async function auth0Secret(
       'client-id': clientId,
       'client-secret': clientSecret,
       'ledger-api-user': clientId + '@clients',
+      ...(audience && { audience: audience }),
     };
   }
 }

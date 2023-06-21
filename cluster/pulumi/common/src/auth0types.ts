@@ -7,9 +7,13 @@ export type Auth0SecretMap = Map<string, Auth0ClientSecret>;
 
 export type ClientIdMap = Partial<Record<string, string>>;
 
+export type AudienceMap = Partial<Record<string, string>>;
+
 export type Auth0Config = {
   appToClientId: ClientIdMap;
   namespaceToUiClientId: ClientIdMap;
+  appToApiAudience: AudienceMap;
+  appToClientAudience: AudienceMap;
   auth0Domain: string;
   auth0MgtClientId: string;
   auth0MgtClientSecret: string;
@@ -23,6 +27,10 @@ export interface Auth0ClientAccessToken {
 
 export interface Auth0Client {
   getSecrets: () => Promise<Auth0SecretMap>;
-  getClientAccessToken: (clientId: string, clientSecret: string) => Promise<string>;
+  getClientAccessToken: (
+    clientId: string,
+    clientSecret: string,
+    audience?: string
+  ) => Promise<string>;
   getCfg: () => Auth0Config;
 }

@@ -123,7 +123,7 @@ function _cluster_apply() {
 
     _info "Applying Pulumi Stack"
 
-    subcmd_pulumi canton-network up --yes --skip-preview --show-sames "${args[@]}"
+    subcmd_pulumi canton-network up --logflow --logtostderr -v=9 --yes --skip-preview --show-sames "${args[@]}"
 }
 
 function _cluster_show() {
@@ -865,7 +865,7 @@ function subcmd_pulumi() {
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
 
-    _pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+    _pulumi --logflow --logtostderr -v=9 --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
             "$pulumi_cmd" "$@"
 }

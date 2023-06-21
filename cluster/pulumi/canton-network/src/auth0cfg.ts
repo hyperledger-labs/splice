@@ -26,6 +26,10 @@ export const auth0Cfg: Auth0Config = {
     'sv-4': 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
   },
 
+  appToApiAudience: {},
+
+  appToClientAudience: {},
+
   fixedTokenCacheName: 'auth0-fixed-token-cache',
 
   // TODO(#5836): the naming we have for this vs those for sv-runbook tenant is terrible!!

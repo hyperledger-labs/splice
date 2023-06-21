@@ -41,6 +41,12 @@
       key: client-secret
       name: "cn-app-{{ $keyName }}-ledger-api-auth"
       optional: false
+- name: "CN_APP_{{ $app | upper }}_LEDGER_API_AUTH_AUDIENCE"
+  valueFrom:
+    secretKeyRef:
+      key: audience
+      name: "cn-app-{{ $keyName }}-ledger-api-auth"
+      optional: true
 {{- end }}
 {{- end -}}
 {{- define "cn-util-lib.auth0-user-env-var" -}}

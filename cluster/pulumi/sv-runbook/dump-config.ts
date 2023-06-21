@@ -22,7 +22,7 @@ async function main() {
   installNode.installNode({
     getSecrets: () => Promise.resolve(secrets),
     /* eslint-disable @typescript-eslint/no-unused-vars */
-    getClientAccessToken: (clientId: string, clientSecret: string) =>
+    getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
       Promise.resolve('access_token'),
     getCfg: () => auth0Cfg.auth0Cfg,
   });

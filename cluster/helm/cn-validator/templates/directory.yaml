@@ -34,6 +34,8 @@ spec:
               key: url
               name: cn-app-directory-ui-auth
               optional: false
+        - name: CN_APP_DIRECTORY_UI_AUTH_AUDIENCE
+          value: {{ (.Values.auth).ledgerApiAudience | default "https://canton.network.global" | quote }}
         - name: CN_APP_DIRECTORY_UI_CLUSTER
           value: {{ .Values.clusterUrl | quote }}
         ports:

@@ -12,6 +12,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://ledger_api.example.com",
           "client-id": "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
           "client-secret": "***",
           "ledger-api-user": "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn@clients",
@@ -36,6 +37,7 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "audience": "https://ledger_api.example.com",
           "client-id": "uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr",
           "client-secret": "***",
           "ledger-api-user": "uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr@clients",
@@ -462,7 +464,7 @@
       "values": {
         "auth": {
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json",
-          "targetAudience": "https://canton.network.global"
+          "targetAudience": "https://ledger_api.example.com"
         },
         "enableHealthProbes": true,
         "globalDomain": {
@@ -520,7 +522,7 @@
       "namespace": "sv",
       "values": {
         "auth": {
-          "audience": "https://canton.network.global",
+          "audience": "https://sv.example.com/api",
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
         "cometBFT": {
@@ -568,8 +570,9 @@
       "namespace": "sv",
       "values": {
         "auth": {
-          "audience": "https://canton.network.global",
-          "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
+          "audience": "https://validator.example.com/api",
+          "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json",
+          "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
         "foundingSvApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",

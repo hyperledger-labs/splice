@@ -7,5 +7,7 @@ globalDomain:
 auth:
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
-  targetAudience: "https://canton.network.global"
+  # If you want to configure audience, replace OIDC_AUTHORITY_PARTICIPANT_TARGET_AUDIENCE with audience for Ledger API
+  # Otherwise, remove this line
+  targetAudience: "OIDC_AUTHORITY_PARTICIPANT_TARGET_AUDIENCE"
 enableHealthProbes: true

@@ -145,7 +145,6 @@ make sure that whatever you configure there matches the contents of the `sub` fi
 *All* JWTs issued for use with your SV node:
 
 - must be signed using the RS256 signing algorithm
-- must set the audience (`aud`) field to exactly ``https://canton.network.global`` [#aud]_
 
 In the future, your OIDC provider might additionally be required to issue JWTs with a ``scope`` explicitly set to ``daml_ledger_api``
 (when requested to do so as part of the OAuth 2.0 authorization code flow).
@@ -172,8 +171,6 @@ it can be beneficial to skim the instructions in :ref:`helm-sv-auth0` as well, t
 
 .. [#reach] The URL must be reachable from the Canton participant, validator app and SV app running in your cluster, as well as from all web browsers that should be able to interact with the SV and wallet UIs.
 
-.. [#aud] This is currently the only audience supported. In the future, the audience will be made customizable.
-
     .. TODO(#2052) use a unique audience for each app
 
 .. _helm-sv-auth0:
@@ -186,7 +183,8 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
 1. Create an Auth0 tenant for your SV
 2. Create an Auth0 API that controls access to the ledger API:
 
-    a. Navigate to Applications > APIs and click "Create API". Set name to ``Daml Ledger API``, set identifier to ``https://canton.network.global`` [#aud]_.
+    a. Navigate to Applications > APIs and click "Create API". Set name to ``Daml Ledger API``,
+       set identifier to a audience of your choice for the ledger API. e.g. ``https://ledger_api.example.com``.
     b. Under the Permissions tab in the new API, add a permission with scope ``daml_ledger_api``, and a description of your choice.
     c. On the Settings tab, scroll down to "Access Settings" and enable "Allow Offline Access", for automatic token refreshing.
 
@@ -220,12 +218,19 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
    - In steps c and d, use the URL for your SV's *wallet* UI.
      If you're using the ingress configuration of this runbook, that would be ``https://wallet.sv.svc.YOUR_HOSTNAME``.
 
-6. Create an Auth0 Application for the directory web UI.
+7. Create an Auth0 Application for the directory web UI.
    Repeat all steps described in step 5, with following modifications:
 
    - In step b, use ``Directory web UI`` as the name of your application.
    - In steps c and d, use the URL for your SV's *directory* UI.
      If you're using the ingress configuration of this runbook, that would be ``https://directory.sv.svc.YOUR_CLUSTER_URL``.
+
+8. Create an Auth0 API that controls access to the CN apps backend API:
+
+    a. Navigate to Applications > APIs and click "Create API". Set name to ``SV App API``,
+       set identifier to an audience of your choice for the API e.g. ``https://sv.example.com/api``.
+    b. Create another API by setting name to ``Validator App API``,
+       set identifier to an audience of your choice for the API e.g. ``https://validator.example.com/api``.
 
 Please refer to Auth0's `own documentation on user management <https://auth0.com/docs/manage-users>`_ for pointers on how to set up end-user accounts for the two web UI applications you created.
 Note that you will need to create at least one such user account for completing the steps in :ref:`helm-sv-install` - for being able to log in as your SV node's administrator.
@@ -238,6 +243,7 @@ We will use the environment variables listed in the table below to refer to aspe
 Name                    Value
 ----------------------- ---------------------------------------------------------------------------
 OIDC_AUTHORITY_URL      ``https://AUTH0_TENANT_NAME.us.auth0.com``
+OIDC_AUTHORITY_AUDIENCE The audience of your choice for Ledger API. e.g. ``https://ledger_api.example.com``
 VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
 SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
@@ -300,6 +306,7 @@ The SV app is configured with a secret as follows:
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
         "--from-literal=client-secret=${SV_CLIENT_SECRET}"
+        "--from-literal=audience=${OIDC_AUTHORITY_AUDIENCE}"
 
 
 The validator app backend requires the following secret.
@@ -311,6 +318,7 @@ The validator app backend requires the following secret.
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
+        "--from-literal=audience=${OIDC_AUTHORITY_AUDIENCE}"
 
 To setup the wallet and SV UI, create the following two secrets.
 
@@ -358,6 +366,7 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` as follows:
 
 - Replace ``TARGET_CLUSTER`` in the `globalDomain.url` entry with |cn_cluster|, per the cluster to which you are connecting.
+- If you want to configure the audience for the participant, replace ``OIDC_AUTHORITY_PARTICIPANT_TARGET_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``. Otherwise, remove `auth.targetAudience`.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 
@@ -365,6 +374,8 @@ An SV node includes a validator app so you also need to configure
 that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``. Otherwise, remove `auth.targetAudience`.
+- If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``. Otherwise, remove `auth.ledgerApiAudience`.
 - Replace ``SV_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
@@ -385,6 +396,7 @@ idenitty.
 For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``. Otherwise, remove `auth.audience`.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
