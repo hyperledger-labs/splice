@@ -1026,7 +1026,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
       # When updating this image version make sure to also update the nix version for cometbft
-      - image: digitalasset-canton-enterprise-docker.jfrog.io/cometbft-canton-network:0.1.6
+      - image: digitalasset-canton-enterprise-docker.jfrog.io/cometbft-canton-network:0.1.7
         entrypoint: testing-entrypoint.sh
         auth:
           username: $ARTIFACTORY_USER
