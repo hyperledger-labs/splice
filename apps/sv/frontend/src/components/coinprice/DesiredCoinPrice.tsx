@@ -29,11 +29,11 @@ import { config } from '../../utils';
 const DesiredCoinPrice: React.FC = () => {
   const coinPriceVotesQuery = useCoinPriceVotes();
   const { updateDesiredCoinPrice } = useSvAdminClient();
-  const [curPrice, setCurPrice] = useState<BigNumber>(new BigNumber(0.0));
+  const [curPriceText, setCurPriceText] = useState<string>('0');
   const [enableEdit, setEnableEdit] = useState<boolean>(false);
   const updateDesiredCoinPriceMutation = useMutation({
     mutationFn: () => {
-      return updateDesiredCoinPrice(curPrice);
+      return updateDesiredCoinPrice(BigNumber(curPriceText));
     },
     onSettled: async () => {
       setEnableEdit(false);
@@ -73,7 +73,7 @@ const DesiredCoinPrice: React.FC = () => {
       return b.lastUpdatedAt.valueOf() - a.lastUpdatedAt.valueOf();
     });
 
-  const isInvalidPrice = curPrice.lte(0.0);
+  const isInvalidPrice = BigNumber(curPriceText).lte(0.0);
   return (
     <>
       <Typography mt={6} variant="h4">
@@ -87,9 +87,9 @@ const DesiredCoinPrice: React.FC = () => {
             <TextField
               error={isInvalidPrice}
               label="Amount"
-              onChange={event => setCurPrice(new BigNumber(event.target.value))}
-              value={curPrice}
-              type="number"
+              onChange={event => setCurPriceText(event.target.value)}
+              value={curPriceText}
+              type="text"
               id="desired-coin-price-field"
             />
             <Button
@@ -121,12 +121,12 @@ const DesiredCoinPrice: React.FC = () => {
           <IconButton
             onClick={() => {
               // set initial value for editing
-              setCurPrice(
+              setCurPriceText(
                 curSvCoinPriceVote?.coinPrice
-                  ? maybeBigNumber(curSvCoinPriceVote.coinPrice)!
+                  ? curSvCoinPriceVote.coinPrice!
                   : // TODO(M3-73) If desired price is not yet set in this SV
                     // Current median value would be a better choice than 0.0 as a initial value for editing.
-                    new BigNumber(0.0)
+                    '0'
               );
               setEnableEdit(true);
             }}

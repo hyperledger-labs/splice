@@ -26,6 +26,20 @@ trait SvTestUtil extends CNNodeTestCommon {
     addSvMember(svXParty, "svX, the phantom of the SVC")
   }
 
+  def median(values: Seq[BigDecimal]): Option[BigDecimal] = {
+    if (values != null && values.length > 0) {
+      val sorted = values.sorted(Ordering[BigDecimal])
+      val length = sorted.length
+      val half = length / 2
+      if (length % 2 != 0)
+        Some(sorted(half))
+      else
+        Some((sorted(half - 1) + sorted(half)) / BigDecimal.valueOf(2))
+    } else {
+      None
+    }
+  }
+
   def addSvMember(
       svParty: PartyId,
       svName: String,
