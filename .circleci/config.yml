@@ -1147,6 +1147,12 @@ jobs:
       cluster:
         type: enum
         enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+      use_published_artifacts:
+        type: boolean
+        default: false
+      reset_if_successful:
+        type: boolean
+        default: false
     steps:
       - checkout
       - record_job_start_time
@@ -1159,14 +1165,31 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply SV-runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
           gce_authenticate: true
           cmd: |
             cncluster activate
             export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
             export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
             export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
-            cncluster ci_apply_sv
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            cncluster ci_apply_sv $VERSION
+      - run_bash_command_in_nix:
+          cmd_name: Bringing down the SV deployment if required
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.reset_if_successful >> == true ]]; then
+              cncluster activate
+              export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
+              export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
+              export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
+              cncluster ci_pdown_sv
+            fi
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
@@ -1323,7 +1346,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet"]
       channel_notify:
         type: string
         # #team-canton-network-internal
@@ -2171,6 +2194,29 @@ workflows:
         context:
           - artifactory
           - datadog
+    - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "devnet"
+          use_published_artifacts: true
+          reset_if_successful: true
+          requires:
+            - deploy_cluster
+            - publish_public_release
+    - preflight_sv_check:
+        <<: *main-branch-never
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "devnet"
+        requires:
+          - deploy_sv_runbook
+
 
   deploy_testnet:
     when:

@@ -1019,6 +1019,8 @@ function subcmd_ci_apply_sv() {
 
     local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
+    local -x CHARTS_VERSION="${1-}"
+
     subcmd_pulumi sv-runbook up --yes --skip-preview "${args[@]}"
 }
 
@@ -1030,6 +1032,19 @@ function subcmd_pdown_sv(){
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
+
+    subcmd_pulumi sv-runbook down --yes
+}
+
+###
+
+subcommand_whitelist[ci_pdown_sv]="Run only by CircleCI"
+
+function subcmd_ci_pdown_sv(){
+
+    if [ -z "${CI-}" ]; then
+        _error "This subcommand is available to CI jobs only."
+    fi
 
     subcmd_pulumi sv-runbook down --yes
 }
