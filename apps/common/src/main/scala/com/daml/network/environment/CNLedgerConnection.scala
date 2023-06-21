@@ -352,30 +352,17 @@ class CNLedgerConnection(
     } yield partyId
   }
 
-  def allocatePartyViaLedgerApi(
-      hint: Option[String],
-      displayName: Option[String],
-      lock: (String, () => Future[PartyId]) => Future[PartyId],
-  ): Future[PartyId] =
-    lock(
-      s"Allocate party with hint $hint",
-      () => client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive),
-    )
-
   def ensureUserPrimaryPartyIsAllocated(
       userId: String,
       hint: String,
-      lock: (String, () => Future[PartyId]) => Future[PartyId],
-  ): Future[PartyId] =
+      participantAdminConnection: ParticipantAdminConnection,
+      lock: (String, () => Future[Unit]) => Future[Unit],
+  )(implicit traceContext: TraceContext): Future[PartyId] =
     retryProvider.ensureThatO(
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
-        party <- allocatePartyViaLedgerApi(
-          Some(hint),
-          Some(hint),
-          lock,
-        )
+        party <- ensurePartyAllocated(hint, None, participantAdminConnection, lock)
         _ <- setUserPrimaryParty(userId, party)
         _ <- grantUserRights(userId, actAsParties = Seq(party), readAsParties = Seq.empty)
       } yield (),
@@ -384,12 +371,13 @@ class CNLedgerConnection(
 
   def ensurePartyAllocated(
       hint: String,
-      namespace: Namespace,
+      namespaceO: Option[Namespace],
       participantAdminConnection: ParticipantAdminConnection,
       lock: (String, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext) =
     for {
       participantId <- participantAdminConnection.getParticipantId()
+      namespace = namespaceO.getOrElse(participantId.uid.namespace)
       partyId = PartyId(
         UniqueIdentifier(
           Identifier.tryCreate(hint),
@@ -399,17 +387,24 @@ class CNLedgerConnection(
       _ <- lock(
         s"Ensure that party $partyId is allocated",
         () =>
-          retryProvider.ensureThatB(
-            s"Party $partyId is allocated",
-            client.getParties(Seq(partyId)).map(_.nonEmpty),
-            participantAdminConnection
-              .proposeInitialPartyToParticipant(
+          for {
+            _ <- participantAdminConnection
+              .ensureInitialPartyToParticipant(
                 partyId,
                 participantId,
                 participantId.uid.namespace.fingerprint,
-              ),
-            logger,
-          ),
+              )
+            _ <- retryProvider.waitUntil(
+              s"Ledger API observers party $partyId",
+              client.getParties(Seq(partyId)).map { parties =>
+                if (parties.isEmpty)
+                  throw Status.NOT_FOUND
+                    .withDescription(s"Party allocation of $partyId not observed on ledger API")
+                    .asRuntimeException()
+              },
+              logger,
+            )
+          } yield (),
       )
     } yield partyId
 
@@ -433,16 +428,18 @@ class CNLedgerConnection(
   private def createPartyAndUser(
       user: String,
       userRights: Seq[User.Right],
-      lock: (String, () => Future[PartyId]) => Future[PartyId],
-  ): Future[PartyId] =
+      participantAdminConnection: ParticipantAdminConnection,
+      lock: (String, () => Future[Unit]) => Future[Unit],
+  )(implicit traceContext: TraceContext): Future[PartyId] =
     for {
-      party <- allocatePartyViaLedgerApi(
-        Some(sanitizeUserIdToPartyString(user)),
-        Some(user),
+      party <- ensurePartyAllocated(
+        sanitizeUserIdToPartyString(user),
+        None,
+        participantAdminConnection,
         lock,
       )
-      partyId <- createUserWithPrimaryParty(user, party, userRights)
-    } yield partyId
+      _ <- createUserWithPrimaryParty(user, party, userRights)
+    } yield party
 
   def createUserWithPrimaryParty(
       user: String,
@@ -528,15 +525,16 @@ class CNLedgerConnection(
   def getOrAllocateParty(
       username: String,
       userRights: Seq[User.Right] = Seq.empty,
-      lock: (String, () => Future[PartyId]) => Future[PartyId],
-  ): Future[PartyId] = {
+      participantAdminConnection: ParticipantAdminConnection,
+      lock: (String, () => Future[Unit]) => Future[Unit],
+  )(implicit traceContext: TraceContext): Future[PartyId] = {
     for {
       existingPartyId <- getOptionalPrimaryParty(username).recover {
         case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
           None
       }
       partyId <- existingPartyId.fold[Future[PartyId]](
-        createPartyAndUser(username, userRights, lock)
+        createPartyAndUser(username, userRights, participantAdminConnection, lock)
       )(
         Future.successful
       )

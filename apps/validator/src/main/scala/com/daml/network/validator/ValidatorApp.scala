@@ -109,16 +109,21 @@ class ValidatorApp(
         lock(
           "Domain connection and primary party allocation of validatior",
           () =>
-            for {
-              _ <- ensureGlobalDomainRegistered()
-              _ <- connection.ensureUserPrimaryPartyIsAllocated(
-                config.ledgerApiUser,
-                config.validatorPartyHint
-                  .getOrElse(CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)),
-                // We have an outer lock around both here so we don't need to lock here.
-                noLock,
-              )
-            } yield (),
+            withParticipantAdminConnection { participantAdminConnection =>
+              for {
+                _ <- ensureGlobalDomainRegistered(participantAdminConnection)
+                _ <- connection.ensureUserPrimaryPartyIsAllocated(
+                  config.ledgerApiUser,
+                  config.validatorPartyHint
+                    .getOrElse(
+                      CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                    ),
+                  participantAdminConnection,
+                  // We have an outer lock around both here so we don't need to lock here.
+                  noLock,
+                )
+              } yield ()
+            },
         )
       )
     } yield ()
@@ -176,6 +181,7 @@ class ValidatorApp(
               party <- storeWithIngestion.connection.getOrAllocateParty(
                 instance.serviceUser,
                 Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
+                participantAdminConnection,
                 // We rely on the outer lock so we don't need to lock here.
                 noLock,
               )
@@ -186,6 +192,7 @@ class ValidatorApp(
                   storeWithIngestion,
                   validatorUserName = config.ledgerApiUser,
                   domainId,
+                  participantAdminConnection,
                   // We rely on the outer lock so we don't need to lock here.
                   noLock,
                   retryProvider,
@@ -270,20 +277,24 @@ class ValidatorApp(
     )
   }
 
-  private def ensureGlobalDomainRegistered(): Future[Unit] = {
+  private def withParticipantAdminConnection[T](f: ParticipantAdminConnection => Future[T]) = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
       loggerFactory,
       retryProvider,
       clock,
     )
+    f(participantAdminConnection).andThen { _ => participantAdminConnection.close() }
+  }
+
+  private def ensureGlobalDomainRegistered(
+      participantAdminConnection: ParticipantAdminConnection
+  ): Future[Unit] = {
     val domainConfig = DomainConnectionConfig(
       config.domains.global.alias,
       SequencerConnections.single(GrpcSequencerConnection.tryCreate(config.domains.global.url)),
     )
-    participantAdminConnection.ensureDomainRegistered(domainConfig).andThen { _ =>
-      participantAdminConnection.close()
-    }
+    participantAdminConnection.ensureDomainRegistered(domainConfig)
   }
 
   override def initialize(
@@ -357,13 +368,14 @@ class ValidatorApp(
           domainId,
         )
       })
-      _ <- withGlobalLock[PartyId, PartyId](
+      _ <- withGlobalLock[Unit, PartyId](
         ValidatorUtil.onboard(
           endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
           knownParty = Some(validatorParty),
           automation,
           validatorUserName = config.ledgerApiUser,
           domainId,
+          participantAdminConnection,
           _,
           retryProvider,
           logger,
@@ -375,12 +387,13 @@ class ValidatorApp(
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
-      handler <- withGlobalLock[PartyId, HttpValidatorHandler](lock =>
+      handler <- withGlobalLock[Unit, HttpValidatorHandler](lock =>
         Future.successful(
           new HttpValidatorHandler(
             automation,
             validatorUserName = config.ledgerApiUser,
             domainId = domainId,
+            participantAdminConnection,
             lock,
             retryProvider,
             loggerFactory,
@@ -388,12 +401,13 @@ class ValidatorApp(
         )
       )
 
-      adminHandler <- withGlobalLock[PartyId, HttpValidatorAdminHandler](lock =>
+      adminHandler <- withGlobalLock[Unit, HttpValidatorAdminHandler](lock =>
         Future.successful(
           new HttpValidatorAdminHandler(
             automation,
             validatorUserName = config.ledgerApiUser,
             domainId = domainId,
+            participantAdminConnection,
             lock,
             retryProvider = retryProvider,
             loggerFactory,

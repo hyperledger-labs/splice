@@ -1,8 +1,9 @@
 package com.daml.network.sv.setup
 
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection}
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -11,8 +12,9 @@ private[setup] object SetupUtil {
   def setupSvParty(
       connection: CNLedgerConnection,
       config: SvAppBackendConfig,
-      lock: (String, () => Future[PartyId]) => Future[PartyId],
-  ): Future[PartyId] = {
+      participantAdminConnection: ParticipantAdminConnection,
+      lock: (String, () => Future[Unit]) => Future[Unit],
+  )(implicit traceContext: TraceContext): Future[PartyId] = {
     val partyHint = config.svPartyHint.getOrElse(
       config.onboarding
         .getOrElse(
@@ -23,6 +25,7 @@ private[setup] object SetupUtil {
     connection.ensureUserPrimaryPartyIsAllocated(
       config.ledgerApiUser,
       partyHint,
+      participantAdminConnection,
       lock,
     )
   }

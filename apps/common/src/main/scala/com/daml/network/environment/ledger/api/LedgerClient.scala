@@ -341,23 +341,6 @@ private[environment] class LedgerClient(
     }
   }
 
-  def allocateParty(hint: Option[String], displayName: Option[String])(implicit
-      ec: ExecutionContext
-  ): Future[String] = {
-    val requestBuilder = PartyManagementServiceOuterClass.AllocatePartyRequest
-      .newBuilder()
-    hint.foreach(requestBuilder.setPartyIdHint(_))
-    displayName.foreach(requestBuilder.setDisplayName(_))
-    for {
-      stub <- withCredentials(partyManagementServiceStub)
-      res <- wrapFuture(
-        stub
-          .allocateParty(requestBuilder.build, _)
-      )
-        .map(_.getPartyDetails.getParty)
-    } yield res
-  }
-
   def getParties(
       parties: Seq[PartyId]
   )(implicit ec: ExecutionContext): Future[Seq[PartyDetails]] = {

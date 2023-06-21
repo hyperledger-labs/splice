@@ -312,7 +312,7 @@ class TopologyAdminConnection(
       logger,
     )
 
-  def proposeInitialPartyToParticipant(
+  protected def proposeInitialPartyToParticipant(
       partyId: PartyId,
       participantId: ParticipantId,
       signedBy: Fingerprint,

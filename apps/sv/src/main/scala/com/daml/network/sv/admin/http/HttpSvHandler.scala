@@ -503,11 +503,12 @@ class HttpSvHandler(
   private def dummyTopologyTransaction(
       sequencerAdminConnection: SequencerAdminConnection
   )(implicit traceContext: TraceContext): Future[Unit] = {
-
+    val dummyHint = s"dummy-${UUID.randomUUID}"
     for {
-      party <- svcStoreWithIngestion.connection.allocatePartyViaLedgerApi(
-        hint = None,
-        displayName = None,
+      party <- svcStoreWithIngestion.connection.ensurePartyAllocated(
+        dummyHint,
+        None,
+        participantAdminConnection,
         { case (_, f) =>
           f()
         }, // Don't lock here, the candidate SV locks around the whole sequencer onboarding.

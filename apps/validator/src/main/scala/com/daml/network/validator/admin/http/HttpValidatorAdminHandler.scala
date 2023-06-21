@@ -1,12 +1,12 @@
 package com.daml.network.validator.admin.http
 
 import com.daml.network.store.CNNodeAppStoreWithIngestion
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validatorAdmin as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
@@ -17,7 +17,8 @@ class HttpValidatorAdminHandler(
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
     validatorUserName: String,
     domainId: DomainId,
-    lock: (String, () => Future[PartyId]) => Future[PartyId],
+    participantAdminConnection: ParticipantAdminConnection,
+    lock: (String, () => Future[Unit]) => Future[Unit],
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -71,6 +72,7 @@ class HttpValidatorAdminHandler(
         storeWithIngestion,
         validatorUserName,
         domainId,
+        participantAdminConnection,
         lock,
         retryProvider,
         logger,

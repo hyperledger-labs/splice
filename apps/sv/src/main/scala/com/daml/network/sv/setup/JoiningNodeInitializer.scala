@@ -93,7 +93,12 @@ class JoiningNodeInitializer(
             for {
               _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
               // We lock through the outer lock here so we don't lock within this.
-              svParty <- SetupUtil.setupSvParty(initConnection, config, { case (_, f) => f() })
+              svParty <- SetupUtil.setupSvParty(
+                initConnection,
+                config,
+                participantAdminConnection,
+                { case (_, f) => f() },
+              )
             } yield svParty
           },
         )

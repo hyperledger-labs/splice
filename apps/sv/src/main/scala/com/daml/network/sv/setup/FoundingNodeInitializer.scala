@@ -103,7 +103,7 @@ class FoundingNodeInitializer(
       _ = logger.info("Participant connected to domain")
       svcParty <- setupSvcParty(initConnection, namespace)
       // founder does not need to lock here
-      svParty <- SetupUtil.setupSvParty(initConnection, config, noLock)
+      svParty <- SetupUtil.setupSvParty(initConnection, config, participantAdminConnection, noLock)
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -165,7 +165,7 @@ class FoundingNodeInitializer(
     for {
       svc <- connection.ensurePartyAllocated(
         foundingConfig.svcPartyHint,
-        namespace,
+        Some(namespace),
         participantAdminConnection,
         // founder does not need to lock here.
         noLock,

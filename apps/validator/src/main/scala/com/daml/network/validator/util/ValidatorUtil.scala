@@ -2,7 +2,7 @@ package com.daml.network.validator.util
 
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.validator.store.ValidatorStore
@@ -72,7 +72,8 @@ private[validator] object ValidatorUtil {
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       domainId: DomainId,
-      lock: (String, () => Future[PartyId]) => Future[PartyId],
+      participantAdminConnection: ParticipantAdminConnection,
+      lock: (String, () => Future[Unit]) => Future[Unit],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
@@ -89,6 +90,7 @@ private[validator] object ValidatorUtil {
           storeWithIngestion.connection.getOrAllocateParty(
             endUserName,
             Seq(),
+            participantAdminConnection,
             lock,
           )
       }
