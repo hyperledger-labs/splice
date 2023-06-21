@@ -278,6 +278,13 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       })
   }
 
+  override def lookupContractStateById(id: ContractId[?])(implicit
+      traceContext: TraceContext
+  ): Future[Option[ContractState]] =
+    offsetAndStateAfterIngestingAcs().map { case (_, st) =>
+      st.lookupContractState(id)
+    }
+
   /** Find a contract that satisfies a predicate.
     *
     * Caution: this function traverses all contracts!

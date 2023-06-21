@@ -1,12 +1,12 @@
 package com.daml.network.splitwell.automation
 
 import akka.stream.Materializer
+import cats.syntax.apply.*
 import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferFollowTrigger,
   TransferInTrigger,
 }
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -78,33 +78,12 @@ class SplitwellAutomationService(
       store,
       connection,
       store.providerParty,
-      splitwellCodegen.Group.COMPANION,
-      splitwellCodegen.BalanceUpdate.COMPANION,
-      implicit tc => store.listLaggingBalanceUpdates(),
-    )
-  )
-
-  registerTrigger(
-    new TransferFollowTrigger(
-      triggerContext,
-      store,
-      connection,
-      store.providerParty,
-      splitwellCodegen.Group.COMPANION,
-      splitwellCodegen.GroupInvite.COMPANION,
-      implicit tc => store.listLaggingGroupInvites(),
-    )
-  )
-
-  registerTrigger(
-    new TransferFollowTrigger(
-      triggerContext,
-      store,
-      connection,
-      store.providerParty,
-      splitwellCodegen.Group.COMPANION,
-      splitwellCodegen.AcceptedGroupInvite.COMPANION,
-      implicit tc => store.listLaggingAcceptedGroupInvites(),
+      implicit tc =>
+        (
+          store.listLaggingBalanceUpdates(),
+          store.listLaggingGroupInvites(),
+          store.listLaggingAcceptedGroupInvites(),
+        ).mapN(_ ++ _ ++ _),
     )
   )
 }

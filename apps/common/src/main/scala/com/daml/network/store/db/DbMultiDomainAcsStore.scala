@@ -112,6 +112,22 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .value
   }
 
+  override def lookupContractStateById(id: ContractId[?])(implicit
+      traceContext: TraceContext
+  ): Future[Option[ContractState]] = waitUntilAcsIngested {
+    storage
+      .querySingle( // index: acs_store_template_sid_cid
+        sql"""
+            #${selectFromAcsTable(tableName)}
+            where store_id = $storeId
+              and contract_id = ${lengthLimited(id.contractId)}
+             """.as[AcsStoreRowTemplate].headOption,
+        "lookupContractStateById",
+      )
+      .semiflatMap(contractStateFromRow(_))
+      .value
+  }
+
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit,
@@ -450,13 +466,22 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[ContractWithState[TCid, T]] = {
-    resolveDomainId(traceContext).map { domainId =>
+    contractStateFromRow(row).map { state =>
       val contract = contractFromRow(companion)(row)
-      // TODO (#5314): handle InFlight
-      val state = ContractState.Assigned(domainId)
       ContractWithState(contract, state)
     }
   }
+
+  @annotation.nowarn(
+    "cat=unused&msg=value row.*is never used"
+  ) // TODO (#5314) domain must come from row
+  private def contractStateFromRow(
+      row: AcsStoreRowTemplate
+  )(implicit traceContext: TraceContext): Future[ContractState] =
+    resolveDomainId(traceContext).map { domainId =>
+      // TODO (#5314): handle InFlight
+      ContractState.Assigned(domainId)
+    }
 
   override def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit ec: ExecutionContext) = ???
 

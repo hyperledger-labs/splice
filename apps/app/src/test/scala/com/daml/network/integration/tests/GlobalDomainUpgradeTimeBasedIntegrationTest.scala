@@ -66,6 +66,11 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest extends SvTimeBasedIntegration
         )
       }
     }
-  // TODO (#4906) check scan for other contracts' transfer
+  // check scan for other contracts' transfer:
+  // TODO (#5842) check svc governance contracts
+  // TODO (#5842) check coinrules contracts
+  // TODO (#5957) check coin contracts signed only by SVC (in particular mining rounds)
+  // TODO (#5958) check coin and wallet contracts
+  // TODO (#5959) check directory contracts
   }
 }

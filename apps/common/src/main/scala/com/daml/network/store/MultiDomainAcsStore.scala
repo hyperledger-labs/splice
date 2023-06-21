@@ -98,6 +98,13 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       }
     })
 
+  /** Like `#lookupContractById` but only returns the [[ContractState]], not the
+    * full decoded contract.
+    */
+  def lookupContractStateById(id: ContractId[?])(implicit
+      traceContext: TraceContext
+  ): Future[Option[ContractState]]
+
   /** Like `lookupContractByIdOnDomain` but
     *
     * Throws [[Status.NOT_FOUND]] if no such contract exists.
