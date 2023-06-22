@@ -666,8 +666,6 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              click on "update-json-submit-button"
-
               click on "create-voterequest-submit-button"
             },
           )(
@@ -685,6 +683,83 @@ class SvFrontendIntegrationTest
             },
           )
           (createdVoteRequestAction, createdVoteRequestRequester)
+        }
+
+    }
+
+    "can create a valid CRARC_SetConfigSchedule(future coin configurations) vote request" in {
+      implicit env =>
+        val requestNewTransferConfigFeeValue = "42"
+        val requestReasonUrl = "This is a request reason url."
+        val requestReasonBody = "This is a request reason."
+
+        withFrontEnd("sv1") { implicit webDriver =>
+          actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1Port/votes"
+              loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+            },
+          )(
+            "sv1 can see the create vote request button",
+            _ => {
+              find(id("create-voterequest-submit-button")) should not be empty
+            },
+          )
+
+          actAndCheck(
+            "sv1 operator can create a new vote request with two future schedules on different dates", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_SetConfigSchedule")
+
+              Seq(("12-12-002030T12:12", 1), ("12-12-002031T12:12", 2)).foreach(e => {
+                inside(find(id("datetime-schedule-configuration-value"))) { case Some(element) =>
+                  element.underlying.clear()
+                  element.underlying.sendKeys(e._1)
+                }
+
+                click on "button-schedule-new-configuration"
+
+                click on s"button-collapse-schedule-configuration-${e._2}"
+
+                clue("sv1 modifies one value") {
+                  find(id("transferConfig.createFee.fee-value")).value.underlying
+                    .sendKeys(requestNewTransferConfigFeeValue)
+                }
+
+              })
+              clue("sv1 modifies url") {
+                find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
+              }
+
+              clue("sv1 modifies description") {
+                find(id("create-reason-description")).value.underlying.sendKeys(requestReasonBody)
+              }
+
+              click on "create-voterequest-submit-button"
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              rows.head
+                .childElement(className("vote-row-action"))
+                .text shouldBe "CRARC_SetConfigSchedule"
+
+              val reviewButton = rows.head
+                .childElement(className("vote-row-review"))
+                .childElement(className("vote-row-review-button"))
+              reviewButton.text should matchText("REVIEW")
+              reviewButton.underlying.click()
+
+              val dropDownSchedules =
+                new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
+              dropDownSchedules.getOptions.size() shouldBe 2
+
+            },
+          )
         }
 
     }

@@ -7,16 +7,21 @@ Release Notes
 ----------
 
 * Frontend updates:
+
+   * The SV web UI allows operators to create vote requests to propose future coin configurations.
+     Others can vote on these. Once the majority is reached the new configurations will be applied at due times.
    * The SV web UI allows operators to create vote requests to propose a new SV Collective configuration.
      Others can vote on these. Once the majority is reached the new configuration is applied.
    * The SV web UI has a new tab to display the status of your sequencer and mediator. Note that the mediator and sequencer are not yet deployed
      as part of the runbook so you will see an error on the status page.
+
 * Deployment updates:
+
    * The container for scan now accepts the address to the participant through the ``CN_APP_SCAN_PARTICIPANT_ADDRESS``
      environment variable matching the SV app and the validator app. The helm charts set the right default so
      if you are using them, there is no need to configure anything.
    * The `audience` which defines the intended consumer of the token is now configurable in Participant, Validator app, Validator web UI, SV app, SV web UI and Directory web UI.
-* Validator apps and SV apps now configure the address of the founding SV app to allow for synchronization across nodes until all aspects of the BFT domain are robust under concurrent operations.
+   * Validator apps and SV apps now configure the address of the founding SV app to allow for synchronization across nodes until all aspects of the BFT domain are robust under concurrent operations.
 
 * Bugfixes
 

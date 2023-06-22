@@ -23,6 +23,7 @@ import ListVoteRequests from './ListVoteRequests';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import RemoveMember from './actions/RemoveMember';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
+import SetCoinRulesConfig from './actions/SetCoinRulesConfig';
 import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 
 const VoteRequest: React.FC = () => {
@@ -36,6 +37,7 @@ const VoteRequest: React.FC = () => {
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
     { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
+    { name: 'Set CoinRules Configuration', value: 'CRARC_SetConfigSchedule' },
   ];
 
   const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
@@ -61,7 +63,7 @@ const VoteRequest: React.FC = () => {
   // TODO (#4966): add a popup to ask confirmation
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
-      <Typography mt={6} variant="h4">
+      <Typography mt={4} variant="h4">
         Create Vote Request
       </Typography>
       <Card variant="elevation">
@@ -90,6 +92,9 @@ const VoteRequest: React.FC = () => {
             <RevokeFeaturedAppRight chooseAction={chooseAction} />
           )}
           {actionName === 'SRARC_SetConfig' && <SetSvcRulesConfig chooseAction={chooseAction} />}
+          {actionName === 'CRARC_SetConfigSchedule' && (
+            <SetCoinRulesConfig chooseAction={chooseAction} />
+          )}
           <Typography variant="h5">Reason</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>

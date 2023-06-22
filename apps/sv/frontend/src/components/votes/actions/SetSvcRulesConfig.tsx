@@ -26,9 +26,7 @@ const SetSvcRulesConfig: React.FC<{
   }
 
   async function setSvcRulesConfigAction(svcRulesConfig: Record<string, JSONValue>) {
-    console.log(svcRulesConfig);
     const decodedConfig = SvcRulesConfig.decoder.runWithException(svcRulesConfig);
-    console.log(decodedConfig);
     chooseAction({
       tag: 'ARC_SvcRules',
       value: {

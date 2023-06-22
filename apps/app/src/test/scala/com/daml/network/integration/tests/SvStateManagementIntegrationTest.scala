@@ -1,7 +1,14 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cc.coin.CoinRules_SetConfigSchedule
+import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, TransferConfig, USD}
+import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
+  ARC_CoinRules,
+  ARC_SvcRules,
+}
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_SetConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
@@ -13,6 +20,7 @@ import com.daml.network.util.Codec
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
+import java.util
 import scala.jdk.OptionConverters.*
 
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
@@ -233,6 +241,126 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           .payload
           .config
           .numUnclaimedRewardsThreshold shouldBe newNumUnclaimedRewardsThreshold
+      },
+    )
+  }
+
+  "At least 3 SVs can vote on changing the Coin Configuration" in { implicit env =>
+    clue("Initialize SVC with 4 SVs") {
+      initSvc()
+      eventually() {
+        sv1.getSvcInfo().svcRules.payload.members should have size 4
+      }
+    }
+
+    val (_, (voteRequestCid, initialFutureValuesSize)) = actAndCheck(
+      "SV1 create a vote request for a new Coin Configuration (changing the transfer config)", {
+
+        val initialValue = sv1.getSvcInfo().coinRules.payload.configSchedule.initialValue
+        val transferConfig = initialValue.transferConfig
+        val newTransferConfig = new TransferConfig[USD](
+          transferConfig.createFee,
+          transferConfig.holdingFee,
+          transferConfig.transferFee,
+          transferConfig.lockHolderFee,
+          42,
+          42,
+          42,
+        )
+
+        val futureValue =
+          new com.daml.network.codegen.java.da.types.Tuple2[Instant, CoinConfig[USD]](
+            Instant.now().plusSeconds(3600),
+            new CoinConfig[USD](
+              newTransferConfig,
+              initialValue.issuanceCurve,
+              initialValue.globalDomain,
+              initialValue.tickDuration,
+            ),
+          )
+
+        sv1.getSvcInfo().coinRules.payload.configSchedule.futureValues
+        val futureValues = new util.ArrayList[
+          com.daml.network.codegen.java.da.types.Tuple2[Instant, CoinConfig[USD]]
+        ]();
+        futureValues.add(futureValue)
+
+        val newConfig = new Schedule[Instant, CoinConfig[USD]](
+          initialValue,
+          futureValues,
+        )
+
+        val action: ActionRequiringConfirmation =
+          new ARC_CoinRules(
+            sv1.getSvcInfo().coinRules.contractId,
+            new CRARC_SetConfigSchedule(new CoinRules_SetConfigSchedule(newConfig)),
+          )
+
+        sv1.createVoteRequest(
+          sv1.getSvcInfo().svParty.toProtoPrimitive,
+          action,
+          "url",
+          "description",
+        )
+      },
+    )(
+      "The vote request has been created and SV1 accepts as he created it",
+      _ => {
+        sv1.listVoteRequests() should not be empty
+        val head = sv1.listVoteRequests().head.contractId
+        sv1.listVotes(Vector(head.contractId)) should have size 1
+        (head, sv1.getSvcInfo().coinRules.payload.configSchedule.futureValues.size())
+      },
+    )
+
+    actAndCheck(
+      "SV2 votes on accepting the new configuration", {
+        sv2.castVote(voteRequestCid, true, "url", "description")
+      },
+    )(
+      "The majority did not vote yet, thus the trigger should not change the coin config futureValues",
+      _ => {
+        sv2
+          .getSvcInfo()
+          .coinRules
+          .payload
+          .configSchedule
+          .futureValues
+          .size() shouldBe initialFutureValuesSize
+      },
+    )
+
+    actAndCheck(
+      "SV3 refuses the new configuration", {
+        sv3.castVote(voteRequestCid, false, "url", "description")
+      },
+    )(
+      "The majority has voted but without an acceptance majority, the trigger should not change the coin config futureValues",
+      _ => {
+        sv3
+          .getSvcInfo()
+          .coinRules
+          .payload
+          .configSchedule
+          .futureValues
+          .size() shouldBe initialFutureValuesSize
+      },
+    )
+
+    actAndCheck(
+      "SV4 votes on accepting the new configuration", {
+        sv4.castVote(voteRequestCid, true, "url", "description")
+      },
+    )(
+      "The majority accepts, the trigger should change the coin config futureValues",
+      _ => {
+        sv4
+          .getSvcInfo()
+          .coinRules
+          .payload
+          .configSchedule
+          .futureValues
+          .size() shouldBe initialFutureValuesSize + 1
       },
     )
 

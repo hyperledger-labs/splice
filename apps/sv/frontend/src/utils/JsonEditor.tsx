@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { Button, Table } from '@mui/material';
+import { Table } from '@mui/material';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
@@ -9,10 +9,11 @@ import { JSONValue } from './JsonType';
 
 interface JsonEditorProps {
   data: Record<string, JSONValue>;
-  onChange: (updatedJson: Record<string, JSONValue>) => void;
+  time?: string;
+  onChange: (updatedJson: Record<string, JSONValue>, time?: string) => void;
 }
 
-const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange }) => {
+const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) => {
   const [json, setJson] = useState(data);
 
   const handleValueChange = (key: string, value: JSONValue) => {
@@ -27,11 +28,7 @@ const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange }) => {
     // @ts-ignore
     nestedObject[lastKey!] = value;
     setJson(previousJson => ({ ...previousJson }));
-  };
-
-  const handleSaveClick = () => {
-    console.log('click');
-    onChange(json);
+    time === 'undefined' ? onChange(json) : onChange(json, time);
   };
 
   const renderJsonValue = (value: object, keyPath: string[] = []) => {
@@ -45,16 +42,18 @@ const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange }) => {
     return (
       <TableRow>
         <TableCell align="left">
-          <label id={nestedKey + '-key'}>{nestedKey}: </label>
+          <label id={nestedKey + '-key'}>{nestedKey}</label>
         </TableCell>
         <TableCell align="right">
-          <input
-            type="text"
-            value={value}
-            id={nestedKey + '-value'}
-            style={{ textAlign: 'right' }}
-            onChange={e => handleValueChange(nestedKey, e.target.value)}
-          />
+          {
+            <input
+              type="text"
+              value={value}
+              id={nestedKey + '-value'}
+              style={{ textAlign: 'right' }}
+              onChange={e => handleValueChange(nestedKey, e.target.value)}
+            />
+          }
         </TableCell>
       </TableRow>
     );
@@ -65,9 +64,6 @@ const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange }) => {
       <Table style={{ tableLayout: 'fixed' }} className="sv-coin-price-table">
         <TableBody>{renderJsonValue(json)}</TableBody>
       </Table>
-      <Button id="update-json-submit-button" fullWidth size="large" onClick={handleSaveClick}>
-        Update Configuration Proposition
-      </Button>
     </>
   );
 };

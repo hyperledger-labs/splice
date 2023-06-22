@@ -94,6 +94,13 @@ const ListVoteRequests: React.FC = () => {
           return `${svcRulesAction.tag}`;
         }
       }
+    } else if (action.tag === 'ARC_CoinRules') {
+      const coinRulesAction = action.value.coinRulesAction;
+      switch (coinRulesAction.tag) {
+        case 'CRARC_SetConfigSchedule': {
+          return `${coinRulesAction.tag}`;
+        }
+      }
     }
     return 'Action tag not defined.';
   }

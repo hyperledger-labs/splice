@@ -223,7 +223,7 @@ const SvcViewPrettyJSON = () => {
 
   return (
     <>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      <Box mt={4} sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={value} onChange={handleChange} aria-label="json tabs">
           <Tab label="General" {...tabProps('general')} />
           <Tab label="SVC Configuration" {...tabProps('svc-configuration')} />
