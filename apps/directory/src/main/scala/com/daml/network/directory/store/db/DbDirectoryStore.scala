@@ -22,8 +22,10 @@ import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import io.circe.Json
 import slick.dbio
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class DbDirectoryStore(
     override val providerParty: PartyId,
@@ -47,7 +49,6 @@ class DbDirectoryStore(
     with AcsQueries
     with NamedLogging {
 
-  import storage.api.jdbcProfile.api.*
   import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.{waitUntilAcsIngested, lastIngestedOffset}
 
@@ -97,13 +98,13 @@ class DbDirectoryStore(
       offset <- lastIngestedOffset(storage, storeId)
       row <- storage
         .querySingle(
-          sql"""
-              #${selectFromAcsTable(DbDirectoryStore.tableName)}
+          (selectFromAcsTable(DbDirectoryStore.tableName) ++
+            sql"""
               where store_id = $storeId
                 and template_id = ${directoryCodegen.DirectoryInstall.COMPANION.TEMPLATE_ID}
                 and directory_install_user = $user
               limit 1
-          """.as[AcsStoreRowTemplate].headOption,
+          """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
           "lookupInstallByUserWithOffset",
         )
         .value
@@ -120,13 +121,13 @@ class DbDirectoryStore(
       offset <- lastIngestedOffset(storage, storeId)
       row <- storage
         .querySingle(
-          sql"""
-            #${selectFromAcsTable(DbDirectoryStore.tableName)}
+          (selectFromAcsTable(DbDirectoryStore.tableName) ++
+            sql"""
             where store_id = $storeId
               and template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
               and directory_entry_name = ${lengthLimited(name)}
             limit 1
-        """.as[AcsStoreRowTemplate].headOption,
+        """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
           "lookupEntryByNameWithOffset",
         )
         .value
@@ -143,15 +144,15 @@ class DbDirectoryStore(
       for {
         row <- storage
           .querySingle(
-            sql"""
-              #${selectFromAcsTable(DbDirectoryStore.tableName)}
+            (selectFromAcsTable(DbDirectoryStore.tableName) ++
+              sql"""
               where store_id = $storeId
                 and template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
                 and directory_entry_owner = $partyId
                 and directory_entry_name >= ''
               order by directory_entry_name
               limit 1
-          """.as[AcsStoreRowTemplate].headOption,
+          """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
             "lookupEntryByParty",
           )
           .value
@@ -165,14 +166,14 @@ class DbDirectoryStore(
     for {
       rows <- storage
         .query(
-          sql"""
-              #${selectFromAcsTable(DbDirectoryStore.tableName)}
+          (selectFromAcsTable(DbDirectoryStore.tableName) ++
+            sql"""
               where store_id = $storeId
                 and template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
                 and directory_entry_name ^@ $limitedPrefix
               order by directory_entry_name
               limit $pageSize
-          """.as[AcsStoreRowTemplate],
+          """).toActionBuilder.as[AcsStoreRowTemplate],
           "listEntries",
         )
     } yield rows.map(contractFromRow(directoryCodegen.DirectoryEntry.COMPANION)(_))

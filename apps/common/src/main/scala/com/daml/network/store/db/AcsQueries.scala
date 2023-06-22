@@ -4,23 +4,27 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.{HardLimit, Limit, PageLimit}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import slick.jdbc.canton.SQLActionBuilder
 
-trait AcsQueries {
+trait AcsQueries extends AcsJdbcTypes {
 
-  // TODO (#5548): avoid string interpolation
-  protected def selectFromAcsTable(tableName: String): String =
-    s"""
-       |select store_id,
-       |  event_number,
-       |  contract_id,
-       |  template_id,
-       |  create_arguments,
-       |  contract_metadata_created_at,
-       |  contract_metadata_contract_key_hash,
-       |  contract_metadata_driver_internal,
-       |  contract_expires_at
-       |from $tableName
-       |""".stripMargin
+  /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
+    *                  This is fine, as all calls to this method should use static string constants.
+    */
+  protected def selectFromAcsTable(tableName: String): SQLActionBuilder =
+    sql"""
+       select store_id,
+         event_number,
+         contract_id,
+         template_id,
+         create_arguments,
+         contract_metadata_created_at,
+         contract_metadata_contract_key_hash,
+         contract_metadata_driver_internal,
+         contract_expires_at
+       from #$tableName
+       """.stripMargin
 
   protected def contractFromRow[C, TCId <: ContractId[_], T](companion: C)(
       row: AcsTables.AcsStoreRowTemplate

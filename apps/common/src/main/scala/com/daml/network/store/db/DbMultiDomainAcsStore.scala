@@ -30,6 +30,9 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.unused
 import scala.collection.immutable.VectorMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     storage: DbStorage,
@@ -52,7 +55,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     with NamedLogging {
 
   import MultiDomainAcsStore.*
-  import profile.api.*
+  import profile.api.jdbcActionExtensionMethods
 
   // storeId is the primary keys of rows in the store_descriptors table.
   // This ID is immutable and used in many queries, that's why it is cached here.
@@ -77,7 +80,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       traceContext: TraceContext,
       closeContext: CloseContext,
   ): Future[String] = waitUntilAcsIngested {
-    import storage.api.jdbcProfile.api.*
     storage
       .querySingle(
         sql"""
@@ -101,11 +103,11 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   ): Future[Option[ContractWithState[TCid, T]]] = waitUntilAcsIngested {
     storage
       .querySingle( // index: acs_store_template_sid_cid
-        sql"""
-          #${selectFromAcsTable(tableName)}
+        (selectFromAcsTable(tableName) ++
+          sql"""
           where store_id = $storeId
             and contract_id = ${lengthLimited(id.contractId)}
-           """.as[AcsStoreRowTemplate].headOption,
+           """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
         "lookupContractById",
       )
       .semiflatMap(contractWithStateFromRow(companion)(_))
@@ -117,11 +119,11 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   ): Future[Option[ContractState]] = waitUntilAcsIngested {
     storage
       .querySingle( // index: acs_store_template_sid_cid
-        sql"""
-            #${selectFromAcsTable(tableName)}
+        (selectFromAcsTable(tableName) ++
+          sql"""
             where store_id = $storeId
               and contract_id = ${lengthLimited(id.contractId)}
-             """.as[AcsStoreRowTemplate].headOption,
+             """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
         "lookupContractStateById",
       )
       .semiflatMap(contractStateFromRow(_))
@@ -138,13 +140,13 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     val templateId = companionClass.typeId(companion)
     for {
       result <- storage.query( // index: acs_store_template_sid_tid_en
-        sql"""
-          #${selectFromAcsTable(tableName)}
+        (selectFromAcsTable(tableName) ++
+          sql"""
           where store_id = $storeId
             and template_id = $templateId
           order by event_number
           limit ${sqlLimit(limit)}
-           """.as[AcsStoreRowTemplate],
+           """).toActionBuilder.as[AcsStoreRowTemplate],
         "listContracts",
       )
       limited = applyLimit(limit, result)
@@ -176,14 +178,14 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       _ <- waitUntilAcsIngested()
       result <- storage
         .query( // index: acs_store_template_sid_tid_ce
-          sql"""
-          #${selectFromAcsTable(tableName)}
+          (selectFromAcsTable(tableName) ++
+            sql"""
           where store_id = $storeId
             and template_id = $templateId
             and contract_expires_at < $now
           order by event_number
           limit ${sqlLimit(limit)}
-           """.as[AcsStoreRowTemplate],
+           """).toActionBuilder.as[AcsStoreRowTemplate],
           "listExpiredFromPayloadExpiry",
         )
       limited = applyLimit(limit, result)
@@ -244,14 +246,14 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             val offsetPromise = offsetChangedAfterStreamingQuery.get()
             storage
               .query( // index: acs_store_template_sid_tid_en
-                sql"""
-                    #${selectFromAcsTable(tableName)}
+                (selectFromAcsTable(tableName) ++
+                  sql"""
                     where store_id = $storeId
                       and template_id = $templateId
                       and event_number >= $fromEventNumber
                     order by event_number
                     limit ${sqlLimit(pageSize)}
-                     """.as[AcsStoreRowTemplate],
+                     """).toActionBuilder.as[AcsStoreRowTemplate],
                 "streamReadyContracts",
               )
               .flatMap { rows =>
