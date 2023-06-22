@@ -28,6 +28,15 @@ template ValidatorOnboarding with
           secret = candidateSecret
           ..
 
+    -- Archive if we are past the `expiresAt`.
+    choice ValidatorOnboarding_Expire : ()
+      controller sv
+      do
+        now <- getTime
+        require "ValidatorOnboarding has expired" (now >= expiresAt)
+        pure ()
+
+
 -- | Template used by a sponsoring SV node for enforcing that an onboarding secret is used only once.
 template UsedSecret with
     sv : Party                  -- ^ The SV node that sponsored the onboarding.

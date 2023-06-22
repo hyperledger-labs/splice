@@ -1,9 +1,9 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.round.*
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.Contract
@@ -11,8 +11,9 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 import java.math.RoundingMode
-import java.time.{Duration as JavaDuration}
+import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
+import scala.util.Random
 
 class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
@@ -389,6 +390,45 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
       _ =>
         svc.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty) shouldBe empty,
+    )
+  }
+
+  "archive expired `ValidatorOnboarding` contracts" in { implicit env =>
+    clue("Initialize SVC with 1 SV") {
+      startAllSync(svc, sv1Scan, sv1, sv1Validator)
+      sv1.getSvcInfo().svcRules.payload.members should have size 1
+    }
+    val testCandidateSecret = Random.alphanumeric.take(10).mkString
+    actAndCheck(
+      "create a new `ValidatorOnboarding` contract", {
+        val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
+          sv1.getSvcInfo().svParty.toProtoPrimitive,
+          testCandidateSecret,
+          svc.participantClientWithAdminToken.ledger_api.time.get().toInstant.plusSeconds(3600),
+        ).create.commands.asScala.toSeq
+
+        sv1.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+          actAs = Seq(sv1.getSvcInfo().svParty),
+          optTimeout = None,
+          commands = validatorOnboarding,
+        )
+      },
+    )(
+      "The `ValidatorOnboarding` contract exists.",
+      _ =>
+        sv1
+          .listOngoingValidatorOnboardings()
+          .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 1,
+    )
+    actAndCheck(
+      "No confirmation happens within 2h",
+      advanceTime(JavaDuration.ofHours(2)),
+    )(
+      "The `ValidatorOnboarding` contract expires and is archived",
+      _ =>
+        sv1
+          .listOngoingValidatorOnboardings()
+          .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 0,
     )
   }
 

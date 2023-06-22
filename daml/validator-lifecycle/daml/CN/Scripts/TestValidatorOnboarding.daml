@@ -35,3 +35,21 @@ testValidatorOnboarding = do
 
   -- sv can now onboard the validator with the authority granted it via the `SvcRules`
   return ()
+
+
+testValidatorOnboardingExpire : Script ()
+testValidatorOnboardingExpire = do
+
+  sv <- allocateParty "sv"
+
+  let secret = "test"
+  now <- getTime
+  onboarding <- submit sv $ createCmd (ValidatorOnboarding sv secret (addRelTime now (days 2)))
+
+  _ <- submitMustFail sv $ exerciseCmd onboarding $ (ValidatorOnboarding_Expire)
+
+  passTime(days 2)
+
+  _ <- submit sv $ exerciseCmd onboarding $ (ValidatorOnboarding_Expire)
+
+  return ()

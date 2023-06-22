@@ -21,10 +21,10 @@ import com.daml.network.http.v0.definitions.{
 import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.http.v0.{definitions, svAdmin as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
-import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}

@@ -28,4 +28,6 @@ class SvSvAutomationService(
       svStore,
       ledgerClient,
       retryProvider,
-    ) {}
+    ) {
+  registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))
+}

@@ -1,13 +1,15 @@
 package com.daml.network.sv.store
 
+import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc.validatorlicense as vl
+import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
+  ConfiguredDefaultDomain,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
-  ConfiguredDefaultDomain,
   TxLogStore,
 }
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -77,6 +79,10 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomai
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.listContractsOnDomain(vo.ValidatorOnboarding.COMPANION, _)
     )
+
+  def listExpiredValidatorOnboardings()
+      : ListExpiredContracts[ValidatorOnboarding.ContractId, ValidatorOnboarding] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(ValidatorOnboarding.COMPANION)(_.expiresAt)
 
   def lookupApprovedSvIdentityByNameWithOffset(
       name: String
