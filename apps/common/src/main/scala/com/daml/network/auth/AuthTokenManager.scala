@@ -69,8 +69,13 @@ class AuthTokenManager(
       promise: Promise[ResultState]
   ): Unit = {
     import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.*
+    val currentTokenMsg = state.get() match {
+      case HaveToken(token) => s", which expires at ${token.expiresAt}"
+      case NoToken => ", currently holding no token"
+      case Refreshing(_) => ", while a refresh is in progress"
+    }
+    logger.debug(s"Refreshing authentication token${currentTokenMsg}")
 
-    logger.debug("Refreshing authentication token")
     obtainToken().onComplete {
       case Failure(exception) =>
         logger.warn("Token refresh failed", exception)
@@ -82,7 +87,7 @@ class AuthTokenManager(
       case Success(Some(authToken)) =>
         val nextState = HaveToken(authToken)
         state.set(nextState)
-        logger.debug("Token refresh complete")
+        logger.debug(s"Token refresh complete, new token expires at: ${authToken.expiresAt}")
         scheduleRefreshBefore(authToken.expiresAt)
         promise.success(nextState)
     }

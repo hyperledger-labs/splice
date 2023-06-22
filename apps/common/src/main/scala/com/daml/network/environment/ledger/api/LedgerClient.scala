@@ -76,7 +76,7 @@ private[environment] class LedgerClient(
   ): Future[T] = {
     getToken().map { token =>
       token.fold(stub) { token =>
-        elc.logger.trace(s"Using token $token for this ledger client")
+        elc.logger.debug(s"Using token that expires at ${token.expiresAt} for this ledger client")
         stub.withCallCredentials(new LedgerCallCredentials(token.accessToken))
       }
     }
