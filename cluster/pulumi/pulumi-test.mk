@@ -1,12 +1,21 @@
 .PHONY: $(dir)/test.json
-$(dir)/test.json: $(dir $(dir))install
+$(dir)/test.json: $(dir $(dir)).build
 	set -o pipefail \
 	&& cd $(@D) \
 	&& npm run --silent dump-config \
 	   | jq --slurp --sort-keys $(JQ_FILTER) > $(@F)
 
-.PHONY: $(dir)/diff-config
-$(dir)/diff-config: $(dir)/test.json $(dir)/expected.json
+.PHONY: $(dir)/test
+$(dir)/test: $(dir)/test-config $(dir)/lint
+
+.PHONY: $(dir)/lint
+$(dir)/lint:
+	set -o pipefail \
+	&& cd $(@D) \
+	&& npm run lint:check
+
+.PHONY: $(dir)/test-config
+$(dir)/test-config: $(dir)/test.json $(dir)/expected.json
 	cd $(@D) && diff -u expected.json test.json
 
 .PHONY: $(dir)/update-expected

@@ -34,24 +34,24 @@ repos:
       - id: pulumi_infra
         name: check pulumi infra config
         language: system
-        entry: "make cluster/pulumi/infra/diff-config"
+        entry: "make cluster/pulumi/infra/test"
         files: '^cluster/pulumi/infra/.*[.]ts$'
         pass_filenames: false
       - id: pulumi_cn
         name: check pulumi canton-network config
         language: system
-        entry: "make cluster/pulumi/canton-network/diff-config"
+        entry: "make cluster/pulumi/canton-network/test"
         files: '^cluster/pulumi/canton-network/.*[.]ts$'
         pass_filenames: false
       - id: pulumi_cn_gw
         name: check pulumi canton-network-gateway config
         language: system
-        entry: "make cluster/pulumi/canton-network-gateway/diff-config"
+        entry: "make cluster/pulumi/canton-network-gateway/test"
         files: '^cluster/pulumi/canton-network-gateway/.*[.]ts$'
         pass_filenames: false
       - id: pulumi_sv
         name: check pulumi sv-runbook config
         language: system
-        entry: "make cluster/pulumi/sv-runbook/diff-config"
+        entry: "make cluster/pulumi/sv-runbook/test"
         files: '^cluster/pulumi/sv-runbook/.*[.]ts$'
         pass_filenames: false
