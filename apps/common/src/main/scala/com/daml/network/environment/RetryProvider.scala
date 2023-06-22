@@ -538,6 +538,16 @@ object RetryProvider {
                   statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
                     "An error occurred. Please contact the operator and inquire about the request"
                   ) ||
+                    // TODO(#6050) Remove me once Canton fixes this time-related issue or retries itself
+                    statusCode == Status.Code.INVALID_ARGUMENT && errorDetails.exists {
+                      case ed: ErrorDetails.ErrorInfoDetail =>
+                        ed.metadata
+                          .get("reason")
+                          .map(_.contains("ContractConsistencyError"))
+                          .getOrElse(false)
+                      case _ => false
+                    }
+                    ||
                     // CANCELLED can also be a deliberate cancellation from the client
                     // so we only retry if we observe RST_STREAM which we sometimes see
                     // around Canton restarts.
