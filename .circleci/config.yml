@@ -2203,7 +2203,7 @@ workflows:
             - deploy_cluster
             - publish_public_release
     - preflight_sv_check:
-        <<: *main-branch-never
+        <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
