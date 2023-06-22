@@ -2,6 +2,8 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { ChartValues, ExactNamespace, requireEnv } from 'cn-pulumi-common';
 
+export const HELM_CHART_TIMEOUT_SEC = 480;
+
 export function installCNSVHelmChartByNamespaceName(
   ns: pulumi.Output<string> | string,
   name: string,
@@ -34,6 +36,7 @@ export function installCNSVHelmChartByNamespaceName(
         ...values,
         imageRepo: local ? 'us-central1-docker.pkg.dev/da-cn-images/cn-images' : undefined,
       },
+      timeout: HELM_CHART_TIMEOUT_SEC,
     },
     {
       dependsOn: dependsOn,
