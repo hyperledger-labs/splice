@@ -9,7 +9,7 @@ import { InfrastructureOutputs } from './infra';
 
 export const config = new pulumi.Config();
 
-export const GLOBAL_TIMEOUT_SEC = 300;
+export const HELM_CHART_TIMEOUT_SEC = 480;
 
 export const CLUSTER_BASENAME = config.require('CLUSTER_BASENAME');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
@@ -135,7 +135,7 @@ export function installCNHelmChartByNamespaceName(
   chartName: string,
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
-): pulumi.Resource {
+): pulumi.ProviderResource {
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
     {
@@ -143,7 +143,7 @@ export function installCNHelmChartByNamespaceName(
       namespace: nsName,
       chart: process.env.REPO_ROOT + '/cluster/helm/' + chartName + '/',
       values: cnChartValues(chartName, values),
-      timeout: GLOBAL_TIMEOUT_SEC,
+      timeout: HELM_CHART_TIMEOUT_SEC,
     },
     {
       dependsOn,
@@ -157,7 +157,7 @@ export function installCNHelmChart(
   chartName: string,
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
-): pulumi.Resource {
+): pulumi.ProviderResource {
   return installCNHelmChartByNamespaceName(
     xns.logicalName,
     xns.ns.metadata.name,

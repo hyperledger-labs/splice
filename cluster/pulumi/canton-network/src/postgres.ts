@@ -1,7 +1,6 @@
 import * as gcp from '@pulumi/gcp';
-import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { ExactNamespace, GLOBAL_TIMEOUT_SEC, cnChartValues } from 'cn-pulumi-common';
+import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -64,19 +63,7 @@ function installCloudPostgres(xns: ExactNamespace, name: string): pulumi.Output<
 /// Database
 
 function installCNPostgres(xns: ExactNamespace, name: string): pulumi.Output<string> {
-  const pg = new k8s.helm.v3.Release(
-    xns.logicalName + '-' + name,
-    {
-      name: name,
-      namespace: xns.ns.metadata.name,
-      chart: process.env.REPO_ROOT + '/cluster/helm/cn-postgres/',
-      values: cnChartValues('cn-postgres'),
-      timeout: GLOBAL_TIMEOUT_SEC,
-    },
-    {
-      dependsOn: xns.ns,
-    }
-  );
+  const pg = installCNHelmChart(xns, name, 'cn-postgres');
 
   return pg.id.apply(() => `${name}.${xns.logicalName}.svc.cluster.local`);
 }
