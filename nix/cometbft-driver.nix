@@ -6,13 +6,12 @@ stdenv.mkDerivation rec {
   name = "cometbft-driver";
   version = sources.version;
   src = builtins.fetchurl {
-    url = "https://digitalasset.jfrog.io/artifactory/canton-drivers/com/digitalasset/canton/drivers/canton-drivers/${sources.version}/canton-drivers-${sources.version}.gz";
+    url = "https://digitalasset.jfrog.io/artifactory/canton-drivers/com/digitalasset/canton/drivers/canton-drivers/${sources.version}/canton-drivers-${sources.version}-all.jar";
     sha256 = sources.sha256;
   };
   dontUnpack = true;
   installPhase = ''
     mkdir -p $out
-    tar -xzf $src
-    cp canton-drivers-${sources.version}-all.jar $out/driver.jar
+    cp $src $out/driver.jar
   '';
 }
