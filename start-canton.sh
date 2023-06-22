@@ -93,60 +93,44 @@ if [[ $global_cometbft -eq 1 ]]; then
   . scripts/cometbft.sh start
 fi;
 
+any_time_db_names=(
+  "participant_sv1"
+  "participant_sv2"
+  "participant_sv3"
+  "participant_sv4"
+  "sequencer_driver"
+  "sequencer_driver_splitwell"
+  "sequencer_driver_splitwell_upgrade"
+  "sequencer_sv1"
+  "sequencer_sv2"
+  "sequencer_sv3"
+  "sequencer_sv4"
+  "sequencer_splitwell"
+  "sequencer_splitwell_upgrade"
+  "mediator_sv1"
+  "mediator_sv2"
+  "mediator_sv3"
+  "mediator_sv4"
+  "mediator_splitwell"
+  "mediator_splitwell_upgrade"
+  "participant_alice"
+  "participant_bob"
+  "participant_splitwell"
+)
+
 db_names=()
 if [ $wallclocktime -eq 1 ]; then
   db_names+=(
-    "participant_sv1"
-    "participant_sv2"
-    "participant_sv3"
-    "participant_sv4"
-    "sequencer_driver"
-    "sequencer_driver_splitwell"
-    "sequencer_driver_splitwell_upgrade"
-    "sequencer_sv1"
-    "sequencer_sv2"
-    "sequencer_sv3"
-    "sequencer_sv4"
-    "sequencer_splitwell"
-    "sequencer_splitwell_upgrade"
-    "mediator_sv1"
-    "mediator_sv2"
-    "mediator_sv3"
-    "mediator_sv4"
-    "mediator_splitwell"
-    "mediator_splitwell_upgrade"
-    "participant_alice"
-    "participant_bob"
-    "participant_splitwell"
+    "${any_time_db_names[@]}"
     "self_hosted_participant"
   )
 fi
 
 if [ $simtime -eq 1 ]; then
-  db_names+=(
-    "participant_sv1_simtime"
-    "participant_sv2_simtime"
-    "participant_sv3_simtime"
-    "participant_sv4_simtime"
-    "sequencer_driver_simtime"
-    "sequencer_driver_splitwell_simtime"
-    "sequencer_driver_splitwell_upgrade_simtime"
-    "sequencer_sv1_simtime"
-    "sequencer_sv2_simtime"
-    "sequencer_sv3_simtime"
-    "sequencer_sv4_simtime"
-    "sequencer_splitwell_simtime"
-    "sequencer_splitwell_upgrade_simtime"
-    "mediator_sv1_simtime"
-    "mediator_sv2_simtime"
-    "mediator_sv3_simtime"
-    "mediator_sv4_simtime"
-    "mediator_splitwell_simtime"
-    "mediator_splitwell_upgrade_simtime"
-    "participant_alice_simtime"
-    "participant_bob_simtime"
-    "participant_splitwell_simtime"
-  )
+  # same names, but with _simtime suffix
+  IFS=' ' read -r -a simtime_db_names <<< \
+      "$(echo "${any_time_db_names[@]}" | sed -Ee 's/( |$)/_simtime\1/g')"
+  db_names+=("${simtime_db_names[@]}")
 
   if [ $globalUpgradeDomain -eq 1 ]; then
     db_names+=(
