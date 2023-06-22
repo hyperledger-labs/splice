@@ -9,6 +9,7 @@ import com.digitalasset.canton.time.Clock
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
+import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.*
 
 /** Attempts to hold a valid authentication token.
   * The first token will not be fetched until `getToken` is called for the first time.
@@ -28,7 +29,10 @@ class AuthTokenManager(
   private sealed trait ResultState extends State
   private case object NoToken extends ResultState
   private case class HaveToken(token: AuthToken) extends ResultState
-  private case class Refreshing(pending: Future[ResultState]) extends State
+  private case class Refreshing(
+      pending: Future[ResultState],
+      startedAt: CantonTimestamp = CantonTimestamp.now(),
+  ) extends State
 
   private val state = new AtomicReference[State](NoToken)
 
@@ -38,12 +42,13 @@ class AuthTokenManager(
     * If there is a refresh already in progress it will be completed with this refresh.
     * If a scheduled refresh occurs while a refresh is in progress, eventually the last completing refresh will be returned.
     */
-  def getToken: Future[Option[AuthToken]] =
+  def getToken: Future[Option[AuthToken]] = {
     state.get() match {
       case HaveToken(token) => Future.successful(Some(token))
       case NoToken => tokenO(refreshState())
-      case Refreshing(pending) => tokenO(pending)
+      case Refreshing(pending, _) => tokenO(pending)
     }
+  }
 
   private def tokenO(pending: Future[ResultState]): Future[Option[AuthToken]] = pending.map {
     case HaveToken(token) => Some(token)
@@ -58,7 +63,11 @@ class AuthTokenManager(
       refreshToken(promise)
     } else {
       prevState match {
-        case Refreshing(pending) => promise.completeWith(pending)
+        case Refreshing(pending, startedAt) =>
+          logger.debug(
+            s"Refresh is already in progress, started at: $startedAt"
+          )
+          promise.completeWith(pending)
         case r: ResultState => promise.success(r)
       }
     }
@@ -68,11 +77,11 @@ class AuthTokenManager(
   private def refreshToken(
       promise: Promise[ResultState]
   ): Unit = {
-    import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.*
     val currentTokenMsg = state.get() match {
-      case HaveToken(token) => s", which expires at ${token.expiresAt}"
+      case HaveToken(token) => s", which expires at: ${token.expiresAt}"
       case NoToken => ", currently holding no token"
-      case Refreshing(_) => ", while a refresh is in progress"
+      case Refreshing(_, startedAt) =>
+        s", while a refresh is in progress that started at: $startedAt"
     }
     logger.debug(s"Refreshing authentication token${currentTokenMsg}")
 
@@ -82,6 +91,7 @@ class AuthTokenManager(
         state.set(NoToken)
         promise.failure(exception)
       case Success(None) =>
+        logger.debug("obtain token returned no token")
         state.set(NoToken)
         promise.success(NoToken)
       case Success(Some(authToken)) =>

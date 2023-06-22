@@ -481,6 +481,7 @@ object RetryProvider {
       Status.Code.FAILED_PRECONDITION,
       Status.Code.DEADLINE_EXCEEDED,
       Status.Code.ABORTED,
+      Status.Code.UNAUTHENTICATED,
     ) ++ additionalCodes
 
     private val retryableHttpStatusCodes: Set[StatusCode] = Set(

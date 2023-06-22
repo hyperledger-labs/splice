@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.Directive0
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.HttpRequestLogger
-import com.daml.network.auth.{AuthTokenManager, AuthTokenSource, AuthTokenSourceNone}
+import com.daml.network.auth.{AuthToken, AuthTokenManager, AuthTokenSource, AuthTokenSourceNone}
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -176,28 +176,30 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     )
   } yield {
     // AuthTokenSourceNone source does not work with AuthTokenManager which re-requests on None result
-    val getToken = authTokenSource match {
-      case none: AuthTokenSourceNone => none.getToken
-      case other =>
-        val clock = new WallClock(timeouts, loggerFactory)
-        val getT = new AuthTokenManager(
-          () => other.getToken,
-          this.isClosing,
-          clock,
-          loggerFactory,
-        ).getToken
-        retryProvider.retryForAutomation(
-          "Acquiring auth token",
-          getT,
-          logger,
-        )
-    }
+    val getToken: () => Future[Option[AuthToken]] =
+      authTokenSource match {
+        case none: AuthTokenSourceNone => () => none.getToken
+        case other =>
+          val clock = new WallClock(timeouts, loggerFactory)
+          val authTokenManager = new AuthTokenManager(
+            () => other.getToken,
+            this.isClosing,
+            clock,
+            loggerFactory,
+          )
+          () =>
+            retryProvider.retryForAutomation(
+              "Acquiring auth token",
+              authTokenManager.getToken,
+              logger,
+            )
+      }
 
     new CNLedgerClient(
       participantClient.ledgerApi.clientConfig,
       // Note: When ledger API auth is enabled, application ID must be equal to user ID
       serviceUser,
-      () => getToken,
+      getToken,
       parameters.loggingConfig.api,
       loggerFactory,
       tracerProvider,
