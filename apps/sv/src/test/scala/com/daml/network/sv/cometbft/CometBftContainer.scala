@@ -33,7 +33,8 @@ class CometBftContainer(nodeType: ContainerType = Testing) extends NamedLogging 
     // Always expect that images are pulled on CI before running tests
     .withImagePullPolicy(NeverPullOnCIImagePolicy)
     .withLogConsumer(
-      new Slf4jLogConsumer(loggerFactory.getLogger(getClass)).withPrefix(s"CometBftNode[$nodeType]")
+      new Slf4jLogConsumer(loggerFactory.getLogger(getClass), true)
+        .withPrefix(s"CometBftNode[$nodeType]")
     )
 
   def initialize(network: Option[Network] = None): Unit = {

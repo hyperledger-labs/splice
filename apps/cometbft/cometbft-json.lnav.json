@@ -6,11 +6,11 @@
         "description": "CometBFT log files",
         "json": true,
         "hide-extra": false,
-        "file-pattern": "\\.cometbft_log.*",
+        "file-pattern": ".*cometbft.*\\.log.*",
         "line-format": [
           { "field" : "ts" }, " [", { "field": "level", "text-transform": "uppercase" }, "] - ",
           { "field": "module" }, " (", {"field": "height", "default-value" : ""}, ") - ",
-          { "field" : "_msg" } 
+          { "field" : "_msg" }
         ],
         "timestamp-field" : "ts",
         "body-field" : "_msg",

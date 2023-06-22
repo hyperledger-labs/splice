@@ -51,7 +51,7 @@ db_dir = "data"
 log_level = "info"
 
 # Output format: 'plain' (colored text) or 'json'
-log_format = "plain"
+log_format = "json"
 
 ##### additional base config options #####
 
@@ -424,7 +424,7 @@ skip_timeout_commit = true
 
 # EmptyBlocks mode and possible interval between empty blocks
 create_empty_blocks = false
-create_empty_blocks_interval = "10s"
+create_empty_blocks_interval = "5s"
 
 # Reactor sleep duration parameters
 peer_gossip_sleep_duration = "100ms"

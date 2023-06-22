@@ -89,7 +89,8 @@ rm -f canton*.tokens
 
 # Start CometBFT
 if [[ $global_cometbft -eq 1 ]]; then
-  ./scripts/cometbft.sh start
+  # Sourcing this to get exported variables.
+  . scripts/cometbft.sh start
 fi;
 
 db_names=()
@@ -178,7 +179,8 @@ tmux new-session -d -s "${tmux_session}"
 
 # Numbers chosen such that we don't run out of memory and CI runs are not measurably slower.
 # Feel free to bump if you encounter issues but make sure the nodes don't run out of memory.
-JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g -Dlogback.configurationFile=./scripts/canton-logback.xml"
+# Setting the user timezone to UTC, as the timestamps in the logs are printed using the JVM timezone
+JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g -Duser.timezone=UTC -Dlogback.configurationFile=./scripts/canton-logback.xml"
 
 config_overrides=""
 config_overrides_simtime=""
@@ -201,6 +203,7 @@ tmux_cmd_canton() {
   local windowName="$1" tokensFile="$2" baseConfig="$3" confOverrides="$4" logFile="$5"
   tmux_cmd "$windowName" \
     "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
+     COMETBFT_DOCKER_IP=${COMETBFT_DOCKER_IP-} \
      CANTON_TOKEN_FILENAME=$tokensFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
       -c $baseConfig $confOverrides \
       --log-level-canton=DEBUG \
