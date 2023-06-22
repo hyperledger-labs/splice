@@ -77,6 +77,7 @@ Use the following shell commands to generate the proper keys:
 
     # Create a folder to store the config
   mkdir cometbft
+  cd cometbft
   # Init the node
   docker run --rm -v $(pwd):/init digitalasset-canton-network-docker.jfrog.io/digitalasset/cometbft:|version| init --home /init
   # Read the node id and keep a note of it for the deployment
