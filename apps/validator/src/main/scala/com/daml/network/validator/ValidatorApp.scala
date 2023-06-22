@@ -406,6 +406,7 @@ class ValidatorApp(
           new HttpValidatorAdminHandler(
             automation,
             validatorUserName = config.ledgerApiUser,
+            validatorWalletUserName = config.validatorWalletUser,
             domainId = domainId,
             participantAdminConnection,
             lock,

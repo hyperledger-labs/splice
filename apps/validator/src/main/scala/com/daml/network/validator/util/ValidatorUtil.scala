@@ -1,15 +1,15 @@
 package com.daml.network.validator.util
 
-import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -128,13 +128,27 @@ private[validator] object ValidatorUtil {
       endUserName: String,
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
+      validatorWalletUserName: Option[String],
       domainId: DomainId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     val store = storeWithIngestion.store
+    val validatorParty = store.key.validatorParty
     for {
       endUserParty <- storeWithIngestion.connection.getPrimaryParty(endUserName)
+      _ <-
+        if (
+          endUserParty == validatorParty ||
+          endUserName == validatorUserName ||
+          validatorWalletUserName.exists(_ == endUserName)
+        ) {
+          val msg = s"Tried to offboard the validator's user: $endUserName"
+          logger.warn(msg)
+          Future.failed(new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(msg)))
+        } else {
+          Future.unit
+        }
       _ <- retryProvider.retryForClientCalls(
         "Remove install contract",
         store

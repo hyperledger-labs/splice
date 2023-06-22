@@ -16,6 +16,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class HttpValidatorAdminHandler(
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
     validatorUserName: String,
+    validatorWalletUserName: Option[String],
     domainId: DomainId,
     participantAdminConnection: ParticipantAdminConnection,
     lock: (String, () => Future[Unit]) => Future[Unit],
@@ -87,6 +88,7 @@ class HttpValidatorAdminHandler(
       user,
       storeWithIngestion,
       validatorUserName,
+      validatorWalletUserName,
       domainId,
       retryProvider,
       logger,
