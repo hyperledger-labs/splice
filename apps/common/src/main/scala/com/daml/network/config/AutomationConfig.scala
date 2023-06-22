@@ -23,4 +23,8 @@ case class AutomationConfig(
       * TODO(#3816) cleanup this flag after DomainFees PoC and replace with a per-validator spend limit
       */
     enableAutomaticValidatorTrafficBalanceTopup: Boolean = false,
+
+    /** Only intended for testing. Disables the generation of SV rewards.
+      */
+    enableSvRewards: Boolean = true,
 ) {}
