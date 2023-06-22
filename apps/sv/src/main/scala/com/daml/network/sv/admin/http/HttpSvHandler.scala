@@ -19,11 +19,13 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.setup.SvcPartyHosting
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock, ExpiringLock}
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, ExpiringLock}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -45,7 +47,6 @@ class HttpSvHandler(
     isDevNet: Boolean,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
-    svcRulesLock: SvcRulesLock,
     localDomainNode: Option[LocalDomainNode],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
@@ -416,14 +417,17 @@ class HttpSvHandler(
   )(implicit tc: TraceContext) = {
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
     for {
+      ourParticipant <- participantAdminConnection.getParticipantId()
       // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-      // We need both locks here to prevent topology transactions and Daml transactions.
-      // This is the only place that calls svcRulesLock.lock() so there is no chance of a deadlock.
       authorizedAt <- withAcquiredGlobalLock(
         s"Authorizing SVC party to participant $participantId", {
           for {
-            _ <- svcRulesLock.lock()
+            _ <- participantAdminConnection.ensureDomainParametersMaxRatePerParticipant(
+              globalDomain,
+              NonNegativeInt.zero,
+              ourParticipant.uid.namespace.fingerprint,
+            )
             _ = logger.info(
               s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
             )
@@ -437,7 +441,11 @@ class HttpSvHandler(
               .info(
                 s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
               )
-            _ <- svcRulesLock.unlock()
+            _ <- participantAdminConnection.ensureDomainParametersMaxRatePerParticipant(
+              globalDomain,
+              StaticDomainParameters.defaultMaxRatePerParticipant,
+              ourParticipant.uid.namespace.fingerprint,
+            )
             _ = logger.info(
               s"svc party to participant authorization completed, unlocked SvcRules and CoinRules contracts"
             )
@@ -451,6 +459,29 @@ class HttpSvHandler(
             )
           } yield authorizedAt
         },
+      )
+      _ = logger.info(
+        "submitting a dummy transaction to make sure that the ACS timestamp will eventually be clean"
+      )
+      // Note that this needs to be a transaction visibile to the SVC to ensure
+      // that the newly onboarded participant will see it and eventually advance its
+      // knowledge of ledger time. Otherwise you can get issues in simtime mode.
+      _ <- retryProvider.retryForClientCalls(
+        "Submitting a dummy transaction",
+        for {
+          svcRules <- svcStore.getSvcRules()
+          _ <- svStoreWithIngestion.connection.submitCommandsNoDedup(
+            actAs = Seq(svParty),
+            readAs = Seq(svcParty),
+            commands = svcRules.contractId
+              .exerciseSvcRules_Cycle(svParty.toProtoPrimitive)
+              .commands
+              .asScala
+              .toSeq,
+            globalDomain,
+          ),
+        } yield (),
+        logger,
       )
       acsBytes <- retryProvider.retryForAutomation(
         show"Download ACS snapshot for SVC at $authorizedAt",

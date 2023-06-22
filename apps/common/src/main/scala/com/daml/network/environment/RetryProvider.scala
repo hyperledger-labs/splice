@@ -532,7 +532,7 @@ object RetryProvider {
                 .appendedAll(errorDetails.map(_.toString))
             logger.info(msg.mkString("\n"))
             TransientErrorKind
-          case None
+          case _
               if retryableStatusCodes.contains(statusCode) ||
                 (
                   // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.

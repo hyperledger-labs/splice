@@ -281,7 +281,6 @@ class SvApp(
         isDevNet,
         clock,
         participantAdminConnection,
-        svcRulesLock,
         localDomainNode,
         retryProvider,
         svcPartyHosting,

@@ -67,4 +67,7 @@ ACS_MISMATCH_NO_SHARED_CONTRACTS.*Received a commitment where we have no shared 
 # TODO(#5763) Remove this once this is fixed in Canton
 LOCAL_VERDICT_MALFORMED_(REQUEST|PAYLOAD).*Received a request.*with a view that is not correctly authorized
 
+# TODO(#6053) Remove this once Canton adjusts the log level.
+Failed to submit submission due to Error\(RequestRefused\(Overloaded\(Submission rate exceeds rate limit of 0/s\.\)\)\)
+
 # Make sure to have a trailing newline
