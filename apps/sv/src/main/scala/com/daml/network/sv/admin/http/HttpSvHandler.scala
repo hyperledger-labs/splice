@@ -734,7 +734,7 @@ class HttpSvHandler(
           .commands
           .asScala
       ).toSeq
-      // No command-dedup required, as the CoinRules contract is archived and recreated.
+      // No command-dedup required, as the ValidatorOnboarding contract is archived
       _ <- svcStoreWithIngestion.connection.submitCommandsNoDedup(
         Seq(svParty),
         Seq(svcParty),

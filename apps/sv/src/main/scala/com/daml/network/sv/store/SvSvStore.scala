@@ -1,7 +1,6 @@
 package com.daml.network.sv.store
 
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
@@ -19,7 +18,6 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -118,24 +116,6 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomai
   ] =
     lookupSvOnboardingConfirmedWithOffset().map(_.value)
 
-  def lookupValidatorLicense()(implicit
-      tc: TraceContext
-  ): Future[Option[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomain(vl.ValidatorLicense.COMPANION)(_, (_: Any) => true)
-    )
-
-  def getValidatorLicense()(implicit
-      tc: TraceContext
-  ): Future[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]] =
-    lookupValidatorLicense().map(
-      _.getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription("No active ValidatorLicense contract")
-        )
-      )
-    )
-
   def key: SvStore.Key
 }
 
@@ -161,7 +141,6 @@ object SvSvStore {
     MultiDomainAcsStore.SimpleContractFilter(
       key.svParty,
       Map(
-        mkFilter(vl.ValidatorLicense.COMPANION)(co => co.payload.validator == sv),
         mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv),
         mkFilter(vo.UsedSecret.COMPANION)(co => co.payload.sv == sv),
         mkFilter(so.ApprovedSvIdentity.COMPANION)(co => co.payload.approvingSv == sv),

@@ -534,6 +534,16 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       )
     )
 
+  def lookupValidatorLicenseWithOffset(validator: PartyId)(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]]] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(vl.ValidatorLicense.COMPANION)(
+        _,
+        co => co.payload.validator == validator.toProtoPrimitive,
+      )
+    )
+
   /** List all ValidatorLicenses */
   def listValidatorLicenses()(implicit
       tc: TraceContext

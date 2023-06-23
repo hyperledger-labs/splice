@@ -235,7 +235,7 @@ class SvApp(
       //    but could also be imported through the stream of the SV party. By only creating the validator user here
       //    we ensure that the party migration has been completed before the contract is created.
       // 2. Concurrent DAR uploads currently break Canton's topology state management.
-      _ <- SvApp.createValidatorUser(svAutomation.connection, config, svStore.key.svParty)
+      _ <- SvApp.initializeValidator(svcAutomation, globalDomain, config, retryProvider, logger)
 
       // Ensure Daml-level invariants for the SV
       // ----------------------------------------
@@ -909,20 +909,67 @@ object SvApp {
       svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   ): Boolean = svcRules.payload.isDevNet
 
-  private def createValidatorUser(
-      connection: CNLedgerConnection,
+  private def initializeValidator(
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      globalDomain: DomainId,
       config: SvAppBackendConfig,
-      svParty: PartyId,
-  ): Future[PartyId] = {
-    // We share the SV party between the validator user and the SV user. Therefore, we allocate the validator user here with the SV
-    // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
-    // That ensures the validator app won't try to allocate its own primary party because it waits first for the user to be created
-    // and then checks if it has a primary party already.
-    connection.createUserWithPrimaryParty(
-      config.validatorLedgerApiUser,
-      svParty,
-      Seq(User.Right.ParticipantAdmin.INSTANCE),
-    )
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+    val store = svcStoreWithIngestion.store
+    val svParty = store.key.svParty
+    logger.debug("Creating validator license for SV party")
+    for {
+      _ <- retryProvider.retryForAutomation(
+        "Create validator license for SV party",
+        for {
+          svcRules <- store.getSvcRules()
+          validatorLicense <- store.lookupValidatorLicenseWithOffset(
+            svParty
+          )
+          _ <- validatorLicense match {
+            case QueryResult(_, Some(_)) =>
+              logger.debug("Validator license for SV party already exists")
+              Future.unit
+            case QueryResult(offset, None) =>
+              logger.debug("Trying to create validator license for SV party")
+              val cmd = svcRules.contractId.exerciseSvcRules_OnboardValidator(
+                svParty.toProtoPrimitive,
+                svParty.toProtoPrimitive,
+              )
+              svcStoreWithIngestion.connection
+                .submitCommands(
+                  actAs = Seq(svParty),
+                  readAs = Seq(store.key.svcParty),
+                  commands = cmd.commands().asScala.toSeq,
+                  commandId = CNLedgerConnection.CommandId(
+                    "com.daml.network.sv.createSvValidatorLicense",
+                    Seq(
+                      store.key.svcParty,
+                      svParty,
+                    ),
+                    svParty.toProtoPrimitive,
+                  ),
+                  deduplicationOffset = offset,
+                  domainId = globalDomain,
+                )
+                .map { _ =>
+                  logger.debug("Created validator license for SV party")
+                }
+          }
+        } yield (),
+        logger,
+      )
+      // We share the SV party between the validator user and the SV user. Therefore, we allocate the validator user here with the SV
+      // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
+      // That ensures the validator app won't try to allocate its own primary party because it waits first for the user to be created
+      // and then checks if it has a primary party already.
+      _ <- svcStoreWithIngestion.connection.createUserWithPrimaryParty(
+        config.validatorLedgerApiUser,
+        svParty,
+        Seq(User.Right.ParticipantAdmin.INSTANCE),
+      )
+    } yield ()
   }
 
   val coinPackage: UploadablePackage = new UploadablePackage {
