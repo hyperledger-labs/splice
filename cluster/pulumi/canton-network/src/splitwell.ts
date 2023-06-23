@@ -11,11 +11,17 @@ import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { installDomain, installParticipant } from './ledger';
+import {
+  ValidatorOnboarding,
+  installValidatorOnboardingSecret,
+  validatorOnboardingSecretName,
+} from './sv';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,
   svc: pulumi.Resource,
-  providerWalletUser: string
+  providerWalletUser: string,
+  onboarding: ValidatorOnboarding
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell');
 
@@ -58,6 +64,7 @@ export async function installSplitwell(
     await installAuth0Secret(auth0Client, xns, 'validator', 'splitwell_validator'),
     await installAuth0UISecret(auth0Client, xns, 'wallet', 'splitwell'),
     await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
+    installValidatorOnboardingSecret(xns, onboarding),
   ];
 
   const fixedTokenConfig = fixedTokens()
@@ -90,6 +97,14 @@ export async function installSplitwell(
         '}',
       ].join('\n'),
       foundingSvApiUrl: 'http://sv-app.sv-1:5014',
+      svSponsorAddress: 'http://sv-app.sv-1:5014',
+      onboardingSecretFrom: {
+        secretKeyRef: {
+          name: validatorOnboardingSecretName(onboarding),
+          key: 'secret',
+          optional: false,
+        },
+      },
     },
     dependsOn
   );

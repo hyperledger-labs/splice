@@ -53,13 +53,42 @@ export type SvOnboarding =
       sponsorApiUrl: string;
     };
 
+export type ValidatorOnboarding = { name: string; expiresIn: string; secret: string };
+
+export const validatorOnboardingSecretName = (onboarding: ValidatorOnboarding): string =>
+  `cn-app-validator-onboarding-${onboarding.name}`;
+
+export function installValidatorOnboardingSecret(
+  xns: ExactNamespace,
+  onboarding: ValidatorOnboarding
+): k8s.core.v1.Secret {
+  const secretName = validatorOnboardingSecretName(onboarding);
+  return new k8s.core.v1.Secret(
+    `cn-app-${xns.logicalName}-validator-onboarding-${onboarding.name}`,
+    {
+      metadata: {
+        name: secretName,
+        namespace: xns.logicalName,
+      },
+      type: 'Opaque',
+      data: {
+        secret: btoa(onboarding.secret),
+      },
+    },
+    {
+      dependsOn: [xns.ns],
+    }
+  );
+}
+
 export async function installSvNode(
   auth0Client: Auth0Client,
   nodename: string,
   onboardingName: string,
   validatorWalletUser: string,
   onboarding: SvOnboarding,
-  withScan = false
+  withScan = false,
+  expectedValidatorOnboardings: ValidatorOnboarding[] = []
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(nodename);
 
@@ -81,6 +110,11 @@ export async function installSvNode(
       onboarding.type == 'join-with-key' && onboarding.sponsorRelease
         ? [onboarding.sponsorRelease]
         : []
+    )
+    .concat(
+      expectedValidatorOnboardings.map(onboarding =>
+        installValidatorOnboardingSecret(xns, onboarding)
+      )
     );
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
@@ -122,6 +156,16 @@ export async function installSvNode(
       // we need to include a dummy value though
       // because helm does not distinguish between an empty object and unset.
       { enable: true },
+    expectedValidatorOnboardings: expectedValidatorOnboardings.map(onboarding => ({
+      expiresIn: onboarding.expiresIn,
+      secretFrom: {
+        secretKeyRef: {
+          name: validatorOnboardingSecretName(onboarding),
+          key: 'secret',
+          optional: false,
+        },
+      },
+    })),
   } as ChartValues;
 
   if (onboarding.type == 'join-with-key') {

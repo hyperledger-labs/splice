@@ -10,12 +10,18 @@ import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { installParticipant } from './ledger';
+import {
+  ValidatorOnboarding,
+  installValidatorOnboardingSecret,
+  validatorOnboardingSecretName,
+} from './sv';
 
 export async function installValidator(
   auth0Client: Auth0Client,
   svc: pulumi.Resource,
   name: string,
-  validatorWalletUser?: string
+  validatorWalletUser: string,
+  onboarding: ValidatorOnboarding
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
@@ -50,6 +56,7 @@ export async function installValidator(
     await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
     await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
     await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
+    installValidatorOnboardingSecret(xns, onboarding),
   ];
 
   return installCNHelmChart(
@@ -68,6 +75,14 @@ export async function installValidator(
       globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
       validatorWalletUser,
       foundingSvApiUrl: 'http://sv-app.sv-1:5014',
+      svSponsorAddress: 'http://sv-app.sv-1:5014',
+      onboardingSecretFrom: {
+        secretKeyRef: {
+          name: validatorOnboardingSecretName(onboarding),
+          key: 'secret',
+          optional: false,
+        },
+      },
     },
     dependsOn
   );

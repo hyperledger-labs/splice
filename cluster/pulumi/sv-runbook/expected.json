@@ -576,7 +576,6 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global/api/v0/scan",
-        "svSponsorAddress": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       }
     },

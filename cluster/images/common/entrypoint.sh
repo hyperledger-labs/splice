@@ -14,7 +14,7 @@ fi
 
 if [ -f /app/pre-bootstrap.sh ]; then
   json_log "Running /app/pre-bootstrap.sh" "entrypoint.sh"
-  /app/pre-bootstrap.sh
+  source /app/pre-bootstrap.sh
 fi
 
 if [ -f /app/bootstrap.sc ]; then

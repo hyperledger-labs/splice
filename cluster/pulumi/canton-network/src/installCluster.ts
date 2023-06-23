@@ -43,6 +43,18 @@ function joinViaSv1(
   };
 }
 
+const splitwellOnboarding = {
+  name: 'splitwell',
+  secret: 'splitwellsecret',
+  expiresIn: '1h',
+};
+
+const validator1Onboarding = {
+  name: 'validator1',
+  secret: 'validator1secret',
+  expiresIn: '1h',
+};
+
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   const sv1 = await installSvNode(
     auth0Client,
@@ -50,7 +62,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'Canton-Foundation-1',
     'auth0|64529b128448ded6aa68048f',
     { type: 'found-collective' },
-    true
+    true,
+    [splitwellOnboarding, validator1Onboarding]
   );
   await installSvNode(
     auth0Client,
@@ -79,9 +92,15 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     auth0Client,
     sv1,
     'validator1',
-    'auth0|63e3d75ff4114d87a2c1e4f5'
+    'auth0|63e3d75ff4114d87a2c1e4f5',
+    validator1Onboarding
   );
-  const splitwell = await installSplitwell(auth0Client, sv1, 'auth0|63e12e0415ad881ffe914e61');
+  const splitwell = await installSplitwell(
+    auth0Client,
+    sv1,
+    'auth0|63e12e0415ad881ffe914e61',
+    splitwellOnboarding
+  );
 
   const docs = installDocs();
 

@@ -645,6 +645,72 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "secret": "c3BsaXR3ZWxsc2VjcmV0"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-onboarding-splitwell",
+        "namespace": "splitwell"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-splitwell-validator-onboarding-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "c3BsaXR3ZWxsc2VjcmV0"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-onboarding-splitwell",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-validator-onboarding-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-onboarding-validator1",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-validator-onboarding-validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnT291cXh2VWlyM0M5KzJhcEVkT1VDNDBYcmJMVGRrYkJJSzc4bzJtM2xPS2hSQU5DQUFTeEZHZTAyUTRzWFphSHNuRlhTc0ZBK0JQNUo2ZDBpTVV0Y3BSY0tzdHRVZXFpYVRLa2RDSmsvdzZBVXhLVUhJNmV2elYrcUpTM2NiZm90U21EOSthQQ==",
           "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFc1JSbnROa09MRjJXaDdKeFYwckJRUGdUK1NlbmRJakZMWEtVWENyTGJWSHFvbWt5cEhRaVpQOE9nRk1TbEJ5T25yODFmcWlVdDNHMzZMVXBnL2ZtZ0E9PQ=="
         }
@@ -703,6 +769,28 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-4-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldA=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-onboarding-validator1",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-validator-onboarding-validator1",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1264,6 +1352,13 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "onboardingSecretFrom": {
+          "secretKeyRef": {
+            "key": "secret",
+            "name": "cn-app-validator-onboarding-splitwell",
+            "optional": false
+          }
+        },
         "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
@@ -1273,7 +1368,8 @@
             "cpu": 1,
             "memory": "8Gi"
           }
-        }
+        },
+        "svSponsorAddress": "http://sv-app.sv-1:5014"
       }
     },
     "name": "helm-splitwell-splitwell",
@@ -1785,6 +1881,28 @@
         "domain": {
           "enable": true
         },
+        "expectedValidatorOnboardings": [
+          {
+            "expiresIn": "1h",
+            "secretFrom": {
+              "secretKeyRef": {
+                "key": "secret",
+                "name": "cn-app-validator-onboarding-splitwell",
+                "optional": false
+              }
+            }
+          },
+          {
+            "expiresIn": "1h",
+            "secretFrom": {
+              "secretKeyRef": {
+                "key": "secret",
+                "name": "cn-app-validator-onboarding-validator1",
+                "optional": false
+              }
+            }
+          }
+        ],
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
@@ -2388,6 +2506,7 @@
         "domain": {
           "enable": true
         },
+        "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
@@ -2919,6 +3038,7 @@
         "domain": {
           "enable": true
         },
+        "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
@@ -3450,6 +3570,7 @@
         "domain": {
           "enable": true
         },
+        "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
@@ -3869,6 +3990,13 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "onboardingSecretFrom": {
+          "secretKeyRef": {
+            "key": "secret",
+            "name": "cn-app-validator-onboarding-validator1",
+            "optional": false
+          }
+        },
         "participantAddress": "participant",
         "postgres": "postgres.validator1.svc.cluster.local",
         "resources": {
@@ -3880,6 +4008,7 @@
             "memory": "8Gi"
           }
         },
+        "svSponsorAddress": "http://sv-app.sv-1:5014",
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       }

@@ -9,6 +9,8 @@ Release Notes
 * The URL to scan in ``validator-values.yaml`` has changed to
   ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/scan``. The
   ``scanPort`` field has been removed.
+* The ``svSponsorAddress`` from ``validator-values.yaml`` has been removed. The validator associated
+  with an SV node is onboarded automatically through its SV node.
 
 2023-06-25
 ----------

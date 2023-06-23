@@ -47,7 +47,21 @@ spec:
         {{ if .Values.svSponsorAddress -}}
         - name: CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS
           value: {{ .Values.svSponsorAddress | quote }}
-        {{ end }}
+        {{ if .Values.onboardingSecretFrom -}}
+        - name: CN_APP_VALIDATOR_ONBOARDING_SECRET
+          valueFrom: {{ .Values.onboardingSecretFrom | toYaml | nindent 12 }}
+        {{ else -}}
+        # Onboarding without specifying a secret only works in devnet
+        - name: CN_APP_DEVNET
+          value: 1
+        {{ end -}}
+        {{ else -}}
+        # Validator has either already been onboarded or
+        # is a supervalidator’s validator that does not need this.
+        - name: ADDITIONAL_CONFIG_NO_ONBOARDING
+          value: |
+            canton.validator-apps.validator_backend.onboarding = null
+        {{ end -}}
         {{ if .Values.scanAddress -}}
         - name: CN_APP_VALIDATOR_SCAN_ADDRESS
           value: {{ .Values.scanAddress | quote }}
