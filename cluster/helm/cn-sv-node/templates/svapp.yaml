@@ -28,7 +28,7 @@ spec:
             {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "sv" "keyName" "sv" "fixedTokens" .Values.cluster.fixedTokens) | indent 12}}
             {{- include "cn-util-lib.auth0-user-env-var" (dict "appName" "validator" "keyName" "validator") | indent 12}}
             - name: CN_APP_SV_IS_DEV_NET
-              value: "true"
+              value: {{ .Values.isDevNet | quote }}
             - name: CN_APP_SV_PARTICIPANT_ADDRESS
               value: {{ .Values.participantAddress | default "participant" | quote }}
             {{- if .Values.onboardingType }}

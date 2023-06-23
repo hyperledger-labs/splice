@@ -55,8 +55,8 @@ const validator1Onboarding = {
   expiresIn: '1h',
 };
 
-const isDevnet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
-if (!isDevnet) {
+const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
+if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
@@ -67,17 +67,19 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'Canton-Foundation-1',
     'auth0|64529b128448ded6aa68048f',
     { type: 'found-collective' },
+    isDevNet,
     true,
     true,
     [splitwellOnboarding, validator1Onboarding]
   );
-  if (isDevnet) {
+  if (isDevNet) {
     await installSvNode(
       auth0Client,
       'sv-2',
       'Canton-Foundation-2',
       'auth0|64529b6852dd694167351045',
       joinViaSv1(sv1, SV2_KEY),
+      isDevNet,
       true,
       false
     );
@@ -86,14 +88,16 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       'sv-3',
       'Canton-Foundation-3',
       'auth0|64529bb10c1aee4f2c819218',
-      joinViaSv1(sv1, SV3_KEY)
+      joinViaSv1(sv1, SV3_KEY),
+      isDevNet
     );
     await installSvNode(
       auth0Client,
       'sv-4',
       'Canton-Foundation-4',
       'auth0|64529bc58d30358eacae5611',
-      joinViaSv1(sv1, SV4_KEY)
+      joinViaSv1(sv1, SV4_KEY),
+      isDevNet
     );
   }
 

@@ -42,6 +42,11 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
   console.error(`Installing SV node in namespace: ${SV_NAMESPACE}`);
 
+  const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
+  if (!isDevNet) {
+    console.error('Launching in non-devnet mode');
+  }
+
   const SV_PUBLIC_KEY =
     'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==';
   const SV_PRIVATE_KEY =
@@ -105,6 +110,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: SV_NAME,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      'isDevNet: true': `isDevNet: ${isDevNet}`,
     }
   );
 

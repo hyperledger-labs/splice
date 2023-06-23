@@ -1977,6 +1977,7 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "onboardingName": "Canton-Foundation-1",
         "onboardingType": "found-collective",
         "resources": {
@@ -2651,6 +2652,7 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
@@ -3253,6 +3255,7 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
@@ -3855,6 +3858,7 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },

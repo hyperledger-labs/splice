@@ -88,6 +88,7 @@ export async function installSvNode(
   onboardingName: string,
   validatorWalletUser: string,
   onboarding: SvOnboarding,
+  isDevNet: boolean,
   withScan = false,
   withDirectoryBackend = false,
   expectedValidatorOnboardings: ValidatorOnboarding[] = []
@@ -168,6 +169,7 @@ export async function installSvNode(
         },
       },
     })),
+    isDevNet: isDevNet,
   } as ChartValues;
 
   if (onboarding.type == 'join-with-key') {
