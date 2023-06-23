@@ -370,22 +370,10 @@
               "targetPort": 443
             },
             {
-              "name": "grpc-svc",
-              "port": 5005,
-              "protocol": "TCP",
-              "targetPort": 5005
-            },
-            {
               "name": "grpc-domain",
               "port": 5008,
               "protocol": "TCP",
               "targetPort": 5008
-            },
-            {
-              "name": "http-scan",
-              "port": 5012,
-              "protocol": "TCP",
-              "targetPort": 5012
             },
             {
               "name": "cometbft-1",
@@ -587,8 +575,7 @@
         "globalDomainUrl": "http://svrun.network.com.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
-        "scanAddress": "https://svrun.network.com.network.canton.global",
-        "scanPort": "5012",
+        "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global/api/v0/scan",
         "svSponsorAddress": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv",
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       }

@@ -67,7 +67,7 @@ local validatorNodes(clusterProtocol, clusterAddress) = {
     wallet: { url: "http://localhost:5003", uiUrl: "http://localhost:3000" },
     splitwell: { url: "http://localhost:6113" },
     directory: { url: clusterProtocol + "://" + "directory.sv-1.svc." + clusterAddress + "/api/v0/directory" },
-    scan: { url: clusterProtocol + "://" + clusterAddress + ":5012" },
+    scan: { url: clusterProtocol + "://" + "scan.sv-1.svc." + clusterAddress + "/api/v0/scan" },
   },
   scan: {
     scan: { url: "http://localhost:5012" },

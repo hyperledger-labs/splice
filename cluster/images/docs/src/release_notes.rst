@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2023-06-02
+----------
+
+* The URL to scan in ``validator-values.yaml`` has changed to
+  ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/scan``. The
+  ``scanPort`` field has been removed.
+
 2023-06-25
 ----------
 

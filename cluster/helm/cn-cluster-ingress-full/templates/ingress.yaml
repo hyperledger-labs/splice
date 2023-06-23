@@ -31,12 +31,6 @@ spec:
   - name: svcp-metrics
     port: 10013
     protocol: TCP
-  - name: grpc-svc-adm
-    port: 5005
-    protocol: TCP
-  - name: scan-api
-    port: 5012
-    protocol: TCP
   - name: grpc-val1-adm
     port: 5102
     protocol: TCP
@@ -136,12 +130,6 @@ spec:
           protocol: TCP
         - containerPort: 10013
           name: svcp-metrics
-          protocol: TCP
-        - containerPort: 5005
-          name: grpc-svc-adm
-          protocol: TCP
-        - containerPort: 5012
-          name: scan-api
           protocol: TCP
         - containerPort: 5102
           name: grpc-val1-adm

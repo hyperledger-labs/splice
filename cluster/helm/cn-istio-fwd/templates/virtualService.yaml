@@ -73,20 +73,6 @@ spec:
         port:
           number: 10013
   - match:
-    - port: 5005
-    route:
-    - destination:
-        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
-        port:
-          number: 5005
-  - match:
-    - port: 5012
-    route:
-    - destination:
-        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
-        port:
-          number: 5012
-  - match:
     - port: 5102
     route:
     - destination:

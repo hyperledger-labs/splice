@@ -16,9 +16,6 @@ spec:
   - number: 443
     name: tls
     protocol: TLS
-  - number: 5005
-    name: grpc-svc
-    protocol: GRPC
   - number: 5008
     name: grpc-domain
     protocol: GRPC
@@ -27,9 +24,6 @@ spec:
     name: cometbft{{ add $index 1 }}-p2p
     protocol: TCP
   {{- end }}
-  - number: 5012
-    name: tls-scan
-    protocol: TLS
   resolution: DNS
 ---
 apiVersion: networking.istio.io/v1alpha3
@@ -58,28 +52,12 @@ spec:
     tls:
       mode: PASSTHROUGH
   - port:
-      number: 5005
-      name: grpc-svc
-      protocol: GRPC
-    hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-  - port:
       number: 5008
       name: grpc-domain
       protocol: GRPC
     hosts:
     - "{{ (.Values.cluster).basename }}.network.canton.global"
     - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-  - hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-    port:
-      name: tls-scan
-      number: 5012
-      protocol: TLS
-    tls:
-      mode: PASSTHROUGH
   {{- range $index, $value := .Values.cometbftPorts }}
   - port:
       number: {{ $value }}

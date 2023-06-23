@@ -87,23 +87,6 @@ spec:
     - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
   - port:
-      number: 5005
-      name: grpc-svc-adm
-      protocol: GRPC
-    hosts:
-    - "{{ (.Values.cluster).hostname }}"
-    - "*.{{ (.Values.cluster).hostname }}"
-  - port:
-      number: 5012
-      name: scan-api
-      protocol: HTTPS
-    tls:
-      mode: SIMPLE
-      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
-    hosts:
-    - "{{ (.Values.cluster).hostname }}"
-    - "*.{{ (.Values.cluster).hostname }}"
-  - port:
       number: 5102
       name: grpc-val1-adm
       protocol: GRPC

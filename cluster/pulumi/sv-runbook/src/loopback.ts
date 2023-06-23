@@ -25,9 +25,7 @@ export function installLoopback(
             ingressPort('status-port', 15021), // istio default
             ingressPort('http2', 80),
             ingressPort('https', 443),
-            ingressPort('grpc-svc', 5005),
             ingressPort('grpc-domain', 5008),
-            ingressPort('http-scan', 5012),
             // see notes when installing a CometBft node in the full deployment
             ingressPort('cometbft-1', 26656),
             ingressPort('cometbft-2', 26666),

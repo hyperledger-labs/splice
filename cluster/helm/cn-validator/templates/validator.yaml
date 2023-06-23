@@ -48,10 +48,6 @@ spec:
         - name: CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS
           value: {{ .Values.svSponsorAddress | quote }}
         {{ end }}
-        {{ if .Values.scanPort -}}
-        - name: CN_APP_VALIDATOR_SCAN_PORT
-          value: {{ .Values.scanPort | quote }}
-        {{ end }}
         {{ if .Values.scanAddress -}}
         - name: CN_APP_VALIDATOR_SCAN_ADDRESS
           value: {{ .Values.scanAddress | quote }}

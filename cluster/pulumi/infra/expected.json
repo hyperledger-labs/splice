@@ -311,18 +311,6 @@
               "targetPort": 10013
             },
             {
-              "name": "grpc-svc-adm",
-              "port": 5005,
-              "protocol": "TCP",
-              "targetPort": 5005
-            },
-            {
-              "name": "scan-api",
-              "port": 5012,
-              "protocol": "TCP",
-              "targetPort": 5012
-            },
-            {
               "name": "grpc-val1-adm",
               "port": 5102,
               "protocol": "TCP",
