@@ -19,6 +19,7 @@
         sphinx-reredirects = pySelf.callPackage ./sphinx-reredirects.nix { };
     };
   };
+  jsonnet = super.callPackage ./jsonnet.nix {};
   pulumi-bin = super.pulumi-bin.overrideAttrs (_: previousAttrs:
     let
       inherit (super.lib.strings) hasPrefix;
