@@ -215,6 +215,9 @@ infrastructure script.
 1. `cncluster pdown` Will remove from the cluster, the portions
    of the configuration managed by Pulumi.
 
+Note: Since we are experiencing a significant amount of false-negatives on Pulumi deployment,
+the `cncluster` script can now optionally retry all pulumi commands. To enable that,
+set an environment variable `PULUMI_RETRY` to 1.
 
 ### Manual Google Cloud Configuration
 
