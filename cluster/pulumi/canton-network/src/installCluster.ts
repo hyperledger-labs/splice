@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import type { Auth0Client } from 'cn-pulumi-common';
+import { Auth0Client } from 'cn-pulumi-common';
 import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
 
 import { installDocs } from './docs';
@@ -63,6 +63,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'auth0|64529b128448ded6aa68048f',
     { type: 'found-collective' },
     true,
+    true,
     [splitwellOnboarding, validator1Onboarding]
   );
   await installSvNode(
@@ -71,7 +72,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'Canton-Foundation-2',
     'auth0|64529b6852dd694167351045',
     joinViaSv1(sv1, SV2_KEY),
-    true
+    true,
+    false
   );
   await installSvNode(
     auth0Client,

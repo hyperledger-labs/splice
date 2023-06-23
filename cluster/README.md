@@ -725,8 +725,7 @@ cover the typical lifecycle of a Canton Network cluster.
         1. If the new component has an API that should be reachable from the internet,
            ensure that the approprate ingress modules contain proxy definitions for
            that API. For test cluster components, the ingress definition will be in
-           `./cluster/images/external-proxy-full/conf`. For SV Runbook components, the ingress
-           definition will be in `./cluster/images/external-proxy-sv/conf`.
+           `./cluster/images/external-proxy-full/conf`.
     1. Note that you are responsible for making sure the ports defined in different config files are consistent.
        In particular, consider:
        1. `./cluster/images/external-proxy-full/config` (egress of the cluster)

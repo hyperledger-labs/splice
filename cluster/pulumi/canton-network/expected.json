@@ -1459,6 +1459,76 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "compat": "true",
+      "name": "ingress-sv-sv-1",
+      "namespace": "sv-1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "hostname": "mock.network.canton.global",
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32",
+              "104.198.172.213/32",
+              "34.70.176.204/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.71.149.222/32",
+              "34.173.27.241/32",
+              "3.114.35.109/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          },
+          "svNamespace": "sv-1"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "withDirectoryBackend": true,
+        "withScan": true
+      }
+    },
+    "name": "helm-sv-1-ingress-sv-sv-1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant",
@@ -2088,6 +2158,76 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "compat": "true",
+      "name": "ingress-sv-sv-2",
+      "namespace": "sv-2",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "hostname": "mock.network.canton.global",
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32",
+              "104.198.172.213/32",
+              "34.70.176.204/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.71.149.222/32",
+              "34.173.27.241/32",
+              "3.114.35.109/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          },
+          "svNamespace": "sv-2"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "withDirectoryBackend": false,
+        "withScan": true
+      }
+    },
+    "name": "helm-sv-2-ingress-sv-sv-2",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant",
@@ -2695,6 +2835,76 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "compat": "true",
+      "name": "ingress-sv-sv-3",
+      "namespace": "sv-3",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "hostname": "mock.network.canton.global",
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32",
+              "104.198.172.213/32",
+              "34.70.176.204/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.71.149.222/32",
+              "34.173.27.241/32",
+              "3.114.35.109/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          },
+          "svNamespace": "sv-3"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "withDirectoryBackend": false,
+        "withScan": false
+      }
+    },
+    "name": "helm-sv-3-ingress-sv-sv-3",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant",
@@ -3220,6 +3430,76 @@
       }
     },
     "name": "helm-sv-4-global-domain",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "compat": "true",
+      "name": "ingress-sv-sv-4",
+      "namespace": "sv-4",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "hostname": "mock.network.canton.global",
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32",
+              "104.198.172.213/32",
+              "34.70.176.204/32",
+              "20.250.62.34/32",
+              "3.248.162.60/32",
+              "34.254.73.185/32",
+              "54.228.250.8/32",
+              "52.50.252.242/32",
+              "52.210.114.82/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.71.149.222/32",
+              "34.173.27.241/32",
+              "3.114.35.109/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          },
+          "svNamespace": "sv-4"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "withDirectoryBackend": false,
+        "withScan": false
+      }
+    },
+    "name": "helm-sv-4-ingress-sv-sv-4",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },

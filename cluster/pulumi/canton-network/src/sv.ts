@@ -8,6 +8,7 @@ import {
   ExactNamespace,
   exactNamespace,
   installCNHelmChart,
+  CLUSTER_BASENAME,
 } from 'cn-pulumi-common';
 import type { Auth0Client } from 'cn-pulumi-common';
 
@@ -88,6 +89,7 @@ export async function installSvNode(
   validatorWalletUser: string,
   onboarding: SvOnboarding,
   withScan = false,
+  withDirectoryBackend = false,
   expectedValidatorOnboardings: ValidatorOnboarding[] = []
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(nodename);
@@ -194,6 +196,21 @@ export async function installSvNode(
       foundingSvApiUrl: 'http://sv-app.sv-1:5014',
     },
     [svApp]
+  );
+
+  installCNHelmChart(
+    xns,
+    'ingress-sv-' + xns.logicalName,
+    'cn-cluster-ingress-sv',
+    {
+      withScan: withScan,
+      withDirectoryBackend: withDirectoryBackend,
+      cluster: {
+        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+        svNamespace: xns.logicalName,
+      },
+    },
+    [xns.ns]
   );
 
   return svApp;

@@ -20,7 +20,6 @@ images := \
 	\
 	docs \
 	external-proxy-full \
-	external-proxy-sv \
 	gcs-proxy \
 	envoy-proxy \
 	json-api \
