@@ -96,15 +96,19 @@ export async function installSvNode(
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(nodename);
 
-  const dependsOn = (
-    [
-      await installAuth0Secret(auth0Client, xns, 'sv', nodename),
-      await installAuth0UISecret(auth0Client, xns, 'sv', nodename),
-      await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
-      await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
-      await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
-    ] as pulumi.Resource[]
-  )
+  const auth0BackendSecrets: pulumi.Resource[] = [
+    await installAuth0Secret(auth0Client, xns, 'sv', nodename),
+    await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
+  ];
+
+  const auth0UISecrets: pulumi.Resource[] = [
+    await installAuth0UISecret(auth0Client, xns, 'sv', nodename),
+    await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
+    await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
+  ];
+
+  const dependsOn = auth0BackendSecrets
+    .concat(auth0UISecrets)
     .concat(
       onboarding.type == 'join-with-key'
         ? [installSvKeySecret(xns, onboarding.publicKey, onboarding.privateKey)]
@@ -141,9 +145,9 @@ export async function installSvNode(
       },
     ],
     [auth0UserNameEnvVar('sv')],
-    dependsOn.concat([domain])
+    auth0BackendSecrets
   );
-  installCometBftNode(xns, nodename, onboardingName);
+  const cometbft = installCometBftNode(xns, nodename, onboardingName);
 
   const svValues = {
     onboardingType: onboarding.type,
@@ -179,9 +183,13 @@ export async function installSvNode(
     };
   }
 
-  const svApp = installCNHelmChart(xns, nodename + '-sv-app', 'cn-sv-node', svValues, [
-    participant,
-  ]);
+  const svApp = installCNHelmChart(
+    xns,
+    nodename + '-sv-app',
+    'cn-sv-node',
+    svValues,
+    dependsOn.concat([participant, domain, cometbft])
+  );
 
   if (onboarding.type == 'found-collective' && !withScan) {
     console.error('Founding node always needs to have CC Scan enabled');

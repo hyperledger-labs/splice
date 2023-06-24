@@ -1,4 +1,4 @@
-import { Output } from '@pulumi/pulumi';
+import { Output, Resource } from '@pulumi/pulumi';
 import {
   CLUSTER_DNS_NAME,
   CLUSTER_BASENAME,
@@ -89,8 +89,8 @@ export function installCometBftNode(
   xns: ExactNamespace,
   nodename: string,
   onboardingName: string
-): void {
-  installCNHelmChart(xns, nodename + '-cometbft', 'cn-cometbft', {
+): Resource {
+  return installCNHelmChart(xns, nodename + '-cometbft', 'cn-cometbft', {
     nodeName: onboardingName,
     imageName: 'cometbft',
     founder: founder,
