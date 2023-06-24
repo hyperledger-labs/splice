@@ -17,14 +17,18 @@ pipeline_workflows_complete() {
   pipeline_id=$1
   if fetch "https://circleci.com/api/v2/pipeline/$pipeline_id/workflow" "/tmp/workflows.json"
   then
-    RESULT=$(jq < /tmp/workflows.json '.items | map(.status) | all(. != "running")')
+    cat /tmp/workflows.json
+    # https://circleci.com/docs/api/v2/index.html#operation/listWorkflowsByPipelineId
+    # Valid statuses are "success" "running" "not_run" "failed" "error" "failing" "on_hold" "canceled" "unauthorized"
+    # We want to wait until it has fully completed
+    # which seems to mean not running or failing
+    RESULT=$(jq < /tmp/workflows.json '.items | map(.status) | all(. != "running" and . != "failing")')
     if [[ $RESULT == "true" ]]
     then
         echo "Pipeline complete"
         return 0
     else
         echo "Pipeline still running"
-        cat /tmp/workflows.json
         return 1
     fi
   else
