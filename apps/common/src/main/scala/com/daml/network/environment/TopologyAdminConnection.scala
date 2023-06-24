@@ -7,7 +7,6 @@ import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.admin.api.client.commands.{TopologyAdminCommandsX}
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   BaseResult,
-  ListDomainParametersStateResult,
   ListMediatorDomainStateResult,
   ListSequencerDomainStateResult,
   ListUnionspaceDefinitionResult,
@@ -237,30 +236,6 @@ class TopologyAdminConnection(
         )
       )
     )
-
-  def getDomainParameters(domainId: DomainId)(implicit
-      traceContext: TraceContext
-  ): Future[TopologyResult[DomainParametersStateX]] =
-    runCmd(
-      TopologyAdminCommandsX.Read.DomainParametersState(
-        BaseQueryX(
-          filterStore = domainId.filterString,
-          proposals = false,
-          timeQuery = TimeQueryX.HeadState,
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
-        filterDomain = "",
-      )
-    ).map { txs =>
-      val ListDomainParametersStateResult(base, mapping) = txs.headOption.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(show"No domain parameters state found for $domainId")
-          .asRuntimeException()
-      )
-      TopologyResult(base, DomainParametersStateX(domainId, mapping))
-    }
 
   def lookupTrafficControlState(
       domainId: DomainId,
@@ -562,33 +537,6 @@ class TopologyAdminConnection(
       DomainParametersStateX(domainId, parameters),
       signedBy = signedBy,
       serial = PositiveInt.one,
-    )
-
-  def ensureDomainParametersMaxRatePerParticipant(
-      domainId: DomainId,
-      maxRatePerParticipant: NonNegativeInt,
-      signedBy: Fingerprint,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Unit] =
-    ensureTopologyMapping[DomainParametersStateX](
-      show"maxRatePerParticipant is set to $maxRatePerParticipant",
-      getDomainParameters(domainId).map(result =>
-        Either.cond(
-          result.mapping.parameters.maxRatePerParticipant == maxRatePerParticipant,
-          (),
-          result,
-        )
-      ),
-      previous =>
-        Right(
-          previous.copy(
-            parameters = previous.parameters.copy(maxRatePerParticipant = maxRatePerParticipant)(
-              previous.parameters.representativeProtocolVersion
-            )
-          )
-        ),
-      signedBy,
     )
 
   def waitForTopologyChangeToBeValid(description: String, validFrom: Instant)(implicit

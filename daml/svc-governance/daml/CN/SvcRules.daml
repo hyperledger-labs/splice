@@ -973,13 +973,6 @@ template SvcRules with
           lock = False
           ..
 
-    choice SvcRules_Cycle : ContractId SvcRules
-      with
-        sv : Party
-      controller sv
-      do require "SV is a collective member" (sv `Map.member` members)
-         create this
-
 -- Utility functions
 --------------------
 
