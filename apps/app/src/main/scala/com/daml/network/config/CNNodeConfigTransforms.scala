@@ -268,6 +268,9 @@ object CNNodeConfigTransforms {
         })
     )
 
+  def noDevNet: CNNodeConfigTransform =
+    updateAllSvAppFoundCollectiveConfigs_(_.focus(_.isDevNet).replace(false))
+
   def updateAllValidatorConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
   ): CNNodeConfigTransform =

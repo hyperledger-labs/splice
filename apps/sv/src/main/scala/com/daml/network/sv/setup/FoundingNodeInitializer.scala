@@ -340,7 +340,7 @@ class FoundingNodeInitializer(
                       foundingConfig.initialCoinPrice.bigDecimal,
                       SvUtil.defaultSvcRulesConfig(),
                       defaultEnabledChoices,
-                      config.isDevNet,
+                      foundingConfig.isDevNet,
                     ).createAnd
                       .exerciseSvcBootstrap_Bootstrap()
                       .commands
@@ -402,7 +402,7 @@ class FoundingNodeInitializer(
                   domainId,
                 ),
                 defaultEnabledChoices,
-                config.isDevNet,
+                foundingConfig.isDevNet,
                 false,
               ).create(),
               commandId = CNLedgerConnection.CommandId(

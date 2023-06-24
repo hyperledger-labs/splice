@@ -11,8 +11,6 @@ Release Notes
   ``scanPort`` field has been removed.
 * The ``svSponsorAddress`` from ``validator-values.yaml`` has been removed. The validator associated
   with an SV node is onboarded automatically through its SV node.
-* ``sv-values.yaml`` now requires specifying ``isDevNet: true``. This will be set to ``false`` on TestNet release
-  to disable features like tap of CC.
 
 2023-06-25
 ----------

@@ -16,9 +16,7 @@ class WalletNoDevNetFrontendIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms.updateAllSvAppConfigs((_, c) => c.copy(isDevNet = false))(config)
-      )
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
 
   "A wallet UI when isDevNet=false" should {
 

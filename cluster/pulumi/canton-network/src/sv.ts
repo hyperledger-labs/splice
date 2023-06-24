@@ -88,11 +88,11 @@ export async function installSvNode(
   onboardingName: string,
   validatorWalletUser: string,
   onboarding: SvOnboarding,
-  isDevNet: boolean,
   withDomainFees: boolean,
   withScan = false,
   withDirectoryBackend = false,
-  expectedValidatorOnboardings: ValidatorOnboarding[] = []
+  expectedValidatorOnboardings: ValidatorOnboarding[] = [],
+  isDevNet?: boolean
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(nodename);
 

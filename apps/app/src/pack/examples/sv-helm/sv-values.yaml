@@ -14,4 +14,3 @@ cometBFT:
   enabled: true
   automationEnabled: false
   connectionUri: "http://cometbft-cometbft-rpc:26657"
-isDevNet: true

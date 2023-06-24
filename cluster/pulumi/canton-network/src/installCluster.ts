@@ -81,11 +81,11 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'Canton-Foundation-1',
     'auth0|64529b128448ded6aa68048f',
     { type: 'found-collective' },
-    isDevNet,
     withDomainFees,
     true,
     true,
-    [splitwellOnboarding, validator1Onboarding]
+    [splitwellOnboarding, validator1Onboarding],
+    isDevNet
   );
   if (!singleSv) {
     await installSvNode(
@@ -94,7 +94,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       'Canton-Foundation-2',
       'auth0|64529b6852dd694167351045',
       joinViaSv1(sv1, SV2_KEY),
-      isDevNet,
       withDomainFees,
       true,
       false
@@ -105,7 +104,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       'Canton-Foundation-3',
       'auth0|64529bb10c1aee4f2c819218',
       joinViaSv1(sv1, SV3_KEY),
-      isDevNet,
       withDomainFees
     );
     await installSvNode(
@@ -114,7 +112,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       'Canton-Foundation-4',
       'auth0|64529bc58d30358eacae5611',
       joinViaSv1(sv1, SV4_KEY),
-      isDevNet,
       withDomainFees
     );
   }

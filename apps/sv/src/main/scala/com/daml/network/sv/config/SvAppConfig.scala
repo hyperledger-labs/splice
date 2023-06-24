@@ -43,6 +43,7 @@ object SvOnboardingConfig {
       initialCoinPrice: BigDecimal = 1.0,
       // TODO(#5855) remove this again
       globalLockTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(120),
+      isDevNet: Boolean = false,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -85,7 +86,6 @@ case class SvAppBackendConfig(
     participantClient: CNParticipantClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SvDomainConfig,
-    isDevNet: Boolean = false,
     expectedValidatorOnboardings: List[ExpectedValidatorOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     // If not set the onboarding name is used. We set this in our tests
