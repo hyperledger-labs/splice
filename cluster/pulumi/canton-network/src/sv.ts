@@ -183,8 +183,16 @@ export async function installSvNode(
     participant,
   ]);
 
+  if (onboarding.type == 'found-collective' && !withScan) {
+    console.error('Founding node always needs to have CC Scan enabled');
+    process.exit(1);
+  }
+
   if (withScan) {
-    installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', {}, [svApp]);
+    const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', {}, [svApp]);
+    if (onboarding.type == 'found-collective') {
+      installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', {}, [scanApp]);
+    }
   }
 
   installCNHelmChart(

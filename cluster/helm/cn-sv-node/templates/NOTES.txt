@@ -1,1 +1,1 @@
-Canton Network SV App Backend and Web UI, SVC App, and Directory App Backend
+Canton Network SV App Backend and Web UI

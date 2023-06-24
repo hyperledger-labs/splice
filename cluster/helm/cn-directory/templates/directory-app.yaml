@@ -1,4 +1,3 @@
-{{- if eq .Values.onboardingType "found-collective" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,4 +47,3 @@ spec:
   - name: directory-api
     port: 5010
     protocol: TCP
-{{- end}}
