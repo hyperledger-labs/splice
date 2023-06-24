@@ -89,6 +89,7 @@ export async function installSvNode(
   validatorWalletUser: string,
   onboarding: SvOnboarding,
   isDevNet: boolean,
+  withDomainFees: boolean,
   withScan = false,
   withDirectoryBackend = false,
   expectedValidatorOnboardings: ValidatorOnboarding[] = []
@@ -122,7 +123,7 @@ export async function installSvNode(
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
-  const domain = installGlobalDomain(xns, 'global-domain', postgresDb);
+  const domain = installGlobalDomain(xns, 'global-domain', postgresDb, withDomainFees);
 
   const participant = installParticipant(
     xns,

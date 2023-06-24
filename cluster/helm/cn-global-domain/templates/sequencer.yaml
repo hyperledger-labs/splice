@@ -27,6 +27,12 @@ spec:
           value: {{ .Values.postgres }}
         - name: SEQUENCER_DRIVER_DATABASE_ADDRESS
           value: {{ .Values.sequencerDriver.address }}
+        {{- if (.Values.trafficControl).enabled }}
+        - name: ADDITIONAL_CONFIG_TRAFFIC_CONTROL
+          value: |
+            canton.sequencers-x.sequencer.traffic-control.base-rate = {{ (.Values.trafficControl).baseRate }}
+            canton.sequencers-x.sequencer.traffic-control.max-burst-duration = {{ (.Values.trafficControl).maxBurstDuration }}
+        {{- end }}
         imagePullPolicy: Always
         ports:
         - containerPort: 5008

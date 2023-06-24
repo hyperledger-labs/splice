@@ -1,6 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Auth0Client } from 'cn-pulumi-common';
 import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
+import { exit } from 'process';
 
 import { installDocs } from './docs';
 import { installClusterIngress } from './ingress';
@@ -60,6 +61,19 @@ if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
+const singleSv = process.env.SINGLE_SV !== undefined && process.env.SINGLE_SV !== '';
+if (singleSv) {
+  console.error('Launching with a single SV');
+}
+
+const withDomainFees = process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '';
+if (withDomainFees && !singleSv) {
+  console.error(
+    `Currently, you cannot enable domain fees with more than one SV, please also set SINGLE_SV to 1 and rerun (${singleSv})`
+  );
+  exit(1);
+}
+
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   const sv1 = await installSvNode(
     auth0Client,
@@ -68,11 +82,12 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'auth0|64529b128448ded6aa68048f',
     { type: 'found-collective' },
     isDevNet,
+    withDomainFees,
     true,
     true,
     [splitwellOnboarding, validator1Onboarding]
   );
-  if (isDevNet) {
+  if (!singleSv) {
     await installSvNode(
       auth0Client,
       'sv-2',
@@ -80,6 +95,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       'auth0|64529b6852dd694167351045',
       joinViaSv1(sv1, SV2_KEY),
       isDevNet,
+      withDomainFees,
       true,
       false
     );
@@ -89,7 +105,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       'Canton-Foundation-3',
       'auth0|64529bb10c1aee4f2c819218',
       joinViaSv1(sv1, SV3_KEY),
-      isDevNet
+      isDevNet,
+      withDomainFees
     );
     await installSvNode(
       auth0Client,
@@ -97,7 +114,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       'Canton-Foundation-4',
       'auth0|64529bc58d30358eacae5611',
       joinViaSv1(sv1, SV4_KEY),
-      isDevNet
+      isDevNet,
+      withDomainFees
     );
   }
 

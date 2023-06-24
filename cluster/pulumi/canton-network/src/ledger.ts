@@ -15,13 +15,24 @@ export function installDomain(
 export function installGlobalDomain(
   xns: ExactNamespace,
   name: string,
-  postgresDb: pulumi.Output<string>
+  postgresDb: pulumi.Output<string>,
+  withDomainFees: boolean
 ): pulumi.Resource {
+  if (withDomainFees) {
+    console.error('Running with domain fees');
+  }
   return installCNHelmChart(xns, name, 'cn-global-domain', {
     postgres: postgresDb,
     sequencerDriver: {
       address: 'postgres.sv-1',
     },
+    trafficControl: withDomainFees
+      ? {
+          enabled: true,
+          baseRate: 300,
+          maxBurstDuration: '10m',
+        }
+      : {},
   });
 }
 

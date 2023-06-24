@@ -1448,7 +1448,8 @@
         },
         "sequencerDriver": {
           "address": "postgres.sv-1"
-        }
+        },
+        "trafficControl": {}
       }
     },
     "name": "helm-sv-1-global-domain",
@@ -2148,7 +2149,8 @@
         },
         "sequencerDriver": {
           "address": "postgres.sv-1"
-        }
+        },
+        "trafficControl": {}
       }
     },
     "name": "helm-sv-2-global-domain",
@@ -2826,7 +2828,8 @@
         },
         "sequencerDriver": {
           "address": "postgres.sv-1"
-        }
+        },
+        "trafficControl": {}
       }
     },
     "name": "helm-sv-3-global-domain",
@@ -3429,7 +3432,8 @@
         },
         "sequencerDriver": {
           "address": "postgres.sv-1"
-        }
+        },
+        "trafficControl": {}
       }
     },
     "name": "helm-sv-4-global-domain",
