@@ -115,14 +115,17 @@ testUnclaimedRewardsMerging = do
 
 testRequiredNumOfConfirmationInDevNet : Script ()
 testRequiredNumOfConfirmationInDevNet = do
-  (_, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
 
   -- add 3 phamton SVs
   forA_ [5 .. 7] $ \i -> do
     [(svcRulesCid, _)] <- query @SvcRules svc
     let svName = "sv" <> show i
     phamtonSv <- allocateParty $ svName
-    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName (Round 3)
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName (Round 3) domainId
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
@@ -136,6 +139,7 @@ testRequiredNumOfConfirmationInDevNet = do
           newMemberParty = svX
           newMemberName = "svX"
           nextMiningRound = (Round 3)
+          domainId
   confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
     submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = svParty
@@ -166,6 +170,8 @@ testConfirmationExpiry = do
   svX <- allocateParty "svX"
 
   [(svcRulesCid, _)] <- query @SvcRules svc
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
 
   -- create a single confirmation which will not suffice to initiate an action
   svConfirmationCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
@@ -175,6 +181,7 @@ testConfirmationExpiry = do
         newMemberParty = svX
         newMemberName = "svX"
         nextMiningRound = (Round 3)
+        domainId
 
   -- leader tries to expire the confirmation, but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
@@ -204,7 +211,9 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
 
   [(svcRulesCid, _)] <- query @SvcRules svc
   svX <- allocateParty "svX"
-  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" (Round 3))
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
+  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" (Round 3) domainId)
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   (round, _) <- getLatestOpenRound app
@@ -217,7 +226,7 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
 
   [(svcRulesCid, _)] <- query @SvcRules svc
   svX <- allocateParty "svX"
-  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" (Round 3))
+  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" (Round 3) domainId)
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   (round, _) <- getLatestOpenRound app

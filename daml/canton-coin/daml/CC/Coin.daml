@@ -293,6 +293,7 @@ template CoinRules
         let configUsd = getValueAsOf now configSchedule
         let minTopupAmount = configUsd.globalDomain.fees.minTopupAmount
         require "extraTraffic is at least as much as the configured minTopupAmount" (extraTraffic >= minTopupAmount)
+        -- TODO(#6112) - Move domain fees computation into separate function
         -- compute price in CC
         contextMiningRound <- exercise context.context.openMiningRound (API.OpenMiningRound_Fetch validator)
         let extraTrafficPrice = configUsd.globalDomain.fees.extraTrafficPrice
@@ -318,7 +319,7 @@ template CoinRules
             intent <- fetch intentCid
             archive intentCid
             require "Known domain-id" (intent.domainId `Set.member` configUsd.globalDomain.requiredDomains)
-            pure $ initialValidatorTraffic svc intent.validator intent.domainId
+            pure $ initialValidatorTraffic svc intent.validator intent.domainId 0
           Right trafficCid -> do
             traffic <- fetch trafficCid
             archive trafficCid

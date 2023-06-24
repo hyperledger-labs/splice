@@ -24,6 +24,7 @@ class DFBootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner 
         this.getClass.getSimpleName,
       )
       .clearConfigTransforms()
+      .withTrafficTopupsEnabled
       .addConfigTransforms((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
 
   "Bootstrap script should pass" in { implicit env =>

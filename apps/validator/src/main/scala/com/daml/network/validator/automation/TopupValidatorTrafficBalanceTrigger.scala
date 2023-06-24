@@ -30,7 +30,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 class TopupValidatorTrafficBalanceTrigger(
@@ -52,19 +51,36 @@ class TopupValidatorTrafficBalanceTrigger(
     // TODO(#3816) - Clean up noisy logs
     logger.debug("Executing top-up validator traffic balance trigger")
     for {
-      validatorTreasury <- getValidatorTreasury()
       coinRules <- scanConnection.getCoinRules()
       globalDomainConfig = CoinConfigSchedule(coinRules)
         .getConfigAsOf(clock.now)
         .globalDomain
-      activeDomainId = DomainId.tryFromString(globalDomainConfig.activeDomain)
-      currentValidatorTraffic <- store.lookupValidatorTrafficWithOffset(activeDomainId)
-      currentTrafficState <- participantAdminConnection.getParticipantTrafficState(activeDomainId)
       topupParameters = ExtraTrafficTopupParameters(
         globalDomainConfig.fees,
         buyExtraTrafficConfig,
         context.config.pollingInterval,
       )
+      result <-
+        if (topupParameters.topupAmount == 0L) {
+          logger.debug(
+            s"Validator is not configured to buy extra traffic. Skipping..."
+          )
+          Future.successful(false)
+        } else {
+          val activeDomainId = DomainId.tryFromString(globalDomainConfig.activeDomain)
+          checkAndTopupIfNeeded(topupParameters, activeDomainId)
+        }
+    } yield result
+  }
+
+  private def checkAndTopupIfNeeded(
+      topupParameters: ExtraTrafficTopupParameters,
+      activeDomainId: DomainId,
+  )(implicit traceContext: TraceContext): Future[Boolean] = {
+    for {
+      validatorTreasury <- getValidatorTreasury()
+      currentValidatorTraffic <- store.lookupValidatorTrafficWithOffset(activeDomainId)
+      currentTrafficState <- participantAdminConnection.getParticipantTrafficState(activeDomainId)
       result <-
         if (shouldTopup(currentTrafficState, currentValidatorTraffic.value, topupParameters))
           topUpValidatorTraffic(
@@ -77,32 +93,6 @@ class TopupValidatorTrafficBalanceTrigger(
     } yield result
   }
 
-  private def getValidatorTreasury()(implicit tc: TraceContext): Future[TreasuryService] = {
-    for {
-      walletInstall <- store
-        .lookupInstallByParty(store.key.validatorParty)
-        .map(
-          _.getOrElse(
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(
-                s"No wallet install contract for validator ${store.key.validatorParty}."
-              )
-            )
-          )
-        )
-      validatorWalletUser = walletInstall.payload.endUserName
-      validatorWallet = walletManager
-        .lookupUserWallet(validatorWalletUser)
-        .getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription(
-              s"No wallet found for validator user $validatorWalletUser."
-            )
-          )
-        )
-    } yield validatorWallet.treasury
-  }
-
   private def shouldTopup(
       currentTrafficState: ParticipantTrafficState,
       validatorTraffic: Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]],
@@ -113,8 +103,7 @@ class TopupValidatorTrafficBalanceTrigger(
       traffic.payload.lastPurchasedAt.toEpochMilli + topupParameters.minTopupInterval.duration.toMillis > clock.now.toEpochMilli
     )
     if (tooSoon) {
-      val lastPurchasedAt = validatorTraffic.fold(Instant.MIN)(_.payload.lastPurchasedAt)
-      logger.debug(s"Trying to top-up too soon after previous top-up at ${lastPurchasedAt}")
+      logger.debug(s"Trying to top-up too soon after previous top-up")
       false
     } else if (
       currentTrafficState.totalExtraTrafficLimit.fold(0L)(_.value) < totalPurchasedTraffic
@@ -124,7 +113,7 @@ class TopupValidatorTrafficBalanceTrigger(
     } else if (currentTrafficState.extraTrafficRemainder.value >= topupParameters.topupAmount) {
       logger.debug(
         s"Skipping top-up because sufficient traffic balance remains. " +
-          s"Current traffic balance: ${currentTrafficState.extraTrafficRemainder.value / 1e6} MB"
+          s"Current traffic balance: ${currentTrafficState.extraTrafficRemainder.value} bytes"
       )
       false
     } else {
@@ -181,6 +170,32 @@ class TopupValidatorTrafficBalanceTrigger(
             case otherwise => sys.error(s"unexpected COO return type: $otherwise")
           }
     } yield taskOutcome
+  }
+
+  private def getValidatorTreasury()(implicit tc: TraceContext): Future[TreasuryService] = {
+    for {
+      walletInstall <- store
+        .lookupInstallByParty(store.key.validatorParty)
+        .map(
+          _.getOrElse(
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(
+                s"No wallet install contract for validator ${store.key.validatorParty}."
+              )
+            )
+          )
+        )
+      validatorWalletUser = walletInstall.payload.endUserName
+      validatorWallet = walletManager
+        .lookupUserWallet(validatorWalletUser)
+        .getOrElse(
+          throw new StatusRuntimeException(
+            Status.NOT_FOUND.withDescription(
+              s"No wallet found for validator user $validatorWalletUser."
+            )
+          )
+        )
+    } yield validatorWallet.treasury
   }
 
   private def getOrCreateTrafficCreationIntent(activeDomainId: DomainId, dedupOffset: String)(

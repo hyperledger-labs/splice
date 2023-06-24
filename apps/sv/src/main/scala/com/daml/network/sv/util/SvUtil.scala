@@ -40,6 +40,7 @@ object SvUtil {
   )
 
   val defaultSvcDomainNumber = 0L;
+  private val defaultInitialTrafficGrant = 100_000L
 
   private def defaultSvcGlobalDomainConfig = new GlobalDomainConfig(
     // domains
@@ -102,6 +103,7 @@ object SvUtil {
     new RelTime(TimeUnit.SECONDS.toMicros(70)), // leaderInactiveTimeout
     defaultDomainNodeConfigLimits,
     1024, // maxTextLength
+    defaultInitialTrafficGrant,
     defaultSvcGlobalDomainConfig, // globalDomainConfig
   )
 

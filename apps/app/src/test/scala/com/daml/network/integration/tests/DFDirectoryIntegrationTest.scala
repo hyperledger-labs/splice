@@ -43,6 +43,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
+      .withTrafficTopupsEnabled
       .withAdditionalSetup(implicit env => {
         aliceValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
         bobValidator.participantClient.upload_dar_unless_exists(directoryDarPath)

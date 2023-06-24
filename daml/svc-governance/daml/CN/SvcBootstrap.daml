@@ -4,6 +4,7 @@ import qualified DA.Map as Map
 
 import CC.Coin
 import CC.CoinConfig
+import CC.GlobalDomain (initialValidatorTraffic)
 import CC.Schedule
 import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round
@@ -61,4 +62,11 @@ template SvcBootstrap with
           sv = founderParty
           coinPrice = Some coinPrice
           lastUpdatedAt = now
+
+        -- create initial ValidatorTraffic for the founding member based on configured initial traffic grant
+        let domainId = coinConfig.globalDomain.activeDomain
+        let trafficAmount = config.initialTrafficGrant
+        let founderTraffic = initialValidatorTraffic svc founderParty domainId trafficAmount
+        _ <- create founderTraffic
+
         pure ()

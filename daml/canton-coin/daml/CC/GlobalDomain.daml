@@ -70,11 +70,11 @@ template ValidatorTraffic with
       && usdSpent >= 0.0
 
 
-initialValidatorTraffic : Party -> Party -> Text -> ValidatorTraffic
-initialValidatorTraffic svc validator domainId = ValidatorTraffic with
+initialValidatorTraffic : Party -> Party -> Text -> Int -> ValidatorTraffic
+initialValidatorTraffic svc validator domainId amount = ValidatorTraffic with
   svc = svc
   validator = validator
-  totalPurchased = 0
+  totalPurchased = amount
   numPurchases = 0
   ccSpent = 0.0
   usdSpent = 0.0

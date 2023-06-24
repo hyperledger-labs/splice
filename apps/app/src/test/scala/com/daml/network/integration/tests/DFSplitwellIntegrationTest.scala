@@ -30,6 +30,7 @@ class DFSplitwellIntegrationTest
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
+      .withTrafficTopupsEnabled
       .withAdditionalSetup(implicit env => {
         aliceValidator.participantClient.upload_dar_unless_exists(darPath)
         bobValidator.participantClient.upload_dar_unless_exists(darPath)

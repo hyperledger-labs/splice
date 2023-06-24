@@ -61,6 +61,7 @@ initCollective isDevNet = do
         leaderInactiveTimeout = seconds 70
         domainNodeConfigLimits = defaultDomainNodeConfigLimits
         maxTextLength = 1024
+        initialTrafficGrant = 100_000
         globalDomain = initialGlobalDomainConfig
   let coinConfig = defaultCoinConfig
 
@@ -105,6 +106,7 @@ initCollective isDevNet = do
       newMemberParty = svParty
       newMemberName = svName
       nextMiningRound = Round (latestOpenRound.round.number + 1)
+      domainId = coinConfig.globalDomain.activeDomain
 
   pure (app, svc, (sv1, sv2, sv3, sv4))
 

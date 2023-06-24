@@ -173,6 +173,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           sv1.getSvcInfo().svcRules.payload.config.leaderInactiveTimeout,
           sv1.getSvcInfo().svcRules.payload.config.domainNodeConfigLimits,
           sv1.getSvcInfo().svcRules.payload.config.maxTextLength,
+          sv1.getSvcInfo().svcRules.payload.config.initialTrafficGrant,
           sv1.getSvcInfo().svcRules.payload.config.globalDomain,
         )
 

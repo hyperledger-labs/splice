@@ -19,11 +19,6 @@ case class AutomationConfig(
     /** TODO(M3-63) Disables the attempt to expire unclaimed rewards. Remove this once we are resilient to unavailable validators
       */
     enableUnclaimedRewardExpiration: Boolean = false,
-    /** Only intended for testing. Disables the validator traffic balance topup loop except in domain fees related tests.
-      * TODO(#3816) cleanup this flag after DomainFees PoC and replace with a per-validator spend limit
-      */
-    enableAutomaticValidatorTrafficBalanceTopup: Boolean = false,
-
     /** Only intended for testing. Disables the generation of SV rewards.
       */
     enableSvRewards: Boolean = true,

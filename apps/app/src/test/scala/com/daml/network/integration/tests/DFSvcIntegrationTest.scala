@@ -20,6 +20,7 @@ class DFSvcIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
+      .withTrafficTopupsEnabled
 
   "restart cleanly" in { implicit env =>
     // TODO(tech-debt): share tests for common properties of CNNodeApps, like restartabilty

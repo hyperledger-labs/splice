@@ -48,6 +48,7 @@ trait SvTestUtil extends CNNodeTestCommon {
       val (openRounds, _) = sv1Scan.getOpenAndIssuingMiningRounds()
       new Round(openRounds.map(_.contract.payload.round.number).max + 1)
     }
+    val coinConfig = sv1Scan.getCoinConfigAsOf(env.environment.clock.now)
     actAndCheck(
       s"Add the phantom SV \"$svName\"",
       svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
@@ -61,6 +62,7 @@ trait SvTestUtil extends CNNodeTestCommon {
             svParty.toProtoPrimitive,
             svName,
             nextMiningRound,
+            coinConfig.globalDomain.activeDomain,
           )
           .commands
           .asScala

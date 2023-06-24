@@ -11,7 +11,12 @@ import com.daml.network.environment.{
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.CommonCNNodeAppInstanceReferences
 import com.digitalasset.canton.admin.api.client.data.User
-import com.digitalasset.canton.config.{ClockConfig, TestingConfigInternal}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.config.{
+  ClockConfig,
+  NonNegativeFiniteDuration,
+  TestingConfigInternal,
+}
 import com.digitalasset.canton.console.TestConsoleOutput
 import com.digitalasset.canton.environment.EnvironmentFactory
 import com.digitalasset.canton.integration.{
@@ -128,6 +133,29 @@ case class CNNodeEnvironmentDefinition(
           )
         )
       )
+    )
+
+  def withTrafficTopupsEnabled: CNNodeEnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      CNNodeConfigTransforms.updateAllValidatorConfigs { case (name, validatorConfig) =>
+        val domainFeesEnabledConfig = validatorConfig
+          // reduce top-up interval from default of 10m so that we can see
+          // multiple top-ups in wall-clock tests
+          .focus(_.domains.global.buyExtraTraffic.minTopupInterval)
+          .replace(NonNegativeFiniteDuration.ofMinutes(1))
+        if (name.startsWith("sv"))
+          domainFeesEnabledConfig
+            .focus(_.domains.global.buyExtraTraffic.targetThroughput)
+            .replace(NonNegativeNumeric.tryCreate(BigDecimal(80000)))
+        else if (name.contains("bob"))
+          domainFeesEnabledConfig
+            .focus(_.domains.global.buyExtraTraffic.targetThroughput)
+            .replace(NonNegativeNumeric.tryCreate(BigDecimal(0)))
+        else
+          domainFeesEnabledConfig
+            .focus(_.domains.global.buyExtraTraffic.targetThroughput)
+            .replace(NonNegativeNumeric.tryCreate(BigDecimal(30000)))
+      }(config)
     )
 
   def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =

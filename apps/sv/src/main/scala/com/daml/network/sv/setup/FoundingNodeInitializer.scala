@@ -311,6 +311,14 @@ class FoundingNodeInitializer(
     private def bootstrapSvc(): Future[Unit] = {
       for {
         coinRules <- svcStore.lookupCoinRules()
+        participantId <- participantAdminConnection.getParticipantId()
+        svcRulesConfig = SvUtil.defaultSvcRulesConfig()
+        _ <- participantAdminConnection.ensureTrafficControlState(
+          domainId,
+          participantId,
+          svcRulesConfig.initialTrafficGrant,
+          participantId.uid.namespace.fingerprint,
+        )
         founderDomainNodes <- SvUtil
           .getFounderDomainNodeConfig(cometBftNode)
         _ <- svcStore.lookupSvcRulesWithOffset().flatMap {
@@ -338,7 +346,7 @@ class FoundingNodeInitializer(
                         domainId,
                       ),
                       foundingConfig.initialCoinPrice.bigDecimal,
-                      SvUtil.defaultSvcRulesConfig(),
+                      svcRulesConfig,
                       defaultEnabledChoices,
                       foundingConfig.isDevNet,
                     ).createAnd

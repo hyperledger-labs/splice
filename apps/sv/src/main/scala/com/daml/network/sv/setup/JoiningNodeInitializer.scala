@@ -257,6 +257,7 @@ class JoiningNodeInitializer(
             "add member to Svc",
             for {
               svcRules <- svcStore.getSvcRules()
+              coinRules <- svcStore.getCoinRules()
               openMiningRounds <- svcStore.getOpenMiningRoundTriple()
               svOnboardingConfirmedOpt <- svcStore.lookupSvOnboardingConfirmedByParty(
                 svcStore.key.svParty
@@ -287,6 +288,7 @@ class JoiningNodeInitializer(
                       openMiningRounds.oldest.contractId,
                       openMiningRounds.middle.contractId,
                       openMiningRounds.newest.contractId,
+                      coinRules.contractId,
                     )
                     svcStoreWithIngestion.connection.submitCommandsNoDedup(
                       Seq(svcStore.key.svParty),

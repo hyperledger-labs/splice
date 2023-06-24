@@ -429,6 +429,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       }
 
       val fakeSv4Party = allocateRandomSvParty("sv4")
+      val coinConfig = sv1Scan.getCoinConfigAsOf(env.environment.clock.now)
       actAndCheck(
         "Add a fake sv4 Party to SvcRules.members to simulate sv4 is already added to SVC", {
           svc.participantClient.ledger_api_extensions.commands.submitWithResult(
@@ -443,6 +444,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
                 fakeSv4Party.toProtoPrimitive,
                 "Canton-Foundation-4",
                 new Round(3),
+                coinConfig.globalDomain.activeDomain,
               ),
           )
         },

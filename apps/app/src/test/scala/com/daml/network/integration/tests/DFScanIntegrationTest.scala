@@ -27,6 +27,7 @@ class DFScanIntegrationTest
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
+      .withTrafficTopupsEnabled
 
   "restart cleanly" in { implicit env =>
     sv1Scan.stop()

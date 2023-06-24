@@ -496,7 +496,6 @@ testBuyExtraTraffic = script do
   runCoinDepositBots app
 
   -- set the validator up with some coin and its own wallet install contract
-  tap app aliceValidator 42.0
   submit aliceValidator.primaryParty $ createCmd $ WalletAppInstall with
     endUserParty = aliceValidator.primaryParty
     endUserName = "wallet_service_participant_user"

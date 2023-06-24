@@ -15,7 +15,7 @@ import CC.Util
 import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
-import CC.GlobalDomain (ValidatorTraffic)
+import CC.GlobalDomain (initialValidatorTraffic, ValidatorTraffic)
 
 import qualified CN.CometBft as CometBft
 import CN.SvOnboarding
@@ -23,6 +23,7 @@ import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
 import CN.Util.Assert
 import CN.Util.ExpiringContract
+import CC.Schedule (getValueAsOf)
 
 
 -- Types
@@ -227,6 +228,7 @@ data SvcRulesConfig = SvcRulesConfig with
     leaderInactiveTimeout: RelTime -- ^ The amount of time given to the leader to complete an action it should take care of
     domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the members' `DomainNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
+    initialTrafficGrant: Int -- ^ Granted extra traffic to SVs at the time of joining
     globalDomain : GlobalDomainConfig
   deriving (Eq, Show)
 
@@ -259,6 +261,7 @@ template SvcRules with
         newMemberParty : Party
         newMemberName : Text
         nextMiningRound : Round
+        domainId: Text
       controller svc
       do
         requireUnlocked lock
@@ -276,6 +279,7 @@ template SvcRules with
           sv = newMemberParty
           coinPrice = None
           lastUpdatedAt = now
+        create (initialValidatorTraffic svc newMemberParty domainId config.initialTrafficGrant)
         create SvcRules with
           svc
           epoch
@@ -324,6 +328,7 @@ template SvcRules with
         earliestRoundCid : ContractId OpenMiningRound
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
+        coinRulesCid: ContractId CoinRules
       controller sv
       do
         requireUnlocked lock
@@ -341,10 +346,14 @@ template SvcRules with
         require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
         require "rounds belong to SVC" (earliestRound.svc == svc && middleRound.svc == svc && latestRound.svc == svc)
 
+        coinRules <- fetch coinRulesCid
+        now <- getTime
+        let coinConfig = getValueAsOf now coinRules.configSchedule
         exercise self SvcRules_AddMember with
           newMemberParty = sv
           newMemberName = svOnboardingConfirmed.svName
           nextMiningRound = Round (latestRound.round.number + 1)
+          domainId = coinConfig.globalDomain.activeDomain
 
 
     -- Global domain config management

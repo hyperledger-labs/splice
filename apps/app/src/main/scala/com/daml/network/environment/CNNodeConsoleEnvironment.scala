@@ -138,6 +138,7 @@ class CNNodeConsoleEnvironment(
       svcOpt.toList,
       svs.local.filter(sv => sv.name == "sv1"),
       scans.local.filter(sv => sv.name == "sv1Scan"),
+      validators.local.filter(v => v.name == "sv1Validator"),
       directories.local,
     ),
     mergeRemoteCNNodeInstances(
@@ -145,6 +146,7 @@ class CNNodeConsoleEnvironment(
       svcClientOpt.toList,
       svs.remote.filter(sv => sv.name == "sv1"),
       scans.remote.filter(sv => sv.name == "sv1Scan"),
+      validators.remote.filter(v => v.name == "sv1Validator"),
       directories.remote,
     ),
   )

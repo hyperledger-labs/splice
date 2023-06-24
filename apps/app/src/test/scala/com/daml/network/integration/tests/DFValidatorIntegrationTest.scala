@@ -31,6 +31,7 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      .withTrafficTopupsEnabled
       .withManualStart
 
   "start and restart cleanly" in { implicit env =>
