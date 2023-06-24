@@ -534,18 +534,18 @@ function _cluster_reset() {
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
     _uses_pulumi_stack canton-network-gateway
-    subcmd_pulumi canton-network-gateway refresh --yes
-    subcmd_pulumi canton-network-gateway down --yes
+    subcmd_pulumi canton-network-gateway refresh --yes --skip-preview
+    subcmd_pulumi canton-network-gateway down --yes --skip-preview
 
     _info "Uninstalling Pulumi canton-network stack"
     _uses_pulumi_stack canton-network
-    subcmd_pulumi canton-network refresh --yes
-    subcmd_pulumi canton-network down --yes
+    subcmd_pulumi canton-network refresh --yes --skip-preview
+    subcmd_pulumi canton-network down --yes --skip-preview
 
     _info "Uninstalling Pulumi sv-runbook stack"
     _uses_pulumi_stack sv-runbook
-    subcmd_pulumi sv-runbook refresh --yes
-    subcmd_pulumi sv-runbook down --yes
+    subcmd_pulumi sv-runbook refresh --yes --skip-preview
+    subcmd_pulumi sv-runbook down --yes --skip-preview
 
     _info "Cluster in reset/idle state."
 }
@@ -663,7 +663,7 @@ function subcmd_delete() {
     _cluster_must_exist
 
     _info "Taking down pulumi infrastructure stack."
-    subcmd_pulumi infra down --yes
+    subcmd_pulumi infra down --yes --skip-preview
 
     _info "Deleting GKE cluster."
     gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
@@ -971,7 +971,7 @@ function subcmd_pdown() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi canton-network down --yes
+    subcmd_pulumi canton-network down --yes --skip-preview
 }
 
 ###
@@ -983,7 +983,7 @@ function subcmd_prefresh() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi canton-network refresh --yes
+    subcmd_pulumi canton-network refresh --yes --skip-preview
 }
 
 ###
@@ -1055,7 +1055,7 @@ function subcmd_pdown_sv(){
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi sv-runbook down --yes
+    subcmd_pulumi sv-runbook down --yes --skip-preview
 }
 
 ###
@@ -1068,7 +1068,7 @@ function subcmd_ci_pdown_sv(){
         _error "This subcommand is available to CI jobs only."
     fi
 
-    subcmd_pulumi sv-runbook down --yes
+    subcmd_pulumi sv-runbook down --yes --skip-preview
 }
 
 ###
