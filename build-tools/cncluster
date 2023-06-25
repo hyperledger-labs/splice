@@ -882,12 +882,21 @@ function subcmd_pulumi() {
         _error "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
     fi
 
+    function run_pulumi() {
+        if [[ -n "${GCP_CLUSTER_PROD_LIKE:-}" || "$pulumi_project" == "infra" ]]
+        then
+            _pulumi "$@"
+        else
+            PULUMI_EXPERIMENTAL=true PULUMI_SKIP_CHECKPOINTS=true _pulumi "$@"
+        fi
+    }
+
     shift 2
 
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
 
-    _pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+    run_pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
             "$pulumi_cmd" "$@"
 }
