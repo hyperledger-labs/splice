@@ -19,7 +19,7 @@ parameters:
     default: "17"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, healthcheck-devnet, healthcheck-testnet, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-devnet, healthcheck-testnet, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   mark-for-testnet:
     type: boolean
@@ -456,7 +456,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "none"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview", "none"]
         default: "none"
       additional_nix_args:
         type: string
@@ -760,7 +760,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
@@ -795,7 +795,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - run:
           name: Checkout cluster version
@@ -864,7 +864,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - run_bash_command_in_nix:
           when: always
@@ -908,7 +908,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
       channel_notify:
         # This parameter allows selecting different notification channels, which can be handy when a subteam
         # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
@@ -1140,7 +1140,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
       use_published_artifacts:
         type: boolean
         default: false
@@ -1182,7 +1182,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - checkout
       - record_job_start_time
@@ -1218,7 +1218,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - checkout
       - record_job_start_time
@@ -1250,7 +1250,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
       channel_notify:
         type: string
         # #team-canton-network-internal
@@ -2228,6 +2228,44 @@ workflows:
         cluster: "testnet"
         requires:
           - deploy_cluster_testnet_release
+
+  deploy_testnet_preview:
+    when:
+      equal: [ deploy-testnet-preview, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        # TODO(#6032) Remove this if we don't remove the whole cluster before.
+        # <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        workflow_names: "deploy_testnet_preview testnet_preview_health_check"
+    - deployment_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - deploy_cluster:
+        # TODO(#6032) Remove this if we don't remove the whole cluster before.
+        # <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "testnet-preview"
+        requires:
+           - deployment_test
+           - docker_images_push
+           - wait_for_previous_pipeline
 
   testnet_health_check:
     when:

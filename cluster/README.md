@@ -59,15 +59,16 @@ The global Canton Network clusters are currently hosted in Google
 Cloud. There are multiple clusters, each with a different purpose, all
 of which are accessible only through VPN:
 
-| Cluster        | URL                                      | Deployment Policy                | Purpose                            |
-|----------------|------------------------------------------|----------------------------------|------------------------------------|
-| TestNet        | http://test.network.canton.global        | Weekly, Midnight UTC Sunday      | Longer Running Tests               |
-| DevNet         | http://dev.network.canton.global         | Nightly, 6AM UTC                 | Current, Tested `main`             |
-| Staging        | http://staging.network.canton.global     | After every push to `main`       | Latest `main`                      |
-| ScratchNetA    | http://scratcha.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
-| ScratchNetB    | http://scratchb.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
-| ScratchNetC    | http://scratchc.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
-| ScratchNetD    | http://scratchd.network.canton.global    | Ad hoc, manual                   | Cluster Configuration Development  |
+| Cluster         | URL                                       | Deployment Policy                | Purpose                                |
+|-----------------|-------------------------------------------|----------------------------------|----------------------------------------|
+| TestNet         | http://test.network.canton.global         | Weekly, Midnight UTC Sunday      | Longer Running Tests                   |
+| DevNet          | http://dev.network.canton.global          | Nightly, 6AM UTC                 | Current, Tested `main`                 |
+| Staging         | http://staging.network.canton.global      | After every push to `main`       | Latest `main`                          |
+| ScratchNetA     | http://scratcha.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
+| ScratchNetB     | http://scratchb.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
+| ScratchNetC     | http://scratchc.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
+| ScratchNetD     | http://scratchd.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
+| TestNet Preview | http://test-preview.network.canton.global | Ad hoc, through CI               | Longer Running Tests with devnet=false |
 
 The automatic deployments are configured as
 [Scheduled](https://app.circleci.com/settings/project/github/DACH-NY/canton-network-node/triggers?return-to=https%3A%2F%2Fapp.circleci.com%2Fpipelines%2Fgithub%2FDACH-NY%2Fcanton-network-node)
