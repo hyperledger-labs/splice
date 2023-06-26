@@ -19,7 +19,7 @@ parameters:
     default: "17"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-devnet, healthcheck-testnet, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   mark-for-testnet:
     type: boolean
@@ -1255,13 +1255,19 @@ jobs:
         type: string
         # #team-canton-network-internal
         default: C03J6NCPSE4
+      test_names_file:
+        type: string
+        default: "test-full-class-names-preflight.log"
+      parallelism:
+        type: integer
+        default: 3
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
-    parallelism: 3
+    parallelism: << parameters.parallelism >>
     steps:
       - checkout
       - record_job_start_time
@@ -1297,7 +1303,7 @@ jobs:
           cmd: "Test/compile"
           cmd_retry_count: 2
       - split_tests_for_parallel_run:
-          test_names_file: "test-full-class-names-preflight.log"
+          test_names_file: << parameters.test_names_file >>
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
@@ -2266,6 +2272,21 @@ workflows:
            - deployment_test
            - docker_images_push
            - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: "testnet-preview"
+        parallelism: 1
+        test_names_file: "test-full-class-names-preflight-non-devnet.log"
+        # TODO(#6032) Remove this if we don't remove the whole cluster before.
+        # <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - deployment_test
+          - docker_images_push
+          - deploy_cluster
 
   testnet_health_check:
     when:
@@ -2305,6 +2326,33 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: "devnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+             - wait_for_previous_pipeline
+
+  testnet_preview_health_check:
+    when:
+      equal: [ healthcheck-testnet-preview, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          # TODO(#6032) Remove this if we don't remove the whole cluster before.
+          # <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_testnet_preview"
+      - preflight_check:
+          # TODO(#6032) Remove this if we don't remove the whole cluster before.
+          # <<: *main-branch-only
+          cluster: "testnet-preview"
+          parallelism: 1
+          test_names_file: "test-full-class-names-preflight-non-devnet.log"
           context:
             - artifactory
             - canton-network-vpn

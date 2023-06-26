@@ -992,7 +992,11 @@ printTests := {
 
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
-  def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
+  def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
+  def isPreflightIntegrationTest(name: String): Boolean =
+    name.contains("PreflightIntegrationTest") && !isNonDevNetTest(name)
+  def isNonDevNetPreflightIntegrationTest(name: String): Boolean =
+    name.contains("PreflightIntegrationTest") && isNonDevNetTest(name)
   def isPreflightSvIntegrationTest(name: String): Boolean =
     name.contains("PreflightSvIntegrationTest")
   def isDomainFeesTest(name: String): Boolean = name.contains(".DF")
@@ -1010,6 +1014,11 @@ printTests := {
       "Preflight tests",
       "test-full-class-names-preflight.log",
       (t: String) => isPreflightIntegrationTest(t),
+    ),
+    (
+      "Non DevNet Preflight tests",
+      "test-full-class-names-preflight-non-devnet.log",
+      (t: String) => isNonDevNetPreflightIntegrationTest(t),
     ),
     (
       "Preflight SV tests",
