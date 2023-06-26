@@ -493,7 +493,7 @@ function subcmd_create() {
     gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
 
     _log "Activating infrastructure Pulumi stack"
-    subcmd_pulumi infra up --yes
+    subcmd_pulumi infra up --yes -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}"
 
     _log "Updating DNS01 secret"
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use

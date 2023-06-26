@@ -45,6 +45,7 @@
     - [Approving new SVs](#approving-new-svs)
       - [Approving via SV API](#approving-via-sv-api)
       - [Approving via SV config](#approving-via-sv-config)
+  - [Configuring a New GCP Project](#configuring-a-new-gcp-project)
   - [Appendix: Kubernetes Resources](#appendix-kubernetes-resources)
     - [Manifests](#manifests)
 
@@ -68,16 +69,17 @@ of which are accessible only through VPN:
 | ScratchNetB     | http://scratchb.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
 | ScratchNetC     | http://scratchc.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
 | ScratchNetD     | http://scratchd.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
+| ScratchNetF     | http://scratchd.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
+| ScratchNetG     | http://scratchd.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
 | TestNet Preview | http://test-preview.network.canton.global | Ad hoc, through CI               | Longer Running Tests with devnet=false |
 
 The automatic deployments are configured as
 [Scheduled](https://app.circleci.com/settings/project/github/DACH-NY/canton-network-node/triggers?return-to=https%3A%2F%2Fapp.circleci.com%2Fpipelines%2Fgithub%2FDACH-NY%2Fcanton-network-node)
 [CI/CD](/.circleci/config.yml) in CircleCI.
 
-The `ScratchNetA`, `ScratchNetB`, `ScratchNetC`, and `ScratchNetD`
-clusters are manually managed and intended to be test beds for new
-code, deployment process updates, and CloudSQL integration. These are
-a shared resource, so please coordinate with the team prior to making
+The `ScratchNetX` clusters are manually managed and intended to be
+test beds for new code and deployment process updates. These are a
+shared resource, so please coordinate with the team prior to making
 changes.
 
 ## Connecting to a Cluster
@@ -1048,6 +1050,34 @@ To login to the following UIs use our test credentials from [our list of passwor
 |------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
 | `https://sv.sv-1.svc.<CLUSTER>.network.canton.global/`     | Admin user interface for Sv Operator to find information about the collective and perform admin tasks. |
 | `https://wallet.sv-1.svc.<CLUSTER>.network.canton.global/` | User interface for the validators to transfer money and manage applications.                           |
+
+
+## Configuring a New GCP Project
+
+Rarely, there may be a need to configure a new GCP project for Canton
+Network. Steps to do this are as follows:
+
+
+1. Request that a project be created by sending a mail to
+   `help@digitalasset.com`. The project should be derived from an
+   existing CN project, and given the organization "'no
+   organization'." Rights to this project should be granted to
+   `team-canton-network@digitalasset.com`.
+2. Create a `deployment` directory for a cluster in the new
+   project. This directory can be populated with `.envrc` and
+   `.envrc.vars` from another deployment directory, but environment
+   specific configuration should be updated in `.envrc.var`.
+3. Change into the new deployment directory, and run `cncluster
+   activate` to authenticate to the project.
+4. Enable the required GCE services with the following command: `gcloud
+   services enable container.googleapis.com`.
+5. Start creating a new cluster with `cncluster create`. Once this
+   command starts working, you'll see in the GCE web UI that a new
+   default service account has been created. It'll have a principal of
+   the following form: '816347582626-compute@developer.gserviceaccount.com'.
+6. Add a role binding to enable the new default service account to
+   have access to `da-cn-images. The command to do this will look like
+   this: `gcloud projects add-iam-policy-binding da-cn-images --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' --role='roles/artifactregistry.serviceAgent'
 
 
 ## Appendix: Kubernetes and Other Deployment Resources
