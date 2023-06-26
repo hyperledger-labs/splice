@@ -1304,6 +1304,9 @@ jobs:
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
+          # TODO(#6153): we bumped this up to allow nix to rebuild everything if needed.
+          # Instead, we should fetch the correct nix cache and avoid those rebuilds
+          no_output_timeout: "20m"
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - execute_sbt_command:
