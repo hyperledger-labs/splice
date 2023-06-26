@@ -66,16 +66,18 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
 
     toxiproxy.disableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceValidator.name))
 
-    loggerFactory.assertThrowsAndLogsSeq[CommandFailure](
-      aliceWallet.tap(2),
-      entries => {
-        forAtLeast(1, entries)(
-          _.message should include(
-            "failed because of java.net.ConnectException: Connection refused"
+    eventually() {
+      loggerFactory.assertThrowsAndLogsSeq[CommandFailure](
+        aliceWallet.tap(2),
+        entries => {
+          forAtLeast(1, entries)(
+            _.message should include(
+              "failed because of java.net.ConnectException: Connection refused"
+            )
           )
-        )
-      },
-    )
+        },
+      )
+    }
 
     toxiproxy.enableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceValidator.name))
 
