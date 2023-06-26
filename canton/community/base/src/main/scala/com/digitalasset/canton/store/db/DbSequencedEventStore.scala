@@ -10,12 +10,15 @@ import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.*
 import com.digitalasset.canton.metrics.TimedLoadGauge
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
-import com.digitalasset.canton.sequencing.protocol.{SequencedEvent, SignedContent, TrafficState}
+import com.digitalasset.canton.sequencing.protocol.{
+  SequencedEvent,
+  SequencedEventTrafficState,
+  SignedContent,
+}
 import com.digitalasset.canton.sequencing.{OrdinarySerializedEvent, PossiblyIgnoredSerializedEvent}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.store.*
@@ -84,26 +87,15 @@ class DbSequencedEventStore(
       val traceContext: TraceContext = r.<<[SerializableTraceContext].unwrap
       val ignore = r.<<[Boolean]
 
-      def getTrafficState(eventTimestamp: CantonTimestamp) = {
+      val getTrafficState = {
         if (protocolVersion >= ProtocolVersion.dev) {
-          val trafficData = r.<<[Option[Long]]
-          trafficData
-            .map(
-              NonNegativeLong
-                .create(_)
-                .valueOr(err =>
-                  throw new DbDeserializationException(
-                    s"Failed to deserialize extra traffic remainder: $err"
-                  )
-                )
-            )
-            .map(TrafficState(_, eventTimestamp))
+          SequencedEventTrafficState.sequencedEventTrafficStateGetResult(r)
         } else None
       }
 
       typ match {
         case SequencedEventDbType.IgnoredEvent =>
-          IgnoredSequencedEvent(timestamp, sequencerCounter, None, getTrafficState(timestamp))(
+          IgnoredSequencedEvent(timestamp, sequencerCounter, None, getTrafficState)(
             traceContext
           )
         case _ =>
@@ -120,12 +112,12 @@ class DbSequencedEventStore(
               timestamp,
               sequencerCounter,
               Some(signedEvent),
-              getTrafficState(signedEvent.content.timestamp),
+              getTrafficState,
             )(
               traceContext
             )
           } else {
-            OrdinarySequencedEvent(signedEvent, getTrafficState(signedEvent.content.timestamp))(
+            OrdinarySequencedEvent(signedEvent, getTrafficState)(
               traceContext
             )
           }
@@ -176,7 +168,7 @@ class DbSequencedEventStore(
         pp >> event.counter
         pp >> SerializableTraceContext(event.traceContext)
         pp >> event.isIgnored
-        pp >> event.trafficStatus.map(_.extraTrafficRemainder)
+        pp >> event.trafficState.map(_.extraTrafficRemainder)
       }
     } else {
       val insertSql = storage.profile match {

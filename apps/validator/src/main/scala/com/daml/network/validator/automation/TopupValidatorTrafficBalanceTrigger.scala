@@ -23,10 +23,10 @@ import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.treasury.TreasuryService
-import com.digitalasset.canton.participant.traffic.TrafficStateController.ParticipantTrafficState
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.traffic.MemberTrafficStatus
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
@@ -94,26 +94,27 @@ class TopupValidatorTrafficBalanceTrigger(
   }
 
   private def shouldTopup(
-      currentTrafficState: ParticipantTrafficState,
+      currentTrafficState: MemberTrafficStatus,
       validatorTraffic: Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]],
       topupParameters: ExtraTrafficTopupParameters,
   )(implicit traceContext: TraceContext): Boolean = {
     val totalPurchasedTraffic = validatorTraffic.fold(0L)(_.payload.totalPurchased)
+    val currentExtraTrafficLimit =
+      currentTrafficState.trafficState.extraTrafficLimit.fold(0L)(_.value)
+    val currentExtraTrafficRemainder = currentTrafficState.trafficState.extraTrafficRemainder.value
     val tooSoon = validatorTraffic.fold(false)(traffic =>
       traffic.payload.lastPurchasedAt.toEpochMilli + topupParameters.minTopupInterval.duration.toMillis > clock.now.toEpochMilli
     )
     if (tooSoon) {
       logger.debug(s"Trying to top-up too soon after previous top-up")
       false
-    } else if (
-      currentTrafficState.totalExtraTrafficLimit.fold(0L)(_.value) < totalPurchasedTraffic
-    ) {
+    } else if (currentExtraTrafficLimit < totalPurchasedTraffic) {
       logger.info(s"There is another top-up already in progress. Retry in some time.")
       false
-    } else if (currentTrafficState.extraTrafficRemainder.value >= topupParameters.topupAmount) {
+    } else if (currentExtraTrafficRemainder >= topupParameters.topupAmount) {
       logger.debug(
         s"Skipping top-up because sufficient traffic balance remains. " +
-          s"Current traffic balance: ${currentTrafficState.extraTrafficRemainder.value} bytes"
+          s"Current traffic balance: $currentExtraTrafficRemainder bytes"
       )
       false
     } else {

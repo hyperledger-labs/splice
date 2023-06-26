@@ -79,6 +79,7 @@ import com.digitalasset.canton.topology.processing.{
 }
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, MonadUtil}
@@ -303,12 +304,10 @@ class SyncDomain(
     )
 
   private val trafficStateController =
-    new TrafficStateController(topologyClient, participantId, loggerFactory)
+    new TrafficStateController(participantId, loggerFactory)
 
-  def getTrafficControlState()(implicit
-      tc: TraceContext
-  ): Future[Option[TrafficStateController.ParticipantTrafficState]] =
-    trafficStateController.getState()
+  def getTrafficControlState: Future[Option[MemberTrafficStatus]] =
+    trafficStateController.getState
 
   def authorityOfInSnapshotApproximation(requestingAuthority: Set[LfPartyId])(implicit
       traceContext: TraceContext
@@ -581,7 +580,7 @@ class SyncDomain(
           ): HandlerResult = {
             tracedEvents.withTraceContext { traceContext => closedEvents =>
               val openEvents = closedEvents.map { event =>
-                event.trafficStatus.foreach(trafficStateController.updateState)
+                event.trafficState.foreach(trafficStateController.updateState(_, event.timestamp))
 
                 val openedEvent = PossiblyIgnoredSequencedEvent.openEnvelopes(event)(
                   staticDomainParameters.protocolVersion,

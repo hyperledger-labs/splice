@@ -9,6 +9,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.SubmissionRequest
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.traffic.MemberTrafficStatus
 
 import scala.concurrent.{ExecutionContext, Future}
 

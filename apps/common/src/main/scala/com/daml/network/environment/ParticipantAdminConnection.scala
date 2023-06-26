@@ -13,11 +13,11 @@ import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.participant.traffic.TrafficStateController.ParticipantTrafficState
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -105,7 +105,7 @@ class ParticipantAdminConnection(
 
   def getParticipantTrafficState(
       domainId: DomainId
-  )(implicit traceContext: TraceContext): Future[ParticipantTrafficState] = {
+  )(implicit traceContext: TraceContext): Future[MemberTrafficStatus] = {
     runCmd(
       ParticipantAdminCommands.TrafficControl.GetTrafficControlState(domainId)
     )

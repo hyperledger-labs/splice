@@ -154,7 +154,7 @@ object SequencedEventStore {
       with Serializable {
     def timestamp: CantonTimestamp
 
-    def trafficStatus: Option[TrafficState]
+    def trafficState: Option[SequencedEventTrafficState]
 
     def counter: SequencerCounter
 
@@ -191,7 +191,7 @@ object SequencedEventStore {
       override val timestamp: CantonTimestamp,
       override val counter: SequencerCounter,
       override val underlying: Option[SignedContent[SequencedEvent[Env]]],
-      override val trafficStatus: Option[TrafficState] = None,
+      override val trafficState: Option[SequencedEventTrafficState] = None,
   )(override val traceContext: TraceContext)
       extends PossiblyIgnoredSequencedEvent[Env] {
 
@@ -248,7 +248,7 @@ object SequencedEventStore {
     */
   final case class OrdinarySequencedEvent[+Env <: Envelope[_]](
       signedEvent: SignedContent[SequencedEvent[Env]],
-      trafficStatus: Option[TrafficState] = None,
+      trafficState: Option[SequencedEventTrafficState] = None,
   )(
       override val traceContext: TraceContext
   ) extends PossiblyIgnoredSequencedEvent[Env] {
@@ -266,7 +266,7 @@ object SequencedEventStore {
     override def underlying: Some[SignedContent[SequencedEvent[Env]]] = Some(signedEvent)
 
     override def asIgnoredEvent: IgnoredSequencedEvent[Env] =
-      IgnoredSequencedEvent(timestamp, counter, Some(signedEvent), trafficStatus)(traceContext)
+      IgnoredSequencedEvent(timestamp, counter, Some(signedEvent), trafficState)(traceContext)
 
     override def asOrdinaryEvent: PossiblyIgnoredSequencedEvent[Env] = this
 
