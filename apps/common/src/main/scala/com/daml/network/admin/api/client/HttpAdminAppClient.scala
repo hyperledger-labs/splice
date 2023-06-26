@@ -59,4 +59,33 @@ object HttpAdminAppClient {
         Right(VersionInfo(response.version, response.commitTs))
     }
   }
+
+  case object IsLive extends BaseCommand[http.IsLiveResponse, Boolean] {
+    override def submitRequest(
+        client: http.CommonAdminClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.IsLiveResponse] =
+      client.isLive(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.IsLiveResponse.OK =>
+        Right(true)
+      case http.IsLiveResponse.ServiceUnavailable =>
+        Right(false)
+    }
+  }
+  case object IsReady extends BaseCommand[http.IsReadyResponse, Boolean] {
+    override def submitRequest(
+        client: http.CommonAdminClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.IsReadyResponse] =
+      client.isReady(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.IsReadyResponse.OK =>
+        Right(true)
+      case http.IsReadyResponse.ServiceUnavailable =>
+        Right(false)
+    }
+  }
 }

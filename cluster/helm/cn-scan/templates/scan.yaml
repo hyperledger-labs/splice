@@ -31,6 +31,22 @@ spec:
         - containerPort: 5012
           name: scan-api
           protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: 5012
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          failureThreshold: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 5012
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          failureThreshold: 5
+          timeoutSeconds: 10
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}

@@ -32,6 +32,8 @@ Release Notes
    * The `audience` which defines the intended consumer of the token is now configurable in Participant, Validator app, Validator web UI, SV app, SV web UI and Directory web UI.
    * Validator apps and SV apps now configure the address of the founding SV app to allow for synchronization across nodes until all aspects of the BFT domain are robust under concurrent operations.
 
+* All CN apps now have ``/readyz`` and ``/livez`` endpoints which can be used for Kubernetes readiness and liveness probes.
+
 * Bugfixes
 
   * Fix a bug where the Directory UI does not connect correctly to the directory backend.

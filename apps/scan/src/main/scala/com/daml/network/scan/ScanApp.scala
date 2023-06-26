@@ -126,8 +126,8 @@ class ScanApp(
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
-                ScanResource.routes(handler),
-                CommonAdminResource.routes(adminHandler),
+                ScanResource.routes(handler, _ => provide(())),
+                CommonAdminResource.routes(adminHandler, _ => provide(())),
               )
             }
           }

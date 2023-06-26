@@ -111,7 +111,10 @@ class DirectoryApp(
         newTraceContext { traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
-              concat(DirectoryResource.routes(handler), CommonAdminResource.routes(adminHandler))
+              concat(
+                DirectoryResource.routes(handler, _ => provide(())),
+                CommonAdminResource.routes(adminHandler, _ => provide(())),
+              )
             }
           }
         }

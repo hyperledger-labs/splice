@@ -17,13 +17,15 @@ class HttpDirectoryHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.DirectoryHandler
+) extends v0.DirectoryHandler[Unit]
     with Spanning
     with NamedLogging {
 
   override def listEntries(
       respond: v0.DirectoryResource.ListEntriesResponse.type
-  )(namePrefix: Option[String], pageSize: Int): Future[v0.DirectoryResource.ListEntriesResponse] =
+  )(namePrefix: Option[String], pageSize: Int)(
+      extracted: Unit
+  ): Future[v0.DirectoryResource.ListEntriesResponse] =
     withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
       for { entries <- store.listEntries(namePrefix.getOrElse(""), pageSize) } yield definitions
         .ListEntriesResponse(entries.map(_.toJson).toVector)
@@ -31,7 +33,7 @@ class HttpDirectoryHandler(
 
   override def lookupEntryByParty(
       respond: v0.DirectoryResource.LookupEntryByPartyResponse.type
-  )(party: String): Future[v0.DirectoryResource.LookupEntryByPartyResponse] =
+  )(party: String)(extracted: Unit): Future[v0.DirectoryResource.LookupEntryByPartyResponse] =
     withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
       store
         .lookupEntryByParty(PartyId.tryFromProtoPrimitive(party))
@@ -51,7 +53,7 @@ class HttpDirectoryHandler(
 
   override def lookupEntryByName(
       respond: v0.DirectoryResource.LookupEntryByNameResponse.type
-  )(name: String): Future[v0.DirectoryResource.LookupEntryByNameResponse] =
+  )(name: String)(extracted: Unit): Future[v0.DirectoryResource.LookupEntryByNameResponse] =
     withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
       store.lookupEntryByName(name).flatMap {
         case Some(entry) =>
@@ -68,7 +70,7 @@ class HttpDirectoryHandler(
   @nowarn("cat=unused")
   override def getProviderPartyId(
       respond: v0.DirectoryResource.GetProviderPartyIdResponse.type
-  )(): Future[v0.DirectoryResource.GetProviderPartyIdResponse] =
+  )()(extracted: Unit): Future[v0.DirectoryResource.GetProviderPartyIdResponse] =
     withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
       Future.successful(
         v0.DirectoryResource.GetProviderPartyIdResponse.OK(

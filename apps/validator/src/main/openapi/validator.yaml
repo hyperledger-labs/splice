@@ -5,6 +5,10 @@ info:
 tags:
   - name: validator
 paths:
+  /readyz:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1readyz"
+  /livez:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1livez"
   /validator-user:
     get:
       tags: [validator]

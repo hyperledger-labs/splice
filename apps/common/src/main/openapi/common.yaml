@@ -27,6 +27,26 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Version"
+  /readyz:
+    get:
+      tags: [common]
+      x-jvm-package: commonAdmin
+      operationId: "isReady"
+      responses:
+        "200":
+          description: ok
+        "503":
+          description: service_unavailable
+  /livez:
+    get:
+      tags: [common]
+      x-jvm-package: commonAdmin
+      operationId: "isLive"
+      responses:
+        "200":
+          description: ok
+        "503":
+          description: service_unavailable
 components:
   responses:
     "400":

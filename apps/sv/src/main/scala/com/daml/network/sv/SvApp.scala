@@ -337,7 +337,7 @@ class SvApp(
                     "canton network sv admin realm",
                   ),
                 ),
-                CommonAdminResource.routes(commonAdminHandler),
+                CommonAdminResource.routes(commonAdminHandler, _ => provide(())),
               )
             }
           }

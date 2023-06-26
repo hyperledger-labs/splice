@@ -33,8 +33,8 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId}
 
 import java.io.File
-
 import scala.concurrent.duration.*
+import scala.util.Try
 import scala.util.control.NonFatal
 
 /** Copy of Canton ParticipantReference */
@@ -151,7 +151,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
 
   @Help.Summary("Health and diagnostic related commands (HTTP)")
   @Help.Group("HTTP Health")
-  def httpHealth = {
+  def httpHealth: NodeStatus[CNNodeStatus] = {
     consoleEnvironment.run {
       // Map failing HTTP requests to a failed NodeStatus if the status endpoint isn't up yet (e.g. slow app initialization)
       ConsoleCommandResult.fromEither(
@@ -162,6 +162,26 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
         )
       )
     }
+  }
+
+  @Help.Summary("Health and diagnostic related commands (HTTP)")
+  @Help.Group("HTTP Liveness")
+  def httpLive: Boolean = {
+    Try(
+      consoleEnvironment.run {
+        httpCommand(HttpAdminAppClient.IsLive)
+      }
+    ).getOrElse(false)
+  }
+
+  @Help.Summary("Health and diagnostic related commands (HTTP)")
+  @Help.Group("HTTP Readiness")
+  def httpReady: Boolean = {
+    Try(
+      consoleEnvironment.run {
+        httpCommand(HttpAdminAppClient.IsReady)
+      }
+    ).getOrElse(false)
   }
 
   // Override topology to avoid using grpc status check

@@ -5,6 +5,10 @@ info:
 tags:
   - name: scan
 paths:
+  /readyz:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1readyz"
+  /livez:
+    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1livez"
   /status:
     $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
   /version:

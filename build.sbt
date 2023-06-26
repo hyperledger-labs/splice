@@ -321,6 +321,7 @@ lazy val `apps-common` =
             new File("apps/common/src/main/openapi/common.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
+            customExtraction = true,
           ),
           ScalaClient(
             new File("apps/common/src/main/openapi/common.yaml"),
@@ -426,6 +427,7 @@ lazy val `apps-scan` =
             new File("apps/scan/src/main/openapi/scan.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
+            customExtraction = true,
           ),
           ScalaClient(
             new File("apps/scan/src/main/openapi/scan.yaml"),
@@ -710,6 +712,7 @@ lazy val `apps-directory` =
             new File("apps/directory/src/main/openapi/directory.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
+            customExtraction = true,
           ),
           ScalaClient(
             new File("apps/directory/src/main/openapi/directory.yaml"),
@@ -803,6 +806,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     // Dedup between ledger-api-java-proto (pulled in via Scala bindings)
     // and the copy of that inlined into bindings-java.
     case PathList("com", "daml", "ledger", "api", "v1" | "v2", _*) => MergeStrategy.first
+    // Hack for not getting trouble with different versions of generated classes of common openapi
+    case PathList("com", "daml", "network", "http", "v0" | "commonAdmin", _*) => MergeStrategy.first
     case x => oldStrategy(x)
   }
 }

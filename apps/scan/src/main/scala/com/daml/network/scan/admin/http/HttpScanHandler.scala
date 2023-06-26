@@ -45,7 +45,7 @@ class HttpScanHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.ScanHandler
+) extends v0.ScanHandler[Unit]
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
@@ -56,7 +56,7 @@ class HttpScanHandler(
 
   def getSvcPartyId(
       response: v0.ScanResource.GetSvcPartyIdResponse.type
-  )(): Future[v0.ScanResource.GetSvcPartyIdResponse] =
+  )()(extracted: Unit): Future[v0.ScanResource.GetSvcPartyIdResponse] =
     withNewTrace(workflowId) { _ => _ =>
       Future.successful(definitions.GetSvcPartyIdResponse(store.svcParty.toProtoPrimitive))
     }
@@ -65,7 +65,7 @@ class HttpScanHandler(
       response: v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse.type
   )(
       body: com.daml.network.http.v0.definitions.GetOpenAndIssuingMiningRoundsRequest
-  ): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] =
+  )(extracted: Unit): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         domainId <- store.defaultAcsDomainIdF
@@ -152,7 +152,7 @@ class HttpScanHandler(
       response: v0.ScanResource.GetCoinRulesResponse.type
   )(
       body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
-  ): Future[v0.ScanResource.GetCoinRulesResponse] =
+  )(extracted: Unit): Future[v0.ScanResource.GetCoinRulesResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         coinRulesO <- store.lookupCoinRules()
@@ -184,7 +184,7 @@ class HttpScanHandler(
       response: v0.ScanResource.GetCoinRulesV1TestResponse.type
   )(
       body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
-  ): Future[v0.ScanResource.GetCoinRulesV1TestResponse] =
+  )(extracted: Unit): Future[v0.ScanResource.GetCoinRulesV1TestResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       if (!config.enableCoinRulesUpgrade) {
         throw new StatusRuntimeException(
@@ -221,7 +221,7 @@ class HttpScanHandler(
 
   def getClosedRounds(
       response: v0.ScanResource.GetClosedRoundsResponse.type
-  )(): Future[v0.ScanResource.GetClosedRoundsResponse] =
+  )()(extracted: Unit): Future[v0.ScanResource.GetClosedRoundsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         domainId <- store.defaultAcsDomainIdF
@@ -237,7 +237,7 @@ class HttpScanHandler(
 
   def listFeaturedAppRights(
       response: v0.ScanResource.ListFeaturedAppRightsResponse.type
-  )(): Future[v0.ScanResource.ListFeaturedAppRightsResponse] =
+  )()(extracted: Unit): Future[v0.ScanResource.ListFeaturedAppRightsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         domainId <- store.defaultAcsDomainIdF
@@ -252,7 +252,7 @@ class HttpScanHandler(
 
   def lookupFeaturedAppRight(
       response: com.daml.network.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse.type
-  )(providerPartyId: String): Future[
+  )(providerPartyId: String)(extracted: Unit): Future[
     com.daml.network.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse
   ] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
@@ -272,7 +272,7 @@ class HttpScanHandler(
 
   def getTotalCoinBalance(
       response: v0.ScanResource.GetTotalCoinBalanceResponse.type
-  )(): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =
+  )()(extracted: Unit): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         (totalCoins, totalLockedCoins) <- store.getTotalCoinBalance()
@@ -286,7 +286,7 @@ class HttpScanHandler(
 
   def getCoinConfigForRound(
       response: v0.ScanResource.GetCoinConfigForRoundResponse.type
-  )(round: Long): Future[v0.ScanResource.GetCoinConfigForRoundResponse] =
+  )(round: Long)(extracted: Unit): Future[v0.ScanResource.GetCoinConfigForRoundResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       store
         .getCoinConfigForRound(round)
@@ -310,7 +310,7 @@ class HttpScanHandler(
 
   def getRoundOfLatestData(
       response: v0.ScanResource.GetRoundOfLatestDataResponse.type
-  )(): Future[v0.ScanResource.GetRoundOfLatestDataResponse] =
+  )()(extracted: Unit): Future[v0.ScanResource.GetRoundOfLatestDataResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       store
         .getRoundOfLatestData()
@@ -325,7 +325,7 @@ class HttpScanHandler(
 
   def getRewardsCollected(
       response: v0.ScanResource.GetRewardsCollectedResponse.type
-  )(round: Option[Long]): Future[v0.ScanResource.GetRewardsCollectedResponse] =
+  )(round: Option[Long])(extracted: Unit): Future[v0.ScanResource.GetRewardsCollectedResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       round
         .fold(store.getTotalRewardsCollectedEver())(store.getRewardsCollectedInRound(_))
@@ -343,7 +343,7 @@ class HttpScanHandler(
   )(
       asOfEndOfRound: Long,
       limit: Int,
-  ): Future[v0.ScanResource.GetTopProvidersByAppRewardsResponse] =
+  )(extracted: Unit): Future[v0.ScanResource.GetTopProvidersByAppRewardsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#4965): Provide an upper bound for limit
       store
@@ -368,7 +368,7 @@ class HttpScanHandler(
   )(
       asOfEndOfRound: Long,
       limit: Int,
-  ): Future[v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse] =
+  )(extracted: Unit): Future[v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#4965): Provide an upper bound for limit
       store
@@ -393,7 +393,7 @@ class HttpScanHandler(
   )(
       asOfEndOfRound: Long,
       limit: Int,
-  ): Future[ScanResource.GetTopValidatorsByPurchasedTrafficResponse] = {
+  )(extracted: Unit): Future[ScanResource.GetTopValidatorsByPurchasedTrafficResponse] = {
     withNewTrace(workflowId) { implicit traceContext => _ =>
       // TODO(#4965): Provide an upper bound for limit
       store
@@ -441,7 +441,9 @@ class HttpScanHandler(
 
   def getValidatorTrafficBalance(
       response: v0.ScanResource.GetValidatorTrafficBalanceResponse.type
-  )(validatorParty: String): Future[v0.ScanResource.GetValidatorTrafficBalanceResponse] =
+  )(
+      validatorParty: String
+  )(extracted: Unit): Future[v0.ScanResource.GetValidatorTrafficBalanceResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       val validatorPartyId = PartyId.tryFromProtoPrimitive(validatorParty)
       for {
@@ -462,7 +464,7 @@ class HttpScanHandler(
       response: v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse.type
   )(
       validatorParty: String
-  ): Future[v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse] =
+  )(extracted: Unit): Future[v0.ScanResource.CheckAndUpdateValidatorTrafficBalanceResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       val validatorPartyId = PartyId.tryFromProtoPrimitive(validatorParty)
       for {

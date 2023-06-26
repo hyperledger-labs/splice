@@ -471,7 +471,7 @@ class ValidatorApp(
                       case _ => pass
                     }).tflatMap(_ => provide(())),
                 ),
-                CommonAdminResource.routes(commonAdminHandler),
+                CommonAdminResource.routes(commonAdminHandler, _ => provide(())),
               )
             }
           }
