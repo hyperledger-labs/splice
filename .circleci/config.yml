@@ -913,8 +913,8 @@ commands:
         # This parameter allows selecting different notification channels, which can be handy when a subteam
         # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
         type: string
-        # #team-canton-network-internal
-        default: C03J6NCPSE4
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
     steps:
       # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
       # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
@@ -1253,8 +1253,8 @@ jobs:
         enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet", "testnet", "testnet-preview"]
       channel_notify:
         type: string
-        # #team-canton-network-internal
-        default: C03J6NCPSE4
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
       test_names_file:
         type: string
         default: "test-full-class-names-preflight.log"
@@ -1333,8 +1333,8 @@ jobs:
         enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "staging", "devnet"]
       channel_notify:
         type: string
-        # #team-canton-network-internal
-        default: C03J6NCPSE4
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -1389,8 +1389,8 @@ jobs:
         enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd"]
       channel_notify:
         type: string
-        # #team-canton-network-internal
-        default: C03J6NCPSE4
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
