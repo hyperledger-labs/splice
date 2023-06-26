@@ -32,6 +32,8 @@ notify-fail: &notify-fail
     # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
     - slack/notify:
         branch_pattern: main
+        # #team-canton-network-internal-ci
+        channel: C05DT77QF5M
         event: fail
         custom: |
           { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST:-$CIRCLE_BUILD_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${CIRCLE_BUILD_URL}|CI Build>)" }
