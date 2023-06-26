@@ -154,7 +154,7 @@ class LocalRunbookIntegrationTest
         }
       })
     // insert the secret into the validator onboarding config
-    conf.validatorApps.size shouldBe 1
+    conf.validatorApps should have size (1)
     CNNodeConfigTransforms.updateAllValidatorConfigs_(vc => {
       val oc = vc.onboarding.value
       vc.focus(_.onboarding).replace(Some(oc.copy(secret = secret)))

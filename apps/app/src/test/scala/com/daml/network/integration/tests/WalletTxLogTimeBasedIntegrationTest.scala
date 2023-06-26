@@ -257,7 +257,7 @@ class WalletTxLogTimeBasedIntegrationTest
         aliceWallet.tap(0.000005),
       )(
         "Wait for coin to appear",
-        _ => aliceWallet.list().coins.size shouldBe 1,
+        _ => aliceWallet.list().coins should have size (1),
       )
 
       actAndCheck(
@@ -265,7 +265,7 @@ class WalletTxLogTimeBasedIntegrationTest
         Range(0, 4).foreach(_ => advanceRoundsByOneTick),
       )(
         "Wait for coin to disappear",
-        _ => aliceWallet.list().coins.size shouldBe 0,
+        _ => aliceWallet.list().coins should have size (0),
       )
 
       checkTxHistory(
@@ -291,7 +291,7 @@ class WalletTxLogTimeBasedIntegrationTest
         aliceWallet.tap(100),
       )(
         "Wait for coin to appear",
-        _ => aliceWallet.list().coins.size shouldBe 1,
+        _ => aliceWallet.list().coins should have size (1),
       )
 
       actAndCheck(
@@ -307,7 +307,7 @@ class WalletTxLogTimeBasedIntegrationTest
         ),
       )(
         "Wait for locked coin to appear",
-        _ => aliceWallet.list().lockedCoins.size shouldBe 1,
+        _ => aliceWallet.list().lockedCoins should have size (1),
       )
 
       actAndCheck(
@@ -315,7 +315,7 @@ class WalletTxLogTimeBasedIntegrationTest
         Range(0, 4).foreach(_ => advanceRoundsByOneTick),
       )(
         "Wait for locked coin to disappear",
-        _ => aliceWallet.list().lockedCoins.size shouldBe 0,
+        _ => aliceWallet.list().lockedCoins should have size (0),
       )
 
       checkTxHistory(

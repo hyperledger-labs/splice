@@ -85,7 +85,7 @@ class WalletTransfersFrontendIntegrationTest
           _ => {
             val offerCards = findAll(className("transfer-offer")).toList
 
-            offerCards.size shouldBe 1
+            offerCards should have size (1)
 
             inside(offerCards) { case Seq(offerCard) =>
               offerCard.childElement(className("transfer-offer-sender")).text should matchText(
@@ -144,7 +144,7 @@ class WalletTransfersFrontendIntegrationTest
         eventually() {
           val offerCards = findAll(className("transfer-offer")).toList
 
-          offerCards.size shouldBe 1
+          offerCards should have size (1)
 
           inside(offerCards) { case Seq(offerCard) =>
             offerCard.childElement(className("transfer-offer-sender")).text should matchText(
@@ -238,7 +238,7 @@ class WalletTransfersFrontendIntegrationTest
         browseToAliceWallet(aliceDamlUser)
 
         eventually() {
-          findAll(className("transfer-offer")).toList.size shouldBe 1
+          findAll(className("transfer-offer")).toList should have size (1)
         }
 
         actAndCheck(
@@ -248,7 +248,7 @@ class WalletTransfersFrontendIntegrationTest
         )(
           "Alice sees no more pending transfer offers",
           _ => {
-            findAll(className("transfer-offer")).toList.size shouldBe 0
+            findAll(className("transfer-offer")).toList should have size (0)
             assertInRange(bobWallet.balance().unlockedQty, (BigDecimal(6), BigDecimal(7)))
             assertInRange(aliceWallet.balance().unlockedQty, (BigDecimal(12), BigDecimal(13)))
           },
