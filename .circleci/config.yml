@@ -283,7 +283,7 @@ commands:
               curl -s -f -X POST --url "https://slack.com/api/chat.postMessage" \
                  -H "Content-type: application/json" \
                  -H "Authorization: Bearer $SLACK_ACCESS_TOKEN" \
-                 --data '{ "text": "The cluster lock on '<< parameters.cluster >>' held by '${lockholder}' is too old. \n*Unlocking and resetting cluster.* :reaper: ( <'${CIRCLE_BUILD_URL}'|CI Build> )", "channel": "C03J6NCPSE4" }'
+                 --data '{ "text": "The cluster lock on '<< parameters.cluster >>' held by '${lockholder}' is too old. \n*Unlocking and resetting cluster.* :reaper: ( <'${CIRCLE_BUILD_URL}'|CI Build> )", "channel": "C05DT77QF5M" }'
 
               cncluster ci_reset_unlock
             fi
