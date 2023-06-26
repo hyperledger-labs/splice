@@ -34,6 +34,13 @@ To prevent false negatives and flakes: Use `actAndCheck`.
 If this doesn't match your test's logic: Consider wrapping checks in an `eventually`.
 If you want to retry a check on failures that are different from `TestFailedException`: Use `eventuallySucceeds`.
 
+## Ensure that test failures print helpful messages
+
+- Use `collection should have size(<expected-size>)`, as that prints the collection and its size on a failure instead
+  of just printing `0 not equal to 1`, which is shown if you use `collection.size shouldBe <expected-size>`
+- Use `inside(complexStructure) { <assertions on fields/properties of complexStructure> }` to ensure `complexStructure` is
+  printed in addition to the assertion failure on any of the checks on the fields of that structure.
+
 ## Time-based tests
 
 For testing time-dependent functionality such as subscription payments or round automation,
