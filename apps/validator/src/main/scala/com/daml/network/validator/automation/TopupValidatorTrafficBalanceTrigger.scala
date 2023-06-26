@@ -79,14 +79,13 @@ class TopupValidatorTrafficBalanceTrigger(
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
       validatorTreasury <- getValidatorTreasury()
-      currentValidatorTraffic <- store.lookupValidatorTrafficWithOffset(activeDomainId)
+      intentCidOrTraffic <- getOrCreateIntentCidOrTraffic(activeDomainId)
       currentTrafficState <- participantAdminConnection.getParticipantTrafficState(activeDomainId)
       result <-
-        if (shouldTopup(currentTrafficState, currentValidatorTraffic.value, topupParameters))
+        if (shouldTopup(currentTrafficState, intentCidOrTraffic.toOption, topupParameters))
           topUpValidatorTraffic(
             validatorTreasury,
-            activeDomainId,
-            currentValidatorTraffic,
+            intentCidOrTraffic,
             topupParameters,
           )
         else Future.successful(false)
@@ -124,35 +123,22 @@ class TopupValidatorTrafficBalanceTrigger(
 
   private def topUpValidatorTraffic(
       validatorTreasury: TreasuryService,
-      activeDomainId: DomainId,
-      validatorTraffic: QueryResult[
-        Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
+      intentOrTraffic: Either[
+        ValidatorTrafficCreationIntent.ContractId,
+        Contract[ValidatorTraffic.ContractId, ValidatorTraffic],
       ],
       topupParameters: ExtraTrafficTopupParameters,
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     logger.info(s"Topping up traffic balance by ${topupParameters.topupAmount / 1e6} MB")
+    val coBuyExtraTraffic = new CO_BuyExtraTraffic(
+      topupParameters.topupAmount,
+      intentOrTraffic.fold(
+        intentCid => new damlTypes.either.Left(intentCid),
+        traffic => new damlTypes.either.Right(traffic.contractId),
+      ),
+      new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
+    )
     for {
-      intentOrTrafficCid <- validatorTraffic match {
-        case QueryResult(offset, None) =>
-          getOrCreateTrafficCreationIntent(activeDomainId, offset).map(cid =>
-            new damlTypes.either.Left[
-              ValidatorTrafficCreationIntent.ContractId,
-              ValidatorTraffic.ContractId,
-            ](cid)
-          )
-        case QueryResult(_, Some(traffic)) =>
-          Future.successful(
-            new damlTypes.either.Right[
-              ValidatorTrafficCreationIntent.ContractId,
-              ValidatorTraffic.ContractId,
-            ](traffic.contractId)
-          )
-      }
-      coBuyExtraTraffic = new CO_BuyExtraTraffic(
-        topupParameters.topupAmount,
-        intentOrTrafficCid,
-        new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
-      )
       taskOutcome <-
         validatorTreasury
           .enqueueCoinOperation(coBuyExtraTraffic)
@@ -199,30 +185,43 @@ class TopupValidatorTrafficBalanceTrigger(
     } yield validatorWallet.treasury
   }
 
-  private def getOrCreateTrafficCreationIntent(activeDomainId: DomainId, dedupOffset: String)(
-      implicit traceContext: TraceContext
-  ): Future[ValidatorTrafficCreationIntent.ContractId] = {
-    store.lookupValidatorTrafficCreationIntent(activeDomainId).flatMap {
-      case Some(co) => Future.successful(co.contractId)
-      case None =>
-        val validator = store.key.validatorParty
-        connection
-          .submitWithResult(
-            Seq(validator),
-            Seq(validator),
-            ValidatorTrafficCreationIntent.create(
-              validator.toProtoPrimitive,
-              activeDomainId.toProtoPrimitive,
-            ),
-            CNLedgerConnection.CommandId(
-              "com.daml.network.validator.automation.TopupValidatorTrafficBalanceTrigger.getOrCreateTrafficCreationIntent",
-              Seq(validator),
-              activeDomainId.toProtoPrimitive,
-            ),
-            DedupOffset(dedupOffset),
-            activeDomainId,
-          )
-          .map(ev => new ValidatorTrafficCreationIntent.ContractId(ev.contractId.contractId))
+  private def getOrCreateIntentCidOrTraffic(activeDomainId: DomainId)(implicit
+      traceContext: TraceContext
+  ): Future[
+    Either[
+      ValidatorTrafficCreationIntent.ContractId,
+      Contract[ValidatorTraffic.ContractId, ValidatorTraffic],
+    ]
+  ] = {
+    store.lookupValidatorTrafficCreationIntentWithOffset(activeDomainId).flatMap {
+      case QueryResult(_, Some(co)) =>
+        Future.successful(Left(co.contractId))
+      case QueryResult(dedupOffset, None) =>
+        store.lookupValidatorTrafficWithOffset(activeDomainId).flatMap {
+          case QueryResult(_, Some(traffic)) =>
+            Future.successful(Right(traffic))
+          case QueryResult(_, None) =>
+            val validator = store.key.validatorParty
+            connection
+              .submitWithResult(
+                Seq(validator),
+                Seq(validator),
+                ValidatorTrafficCreationIntent.create(
+                  validator.toProtoPrimitive,
+                  activeDomainId.toProtoPrimitive,
+                ),
+                CNLedgerConnection.CommandId(
+                  "com.daml.network.validator.automation.TopupValidatorTrafficBalanceTrigger.getOrCreateIntentCidOrTraffic",
+                  Seq(validator),
+                  activeDomainId.toProtoPrimitive,
+                ),
+                DedupOffset(dedupOffset),
+                activeDomainId,
+              )
+              .map(ev =>
+                Left(new ValidatorTrafficCreationIntent.ContractId(ev.contractId.contractId))
+              )
+        }
     }
   }
 }

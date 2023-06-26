@@ -91,12 +91,16 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       )
     )
 
-  def lookupValidatorTrafficCreationIntent(domainId: DomainId)(implicit tc: TraceContext): Future[
-    Option[Contract[ValidatorTrafficCreationIntent.ContractId, ValidatorTrafficCreationIntent]]
+  def lookupValidatorTrafficCreationIntentWithOffset(
+      domainId: DomainId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[
+      Option[Contract[ValidatorTrafficCreationIntent.ContractId, ValidatorTrafficCreationIntent]]
+    ]
   ] =
     defaultAcsDomainIdF.flatMap(defaultDomainId =>
       // TODO(#4913): read from all domains in the global domain
-      multiDomainAcsStore.findContractOnDomain(ValidatorTrafficCreationIntent.COMPANION)(
+      multiDomainAcsStore.findContractOnDomainWithOffset(ValidatorTrafficCreationIntent.COMPANION)(
         defaultDomainId,
         intent => intent.payload.domainId == domainId.toProtoPrimitive,
       )
