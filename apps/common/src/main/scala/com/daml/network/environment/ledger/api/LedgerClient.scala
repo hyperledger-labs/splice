@@ -35,7 +35,6 @@ import com.digitalasset.canton.logging.pretty.Pretty
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.emptyTraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration, FieldMask}
 import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
@@ -76,7 +75,6 @@ private[environment] class LedgerClient(
   ): Future[T] = {
     getToken().map { token =>
       token.fold(stub) { token =>
-        elc.logger.debug(s"Using token that expires at ${token.expiresAt} for this ledger client")
         stub.withCallCredentials(new LedgerCallCredentials(token.accessToken))
       }
     }
