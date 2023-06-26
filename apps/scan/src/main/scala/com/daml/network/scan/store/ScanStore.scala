@@ -10,11 +10,11 @@ import com.daml.network.scan.store
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{
   CNNodeAppStoreWithHistory,
+  ConfiguredDefaultDomain,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
-  ConfiguredDefaultDomain,
 }
-import MultiDomainAcsStore.ReadyContract
+import MultiDomainAcsStore.{ContractWithState, ReadyContract}
 import com.daml.network.util.{CoinConfigSchedule, Contract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -123,6 +123,10 @@ trait ScanStore
         )
     )
 
+  def listImportCrates(receiver: String)(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]]
+
 }
 
 object ScanStore {
@@ -167,6 +171,7 @@ object ScanStore {
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
         mkFilter(cc.globaldomain.ValidatorTraffic.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc),
       ) ++
         (if (scanConfig.enableCoinRulesUpgrade)
            Map(mkFilter(ccV1Test.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))

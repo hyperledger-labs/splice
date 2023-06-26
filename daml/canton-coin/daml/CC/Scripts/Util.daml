@@ -41,13 +41,17 @@ demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
 
 -- | Setup the SVC party and the contracts defining the CC app.
 setupApp : Script CCApp
-setupApp = do
+setupApp = genericSetupApp ""
+
+-- | Setup the SVC party with a specific prefix and the contracts defining the CC app.
+genericSetupApp : Text -> Script CCApp
+genericSetupApp svcPrefix = do
   -- use a time that is easy to reason about in script outputs
   setTime demoTime
 
   -- In this model the SV Collective is not decentralized.
-  svc <- allocateParty "SVC"
-  svcUser <- validateUserId "svc"
+  svc <- allocateParty (svcPrefix <> "SVC")
+  svcUser <- validateUserId (svcPrefix <> "svc")
   _ <- createUser (User svcUser (Some svc)) []
   let app =  CCApp with svc, svcUser = CCUser svcUser svc
 
@@ -292,6 +296,9 @@ queryCoinRulesByKey svc = do
     [] -> pure None
     [coinRules] -> pure (Some coinRules)
     rules -> abort $ "Expected 0 or 1 CoinRules contracts but got " <> show rules
+
+getCoinRules : CCApp -> Script (ContractId CoinRules, CoinRules)
+getCoinRules app = fetchCoinRulesByKey app.svc
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfers the desired amount off of them to the receiver.
@@ -540,7 +547,7 @@ assertError f = do
   unless isThrown (abort "expected exception but didn't get one")
 
 getCoinConfig : CCApp -> Script (CoinConfig USD)
-getCoinConfig app = do     
+getCoinConfig app = do
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   now <- getTime
   pure $ getValueAsOf now coinRules.configSchedule

@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, V
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
-import com.daml.network.http.v0.definitions.{CometBftNodeDumpResponse, CometBftNodeStatusResponse}
+import com.daml.network.http.v0.definitions
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
@@ -230,13 +230,13 @@ class SvAppBackendReference(
   }
 
   @Help.Summary("Get the CometBFT node status")
-  def cometBftNodeStatus(): CometBftNodeStatusResponse =
+  def cometBftNodeStatus(): definitions.CometBftNodeStatusResponse =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetCometBftNodeStatus())
     }
 
   @Help.Summary("Get the CometBFT node debug dump")
-  def cometBftNodeDump(): CometBftNodeDumpResponse =
+  def cometBftNodeDump(): definitions.CometBftNodeDumpResponse =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetCometBftNodeDump())
     }
@@ -251,6 +251,12 @@ class SvAppBackendReference(
   def mediatorNodeStatus(): NodeStatus[CNNodeStatus] =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
+    }
+
+  @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
+  def triggerAcsDump(): definitions.TriggerAcsDumpResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.TriggerAcsDump())
     }
 
   /** Remote participant this sv app is configured to interact with. */

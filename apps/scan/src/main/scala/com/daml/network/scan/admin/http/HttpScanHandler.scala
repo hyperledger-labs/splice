@@ -16,6 +16,8 @@ import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
+import com.daml.network.store.AcsStoreDump
+import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{
   Codec,
   Contract,
@@ -487,4 +489,30 @@ class HttpScanHandler(
       }
     }
 
+  // TODO(#6073): make the process for importing crates on the validator app robust to large lists of crates, if required
+  override def listImportCrates(respond: v0.ScanResource.ListImportCratesResponse.type)(
+      party: String
+  )(extracted: Unit): Future[v0.ScanResource.ListImportCratesResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      {
+        // TODO(#6073): only do that in test-mode
+        val receiverName = AcsStoreDump.dropPartyNameSuffix(party)
+        for {
+          crates <- store.listImportCrates(receiverName)
+        } yield definitions.ListImportCratesResponse(
+          crates
+            .map(crate =>
+              MaybeCachedContractWithState(
+                Some(crate.contract.toJson),
+                crate.state match {
+                  // TODO(#6073): figure out whether there's a better way to do this conversion
+                  case ContractState.InFlight => None
+                  case ContractState.Assigned(domainId) => Some(domainId.toProtoPrimitive)
+                },
+              )
+            )
+            .toVector
+        )
+      }
+    }
 }

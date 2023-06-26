@@ -2,6 +2,7 @@ package com.daml.network.scan.admin.api.client
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
@@ -12,7 +13,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.MultiDomainAcsStore.ContractWithState
-import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder, DisclosedContracts}
+import com.daml.network.util.{CNNodeUtil, Contract, DisclosedContracts, TemplateJsonDecoder}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -163,12 +164,12 @@ final class ScanConnection private (
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
-  ): Future[Contract[OpenMiningRound.ContractId, OpenMiningRound]] = {
+  ): Future[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]] = {
     for {
       (openRounds, _) <- getOpenAndIssuingMiningRounds()
       now = clock.now
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
-    } yield openRound.contract
+    } yield openRound
   }
 
   def getOpenAndIssuingMiningRounds()(implicit
@@ -300,6 +301,16 @@ final class ScanConnection private (
       }
     }
   }
+
+  def listImportCrates(
+      party: PartyId
+  ): Future[
+    Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
+  ] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListImportCrates(party),
+    )
 
 }
 

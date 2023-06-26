@@ -215,6 +215,18 @@ abstract class ScanAppReference(
         HttpScanAppClient.CheckAndUpdateValidatorTrafficBalance(validatorParty)
       )
     }
+
+  @Help.Summary(
+    "List the import crates available for a party"
+  )
+  def listImportCrates(
+      party: PartyId
+  ): Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListImportCrates(party)
+      )
+    }
 }
 
 final class ScanAppBackendReference(

@@ -392,4 +392,28 @@ object HttpSvAdminAppClient {
       CNNodeStatus.fromJsonNodeStatus(CNNodeStatus.fromJsonV0)(response)
     }
   }
+
+  case class TriggerAcsDump()
+      extends BaseCommand[
+        http.TriggerAcsDumpResponse,
+        definitions.TriggerAcsDumpResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.TriggerAcsDumpResponse] =
+      client.triggerAcsDump(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      http.TriggerAcsDumpResponse,
+      Either[String, definitions.TriggerAcsDumpResponse],
+    ] = { case http.TriggerAcsDumpResponse.OK(response) =>
+      Either.right(response)
+    }
+  }
 }

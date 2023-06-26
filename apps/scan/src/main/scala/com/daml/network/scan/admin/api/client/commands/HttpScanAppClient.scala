@@ -13,7 +13,9 @@ import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRou
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
-import com.daml.network.store.MultiDomainAcsStore, MultiDomainAcsStore.ContractWithState
+import com.daml.network.store.MultiDomainAcsStore
+import MultiDomainAcsStore.ContractWithState
+import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -502,6 +504,28 @@ object HttpScanAppClient {
         Right(response.approved)
       case http.CheckAndUpdateValidatorTrafficBalanceResponse.NotFound(value) =>
         Left(value.error)
+    }
+  }
+
+  case class ListImportCrates(party: PartyId)
+      extends BaseCommand[http.ListImportCratesResponse, Seq[
+        ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]
+      ]] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListImportCratesResponse] =
+      client.listImportCrates(party.toProtoPrimitive, headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListImportCratesResponse.OK(response) =>
+        response.crates
+          .traverse(co =>
+            ContractWithState.handleMaybeCached(cc.coinimport.ImportCrate.COMPANION)(None, co)
+          )
     }
   }
 }

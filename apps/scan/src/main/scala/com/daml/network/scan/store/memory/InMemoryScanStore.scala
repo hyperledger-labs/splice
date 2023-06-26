@@ -2,12 +2,15 @@ package com.daml.network.scan.store.memory
 
 import cats.implicits.*
 import cats.kernel.Monoid
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
+import com.daml.network.store.MultiDomainAcsStore.ContractWithState
 import com.daml.network.store.{InMemoryCNNodeAppStore, TxLogStore}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -303,6 +306,17 @@ class InMemoryScanStore(
       case Some(validatorTraffic) => validatorTraffic.payload.totalPurchased
     }
   }
+
+  def listImportCrates(receiverName: String)(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
+  ] =
+    multiDomainAcsStore.filterContracts(
+      cc.coinimport.ImportCrate.COMPANION,
+      (co: Contract[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]) =>
+        co.payload.receiverName == receiverName,
+    )
 
   override def close(): Unit = {
     super.close()

@@ -178,23 +178,26 @@ class SvApp(
       // a fresh collective is fundamentally different from joining an existing collective
       config.onboarding match {
         case Some(foundingConfig: SvOnboardingConfig.FoundCollective) =>
-          val initializer = new FoundingNodeInitializer(
-            config,
-            foundingConfig,
-            cometBftNode,
-            darFilesToUploadDuringInit,
-            loggerFactory,
-            retryProvider,
-            ledgerClient,
-            participantAdminConnection,
-            participantId,
-            clock,
-            storage,
-            localDomainNode.getOrElse(
-              sys.error("Founding node must always specify a domain config")
-            ),
-          )
-          initializer.bootstrapCollective().map((_, Some(foundingConfig)))
+          // TODO(#5419): make the whole SvApp init tracing instead of just this local piece of code
+          TraceContext.withNewTraceContext(implicit traceContext => {
+            val initializer = new FoundingNodeInitializer(
+              config,
+              foundingConfig,
+              cometBftNode,
+              darFilesToUploadDuringInit,
+              loggerFactory,
+              retryProvider,
+              ledgerClient,
+              participantAdminConnection,
+              participantId,
+              clock,
+              storage,
+              localDomainNode.getOrElse(
+                sys.error("Founding node must always specify a domain config")
+              ),
+            )
+            initializer.bootstrapCollective().map((_, Some(foundingConfig)))
+          })
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           val initializer = new JoiningNodeInitializer(
             config,
@@ -292,6 +295,7 @@ class SvApp(
 
       adminHandler = new HttpSvAdminHandler(
         globalDomain,
+        config.acsStoreDump,
         svAutomation,
         svcAutomation,
         cometBftClient,

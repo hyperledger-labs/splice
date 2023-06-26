@@ -309,7 +309,7 @@ def writeToFile(content: String, filename: String): Unit = {
 }
 
 def grepForPattern(pattern: String): Seq[String] =
-  Seq("git", "grep", pattern)
+  Seq("git", "grep", "-I", pattern)
 
 object ErrorCollector extends ProcessLogger {
   private val allErrors = ListBuffer[String]()

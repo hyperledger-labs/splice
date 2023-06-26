@@ -81,7 +81,7 @@ class HttpWalletHandler(
   ): Future[r0.ListResponse] = withNewTrace(workflowId) { implicit traceContext => _ =>
     for {
       userStore <- getUserStore(user)
-      currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
+      currentRound <- scanConnection.getLatestOpenMiningRound().map(_.contract.payload.round.number)
       coins <- userStore.multiDomainAcsStore.listContracts(
         coinCodegen.Coin.COMPANION
       )
@@ -470,7 +470,9 @@ class HttpWalletHandler(
         lockedCoins <- userStore.multiDomainAcsStore.listContracts(
           coinCodegen.LockedCoin.COMPANION
         )
-        currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
+        currentRound <- scanConnection
+          .getLatestOpenMiningRound()
+          .map(_.contract.payload.round.number)
       } yield {
         val unlockedHoldingFees =
           coins.view

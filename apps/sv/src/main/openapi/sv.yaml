@@ -293,6 +293,20 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+  /admin/svc/trigger-acs-dump:
+    put:
+      tags: [ sv ]
+      x-jvm-package: svAdmin
+      operationId: "TriggerAcsDump"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TriggerAcsDumpResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
   /admin/authorization:
     get:
       tags: [sv]
@@ -841,4 +855,18 @@ components:
         reason:
           type: string
         trace_id:
+          type: string
+
+    TriggerAcsDumpResponse:
+      type: object
+      required:
+        - filename
+        - num_events
+        - offset
+      properties:
+        filename:
+          type: string
+        num_events:
+          type: number
+        offset:
           type: string

@@ -16,12 +16,14 @@ import com.daml.network.http.v0.definitions.{
   CometBftStatusOrError,
   CreateVoteRequest,
   ErrorResponse,
+  TriggerAcsDumpResponse,
   UpdateVoteRequest,
 }
 import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.http.v0.{definitions, svAdmin as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.cometbft.CometBftClient
+import com.daml.network.sv.config.SvAcsStoreDumpConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
@@ -31,12 +33,15 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 
 class HttpSvAdminHandler(
     globalDomain: DomainId,
+    optAcsDumpConfig: Option[SvAcsStoreDumpConfig],
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
@@ -364,6 +369,58 @@ class HttpSvAdminHandler(
     withMediatorConnectionOrNotFound(respond.NotFound)(
       _.getStatus.map(CNNodeStatus.toJsonNodeStatus(_))
     )
+  }
+
+  override def triggerAcsDump(respond: SvAdminResource.TriggerAcsDumpResponse.type)()(
+      extracted: String
+  ): Future[SvAdminResource.TriggerAcsDumpResponse] = withNewTrace(workflowId) { implicit tc => _ =>
+    optAcsDumpConfig match {
+      case None =>
+        Future.failed(
+          Status.FAILED_PRECONDITION
+            .withDescription("No ACS dump directory configured")
+            .asRuntimeException()
+        )
+      case Some(acsDumpConfig: SvAcsStoreDumpConfig) =>
+        Future {
+          // TODO(#6073): this doesn't work for larger ACS as the client will timeout -- we can change its semantics to start a dump process and return a handle to the operation that can be checked for completion
+          blocking {
+            import better.files.File
+
+            // create output directories
+            val dumpDir = File(acsDumpConfig.directory)
+            dumpDir.createDirectories()
+            // determine target file
+            val now = clock.now.toInstant
+            val svcFingerprint = show"${svcStore.key.svcParty}".filter('.'.!=)
+            val filename = s"temp-${svcFingerprint}-${now}.acs-dump-v1"
+            val file = dumpDir / filename
+            // and dump
+            logger.debug(s"Attempting to write ACS snapshot to: ${file.path.toAbsolutePath}")
+            // TODO(#6073): compress output file
+            val output = file.newOutputStream
+            val summary =
+              try {
+                svcStore.multiDomainAcsStore.writeAcsSnapshot(output)
+              } finally {
+                output.close()
+              }
+            // move file to incorporate summary into filename
+            val finalFilename =
+              s"${svcFingerprint}_off-${summary.offset}_size-${summary.numEvents}_${now}.acs-dump-v1"
+            val finalFile = dumpDir / finalFilename
+            file.moveTo(finalFile)
+            logger.info(s"Wrote ACS snapshot with $summary to: ${finalFile.path.toAbsolutePath}")
+            SvAdminResource.TriggerAcsDumpResponseOK(
+              TriggerAcsDumpResponse(
+                filename = finalFilename,
+                numEvents = summary.numEvents,
+                offset = summary.offset,
+              )
+            )
+          }
+        }
+    }
   }
 
   private def withClientOrNotFound[T](

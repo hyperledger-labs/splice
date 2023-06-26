@@ -12,6 +12,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
+import java.nio.file.Path
 
 case class ExpectedValidatorOnboardingConfig(
     secret: String,
@@ -44,6 +45,7 @@ object SvOnboardingConfig {
       // TODO(#5855) remove this again
       globalLockTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(120),
       isDevNet: Boolean = false,
+      bootstrappingDump: Option[String] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -74,6 +76,10 @@ final case class SvDomainConfig(
     global: SvGlobalDomainConfig
 )
 
+final case class SvAcsStoreDumpConfig(
+    directory: Path
+)
+
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
@@ -98,6 +104,7 @@ case class SvAppBackendConfig(
     localDomainNode: Option[SvDomainNodeConfig],
     // TODO(#5855) so we can lock; remove this again
     foundingSvClient: SvAppClientConfig,
+    acsStoreDump: Option[SvAcsStoreDumpConfig] = None,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

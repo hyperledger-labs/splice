@@ -316,6 +316,24 @@ paths:
                 "$ref": "#/components/schemas/CheckAndUpdateValidatorTrafficBalanceResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+  /bootstrap/import-crates:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listImportCrates"
+      parameters:
+        - in: query
+          name: party
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListImportCratesResponse"
 
 components:
   schemas:
@@ -510,3 +528,12 @@ components:
         lastPurchasedInRound:
           type: integer
           format: int64
+    ListImportCratesResponse:
+      type: object
+      required: ["crates"]
+      properties:
+        crates:
+          type: array
+          items:
+            # TODO(#6073): consider using a more precise type; i.e., no 'MaybeCached'
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractWithState"

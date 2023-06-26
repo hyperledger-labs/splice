@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.ledger.api.v2.transaction_filter.{TransactionFilter as LapiTransactionFilter}
+import com.daml.ledger.api.v2.transaction_filter.TransactionFilter as LapiTransactionFilter
 import com.daml.ledger.javaapi.data.{
   ContractMetadata,
   CreatedEvent,
@@ -44,6 +44,7 @@ import com.google.protobuf.ByteString
 import io.circe.Json
 import io.grpc.Status
 
+import java.io.OutputStream
 import java.time.Instant
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -220,9 +221,17 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
   ): Future[Unit]
 
   def ingestionSink: MultiDomainAcsStore.IngestionSink
+
+  /** Write the CreatedEvents of a consistent snapshot of the ACS to an output stream.
+    *
+    * Implementations MAY block.
+    */
+  def writeAcsSnapshot(output: OutputStream): SnapshotSummary
 }
 
 object MultiDomainAcsStore {
+
+  case class SnapshotSummary(offset: String, numEvents: Int)
 
   // TODO (#2676) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
   abstract class InterfaceDecoder {

@@ -479,6 +479,8 @@ object CNNodeConfig {
       deriveReader[SvGlobalDomainConfig]
     implicit val svDomainConfigReader: ConfigReader[SvDomainConfig] =
       deriveReader[SvDomainConfig]
+    implicit val svAcsStoreDumpConfigReader: ConfigReader[SvAcsStoreDumpConfig] =
+      deriveReader[SvAcsStoreDumpConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         // We support joining nodes without sequencers/mediators but
@@ -637,6 +639,8 @@ object CNNodeConfig {
       deriveWriter[SvGlobalDomainConfig]
     implicit val svDomainConfigWriter: ConfigWriter[SvDomainConfig] =
       deriveWriter[SvDomainConfig]
+    implicit val svAcsStoreDumpConfigWriter: ConfigWriter[SvAcsStoreDumpConfig] =
+      deriveWriter[SvAcsStoreDumpConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

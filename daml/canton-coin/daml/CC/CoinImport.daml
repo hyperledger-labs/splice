@@ -1,0 +1,37 @@
+-- TODO(#6073): move into its own .dar
+module CC.CoinImport where
+
+import CC.Coin
+import CC.Round
+
+import qualified CC.API.V1.Coin as API
+
+import CN.Util.Assert
+
+import DA.Text as T
+
+-- | A crate of contracts imported from another network instance upon bootstrapping this SVC.
+template ImportCrate with
+    svc : Party
+    receiverName : Text
+    exactMatch : Bool -- ^ If true, then the receiver-name must match exactly to the receiver's party-id otherwise it must be a prefix, which we use in our test-setups only.
+    -- TODO(#6073): remove the need for inexact matches and text-to-party
+    payload : Coin -- TODO(#6073): generalize to capture more than just coins
+  where
+    signatory svc
+
+    choice ImportCrate_Receive : API.CoinCreateSummary (ContractId Coin)
+      with
+        receiver : Party
+        coinRules : ContractId CoinRules
+        openRound : ContractId OpenMiningRound
+      controller receiver
+      do
+        if exactMatch
+          then require "Receiver party matches receiver name" (partyToText receiver == receiverName)
+          else require "Receiver name is a prefix of the receiver party" (receiverName `T.isPrefixOf` partyToText receiver)
+        exercise coinRules CoinRules_Mint with
+          receiver
+          amount = payload.amount.initialAmount
+          openRound
+
