@@ -121,13 +121,15 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'validator1',
     'auth0|63e3d75ff4114d87a2c1e4f5',
-    validator1Onboarding
+    validator1Onboarding,
+    withDomainFees
   );
   const splitwell = await installSplitwell(
     auth0Client,
     sv1,
     'auth0|63e12e0415ad881ffe914e61',
-    splitwellOnboarding
+    splitwellOnboarding,
+    withDomainFees
   );
 
   const docs = installDocs();

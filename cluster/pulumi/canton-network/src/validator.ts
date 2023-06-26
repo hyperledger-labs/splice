@@ -9,6 +9,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
+import { domainFeesConfig } from './domainFeesCfg';
 import { installParticipant } from './ledger';
 import {
   ValidatorOnboarding,
@@ -21,7 +22,8 @@ export async function installValidator(
   svc: pulumi.Resource,
   name: string,
   validatorWalletUser: string,
-  onboarding: ValidatorOnboarding
+  onboarding: ValidatorOnboarding,
+  withDomainFees = false
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
@@ -83,6 +85,13 @@ export async function installValidator(
           optional: false,
         },
       },
+      topup: withDomainFees
+        ? {
+            enabled: true,
+            targetThroughput: domainFeesConfig.targetThroughput,
+            minTopupInterval: domainFeesConfig.minTopupInterval,
+          }
+        : {},
     },
     dependsOn
   );

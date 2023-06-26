@@ -10,6 +10,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
+import { domainFeesConfig } from './domainFeesCfg';
 import { installDomain, installParticipant } from './ledger';
 import {
   ValidatorOnboarding,
@@ -21,7 +22,8 @@ export async function installSplitwell(
   auth0Client: Auth0Client,
   svc: pulumi.Resource,
   providerWalletUser: string,
-  onboarding: ValidatorOnboarding
+  onboarding: ValidatorOnboarding,
+  withDomainFees = false
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell');
 
@@ -105,6 +107,13 @@ export async function installSplitwell(
           optional: false,
         },
       },
+      topup: withDomainFees
+        ? {
+            enabled: true,
+            targetThroughput: domainFeesConfig.targetThroughput,
+            minTopupInterval: domainFeesConfig.minTopupInterval,
+          }
+        : {},
     },
     dependsOn
   );

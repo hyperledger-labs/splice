@@ -14,6 +14,7 @@ import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { installCometBftNode } from './cometbft';
+import { domainFeesConfig } from './domainFeesCfg';
 import { installGlobalDomain, installParticipant } from './ledger';
 
 // btoa is only available in DOM so inline the definition here.
@@ -213,6 +214,13 @@ export async function installSvNode(
       validatorWalletUser,
       globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
       foundingSvApiUrl: 'http://sv-app.sv-1:5014',
+      topup: withDomainFees
+        ? {
+            enabled: true,
+            targetThroughput: domainFeesConfig.targetThroughput,
+            minTopupInterval: domainFeesConfig.minTopupInterval,
+          }
+        : {},
     },
     [svApp]
   );

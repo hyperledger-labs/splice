@@ -2,6 +2,8 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
+import { domainFeesConfig } from './domainFeesCfg';
+
 export function installDomain(
   xns: ExactNamespace,
   name: string,
@@ -29,8 +31,8 @@ export function installGlobalDomain(
     trafficControl: withDomainFees
       ? {
           enabled: true,
-          baseRate: 300,
-          maxBurstDuration: '10m',
+          baseRate: domainFeesConfig.baseRate,
+          maxBurstDuration: domainFeesConfig.maxBurstDuration,
         }
       : {},
   });

@@ -86,6 +86,12 @@ spec:
           value: {{ .Values.globalDomainUrl | quote }}
         - name: ADDITIONAL_CONFIG_FOUNDING_SV
           value: canton.validator-apps.validator_backend.founding-sv-client.admin-api.url = "{{ .Values.foundingSvApiUrl }}"
+        {{- if (.Values.topup).enabled }}
+        - name: ADDITIONAL_CONFIG_TOPUPS
+          value: |
+            canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.target-throughput = {{ (.Values.topup).targetThroughput }}
+            canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.min-topup-interval = {{ (.Values.topup).minTopupInterval }}
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http

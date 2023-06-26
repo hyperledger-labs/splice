@@ -170,7 +170,8 @@ object CNNodeUtil {
     // 10 txs of 20kB each in a window of 10 mins
     damlDecimal(333.0),
     NonNegativeFiniteDuration.ofMinutes(10),
-    1_000_000, // minTopupAmount = 1MB
+    // TODO(#6032): determine the best defaults here
+    1_000, // minTopupAmount = 1KB
   )
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here

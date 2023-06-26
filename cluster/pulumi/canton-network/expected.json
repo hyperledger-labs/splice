@@ -1369,7 +1369,8 @@
             "memory": "8Gi"
           }
         },
-        "svSponsorAddress": "http://sv-app.sv-1:5014"
+        "svSponsorAddress": "http://sv-app.sv-1:5014",
+        "topup": {}
       }
     },
     "name": "helm-splitwell-splitwell",
@@ -2146,6 +2147,7 @@
             "memory": "8Gi"
           }
         },
+        "topup": {},
         "validatorWalletUser": "auth0|64529b128448ded6aa68048f"
       }
     },
@@ -2824,6 +2826,7 @@
             "memory": "8Gi"
           }
         },
+        "topup": {},
         "validatorWalletUser": "auth0|64529b6852dd694167351045"
       }
     },
@@ -3427,6 +3430,7 @@
             "memory": "8Gi"
           }
         },
+        "topup": {},
         "validatorWalletUser": "auth0|64529bb10c1aee4f2c819218"
       }
     },
@@ -4030,6 +4034,7 @@
             "memory": "8Gi"
           }
         },
+        "topup": {},
         "validatorWalletUser": "auth0|64529bc58d30358eacae5611"
       }
     },
@@ -4370,6 +4375,7 @@
           }
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
+        "topup": {},
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       }

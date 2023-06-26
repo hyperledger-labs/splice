@@ -33,6 +33,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const SV_WALLET_USER_ID = process.env.SV_WALLET_USER_ID || 'auth0|64553aa683015a9687d9cc2e'; // Default to admin@sv.com at the sv-test tenant by default
   const SV_NAMESPACE = process.env.SV_NAMESPACE || 'sv';
   const DEFAULT_AUDIENCE = 'https://canton.network.global';
+  const withDomainFees = process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '';
 
   console.error(
     localCharts
@@ -167,9 +168,24 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     },
   };
 
-  const validatorValuesWithFixedTokens = {
+  const validatorValuesWithMaybeFixedTokens: ChartValues = {
     ...validatorValuesWithSpecifiedAud,
-    ...fixedTokensValue,
+    ...(fixedTokens() ? fixedTokensValue : {}),
+  };
+
+  // TODO(#6032): determine the best defaults here
+  // TODO(#6151): move this to the runbook values once we enable domain fees in testnet
+  const domainFeesValues = {
+    topup: {
+      enabled: true,
+      targetThroughput: 10000,
+      minTopupInterval: '1m',
+    },
+  };
+
+  const validatorValuesWithMaybeDomainFees: ChartValues = {
+    ...validatorValuesWithMaybeFixedTokens,
+    ...(withDomainFees ? domainFeesValues : {}),
   };
 
   const svValidatorSecrets = await createSvValidatorSecrets(svNamespace, auth0Client);
@@ -179,7 +195,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     svNamespace,
     'validator',
     'cn-validator',
-    fixedTokens() ? validatorValuesWithFixedTokens : validatorValuesWithSpecifiedAud,
+    validatorValuesWithMaybeDomainFees,
     localCharts,
     version,
     svImagePullDeps
