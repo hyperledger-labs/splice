@@ -180,7 +180,7 @@ export function requireEnv(name: string, msg = ''): string {
 
   if (!value) {
     console.error(
-      `Environment variable ${name} is undefined.` + msg != '' ? `(should define: ${msg})` : ''
+      `Environment variable ${name} is undefined.` + (msg != '' ? `(should define: ${msg})` : '')
     );
     process.exit(1);
   } else {
