@@ -3,7 +3,7 @@
 Release Notes
 =============
 
-2023-06-02
+2023-07-02
 ----------
 
 * The URL to scan in ``validator-values.yaml`` has changed to
@@ -11,6 +11,11 @@ Release Notes
   ``scanPort`` field has been removed.
 * The ``svSponsorAddress`` from ``validator-values.yaml`` has been removed. The validator associated
   with an SV node is onboarded automatically through its SV node.
+* The request to the IAM to acquire a token is now made using content
+  type ``application/x-www-form-urlencoded`` instead of
+  ``application/json``. This matches the OAuth standard and is
+  compatible with a wider range of IAMs. No change is required if your
+  IAM configuration was working previously.
 
 2023-06-25
 ----------

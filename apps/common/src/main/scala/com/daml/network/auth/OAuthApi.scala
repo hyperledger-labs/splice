@@ -3,16 +3,16 @@ package com.daml.network.auth
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{FormData, HttpMethods, HttpRequest, HttpResponse}
 import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import spray.json.{DefaultJsonProtocol, *}
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Failure
+import spray.json.DefaultJsonProtocol
 
 object OAuthApi {
   final case class ClientCredentialRequest(
@@ -20,7 +20,14 @@ object OAuthApi {
       client_secret: String,
       audience: String,
       grant_type: String = "client_credentials",
-  )
+  ) {
+    def toFormData = FormData(
+      "client_id" -> client_id,
+      "client_secret" -> client_secret,
+      "audience" -> audience,
+      "grant_type" -> grant_type,
+    )
+  }
 
   /** expires_in is in seconds */
   final case class TokenResponse(access_token: String, expires_in: Long) {
@@ -39,7 +46,6 @@ object OAuthApi {
 }
 
 trait OAuthApiJson extends SprayJsonSupport with DefaultJsonProtocol {
-  implicit val clientCredentialRequestFormat = jsonFormat4(OAuthApi.ClientCredentialRequest)
   implicit val wellKnownResponseFormat = jsonFormat4(OAuthApi.WellKnownResponse)
   implicit val tokenResponseFormat = jsonFormat2(OAuthApi.TokenResponse)
 }
@@ -94,16 +100,13 @@ class OAuthApi(
   )(implicit tc: TraceContext): Future[TokenResponse] = {
     logger.debug(s"Using OAuth client credentials flow with clientId='$clientId' at $tokenUrl")
 
-    val payload = ClientCredentialRequest(clientId, clientSecret, audience).toJson.toString
+    val payload = ClientCredentialRequest(clientId, clientSecret, audience)
 
     val responseFuture: Future[HttpResponse] = Http().singleRequest(
       HttpRequest(
         method = HttpMethods.POST,
         uri = tokenUrl,
-        entity = HttpEntity(
-          ContentTypes.`application/json`,
-          payload,
-        ),
+        entity = payload.toFormData.toEntity,
       )
     )
 
