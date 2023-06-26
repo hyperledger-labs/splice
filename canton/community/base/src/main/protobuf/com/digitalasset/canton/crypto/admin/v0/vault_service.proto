@@ -87,6 +87,12 @@ service VaultService {
   rpc RotateWrapperKey(RotateWrapperKeyRequest) returns (google.protobuf.Empty);
 
   rpc GetWrapperKeyId(GetWrapperKeyIdRequest) returns (GetWrapperKeyIdResponse);
+
+  rpc ExportKeyPair(ExportKeyPairRequest) returns (ExportKeyPairResponse);
+
+  rpc ImportKeyPair(ImportKeyPairRequest) returns (ImportKeyPairResponse);
+
+  rpc DeleteKeyPair(DeleteKeyPairRequest) returns (DeleteKeyPairResponse);
 }
 
 message GenerateCertificateRequest {
@@ -192,3 +198,28 @@ message GetWrapperKeyIdRequest {}
 message GetWrapperKeyIdResponse {
   string wrapper_key_id = 1;
 }
+
+message ExportKeyPairRequest {
+  // The id of the keypair to export
+  string fingerprint = 1;
+
+  // The protocol version that defines the serialization of the keypair
+  int32 protocol_version = 2;
+}
+
+message ExportKeyPairResponse {
+  bytes key_pair = 1;
+}
+
+message ImportKeyPairRequest {
+  bytes key_pair = 1;
+  string name = 2;
+}
+
+message ImportKeyPairResponse {}
+
+message DeleteKeyPairRequest {
+  string fingerprint = 1;
+}
+
+message DeleteKeyPairResponse {}

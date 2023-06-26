@@ -225,6 +225,35 @@ class GrpcVaultService(
       StaticGrpcServices.notSupportedByCommunityStatus.asRuntimeException()
     )
 
+  override def exportKeyPair(request: v0.ExportKeyPairRequest): Future[v0.ExportKeyPairResponse] = {
+    Future.failed[v0.ExportKeyPairResponse](
+      io.grpc.Status.UNIMPLEMENTED
+        .withDescription(
+          "Implementation not yet availble on our Canton fork."
+        )
+        .asRuntimeException()
+    )
+  }
+
+  override def importKeyPair(request: v0.ImportKeyPairRequest): Future[v0.ImportKeyPairResponse] = {
+    Future.failed[v0.ImportKeyPairResponse](
+      io.grpc.Status.UNIMPLEMENTED
+        .withDescription(
+          "Implementation not yet availble on our Canton fork."
+        )
+        .asRuntimeException()
+    )
+  }
+
+  override def deleteKeyPair(request: v0.DeleteKeyPairRequest): Future[v0.DeleteKeyPairResponse] = {
+    Future.failed[v0.DeleteKeyPairResponse](
+      io.grpc.Status.UNIMPLEMENTED
+        .withDescription(
+          "Implementation not yet availble on our Canton fork."
+        )
+        .asRuntimeException()
+    )
+  }
 }
 
 object GrpcVaultService {
