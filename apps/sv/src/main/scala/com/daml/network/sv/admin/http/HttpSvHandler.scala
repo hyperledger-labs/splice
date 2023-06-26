@@ -35,7 +35,6 @@ import io.opentelemetry.api.trace.Tracer
 import java.util.{Base64, UUID}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-import com.daml.network.sv.config.SvOnboardingConfig
 
 class HttpSvHandler(
     globalDomain: DomainId,
@@ -49,8 +48,7 @@ class HttpSvHandler(
     localDomainNode: Option[LocalDomainNode],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
-    // TODO(#5755) likely needed only for our locking workaround
-    foundingConfig: Option[SvOnboardingConfig.FoundCollective],
+    globalLockO: Option[ExpiringLock],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -63,16 +61,6 @@ class HttpSvHandler(
   private val svcStore = svcStoreWithIngestion.store
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
-
-  // TODO(#5855) Remove this lock
-  // For now, we lock around all operations that somehow affect topology state.
-  // Specifically, we lock around mediator/sequencer onboarding,
-  // participant onboarding (i.e. domain connections),
-  // party allocations and package uploads.
-  // This avoids a bunch of issues where Canton
-  // does not handle concurrency for those operations
-  // correctly.
-  private val globalLockO = foundingConfig.map(c => new ExpiringLock(c.globalLockTimeout, logger))
 
   private def withGlobalLock[T](f: ExpiringLock => Future[T]): Future[T] =
     globalLockO match {
@@ -103,15 +91,9 @@ class HttpSvHandler(
   )(fake: Unit): Future[v0.SvResource.AcquireGlobalLockResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       withGlobalLock { globalLock =>
-        logger.debug(s"Trying to acquire lock for $body.reason ($body.traceId)")
-        val success = globalLock.tryAcquire()
-        if (success) {
-          logger.debug(s"Acquired lock ($body.traceId)")
-          Future.successful(v0.SvResource.AcquireGlobalLockResponseOK)
-        } else {
-          logger.debug(s"Failed to acquire lock ($body.traceId)")
-          Future.failed(HttpErrorHandler.serviceUnavailable("Lock is not free"))
-        }
+        globalLock
+          .tryAcquire(body.reason, body.traceId)
+          .map(_ => v0.SvResource.AcquireGlobalLockResponseOK)
       }
     }
 
@@ -122,9 +104,9 @@ class HttpSvHandler(
   )(fake: Unit): Future[v0.SvResource.ReleaseGlobalLockResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       withGlobalLock { globalLock =>
-        globalLock.release()
-        logger.debug(s"Released lock for $body.reason ($body.traceId)")
-        Future.successful(v0.SvResource.ReleaseGlobalLockResponseOK)
+        globalLock
+          .release(body.reason, body.traceId)
+          .map(_ => v0.SvResource.ReleaseGlobalLockResponseOK)
       }
     }
 

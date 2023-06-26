@@ -170,6 +170,7 @@ class SvApp(
           svcStore,
           svcAutomation,
           svcRulesLock,
+          globalLockO,
         ),
         foundingConfig,
       ) <-
@@ -285,7 +286,7 @@ class SvApp(
         localDomainNode,
         retryProvider,
         svcPartyHosting,
-        foundingConfig,
+        globalLockO,
         loggerFactory,
       )
 

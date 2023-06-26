@@ -12,7 +12,7 @@ import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationSer
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
+import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -63,6 +63,7 @@ class JoiningNodeInitializer(
         SvSvcStore,
         SvSvcAutomationService,
         SvcRulesLock,
+        Option[ExpiringLock],
     )
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
@@ -185,6 +186,7 @@ class JoiningNodeInitializer(
       svcStore,
       svcAutomation,
       svcRulesLock,
+      None,
     )
   }
 
@@ -423,6 +425,7 @@ class JoiningNodeInitializer(
         participantAdminConnection,
         retryProvider,
         cometBftNode,
+        None,
         loggerFactory,
       )
   }
@@ -471,6 +474,7 @@ class JoiningNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
+      None,
       loggerFactory,
     )
 

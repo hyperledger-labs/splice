@@ -6,6 +6,7 @@ import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection,
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.util.ExpiringLock
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -21,6 +22,7 @@ class SvSvcAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
+    globalLockO: Option[ExpiringLock],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -61,11 +63,14 @@ class SvSvcAutomationService(
     }
   }
 
-  registerTrigger(
-    new ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
-      triggerContext,
-      svcStore,
-      participantAdminConnection,
+  globalLockO.foreach(lock =>
+    registerTrigger(
+      new ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
+        triggerContext,
+        svcStore,
+        participantAdminConnection,
+        lock,
+      )
     )
   )
   registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))

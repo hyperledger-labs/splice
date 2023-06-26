@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.util.ExpiringLock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -22,6 +23,7 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     participantAdminConnection: ParticipantAdminConnection,
+    globalLock: ExpiringLock,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -70,12 +72,17 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
           participantAdminConnection
             .getParticipantId()
             .flatMap(svParticipantId =>
-              participantAdminConnection
-                .ensureTrafficControlState(
-                  domainId,
-                  validatorParticipant.participantId,
-                  validatorTraffic_.totalPurchased,
-                  svParticipantId.uid.namespace.fingerprint,
+              globalLock
+                .withGlobalLock(
+                  s"Updating traffic limit for validator ${validatorTraffic_.validator}"
+                )(
+                  participantAdminConnection
+                    .ensureTrafficControlState(
+                      domainId,
+                      validatorParticipant.participantId,
+                      validatorTraffic_.totalPurchased,
+                      svParticipantId.uid.namespace.fingerprint,
+                    )
                 )
                 .map(_ =>
                   TaskSuccess(

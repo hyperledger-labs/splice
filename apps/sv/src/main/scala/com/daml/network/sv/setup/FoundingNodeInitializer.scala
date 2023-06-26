@@ -15,7 +15,7 @@ import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationSer
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
+import com.daml.network.sv.util.{ExpiringLock, SvUtil, SvcRulesLock}
 import com.daml.network.util.CNNodeUtil.{
   defaultCoinConfig,
   defaultCoinConfigSchedule,
@@ -85,9 +85,20 @@ class FoundingNodeInitializer(
         SvSvcStore,
         SvSvcAutomationService,
         SvcRulesLock,
+        Option[ExpiringLock],
     )
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+
+    // TODO(#5855) Remove this lock
+    // For now, we lock around all operations that somehow affect topology state.
+    // Specifically, we lock around mediator/sequencer onboarding,
+    // participant onboarding (i.e. domain connections),
+    // party allocations and package uploads.
+    // This avoids a bunch of issues where Canton
+    // does not handle concurrency for those operations
+    // correctly.
+    val globalLock = new ExpiringLock(foundingConfig.globalLockTimeout, logger)
     for {
       namespace <- bootstrapDomain(localDomainNode)
       _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
@@ -141,7 +152,13 @@ class FoundingNodeInitializer(
       )
 
       svcStore = newSvcStore(svStore.key)
-      svcAutomation = newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
+      svcAutomation = newSvSvcAutomationService(
+        svStore,
+        svcStore,
+        ledgerClient,
+        cometBftNode,
+        globalLock,
+      )
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- retryProvider.ensureThatB(
         show"the SvcRules and CoinRules are bootstrapped",
@@ -159,6 +176,7 @@ class FoundingNodeInitializer(
       svcStore,
       svcAutomation,
       svcRulesLock,
+      Some(globalLock),
     )
   }
 
@@ -463,6 +481,7 @@ class FoundingNodeInitializer(
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
       cometBftNode: Option[CometBftNode],
+      globalLock: ExpiringLock,
   ) =
     new SvSvcAutomationService(
       clock,
@@ -473,6 +492,7 @@ class FoundingNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
+      Some(globalLock),
       loggerFactory,
     )
 

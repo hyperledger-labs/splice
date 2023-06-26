@@ -4,18 +4,48 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
 
+import io.grpc.Status
 import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.blocking
+import scala.concurrent.{blocking, ExecutionContext, Future}
 
 // TODO(#5855) remove this class and file
 private[sv] class ExpiringLock(
     expirationDuration: NonNegativeFiniteDuration,
     logger: TracedLogger,
-) {
+)(implicit ec: ExecutionContext) {
   private val lockRef: AtomicReference[LockState] = new AtomicReference[LockState](Unlocked)
 
-  def tryAcquire()(implicit traceContext: TraceContext): Boolean = {
+  def tryAcquire(reason: String, traceId: String)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = Future {
+    logger.debug(s"Trying to acquire lock for $reason ($traceId)")
+    val success = tryAcquire()
+    if (success) {
+      logger.debug(s"Acquired lock ($traceId)")
+    } else {
+      logger.debug(s"Failed to acquire lock ($traceId)")
+      throw Status.ABORTED.withDescription("Lock is not free").asRuntimeException()
+    }
+  }
+
+  def release(reason: String, traceId: String)(implicit traceContext: TraceContext): Future[Unit] =
+    Future {
+      release()
+      logger.debug(s"Released lock for $reason ($traceId)")
+    }
+
+  def withGlobalLock[T](
+      reason: String
+  )(f: => Future[T])(implicit traceContext: TraceContext): Future[T] = {
+    val traceId = UUID.randomUUID.toString
+    tryAcquire(reason, traceId).flatMap { _ =>
+      f.transformWith(r => release(reason, traceId).transform(rr => rr.flatMap(_ => r)))
+    }
+  }
+
+  private def tryAcquire()(implicit traceContext: TraceContext): Boolean = {
     blocking {
       // we probably don't need this but we also never want to have to debug this code again
       synchronized {
@@ -36,7 +66,7 @@ private[sv] class ExpiringLock(
     }
   }
 
-  def release()(implicit traceContext: TraceContext): Unit = {
+  private def release()(implicit traceContext: TraceContext): Unit = {
     blocking {
       // we probably don't need this we but also never want to have to debug this code
       synchronized {
