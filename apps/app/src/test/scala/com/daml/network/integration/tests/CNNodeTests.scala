@@ -13,19 +13,10 @@ import com.daml.network.console.{
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
-import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.sv.config.SvOnboardingConfig
-import com.daml.network.util.{
-  Auth0Util,
-  CNNodeUtil,
-  CoinConfigSchedule,
-  CommonCNNodeAppInstanceReferences,
-}
-import com.daml.network.util.CNNodeUtil.defaultCoinConfig
+import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.*
@@ -38,11 +29,9 @@ import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 import com.daml.network.integration.plugins.WaitForPorts
-import com.digitalasset.canton.topology.DomainId
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.AppendedClues
 
-import java.time.Instant
 import scala.math.BigDecimal.RoundingMode
 
 /** Analogue to Canton's CommunityTests */
@@ -207,28 +196,6 @@ object CNNodeTests {
 
     def tickDurationWithBuffer(implicit env: CNNodeTestConsoleEnvironment) =
       defaultTickDuration.asJava.plus(java.time.Duration.ofSeconds(10))
-
-    /** Helper function to create CoinConfig's in tests for coin config changes. Uses the `currentSchedule` as a reference
-      * to fill in the id of the activeDomain. Not meant to be a general utility. Please adjust if you need it to do more
-      */
-    protected def mkUpdatedCoinConfig(
-        currentSchedule: Schedule[Instant, CoinConfig[USD]],
-        tickDuration: NonNegativeFiniteDuration,
-        maxNumInputs: Int = 100,
-        holdingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
-        nextDomainId: Option[DomainId] = None,
-    )(implicit env: CNNodeTestConsoleEnvironment): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
-      val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
-      val activeDomainId =
-        CoinConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain
-      defaultCoinConfig(
-        tickDuration,
-        maxNumInputs,
-        DomainId.tryFromString(activeDomainId),
-        holdingFee,
-        nextDomainId = nextDomainId,
-      )
-    }
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
       value should (be >= range._1 and be <= range._2)

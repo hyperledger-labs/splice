@@ -84,7 +84,6 @@ class SvcApp(
             new GrpcSvcAppService(
               config.svUser,
               automation,
-              domainId,
               loggerFactory,
             ),
             ec,

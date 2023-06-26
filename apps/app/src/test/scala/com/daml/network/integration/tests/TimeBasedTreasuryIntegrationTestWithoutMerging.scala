@@ -10,7 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{CNNodeUtil, ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
@@ -25,6 +25,7 @@ import scala.annotation.nowarn
 @nowarn("msg=match may not be exhaustive")
 class TimeBasedTreasuryIntegrationTestWithoutMerging
     extends CNNodeIntegrationTest
+    with ConfigScheduleUtil
     with HasExecutionContext
     with WalletTestUtil
     with TimeTestUtil {
@@ -222,7 +223,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         )
       ).asJava,
     )
-    svcClient.setConfigSchedule(configSchedule)
+    setConfigSchedule(configSchedule)
 
     val (alice, _) = onboardAliceAndBob()
 

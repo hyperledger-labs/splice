@@ -7,7 +7,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
@@ -15,6 +15,7 @@ import org.slf4j.event.Level
 
 class SvcTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
+    with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
 
@@ -54,7 +55,7 @@ class SvcTimeBasedIntegrationTest
             ),
           ),
         )
-      svcClient.setConfigSchedule(configSchedule)
+      setConfigSchedule(configSchedule)
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(

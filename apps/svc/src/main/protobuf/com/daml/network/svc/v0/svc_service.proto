@@ -7,10 +7,6 @@ import "google/protobuf/empty.proto";
 service SvcService {
   // Returns some debug info about the running app
   rpc GetDebugInfo(google.protobuf.Empty) returns (GetDebugInfoResponse);
-
-  // set config schedule in USD
-  rpc SetConfigSchedule(SetConfigScheduleRequest)
-      returns (google.protobuf.Empty);
 }
 
 // Contains information useful for debugging a running SVC app.

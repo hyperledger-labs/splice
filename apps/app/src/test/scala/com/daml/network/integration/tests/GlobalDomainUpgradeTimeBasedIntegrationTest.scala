@@ -2,12 +2,14 @@ package com.daml.network.integration.tests
 
 import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
 import ContractState.Assigned
-import com.daml.network.util.CoinConfigSchedule
+import com.daml.network.util.{CoinConfigSchedule, ConfigScheduleUtil}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.DomainAlias
 
 /** You must `start-canton` with `-g` to run this test locally. */
-class GlobalDomainUpgradeTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
+class GlobalDomainUpgradeTimeBasedIntegrationTest
+    extends SvTimeBasedIntegrationTestBase
+    with ConfigScheduleUtil {
   private[this] val globalUpgradeDomain = DomainAlias.tryCreate("global-upgrade")
 
   "scheduled global domain upgrade happens" in { implicit env =>
@@ -49,7 +51,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest extends SvTimeBasedIntegration
         )
 
         eventually() { // see https://github.com/DACH-NY/canton-network-node/pull/5518#discussion_r1233108607
-          svcClient.setConfigSchedule(upgradeAfterTick)
+          setConfigSchedule(upgradeAfterTick)
         } withClue "set config schedule with upgraded domain"
       }
     }

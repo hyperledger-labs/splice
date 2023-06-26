@@ -1,15 +1,11 @@
 package com.daml.network.console
 
 import akka.actor.ActorSystem
-import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
-import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-
-import java.time.Instant
 
 abstract class SvcAppReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
@@ -32,12 +28,6 @@ class SvcAppClientReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SVC Client"
-
-  @Help.Summary("Set config schedule for the CoinRules.")
-  def setConfigSchedule(configSchedule: Schedule[Instant, CoinConfig[USD]]): Unit =
-    consoleEnvironment.run {
-      adminCommand(GrpcSvcAppClient.SetConfigSchedule(configSchedule))
-    }
 }
 
 /** Single SVC app backend reference. Defines the console commands that can be run against a backend SVC

@@ -7,7 +7,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{CNNodeUtil, ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.console.WalletAppClientReference
@@ -18,6 +18,7 @@ import com.digitalasset.canton.topology.PartyId
 
 class ScanTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
+    with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
 
@@ -95,7 +96,9 @@ class ScanTimeBasedIntegrationTest
             ),
           ),
         )
-      svcClient.setConfigSchedule(configSchedule)
+
+      setConfigSchedule(configSchedule)
+
       advanceRoundsByOneTick
     }
     clue("Round 4 should now be open, and have the new configuration") {

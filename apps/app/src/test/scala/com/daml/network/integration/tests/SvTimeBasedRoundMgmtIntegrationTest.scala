@@ -1,16 +1,22 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
+
+import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.cc
 import com.daml.network.sv.util.SvUtil
+import com.daml.network.util.ConfigScheduleUtil
+
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.time.EnrichedDurations.*
-import com.daml.network.codegen.java.da.types.Tuple2
+
 import java.time.{Duration as JavaDuration}
 import scala.jdk.CollectionConverters.*
 
-class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTestBase {
+class SvTimeBasedRoundMgmtIntegrationTest
+    extends SvTimeBasedIntegrationTestBase
+    with ConfigScheduleUtil {
 
   "round management" in { implicit env =>
     initSvc()
@@ -82,7 +88,7 @@ class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTestBase
     val currentConfigSchedule = sv1Scan.getCoinRules().contract.payload.configSchedule
 
     val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
-    svcClient.setConfigSchedule(
+    setConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
         (
@@ -184,7 +190,7 @@ class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTestBase
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
     val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
     sv1Scan.getCoinConfigAsOf(now).globalDomain.activeDomain
-    svcClient.setConfigSchedule(
+    setConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
         (
@@ -359,7 +365,7 @@ class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTestBase
     val config101 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 101)
     val config102 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 102)
 
-    svcClient.setConfigSchedule(
+    setConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
         (JavaDuration.ofSeconds(150), config101),
@@ -400,7 +406,7 @@ class SvTimeBasedRoundMgmtIntegrationTest extends SvTimeBasedIntegrationTestBase
       }
 
       // set configSchedule
-      svcClient.setConfigSchedule(configSchedule)
+      setConfigSchedule(configSchedule)
     }
 
     // Each advanceRoundsByOneTick will advance the time by exactly 160 second.

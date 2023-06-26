@@ -1,13 +1,9 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.{TimeLock, TransferOutput}
 import com.daml.network.codegen.java.cc.coin.SvcReward
-import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.console.*
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
@@ -20,7 +16,7 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
-import java.time.{Duration, Instant}
+import java.time.Duration
 import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -49,12 +45,12 @@ trait TimeTestUtil extends CNNodeTestCommon {
         // While we do recover from such an issue, we recover from it once the participant
         // times out with LOCAL_VERDICT_TIMEOUT. That timeout is measured in wall clock
         // so we will wait the full participantResponseTimeout (30s by default) which
-        // then results in `eventually`’s in tests never completing.
+        // then results in `eventually`'s in tests never completing.
         //
         // The waiting implement below should ensure that existing background automation (e.g. coin merging)
         // can complete in-flight commands before we change the time. The assumption here
         // is that our period automation also takes sim time into account so if
-        // the time does not change, it won’t continue sending commands.
+        // the time does not change, it won't continue sending commands.
         //
         // The main source of activity are the follow-up action after advancing a round.
         // We thus first wait for a successful Svc reward collection; and bet that the
@@ -360,31 +356,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
       validatorPartyId
     )
     .sortBy(_.data.round.number)
-
-  /** Create a new config schedule reusing the active domain value from the existing one.
-    * Intended for testing only. Please generalize if you need more functionality
-    */
-  def createConfigSchedule(
-      currentSchedule: Schedule[Instant, CoinConfig[USD]],
-      newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
-  )(implicit env: CNNodeTestConsoleEnvironment): Schedule[Instant, CoinConfig[USD]] = {
-    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
-    val configSchedule = {
-      new cc.schedule.Schedule(
-        mkUpdatedCoinConfig(currentSchedule, defaultTickDuration),
-        newSchedules
-          .map { case (durationUntilScheduled, config) =>
-            new Tuple2(
-              now.add(durationUntilScheduled).toInstant,
-              config,
-            )
-          }
-          .toList
-          .asJava,
-      )
-    }
-    configSchedule
-  }
 
   def cancelAllSubscriptions(
       walletClient: WalletAppClientReference,
