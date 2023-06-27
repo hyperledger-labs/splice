@@ -505,6 +505,13 @@ query can be useful to cull out noise from an overly verbose log stream.
 -resource.labels.container_name="docs"
 ```
 
+You can also use patterns to exclude similarly named nodes and containers, for instance:
+
+```
+-resource.labels.node_name=~"gke-cn-devnet-default-pool-.*"
+-resource.labels.container_name=~"cometbft.*"
+```
+
 ##### Manual configuration actions taken by DA employees
 
 This will show all configuration changes applied by a user with
