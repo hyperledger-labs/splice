@@ -1,0 +1,583 @@
+{
+  "offset": "00000000000000003e",
+  "contracts": [
+    {
+      "template_id": "deadbeef001:CN.SvcRules:SvcRules",
+      "contract_id": "005551edf78121a229641296c3a5684a3e7b4227fb8d0b37665837ff0ff0229862ca011220b3eeb2c71e2d99d0fb307836430a6cd388ecd5a45acb92084052e95e8eb1a650",
+      "payload": {
+        "epoch": "0",
+        "leader": "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+        "isDevNet": true,
+        "lock": false,
+        "config": {
+          "domainNodeConfigLimits": {
+            "cometBft": {
+              "maxNumSequencingKeys": "2",
+              "maxNodeIdLength": "50",
+              "maxNumCometBftNodes": "2",
+              "maxPubKeyLength": "256",
+              "maxNumGovernanceKeys": "2"
+            }
+          },
+          "svOnboardingRequestTimeout": {
+            "microseconds": "86400000000"
+          },
+          "numUnclaimedRewardsThreshold": "10",
+          "actionConfirmationTimeout": {
+            "microseconds": "300000000"
+          },
+          "leaderInactiveTimeout": {
+            "microseconds": "70000000"
+          },
+          "voteRequestTimeout": {
+            "microseconds": "604800000000"
+          },
+          "initialTrafficGrant": "100000",
+          "svOnboardingConfirmedTimeout": {
+            "microseconds": "86400000000"
+          },
+          "globalDomain": {
+            "domains": [
+              [
+                "0",
+                {
+                  "state": "DS_Operational",
+                  "cometBftGenesisJson": "TODO(#4900): share CometBFT genesis.json of founding SV node via SvcRules config."
+                }
+              ]
+            ],
+            "lastDomainNumber": "0",
+            "activeDomain": "0"
+          },
+          "maxTextLength": "1024"
+        },
+        "members": [
+          [
+            "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+            {
+              "name": "Canton-Foundation-1",
+              "joinedAsOfRound": {
+                "number": "0"
+              },
+              "domainNodes": []
+            }
+          ]
+        ],
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee"
+      },
+      "metadata": {
+        "createdAt": "1687859996256654",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a24080112204939747c510e29eb49a583bb7c9adc13a915b018857fc1f982f8823e4fc47d1c"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.Coin:CoinRules",
+      "contract_id": "0047f12e62df212fc3e21373a61c8300dac8cb008938b11ae988cf435e0a4b2497ca011220ae814a6bfcd2e31ee586fbbcbd7864c6247824221b08d835694e04115887adff",
+      "payload": {
+        "enabledChoices": {
+          "enable_ValidatorRewardCoupon_ArchiveAsValidator": true,
+          "enable_CoinRules_DevNet_Tap": true,
+          "enable_LockedCoin_OwnerExpireLock": true,
+          "enable_LockedCoin_Unlock": true,
+          "enable_LockedCoin_ExpireCoin": true,
+          "enable_CoinRules_Transfer": true,
+          "enable_CoinRules_ComputeFees": true,
+          "enable_Coin_Expire": true
+        },
+        "configSchedule": {
+          "initialValue": {
+            "transferConfig": {
+              "holdingFee": {
+                "rate": "0.0000048225"
+              },
+              "maxNumInputs": "100",
+              "lockHolderFee": {
+                "fee": "0.005"
+              },
+              "createFee": {
+                "fee": "0.03"
+              },
+              "maxNumLockHolders": "50",
+              "transferFee": {
+                "initialRate": "0.01",
+                "steps": [
+                  {
+                    "_1": "100.0",
+                    "_2": "0.001"
+                  },
+                  {
+                    "_1": "1000.0",
+                    "_2": "0.0001"
+                  },
+                  {
+                    "_1": "1000000.0",
+                    "_2": "0.00001"
+                  }
+                ]
+              },
+              "maxNumOutputs": "100"
+            },
+            "issuanceCurve": {
+              "initialValue": {
+                "validatorRewardPercentage": "0.5",
+                "coinToIssuePerYear": "40000000000.0",
+                "unfeaturedAppRewardCap": "0.6",
+                "appRewardPercentage": "0.15",
+                "featuredAppRewardCap": "100.0",
+                "validatorRewardCap": "0.2"
+              },
+              "futureValues": [
+                {
+                  "_1": {
+                    "microseconds": "15768000000000"
+                  },
+                  "_2": {
+                    "validatorRewardPercentage": "0.12",
+                    "coinToIssuePerYear": "20000000000.0",
+                    "unfeaturedAppRewardCap": "0.6",
+                    "appRewardPercentage": "0.4",
+                    "featuredAppRewardCap": "100.0",
+                    "validatorRewardCap": "0.2"
+                  }
+                },
+                {
+                  "_1": {
+                    "microseconds": "47304000000000"
+                  },
+                  "_2": {
+                    "validatorRewardPercentage": "0.18",
+                    "coinToIssuePerYear": "10000000000.0",
+                    "unfeaturedAppRewardCap": "0.6",
+                    "appRewardPercentage": "0.62",
+                    "featuredAppRewardCap": "100.0",
+                    "validatorRewardCap": "0.2"
+                  }
+                },
+                {
+                  "_1": {
+                    "microseconds": "157680000000000"
+                  },
+                  "_2": {
+                    "validatorRewardPercentage": "0.21",
+                    "coinToIssuePerYear": "5000000000.0",
+                    "unfeaturedAppRewardCap": "0.6",
+                    "appRewardPercentage": "0.69",
+                    "featuredAppRewardCap": "100.0",
+                    "validatorRewardCap": "0.2"
+                  }
+                },
+                {
+                  "_1": {
+                    "microseconds": "315360000000000"
+                  },
+                  "_2": {
+                    "validatorRewardPercentage": "0.2",
+                    "coinToIssuePerYear": "2500000000.0",
+                    "unfeaturedAppRewardCap": "0.6",
+                    "appRewardPercentage": "0.75",
+                    "featuredAppRewardCap": "100.0",
+                    "validatorRewardCap": "0.2"
+                  }
+                }
+              ]
+            },
+            "globalDomain": {
+              "requiredDomains": {
+                "map": [
+                  [
+                    "global-domain::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+                    {}
+                  ]
+                ]
+              },
+              "activeDomain": "global-domain::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+              "fees": {
+                "baseRateTrafficLimits": {
+                  "rate": "333.0",
+                  "burstWindow": {
+                    "microseconds": "600000000"
+                  }
+                },
+                "extraTrafficPrice": "1.0",
+                "readScalingFactor": "0.02",
+                "minTopupAmount": "1000"
+              }
+            },
+            "tickDuration": {
+              "microseconds": "150000000"
+            }
+          },
+          "futureValues": []
+        },
+        "lock": false,
+        "isDevNet": true,
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee"
+      },
+      "metadata": {
+        "createdAt": "1687859996256654",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a24080112205c12174a247f3e69057f53965953579a48e1ab0ec52ba62adc92bba51141cf75"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.Round:OpenMiningRound",
+      "contract_id": "00871fc71df3d18a33990bb84f2c7e65a7e86ff3ee7d1362435749a4d47752f9a8ca011220c39f6dd60641111682226a01a465bd30e70a60230387cabe8b7a020065e8c1fc",
+      "payload": {
+        "issuingFor": {
+          "microseconds": "0"
+        },
+        "issuanceConfig": {
+          "validatorRewardPercentage": "0.5",
+          "coinToIssuePerYear": "40000000000.0",
+          "unfeaturedAppRewardCap": "0.6",
+          "appRewardPercentage": "0.15",
+          "featuredAppRewardCap": "100.0",
+          "validatorRewardCap": "0.2"
+        },
+        "opensAt": "2023-06-27T09:59:56.256654Z",
+        "transferConfigUsd": {
+          "holdingFee": {
+            "rate": "0.0000048225"
+          },
+          "maxNumInputs": "100",
+          "lockHolderFee": {
+            "fee": "0.005"
+          },
+          "createFee": {
+            "fee": "0.03"
+          },
+          "maxNumLockHolders": "50",
+          "transferFee": {
+            "initialRate": "0.01",
+            "steps": [
+              {
+                "_1": "100.0",
+                "_2": "0.001"
+              },
+              {
+                "_1": "1000.0",
+                "_2": "0.0001"
+              },
+              {
+                "_1": "1000000.0",
+                "_2": "0.00001"
+              }
+            ]
+          },
+          "maxNumOutputs": "100"
+        },
+        "targetClosesAt": "2023-06-27T10:02:26.256654Z",
+        "coinPrice": "1.0",
+        "tickDuration": {
+          "microseconds": "150000000"
+        },
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "round": {
+          "number": "0"
+        }
+      },
+      "metadata": {
+        "createdAt": "1687859996256654",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a24080112202ae2a9d2e356851937d02d6c2e5ceb4039433cc2f9c810c94aeef8836210a823"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.Round:OpenMiningRound",
+      "contract_id": "0085f23921d886a8f5c1702d87a5e50a691991b1fabbecf90aa39434ece9336b93ca01122035c771870b82957c32e3004d62867592f05535f79208063b36c85b7ddaf0f5a4",
+      "payload": {
+        "issuingFor": {
+          "microseconds": "150000000"
+        },
+        "issuanceConfig": {
+          "validatorRewardPercentage": "0.5",
+          "coinToIssuePerYear": "40000000000.0",
+          "unfeaturedAppRewardCap": "0.6",
+          "appRewardPercentage": "0.15",
+          "featuredAppRewardCap": "100.0",
+          "validatorRewardCap": "0.2"
+        },
+        "opensAt": "2023-06-27T09:59:56.256654Z",
+        "transferConfigUsd": {
+          "holdingFee": {
+            "rate": "0.0000048225"
+          },
+          "maxNumInputs": "100",
+          "lockHolderFee": {
+            "fee": "0.005"
+          },
+          "createFee": {
+            "fee": "0.03"
+          },
+          "maxNumLockHolders": "50",
+          "transferFee": {
+            "initialRate": "0.01",
+            "steps": [
+              {
+                "_1": "100.0",
+                "_2": "0.001"
+              },
+              {
+                "_1": "1000.0",
+                "_2": "0.0001"
+              },
+              {
+                "_1": "1000000.0",
+                "_2": "0.00001"
+              }
+            ]
+          },
+          "maxNumOutputs": "100"
+        },
+        "targetClosesAt": "2023-06-27T10:04:56.256654Z",
+        "coinPrice": "1.0",
+        "tickDuration": {
+          "microseconds": "150000000"
+        },
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "round": {
+          "number": "1"
+        }
+      },
+      "metadata": {
+        "createdAt": "1687859996256654",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a2408011220d73078f0fda024a436f22fe0ab40396c6118a4a3d17891e91d6327c7ecc36736"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.Round:OpenMiningRound",
+      "contract_id": "00ebd87070cc288b08c19db2a861a05ff37bd99d85d79112beed3c66bc653b61d1ca011220d243f85b724fc403b452b40f60c094fde253d9a4a3c9ae90996a561241d6b240",
+      "payload": {
+        "issuingFor": {
+          "microseconds": "300000000"
+        },
+        "issuanceConfig": {
+          "validatorRewardPercentage": "0.5",
+          "coinToIssuePerYear": "40000000000.0",
+          "unfeaturedAppRewardCap": "0.6",
+          "appRewardPercentage": "0.15",
+          "featuredAppRewardCap": "100.0",
+          "validatorRewardCap": "0.2"
+        },
+        "opensAt": "2023-06-27T10:02:26.256654Z",
+        "transferConfigUsd": {
+          "holdingFee": {
+            "rate": "0.0000048225"
+          },
+          "maxNumInputs": "100",
+          "lockHolderFee": {
+            "fee": "0.005"
+          },
+          "createFee": {
+            "fee": "0.03"
+          },
+          "maxNumLockHolders": "50",
+          "transferFee": {
+            "initialRate": "0.01",
+            "steps": [
+              {
+                "_1": "100.0",
+                "_2": "0.001"
+              },
+              {
+                "_1": "1000.0",
+                "_2": "0.0001"
+              },
+              {
+                "_1": "1000000.0",
+                "_2": "0.00001"
+              }
+            ]
+          },
+          "maxNumOutputs": "100"
+        },
+        "targetClosesAt": "2023-06-27T10:07:26.256654Z",
+        "coinPrice": "1.0",
+        "tickDuration": {
+          "microseconds": "150000000"
+        },
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "round": {
+          "number": "2"
+        }
+      },
+      "metadata": {
+        "createdAt": "1687859996256654",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a24080112202e0d588e7b4e8c5d1a167ae26d10d6ec13b5f3dcd1a5b83babe4a0db8edf3dab"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef001:CN.SVC.CoinPrice:CoinPriceVote",
+      "contract_id": "00393f43bdd2b3bc7c7ff1f60966802e3619229933ee4c1c1474269f46501268bdca01122058255d411c6c0076e800aac232f71149775326f4c4c2acbac4f6d39bbfb50d3d",
+      "payload": {
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "sv": "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+        "coinPrice": "1.0",
+        "lastUpdatedAt": "2023-06-27T09:59:56.256654Z"
+      },
+      "metadata": {
+        "createdAt": "1687859996256654",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a240801122067dbb5a1f61e1429984e2cb6c3cf3b248a7dc0631ec309ec8da74ebad28d4e85"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.GlobalDomain:ValidatorTraffic",
+      "contract_id": "00ae0f62168105ca870334c50369403bed48a68212bcad8f4e5e8d02af7a8dfd64ca011220fa14c64709048bc35b4e4feaac7b857c7ce46624a35676dd89ef304f557c27f0",
+      "payload": {
+        "usdSpent": "0.0",
+        "ccSpent": "0.0",
+        "lastPurchasedAt": "0001-01-01T00:00:00Z",
+        "numPurchases": "0",
+        "validator": "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+        "domainId": "global-domain::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "totalPurchased": "100000"
+      },
+      "metadata": {
+        "createdAt": "1687859996256654",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a2408011220983f88cb18cc19c69fa273bc2de6ba5809a43f7687c436d9f629adec6b94eb24"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.ValidatorLicense:ValidatorLicense",
+      "contract_id": "00fe60fd9fe08f98e2076f0ea3693caba2e679a71da836014acdcfce76068336f8ca011220be374e34af832f83cc98f864076a82f06c77f01516cb38737a1d2322a7b6dfe3",
+      "payload": {
+        "validator": "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+        "sponsor": "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee"
+      },
+      "metadata": {
+        "createdAt": "1687859996987468",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a2408011220e3e1865c461f5747af23473cf93d50e786ed6b4169fbb3db6f2f137a5446ecf7"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.ValidatorLicense:ValidatorLicense",
+      "contract_id": "00abe85f7e1b7696667dd87e0b8352c27a48e4e54865a4bfb0d2ad9dabc75a3540ca0112209fc8e68f98a3be9e0e68b86525dd0e8227655927185b938c6403fb8eda2d7b66",
+      "payload": {
+        "validator": "alice__validator__user-6a14603b::122066ab2890a32ae4ac4d6292a64fab32a7a97698c7149ff22e0614f227aea28b53",
+        "sponsor": "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee"
+      },
+      "metadata": {
+        "createdAt": "1687860002212338",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a2408011220431293f89ead2ac28ba8b219a17a58e45f27f41b8f05ce92483e7c507151bb63"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.ValidatorLicense:ValidatorLicense",
+      "contract_id": "00e0582aec52d3a8ff3c5a776b247b4ccd73f1a12274e306b37c1557bfbb9eaa1cca011220a2abb5022a3a9b64b5c8c8b268e897523513c564412ca2d1932eaf8de3d81b9d",
+      "payload": {
+        "validator": "bob__validator__user-6a14603b::1220f7a752fafaeebe6da043e53ea0fb9f50b4130ef4556404b441dd97df356cc2a5",
+        "sponsor": "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee"
+      },
+      "metadata": {
+        "createdAt": "1687860002956888",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a2408011220e9854caac8f1c60a66c0d1fff1185ac44e7bbfd0288fe2fd00b3688eb0513a71"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.ValidatorLicense:ValidatorLicense",
+      "contract_id": "008a38a7d5517565153afa7c3b5b1b9aeeb8bcac69a91d7b5300e9d35c17e89e98ca0112204a47d7a0e3afdc259c9ebcbf57a337d2df5bf16de962a3adef32a4408486e823",
+      "payload": {
+        "validator": "splitwell__validator__user-6a14603b::1220beffb6c30f147a69fbdec26c0c378d86076800b9dd898c4a6f738f602dda28aa",
+        "sponsor": "canton-foundation-1-6a14603b::1220ffd12c950b5a2234f6e2f3af4b3182ace4a6fd59d58cbc1bb312f8141343d850",
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee"
+      },
+      "metadata": {
+        "createdAt": "1687860006546434",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a2408011220764ef1ee5e010fa7bb1cc427206159bb45556e815e33e712e7b206f82b656cf9"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.Coin:Coin",
+      "contract_id": "00458c1018cb112280ddfe3341dd5d31b4851ff65ee38e34abbcae99a6a5e07d26ca011220ae5c6b3168bccd349c66c8670000ed2c87f5ab77c3aed39e7e394261e4398611",
+      "payload": {
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "owner": "alice__wallet__user-6a14603b::122066ab2890a32ae4ac4d6292a64fab32a7a97698c7149ff22e0614f227aea28b53",
+        "amount": {
+          "initialAmount": "10.0",
+          "createdAt": {
+            "number": "1"
+          },
+          "ratePerRound": {
+            "rate": "0.0000048225"
+          }
+        }
+      },
+      "metadata": {
+        "createdAt": "1687860011322141",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a2408011220e33e7c0a8860f4d704cd7c956293fc503c1b33e13e4658c5c295f229e7402797"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.Coin:Coin",
+      "contract_id": "005278c47c80d5a7d08b56bd91f0ad80d59ae051882ad5b718bab7bed052f95d7aca011220422f93358df0de7e4f5f1259c9930652a64bca69ca30715aedeed21e60320d41",
+      "payload": {
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "owner": "bob__wallet__user-6a14603b::1220f7a752fafaeebe6da043e53ea0fb9f50b4130ef4556404b441dd97df356cc2a5",
+        "amount": {
+          "initialAmount": "20.0",
+          "createdAt": {
+            "number": "1"
+          },
+          "ratePerRound": {
+            "rate": "0.0000048225"
+          }
+        }
+      },
+      "metadata": {
+        "createdAt": "1687860013498117",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a24080112205a78ee70794587075a6821029e9174668a672b605749c797765725ddf98e1543"
+      },
+      "create_arguments_blob": ""
+    },
+    {
+      "template_id": "deadbeef002:CC.Coin:Coin",
+      "contract_id": "00a6f2abb38120569eb1e677db5991b481c37dadd5f21fcada8c7ef811314d2595ca011220563b695a7522f0c5bfff76475e5939856c21641a458c5fb78a61185bdb070f2e",
+      "payload": {
+        "svc": "svc-6a14603b-6a14603b::1220608bda4f92df4e6a9f9468abff80884662bb1384711b44d7f558f716a8fed0ee",
+        "owner": "charlie__wallet__user-6a14603b::122066ab2890a32ae4ac4d6292a64fab32a7a97698c7149ff22e0614f227aea28b53",
+        "amount": {
+          "initialAmount": "30.0",
+          "createdAt": {
+            "number": "1"
+          },
+          "ratePerRound": {
+            "rate": "0.0000048225"
+          }
+        }
+      },
+      "metadata": {
+        "createdAt": "1687860015798382",
+        "contractKeyHash": "",
+        "driverMetadata": "0a260a24080112201df1cc8aec89314924f760c252403485b29c1932f41e2c062367a1442b49859e"
+      },
+      "create_arguments_blob": ""
+    }
+  ]
+}

@@ -1,8 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc
-import better.files.File
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.codegen.java.cc
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -10,7 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.store.AcsStoreDump
+import com.daml.network.http.v0.definitions as http
 import com.daml.network.util.{
   Contract,
   ResourceTemplateDecoder,
@@ -18,8 +17,6 @@ import com.daml.network.util.{
   WalletTestUtil,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-
-import scala.util.Using
 
 class AcsStoreDumpExportIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
@@ -51,7 +48,7 @@ class AcsStoreDumpExportIntegrationTest extends CNNodeIntegrationTest with Walle
   }
 
   "sv1" should {
-    "produce an ACS dump via JSON" in { implicit env =>
+    "produce an ACS store dump via a download from the SvApp admin api" in { implicit env =>
       val testContractIds = createTestContracts()
 
       eventually() {
@@ -69,23 +66,32 @@ class AcsStoreDumpExportIntegrationTest extends CNNodeIntegrationTest with Walle
       }
     }
 
-    "produce an ACS dump via protobuf" in { implicit env =>
+    "produce an ACS store dump via triggering the writing to a file" in { implicit env =>
       val testContractIds = createTestContracts()
 
       eventually() {
+        import better.files.File
+
         // Note: use eventually to ensure if the propagation to the SvSvcStore has not completed
         val response = sv1.triggerAcsDump()
 
         val dumpConfig = sv1.config.acsStoreDump.getOrElse(sys.error("no dump config specified"))
         val dumpDir = File(dumpConfig.directory)
         val dumpFile = dumpDir / response.filename
-        val readEvents = Using(dumpFile.newInputStream)(AcsStoreDump.readFile).get
-        readEvents should have size (response.numEvents.toLong)
+
+        val jsonDump = io.circe.parser
+          .decode[http.GetAcsStoreDumpResponse](dumpFile.contentAsString)
+          .fold(
+            err => throw new IllegalArgumentException(s"Failed to parse $dumpFile: $err"),
+            result => result,
+          )
+        val contracts = jsonDump.contracts
+        contracts should have size (response.numEvents.toLong)
         // TODO(#6073): polish: disable all triggers and also test that the offset matches
 
         // check that the coins we tapped are present in the dump
-        val coinContracts = readEvents.collect(
-          Function.unlift(ev => Contract.fromCreatedEvent(cc.coin.Coin.COMPANION)(ev))
+        val coinContracts = contracts.collect(
+          Function.unlift(ev => Contract.fromJson(cc.coin.Coin.COMPANION)(ev).toOption)
         )
         inside(coinContracts)(_ =>
           testContractIds shouldBe coinContracts.map(co => co.contractId).toSet

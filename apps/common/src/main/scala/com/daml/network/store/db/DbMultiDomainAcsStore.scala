@@ -34,8 +34,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
-import java.io.OutputStream
-
 class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     storage: DbStorage,
     tableName: String,
@@ -502,10 +500,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
       ec: ExecutionContext
   ): Future[A] = ???
-
-  override def writeAcsSnapshot(output: OutputStream): SnapshotSummary =
-    // TODO(#6073): implement snapshot writing for the DB store
-    ???
 
   override def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
     // TODO(#6073): implement snapshot reading for the DB store

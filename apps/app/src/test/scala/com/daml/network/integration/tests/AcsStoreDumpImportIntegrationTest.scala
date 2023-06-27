@@ -18,8 +18,10 @@ class AcsStoreDumpImportIntegrationTest extends CNNodeIntegrationTest with Walle
   // We use fixed dumps to test data continuity.
   // We expect to add new dumps and a corresponding test from test-net releases that fail staging
   // and required adaption of the dump import code.
+
+  // TODO(#6073): move to test/resources and remove the `./dumps` directory and its .gitignore once we dump to a Google Cloud Storage bucket
   private val bootstrappingDumpFilename =
-    "dumps/static_test_data/svc-d7d33cdf-d7d33cdf::1220799e9f10_off-0000000000000000be_size-13_time-1687510891786969.acs-dump-v1"
+    "dumps/static_test_data/test-dump_changed-package-ids.json"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

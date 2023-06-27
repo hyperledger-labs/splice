@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
+import com.daml.network.http.v0.definitions as http
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.daml.network.sv.LocalDomainNode
@@ -48,7 +49,6 @@ import io.opentelemetry.api.trace.Tracer
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
-import scala.util.Using
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
@@ -331,26 +331,25 @@ class FoundingNodeInitializer(
       case None => Future.unit
       case Some(dumpFilename) =>
         for {
-          events <- Future {
+          cmds <- Future {
             blocking {
-              import better.files.File
-
-              val file = File(dumpFilename)
-
-              logger.info(s"Parsing events in ACS snapshot: ${file.path.toAbsolutePath}")
-              // parse events
-              @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
-              val events = Using(file.newInputStream)(AcsStoreDump.readFile).get
-              logger.info(
-                s"Parsed ${events.size} events; attempting to import them"
+              val file = better.files.File(dumpFilename)
+              logger.info(s"Parsing contracts in ACS store dump: ${file.path.toAbsolutePath}")
+              val jsonString = file.contentAsString
+              val jsonDump = io.circe.parser
+                .decode[http.GetAcsStoreDumpResponse](jsonString)
+                .fold(
+                  err => throw new IllegalArgumentException(s"Failed to parse $file: $err"),
+                  result => result,
+                )
+              AcsStoreDump.extractImportCommandsFromJsonDump(svcParty, productionMode = false)(
+                jsonDump.contracts.toSeq
               )
-              events
             }
           }
-          // TODO(#6073): make production mode configurable
-          cmds =
-            events.flatMap(AcsStoreDump.extractImportCommands(svcParty, productionMode = false))
-          _ = logger.debug(show"Extracted ${cmds.size} import commands; attempting to submit them")
+          _ = logger.debug(
+            show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
+          )
           _ <-
             // TODO(#6073): consider command dedup (or another protection from failed/partial imports), and limiting the batch size
             svcStoreWithIngestion.connection
@@ -361,7 +360,9 @@ class FoundingNodeInitializer(
                 domainId = domainId,
               )
 
-        } yield logger.info(s"Completed importing ACS snapshot using ${cmds.size} commands.")
+        } yield logger.info(
+          s"Completed importing ACS store dump by submitting ${cmds.size} commands in one transaction."
+        )
     }
 
     // Create SvcRules and CoinRules and open the first mining round

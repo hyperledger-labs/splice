@@ -44,7 +44,6 @@ import com.google.protobuf.ByteString
 import io.circe.Json
 import io.grpc.Status
 
-import java.io.OutputStream
 import java.time.Instant
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -221,12 +220,6 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
   ): Future[Unit]
 
   def ingestionSink: MultiDomainAcsStore.IngestionSink
-
-  /** Write the CreatedEvents of a consistent snapshot of the ACS to an output stream.
-    *
-    * Implementations MAY block.
-    */
-  def writeAcsSnapshot(output: OutputStream): SnapshotSummary
 
   /** Get a snapshot of all contracts in the ACS encoded as JSON. */
   def getJsonAcsSnapshot(): Future[JsonAcsSnapshot]

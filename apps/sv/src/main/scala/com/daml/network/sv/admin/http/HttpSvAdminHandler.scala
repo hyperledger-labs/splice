@@ -8,6 +8,7 @@ import com.daml.network.environment.{
   MediatorAdminConnection,
   SequencerAdminConnection,
 }
+import com.daml.network.http.v0.definitions as http
 import com.daml.network.http.v0.definitions.{
   BatchListVotesByVoteRequestsRequest,
   CastVoteRequest,
@@ -382,48 +383,49 @@ class HttpSvAdminHandler(
       case None =>
         Future.failed(
           Status.FAILED_PRECONDITION
-            .withDescription("No ACS dump directory configured")
+            .withDescription("No ACS store dump directory configured")
             .asRuntimeException()
         )
       case Some(acsDumpConfig: SvAcsStoreDumpConfig) =>
-        Future {
+        logger.debug(s"Attempting to write ACS store dump as JSON to ${acsDumpConfig.directory}")
+        for {
           // TODO(#6073): this doesn't work for larger ACS as the client will timeout -- we can change its semantics to start a dump process and return a handle to the operation that can be checked for completion
-          blocking {
-            import better.files.File
+          snapshot <- svcStore.multiDomainAcsStore.getJsonAcsSnapshot()
+          response <- Future {
+            blocking {
+              import better.files.File
+              import io.circe.syntax.*
 
-            // create output directories
-            val dumpDir = File(acsDumpConfig.directory)
-            dumpDir.createDirectories()
-            // determine target file
-            val now = clock.now.toInstant
-            val svcFingerprint = show"${svcStore.key.svcParty}".filter('.'.!=)
-            val filename = s"temp-${svcFingerprint}-${now}.acs-dump-v1"
-            val file = dumpDir / filename
-            // and dump
-            logger.debug(s"Attempting to write ACS snapshot to: ${file.path.toAbsolutePath}")
-            // TODO(#6073): compress output file
-            val output = file.newOutputStream
-            val summary =
-              try {
-                svcStore.multiDomainAcsStore.writeAcsSnapshot(output)
-              } finally {
-                output.close()
-              }
-            // move file to incorporate summary into filename
-            val finalFilename =
-              s"${svcFingerprint}_off-${summary.offset}_size-${summary.numEvents}_${now}.acs-dump-v1"
-            val finalFile = dumpDir / finalFilename
-            file.moveTo(finalFile)
-            logger.info(s"Wrote ACS snapshot with $summary to: ${finalFile.path.toAbsolutePath}")
-            SvAdminResource.TriggerAcsDumpResponseOK(
-              TriggerAcsDumpResponse(
-                filename = finalFilename,
-                numEvents = summary.numEvents,
-                offset = summary.offset,
+              // create output directories
+              val dumpDir = File(acsDumpConfig.directory)
+              dumpDir.createDirectories()
+              // determine target file
+              val now = clock.now.toInstant
+              val svcFingerprint = show"${svcStore.key.svcParty}".filter('.'.!=)
+              val filename =
+                s"${svcFingerprint}_off-${snapshot.offset}_size-${snapshot.contracts.size}_${now}.json"
+              val file = dumpDir / filename
+
+              // TODO(#6073): compress output file
+              val httpSnapshot = http.GetAcsStoreDumpResponse(
+                offset = snapshot.offset,
+                contracts = snapshot.contracts.map(_.toJson).toVector,
               )
-            )
+              val fileDesc =
+                s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $file"
+              logger.debug(s"Attempting to write $fileDesc")
+              file.write(httpSnapshot.asJson.noSpaces)
+              logger.info(s"Wrote $fileDesc")
+              SvAdminResource.TriggerAcsDumpResponseOK(
+                TriggerAcsDumpResponse(
+                  filename = filename,
+                  numEvents = snapshot.contracts.size,
+                  offset = snapshot.offset,
+                )
+              )
+            }
           }
-        }
+        } yield response
     }
   }
 

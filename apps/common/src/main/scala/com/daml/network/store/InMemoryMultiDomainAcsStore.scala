@@ -2,19 +2,11 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
-import com.daml.network.environment.ledger.api.{
-  ActiveContract,
-  InFlightTransferOutEvent,
-  TransactionTreeUpdate,
-  Transfer,
-  TransferEvent,
-  TransferUpdate,
-  TreeUpdate,
-}
+import com.daml.network.environment.ledger.api.*
 import com.daml.network.util.{Contract, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
@@ -24,7 +16,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
-import java.io.OutputStream
 import java.time.Instant
 import scala.collection.immutable.{Queue, SortedMap}
 import scala.concurrent.*
@@ -532,19 +523,6 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     Future.successful(stateVar.pendingTransfersById)
 
   override def close(): Unit = ()
-
-  override def writeAcsSnapshot(output: OutputStream): SnapshotSummary = {
-    val state = stateVar
-    state.offset match {
-      case None =>
-        throw Status.NOT_FOUND
-          .withDescription("ACS has not yet been fully ingested.")
-          .asRuntimeException()
-      case Some(offset) =>
-        AcsStoreDump.writeEvents(state.createEvents.values.toSeq, output)
-        SnapshotSummary(offset, state.createEvents.size)
-    }
-  }
 
   override def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] = Future {
     val state = stateVar
