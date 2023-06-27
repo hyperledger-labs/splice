@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests.runbook
 
-import java.nio.file.Files
 import better.files.{File, *}
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -14,6 +13,8 @@ import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
+
+import java.nio.file.Files
 
 /** Runs through runbook but does so while spinning up a local SVC. */
 class LocalRunbookIntegrationTest
@@ -119,7 +120,8 @@ class LocalRunbookIntegrationTest
         // This test starts the participant on ports 7xxx instead, so we need to adjust all remote participant
         // configs of apps started on the self-hosted validator node.
         (_, conf) => CNNodeConfigTransforms.bumpSelfHostedParticipantPortsBy(2000)(conf),
-        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(4000)(conf),
+        // The domain ports of the SV are already correct as per its config.
+        (_, conf) => CNNodeConfigTransforms.bumpValidatorAppCantonDomainPortsBy(4000)(conf),
         (_, conf) => expectValidatorOnboarding(conf, "validatorsecret"),
         (_, conf) => localValidatorSvSponsorUrl(conf),
         (_, conf) => localValidatorFoundingSvUrl(conf),
@@ -142,7 +144,7 @@ class LocalRunbookIntegrationTest
     val conf_ = conf
       .focus(_.svApps)
       .modify(_.map { case (svName, svConfig) =>
-        if (svName.unwrap == "sv1") {
+        if (svName.unwrap == "sv1Local") {
           (
             svName,
             svConfig

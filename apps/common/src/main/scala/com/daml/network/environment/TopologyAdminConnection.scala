@@ -48,6 +48,7 @@ import com.digitalasset.canton.topology.transaction.{
   VettedPackagesX,
 }
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
+  IdentifierDelegationX,
   NamespaceDelegationX,
   OwnerToKeyMappingX,
 }
@@ -218,6 +219,29 @@ class TopologyAdminConnection(
           ) && (tx.transaction.mapping.maybeUid.contains(
             id
           ) || tx.transaction.mapping.namespace == id.namespace)
+        )
+    }
+
+  def getIdentityBootstrapTransactions(id: UniqueIdentifier)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[GenericSignedTopologyTransactionX]] =
+    runCmd(
+      TopologyAdminCommandsX.Read.ListAll(
+        BaseQueryX(
+          filterStore = "Authorized",
+          proposals = false,
+          timeQuery = TimeQueryX.HeadState,
+          ops = None,
+          filterSigningKey = id.namespace.fingerprint.toProtoPrimitive,
+          protocolVersion = None,
+        )
+      )
+    ).map { transactions =>
+      transactions.result
+        .map(_.transaction)
+        .filter(tx =>
+          Set(NamespaceDelegationX, OwnerToKeyMappingX, IdentifierDelegationX)
+            .contains(tx.transaction.mapping.code)
         )
     }
 

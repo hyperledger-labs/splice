@@ -69,7 +69,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
   "run through runbook with self-hosted splitwell" in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
-    val bootstrapFile: File = Files.createTempFile("validator-and-splitwell-bootstrap", "scala")
+    val bootstrapFile: File = Files.createTempFile("validator-and-splitwell-bootstrap", ".sc")
 
     val validatorBootstrapContent: String =
       (validatorPath / "validator-participant.sc").contentAsString

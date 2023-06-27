@@ -7,9 +7,10 @@ import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpComman
 import com.daml.network.http.v0.validatorAdmin as http
 import com.daml.network.http.v0.definitions.OnboardUserRequest
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpValidatorAdminAppClient {
@@ -65,6 +66,43 @@ object HttpValidatorAdminAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.OffboardUserResponse.OK => Right(())
+    }
+  }
+
+  // TODO(#6177) Extend by "user->party" mappings and consider renaming to `ParticipantIdentitiesDump`
+  final case class ParticipantIdentity(
+      id: ParticipantId,
+      keys: Seq[ParticipantKey],
+      bootstrapTxes: Seq[Array[Byte]],
+  )
+  final case class ParticipantKey(
+      keyPair: Array[Byte],
+      name: Option[String],
+  )
+
+  case class ExportParticipantIdentity()
+      extends BaseCommand[
+        http.ExportParticipantIdentityResponse,
+        ParticipantIdentity,
+      ] {
+
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ExportParticipantIdentityResponse] =
+      client.exportParticipantIdentity(headers = headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ExportParticipantIdentityResponse.OK(response) =>
+        for {
+          id <- ParticipantId.fromProtoPrimitive(response.id, "participant").left.map(_.message)
+        } yield ParticipantIdentity(
+          id = id,
+          keys = response.keys.toSeq.map(k =>
+            ParticipantKey(Base64.getDecoder.decode(k.keyPair), k.name)
+          ),
+          bootstrapTxes = response.bootstrapTxes.toSeq.map(t => Base64.getDecoder.decode(t)),
+        )
     }
   }
 }

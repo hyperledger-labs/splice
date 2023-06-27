@@ -82,6 +82,18 @@ abstract class ValidatorAppReference(
       )
     }
   }
+
+  @Help.Summary("Export participant identity")
+  @Help.Description(
+    "Exports participant ID, secret keys, and necessary topology transactions for cloning to a new participant"
+  )
+  def exportParticipantIdentity(): HttpValidatorAdminAppClient.ParticipantIdentity = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.ExportParticipantIdentity()
+      )
+    }
+  }
 }
 
 final class ValidatorAppBackendReference(

@@ -72,7 +72,7 @@ case class CNNodeEnvironmentDefinition(
       import env.*
       this.preSetup(env)
       svs.local.foreach(sv => {
-        if (!sv.name.endsWith("Onboarded")) {
+        if (!sv.name.endsWith("Onboarded") && !sv.name.endsWith("Local")) {
           CNNodeEnvironmentDefinition.withAllocatedAdminUser(
             sv.config.ledgerApiUser,
             sv.participantClientWithAdminToken,

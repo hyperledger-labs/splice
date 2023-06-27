@@ -5,7 +5,10 @@ import cats.syntax.traverse.*
 import com.daml.lf.archive.DarParser
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.{DomainAlias, DiscardOps}
-import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands
+import com.digitalasset.canton.admin.api.client.commands.{
+  ParticipantAdminCommands,
+  VaultAdminCommands,
+}
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -19,6 +22,7 @@ import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 import io.grpc.Status
 
@@ -308,4 +312,16 @@ class ParticipantAdminConnection(
         logger,
       )
     } yield ()
+
+  def listMyKeys()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata]] = {
+    runCmd(VaultAdminCommands.ListMyKeys("", ""))
+  }
+
+  def exportKeyPair(fingerprint: Fingerprint)(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = {
+    runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest))
+  }
 }

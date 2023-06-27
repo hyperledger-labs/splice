@@ -314,20 +314,29 @@ object CNNodeConfigTransforms {
         .focus(_.remoteParticipants)
         .modify(_.map { case (pName, pConfig) => (pName, update(pName.unwrap, pConfig)) })
 
-  def bumpCantonDomainPortsBy(bump: Int): CNNodeConfigTransform = {
+  def bumpCantonDomainPortsBy(bump: Int): CNNodeConfigTransform =
+    bumpSvAppCantonDomainPortsBy(bump) compose bumpValidatorAppCantonDomainPortsBy(bump)
+
+  def bumpSvAppCantonDomainPortsBy(bump: Int): CNNodeConfigTransform = {
     def bumpUrl(s: String): String = {
       val uri = Uri(s)
       uri.withPort(uri.effectivePort + bump).toString
     }
-
     updateAllSvAppConfigs_(
       _.focus(_.domains.global.url)
         .modify(bumpUrl(_))
-    ) compose
-      updateAllValidatorConfigs_(
-        _.focus(_.domains.global.url)
-          .modify(bumpUrl(_))
-      )
+    )
+  }
+
+  def bumpValidatorAppCantonDomainPortsBy(bump: Int): CNNodeConfigTransform = {
+    def bumpUrl(s: String): String = {
+      val uri = Uri(s)
+      uri.withPort(uri.effectivePort + bump).toString
+    }
+    updateAllValidatorConfigs_(
+      _.focus(_.domains.global.url)
+        .modify(bumpUrl(_))
+    )
   }
 
   def bumpCantonPortsBy(bump: Int): CNNodeConfigTransform = {
@@ -454,7 +463,7 @@ object CNNodeConfigTransforms {
     transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
-  private def selfSignedTokenAuthSourceTransform(clockConfig: ClockConfig, secret: String)(
+  def selfSignedTokenAuthSourceTransform(clockConfig: ClockConfig, secret: String)(
       user: String,
       c: CNLedgerApiClientConfig,
   ): CNLedgerApiClientConfig = {
