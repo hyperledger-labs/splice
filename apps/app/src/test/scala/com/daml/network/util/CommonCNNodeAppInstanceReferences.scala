@@ -4,6 +4,7 @@ import com.daml.network.console.{
   DirectoryAppBackendReference,
   DirectoryAppClientReference,
   ScanAppBackendReference,
+  ScanAppClientReference,
   SplitwellAppBackendReference,
   SplitwellAppClientReference,
   SvAppBackendReference,
@@ -11,11 +12,11 @@ import com.daml.network.console.{
   SvcAppBackendReference,
   SvcAppClientReference,
   ValidatorAppBackendReference,
+  ValidatorAppClientReference,
   WalletAppClientReference,
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.console.ValidatorAppClientReference
 
 // TODO(#736): these should eventually be defined analogue to Canton's `participant1` references etc
 // however, this is likely only possible once we depend on Canton as a library
@@ -237,4 +238,11 @@ trait CommonCNNodeAppInstanceReferences {
     env.scans.local
       .find(_.name == name)
       .getOrElse(sys.error(s"scan app [$name] not configured"))
+
+  def scancl(
+      name: String
+  )(implicit env: CNNodeTestConsoleEnvironment): ScanAppClientReference =
+    env.scans.remote
+      .find(_.name == name)
+      .getOrElse(sys.error(s"scan app client [$name] not configured"))
 }

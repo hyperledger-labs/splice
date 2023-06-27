@@ -243,7 +243,7 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
     simpleTopology(testName).withSimTime
 
   def preflightTopology(testName: String): CNNodeEnvironmentDefinition = {
-    fromResource("preflight-topology.conf", testName)
+    fromResource("preflight-topology.conf", testName).clearConfigTransforms()
   }
 
   def fromResource(path: String, testName: String): CNNodeEnvironmentDefinition =
