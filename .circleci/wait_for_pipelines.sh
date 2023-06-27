@@ -60,6 +60,7 @@ wait_for_pipeline_to_complete() {
 fetch "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=main" "/tmp/pipelines.json"
 # The results are paginated but we are interested in handling conflicts with more or less concurrent jobs so we can reasonably assume that relevant jobs are
 # wtihin the first page and not fetch later responses.
+# TODO(#6161): remove this assumption
 PREVIOUS_JOBS=$(jq -c < /tmp/pipelines.json ".items | map(select(.number < $PIPELINE_NUMBER)) | .[]")
 while IFS= read -r JOB; do
     PIPELINE_NUMBER=$(jq <<< "$JOB" -r '.number')
