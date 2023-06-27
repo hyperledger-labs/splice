@@ -1,12 +1,14 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref.*
 import com.daml.lf.data.Time.Timestamp
 import com.daml.lf.value.Value
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.util.Contract
+import com.daml.network.util.Contract.Companion
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.CantonRequireTypes.String2066
 import com.digitalasset.canton.ledger.offset.Offset
@@ -208,5 +210,19 @@ trait AcsJdbcTypes {
     * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
     */
   protected def lengthLimited(s: String): String2066 = String2066.tryCreate(s)
+
+  protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](
+      companion: Companion.Template[TCid, T],
+      createdEvent: CreatedEvent,
+  )(
+      toData: Contract[TCid, T] => D
+  ): Either[String, D] = {
+    Contract
+      .fromCreatedEvent(companion)(createdEvent)
+      .map(toData)
+      .toRight(
+        s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
+      )
+  }
 
 }

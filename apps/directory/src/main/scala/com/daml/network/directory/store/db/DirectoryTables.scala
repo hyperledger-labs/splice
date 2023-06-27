@@ -1,19 +1,18 @@
 package com.daml.network.directory.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionContext
 import com.daml.network.store.db.AcsTables
 import com.daml.network.store.db.AcsTables.AcsStoreTemplate
+import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.PartyId
 import io.circe.Json
 import shapeless.HNil
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.util.Contract
-import com.daml.network.util.Contract.Companion
 
 object DirectoryTables extends AcsTables {
   import profile.api.*
@@ -139,20 +138,6 @@ object DirectoryTables extends AcsTables {
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the directory store.")
       }
-    }
-
-    private def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?]](
-        companion: Companion.Template[TCid, T],
-        createdEvent: CreatedEvent,
-    )(
-        toData: Contract[TCid, T] => DirectoryAcsStoreRowData
-    ): Either[String, DirectoryAcsStoreRowData] = {
-      Contract
-        .fromCreatedEvent(companion)(createdEvent)
-        .map(toData)
-        .toRight(
-          s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
-        )
     }
   }
 

@@ -14,8 +14,10 @@ import com.daml.network.store.{
 }
 import MultiDomainAcsStore.{ContractWithState, ReadyContract}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.util.{CoinConfigSchedule, Contract}
+import com.daml.network.scan.store.db.DbScanStore
+import com.daml.network.util.{CoinConfigSchedule, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -124,7 +126,9 @@ object ScanStore {
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      close: CloseContext,
   ): ScanStore =
     storage match {
       case _: MemoryStorage =>
@@ -135,7 +139,8 @@ object ScanStore {
           connection,
           retryProvider,
         )
-      case _: DbStorage => throw new RuntimeException("Not implemented")
+      case db: DbStorage =>
+        new DbScanStore(svcParty, db, scanConfig, loggerFactory, connection, retryProvider)
     }
 
   def contractFilter(

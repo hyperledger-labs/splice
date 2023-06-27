@@ -1,6 +1,8 @@
 package com.daml.network.scan.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
@@ -8,9 +10,10 @@ import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppBackendConfig
+import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.store.db.DbCNNodeAppStoreWithHistory
+import com.daml.network.store.db.{AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -24,6 +27,7 @@ import slick.dbio.DBIO
 import java.time.Instant
 import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class DbScanStore(
     override val svcParty: PartyId,
@@ -45,10 +49,45 @@ class DbScanStore(
         "svc_party" -> Json.fromString(svcParty.toProtoPrimitive),
       ),
     )
-    with ScanStore {
+    with ScanStore
+    with AcsTables {
+
+  import storage.DbStorageConverters.setParameterByteArray
+
+  def storeId: Int = multiDomainAcsStore.storeId
+
   override def ingestionInsert(createdEvent: CreatedEvent)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = ???
+  ): Either[String, DBIO[_]] = {
+    ScanAcsStoreRowData.fromCreatedEvent(createdEvent, scanConfig).map {
+      case ScanAcsStoreRowData(
+            contract,
+            contractExpiresAt,
+            round,
+            validator,
+            amount,
+            importCrateReceiverName,
+            featuredAppRightProvider,
+          ) =>
+        val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
+        val templateId = contract.identifier
+        val createArguments = payloadJsonFromContract(contract.payload)
+        val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
+        val contractMetadataContractKeyHash =
+          lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
+        val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
+        val safeImportCrateReceiverName = importCrateReceiverName.map(lengthLimited)
+        sqlu"""
+              insert into scan_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+              contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+              round, validator, amount, import_crate_receiver_name, featured_app_right_provider)
+              values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+                      $round, $validator, $amount, $safeImportCrateReceiverName, $featuredAppRightProvider)
+              on conflict do nothing
+              """
+    }
+  }
 
   override def lookupCoinRules()(implicit
       tc: TraceContext
