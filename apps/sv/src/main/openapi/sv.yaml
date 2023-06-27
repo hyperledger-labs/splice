@@ -293,6 +293,7 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+  # TODO(#6073): rename to `trigger-acs-store-dump` and switch to a post method
   /admin/svc/trigger-acs-dump:
     put:
       tags: [ sv ]
@@ -305,6 +306,20 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/TriggerAcsDumpResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+  /admin/svc/get-acs-store-dump:
+    get:
+      tags: [ sv ]
+      x-jvm-package: svAdmin
+      operationId: "GetAcsStoreDump"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAcsStoreDumpResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
   /admin/authorization:
@@ -870,3 +885,16 @@ components:
           type: number
         offset:
           type: string
+
+    GetAcsStoreDumpResponse:
+      type: object
+      required:
+        - offset
+        - contracts
+      properties:
+        offset:
+          type: string
+        contracts:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"

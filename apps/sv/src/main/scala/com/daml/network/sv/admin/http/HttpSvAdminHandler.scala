@@ -29,10 +29,10 @@ import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -55,6 +55,10 @@ class HttpSvAdminHandler(
 ) extends v0.SvAdminHandler[String]
     with Spanning
     with NamedLogging {
+
+  implicit private val loggingContext: ErrorLoggingContext =
+    ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
+
   private val workflowId = this.getClass.getSimpleName
   private val svStore = svStoreWithIngestion.store
   private val svcStore = svcStoreWithIngestion.store
@@ -421,6 +425,23 @@ class HttpSvAdminHandler(
           }
         }
     }
+  }
+
+  def getAcsStoreDump(
+      respond: com.daml.network.http.v0.svAdmin.SvAdminResource.GetAcsStoreDumpResponse.type
+  )()(extracted: String): scala.concurrent.Future[
+    com.daml.network.http.v0.svAdmin.SvAdminResource.GetAcsStoreDumpResponse
+  ] = {
+    svcStore.multiDomainAcsStore
+      .getJsonAcsSnapshot()
+      .map(snapshot =>
+        SvAdminResource.GetAcsStoreDumpResponse.OK(
+          definitions.GetAcsStoreDumpResponse(
+            offset = snapshot.offset,
+            contracts = snapshot.contracts.map(_.toJson).toVector,
+          )
+        )
+      )
   }
 
   private def withClientOrNotFound[T](

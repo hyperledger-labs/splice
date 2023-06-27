@@ -71,7 +71,7 @@ class DbMultiDomainAcsStoreTest
     val contractFilter = MultiDomainAcsStore
       .SimpleContractFilter(
         PartyId.tryFromProtoPrimitive("aaaa::bbbb"),
-        Map(AppRewardCoupon.COMPANION.TEMPLATE_ID -> (_ => true)),
+        Map(MultiDomainAcsStore.mkFilter(AppRewardCoupon.COMPANION)(_ => true)),
         Map.empty,
       )
 

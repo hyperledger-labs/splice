@@ -416,4 +416,28 @@ object HttpSvAdminAppClient {
       Either.right(response)
     }
   }
+
+  case class GetAcsStoreDump()
+      extends BaseCommand[
+        http.GetAcsStoreDumpResponse,
+        definitions.GetAcsStoreDumpResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAcsStoreDumpResponse] =
+      client.getAcsStoreDump(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      http.GetAcsStoreDumpResponse,
+      Either[String, definitions.GetAcsStoreDumpResponse],
+    ] = { case http.GetAcsStoreDumpResponse.OK(response) =>
+      Either.right(response)
+    }
+  }
 }

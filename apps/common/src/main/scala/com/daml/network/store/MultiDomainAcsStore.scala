@@ -227,11 +227,16 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
     * Implementations MAY block.
     */
   def writeAcsSnapshot(output: OutputStream): SnapshotSummary
+
+  /** Get a snapshot of all contracts in the ACS encoded as JSON. */
+  def getJsonAcsSnapshot(): Future[JsonAcsSnapshot]
 }
 
 object MultiDomainAcsStore {
 
   case class SnapshotSummary(offset: String, numEvents: Int)
+
+  case class JsonAcsSnapshot(offset: String, contracts: Seq[Contract[?, ?]])
 
   // TODO (#2676) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
   abstract class InterfaceDecoder {
@@ -289,12 +294,17 @@ object MultiDomainAcsStore {
     def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[_]](
         interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
     )(ev: CreatedEvent): Option[Contract[Id, View]]
+
+    def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]]
   }
 
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
   case class SimpleContractFilter(
       primaryParty: PartyId,
-      templateFilters: Map[Identifier, CreatedEvent => Boolean],
+      templateFilters: Map[
+        Identifier,
+        (CreatedEvent => Boolean, CreatedEvent => Option[Contract[?, ?]]),
+      ],
       interfaceFilters: Map[Identifier, (CreatedEvent => Boolean, InterfaceDecoder)] = Map.empty,
   ) extends ContractFilter {
 
@@ -306,7 +316,7 @@ object MultiDomainAcsStore {
       )
 
     override def contains(ev: CreatedEvent): Boolean =
-      templateFilters.get(ev.getTemplateId).exists(evPredicate => evPredicate(ev)) ||
+      templateFilters.get(ev.getTemplateId).exists { case (evPredicate, _) => evPredicate(ev) } ||
         // TODO (#2676) Avoid linear search once we have proper interface support in multi-domain.
         interfaceFilters.exists { case (_, (evPredicate, _)) => evPredicate(ev) }
 
@@ -320,12 +330,18 @@ object MultiDomainAcsStore {
     ): Boolean =
       interfaceFilters.contains(interfaceCompanion.TEMPLATE_ID)
 
-    override def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[_]](
+    override def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[?]](
         interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
     )(ev: CreatedEvent): Option[Contract[Id, View]] =
       interfaceFilters.get(interfaceCompanion.TEMPLATE_ID).flatMap { case (_, decoder) =>
         decoder.fromCreatedEvent(interfaceCompanion)(ev)
       }
+
+    override def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]] =
+      for {
+        (_, decoder) <- templateFilters.get(ev.getTemplateId)
+        contract <- decoder(ev)
+      } yield contract
   }
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
@@ -333,10 +349,13 @@ object MultiDomainAcsStore {
       templateCompanion: Contract.Companion.Template[TCid, T]
   )(
       p: Contract[TCid, T] => Boolean
-  ): (Identifier, CreatedEvent => Boolean) =
+  ): (Identifier, (CreatedEvent => Boolean, CreatedEvent => Option[Contract[?, ?]])) =
     (
       templateCompanion.TEMPLATE_ID,
-      ev => Contract.fromCreatedEvent(templateCompanion)(ev).exists(p),
+      (
+        ev => Contract.fromCreatedEvent(templateCompanion)(ev).exists(p),
+        ev => Contract.fromCreatedEvent(templateCompanion)(ev),
+      ),
     )
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */

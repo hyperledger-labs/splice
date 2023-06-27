@@ -537,12 +537,31 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     val state = stateVar
     state.offset match {
       case None =>
-        throw Status.FAILED_PRECONDITION
+        throw Status.NOT_FOUND
           .withDescription("ACS has not yet been fully ingested.")
           .asRuntimeException()
       case Some(offset) =>
         AcsStoreDump.writeEvents(state.createEvents.values.toSeq, output)
         SnapshotSummary(offset, state.createEvents.size)
+    }
+  }
+
+  override def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] = Future {
+    val state = stateVar
+    state.offset match {
+      case None =>
+        throw Status.NOT_FOUND
+          .withDescription("ACS has not yet been fully ingested.")
+          .asRuntimeException()
+      case Some(offset) =>
+        JsonAcsSnapshot(
+          offset,
+          state.createEvents.values
+            .collect(
+              Function.unlift(ev => contractFilter.decodeMatchingContract(ev))
+            )
+            .toSeq,
+        )
     }
   }
 }

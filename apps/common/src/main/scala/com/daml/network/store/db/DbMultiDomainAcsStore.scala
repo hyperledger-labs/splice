@@ -506,4 +506,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def writeAcsSnapshot(output: OutputStream): SnapshotSummary =
     // TODO(#6073): implement snapshot writing for the DB store
     ???
+
+  override def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
+    // TODO(#6073): implement snapshot reading for the DB store
+    ???
 }
