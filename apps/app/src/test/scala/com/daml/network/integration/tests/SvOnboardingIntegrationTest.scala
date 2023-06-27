@@ -228,7 +228,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      startAllSync(svc, sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
+      startAllSync(sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
       sv1.getSvcInfo().svcRules.payload.members should have size 3
     }
     clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
@@ -272,7 +272,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         eventually()(
           // The onboarding is requested by SV4 during SvApp init.
           inside(
-            svc.participantClientWithAdminToken.ledger_api_extensions.acs
+            sv1.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty)
           ) {
             case Seq(svOnboarding) => {
@@ -297,7 +297,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       }
     clue("Attempting to start an onboarding multiple times has no effect") {
       sv1.startSvOnboarding(token)
-      svc.participantClientWithAdminToken.ledger_api_extensions.acs
+      sv1.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
     }
     clue(
@@ -310,7 +310,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     }
     clue("All online and approving SVs confirm SV4's onboarding") {
       eventually() {
-        svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action match {
             case a: ARC_SvcRules =>
@@ -340,7 +340,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     actAndCheck("SV2 comes back online", sv2.start())(
       "SV4's onboarding gathers suffcient confirmations and is completed",
       { _ =>
-        svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty
         sv1.getSvcInfo().svcRules.payload.members.keySet should contain(sv4Party.toProtoPrimitive)
       },
@@ -365,7 +365,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     implicit env =>
       // only 1 SV => slightly faster test
       clue("Initialize SVC with 1 SV") {
-        startAllSync(svc, sv1Scan, sv1)
+        startAllSync(sv1Scan, sv1)
         sv1.getSvcInfo().svcRules.payload.members should have size 1
       }
       // SV two’s party hasn't been allocated at this point because the SV app isn't running so we allocate it here.
@@ -390,7 +390,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       }
       actAndCheck(
         "Moving sv2 to confirmed state",
-        svc.participantClientWithAdminToken.ledger_api_extensions.commands
+        sv1.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitWithResult(
             userId = "svc",
             actAs = Seq(svcParty),
@@ -424,7 +424,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
   "The new sv with same name can be onboarded and overwrite existing member only in devnet" in {
     implicit env =>
       clue("Initialize SVC with 3 SVs") {
-        startAllSync(svc, sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
+        startAllSync(sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
         sv1.getSvcInfo().svcRules.payload.members should have size 3
       }
 
@@ -432,8 +432,8 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       val coinConfig = sv1Scan.getCoinConfigAsOf(env.environment.clock.now)
       actAndCheck(
         "Add a fake sv4 Party to SvcRules.members to simulate sv4 is already added to SVC", {
-          svc.participantClient.ledger_api_extensions.commands.submitWithResult(
-            svc.config.svUser,
+          sv1.participantClient.ledger_api_extensions.commands.submitWithResult(
+            sv1.config.ledgerApiUser,
             actAs = Seq(svcParty),
             readAs = Seq.empty,
             update = sv1
@@ -505,7 +505,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV1 to SV4 create confirmation to Confirm SVX", {
-        val svcRules = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        val svcRules = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
           .head
         val newMemberName = "Canton-Foundation-X"
@@ -519,7 +519,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       "There are 7 SVC members in total but only 4 confirmations are required to confirm a SV",
       _ =>
         inside(
-          svc.participantClientWithAdminToken.ledger_api_extensions.acs
+          sv1.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty)
         ) { case Seq(svOnboardingConfirmed) =>
           svOnboardingConfirmed.data.svName shouldBe "Canton-Foundation-X"

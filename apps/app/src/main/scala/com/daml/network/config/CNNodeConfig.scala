@@ -14,7 +14,6 @@ import com.daml.network.splitwell.config.{
   SplitwellDomains,
 }
 import com.daml.network.sv.config.*
-import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.*
 import com.daml.network.wallet.config.{
   TreasuryConfig,
@@ -56,8 +55,6 @@ case class CNNodeConfig(
     override val name: Option[String] = None,
     validatorApps: Map[InstanceName, ValidatorAppBackendConfig] = Map.empty,
     validatorAppClients: Map[InstanceName, ValidatorAppClientConfig] = Map.empty,
-    svcApp: Option[SvcAppBackendConfig] = None,
-    svcAppClient: Option[SvcAppClientConfig] = None,
     svApps: Map[InstanceName, SvAppBackendConfig] = Map.empty,
     svAppClients: Map[InstanceName, SvAppClientConfig] = Map.empty,
     scanApps: Map[InstanceName, ScanAppBackendConfig] = Map.empty,
@@ -131,53 +128,6 @@ case class CNNodeConfig(
   def validatorsByString: Map[String, ValidatorAppBackendConfig] = validatorApps.map {
     case (n, c) =>
       n.unwrap -> c
-  }
-
-  // The config contains one optional unnamed SVC app (because in M1, there can only be one)
-  // Since the rest of the code generally expects a map of nodes, we'll create one.
-  private lazy val svcAppInstanceName = InstanceName.tryCreate("svc-app")
-  lazy val svcApps = svcApp.toList.map(config => svcAppInstanceName -> config).toMap
-  private lazy val svcAppClientInstanceName = InstanceName.tryCreate("svc-app-client")
-  lazy val svcAppClients =
-    svcAppClient.toList.map(config => svcAppClientInstanceName -> config).toMap
-
-  private lazy val svcAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
-    svcApps.fmap { svcConfig =>
-      SharedCNNodeAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.getLoggingConfig,
-        monitoring.logQueryCost,
-        parameters.timeouts.processing,
-        parameters.timeouts.console.requestTimeout,
-        svcConfig.caching,
-        parameters.enableAdditionalConsistencyChecks,
-        features.enablePreviewCommands,
-        parameters.nonStandardConfig,
-        svcConfig.sequencerClient,
-        devVersionSupport = false,
-        dontWarnOnDeprecatedPV = false,
-        initialProtocolVersion = ProtocolVersion.latest,
-        dbMigrateAndStart = false,
-      )
-    }
-
-  private[network] def svcAppParameters(
-      appName: InstanceName
-  ): SharedCNNodeAppParameters =
-    nodeParametersFor(svcAppParameters_, "svc-app", appName)
-
-  /** Use `svcAppParameters` instead!
-    */
-  def trySvcAppParametersByString(name: String): SharedCNNodeAppParameters =
-    svcAppParameters(
-      InstanceName.tryCreate(name)
-    )
-
-  /** Use `svcs` instead!
-    */
-  def svcsByString: Map[String, SvcAppBackendConfig] = svcApps.map { case (n, c) =>
-    n.unwrap -> c
   }
 
   private lazy val svAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
@@ -447,10 +397,6 @@ object CNNodeConfig {
       deriveReader[GlobalOnlyDomainConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
-    implicit val svcConfigReader: ConfigReader[SvcAppBackendConfig] =
-      deriveReader[SvcAppBackendConfig]
-    implicit val svcClientConfigReader: ConfigReader[SvcAppClientConfig] =
-      deriveReader[SvcAppClientConfig]
 
     implicit val svClientConfigReader: ConfigReader[SvAppClientConfig] =
       deriveReader[SvAppClientConfig]
@@ -603,10 +549,6 @@ object CNNodeConfig {
       deriveWriter[ScanAppClientConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
-    implicit val svcConfigWriter: ConfigWriter[SvcAppBackendConfig] =
-      deriveWriter[SvcAppBackendConfig]
-    implicit val svcClientConfigWriter: ConfigWriter[SvcAppClientConfig] =
-      deriveWriter[SvcAppClientConfig]
 
     implicit val svClientConfigWriter: ConfigWriter[SvAppClientConfig] =
       deriveWriter[SvAppClientConfig]

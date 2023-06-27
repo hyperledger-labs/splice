@@ -889,7 +889,6 @@ commands:
               "svc global-domain"
               "svc participant"
               "svc scan-app"
-              "svc svc-app"
               "validator1 participant"
               "validator1 validator-app"
               "validator1 wallet-app"

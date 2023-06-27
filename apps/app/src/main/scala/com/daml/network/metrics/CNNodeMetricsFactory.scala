@@ -8,7 +8,6 @@ import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.daml.network.sv.metrics.SvAppMetrics
-import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryType}
@@ -33,7 +32,6 @@ case class CNNodeMetricsFactory(
       factoryType,
     ) {
   private val validators = TrieMap[String, ValidatorAppMetrics]()
-  private val svcs = TrieMap[String, SvcAppMetrics]()
   private val svs = TrieMap[String, SvAppMetrics]()
   private val scans = TrieMap[String, ScanAppMetrics]()
   private val wallets = TrieMap[String, WalletAppMetrics]()
@@ -41,7 +39,7 @@ case class CNNodeMetricsFactory(
   private val splitwells = TrieMap[String, SplitwellAppMetrics]()
 
   override protected def allNodeMetrics: Seq[TrieMap[String, _]] =
-    Seq(validators, svcs, svs, scans, wallets, directories, splitwells)
+    Seq(validators, svs, scans, wallets, directories, splitwells)
 
   def forValidator(name: String): ValidatorAppMetrics = {
     validators.getOrElseUpdate(
@@ -60,27 +58,10 @@ case class CNNodeMetricsFactory(
     )
   }
 
-  def forSvc(name: String): SvcAppMetrics = {
-    svcs.getOrElseUpdate(
-      name, {
-        val metricName = deduplicateName(name, "SVC", svcs)
-        val metricsContext = MetricsContext("svc" -> name, "component" -> "svc")
-        val labeledMetricsFactory =
-          createLabeledMetricsFactory(metricsContext)
-        new SvcAppMetrics(
-          MetricsFactory.prefix,
-          new CantonDropwizardMetricsFactory(newRegistry(metricName)),
-          new DamlGrpcServerMetrics(labeledMetricsFactory, "SVC"),
-          new DMHealth(labeledMetricsFactory),
-        )
-      },
-    )
-  }
-
   def forSv(name: String): SvAppMetrics = {
     svs.getOrElseUpdate(
       name, {
-        val metricName = deduplicateName(name, "SV", svcs)
+        val metricName = deduplicateName(name, "SV", svs)
         val metricsContext = MetricsContext("sv" -> name, "component" -> "sv")
         val labeledMetricsFactory =
           createLabeledMetricsFactory(metricsContext)

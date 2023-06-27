@@ -33,11 +33,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         globalUpgradeId.toProtoPrimitive should not be activeDomainId
         global1.toProtoPrimitive shouldBe activeDomainId
 
-        eventually() {
-          svcClient.health.initialized() shouldBe true
-          svcClient.health.running() shouldBe true
-        }
-
         val upgradeAfterTick = createConfigSchedule(
           currentSchedule,
           (

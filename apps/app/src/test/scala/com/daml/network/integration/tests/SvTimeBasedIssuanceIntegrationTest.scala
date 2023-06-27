@@ -17,7 +17,7 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
     initSvc()
 
     eventually() {
-      val rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
+      val rounds = getSortedOpenMiningRounds(sv1.participantClientWithAdminToken, svcParty)
       rounds should have size 3
       svs.map { sv =>
         val coins = sv.participantClient.ledger_api_extensions.acs
@@ -39,7 +39,7 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
       )
       .divide(RoundsPerYear, RoundingMode.HALF_UP)
     eventually() {
-      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 1
+      getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty) should have size 1
 
       // Only Sv1 get svc reward from round 0 as Sv2, Sv3 and Sv4 only joined in round 3
       inside(
@@ -64,7 +64,7 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
     advanceRoundsByOneTick
     advanceRoundsByOneTick
     eventually() {
-      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 3
+      getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty) should have size 3
 
       val eachSvGetInRound3 =
         coinsToIssueToSvc
@@ -217,7 +217,7 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
       ),
     )
     // Create a bunch of rewards directly
-    svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+    sv1.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(svcParty),
       optTimeout = None,
       commands = rewards.flatMap(_.create.commands.asScala.toSeq),
@@ -227,7 +227,7 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
       {
         advanceRoundsByOneTick
         eventually() {
-          getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 1
+          getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty) should have size 1
         }
       },
       entries =>
@@ -241,7 +241,7 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
 
     def decimal(d: Double): java.math.BigDecimal = BigDecimal(d).setScale(10).bigDecimal
 
-    val issuingRounds = getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty)
+    val issuingRounds = getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty)
 
     inside(issuingRounds) { case Seq(issuingRound) =>
       issuingRound.data.issuancePerValidatorRewardCoupon shouldBe decimal(0.2000000000)
@@ -254,12 +254,12 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
     def getRewardCoupons(
         round: Contract[OpenMiningRound.ContractId, OpenMiningRound]
     ) = {
-      svc.participantClientWithAdminToken.ledger_api_extensions.acs
+      sv1.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(AppRewardCoupon.COMPANION)(
           svcParty,
           co => co.data.round.number == round.payload.round.number,
         ) ++
-        svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(ValidatorRewardCoupon.COMPANION)(
             svcParty,
             co => co.data.round.number == round.payload.round.number,

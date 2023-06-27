@@ -11,8 +11,6 @@ import com.daml.network.splitwell.SplitwellAppBootstrap
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.sv.SvAppBootstrap
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.svc.SvcAppBootstrap
-import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.ValidatorAppBootstrap
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.digitalasset.canton.config.TestingConfigInternal
@@ -67,39 +65,6 @@ trait CNNodeEnvironment extends Environment {
     timeouts,
     config.validatorsByString,
     config.tryValidatorAppParametersByString,
-    loggerFactory,
-  )
-
-  protected def createSvc(
-      name: String,
-      svcConfig: SvcAppBackendConfig,
-  ): SvcAppBootstrap = {
-    val appLoggerFactory = loggerFactory.append(SvcAppBootstrap.LoggerFactoryKeyName, name)
-    SvcAppBootstrap(
-      name,
-      svcConfig,
-      config.trySvcAppParametersByString(name),
-      createClock(Some(SvcAppBootstrap.LoggerFactoryKeyName -> name)),
-      cnNodeMetrics.forSvc(name),
-      testingConfig,
-      futureSupervisor,
-      appLoggerFactory,
-      writeHealthDumpToFile,
-      configuredOpenTelemetry,
-    )
-      .valueOr(err =>
-        throw new RuntimeException(
-          s"Failed to create participant bootstrap: $err"
-        )
-      )
-  }
-
-  lazy val svcs = new SvcApps(
-    createSvc,
-    migrationsFactory,
-    timeouts,
-    config.svcsByString,
-    config.trySvcAppParametersByString,
     loggerFactory,
   )
 
@@ -236,8 +201,7 @@ trait CNNodeEnvironment extends Environment {
   override def startAll(): Either[Seq[StartupError], Unit] = {
     val errors =
       // Ordering here matches CNNodeConsoleEnvironment.startupOrderPrecedence
-      svcs.startAll.left.getOrElse(Seq.empty) ++
-        svs.startAll.left.getOrElse(Seq.empty) ++
+      svs.startAll.left.getOrElse(Seq.empty) ++
         scans.startAll.left.getOrElse(Seq.empty) ++
         validators.startAll.left.getOrElse(Seq.empty) ++
         directories.startAll.left.getOrElse(Seq.empty) ++
@@ -247,7 +211,7 @@ trait CNNodeEnvironment extends Environment {
 
   // Ordering here matches CNNodeConsoleEnvironment.startupOrderPrecedence
   def allCNNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(svcs, svs, scans, validators, directories, splitwells)
+    List(svs, scans, validators, directories, splitwells)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCNNodes

@@ -27,9 +27,6 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
     config.validatorApps.foreach(validator =>
       waitForPort(validator._1, validator._2.adminApi.port.unwrap)
     )
-    config.svcApp.foreach(svc =>
-      waitForPort(InstanceName.tryCreate("SVC"), svc.adminApi.port.unwrap)
-    )
     config.svApps.foreach(sv => waitForPort(sv._1, sv._2.adminApi.port.unwrap))
     config.splitwellApps.foreach(sw => waitForPort(sw._1, sw._2.adminApi.port.unwrap))
     config.directoryApp.foreach(directory =>

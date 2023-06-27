@@ -27,7 +27,6 @@
     1. [Code Layout](#code-layout)
     1. [Domain Specific Naming](#domain-specific-naming)
     1. [App Architecture - Initialization](#app-architecture---initialization)
-        1. [SVC App](#svc-app)
         1. [Validator App](#validator-app)
         1. [All Other Applications](#all-other-applications)
     1. [Frontend Code](#frontend-code)
@@ -602,22 +601,6 @@ To add a new library as a dependency for some module:
 * Between `sender`/`receiver` and `payer`/`payee`: please use **`sender`/`receiver`**
 
 ### App Architecture - Initialization
-
-#### SVC App
-
-*Warning: The SVC App is being phased out; below infos are at least partially outdated.*
-
-The SVC app is special since it creates the SVC party which eventually
-needs to be decentralized and because other apps rely on the SVC app
-being up so they can query the SVC party identity.
-
-Startup proceeds as follows:
-
-1. Allocate SVC party and user
-2. Upload DAR file
-3. Create initial coin rules
-4. Start automation
-5. Start gRPC service
 
 #### Validator App
 

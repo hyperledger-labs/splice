@@ -91,7 +91,7 @@ class SvFrontendIntegrationTest
             val valueCells = findAll(className("general-svc-value-name")).toSeq
             valueCells should have length 9
             forExactly(1, valueCells)(
-              _.text should matchText(sv1.getSvcInfo().svUser)
+              _.text should matchText(sv1.config.ledgerApiUser)
             )
             forExactly(3, valueCells)(
               _.text should matchText(sv1.getSvcInfo().svParty.toProtoPrimitive)

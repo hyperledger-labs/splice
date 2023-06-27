@@ -44,11 +44,11 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
   "initialize svc and validator apps" in { implicit env =>
     initSvcWithSv1Only()
     // Check that there is exactly one CoinRule and OpenMiningRound
-    val coinRules = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+    val coinRules = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
     coinRules should have length 1
 
-    val openRounds = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+    val openRounds = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
     openRounds should have length 3
 

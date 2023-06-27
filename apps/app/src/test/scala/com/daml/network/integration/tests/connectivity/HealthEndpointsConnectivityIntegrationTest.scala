@@ -23,9 +23,7 @@ class HealthEndpointsConnectivityIntegrationTest extends CNNodeIntegrationTest {
   registerPlugin(toxiproxy)
 
   "sv1 app should report liveness and readiness" in { implicit env =>
-    startAllSync(sv1, sv1Scan, svc)
-
-    clue("svc app should report as active")(svc.health.active shouldBe true)
+    startAllSync(sv1, sv1Scan)
 
     sv1.httpLive shouldBe true
     sv1.httpReady shouldBe true

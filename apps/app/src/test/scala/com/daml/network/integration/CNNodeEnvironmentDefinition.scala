@@ -196,8 +196,8 @@ case class CNNodeEnvironmentDefinition(
         .replace(
           ClockConfig.RemoteClock(
             // This reads the right port as the bump is added to the front
-            conf.svcApp
-              .getOrElse(throw new IllegalArgumentException("expected svc app to be configured"))
+            conf.svApps.values.headOption
+              .getOrElse(throw new IllegalArgumentException("expected a sv app to be configured"))
               .participantClient
               .clientAdminApi
           )

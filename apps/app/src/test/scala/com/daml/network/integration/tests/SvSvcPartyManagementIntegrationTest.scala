@@ -185,7 +185,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       amount: Double,
   )(implicit env: CNNodeTestConsoleEnvironment) =
     participant.ledger_api_extensions.commands.submitWithResult(
-      svc.config.svUser,
+      sv1.config.ledgerApiUser,
       actAs = Seq(svcParty),
       readAs = Seq.empty,
       update = coin(amount, svcParty).create,

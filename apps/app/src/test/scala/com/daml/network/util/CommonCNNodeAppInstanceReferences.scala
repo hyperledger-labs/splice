@@ -9,8 +9,6 @@ import com.daml.network.console.{
   SplitwellAppClientReference,
   SvAppBackendReference,
   SvAppClientReference,
-  SvcAppBackendReference,
-  SvcAppClientReference,
   ValidatorAppBackendReference,
   ValidatorAppClientReference,
   WalletAppClientReference,
@@ -23,18 +21,6 @@ import com.digitalasset.canton.topology.PartyId
 trait CommonCNNodeAppInstanceReferences {
 
   def svcParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = sv1Scan.getSvcPartyId()
-
-  def svc(implicit env: CNNodeTestConsoleEnvironment): SvcAppBackendReference =
-    env.svcOpt.getOrElse(
-      sys.error("Tried to access the SVC app but it isn't defined in the test's configuration file")
-    )
-
-  def svcClient(implicit env: CNNodeTestConsoleEnvironment): SvcAppClientReference =
-    env.svcClientOpt.getOrElse(
-      sys.error(
-        "Tried to access the SVC app client but it isn't defined in the test's configuration file"
-      )
-    )
 
   def sv1(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
 

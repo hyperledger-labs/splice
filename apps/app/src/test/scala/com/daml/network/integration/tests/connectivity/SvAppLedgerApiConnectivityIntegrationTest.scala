@@ -24,9 +24,7 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
 
   "sv1 app should recover and correctly report their activeness status after a disconnect" in {
     implicit env =>
-      startAllSync(sv1, sv1Scan, svc)
-
-      clue("svc app should report as active")(svc.health.active shouldBe true)
+      startAllSync(sv1, sv1Scan)
 
       clue("sv1 app should report as active")(eventually() {
         sv1.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true

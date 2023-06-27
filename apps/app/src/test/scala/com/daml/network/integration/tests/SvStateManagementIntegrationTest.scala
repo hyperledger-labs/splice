@@ -128,8 +128,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "execute an action to remove sv3 on svcRules contract to trigger `GarbageCollectCoinPriceVotesTrigger` to remove duplicated and non member votes", {
-        svc.participantClient.ledger_api_extensions.commands.submitWithResult(
-          svc.config.svUser,
+        sv1.participantClient.ledger_api_extensions.commands.submitWithResult(
+          sv1.config.ledgerApiUser,
           actAs = Seq(svcParty),
           readAs = Seq.empty,
           update = sv1
@@ -386,8 +386,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       svParty: PartyId,
       coinPrice: Option[BigDecimal],
   )(implicit env: CNNodeTestConsoleEnvironment) =
-    svc.participantClient.ledger_api_extensions.commands.submitWithResult(
-      svc.config.svUser,
+    sv1.participantClient.ledger_api_extensions.commands.submitWithResult(
+      sv1.config.ledgerApiUser,
       actAs = Seq(svcParty),
       readAs = Seq.empty,
       update = new cn.svc.coinprice.CoinPriceVote(

@@ -36,7 +36,7 @@ abstract class HttpCNNodeClientConfig extends NetworkAppNodeConfig {}
   * An exception to this are the [[SequencerClientConfig]] and [[CachingConfigs]]. These are configured on a per-node-level
   * but are still in the [[SharedCNNodeAppParameters]]. They will be removed in the future.
   * These two parameters are also the reason why the [[SharedCNNodeAppParameters]] are created individually for each configured
-  * SVC/Validator/Wallet app in, e.g., `svcAppParameters_` of [[com.daml.network.config.CNNodeConfig]] (instead of just
+  * SV/Validator app in, e.g., `svAppParameters_` of [[com.daml.network.config.CNNodeConfig]] (instead of just
   * creating a single [[SharedCNNodeAppParameters]] instance once and passing that instance to all apps).
   */
 case class SharedCNNodeAppParameters(

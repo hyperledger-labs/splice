@@ -21,7 +21,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     val rewardAmount = 0.1
 
     def getUnclaimedRewardContracts() =
-      svc.participantClientWithAdminToken.ledger_api_extensions.acs
+      sv1.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(UnclaimedReward.COMPANION)(svcParty)
 
     val existingUnclaimedRewards = getUnclaimedRewardContracts().length
@@ -32,7 +32,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
           new UnclaimedReward(svcParty.toProtoPrimitive, BigDecimal(rewardAmount).bigDecimal)
         )
         if (!unclaimedRewards.isEmpty) {
-          svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+          sv1.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
             actAs = Seq(svcParty),
             optTimeout = None,
             commands = unclaimedRewards.flatMap(_.create.commands.asScala.toSeq),
@@ -42,7 +42,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     )(
       "Wait for the unclaimed rewards to get merged automagically",
       _ => {
-        advanceTimeByPollingInterval(svc)
+        advanceTimeByPollingInterval(sv1)
         getUnclaimedRewardContracts().length should (be < threshold)
       },
     )
@@ -51,7 +51,6 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
   "expire stale `Confirmation` contracts" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
       startAllSync(
-        svc,
         sv1Scan,
         sv1,
         sv2,
@@ -78,7 +77,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
       "Sync with background automation that onboards validator"
     ) {
       eventually()({
-        val rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
+        val rounds = getSortedOpenMiningRounds(sv1.participantClientWithAdminToken, svcParty)
         rounds should have size 3
       })
     }
@@ -89,7 +88,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     )(
       "Find confirmation (for issuing rounds)",
       _ => {
-        val contractList = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        val contractList = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
         contractList should have length 1
@@ -109,7 +108,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     )(
       "The Confirmation expires and is archived",
       _ => {
-        svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
           .filter(_.id == confirmationCid) should have length 0
@@ -122,7 +121,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     )(
       "Find new confirmation (for issuing rounds)",
       _ => {
-        val contractList = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        val contractList = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
         contractList should have length 1
@@ -134,7 +133,6 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
   "detect an inactive leader" in { implicit env =>
     val svcRulesBeforeElection = clue("Initialize SVC with 4 SVs") {
       startAllSync(
-        svc,
         sv1Scan,
         sv1,
         sv2,
@@ -145,7 +143,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
         sv3Validator,
         sv4Validator,
       )
-      val svcRulesBeforeElection = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+      val svcRulesBeforeElection = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
         .head
         .data
@@ -159,7 +157,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
       "Wait for first three rounds to be opened"
     ) {
       eventually()({
-        rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
+        rounds = getSortedOpenMiningRounds(sv1.participantClientWithAdminToken, svcParty)
         rounds should have size 3
       })
     }
@@ -200,7 +198,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
       advanceTime(effectiveTimeout.plus(bufferDuration))
       eventually() {
-        val svcRulesAfterElection = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        val svcRulesAfterElection = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
           .head
           .data
@@ -209,7 +207,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
       }
 
       eventually() {
-        val newRounds = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        val newRounds = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(OpenMiningRound.COMPANION)(
             svcParty,
             c => !rounds.contains(c),

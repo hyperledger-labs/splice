@@ -48,7 +48,6 @@ lazy val root = (project in file("."))
     `apps-validator`,
     `apps-scan`,
     `apps-splitwell`,
-    `apps-svc`,
     `apps-sv`,
     `apps-app`,
     `apps-wallet`,
@@ -365,27 +364,15 @@ lazy val `apps-validator` =
         ),
     )
 
-lazy val `apps-svc` =
-  project
-    .in(file("apps/svc"))
-    .dependsOn(`apps-common` % "compile->compile;test->test")
-    .settings(
-      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      BuildCommon.sharedAppSettings,
-    )
-    .dependsOn(
-      `svc-governance-daml`
-    )
-    .dependsOn(`svc-governance-v1test-daml`)
-
 lazy val `apps-sv` =
   project
     .in(file("apps/sv"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
-      `apps-svc`,
       `directory-daml`,
       `validator-lifecycle-daml`,
+      `svc-governance-daml`,
+      `svc-governance-v1test-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime, comet_bft_proto),
@@ -945,7 +932,6 @@ lazy val `apps-app` =
       `apps-splitwell`,
       `apps-directory`,
       `apps-validator`,
-      `apps-svc`,
       `apps-sv` % "compile->compile;test->test",
       `apps-scan`,
       `apps-wallet`,

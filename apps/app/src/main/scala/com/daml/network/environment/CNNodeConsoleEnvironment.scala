@@ -3,7 +3,6 @@ package com.daml.network.environment
 import com.daml.network.console.*
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
-import com.daml.network.svc.config.SvcAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.validator.config.ValidatorAppClientConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
@@ -114,16 +113,12 @@ class CNNodeConsoleEnvironment(
   /* Local apps that are (in the target deployment) operated by the SVC */
   lazy val fullSvcApps = NodeReferences(
     mergeLocalCNNodeInstances(
-      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
-      svcOpt.toList,
       svs.local,
       scans.local,
       directories.local,
       validators.local.filter(v => v.name.startsWith("sv")),
     ),
     mergeRemoteCNNodeInstances(
-      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
-      svcClientOpt.toList,
       svs.remote,
       scans.remote,
       directories.remote,
@@ -134,16 +129,12 @@ class CNNodeConsoleEnvironment(
   /* Local apps that are (in the target deployment) operated by the SVC with only Sv1 */
   lazy val minimalSvcApps = NodeReferences(
     mergeLocalCNNodeInstances(
-      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
-      svcOpt.toList,
       svs.local.filter(sv => sv.name == "sv1"),
       scans.local.filter(sv => sv.name == "sv1Scan"),
       validators.local.filter(v => v.name == "sv1Validator"),
       directories.local,
     ),
     mergeRemoteCNNodeInstances(
-      // TODO(#4035) svc can be removed when all logic is ported from SvcApp to Sv Apps
-      svcClientOpt.toList,
       svs.remote.filter(sv => sv.name == "sv1"),
       scans.remote.filter(sv => sv.name == "sv1Scan"),
       validators.remote.filter(v => v.name == "sv1Validator"),
@@ -184,16 +175,6 @@ class CNNodeConsoleEnvironment(
       environment.config.scansByString.keys.map(createScanReference).toSeq,
       environment.config.scanAppClients.toSeq.map(createRemoteScanReference),
     )
-
-  lazy val svcOpt: Option[SvcAppBackendReference] =
-    environment.config.svcsByString.keys
-      .map(createSvcReference)
-      .headOption
-
-  lazy val svcClientOpt: Option[SvcAppClientReference] =
-    environment.config.svcAppClients.toSeq
-      .map(createSvcClientReference)
-      .headOption
 
   lazy val svs: NodeReferences[CNNodeAppReference, SvAppClientReference, SvAppBackendReference] =
     NodeReferences(
@@ -243,14 +224,6 @@ class CNNodeConsoleEnvironment(
       conf: (InstanceName, ScanAppClientConfig)
   ): ScanAppClientReference =
     new ScanAppClientReference(this, conf._1.unwrap, conf._2)
-
-  private def createSvcReference(name: String): SvcAppBackendReference =
-    new SvcAppBackendReference(this, name)
-
-  private def createSvcClientReference(
-      conf: (InstanceName, SvcAppClientConfig)
-  ): SvcAppClientReference =
-    new SvcAppClientReference(this, conf._1.unwrap, conf._2)
 
   private def createSvBackendReference(name: String): SvAppBackendReference =
     new SvAppBackendReference(this, name)
@@ -383,11 +356,7 @@ class CNNodeConsoleEnvironment(
         ),
         splitwells.remote,
         Seq("App References"),
-      ) :++ svcOpt
-        .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))
-        .toList :++ svcClientOpt
-        .map(svc => TopLevelValue(svc.name, helpText("SVC app client", svc.name), svc, Seq("SVC")))
-        .toList :++ scans.local.headOption
+      ) :++ scans.local.headOption
         .map(scan => TopLevelValue(scan.name, helpText("Scan app", scan.name), scan, Seq("Scan")))
         .toList :++ scans.remote.headOption
         .map(scan =>
@@ -436,10 +405,9 @@ class CNNodeConsoleEnvironment(
     instance match {
       case _: LocalDomainReference => 1
       case _: LocalParticipantReference => 2
-      case _: SvcAppBackendReference => 3
-      case _: ScanAppBackendReference => 4
-      case _: ValidatorAppBackendReference => 5
-      case _ => 6
+      case _: ScanAppBackendReference => 3
+      case _: ValidatorAppBackendReference => 4
+      case _ => 5
     }
 
   override protected def domainsTopLevelValue(

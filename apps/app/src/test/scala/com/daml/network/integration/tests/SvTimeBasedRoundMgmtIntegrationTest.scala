@@ -23,27 +23,27 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
     // Sync with background automation that onboards validator.
     eventually()({
-      val rounds = getSortedOpenMiningRounds(svc.participantClientWithAdminToken, svcParty)
+      val rounds = getSortedOpenMiningRounds(sv1.participantClientWithAdminToken, svcParty)
       rounds should have size 3
     })
 
     // one tick - round 0 closes.
     advanceRoundsByOneTick
     eventually()(
-      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 1
+      getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty) should have size 1
     )
     // next tick - round 1 closes.
     advanceRoundsByOneTick
     eventually()(
-      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 2
+      getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty) should have size 2
     )
     // next tick - round 2 closes.
     advanceRoundsByOneTick
     eventually()(
-      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 3
+      getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty) should have size 3
     )
 
-    val offsetBefore = svc.participantClientWithAdminToken.ledger_api.transactions.end()
+    val offsetBefore = sv1.participantClientWithAdminToken.ledger_api.transactions.end()
     // next tick - issuing round 0 can be closed
     // not using `advanceRoundsByOneTick` because this interferes with checking the state of the ClosedMiningRounds
     advanceTime(tickDurationWithBuffer)
@@ -51,7 +51,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       // Check for closing mining round in transactions instead of acs
       // to guard against automation archiving it concurrently.
       val transactions =
-        svc.participantClientWithAdminToken.ledger_api_extensions.transactions
+        sv1.participantClientWithAdminToken.ledger_api_extensions.transactions
           .treesJava(
             Set(svcParty),
             completeAfter = Int.MaxValue,
@@ -66,7 +66,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       rounds should have size 1
     }
     eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
-      getSortedIssuingRounds(svc.participantClientWithAdminToken, svcParty) should have size 3
+      getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty) should have size 3
     )
 
     // advance time by 2 polling intervals to ensure that the automations
@@ -76,7 +76,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     advanceTimeByPollingInterval(sv1)
     clue("Wait until the closed round is archived") {
       eventually()(
-        svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cc.round.ClosedMiningRound.COMPANION)(svcParty) should have size 0
       )
     }
@@ -101,7 +101,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
     // latest OpenMiningRound was created with doubled tick duration.
     eventually()({
-      val now = svc.participantClientWithAdminToken.ledger_api.time.get()
+      val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
 
       val rounds = getOpenMiningRounds()
       rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
@@ -203,7 +203,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
     // latest OpenMiningRound was created with reduced tick duration.
     eventually()({
-      val now = svc.participantClientWithAdminToken.ledger_api.time.get()
+      val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
 
       val rounds = getOpenMiningRounds()
       rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
@@ -388,7 +388,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     val config202 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 202)
 
     {
-      val now = svc.participantClientWithAdminToken.ledger_api.time.get()
+      val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
       val configSchedule = {
         new cc.schedule.Schedule(
           mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration),

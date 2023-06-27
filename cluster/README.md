@@ -378,8 +378,6 @@ canton-participant-6685859869-nh9vm   1/1     Running            1 (45s ago)   1
 canton-participant-7c9674cfd6-8fj7v   0/1     ImagePullBackOff   0             14s
 docs-55f7b8967-67vcw                  1/1     Running            0             108s
 docs-78dddd9c8b-5swzv                 0/1     ImagePullBackOff   0             17s
-svc-app-6654f84564-bnvwq              1/1     Running            2 (64s ago)   108s
-svc-app-84f954fb99-6ccw5              0/1     ImagePullBackOff   0             16s
 ```
 
 The `ImagePullBackOff` status indicates that Kubernetes is waiting for

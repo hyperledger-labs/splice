@@ -28,9 +28,8 @@ class LocalRunbookIntegrationTest
 
   val svNodePath: File = "apps" / "app" / "src" / "test" / "resources" / "local-sv-node"
 
-  val svcParticipantPath: File = svNodePath / "canton-participant"
-  val svcDomainPath: File = svNodePath / "canton-domain"
-  val svcAppPath: File = svNodePath / "svc-app"
+  val svParticipantPath: File = svNodePath / "canton-participant"
+  val svDomainPath: File = svNodePath / "canton-domain"
   val svAppsPath: File = svNodePath / "sv-apps"
   val scanAppPath: File = svNodePath / "scan-apps"
 
@@ -55,7 +54,7 @@ class LocalRunbookIntegrationTest
       (validatorPath / "validator-participant.sc").contentAsString
     bootstrapFile.overwrite("""
       |println("Creating sv1 user")
-      |svc_participant.ledger_api.users.create(
+      |sv_participant.ledger_api.users.create(
       |  id = "sv1",
       |  actAs = Set.empty,
       |  readAs = Set.empty,
@@ -77,9 +76,9 @@ class LocalRunbookIntegrationTest
         "-c",
         (validatorPath / "validator-participant.conf").toString,
         "-c",
-        (svcParticipantPath / "canton.conf").toString,
+        (svParticipantPath / "canton.conf").toString,
         "-c",
-        (svcDomainPath / "canton.conf").toString,
+        (svDomainPath / "canton.conf").toString,
         "-C",
         "canton.participants-x.validatorParticipant.ledger-api.port=7001",
         "-C",
@@ -109,7 +108,6 @@ class LocalRunbookIntegrationTest
         // Config file template for onboarding self-hosted validator (original version from the runbook)
         validatorPath / "validator-onboarding-nosecret.conf",
         // Config files for SVC-hosted apps (modified copies of deployed configs)
-        svcAppPath / "app.conf",
         svAppsPath / "app.conf",
         scanAppPath / "app.conf",
       )

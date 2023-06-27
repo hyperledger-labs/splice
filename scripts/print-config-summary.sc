@@ -37,9 +37,6 @@ object ConfigSummaryPrinter extends App {
         i.adminApi.internalPort.fold(0)(_.unwrap) -> s"Participant '${name.unwrap}', Admin API"
       )
     }
-    config.svcApp.foreach(i =>
-      ports.addOne(i.adminApi.internalPort.fold(0)(_.unwrap) -> s"SVC App, Admin API")
-    )
     config.directoryApp.foreach(i =>
       ports.addOne(i.adminApi.internalPort.fold(0)(_.unwrap) -> s"Directory App, Admin API")
     )

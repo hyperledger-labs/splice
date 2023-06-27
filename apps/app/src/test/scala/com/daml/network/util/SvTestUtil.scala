@@ -17,7 +17,7 @@ trait SvTestUtil extends CNNodeTestCommon {
 
   def allocateRandomSvParty(name: String)(implicit env: CNNodeTestConsoleEnvironment) = {
     val id = (new scala.util.Random).nextInt().toHexString
-    svc.participantClient.ledger_api.parties.allocate(s"$name-$id", name).party
+    sv1.participantClient.ledger_api.parties.allocate(s"$name-$id", name).party
   }
 
   def addPhantomSv()(implicit env: CNNodeTestConsoleEnvironment) = {
@@ -51,10 +51,10 @@ trait SvTestUtil extends CNNodeTestCommon {
     val coinConfig = sv1Scan.getCoinConfigAsOf(env.environment.clock.now)
     actAndCheck(
       s"Add the phantom SV \"$svName\"",
-      svc.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+      sv1.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(svcParty),
         optTimeout = None,
-        commands = svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        commands = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
           .head
           .id
@@ -71,7 +71,7 @@ trait SvTestUtil extends CNNodeTestCommon {
     )(
       s"$svName is a member of the SvcRules",
       _ =>
-        svc.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
           .head
           .data

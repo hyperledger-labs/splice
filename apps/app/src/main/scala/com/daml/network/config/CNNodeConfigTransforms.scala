@@ -16,7 +16,6 @@ import com.daml.network.sv.config.{
   SvSequencerConfig,
   SvDomainNodeConfig,
 }
-import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
@@ -61,7 +60,6 @@ object CNNodeConfigTransforms {
     val suffix = context.toLowerCase
 
     val transforms = Seq(
-      updateSvcAppConfig(c => c.copy(svUser = s"${c.svUser}-$suffix")),
       updateAllSvAppConfigs_(c =>
         c.copy(
           ledgerApiUser = s"${c.ledgerApiUser}-$suffix",
@@ -117,7 +115,6 @@ object CNNodeConfigTransforms {
   def updateAllAutomationConfigs(transform: AutomationConfigTransform): CNNodeConfigTransform = {
     config =>
       val transforms = Seq(
-        updateSvcAppConfig(c => c.focus(_.automation).modify(transform)),
         updateAllSvAppConfigs_(c => c.focus(_.automation).modify(transform)),
         updateAllScanAppConfigs_(c => c.focus(_.automation).modify(transform)),
         updateAllValidatorConfigs_(c => c.focus(_.automation).modify(transform)),
@@ -183,7 +180,6 @@ object CNNodeConfigTransforms {
   type DirectoryClientConfigReader = CnAppConfigTransform[DirectoryAppClientConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
-  type SvcAppTransform = CnAppConfigTransform[SvcAppBackendConfig]
   type ScanAppTransform = CnAppConfigTransform[ScanAppBackendConfig]
   type SplitwellAppTransform = CnAppConfigTransform[SplitwellAppBackendConfig]
   type RemoteSplitwellAppTransform = CnAppConfigTransform[SplitwellAppClientConfig]
@@ -192,7 +188,6 @@ object CNNodeConfigTransforms {
   def setCoinPrice(price: BigDecimal): CNNodeConfigTransform =
     config =>
       Seq(
-        updateSvcAppConfig(c => c.focus(_.coinPrice).replace(price)),
         updateAllSvAppFoundCollectiveConfigs_(c => c.focus(_.initialCoinPrice).replace(price)),
         updateAllSvAppConfigs_(c => c.focus(_.initialCoinPriceVote).replace(Some(price))),
       ).foldLeft(config)((c, tf) => tf(c))
@@ -232,15 +227,6 @@ object CNNodeConfigTransforms {
       cantonConfig
         .focus(_.scanApps)
         .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
-
-  def updateSvcAppConfig(update: SvcAppTransform): CNNodeConfigTransform =
-    cantonConfig =>
-      cantonConfig
-        .focus(_.svcApp)
-        .replace(cantonConfig.svcApp match {
-          case None => None
-          case Some(svcApp) => Some(update(svcApp))
-        })
 
   def updateAllSvAppConfigs(
       update: (String, SvAppBackendConfig) => SvAppBackendConfig
@@ -342,7 +328,6 @@ object CNNodeConfigTransforms {
   def bumpCantonPortsBy(bump: Int): CNNodeConfigTransform = {
 
     val transforms = Seq(
-      updateSvcAppConfig(_.focus(_.participantClient).modify(portTransform(bump, _))),
       updateAllSvAppConfigs_(
         _.focus(_.participantClient)
           .modify(portTransform(bump, _))
@@ -437,9 +422,6 @@ object CNNodeConfigTransforms {
     val transforms: Seq[CNNodeConfigTransform] = Seq(
       updateAllValidatorConfigs_(c => {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
-      }),
-      updateSvcAppConfig(c => {
-        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
       }),
       updateAllSvAppConfigs_(c => {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
