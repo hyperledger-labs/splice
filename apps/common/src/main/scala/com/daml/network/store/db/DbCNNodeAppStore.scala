@@ -2,13 +2,7 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{
-  CNNodeAppStore,
-  ConfiguredDefaultDomain,
-  InMemoryDomainStore,
-  InMemoryMultiDomainAcsStore,
-  TxLogStore,
-}
+import com.daml.network.store.*
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -81,3 +75,21 @@ abstract class DbCNNodeAppStoreWithoutHistory(
       tableName,
       storeDescriptor,
     ) { this: ConfiguredDefaultDomain => }
+
+abstract class DbCNNodeAppStoreWithHistory[
+    TXI <: TxLogStore.IndexRecord,
+    TXE <: TxLogStore.Entry[TXI],
+](
+    storage: DbStorage,
+    tableName: String,
+    storeDescriptor: io.circe.Json,
+)(implicit
+    ec: ExecutionContext,
+    templateJsonDecoder: TemplateJsonDecoder,
+    closeContext: CloseContext,
+) extends DbCNNodeAppStore[TXI, TXE](
+      storage,
+      tableName,
+      storeDescriptor,
+    )
+    with CNNodeAppStoreWithHistory[TXI, TXE] { this: ConfiguredDefaultDomain => }

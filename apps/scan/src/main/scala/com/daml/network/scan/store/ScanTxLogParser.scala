@@ -84,7 +84,7 @@ class ScanTxLogParser(
 
 object ScanTxLogParser {
 
-  trait TxLogIndexRecord extends TxLogStore.IndexRecord
+  sealed trait TxLogIndexRecord extends TxLogStore.IndexRecord
 
   object TxLogIndexRecord {
     final case class ErrorIndexRecord(
@@ -105,7 +105,7 @@ object ScanTxLogParser {
         effectiveAt: Instant,
     ) extends TxLogIndexRecord
 
-    trait RewardIndexRecord extends TxLogIndexRecord {
+    sealed trait RewardIndexRecord extends TxLogIndexRecord {
       def party: PartyId
       def amount: BigDecimal
       def round: Long

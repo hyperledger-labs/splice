@@ -166,3 +166,89 @@ create index directory_acs_store_sid_deo_den
 create index directory_acs_store_sid_snpd
     on directory_acs_store (store_id, subscription_next_payment_due_at)
     where subscription_next_payment_due_at is not null;
+
+-- Scan store
+------------------
+
+create table scan_acs_store
+(
+    like acs_store_template including all,
+
+    -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
+    foreign key (store_id) references store_descriptors (id),
+
+    -- index columns
+    ----------------
+
+    -- the round of the OpenMiningRound/ClosedMiningRound/IssuingMiningRound/SummarizingMiningRound contract
+    round                       bigint,
+
+    -- the party id of the validator
+    validator                   text,
+
+    -- amount of coins
+    amount                      numeric,
+
+    -- the receiverName of an ImportCreate contract
+    import_crate_receiver_name  text,
+
+    -- the provider partyid of a FeaturedAppRight contract
+    featured_app_right_provider text
+);
+
+-- lookup validator traffic
+create index scan_acs_store_sid_tid_val
+    on scan_acs_store (store_id, template_id, validator, event_number)
+    where validator is not null;
+
+-- list ImportCrates
+create index scan_acs_store_sid_tid_icrn
+    on scan_acs_store (store_id, template_id, import_crate_receiver_name)
+    where import_crate_receiver_name is not null;
+
+-- lookup FeaturedAppRight
+create index scan_acs_store_sid_tid_farp
+    on scan_acs_store (store_id, template_id, featured_app_right_provider)
+    where featured_app_right_provider is not null;
+
+create table scan_txlog_store
+(
+    like txlog_store_template including all,
+
+    -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
+    foreign key (store_id) references store_descriptors (id),
+
+    -- index columns
+    ----------------
+
+    -- defines what type of index record this row represents.
+    -- parent traits (e.g. RewardIndexRecord) are *not* present in the DB, only their subclasses
+    index_record_type                                        text not null,
+
+    -- the round of a OpenMiningRound/ClosedMiningRound/Reward/ExtraTrafficPurchase IndexRecord
+    round                                                    bigint,
+
+    -- The value of the reward coupon (in CC) in AppRewardIndexRecord/ValidatorRewardIndexRecord
+    reward_amount                                            numeric,
+
+    -- the party of a AppRewardIndexRecord/ValidatorRewardIndexRecord
+    rewarded_party                                           text,
+
+    -- change_to_initial_amount_as_of_round_zero in BalanceChangeIndexRecord
+    balance_change_change_to_initial_amount_as_of_round_zero numeric,
+
+    -- change_to_holding_fees_rate in BalanceChangeIndexRecord
+    balance_change_change_to_holding_fees_rate               numeric,
+
+    -- the validator of a ExtraTrafficPurchaseIndexRecord
+    extra_traffic_validator                                  text,
+
+    -- traffic_purchased in ExtraTrafficPurchaseIndexRecord
+    extra_traffic_purchase_traffic_purchased                 bigint,
+
+    -- cc_spent in ExtraTrafficPurchaseIndexRecord
+    extra_traffic_purchase_cc_spent                          numeric
+);
+
+create index scan_txlog_store_sid_irt_r_en
+    on scan_txlog_store (store_id, index_record_type, round, entry_number desc);

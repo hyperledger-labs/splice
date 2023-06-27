@@ -6,20 +6,19 @@ import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
-import com.daml.network.scan.store
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{
   CNNodeAppStoreWithHistory,
   ConfiguredDefaultDomain,
-  InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
 }
 import MultiDomainAcsStore.{ContractWithState, ReadyContract}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.util.{CoinConfigSchedule, Contract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -41,30 +40,18 @@ trait ScanStore
 
   protected[this] def scanConfig: ScanAppBackendConfig
 
-  override final def defaultAcsDomain = scanConfig.domains.global.alias
+  override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter =
+    ScanStore.contractFilter(svcParty, scanConfig)
 
-  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
-    store.ScanTxLogParser.TxLogIndexRecord,
-    store.ScanTxLogParser.TxLogEntry,
-  ]
+  override final def defaultAcsDomain = scanConfig.domains.global.alias
 
   def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] = for {
-    domain <- defaultAcsDomainIdF
-    contractO <- multiDomainAcsStore
-      .findContractOnDomain(cc.coin.CoinRules.COMPANION)(domain, (_: Any) => true)
-  } yield contractO.map(ReadyContract(_, domain))
+  ): Future[Option[ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
 
   def lookupCoinRulesV1Test()(implicit tc: TraceContext): Future[
-    Option[
-      ReadyContract[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]
-    ]
-  ] = for {
-    domain <- defaultAcsDomainIdF
-    contractO <- multiDomainAcsStore
-      .findContractOnDomain(ccV1Test.coin.CoinRulesV1Test.COMPANION)(domain, (_: Any) => true)
-  } yield contractO.map(ReadyContract(_, domain))
+    Option[ReadyContract[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]]
+  ]
 
   def getTotalCoinBalance()(implicit tc: TraceContext): Future[(BigDecimal, BigDecimal)]
 
@@ -95,13 +82,7 @@ trait ScanStore
 
   def lookupValidatorTraffic(validatorParty: PartyId)(implicit tc: TraceContext): Future[
     Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomain(ValidatorTraffic.COMPANION)(
-        _,
-        contract => contract.payload.validator == validatorParty.toProtoPrimitive,
-      )
-    )
+  ]
 
   def getTotalPaidValidatorTraffic(validatorParty: PartyId)(implicit
       tc: TraceContext
@@ -126,6 +107,11 @@ trait ScanStore
   def listImportCrates(receiver: String)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]]
+
+  def findFeaturedAppRight(
+      domainId: DomainId,
+      providerPartyId: PartyId,
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
 }
 

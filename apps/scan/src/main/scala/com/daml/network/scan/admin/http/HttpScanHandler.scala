@@ -260,12 +260,9 @@ class HttpScanHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         domainId <- store.defaultAcsDomainIdF
-        right <- store.multiDomainAcsStore.findContractOnDomain(
-          coinCodegen.FeaturedAppRight.COMPANION
-        )(
+        right <- store.findFeaturedAppRight(
           domainId,
-          (co: Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]) =>
-            co.payload.provider == providerPartyId,
+          PartyId.tryFromProtoPrimitive(providerPartyId),
         )
       } yield {
         definitions.LookupFeaturedAppRightResponse(right.map(r => r.toJson))
