@@ -16,6 +16,16 @@ Release Notes
   ``application/json``. This matches the OAuth standard and is
   compatible with a wider range of IAMs. No change is required if your
   IAM configuration was working previously.
+* The public keys of other super validators now need to be specified in
+  the ``approvedSvIdentities`` section in ``sv-values.yaml``. For TestNet launch these are::
+
+    approvedSvIdentities:
+      - name: sbi
+        publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETM+CeyHvphl9RiPDKL3vVX7F+Qo4fIhJopmgU5B7IzkwSdFic20hFB6tnAuCTU+UBjqZgh8N/h9r+CTrXMPsRg==
+      - name: intellecteu-canton-da-test
+        publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw==
+      - name: damlHub
+        publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==
 
 2023-06-25
 ----------

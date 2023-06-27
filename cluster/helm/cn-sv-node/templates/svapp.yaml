@@ -119,6 +119,14 @@ spec:
             - name: CN_APP_VALIDATOR_ONBOARDING_SECRET_{{ $ii }}
               valueFrom: {{ $onboarding.secretFrom | toYaml | nindent 16 }}
             {{- end }}
+            {{- range $ii, $sv := .Values.approvedSvIdentities }}
+            - name: ADDITIONAL_CONFIG_APPROVED_SV_IDENTITY_{{ $ii }}
+              value: |
+                canton.sv-apps.sv.approved-sv-identities.{{ $ii }} = {
+                  name = {{ $sv.name | quote }}
+                  public-key = {{ $sv.publicKey | quote }}
+                }
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

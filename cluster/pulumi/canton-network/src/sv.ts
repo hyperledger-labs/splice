@@ -57,6 +57,8 @@ export type SvOnboarding =
 
 export type ValidatorOnboarding = { name: string; expiresIn: string; secret: string };
 
+export type ApprovedSvIdentity = { name: string; publicKey: string };
+
 export const validatorOnboardingSecretName = (onboarding: ValidatorOnboarding): string =>
   `cn-app-validator-onboarding-${onboarding.name}`;
 
@@ -90,6 +92,7 @@ export async function installSvNode(
   validatorWalletUser: string,
   onboarding: SvOnboarding,
   withDomainFees: boolean,
+  approvedSvIdentities: ApprovedSvIdentity[],
   withScan = false,
   withDirectoryBackend = false,
   expectedValidatorOnboardings: ValidatorOnboarding[] = [],
@@ -175,7 +178,8 @@ export async function installSvNode(
         },
       },
     })),
-    isDevNet: isDevNet,
+    isDevNet,
+    approvedSvIdentities,
   } as ChartValues;
 
   if (onboarding.type == 'join-with-key') {
