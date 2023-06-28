@@ -1,13 +1,15 @@
 package com.daml.network.integration.tests.runbook
 
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.FrontendLoginUtil
+import com.daml.network.util.{CoinConfigSchedule, FrontendLoginUtil}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import scala.concurrent.duration.*
+import java.time.{Duration, Instant}
 
 class NonDevNetPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
@@ -81,6 +83,7 @@ class NonDevNetPreflightIntegrationTest
 
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
+      import scala.concurrent.duration.*
       eventually(3.minutes) {
         val asOfRound = find(id("as-of-round")).value.text
         asOfRound should startWith("The content on this page is computed as of round: ")
@@ -103,6 +106,32 @@ class NonDevNetPreflightIntegrationTest
       )(_.httpReady shouldBe true)
       splitwellClient.health.status.isActive shouldBe Some(true)
     }
+  }
+
+  "Check latest open mining round from SV1 scan-app has been open for < 1.3 ticks" in {
+    implicit env =>
+      val round = sv1ScanClient.getLatestOpenMiningRound(env.environment.clock.now).contract.payload
+      checkRoundWithinTickDuration(round.opensAt, 1.3)
+  }
+
+  "Check latest open mining round from SV1 sv-app has been open for < 1.3 ticks" in {
+    implicit env =>
+      val round = sv1Client.getSvcInfo().latestMiningRound.payload
+      checkRoundWithinTickDuration(round.opensAt, 1.3)
+  }
+
+  private def checkRoundWithinTickDuration(round: Instant, factor: Double)(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): Unit = {
+    val tickDuration: RelTime = CoinConfigSchedule(
+      sv1ScanClient
+        .getCoinRules()
+        .toReadyContract
+        .getOrElse(fail("coinRules is currently in-flight"))
+    ).getConfigAsOf(env.environment.clock.now).tickDuration
+    (env.environment.clock.now - CantonTimestamp.assertFromInstant(
+      round
+    )) should be < Duration.ofNanos(tickDuration.microseconds * (1000 * factor).longValue())
   }
 
 }

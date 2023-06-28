@@ -1,9 +1,7 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
-import cats.syntax.foldable.*
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
@@ -13,19 +11,20 @@ import com.daml.network.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
-import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.http.v0.sv.SvResource
+import com.daml.network.http.v0.{definitions, sv as v0}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.setup.SvcPartyHosting
-import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock, ExpiringLock}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
+import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status.Code
@@ -276,12 +275,14 @@ class HttpSvHandler(
   )()(fake: Unit): Future[v0.SvResource.GetSvcInfoResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
+        latestOpenMiningRound <- svcStore.getLatestActiveOpenMiningRound()
         coinRules <- svcStore.getCoinRules()
         svcRules <- svcStore.getSvcRules()
       } yield definitions.GetSvcInfoResponse(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         svcPartyId = svcParty.toProtoPrimitive,
+        latestMiningRound = latestOpenMiningRound.toJson,
         coinRules = coinRules.toJson,
         svcRules = svcRules.toJson,
       )

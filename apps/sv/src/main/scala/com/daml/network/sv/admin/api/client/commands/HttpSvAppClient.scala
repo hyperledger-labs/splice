@@ -5,14 +5,13 @@ import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coin.CoinRules
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.http.v0.{definitions, sv as http}
-import com.daml.network.util.{TemplateJsonDecoder, Contract, Codec}
+import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.google.protobuf.ByteString
-import com.digitalasset.canton.domain.sequencing.sequencer.{
-  SequencerSnapshot as CantonSequencerSnapshot
-}
+import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
 import com.digitalasset.canton.protocol.v0
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
@@ -40,6 +39,7 @@ object HttpSvAppClient {
       svUser: String,
       svParty: PartyId,
       svcParty: PartyId,
+      latestMiningRound: Contract[OpenMiningRound.ContractId, OpenMiningRound],
       coinRules: Contract[CoinRules.ContractId, CoinRules],
       svcRules: Contract[SvcRules.ContractId, SvcRules],
   )
@@ -196,6 +196,7 @@ object HttpSvAppClient {
               svUser,
               svPartyId,
               svcPartyId,
+              latestMiningRound,
               coinRules,
               svcRules,
             )
@@ -203,12 +204,17 @@ object HttpSvAppClient {
         for {
           svPartyId <- Codec.decode(Codec.Party)(svPartyId)
           svcPartyId <- Codec.decode(Codec.Party)(svcPartyId)
+          latestMiningRound <- Contract
+            .fromJson(OpenMiningRound.COMPANION)(latestMiningRound)
+            .left
+            .map(_.toString)
           coinRules <- Contract.fromJson(CoinRules.COMPANION)(coinRules).left.map(_.toString)
           svcRules <- Contract.fromJson(SvcRules.COMPANION)(svcRules).left.map(_.toString)
         } yield SvcInfo(
           svUser,
           svPartyId,
           svcPartyId,
+          latestMiningRound,
           coinRules,
           svcRules,
         )

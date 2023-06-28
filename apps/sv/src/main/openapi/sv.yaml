@@ -831,6 +831,7 @@ components:
         - sv_user
         - sv_party_id
         - svc_party_id
+        - latest_mining_round
         - coin_rules
         - svc_rules
       properties:
@@ -843,6 +844,9 @@ components:
         # Party representing the whole SVC
         svc_party_id:
           type: string
+        # Contract ID of the OpenMiningRound contract of the latest Mining Round
+        latest_mining_round:
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
         # Contract ID of the CoinRules contract associated with the SVC
         coin_rules:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
