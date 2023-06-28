@@ -5,9 +5,11 @@ import com.daml.ledger.javaapi.data.{
   ContractMetadata,
   CreatedEvent,
   ExercisedEvent,
+  Identifier,
   LedgerOffset,
   TransactionTree,
   TreeEvent,
+  Value as damlValue,
   Unit as damlUnit,
 }
 import com.google.protobuf
@@ -130,6 +132,30 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  protected def exercisedEvent[TCid <: ContractId[T], T](
+      contractId: String,
+      templateId: Identifier,
+      interfaceId: Option[Identifier],
+      choice: String,
+      consuming: Boolean,
+      argument: damlValue,
+      result: damlValue,
+  ): ExercisedEvent = {
+    new ExercisedEvent(
+      eventId = "dummyEventId",
+      contractId = contractId,
+      templateId = templateId,
+      interfaceId = interfaceId.toJava,
+      witnessParties = Seq.empty.asJava,
+      consuming = consuming,
+      choice = choice,
+      choiceArgument = argument,
+      exerciseResult = result,
+      actingParties = Seq.empty.asJava,
+      childEventIds = Seq.empty.asJava,
+    )
+  }
+
   protected def withEventId(
       event: TreeEvent,
       eventId: String,
@@ -166,6 +192,21 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       )
     case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
   }
+
+  protected def withChildren(exercised: ExercisedEvent, childEventIds: Seq[String]) =
+    new ExercisedEvent(
+      eventId = exercised.getEventId,
+      contractId = exercised.getContractId,
+      templateId = exercised.getTemplateId,
+      interfaceId = exercised.getInterfaceId,
+      witnessParties = exercised.getWitnessParties,
+      consuming = exercised.isConsuming,
+      choice = exercised.getChoice,
+      choiceArgument = exercised.getChoiceArgument,
+      exerciseResult = exercised.getExerciseResult,
+      actingParties = exercised.getActingParties,
+      childEventIds = childEventIds.asJava,
+    )
 
   protected val dummyDomain = DomainId.tryFromString("dummy::domain")
 
@@ -267,6 +308,25 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         ),
       )
 
+    def createMulti[TCid <: ContractId[T], T](
+        c: Contract[TCid, T],
+        offset: String = nextOffset,
+    )(implicit stores: Seq[MultiDomainAcsStore]) = {
+      val tx = TransactionTreeUpdate(
+        mkCreateTx(
+          offset,
+          Seq(c),
+        )
+      )
+      // Note: runs the futures sequentially in order to get deterministic tests
+      stores.foldLeft(Future.unit) { (acc, store) =>
+        for {
+          _ <- acc
+          _ <- store.ingestionSink.ingestUpdate(domain, tx)
+        } yield ()
+      }
+    }
+
     def archive[TCid <: ContractId[T], T](
         c: Contract[TCid, T]
     )(implicit store: MultiDomainAcsStore) =
@@ -276,6 +336,18 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           mkTx(nextOffset, Seq(toArchivedEvent(c)))
         ),
       )
+
+    def ingest(
+        makeTx: String => TransactionTree
+    )(implicit store: MultiDomainAcsStore) = {
+      val tx = makeTx(nextOffset)
+      store.ingestionSink.ingestUpdate(
+        domain,
+        TransactionTreeUpdate(
+          tx
+        ),
+      )
+    }
 
     def transferOut[TCid <: ContractId[T], T](
         contractAndDomain: (Contract[TCid, T], DomainId),
@@ -331,13 +403,34 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  protected def mkExerciseTx(
+      offset: String,
+      root: ExercisedEvent,
+      children: Seq[TreeEvent],
+  ): TransactionTree = {
+    val childrenWithId = children.zipWithIndex.map { case (e, i) =>
+      withEventId(e, s"$offset:${i + 1}")
+    }
+    val rootWithId = withEventId(withChildren(root, childrenWithId.map(_.getEventId)), s"$offset:0")
+    val eventsById = (rootWithId +: childrenWithId).map(e => e.getEventId -> e).toMap
+    val rootEventIds = Seq(rootWithId.getEventId)
+    new TransactionTree(
+      transactionId = "",
+      commandId = "",
+      workflowId = "",
+      effectiveAt = effectiveAt,
+      offset = offset,
+      eventsById = eventsById.asJava,
+      rootEventIds = rootEventIds.asJava,
+    )
+  }
+
   protected def mkTransfer[T <: TransferEvent](offset: String, event: T): Transfer[T] =
     Transfer(
       updateId = "",
       offset = new LedgerOffset.Absolute(offset),
       event = event,
     )
-
 }
 
 object StoreTest {

@@ -42,7 +42,12 @@ class DbDirectoryStore(
       storage,
       DbDirectoryStore.tableName,
       // TODO (#5544): change this to something better
-      storeDescriptor = Json.obj("version" -> Json.fromInt(1)),
+      storeDescriptor = Json.obj(
+        "version" -> Json.fromInt(1),
+        "store" -> Json.fromString("DbDirectoryStore"),
+        "providerParty" -> Json.fromString(providerParty.toProtoPrimitive),
+        "svcParty" -> Json.fromString(svcParty.toProtoPrimitive),
+      ),
     )
     with DirectoryStore
     with AcsTables

@@ -227,6 +227,7 @@ class HttpWalletHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
+        // TODO(#6176): add pagination or document that this only returns the first N items.
         validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
           userStore,
           None,

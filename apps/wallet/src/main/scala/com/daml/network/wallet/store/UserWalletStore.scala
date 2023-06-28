@@ -1,12 +1,8 @@
 package com.daml.network.wallet.store
 
-import com.daml.network.automation.MultiDomainExpiredContractTrigger
-import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.InputCoin
-import com.daml.network.codegen.java.cc.api.v1.round.Round
-import com.daml.network.codegen.java.cc.coin.ValidatorRight
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.{
   directory as directoryCodegen,
   splitwell as splitwellCodegen,
@@ -20,12 +16,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.{
-  CNNodeAppStoreWithHistory,
-  InMemoryMultiDomainAcsStore,
-  PageLimit,
-  ConfiguredDefaultDomain,
-}
+import com.daml.network.store.{CNNodeAppStoreWithHistory, ConfiguredDefaultDomain, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.wallet.store.UserWalletStore.{
@@ -48,7 +39,6 @@ import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore
@@ -62,20 +52,15 @@ trait UserWalletStore
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
-  // TODO (#5164): Remove this override so that multiDomainAcsStore is just the generic MultiDomainAcsStore
-  def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
-    UserWalletTxLogParser.TxLogIndexRecord,
-    UserWalletTxLogParser.TxLogEntry,
-  ]
-
   def lookupInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
-  ] = for {
-    domainId <- defaultAcsDomainIdF
-    // TODO (#5164): Replace with a wallet-specific lookup by templateId
-    ct <- multiDomainAcsStore
-      .findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(domainId, (_: Any) => true)
-  } yield ct
+  ] = defaultAcsDomainIdF.flatMap(
+    multiDomainAcsStore
+      // Note: there is nothing that prevents a party from having multiple WalletAppInstall contracts
+      // here we just take the first one.
+      .listContractsOnDomain(installCodegen.WalletAppInstall.COMPANION, _, PageLimit(1))
+      .map(_.headOption)
+  )
 
   def getInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
@@ -85,10 +70,9 @@ trait UserWalletStore
     throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
   )
 
-  def signalWhenIngestedOrShutdown(offset: String)(implicit tc: TraceContext): Future[Unit] =
-    multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)
-
-  import MultiDomainExpiredContractTrigger.ListExpiredContracts
+  def signalWhenIngestedOrShutdown(offset: String)(implicit
+      tc: TraceContext
+  ): Future[Unit] = multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)
 
   def listExpiredTransferOffers: ListExpiredContracts[
     transferOffersCodegen.TransferOffer.ContractId,
@@ -101,12 +85,11 @@ trait UserWalletStore
   def listExpiredAcceptedTransferOffers: ListExpiredContracts[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
-  ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(
-      transferOffersCodegen.AcceptedTransferOffer.COMPANION
-    )(
-      _.expiresAt
-    )
+  ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(
+    transferOffersCodegen.AcceptedTransferOffer.COMPANION
+  )(
+    _.expiresAt
+  )
 
   def listAppPaymentRequests(implicit tc: TraceContext): Future[Seq[AppPaymentRequest]] = {
     for {
@@ -152,10 +135,9 @@ trait UserWalletStore
   def listExpiredAppPaymentRequests: ListExpiredContracts[
     walletCodegen.AppPaymentRequest.ContractId,
     walletCodegen.AppPaymentRequest,
-  ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(walletCodegen.AppPaymentRequest.COMPANION)(
-      _.expiresAt
-    )
+  ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(walletCodegen.AppPaymentRequest.COMPANION)(
+    _.expiresAt
+  )
 
   def listSubscriptionStatesReadyForPayment: ListExpiredContracts[
     subsCodegen.SubscriptionIdleState.ContractId,
@@ -167,14 +149,13 @@ trait UserWalletStore
           state.nextPaymentDueAt.minus(CNNodeUtil.relTimeToDuration(state.payData.paymentDuration))
         )
 
-      multiDomainAcsStore.filterReadyContracts(
-        subsCodegen.SubscriptionIdleState.COMPANION,
-        (c: Contract[
-          subsCodegen.SubscriptionIdleState.ContractId,
-          subsCodegen.SubscriptionIdleState,
-        ]) => isReadyForPayment(c.payload),
-        PageLimit(limit.toLong),
-      )
+      for {
+        idleStates <- multiDomainAcsStore.listReadyContracts(
+          subsCodegen.SubscriptionIdleState.COMPANION
+        )
+      } yield idleStates
+        .filter(s => isReadyForPayment(s.contract.payload))
+        .take(limit)
     }
 
   def listSubscriptions()(implicit
@@ -275,7 +256,9 @@ trait UserWalletStore
   def listSortedCoinsAndQuantity(
       maxNumInputs: Int,
       submittingRound: Long,
-  )(implicit tc: TraceContext): Future[Seq[(BigDecimal, InputCoin)]] = for {
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[(BigDecimal, ccApiCodegen.coin.transferinput.InputCoin)]] = for {
     domainId <- defaultAcsDomainIdF
     coins <- multiDomainAcsStore.listContractsOnDomain(
       coinCodegen.Coin.COMPANION,
@@ -298,8 +281,8 @@ trait UserWalletStore
     .map(quantityAndCoin =>
       (
         quantityAndCoin._1,
-        new v1.coin.transferinput.InputCoin(
-          quantityAndCoin._2.contractId.toInterface(v1.coin.Coin.INTERFACE)
+        new ccApiCodegen.coin.transferinput.InputCoin(
+          quantityAndCoin._2.contractId.toInterface(ccApiCodegen.coin.Coin.INTERFACE)
         ),
       )
     )
@@ -312,74 +295,32 @@ trait UserWalletStore
       activeIssuingRoundsO: Option[Set[Long]],
   )(implicit tc: TraceContext): Future[Seq[
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
-  ]] = {
-    def filterActiveRounds(round: Long) = activeIssuingRoundsO match {
-      case Some(rounds) => rounds.contains(round)
-      case None => true
-    }
-    // TODO(M3-83): use an index to access sorted rounds in the DB schema.
-    for {
-      domainId <- defaultAcsDomainIdF
-      rewards <- multiDomainAcsStore.listContractsOnDomain(
-        coinCodegen.ValidatorRewardCoupon.COMPANION,
-        domainId,
-      )
-    } yield rewards
-      .filter(rw => filterActiveRounds(rw.payload.round.number))
-      .sortBy(_.payload.round.number)
-      .take(maxNumInputs.getOrElse(Int.MaxValue))
-  }
+  ]]
 
   /** Returns the validator reward coupon sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedAppRewards(
       maxNumInputs: Int,
-      issuingRoundsMap: Map[Round, IssuingMiningRound],
+      issuingRoundsMap: Map[ccApiCodegen.round.Round, roundCodegen.IssuingMiningRound],
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
-  ]] = for {
-    domainId <- defaultAcsDomainIdF
-    // TODO(M3-83): use an index to access sorted rounds in the DB schema.
-    rewards <- multiDomainAcsStore.listContractsOnDomain(
-      coinCodegen.AppRewardCoupon.COMPANION,
-      domainId,
-    )
-  } yield rewards
-    .flatMap { rw =>
-      val issuingO = issuingRoundsMap.get(rw.payload.round)
-      issuingO
-        .map(i => {
-          val quantity =
-            if (rw.payload.featured)
-              rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
-            else
-              rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
-          (rw, BigDecimal(quantity))
-        })
-    }
-    .sorted(
-      Ordering[(Long, BigDecimal)].on(
-        (x: (
-            Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
-            BigDecimal,
-        )) => (x._1.payload.round.number, -x._2)
-      )
-    )
-    .take(maxNumInputs)
+  ]]
 
   def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      // TODO (#5164): Replace with a wallet-specific lookup by templateId
-      multiDomainAcsStore.findContractOnDomain(coinCodegen.FeaturedAppRight.COMPANION)(_, _ => true)
-    )
+  ] = defaultAcsDomainIdF.flatMap(
+    multiDomainAcsStore
+      // Note: there is nothing that prevents a party from having multiple FeaturedAppRight contracts
+      // here we just take the first one.
+      .listContractsOnDomain(coinCodegen.FeaturedAppRight.COMPANION, _, PageLimit(1))
+      .map(_.headOption)
+  )
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   def getValidatorRightsWhereUserIsValidator()(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[ValidatorRight.ContractId, ValidatorRight]]] =
+  ): Future[Seq[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]] =
     defaultAcsDomainIdF.flatMap(
       multiDomainAcsStore.listContractsOnDomain(
         coinCodegen.ValidatorRight.COMPANION,
@@ -390,15 +331,7 @@ trait UserWalletStore
   def listTransactions(
       beginAfterEventId: Option[String],
       limit: Int,
-  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]] =
-    for {
-      domain <- domains.waitForDomainConnection(defaultAcsDomain)
-      entries <- beginAfterEventId.fold(
-        txLogReader.getTxLogByOffset(0, limit)
-      )(
-        txLogReader.getTxLogAfterEventId(domain, _, limit)
-      )
-    } yield entries
+  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]]
 
   override protected def txLogParser =
     new UserWalletTxLogParser(
@@ -574,10 +507,6 @@ object UserWalletStore {
             co.payload.subscriptionData.sender == endUser
         ),
         mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc &&
-            co.payload.subscriptionData.sender == endUser
-        ),
-        mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),

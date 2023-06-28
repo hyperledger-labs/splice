@@ -66,8 +66,6 @@ class WalletPersistenceTest
           contractMetadataContractKeyHash = Some("0123456789"),
           contractMetadataDriverInternal = Array(255.toByte, 0.toByte, 255.toByte, 0.toByte),
           contractExpiresAt = Some(Timestamp.Epoch.add(Duration.ofDays(2))),
-          rewardCouponRoundNumber = Some(13),
-          subscriptionReadyForRenewalAt = Some(Timestamp.Epoch.add(Duration.ofDays(3))),
         )
         _ <- storage.queryAndUpdate(
           insertRowIfNotExists(AcsTable)(

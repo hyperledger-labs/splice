@@ -82,26 +82,11 @@ create table user_wallet_acs_store(
     like acs_store_template including all,
 
     -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
-    foreign key (store_id) references store_descriptors(id),
+    foreign key (store_id) references store_descriptors(id)
 
     -- index columns
     ----------------
-
-    -- The round for which a reward coupons was registered
-    reward_coupon_round_number bigint,
-
-    -- The time as of which a subscription can be renewed
-    subscription_ready_for_renewal_at bigint
 );
-
-create index user_wallet_acs_store_sid_rcrn
-    on user_wallet_acs_store (store_id, reward_coupon_round_number)
-    where reward_coupon_round_number is not null;
-
-create index user_wallet_acs_store_sid_srfr
-    on user_wallet_acs_store (store_id, subscription_ready_for_renewal_at)
-    where subscription_ready_for_renewal_at is not null;
-
 
 create table user_wallet_txlog_store(
     like txlog_store_template including all,

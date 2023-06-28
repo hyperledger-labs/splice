@@ -188,6 +188,7 @@ class UserWalletManager(
           }
         )
       validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
+      // TODO(#6176): do not take unbounded number of items
     } yield validatorRewardCoupons.flatten.take(maxNumInputs.getOrElse(Int.MaxValue))
 
   override def isHealthy: Boolean = endUserWalletsMap.values.forall(_._2.isHealthy)

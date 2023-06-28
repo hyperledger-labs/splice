@@ -48,12 +48,12 @@ trait AcsJdbcTypes {
   protected implicit def contractIdJdbcType[T]: JdbcType[ContractId[T]] =
     MappedColumnType.base[ContractId[T], String](_.contractId, new ContractId[T](_))
 
-  protected implicit def contractIdSetParameter[T]: SetParameter[ContractId[T]] =
-    (c: ContractId[T], pp: PositionedParameters) =>
+  protected implicit def contractIdSetParameter: SetParameter[ContractId[?]] =
+    (c: ContractId[?], pp: PositionedParameters) =>
       implicitly[SetParameter[String2066]].apply(lengthLimited(c.contractId), pp)
 
-  protected implicit def contractIdSetParameterOption[T]: SetParameter[Option[ContractId[T]]] =
-    (cId: Option[ContractId[T]], pp: PositionedParameters) =>
+  protected implicit def contractIdSetParameterOption: SetParameter[Option[ContractId[?]]] =
+    (cId: Option[ContractId[?]], pp: PositionedParameters) =>
       implicitly[SetParameter[Option[String2066]]]
         .apply(cId.map(c => lengthLimited(c.contractId)), pp)
 
