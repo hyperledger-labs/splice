@@ -239,6 +239,13 @@ function _assert_lock() {
 declare -A subcommand_whitelist
 
 function _prompt_to_confirm() {
+    # Many subcommands invoke other subcommands to do their work. This
+    # keeps a record of the first confirmation prompt to avoid prompting
+    # the user at every one of these steps.
+    if [ -n "${USER_PROMPT_CONFIRMED:-}" ]; then
+        return
+    fi
+
     _cluster_show
 
     if [ "${1-}" != "--no-lock" ]; then
@@ -253,6 +260,7 @@ function _prompt_to_confirm() {
     fi
 
     _confirm "Confirm: ${subcommand_whitelist[${SUBCOMMAND_NAME}]}"
+   USER_PROMPT_CONFIRMED=1
 }
 
 ###
