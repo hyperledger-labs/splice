@@ -16,12 +16,13 @@ if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
-const singleSv = process.env.SINGLE_SV !== undefined && process.env.SINGLE_SV !== '';
+const singleSv = (process.env.SINGLE_SV !== undefined && process.env.SINGLE_SV !== '') || !isDevNet;
 if (singleSv) {
   console.error('Launching with a single SV');
 }
 
-const withDomainFees = process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '';
+const withDomainFees =
+  (process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '') || !isDevNet;
 if (withDomainFees && !singleSv) {
   console.error(
     `Currently, you cannot enable domain fees with more than one SV, please also set SINGLE_SV to 1 and rerun (${singleSv})`
