@@ -30,7 +30,7 @@ class WalletSubscriptionsIntegrationTest
 
       val nonExistentName = "does not exist"
       val errorString =
-        s"status: 404 Not Found, message: contract id not found: ContractId(id = $nonExistentName"
+        s"HTTP 404 Not Found GET at '/wallet/subscription-requests/does%20not%20exist'. Command failed, message: contract id not found: ContractId(id = $nonExistentName"
 
       assertThrowsAndLogsCommandFailures(
         aliceWallet.getSubscriptionRequest(new SubscriptionRequest.ContractId(nonExistentName)),

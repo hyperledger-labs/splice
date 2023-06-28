@@ -15,9 +15,10 @@ import com.daml.network.http.v0.definitions.ErrorResponse
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.tracing.TraceContext
 
-case class HttpCommandException(status: StatusCode, message: String) extends Exception {
-  override def toString(): String = s"HttpCommandException (status: ${status}, message: ${message})"
-}
+case class HttpCommandException(request: HttpRequest, status: StatusCode, message: String)
+    extends Exception(
+      s"HTTP ${status} ${request.method.name} at '${request.uri.path.toString}'. Command failed, message: ${message}"
+    )
 
 /** Equivalent of Canton’s AdminCommand but for our
   * native HTTP APIs.
@@ -69,7 +70,10 @@ final class HttpClientBuilder()(implicit
     ec: ExecutionContext,
     mat: Materializer,
 ) {
-  private def getApiErrorFromResponse(response: HttpResponse): Future[HttpCommandException] = {
+  private def getApiErrorFromResponse(
+      request: HttpRequest,
+      response: HttpResponse,
+  ): Future[HttpCommandException] = {
     Unmarshal(response)
       .to[String]
       .map { body =>
@@ -81,7 +85,7 @@ final class HttpClientBuilder()(implicit
         // Fallback to original response string if deserializing to ErrorResponse fails
         decoded.getOrElse(body)
       }
-      .map { errorMessage => HttpCommandException(response.status, errorMessage) }
+      .map { errorMessage => HttpCommandException(request, response.status, errorMessage) }
   }
 
   def httpClientWithErrors(nextClient: HttpRequest => Future[HttpResponse])(
@@ -90,7 +94,7 @@ final class HttpClientBuilder()(implicit
     nextClient(req).flatMap { _resp =>
       _resp.status match {
         case StatusCodes.ServerError(_) | StatusCodes.ClientError(_) =>
-          getApiErrorFromResponse(_resp).flatMap { error =>
+          getApiErrorFromResponse(req, _resp).flatMap { error =>
             Future.failed(error)
           }
         case _ => Future.successful(_resp)

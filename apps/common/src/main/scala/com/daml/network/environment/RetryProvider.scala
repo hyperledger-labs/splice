@@ -585,7 +585,7 @@ object RetryProvider {
           s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
         logger.info(msg)
         TransientErrorKind
-      case Failure(ex @ HttpCommandException(status, _)) =>
+      case Failure(ex @ HttpCommandException(_, status, _)) =>
         if (retryableHttpStatusCodes.contains(status)) {
           logger.info(
             s"The operation ${operationName.singleQuoted} failed with a $transientDescription HTTP error: $ex"
