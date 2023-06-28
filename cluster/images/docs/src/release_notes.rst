@@ -26,6 +26,8 @@ Release Notes
         publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw==
       - name: damlHub
         publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==
+* The SV node now supports domain fee top-ups in a network where domain fees are enabled.
+  The ``validator-values.yaml`` file contains initial recommended values for those.
 
 2023-06-25
 ----------

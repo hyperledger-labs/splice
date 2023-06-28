@@ -173,20 +173,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     ...(fixedTokens() ? fixedTokensValue : {}),
   };
 
-  // TODO(#6032): determine the best defaults here
-  // TODO(#6151): move this to the runbook values once we enable domain fees in testnet
-  const domainFeesValues = {
-    topup: {
-      enabled: true,
-      targetThroughput: 10000,
-      minTopupInterval: '1m',
-    },
-  };
-
-  const validatorValuesWithMaybeDomainFees: ChartValues = {
-    ...validatorValuesWithMaybeFixedTokens,
-    ...(withDomainFees ? domainFeesValues : {}),
-  };
+  const validatorValuesWithMaybeDomainFees = validatorValuesWithMaybeFixedTokens;
+  if (!withDomainFees) {
+    validatorValuesWithMaybeDomainFees['topup']['enabled'] = false;
+  }
 
   const svValidatorSecrets = await createSvValidatorSecrets(svNamespace, auth0Client);
   const svDirectoryUiSecrets = createSvDirectoryUiSecrets(svNamespace, auth0Client);

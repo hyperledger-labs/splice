@@ -7,3 +7,8 @@
 {{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
 
 {{ $_ := required ".Values.foundingSvApiUrl is required." .Values.foundingSvApiUrl }}
+
+{{- if (.Values.topup).enabled }}
+{{ $_ := required ".Values.topup.targetThroughput is required when topup is enabled." .Values.topup.targetThroughput }}
+{{ $_ := required ".Values.topup.minTopupInterval is required when topup is enabled." .Values.topup.minTopupInterval }}
+{{- end }}
