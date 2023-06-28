@@ -20,8 +20,9 @@ class AcsStoreDumpImportIntegrationTest extends CNNodeIntegrationTest with Walle
   // and required adaption of the dump import code.
 
   // TODO(#6073): move to test/resources and remove the `./dumps` directory and its .gitignore once we dump to a Google Cloud Storage bucket
-  private val bootstrappingDumpFilename =
+  private val bootstrappingDumpFilename = {
     "dumps/static_test_data/test-dump_changed-package-ids.json"
+  }
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -62,7 +63,8 @@ class AcsStoreDumpImportIntegrationTest extends CNNodeIntegrationTest with Walle
         sv1Scan.listImportCrates(dora) should have size (0)
       }
 
-      checkWallet(alice, aliceWallet, Seq((10.0, 10.0)))
+      // Note: we import two coins, but they get merged
+      checkWallet(alice, aliceWallet, Seq((109.0, 110.0)))
       checkWallet(bob, bobWallet, Seq((20.0, 20.0)))
       checkWallet(charlie, charlieWallet, Seq((30.0, 30.0)))
     }

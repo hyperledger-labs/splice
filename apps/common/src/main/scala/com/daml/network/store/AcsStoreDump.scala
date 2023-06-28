@@ -16,7 +16,7 @@ object AcsStoreDump {
   )(implicit templateDecoder: TemplateJsonDecoder): Seq[data.Command] = {
     val ccPackageId = Ref.PackageId.assertFromString(cc.coin.Coin.TEMPLATE_ID.getPackageId)
 
-    def extractCoin(co: http.Contract) = {
+    def extractCoin(co: http.Contract): Seq[cc.coin.Coin] = {
       // fixup templateId
       val templateId = Ref.Identifier.assertFromString(co.templateId)
       val fixedTemplateId = Ref.Identifier(
@@ -24,8 +24,19 @@ object AcsStoreDump {
         templateId.qualifiedName,
       )
       val fixedContract = co.copy(templateId = fixedTemplateId.toString())
-      Contract.fromJson(cc.coin.Coin.COMPANION)(fixedContract).toSeq
-      // TODO(#6183): support locked contracts
+      // attempt to decode as a: Coin
+      Contract
+        .fromJson(cc.coin.Coin.COMPANION)(fixedContract)
+        .map(_.payload)
+        // LockedCoin
+        .orElse(Contract.fromJson(cc.coin.LockedCoin.COMPANION)(fixedContract).map(_.payload.coin))
+        // ImportCrate, as not all of them might have been imported
+        .orElse(
+          Contract
+            .fromJson(cc.coinimport.ImportCrate.COMPANION)(fixedContract)
+            .map(_.payload.payload)
+        )
+        .toSeq
     }
 
     for {
@@ -33,17 +44,17 @@ object AcsStoreDump {
       coin <- extractCoin(httpCo)
       cmd <- {
         val receiverName =
-          if (productionMode) coin.payload.owner
+          if (productionMode) coin.owner
           else {
             // Drop the party name suffix, as we don't migrate the parties to a fresh participant node
-            dropPartyNameSuffix(coin.payload.owner)
+            dropPartyNameSuffix(coin.owner)
           }
 
         new cc.coinimport.ImportCrate(
           svcParty.toProtoPrimitive,
           receiverName,
           productionMode,
-          coin.payload, // TODO(#6073): consider embedding the contract-id as well for easier traceability
+          coin, // TODO(#6073): consider embedding the contract-id as well for easier traceability
         ).create().commands().asScala.toSeq
       }
     } yield cmd
