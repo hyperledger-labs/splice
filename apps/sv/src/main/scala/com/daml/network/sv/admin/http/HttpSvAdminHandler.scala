@@ -28,7 +28,7 @@ import com.daml.network.sv.config.SvAcsStoreDumpConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
-import com.daml.network.util.{Codec, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, GcpBucket, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -38,6 +38,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
+import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
 class HttpSvAdminHandler(
@@ -387,24 +388,19 @@ class HttpSvAdminHandler(
             .asRuntimeException()
         )
       case Some(acsDumpConfig: SvAcsStoreDumpConfig) =>
-        logger.debug(s"Attempting to write ACS store dump as JSON to ${acsDumpConfig.directory}")
+        logger.debug(s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription}")
         for {
           // TODO(#6073): this doesn't work for larger ACS as the client will timeout -- we can change its semantics to start a dump process and return a handle to the operation that can be checked for completion
           snapshot <- svcStore.multiDomainAcsStore.getJsonAcsSnapshot()
           response <- Future {
             blocking {
-              import better.files.File
               import io.circe.syntax.*
 
-              // create output directories
-              val dumpDir = File(acsDumpConfig.directory)
-              dumpDir.createDirectories()
               // determine target file
               val now = clock.now.toInstant
               val svcFingerprint = show"${svcStore.key.svcParty}".filter('.'.!=)
               val filename =
                 s"${svcFingerprint}_off-${snapshot.offset}_size-${snapshot.contracts.size}_${now}.json"
-              val file = dumpDir / filename
 
               // TODO(#6073): compress output file
               val httpSnapshot = http.GetAcsStoreDumpResponse(
@@ -412,9 +408,24 @@ class HttpSvAdminHandler(
                 contracts = snapshot.contracts.map(_.toJson).toVector,
               )
               val fileDesc =
-                s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $file"
+                s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $filename"
               logger.debug(s"Attempting to write $fileDesc")
-              file.write(httpSnapshot.asJson.noSpaces)
+              acsDumpConfig match {
+                case SvAcsStoreDumpConfig.Directory(directory) =>
+                  import better.files.File
+                  // create output directories
+                  val dumpDir = File(directory)
+                  dumpDir.createDirectories()
+                  val file = dumpDir / filename
+                  file.write(httpSnapshot.asJson.noSpaces)
+                case SvAcsStoreDumpConfig.Gcp(bucketConfig) =>
+                  val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
+                  gcpBucket.dumpBytesToBucket(
+                    httpSnapshot.asJson.noSpaces.getBytes(StandardCharsets.UTF_8),
+                    filename,
+                  )
+              }
+
               logger.info(s"Wrote $fileDesc")
               SvAdminResource.TriggerAcsDumpResponseOK(
                 TriggerAcsDumpResponse(

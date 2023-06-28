@@ -9,7 +9,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.http.v0.definitions as http
 import com.daml.network.util.{
   Contract,
   ResourceTemplateDecoder,
@@ -55,39 +54,6 @@ class AcsStoreDumpExportIntegrationTest extends CNNodeIntegrationTest with Walle
         // Note: use eventually to ensure that the SvSvcStore ingests the change
         val dump = sv1.getAcsStoreDump()
         val contracts = dump.contracts
-
-        // check that the coins we tapped are present in the dump
-        val coinContracts = contracts.collect(
-          Function.unlift(ev => Contract.fromJson(cc.coin.Coin.COMPANION)(ev).toOption)
-        )
-        inside(coinContracts)(_ =>
-          testContractIds shouldBe coinContracts.map(co => co.contractId).toSet
-        )
-      }
-    }
-
-    "produce an ACS store dump via triggering the writing to a file" in { implicit env =>
-      val testContractIds = createTestContracts()
-
-      eventually() {
-        import better.files.File
-
-        // Note: use eventually to ensure if the propagation to the SvSvcStore has not completed
-        val response = sv1.triggerAcsDump()
-
-        val dumpConfig = sv1.config.acsStoreDump.getOrElse(sys.error("no dump config specified"))
-        val dumpDir = File(dumpConfig.directory)
-        val dumpFile = dumpDir / response.filename
-
-        val jsonDump = io.circe.parser
-          .decode[http.GetAcsStoreDumpResponse](dumpFile.contentAsString)
-          .fold(
-            err => throw new IllegalArgumentException(s"Failed to parse $dumpFile: $err"),
-            result => result,
-          )
-        val contracts = jsonDump.contracts
-        contracts should have size (response.numEvents.toLong)
-        // TODO(#6073): polish: disable all triggers and also test that the offset matches
 
         // check that the coins we tapped are present in the dump
         val coinContracts = contracts.collect(

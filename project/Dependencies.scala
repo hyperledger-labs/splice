@@ -61,4 +61,7 @@ object Dependencies {
   lazy val comet_bft_proto =
     "com.digitalasset.canton.drivers" % "canton-drivers-proto" % sys.env("COMETBFT_RELEASE_VERSION")
 
+  lazy val google_cloud_storage =
+    "com.google.cloud" % "google-cloud-storage" % "2.23.0"
+
 }

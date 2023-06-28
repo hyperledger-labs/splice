@@ -401,6 +401,15 @@ object CNNodeConfig {
     implicit val svClientConfigReader: ConfigReader[SvAppClientConfig] =
       deriveReader[SvAppClientConfig]
 
+    implicit val gcpCredentialsConfigHint = new FieldCoproductHint[GcpCredentialsConfig]("type")
+    implicit val userCredentialsConfigReader: ConfigReader[GcpCredentialsConfig.User] =
+      deriveReader[GcpCredentialsConfig.User]
+    implicit val serviceAccountCredentialsConfigReader
+        : ConfigReader[GcpCredentialsConfig.ServiceAccount] =
+      deriveReader[GcpCredentialsConfig.ServiceAccount]
+    implicit val gcpCredentialsConfigReader: ConfigReader[GcpCredentialsConfig] =
+      deriveReader[GcpCredentialsConfig]
+    implicit val gcpBucketConfig: ConfigReader[GcpBucketConfig] = deriveReader[GcpBucketConfig]
     implicit val svOnboardingConfigHint = new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val svOnboardingFoundCollectiveReader
         : ConfigReader[SvOnboardingConfig.FoundCollective] =
@@ -425,6 +434,11 @@ object CNNodeConfig {
       deriveReader[SvGlobalDomainConfig]
     implicit val svDomainConfigReader: ConfigReader[SvDomainConfig] =
       deriveReader[SvDomainConfig]
+    implicit val svAcsStoreDumpConfigHint = new FieldCoproductHint[SvAcsStoreDumpConfig]("type")
+    implicit val svAcsStoreDumpConfigDirectoryReader: ConfigReader[SvAcsStoreDumpConfig.Directory] =
+      deriveReader[SvAcsStoreDumpConfig.Directory]
+    implicit val svAcsStoreDumpConfigGcpReader: ConfigReader[SvAcsStoreDumpConfig.Gcp] =
+      deriveReader[SvAcsStoreDumpConfig.Gcp]
     implicit val svAcsStoreDumpConfigReader: ConfigReader[SvAcsStoreDumpConfig] =
       deriveReader[SvAcsStoreDumpConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
@@ -553,6 +567,15 @@ object CNNodeConfig {
     implicit val svClientConfigWriter: ConfigWriter[SvAppClientConfig] =
       deriveWriter[SvAppClientConfig]
 
+    implicit val gcpCredentialsConfigHint = new FieldCoproductHint[GcpCredentialsConfig]("type")
+    implicit val userCredentialsConfigWriter: ConfigWriter[GcpCredentialsConfig.User] =
+      deriveWriter[GcpCredentialsConfig.User]
+    implicit val serviceAccountCredentialsConfigWriter
+        : ConfigWriter[GcpCredentialsConfig.ServiceAccount] =
+      deriveWriter[GcpCredentialsConfig.ServiceAccount]
+    implicit val gcpCredentialsConfigWriter: ConfigWriter[GcpCredentialsConfig] =
+      confidentialWriter[GcpCredentialsConfig](GcpCredentialsConfig.hideConfidential)
+    implicit val gcpBucketConfig: ConfigWriter[GcpBucketConfig] = deriveWriter[GcpBucketConfig]
     implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
       new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val svOnboardingFoundCollectiveWriter
@@ -581,6 +604,11 @@ object CNNodeConfig {
       deriveWriter[SvGlobalDomainConfig]
     implicit val svDomainConfigWriter: ConfigWriter[SvDomainConfig] =
       deriveWriter[SvDomainConfig]
+    implicit val svAcsStoreDumpConfigHint = new FieldCoproductHint[SvAcsStoreDumpConfig]("type")
+    implicit val svAcsStoreDumpConfigDirectoryWriter: ConfigWriter[SvAcsStoreDumpConfig.Directory] =
+      deriveWriter[SvAcsStoreDumpConfig.Directory]
+    implicit val svAcsStoreDumpConfigGcpWriter: ConfigWriter[SvAcsStoreDumpConfig.Gcp] =
+      deriveWriter[SvAcsStoreDumpConfig.Gcp]
     implicit val svAcsStoreDumpConfigWriter: ConfigWriter[SvAcsStoreDumpConfig] =
       deriveWriter[SvAcsStoreDumpConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =

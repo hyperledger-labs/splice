@@ -289,6 +289,7 @@ lazy val `apps-common` =
     .enablePlugins(BuildInfoPlugin)
     .settings(
       libraryDependencies ++= Seq(
+        google_cloud_storage,
         Dependencies.daml_lf_value_json,
         Dependencies.daml_lf_validation,
         scalatestScalacheck % Test,
@@ -375,7 +376,11 @@ lazy val `apps-sv` =
       `svc-governance-v1test-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime, comet_bft_proto),
+      libraryDependencies ++= Seq(
+        akka_http_cors,
+        scalapb_runtime,
+        comet_bft_proto,
+      ),
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "sv-openapi",
@@ -944,6 +949,7 @@ lazy val `apps-app` =
       libraryDependencies += "org.scalatestplus" %% "selenium-4-9" % "3.2.16.0" % "test",
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.10.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
+      libraryDependencies += google_cloud_storage,
       libraryDependencies += auth0,
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(

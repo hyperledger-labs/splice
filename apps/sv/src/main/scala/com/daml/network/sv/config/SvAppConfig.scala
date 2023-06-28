@@ -5,6 +5,7 @@ import com.daml.network.config.{
   AutomationConfig,
   CNNodeBackendConfig,
   CNParticipantClientConfig,
+  GcpBucketConfig,
   HttpCNNodeClientConfig,
   NetworkAppClientConfig,
 }
@@ -76,9 +77,22 @@ final case class SvDomainConfig(
     global: SvGlobalDomainConfig
 )
 
-final case class SvAcsStoreDumpConfig(
-    directory: Path
-)
+sealed abstract class SvAcsStoreDumpConfig {
+  def locationDescription: String
+}
+
+object SvAcsStoreDumpConfig {
+  final case class Directory(
+      directory: Path
+  ) extends SvAcsStoreDumpConfig {
+    override val locationDescription = s"directory $directory"
+  }
+  final case class Gcp(
+      bucket: GcpBucketConfig
+  ) extends SvAcsStoreDumpConfig {
+    override val locationDescription = s"GCP bucket ${bucket.bucketName}"
+  }
+}
 
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
