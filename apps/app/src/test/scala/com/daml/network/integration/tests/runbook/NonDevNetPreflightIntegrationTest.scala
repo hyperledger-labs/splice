@@ -1,15 +1,20 @@
 package com.daml.network.integration.tests.runbook
 
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.config.GcpBucketConfig
 import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{CoinConfigSchedule, FrontendLoginUtil}
+import com.daml.network.util.CoinConfigSchedule
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.{Duration, Instant}
+import com.daml.network.util.{FrontendLoginUtil, GcpBucket}
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+
+import java.nio.charset.StandardCharsets
 
 class NonDevNetPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
@@ -120,6 +125,17 @@ class NonDevNetPreflightIntegrationTest
       checkRoundWithinTickDuration(round.opensAt, 1.3)
   }
 
+  // TODO(#6073) Replace this by only checking that a recent snapshot exists
+  // instead of triggering one.
+  "trigger ACS snapshot and check that it can be downloaded and decoded" in { implicit env =>
+    val result = sv1Client.triggerAcsDump()
+    val bucket = new GcpBucket(GcpBucketConfig.inferForTesting, loggerFactory)
+    val dump = new String(bucket.readBytesFromBucket(result.filename), StandardCharsets.UTF_8)
+    io.circe.parser.decode[http.GetAcsStoreDumpResponse](dump) should matchPattern {
+      case Right(_) =>
+    }
+  }
+
   private def checkRoundWithinTickDuration(round: Instant, factor: Double)(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
@@ -133,5 +149,4 @@ class NonDevNetPreflightIntegrationTest
       round
     )) should be < Duration.ofNanos(tickDuration.microseconds * (1000 * factor).longValue())
   }
-
 }

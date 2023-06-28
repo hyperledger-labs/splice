@@ -82,6 +82,18 @@ abstract class SvAppReference(
   def releaseGlobalLock(reason: String, traceId: String) = consoleEnvironment.run {
     httpCommand(HttpSvAppClient.ReleaseGlobalLock(reason, traceId))
   }
+
+  @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
+  def triggerAcsDump(): definitions.TriggerAcsDumpResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAppClient.TriggerAcsDump())
+    }
+
+  @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
+  def getAcsStoreDump(): definitions.GetAcsStoreDumpResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAppClient.GetAcsStoreDump())
+    }
 }
 
 class SvAppClientReference(
@@ -251,18 +263,6 @@ class SvAppBackendReference(
   def mediatorNodeStatus(): NodeStatus[CNNodeStatus] =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
-    }
-
-  @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
-  def triggerAcsDump(): definitions.TriggerAcsDumpResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.TriggerAcsDump())
-    }
-
-  @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
-  def getAcsStoreDump(): definitions.GetAcsStoreDumpResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetAcsStoreDump())
     }
 
   /** Remote participant this sv app is configured to interact with. */

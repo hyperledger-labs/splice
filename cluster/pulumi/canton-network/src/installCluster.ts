@@ -1,4 +1,6 @@
+import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
+import { Key } from '@pulumi/gcp/serviceaccount';
 import { Auth0Client } from 'cn-pulumi-common';
 import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
 import { exit } from 'process';
@@ -134,6 +136,19 @@ const validator1Onboarding = {
   expiresIn: '1h',
 };
 
+function configureGcpBucketKey(): Key {
+  const serviceAccountName = `projects/da-cn-scratchnet/serviceAccounts/da-cn-scratch-sv1-simon-test@da-cn-scratchnet.iam.gserviceaccount.com`;
+
+  // Note, creating a new key can fail with a precondition error on an attempt
+  // to create keys beyond the tenth.
+  const key = new gcp.serviceaccount.Key(`gcp-bucket-${process.env.GCP_CLUSTER_BASENAME}`, {
+    serviceAccountId: serviceAccountName,
+    publicKeyType: 'TYPE_X509_PEM_FILE',
+  });
+
+  return key;
+}
+
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   const sv1 = await installSvNode(
     auth0Client,
@@ -146,7 +161,15 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     true,
     true,
     [splitwellOnboarding, validator1Onboarding],
+    isDevNet,
     isDevNet
+      ? undefined
+      : {
+          // fixme
+          projectId: 'da-cn-scratchnet',
+          bucketName: 'da-cn-scratch-acs-store-dumps',
+          jsonCredentials: configureGcpBucketKey().privateKey,
+        }
   );
   if (!singleSv) {
     await installSvNode(

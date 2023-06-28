@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { Output } from '@pulumi/pulumi';
 import {
   auth0UserNameEnvVar,
   installAuth0Secret,
@@ -85,6 +86,39 @@ export function installValidatorOnboardingSecret(
   );
 }
 
+export const gcpBucketSecretName = 'cn-app-sv-gcp-bucket';
+
+export function installGcpBucketSecret(
+  xns: ExactNamespace,
+  config: GcpBucketConfig
+): Output<k8s.core.v1.Secret> {
+  return config.jsonCredentials.apply(
+    credential =>
+      new k8s.core.v1.Secret(
+        `cn-app-${xns.logicalName}-gcp-bucket`,
+        {
+          metadata: {
+            name: gcpBucketSecretName,
+            namespace: xns.logicalName,
+          },
+          type: 'Opaque',
+          data: {
+            'json-credentials': credential,
+          },
+        },
+        {
+          dependsOn: [xns.ns],
+        }
+      )
+  );
+}
+
+export type GcpBucketConfig = {
+  projectId: string;
+  bucketName: string;
+  jsonCredentials: Output<string>;
+};
+
 export async function installSvNode(
   auth0Client: Auth0Client,
   nodename: string,
@@ -96,11 +130,12 @@ export async function installSvNode(
   withScan = false,
   withDirectoryBackend = false,
   expectedValidatorOnboardings: ValidatorOnboarding[] = [],
-  isDevNet?: boolean
+  isDevNet?: boolean,
+  acsStoreDump?: GcpBucketConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(nodename);
 
-  const auth0BackendSecrets: pulumi.Resource[] = [
+  const auth0BackendSecrets: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = [
     await installAuth0Secret(auth0Client, xns, 'sv', nodename),
     await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
   ];
@@ -111,7 +146,7 @@ export async function installSvNode(
     await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
   ];
 
-  const dependsOn = auth0BackendSecrets
+  const dependsOn: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = auth0BackendSecrets
     .concat(auth0UISecrets)
     .concat(
       onboarding.type == 'join-with-key'
@@ -127,7 +162,8 @@ export async function installSvNode(
       expectedValidatorOnboardings.map(onboarding =>
         installValidatorOnboardingSecret(xns, onboarding)
       )
-    );
+    )
+    .concat(acsStoreDump ? [installGcpBucketSecret(xns, acsStoreDump)] : []);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
@@ -180,6 +216,13 @@ export async function installSvNode(
     })),
     isDevNet,
     approvedSvIdentities,
+    acsStoreDump: acsStoreDump
+      ? {
+          projectId: acsStoreDump.projectId,
+          bucketName: acsStoreDump.bucketName,
+          secretName: gcpBucketSecretName,
+        }
+      : undefined,
   } as ChartValues;
 
   if (onboarding.type == 'join-with-key') {

@@ -15,12 +15,13 @@ import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.sv.config.SvAcsStoreDumpConfig
 import com.daml.network.sv.setup.SvcPartyHosting
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
-import com.daml.network.util.{Codec, Contract}
+import com.daml.network.util.{Codec, Contract, GcpBucket}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -31,12 +32,14 @@ import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import java.nio.charset.StandardCharsets
 import java.util.{Base64, UUID}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
     globalDomain: DomainId,
+    optAcsDumpConfig: Option[SvAcsStoreDumpConfig],
     svUserName: String,
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
@@ -367,6 +370,88 @@ class HttpSvHandler(
         ),
       )
     }
+
+  override def triggerAcsDump(respond: v0.SvResource.TriggerAcsDumpResponse.type)()(
+      fake: Unit
+  ): Future[v0.SvResource.TriggerAcsDumpResponse] = withNewTrace(workflowId) { implicit tc => _ =>
+    optAcsDumpConfig match {
+      case None =>
+        Future.failed(
+          Status.FAILED_PRECONDITION
+            .withDescription("No ACS store dump directory configured")
+            .asRuntimeException()
+        )
+      case Some(acsDumpConfig: SvAcsStoreDumpConfig) =>
+        logger.debug(s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription}")
+        for {
+          // TODO(#6073): this doesn't work for larger ACS as the client will timeout -- we can change its semantics to start a dump process and return a handle to the operation that can be checked for completion
+          snapshot <- svcStore.multiDomainAcsStore.getJsonAcsSnapshot()
+          response <- Future {
+            blocking {
+              import io.circe.syntax.*
+
+              // determine target file
+              val now = clock.now.toInstant
+              val svcFingerprint = show"${svcStore.key.svcParty}".filter('.'.!=)
+              val filename =
+                s"${svcFingerprint}_off-${snapshot.offset}_size-${snapshot.contracts.size}_${now}.json"
+
+              // TODO(#6073): compress output file
+              val httpSnapshot = definitions.GetAcsStoreDumpResponse(
+                offset = snapshot.offset,
+                contracts = snapshot.contracts.map(_.toJson).toVector,
+              )
+              val fileDesc =
+                s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $filename"
+              logger.debug(s"Attempting to write $fileDesc")
+              acsDumpConfig match {
+                case SvAcsStoreDumpConfig.Directory(directory) =>
+                  import better.files.File
+                  // create output directories
+                  val dumpDir = File(directory)
+                  dumpDir.createDirectories()
+                  val file = dumpDir / filename
+                  file.write(httpSnapshot.asJson.noSpaces)
+                case SvAcsStoreDumpConfig.Gcp(bucketConfig) =>
+                  val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
+                  gcpBucket.dumpBytesToBucket(
+                    httpSnapshot.asJson.noSpaces.getBytes(StandardCharsets.UTF_8),
+                    filename,
+                  )
+              }
+
+              logger.info(s"Wrote $fileDesc")
+              v0.SvResource.TriggerAcsDumpResponseOK(
+                definitions.TriggerAcsDumpResponse(
+                  filename = filename,
+                  numEvents = snapshot.contracts.size,
+                  offset = snapshot.offset,
+                )
+              )
+            }
+          }
+        } yield response
+    }
+  }
+
+  override def getAcsStoreDump(
+      respond: v0.SvResource.GetAcsStoreDumpResponse.type
+  )()(fake: Unit): scala.concurrent.Future[
+    v0.SvResource.GetAcsStoreDumpResponse
+  ] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      svcStore.multiDomainAcsStore
+        .getJsonAcsSnapshot()
+        .map(snapshot =>
+          v0.SvResource.GetAcsStoreDumpResponse.OK(
+            definitions.GetAcsStoreDumpResponse(
+              offset = snapshot.offset,
+              contracts = snapshot.contracts.map(_.toJson).toVector,
+            )
+          )
+        )
+    }
+  }
 
   private def isOnboardingConfirmed(party: PartyId)(implicit tc: TraceContext): Future[Boolean] = {
     // wait for a bit as it is possible the store ingression is not complete

@@ -294,10 +294,12 @@ paths:
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
   # TODO(#6073): rename to `trigger-acs-store-dump` and switch to a post method
-  /admin/svc/trigger-acs-dump:
+  # TODO(#6073): Remove this unauthenticated endpoint in favor of automation or
+  # expose it through the UI.
+  /svc/trigger-acs-dump:
     put:
       tags: [ sv ]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv
       operationId: "TriggerAcsDump"
       responses:
         "200":
@@ -308,10 +310,11 @@ paths:
                 "$ref": "#/components/schemas/TriggerAcsDumpResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
-  /admin/svc/get-acs-store-dump:
+  # TODO(#6073): Remove this unauthenticated endpoint or expose it through the UI.
+  /svc/get-acs-store-dump:
     get:
       tags: [ sv ]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv
       operationId: "GetAcsStoreDump"
       responses:
         "200":

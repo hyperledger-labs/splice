@@ -45,7 +45,7 @@ export function installParticipant(
   extraDomains: Domain[],
   participantUsers: ParticipantUser[],
   extraEnvVars: k8s.types.input.core.v1.EnvVar[],
-  dependsOn: pulumi.Resource[] = []
+  dependsOn: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = []
 ): pulumi.Resource {
   return installCNHelmChart(
     xns,

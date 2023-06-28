@@ -127,6 +127,26 @@ spec:
                   public-key = {{ $sv.publicKey | quote }}
                 }
             {{- end }}
+            {{- with .Values.acsStoreDump }}
+            - name: ADDITIONAL_CONFIG_CN_APP_SV_ACS_STORE_DUMP
+              value: |
+                canton.sv-apps.sv.acs-store-dump = {
+                  type = gcp
+                  bucket {
+                    project-id = {{ .projectId }}
+                    bucket-name = {{ .bucketName }}
+                    credentials {
+                      type = service-account
+                      json-credentials = ${CN_APP_SV_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                    }
+                  }
+                }
+            - name: CN_APP_SV_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  key: "json-credentials"
+                  name: {{ .secretName }}
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

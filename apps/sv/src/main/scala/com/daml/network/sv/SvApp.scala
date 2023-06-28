@@ -279,6 +279,7 @@ class SvApp(
 
       handler = new HttpSvHandler(
         globalDomain,
+        config.acsStoreDump,
         config.ledgerApiUser,
         svAutomation,
         svcAutomation,
@@ -295,7 +296,6 @@ class SvApp(
 
       adminHandler = new HttpSvAdminHandler(
         globalDomain,
-        config.acsStoreDump,
         svAutomation,
         svcAutomation,
         cometBftClient,
