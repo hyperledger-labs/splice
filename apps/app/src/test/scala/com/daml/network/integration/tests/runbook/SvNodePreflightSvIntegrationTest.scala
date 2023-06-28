@@ -138,7 +138,7 @@ class SvNodePreflightSvIntegrationTest
 
   // TODO(#5979): Revise this after adding auth...
   "Dumping participant identities works" in { implicit env =>
-    def svValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc("svValidator")
+    def svValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc("svTestValidator")
     svValidatorClient.dumpParticipantIdentities()
   }
 }
