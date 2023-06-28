@@ -12,8 +12,6 @@ import com.daml.network.http.v0.definitions.{
   BatchListVotesByVoteRequestsRequest,
   CastVoteRequest,
   CometBftNodeDumpResponse,
-  CometBftNodeStatusResponse,
-  CometBftStatusOrError,
   CreateVoteRequest,
   ErrorResponse,
   UpdateVoteRequest,
@@ -311,24 +309,6 @@ class HttpSvAdminHandler(
       }
     }
 
-  override def getCometBftNodeStatus(
-      respond: SvAdminResource.GetCometBftNodeStatusResponse.type
-  )()(extracted: String): Future[
-    SvAdminResource.GetCometBftNodeStatusResponse
-  ] = withNewTrace(workflowId) { implicit tc => _ =>
-    withClientOrNotFound(respond.NotFound) {
-      _.nodeStatus()
-        .map(status =>
-          CometBftStatusOrError(
-            response = CometBftNodeStatusResponse(
-              status.nodeInfo.id,
-              status.syncInfo.catchingUp,
-              BigDecimal(status.validatorInfo.votingPower),
-            ).some
-          )
-        )
-    }
-  }
   override def getCometBftNodeDebugDump(
       respond: SvAdminResource.GetCometBftNodeDebugDumpResponse.type
   )()(extracted: String): Future[

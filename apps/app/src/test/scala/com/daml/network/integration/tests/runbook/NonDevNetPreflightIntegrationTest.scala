@@ -125,6 +125,10 @@ class NonDevNetPreflightIntegrationTest
       checkRoundWithinTickDuration(round.opensAt, 1.3)
   }
 
+  "Check health status of sv1 cometBft node" in { implicit env =>
+    sv1Client.cometBftNodeStatus().catchingUp shouldBe false
+  }
+
   // TODO(#6073) Replace this by only checking that a recent snapshot exists
   // instead of triggering one.
   "trigger ACS snapshot and check that it can be downloaded and decoded" in { implicit env =>

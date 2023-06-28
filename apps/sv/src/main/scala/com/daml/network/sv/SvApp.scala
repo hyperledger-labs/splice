@@ -291,6 +291,7 @@ class SvApp(
         retryProvider,
         svcPartyHosting,
         globalLockO,
+        cometBftClient,
         loggerFactory,
       )
 

@@ -1,6 +1,7 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
+import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
@@ -11,10 +12,16 @@ import com.daml.network.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
+import com.daml.network.http.v0.definitions.{
+  CometBftNodeStatusResponse,
+  CometBftStatusOrError,
+  ErrorResponse,
+}
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAcsStoreDumpConfig
 import com.daml.network.sv.setup.SvcPartyHosting
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
@@ -51,6 +58,7 @@ class HttpSvHandler(
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
     globalLockO: Option[ExpiringLock],
+    cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -291,6 +299,25 @@ class HttpSvHandler(
       )
     }
 
+  def getCometBftNodeStatus(
+      respond: SvResource.GetCometBftNodeStatusResponse.type
+  )()(extracted: Unit): Future[
+    SvResource.GetCometBftNodeStatusResponse
+  ] = withNewTrace(workflowId) { implicit tc => _ =>
+    withClientOrNotFound(respond.NotFound) {
+      _.nodeStatus()
+        .map(status =>
+          CometBftStatusOrError(
+            response = CometBftNodeStatusResponse(
+              status.nodeInfo.id,
+              status.syncInfo.catchingUp,
+              BigDecimal(status.validatorInfo.votingPower),
+            ).some
+          )
+        )
+    }
+  }
+
   def onboardSvPartyMigrationAuthorize(
       respond: v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse.type
   )(
@@ -369,6 +396,16 @@ class HttpSvHandler(
           )
         ),
       )
+    }
+
+  private def withClientOrNotFound[T](
+      notFound: ErrorResponse => T
+  )(call: CometBftClient => Future[T]) = cometBftClient
+    .fold {
+      notFound(ErrorResponse("CometBFT is not configured."))
+        .pure[Future]
+    } {
+      call
     }
 
   override def triggerAcsDump(respond: v0.SvResource.TriggerAcsDumpResponse.type)()(

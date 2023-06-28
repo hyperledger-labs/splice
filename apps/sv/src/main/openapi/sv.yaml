@@ -56,7 +56,7 @@ paths:
   /admin/domain/cometbft/status:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv
       operationId: "getCometBftNodeStatus"
       responses:
         "200":

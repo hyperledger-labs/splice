@@ -9,15 +9,17 @@ import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
+import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
+import com.daml.network.http.v0.sv.GetCometBftNodeStatusResponse
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
-import com.google.protobuf.ByteString
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
 import com.digitalasset.canton.protocol.v0
-import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
@@ -411,4 +413,29 @@ object HttpSvAppClient {
       Either.right(response)
     }
   }
+
+  case class GetCometBftNodeStatus()
+      extends BaseCommand[
+        http.GetCometBftNodeStatusResponse,
+        definitions.CometBftNodeStatusResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCometBftNodeStatusResponse] =
+      client.getCometBftNodeStatus(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      GetCometBftNodeStatusResponse,
+      Either[String, CometBftNodeStatusResponse],
+    ] = { case http.GetCometBftNodeStatusResponse.OK(response) =>
+      response.response.toRight(response.error.map(_.error).getOrElse("No response found"))
+    }
+  }
+
 }

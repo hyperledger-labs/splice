@@ -62,6 +62,12 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.GetSvcInfo)
     }
 
+  @Help.Summary("Get the CometBFT node status")
+  def cometBftNodeStatus(): definitions.CometBftNodeStatusResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAppClient.GetCometBftNodeStatus())
+    }
+
   def onboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       candidateParty: PartyId,
@@ -240,12 +246,6 @@ class SvAppBackendReference(
       )
     }
   }
-
-  @Help.Summary("Get the CometBFT node status")
-  def cometBftNodeStatus(): definitions.CometBftNodeStatusResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetCometBftNodeStatus())
-    }
 
   @Help.Summary("Get the CometBFT node debug dump")
   def cometBftNodeDump(): definitions.CometBftNodeDumpResponse =
