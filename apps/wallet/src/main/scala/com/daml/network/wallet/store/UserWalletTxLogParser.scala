@@ -89,6 +89,9 @@ class UserWalletTxLogParser(
             // Unfortunately there is not a 1:1 correspondence between CoinOperationOutcome and child events in the
             // transaction tree:
             // - COO_Error does not produce any child event
+            // - COO_BuyExtraTraffic can produce up to 2 child events of interest
+            //   - tapping of coins to pay for extra traffic (only on DevNet)
+            //   - the actual purchase of extra traffic
             // - all other outcomes produce exactly one child exercise event
             val outputsWithChildEvent =
               operations
@@ -99,7 +102,7 @@ class UserWalletTxLogParser(
                       (
                           CoinOperation,
                           CoinOperationOutcome,
-                          Either[InvalidTransferReason, ExercisedEvent],
+                          Either[InvalidTransferReason, Seq[ExercisedEvent]],
                       )
                     ],
                     0,
@@ -114,12 +117,62 @@ class UserWalletTxLogParser(
                           ),
                           nextChildEventId,
                         )
+                      case (op: CO_BuyExtraTraffic, outcome) =>
+                        // Special handling for CO_BuyExtraTraffic to associate multiple events with it.
+                        // Since on DevNet, we auto-tap coins, there will be five associated events.
+                        // - CoinRules_Fetch
+                        // - OpenMiningRound_Fetch
+                        // - CoinRules_ComputeFees
+                        // - CoinRules_DevNet_Tap
+                        // - CoinRules_BuyExtraTraffic
+                        // The first 4 of these are related to identifying the amount of CC to tap to cover
+                        // the purchase and then actually tapping it.
+                        // On non-DevNet, there will be only 1 associated event: the CoinRules_BuyExtraTraffic exercise.
+                        val (childEventCount, expectedChildEvents) = tree.getEventsById
+                          .get(exercised.getChildEventIds.get(nextChildEventId)) match {
+                          // assume non-DevNet if the first event is the BuyExtraTraffic choice
+                          case e: ExercisedEvent if e.getChoice == "CoinRules_BuyExtraTraffic" =>
+                            (1, Seq("CoinRules_BuyExtraTraffic"))
+                          case _ =>
+                            (
+                              5,
+                              Seq(
+                                "CoinRules_Fetch",
+                                "OpenMiningRound_Fetch",
+                                "CoinRules_ComputeFees",
+                                "CoinRules_DevNet_Tap",
+                                "CoinRules_BuyExtraTraffic",
+                              ),
+                            )
+                        }
+                        val childEvents = exercised.getChildEventIds.asScala.toSeq
+                          .slice(nextChildEventId, nextChildEventId + childEventCount)
+                          .map(tree.getEventsById.get)
+                          .flatMap {
+                            case e: ExercisedEvent =>
+                              Seq(e)
+                            case e =>
+                              logger.warn(s"Unexpected event $e.")
+                              Seq()
+                          }
+                        if (childEvents.map(_.getChoice) != expectedChildEvents)
+                          logger.warn(
+                            s"Expected events $expectedChildEvents. Got ${childEvents.map(_.getChoice)}"
+                          )
+                        val eventsOfInterest = childEvents.filter(e =>
+                          Seq("CoinRules_BuyExtraTraffic", "CoinRules_DevNet_Tap")
+                            .contains(e.getChoice)
+                        )
+                        (
+                          result.appended((op, outcome, Right(eventsOfInterest))),
+                          nextChildEventId + childEventCount,
+                        )
                       case (op, outcome) =>
                         val childEvent =
                           tree.getEventsById.get(exercised.getChildEventIds.get(nextChildEventId))
                         childEvent match {
                           case e: ExercisedEvent =>
-                            (result.appended((op, outcome, Right(e))), nextChildEventId + 1)
+                            (result.appended((op, outcome, Right(Seq(e)))), nextChildEventId + 1)
                           case _ =>
                             throw new RuntimeException(
                               "All child events of WalletAppInstall_ExecuteBatch should be exercise events"
@@ -169,11 +222,12 @@ class UserWalletTxLogParser(
                 })
               // Tag wallet automation (coin merging, reward collection) as such, to distinguish from
               // explicit self-transfers
-              case (_, _: COO_MergeTransferInputs, Right(childEvent)) =>
+              case (_, _: COO_MergeTransferInputs, Right(Seq(childEvent))) =>
                 defer(parseTree(tree, childEvent))
                   .map(_.setTransferSubtype(TxLogEntry.Transfer.WalletAutomation))
               // All other successful operations are handled by parsing their subtree
-              case (_, _, Right(childEvent)) => defer(parseTree(tree, childEvent))
+              case (_, _, Right(childEvents)) =>
+                childEvents.foldMap(parseTree(tree, _))
               // The above cases should be exhaustive
               case (op, outcome, child) =>
                 throw new RuntimeException(
