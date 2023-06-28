@@ -446,3 +446,44 @@ NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME    The user ID of the user you wish to a
 7. Refresh your browser with the wallet UI, log out of any user you may be logged in as, and login again using the validator admin user defined above.
 
 This user should be automatically onboarded to the wallet, so you should NOT be seeing a prompt to onboard yourself. This user will now administer the rewards earned by your validator.
+
+.. _validator_continuity:
+
+Transitioning Across Network Resets
+-----------------------------------
+
+To support data continuity across network resets (i.e., among others, the preservation of coin balances),
+validator operators need to:
+
+1. Back up identities data from their participants on the "old" network.
+2. Set up their participants on "new" networks so they are initialized with that identities data.
+
+We cover these steps in the following.
+
+Backing Up Participant Identities Data
+++++++++++++++++++++++++++++++++++++++
+
+Backed-up participant identities data is necessary for enabling validator users to reclaim their coin balances after a network reset.
+Obtaining the necessary data is currently as simple as:
+
+.. parsed-literal::
+
+  curl <YOUR_VALIDATOR_API_URL>/admin/participant/identities > participant-dump.json
+
+.. TODO(#5979): !!! We need auth here !!!
+
+If your are following this runbook, you can replace ``YOUR_VALIDATOR_API_URL`` with ``http://localhost:5003``.
+If you are following the :ref:`Kubernetes-based SV runbook <sv-helm>`, you can replace it with ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator``.
+
+Please store the resulting ``participant-dump.json`` in a safe location.
+We recommend performing a fresh participant identities dump (on your "old" network validator) just before re-initializing your participant and validator on a freshly reset ("new") network.
+To account for cases where this is not possible, we additionally recommend setting up periodical backups of your validator's participant identities data.
+
+.. TODO(#6217): Consider covering dumping to GCP buckets as well
+
+Initialize With Existing Identities Data
+++++++++++++++++++++++++++++++++++++++++
+
+Detailed instructions will be added soon.
+
+.. TODO(#6219): Add instructions once we have actually implemented this and know it works

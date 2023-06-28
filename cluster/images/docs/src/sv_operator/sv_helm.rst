@@ -632,3 +632,8 @@ Note that as of now, each instance of the Scan app backend aggregates only Canto
 This will be changed in future updates, where the Scan app will guarantee correctness against all data since network start.
 At that point, data in different instances of the Scan app (hosted by different Super Validators) will always be consistent.
 This allows the public to inspect multiple Scan UIs and compare their data, so that they do not need to trust a single Super Validator.
+
+Transitioning Across Network Resets
+-----------------------------------
+
+Please consult the :ref:`relevant section of the validator runbook <validator_continuity>` to ensure that coin balances associated with your SV's validator node (which likely includes rewards earned by your SV nodes) are preserved across a network reset.

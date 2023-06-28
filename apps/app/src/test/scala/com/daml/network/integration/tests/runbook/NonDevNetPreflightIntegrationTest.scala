@@ -140,6 +140,11 @@ class NonDevNetPreflightIntegrationTest
     }
   }
 
+  // TODO(#5979): Revise this after adding auth... Which can also mean: just removing it.
+  "can dump participant identities of validator1" in { implicit env =>
+    validator1Client.dumpParticipantIdentities()
+  }
+
   private def checkRoundWithinTickDuration(round: Instant, factor: Double)(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
