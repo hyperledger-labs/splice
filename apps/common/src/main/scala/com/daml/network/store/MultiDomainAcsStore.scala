@@ -53,8 +53,6 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 
   import MultiDomainAcsStore.*
 
-  protected val DefaultLimit: Limit = HardLimit(1000L)
-
   def lookupContractById[C, TCid <: ContractId[_], T](
       companion: C
   )(id: ContractId[_])(implicit
@@ -129,7 +127,7 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
-      limit: Limit = DefaultLimit,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -137,7 +135,7 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 
   def listReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
-      limit: Limit = DefaultLimit,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -152,7 +150,7 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
   def listContractsOnDomain[C, TCid <: ContractId[_], T](
       companion: C,
       domain: DomainId,
-      limit: Limit = DefaultLimit,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -165,30 +163,6 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
   )(implicit
       companionClass: ContractCompanion[C, TCid, T]
   ): ListExpiredContracts[TCid, T]
-
-  protected def applyLimit[T, S[A] <: scala.collection.IterableOps[A, S, S[A]]](
-      limit: Limit,
-      result: S[T],
-  )(implicit
-      traceContext: TraceContext
-  ): S[T] = {
-    limit match {
-      case PageLimit(limit) =>
-        result.take(limit.intValue())
-      case HardLimit(limit) =>
-        val resultSize = result.size
-        if (resultSize > limit) {
-          logger.warn(
-            "Size of the result exceeded the limit. Result size: {}. Limit: {}",
-            resultSize.toLong,
-            limit,
-          )
-          result.take(limit.intValue())
-        } else {
-          result
-        }
-    }
-  }
 
   /** Stream all ready contracts that can be acted upon.
     * Note that the same contract can be returned multiple

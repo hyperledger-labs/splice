@@ -52,7 +52,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     with TxLogStore[TXI, TXE]
     with AcsTables
     with AcsQueries
-    with NamedLogging {
+    with NamedLogging
+    with LimitHelpers {
 
   import MultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods

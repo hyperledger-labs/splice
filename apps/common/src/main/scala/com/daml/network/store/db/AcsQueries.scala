@@ -2,7 +2,6 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
-import com.daml.network.store.{HardLimit, Limit, PageLimit}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
@@ -45,13 +44,6 @@ trait AcsQueries extends AcsJdbcTypes {
         err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
         identity,
       )
-  }
-
-  protected def sqlLimit(limit: Limit): Long = {
-    limit match {
-      case HardLimit(limit) => limit + 1
-      case PageLimit(limit) => limit
-    }
   }
 
 }

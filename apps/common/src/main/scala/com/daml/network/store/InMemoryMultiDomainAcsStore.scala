@@ -29,7 +29,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     ec: ExecutionContext
 ) extends MultiDomainAcsStore
     with TxLogStore[TXI, TXE]
-    with NamedLogging {
+    with NamedLogging
+    with LimitHelpers {
 
   import MultiDomainAcsStore.*
 
@@ -151,7 +152,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   def filterContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean,
-      limit: Limit = DefaultLimit,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -191,7 +192,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       companion: C,
       domainId: DomainId,
       filter: Contract[TCid, T] => Boolean,
-      limit: Limit = DefaultLimit,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
@@ -216,7 +217,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   def filterReadyContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean,
-      limit: Limit = DefaultLimit,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
