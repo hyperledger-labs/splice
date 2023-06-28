@@ -14,6 +14,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.*
 
 class HttpValidatorAdminHandler(
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
@@ -67,11 +68,11 @@ class HttpValidatorAdminHandler(
       })
   }
 
-  def exportParticipantIdentity(
-      respond: v0.ValidatorAdminResource.ExportParticipantIdentityResponse.type
+  def dumpParticipantIdentities(
+      respond: v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.type
   )()(
       fake: Unit
-  ): scala.concurrent.Future[v0.ValidatorAdminResource.ExportParticipantIdentityResponse] =
+  ): scala.concurrent.Future[v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
         id <- participantAdminConnection.getParticipantId()
@@ -89,10 +90,21 @@ class HttpValidatorAdminHandler(
         bootstrapTxs <- participantAdminConnection
           .getIdentityBootstrapTransactions(id.uid)
           .map(txes => txes.map(tx => Base64.getEncoder().encodeToString(tx.toByteArray)))
-      } yield definitions.ExportParticipantIdentityResponse(
+        users <- storeWithIngestion.connection
+          .listUsers()
+          .map(users =>
+            users.map(user =>
+              definitions.ParticipantUser(
+                user.getId(),
+                user.getPrimaryParty().toScala,
+              )
+            )
+          )
+      } yield definitions.DumpParticipantIdentitiesResponse(
         id.toProtoPrimitive,
         keys.toVector,
         bootstrapTxs.toVector,
+        users.toVector,
       )
     }
 

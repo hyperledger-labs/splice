@@ -9,7 +9,10 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.ProcessTestUtil
-import com.daml.network.validator.admin.api.client.commands.HttpValidatorAdminAppClient
+import com.daml.network.validator.admin.api.client.commands.HttpValidatorAdminAppClient.{
+  ParticipantIdentitiesDump,
+  ParticipantUser,
+}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 
@@ -49,9 +52,23 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
   "We can export a Canton participant identity and import it in a new participant" in {
     implicit env =>
       startAllSync(sv1, sv1Scan, sv1Validator)
-
       val svcInfoBefore = sv1.getSvcInfo()
-      val participantIdentity = sv1Validator.exportParticipantIdentity()
+
+      val participantDump = clue("Getting participant identities dump") {
+        sv1Validator.dumpParticipantIdentities()
+      }
+      clue("Checking exported users list") {
+        val sv1Party = svcInfoBefore.svParty
+        participantDump.users should contain(
+          ParticipantUser(sv1.config.ledgerApiUser, Some(sv1Party))
+        )
+        participantDump.users should contain(
+          ParticipantUser(sv1Validator.config.ledgerApiUser, Some(sv1Party))
+        )
+        participantDump.users should contain(
+          ParticipantUser(sv1Validator.config.validatorWalletUser.value, Some(sv1Party))
+        )
+      }
 
       sv1Validator.stop()
       sv1Scan.stop()
@@ -59,7 +76,7 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
 
       // TODO(#6128) run whole test once we have moved away from using a bootstrap script for upload OR have bumped Canton so that init_id works
       if (false) {
-        Using.resource(startStandaloneCanton(participantIdentity)) { _ =>
+        Using.resource(startStandaloneCanton(participantDump)) { _ =>
           sv1Local.startSync()
 
           val svcInfoAfter = sv1Local.getSvcInfo()
@@ -72,11 +89,9 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       }
   }
 
-  private def startStandaloneCanton(
-      participantIdentity: HttpValidatorAdminAppClient.ParticipantIdentity
-  ) = {
+  private def startStandaloneCanton(participantDump: ParticipantIdentitiesDump) = {
     // TODO(#6073) Remove this complicated mess once identity upload is handled by the validator and SV app init
-    val txes = "Seq(" + participantIdentity.bootstrapTxes
+    val txes = "Seq(" + participantDump.bootstrapTxes
       .map(tx =>
         s"""SignedTopologyTransactionX.fromByteArray(Array(${tx.mkString(
             ", "
@@ -88,7 +103,7 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
     |svc_participant.topology.transactions.load($txes)
     """
 
-    val keyUploadCommands = participantIdentity.keys.zipWithIndex
+    val keyUploadCommands = participantDump.keys.zipWithIndex
       .map {
         case (k, i) => {
           val keyFile: File = Files.createTempFile(s"$i", ".key")
@@ -103,7 +118,7 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       .mkString("\n")
 
     val participantInitializationCommand = s"""
-    |svc_participant.topology.init_id("${participantIdentity.id.uid.id}", "${participantIdentity.id.uid.namespace.fingerprint}")
+    |svc_participant.topology.init_id("${participantDump.id.uid.id}", "${participantDump.id.uid.namespace.fingerprint}")
     """
 
     val bootstrapScript = s"""
@@ -114,7 +129,7 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       |println("Uploading participant keys")
       $keyUploadCommands
       |println(svc_participant.keys.secret.list())
-      |println("Initializing participant with uid ${participantIdentity.id.toString}")
+      |println("Initializing participant with uid ${participantDump.id.toString}")
       $participantInitializationCommand
       |println("Creating sv1 user")
       |svc_participant.ledger_api.users.create(

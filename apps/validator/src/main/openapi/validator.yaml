@@ -87,18 +87,18 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
 
-  /admin/participant/export:
+  /admin/participant/identities:
     get:
       tags: [validator]
       x-jvm-package: validatorAdmin
-      operationId: "exportParticipantIdentity"
+      operationId: "dumpParticipantIdentities"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ExportParticipantIdentityResponse"
+                "$ref": "#/components/schemas/DumpParticipantIdentitiesResponse"
 
 components:
   schemas:
@@ -151,12 +151,13 @@ components:
           items:
             type: string
 
-    ExportParticipantIdentityResponse:
+    DumpParticipantIdentitiesResponse:
       type: object
       required:
         - id
         - keys
         - bootstrapTxes
+        - users
       properties:
         id:
           type: string
@@ -168,6 +169,10 @@ components:
           type: array
           items:
             type: string
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantUser"
 
     ParticipantKeyPair:
       type: object
@@ -177,4 +182,14 @@ components:
         keyPair:
           type: string
         name:
+          type: string
+
+    ParticipantUser:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        primaryParty:
           type: string

@@ -423,6 +423,8 @@ class CNLedgerConnection(
       logger,
     )
 
+  def listUsers(): Future[Seq[User]] = client.listUsers()
+
   def getUser(user: String): Future[User] = client.getUser(user)
 
   private def createPartyAndUser(

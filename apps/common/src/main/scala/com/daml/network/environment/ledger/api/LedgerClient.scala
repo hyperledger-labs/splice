@@ -14,6 +14,7 @@ import com.daml.ledger.javaapi.data.{
   GetUserRequest,
   GrantUserRightsRequest,
   LedgerOffset,
+  ListUsersRequest,
   ListUserRightsRequest,
   ListUserRightsResponse,
   RevokeUserRightsRequest,
@@ -315,6 +316,23 @@ private[environment] class LedgerClient(
       stub <- withCredentials(packageManagementServiceStub)
       res <- wrapFuture(stub.uploadDarFile(request, _)).map(_ => ())
     } yield res
+  }
+
+  def listUsers()(implicit ec: ExecutionContext): Future[Seq[User]] = {
+    val request = new ListUsersRequest(java.util.Optional.empty, Integer.MAX_VALUE).toProto
+    for {
+      stub <- withCredentials(userManagementServiceStub)
+      res <- wrapFuture(stub.listUsers(request, _))
+      _ <-
+        if (res.getNextPageToken() != "") {
+          // If we have more than Integer.MAX_VALUE users we are probably going to see other problems first.
+          ErrorUtil.internalError(
+            new IllegalStateException(
+              "Participant has more users than can be listed in one API call."
+            )
+          )
+        } else { Future.unit }
+    } yield res.getUsersList().asScala.toSeq.map(User.fromProto(_))
   }
 
   def getUserProto(

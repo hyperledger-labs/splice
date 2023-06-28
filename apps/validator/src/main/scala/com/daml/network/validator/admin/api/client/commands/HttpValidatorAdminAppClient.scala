@@ -12,6 +12,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 object HttpValidatorAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -69,40 +70,47 @@ object HttpValidatorAdminAppClient {
     }
   }
 
-  // TODO(#6177) Extend by "user->party" mappings and consider renaming to `ParticipantIdentitiesDump`
-  final case class ParticipantIdentity(
+  final case class ParticipantIdentitiesDump(
       id: ParticipantId,
       keys: Seq[ParticipantKey],
       bootstrapTxes: Seq[Array[Byte]],
+      users: Seq[ParticipantUser],
   )
   final case class ParticipantKey(
       keyPair: Array[Byte],
       name: Option[String],
   )
+  final case class ParticipantUser(
+      id: String,
+      primaryParty: Option[PartyId],
+  )
 
-  case class ExportParticipantIdentity()
+  case class DumpParticipantIdentities()
       extends BaseCommand[
-        http.ExportParticipantIdentityResponse,
-        ParticipantIdentity,
+        http.DumpParticipantIdentitiesResponse,
+        ParticipantIdentitiesDump,
       ] {
 
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ExportParticipantIdentityResponse] =
-      client.exportParticipantIdentity(headers = headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.DumpParticipantIdentitiesResponse] =
+      client.dumpParticipantIdentities(headers = headers)
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.ExportParticipantIdentityResponse.OK(response) =>
-        for {
-          id <- ParticipantId.fromProtoPrimitive(response.id, "participant").left.map(_.message)
-        } yield ParticipantIdentity(
-          id = id,
-          keys = response.keys.toSeq.map(k =>
-            ParticipantKey(Base64.getDecoder.decode(k.keyPair), k.name)
-          ),
-          bootstrapTxes = response.bootstrapTxes.toSeq.map(t => Base64.getDecoder.decode(t)),
-        )
+      case http.DumpParticipantIdentitiesResponse.OK(response) =>
+        Try(
+          ParticipantIdentitiesDump(
+            id = ParticipantId.tryFromProtoPrimitive(response.id),
+            keys = response.keys.toSeq.map(k =>
+              ParticipantKey(Base64.getDecoder.decode(k.keyPair), k.name)
+            ),
+            bootstrapTxes = response.bootstrapTxes.toSeq.map(t => Base64.getDecoder.decode(t)),
+            users = response.users.toSeq.map(user =>
+              ParticipantUser(user.id, user.primaryParty.map(PartyId.tryFromProtoPrimitive(_)))
+            ),
+          )
+        ).toEither.left.map(_.getMessage())
     }
   }
 }
