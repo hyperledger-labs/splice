@@ -4,7 +4,7 @@ import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.lf.archive.DarParser
 import com.daml.network.util.UploadablePackage
-import com.digitalasset.canton.{DomainAlias, DiscardOps}
+import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   VaultAdminCommands,
@@ -112,6 +112,8 @@ class ParticipantAdminConnection(
   )(implicit traceContext: TraceContext): Future[MemberTrafficStatus] = {
     runCmd(
       ParticipantAdminCommands.TrafficControl.GetTrafficControlState(domainId)
+    ).map(
+      _.getOrElse(throw Status.NOT_FOUND.withDescription("No traffic state").asRuntimeException())
     )
   }
 

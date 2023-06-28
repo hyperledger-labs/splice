@@ -38,7 +38,7 @@ class TrafficControlAdministrationGroup(
   )
   def traffic_state(
       domainId: DomainId
-  ): MemberTrafficStatus = {
+  ): Option[MemberTrafficStatus] = {
     consoleEnvironment.run(
       runner.adminCommand(
         ParticipantAdminCommands.TrafficControl

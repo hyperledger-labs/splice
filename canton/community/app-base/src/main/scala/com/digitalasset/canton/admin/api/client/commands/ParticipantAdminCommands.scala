@@ -1107,7 +1107,7 @@ object ParticipantAdminCommands {
         extends GrpcAdminCommand[
           TrafficControlStateRequest,
           TrafficControlStateResponse,
-          MemberTrafficStatus,
+          Option[MemberTrafficStatus],
         ] {
       override type Svc = TrafficControlServiceGrpc.TrafficControlServiceStub
 
@@ -1128,14 +1128,17 @@ object ParticipantAdminCommands {
 
       override def handleResponse(
           response: TrafficControlStateResponse
-      ): Either[String, MemberTrafficStatus] = {
+      ): Either[String, Option[MemberTrafficStatus]] = {
         response.trafficState
           .map { trafficStatus =>
             MemberTrafficStatus
               .fromProtoV0(trafficStatus)
               .leftMap(_.message)
-          }
-          .getOrElse(Left("No traffic state available"))
+          } match {
+          case None => Right(None)
+          case Some(Left(e)) => Left(e)
+          case Some(Right(v)) => Right(Some(v))
+        }
       }
     }
   }
