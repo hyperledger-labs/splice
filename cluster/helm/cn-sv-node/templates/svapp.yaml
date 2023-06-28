@@ -127,6 +127,7 @@ spec:
                   public-key = {{ $sv.publicKey | quote }}
                 }
             {{- end }}
+            {{- $clusterBaseName := .Values.cluster.basename -}}
             {{- with .Values.acsStoreDump }}
             - name: ADDITIONAL_CONFIG_CN_APP_SV_ACS_STORE_DUMP
               value: |
@@ -140,6 +141,7 @@ spec:
                       json-credentials = ${CN_APP_SV_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
                     }
                   }
+                  prefix = {{ $clusterBaseName }}
                 }
             - name: CN_APP_SV_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
               valueFrom:

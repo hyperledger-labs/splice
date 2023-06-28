@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.environment.{
+  BuildInfo,
   CNLedgerConnection,
   ParticipantAdminConnection,
   RetryProvider,
@@ -426,13 +427,19 @@ class HttpSvHandler(
           response <- Future {
             blocking {
               import io.circe.syntax.*
+              import java.nio.file.Paths
 
               // determine target file
               val now = clock.now.toInstant
               val svcFingerprint = show"${svcStore.key.svcParty}".filter('.'.!=)
-              val filename =
-                s"${svcFingerprint}_off-${snapshot.offset}_size-${snapshot.contracts.size}_${now}.json"
-
+              // Deliberately not using better files here
+              // because it turns this into an absolute path which
+              // then makes all the logging stuff below very confusing.
+              val filename = Paths.get(
+                BuildInfo.compiledVersion,
+                svStoreWithIngestion.store.key.svParty.uid.id.toProtoPrimitive,
+                s"${svcFingerprint}_off-${snapshot.offset}_size-${snapshot.contracts.size}_${now}.json",
+              )
               // TODO(#6073): compress output file
               val httpSnapshot = definitions.GetAcsStoreDumpResponse(
                 offset = snapshot.offset,
@@ -441,26 +448,28 @@ class HttpSvHandler(
               val fileDesc =
                 s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $filename"
               logger.debug(s"Attempting to write $fileDesc")
-              acsDumpConfig match {
+              val path = acsDumpConfig match {
                 case SvAcsStoreDumpConfig.Directory(directory) =>
                   import better.files.File
                   // create output directories
-                  val dumpDir = File(directory)
-                  dumpDir.createDirectories()
-                  val file = dumpDir / filename
+                  val file = File(directory) / filename.toString
+                  file.parent.createDirectories()
                   file.write(httpSnapshot.asJson.noSpaces)
-                case SvAcsStoreDumpConfig.Gcp(bucketConfig) =>
+                  filename.toString
+                case SvAcsStoreDumpConfig.Gcp(bucketConfig, prefix) =>
                   val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
+                  val path = prefix.fold(filename.toString)(prefix => s"$prefix/${filename}")
                   gcpBucket.dumpBytesToBucket(
                     httpSnapshot.asJson.noSpaces.getBytes(StandardCharsets.UTF_8),
-                    filename,
+                    path,
                   )
+                  path
               }
 
               logger.info(s"Wrote $fileDesc")
               v0.SvResource.TriggerAcsDumpResponseOK(
                 definitions.TriggerAcsDumpResponse(
-                  filename = filename,
+                  filename = path,
                   numEvents = snapshot.contracts.size,
                   offset = snapshot.offset,
                 )

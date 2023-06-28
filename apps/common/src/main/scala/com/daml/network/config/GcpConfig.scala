@@ -44,9 +44,19 @@ final case class GcpBucketConfig(
 )
 
 object GcpBucketConfig {
-  def inferForTesting: GcpBucketConfig = {
+  def inferForTesting: GcpBucketConfig =
+    infer(
+      "GCP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS",
+      "da-cn-scratchnet",
+      "da-cn-scratch-acs-store-dumps",
+    )
+
+  def inferForCluster: GcpBucketConfig =
+    infer("GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS", "da-cn-devnet", "da-cn-data-dumps")
+
+  private def infer(envVar: String, projectId: String, bucketName: String): GcpBucketConfig = {
     val credentialsConfig =
-      sys.env.get("GCP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS") match {
+      sys.env.get(envVar) match {
         case Some(credentials) => GcpCredentialsConfig.ServiceAccount(credentials)
         case None =>
           val homeDir = Paths.get(System.getProperty("user.home"))
@@ -55,6 +65,6 @@ object GcpBucketConfig {
             homeDir.resolve(".config/gcloud/application_default_credentials.json")
           GcpCredentialsConfig.User(scala.io.Source.fromFile(userCredentialsPath.toFile).mkString)
       }
-    GcpBucketConfig(credentialsConfig, "da-cn-scratchnet", "da-cn-scratch-acs-store-dumps")
+    GcpBucketConfig(credentialsConfig, projectId, bucketName)
   }
 }

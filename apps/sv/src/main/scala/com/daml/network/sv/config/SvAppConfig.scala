@@ -88,7 +88,8 @@ object SvAcsStoreDumpConfig {
     override val locationDescription = s"directory $directory"
   }
   final case class Gcp(
-      bucket: GcpBucketConfig
+      bucket: GcpBucketConfig,
+      prefix: Option[String],
   ) extends SvAcsStoreDumpConfig {
     override val locationDescription = s"GCP bucket ${bucket.bucketName}"
   }

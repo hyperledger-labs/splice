@@ -137,7 +137,7 @@ const validator1Onboarding = {
 };
 
 function configureGcpBucketKey(): Key {
-  const serviceAccountName = `projects/da-cn-scratchnet/serviceAccounts/da-cn-scratch-sv1-simon-test@da-cn-scratchnet.iam.gserviceaccount.com`;
+  const serviceAccountName = `projects/da-cn-devnet/serviceAccounts/da-cn-data-exports@da-cn-devnet.iam.gserviceaccount.com`;
 
   // Note, creating a new key can fail with a precondition error on an attempt
   // to create keys beyond the tenth.
@@ -165,9 +165,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     isDevNet
       ? undefined
       : {
-          // fixme
-          projectId: 'da-cn-scratchnet',
-          bucketName: 'da-cn-scratch-acs-store-dumps',
+          projectId: 'da-cn-devnet',
+          bucketName: 'da-cn-data-dumps',
           jsonCredentials: configureGcpBucketKey().privateKey,
         }
   );

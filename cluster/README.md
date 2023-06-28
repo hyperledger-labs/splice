@@ -1084,6 +1084,15 @@ Network. Steps to do this are as follows:
    have access to `da-cn-images. The command to do this will look like
    this: `gcloud projects add-iam-policy-binding da-cn-images --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' --role='roles/artifactregistry.serviceAgent'
 
+## Cluster Data Dumps
+
+Our SV app produces regular dumps of the ACS to a [gcp
+bucket](https://console.cloud.google.com/storage/browser?project=da-cn-devnet&prefix=&forceOnBucketsSortingFiltering=true). The
+cluster authenticates towards that using a [service
+account](https://console.cloud.google.com/iam-admin/serviceaccounts/details/110633355488996978852?project=da-cn-devnet).
+
+To download exports for local inspection either use the web UI or
+`gsutil cp`.
 
 ## Appendix: Kubernetes and Other Deployment Resources
 

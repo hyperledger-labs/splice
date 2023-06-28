@@ -133,7 +133,7 @@ class NonDevNetPreflightIntegrationTest
   // instead of triggering one.
   "trigger ACS snapshot and check that it can be downloaded and decoded" in { implicit env =>
     val result = sv1Client.triggerAcsDump()
-    val bucket = new GcpBucket(GcpBucketConfig.inferForTesting, loggerFactory)
+    val bucket = new GcpBucket(GcpBucketConfig.inferForCluster, loggerFactory)
     val dump = new String(bucket.readBytesFromBucket(result.filename), StandardCharsets.UTF_8)
     io.circe.parser.decode[http.GetAcsStoreDumpResponse](dump) should matchPattern {
       case Right(_) =>

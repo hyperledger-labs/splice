@@ -69,7 +69,7 @@ final class DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest
 
 final class GcpBucketAcsStoreDumpTriggerExportTimeBasedIntegrationTest
     extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[SvAcsStoreDumpConfig.Gcp] {
-  override def acsStoreDumpConfig = SvAcsStoreDumpConfig.Gcp(GcpBucketConfig.inferForTesting)
+  override def acsStoreDumpConfig = SvAcsStoreDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None)
   val bucket = new GcpBucket(acsStoreDumpConfig.bucket, loggerFactory)
   override def readDump(filename: String) = {
     new String(bucket.readBytesFromBucket(filename), StandardCharsets.UTF_8)
