@@ -243,7 +243,9 @@ function _prompt_to_confirm() {
     # Many subcommands invoke other subcommands to do their work. This
     # keeps a record of the first confirmation prompt to avoid prompting
     # the user at every one of these steps.
-    if [ -n "${USER_PROMPT_CONFIRMED:-}" ]; then
+    # We also autoconfirm on CI instead of having to be careful to avoid all calls to
+    # _prompt_to_confirm.
+    if [ -n "${USER_PROMPT_CONFIRMED:-}" ] || [ -n "${CI:-}" ]; then
         return
     fi
 
