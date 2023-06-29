@@ -6,6 +6,8 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import com.google.cloud.storage.{BlobId, BlobInfo, Storage, StorageOptions}
 
+import java.nio.charset.StandardCharsets
+
 class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {
   private val credentials = config.credentials.credentials
@@ -17,7 +19,15 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     .build()
     .getService()
 
-  def dumpBytesToBucket(data: Array[Byte], fileName: String)(implicit
+  def dumpStringToBucket(data: String, fileName: String)(implicit
+      traceContext: TraceContext
+  ): Unit =
+    dumpBytesToBucket(data.getBytes(StandardCharsets.UTF_8), fileName)
+
+  def readStringFromBucket(fileName: String): String =
+    new String(readBytesFromBucket(fileName), StandardCharsets.UTF_8)
+
+  private def dumpBytesToBucket(data: Array[Byte], fileName: String)(implicit
       traceContext: TraceContext
   ): Unit = {
     val blobId = BlobId.of(config.bucketName, fileName)
@@ -26,7 +36,7 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     logger.info(s"Bytes dumped to GCP bucket: gs://${config.bucketName}/$fileName")
   }
 
-  def readBytesFromBucket(fileName: String): Array[Byte] = {
+  private def readBytesFromBucket(fileName: String): Array[Byte] = {
     val blobId = BlobId.of(config.bucketName, fileName)
     val blob = storage.get(blobId)
     blob.getContent()

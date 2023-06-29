@@ -8,7 +8,6 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.GcpBucket
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 
 abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: BackupDumpConfig]
@@ -71,7 +70,5 @@ final class GcpBucketAcsStoreDumpTriggerExportTimeBasedIntegrationTest
   override def acsStoreDumpConfig =
     BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None, None)
   val bucket = new GcpBucket(acsStoreDumpConfig.bucket, loggerFactory)
-  override def readDump(filename: String) = {
-    new String(bucket.readBytesFromBucket(filename), StandardCharsets.UTF_8)
-  }
+  override def readDump(filename: String) = bucket.readStringFromBucket(filename)
 }

@@ -45,7 +45,6 @@ import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.nio.charset.StandardCharsets
 import java.util.{Base64, UUID}
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
@@ -464,8 +463,8 @@ class HttpSvHandler(
                 case BackupDumpConfig.Gcp(bucketConfig, prefix, _) =>
                   val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
                   val path = prefix.fold(filename.toString)(prefix => s"$prefix/${filename}")
-                  gcpBucket.dumpBytesToBucket(
-                    httpSnapshot.asJson.noSpaces.getBytes(StandardCharsets.UTF_8),
+                  gcpBucket.dumpStringToBucket(
+                    httpSnapshot.asJson.noSpaces,
                     path,
                   )
                   path

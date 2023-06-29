@@ -49,7 +49,6 @@ import io.opentelemetry.api.trace.Tracer
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
-import java.nio.charset.StandardCharsets
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
@@ -340,8 +339,7 @@ class FoundingNodeInitializer(
                   better.files.File(file).contentAsString
                 case SvBootstrapDumpConfig.Gcp(bucketConfig, path) =>
                   val bucket = new GcpBucket(bucketConfig, loggerFactory)
-                  val byte = bucket.readBytesFromBucket(path)
-                  new String(byte, StandardCharsets.UTF_8)
+                  bucket.readStringFromBucket(path)
               }
               val jsonDump = io.circe.parser
                 .decode[http.GetAcsStoreDumpResponse](jsonString)

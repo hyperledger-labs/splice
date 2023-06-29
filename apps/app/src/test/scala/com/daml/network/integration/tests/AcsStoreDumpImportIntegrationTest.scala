@@ -12,7 +12,6 @@ import com.daml.network.sv.config.{SvBootstrapDumpConfig, SvOnboardingConfig}
 import com.daml.network.util.{GcpBucket, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 
 // Separate from the export as we need a different config for SV1
@@ -93,6 +92,6 @@ final class GcpAcsStoreDumpIntegrationTest
     super.beforeAll()
     val gcpBucket = new GcpBucket(GcpBucketConfig.inferForTesting, loggerFactory)
     val fileContent = better.files.File(bootstrappingDumpFilename).contentAsString
-    gcpBucket.dumpBytesToBucket(fileContent.getBytes(StandardCharsets.UTF_8), bucketPath)
+    gcpBucket.dumpStringToBucket(fileContent, bucketPath)
   }
 }

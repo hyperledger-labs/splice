@@ -14,13 +14,12 @@ class AcsStoreDumpGcpIntegrationTest extends AsyncWordSpec with BaseTest {
     "support writing to and reading from a gcp bucket" in {
       // Dump bytes to GCP bucket
       val originalText = "Hello, GCP!"
-      val dataToDump = originalText.getBytes("UTF-8")
+      val dataToDump = originalText
       val fileName = "integration-test/dummyfile.txt"
-      bucket.dumpBytesToBucket(dataToDump, fileName)
+      bucket.dumpStringToBucket(dataToDump, fileName)
 
       // Read bytes from GCP bucket
-      val retrievedData = bucket.readBytesFromBucket(fileName)
-      val retrievedText = new String(retrievedData, "UTF-8")
+      val retrievedText = bucket.readStringFromBucket(fileName)
       logger.info(s"Retrieved data: $retrievedText")
 
       originalText shouldBe retrievedText
