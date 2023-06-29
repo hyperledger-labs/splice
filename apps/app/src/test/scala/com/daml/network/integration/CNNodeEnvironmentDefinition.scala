@@ -158,6 +158,15 @@ case class CNNodeEnvironmentDefinition(
       }(config)
     )
 
+  def withTrafficTopupsDisabled: CNNodeEnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      CNNodeConfigTransforms.updateAllValidatorConfigs_(config =>
+        config
+          .focus(_.domains.global.buyExtraTraffic.targetThroughput)
+          .replace(NonNegativeNumeric.tryCreate(0))
+      )(config)
+    )
+
   def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
     addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 

@@ -1,14 +1,13 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
-
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
 
-class WalletTxLogWithDomainFeesIntegrationTest
+class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
@@ -19,8 +18,9 @@ class WalletTxLogWithDomainFeesIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
@@ -29,7 +29,15 @@ class WalletTxLogWithDomainFeesIntegrationTest
 
   "A wallet" should {
 
-    "handle domain fees that have been paid (in a DevNet cluster)" in { implicit env =>
+    "handle domain fees that have been paid (in a non DevNet cluster)" in { implicit env =>
+      actAndCheck(
+        "Advance rounds",
+        advanceRoundsByOneTick,
+      )(
+        "Wait for SV rewards to be collected",
+        _ => sv1Wallet.balance().unlockedQty should be > BigDecimal(0),
+      )
+
       val now = env.environment.clock.now
       val domainFeesConfig = sv1Scan.getCoinConfigAsOf(now).globalDomain.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount, 1_000_000L)
@@ -37,7 +45,7 @@ class WalletTxLogWithDomainFeesIntegrationTest
 
       actAndCheck(
         "Purchase extra traffic", {
-          buyExtraTraffic(sv1Validator, Seq(), trafficAmount, now)
+          buyExtraTraffic(sv1Validator, sv1Wallet.list().coins, trafficAmount, now)
         },
       )(
         "Check that an extra traffic purchase is registered in the transaction history",
@@ -60,9 +68,9 @@ class WalletTxLogWithDomainFeesIntegrationTest
                 }
               },
               { case logEntry: walletLogEntry.BalanceChange =>
-                logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
+                logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.SvRewardCollected
                 logEntry.receiver shouldBe sv1Validator.getValidatorPartyId().toProtoPrimitive
-                logEntry.amount should beWithin(totalCostCc, totalCostCc + smallAmount)
+                logEntry.amount should be > totalCostCc
               },
             ),
           )

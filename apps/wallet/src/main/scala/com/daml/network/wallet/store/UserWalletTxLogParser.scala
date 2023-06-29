@@ -127,12 +127,13 @@ class UserWalletTxLogParser(
                         // - CoinRules_BuyExtraTraffic
                         // The first 4 of these are related to identifying the amount of CC to tap to cover
                         // the purchase and then actually tapping it.
-                        // On non-DevNet, there will be only 1 associated event: the CoinRules_BuyExtraTraffic exercise.
+                        // On non-DevNet, there will be only 2 associated events: the CoinRules_Fetch and
+                        // the CoinRules_BuyExtraTraffic exercises.
                         val (childEventCount, expectedChildEvents) = tree.getEventsById
-                          .get(exercised.getChildEventIds.get(nextChildEventId)) match {
-                          // assume non-DevNet if the first event is the BuyExtraTraffic choice
+                          .get(exercised.getChildEventIds.get(nextChildEventId + 1)) match {
+                          // assume non-DevNet if the second event is the BuyExtraTraffic choice
                           case e: ExercisedEvent if e.getChoice == "CoinRules_BuyExtraTraffic" =>
-                            (1, Seq("CoinRules_BuyExtraTraffic"))
+                            (2, Seq("CoinRules_Fetch", "CoinRules_BuyExtraTraffic"))
                           case _ =>
                             (
                               5,
