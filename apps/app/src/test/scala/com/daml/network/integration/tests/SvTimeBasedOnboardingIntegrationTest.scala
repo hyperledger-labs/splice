@@ -10,8 +10,16 @@ class SvTimeBasedOnboardingIntegrationTest extends SvTimeBasedIntegrationTestBas
 
   "expire stale `SvOnboarding` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      startAllSync(sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
-      sv1.getSvcInfo().svcRules.payload.members should have size 3
+      startAllSync(
+        sv1ScanBackend,
+        sv1Backend,
+        sv2Backend,
+        sv3Backend,
+        sv1ValidatorBackend,
+        sv2ValidatorBackend,
+        sv3ValidatorBackend,
+      )
+      sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
     }
     clue(
       "Add a phantom SV and stop SV3 so that SV4 can't gather enough confirmations just yet"
@@ -19,42 +27,53 @@ class SvTimeBasedOnboardingIntegrationTest extends SvTimeBasedIntegrationTestBas
       actAndCheck(
         "Add phantom Sv and stop sv3", {
           addPhantomSv()
-          sv3.stop()
+          sv3Backend.stop()
         },
-      )("there are 4 members", _ => sv1.getSvcInfo().svcRules.payload.members should have size 4)
+      )(
+        "there are 4 members",
+        _ => sv1Backend.getSvcInfo().svcRules.payload.members should have size 4,
+      )
       // We now need 3 confirmations to execute an action, but only sv1 and sv2 are active.
     }
     clue("SV4 starts") {
-      sv4Validator.start()
-      sv4.start()
+      sv4ValidatorBackend.start()
+      sv4Backend.start()
     }
     clue("An `SvOnboarding` contract is created") {
       eventually()(
         // The onboarding is requested by SV4 during SvApp init.
-        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
       )
     }
     actAndCheck("No onboarding happens for a long time", advanceTime(JavaDuration.ofHours(25)))(
       "The `SvOnboarding` contract expires and is archived",
       _ =>
-        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty,
     )
   }
 
   "expire stale `SvOnboardingConfirmed` contracts" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      startAllSync(sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
-      sv1.getSvcInfo().svcRules.payload.members should have size 3
+      startAllSync(
+        sv1ScanBackend,
+        sv1Backend,
+        sv2Backend,
+        sv3Backend,
+        sv1ValidatorBackend,
+        sv2ValidatorBackend,
+        sv3ValidatorBackend,
+      )
+      sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
     }
     val svXParty = allocateRandomSvParty("svX")
     actAndCheck(
       "Create a new `SvOnboardingConfirmed` Contract with new party \"svX\"",
-      sv1.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         actAs = Seq(svcParty),
         optTimeout = None,
-        commands = sv1
+        commands = sv1Backend
           .getSvcInfo()
           .svcRules
           .contractId
@@ -70,7 +89,7 @@ class SvTimeBasedOnboardingIntegrationTest extends SvTimeBasedIntegrationTestBas
     )(
       "SvX's `SvOnboardingConfirmed` contract is created'",
       _ =>
-        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
             svcParty
           ) should have length 1,
@@ -81,27 +100,30 @@ class SvTimeBasedOnboardingIntegrationTest extends SvTimeBasedIntegrationTestBas
     )(
       "The `SvOnboardingConfirmed` contract expires and is archived",
       _ =>
-        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty) shouldBe empty,
     )
   }
 
   "archive expired `ValidatorOnboarding` contracts" in { implicit env =>
     clue("Initialize SVC with 1 SV") {
-      startAllSync(sv1Scan, sv1, sv1Validator)
-      sv1.getSvcInfo().svcRules.payload.members should have size 1
+      startAllSync(sv1ScanBackend, sv1Backend, sv1ValidatorBackend)
+      sv1Backend.getSvcInfo().svcRules.payload.members should have size 1
     }
     val testCandidateSecret = Random.alphanumeric.take(10).mkString
     actAndCheck(
       "create a new `ValidatorOnboarding` contract", {
         val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
-          sv1.getSvcInfo().svParty.toProtoPrimitive,
+          sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
           testCandidateSecret,
-          sv1.participantClientWithAdminToken.ledger_api.time.get().toInstant.plusSeconds(3600),
+          sv1Backend.participantClientWithAdminToken.ledger_api.time
+            .get()
+            .toInstant
+            .plusSeconds(3600),
         ).create.commands.asScala.toSeq
 
-        sv1.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-          actAs = Seq(sv1.getSvcInfo().svParty),
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+          actAs = Seq(sv1Backend.getSvcInfo().svParty),
           optTimeout = None,
           commands = validatorOnboarding,
         )
@@ -109,7 +131,7 @@ class SvTimeBasedOnboardingIntegrationTest extends SvTimeBasedIntegrationTestBas
     )(
       "The `ValidatorOnboarding` contract exists.",
       _ =>
-        sv1
+        sv1Backend
           .listOngoingValidatorOnboardings()
           .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 1,
     )
@@ -119,7 +141,7 @@ class SvTimeBasedOnboardingIntegrationTest extends SvTimeBasedIntegrationTestBas
     )(
       "The `ValidatorOnboarding` contract expires and is archived",
       _ =>
-        sv1
+        sv1Backend
           .listOngoingValidatorOnboardings()
           .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 0,
     )

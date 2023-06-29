@@ -23,39 +23,39 @@ class HealthEndpointsConnectivityIntegrationTest extends CNNodeIntegrationTest {
   registerPlugin(toxiproxy)
 
   "sv1 app should report liveness and readiness" in { implicit env =>
-    startAllSync(sv1, sv1Scan)
+    startAllSync(sv1Backend, sv1ScanBackend)
 
-    sv1.httpLive shouldBe true
-    sv1.httpReady shouldBe true
+    sv1Backend.httpLive shouldBe true
+    sv1Backend.httpReady shouldBe true
 
     actAndCheck(
       "disable all SV connections to the ledger API server",
-      toxiproxy.disableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1.name)),
+      toxiproxy.disableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1Backend.name)),
     )(
       "sv1 app should report as inactive",
       _ => {
-        sv1.httpHealth.successOption.exists(_.active) shouldBe false
+        sv1Backend.httpHealth.successOption.exists(_.active) shouldBe false
       },
     )
 
-    sv1.httpLive shouldBe true
+    sv1Backend.httpLive shouldBe true
 
     loggerFactory.assertLogs(
-      sv1.httpReady shouldBe false,
+      sv1Backend.httpReady shouldBe false,
       _.errorMessage should include("503"),
     )
 
     actAndCheck(
       "re-enable the connection and wait for sv1 app to report healthy again",
-      toxiproxy.enableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1.name)),
+      toxiproxy.enableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1Backend.name)),
     )(
       "sv1 app should report as active",
       _ => {
-        sv1.httpHealth.successOption.exists(_.active) shouldBe true
+        sv1Backend.httpHealth.successOption.exists(_.active) shouldBe true
       },
     )
 
-    sv1.httpLive shouldBe true
-    sv1.httpReady shouldBe true
+    sv1Backend.httpLive shouldBe true
+    sv1Backend.httpReady shouldBe true
   }
 }

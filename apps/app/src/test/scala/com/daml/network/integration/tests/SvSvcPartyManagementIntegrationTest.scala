@@ -12,17 +12,18 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
   "SV users can act as SV party and act or read as the SVC party" in { implicit env =>
     initSvc()
-    val rights = sv1.participantClient.ledger_api.users.rights.list(sv1.config.ledgerApiUser)
+    val rights =
+      sv1Backend.participantClient.ledger_api.users.rights.list(sv1Backend.config.ledgerApiUser)
     rights.actAs should contain(svcParty)
     rights.readAs shouldBe empty
-    Seq(sv2, sv3, sv4).foreach(sv => {
+    Seq(sv2Backend, sv3Backend, sv4Backend).foreach(sv => {
       val rights = sv.participantClient.ledger_api.users.rights.list(sv.config.ledgerApiUser)
       rights.actAs should not contain svcParty
       rights.readAs should contain(svcParty)
     })
     actAndCheck(
       "creating a `ValidatorOnboarding` contract readable only by sv3", {
-        val sv = sv3 // it doesn't really matter which sv we pick
+        val sv = sv3Backend // it doesn't really matter which sv we pick
         val svParty = sv.getSvcInfo().svParty
         sv.listOngoingValidatorOnboardings() shouldBe empty
         sv.participantClient.ledger_api_extensions.commands.submitWithResult(
@@ -39,7 +40,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
     )(
       "sv3's store ingests the contract",
       created =>
-        inside(sv3.listOngoingValidatorOnboardings()) { case Seq(visible) =>
+        inside(sv3Backend.listOngoingValidatorOnboardings()) { case Seq(visible) =>
           visible.contractId shouldBe created.contractId
         },
     )
@@ -48,21 +49,21 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
       clue("Starting SVC app and SV1 app") {
-        startAllSync(sv1Scan, sv1)
+        startAllSync(sv1ScanBackend, sv1Backend)
       }
 
-      val svcParty = sv1.getSvcInfo().svcParty
+      val svcParty = sv1Backend.getSvcInfo().svcParty
       val svcPartyStr: String = svcParty.toProtoPrimitive
-      val svcParticipant = sv1.participantClient
-      val sv4Participant = sv4.participantClient
+      val svcParticipant = sv1Backend.participantClient
+      val sv4Participant = sv4Backend.participantClient
 
       clue(
         "svc party hosting authorization request with party which is not confirmed will be rejected by sponsor SV"
       ) {
         val randomParty = allocateRandomSvParty("random")
         assertThrowsAndLogsCommandFailures(
-          sv1.onboardSvPartyMigrationAuthorize(
-            sv4.participantClient.id,
+          sv1Backend.onboardSvPartyMigrationAuthorize(
+            sv4Backend.participantClient.id,
             randomParty,
           ),
           _.errorMessage should include(
@@ -74,10 +75,10 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       clue(
         "svc party hosting authorization request with party which is not hosted on the target participant"
       ) {
-        val sv1Party = sv1.getSvcInfo().svParty
+        val sv1Party = sv1Backend.getSvcInfo().svParty
         assertThrowsAndLogsCommandFailures(
-          sv1.onboardSvPartyMigrationAuthorize(
-            sv4.participantClient.id,
+          sv1Backend.onboardSvPartyMigrationAuthorize(
+            sv4Backend.participantClient.id,
             sv1Party,
           ),
           _.errorMessage should include(
@@ -90,7 +91,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
       clue("start onboarding new SV and SVC party setup on new SV's dedicated participant") {
         // SV4 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
-        startAllSync(sv4Validator, sv4)
+        startAllSync(sv4ValidatorBackend, sv4Backend)
       }
 
       createCoinOwnBySvc(svcParticipant, 2.0)
@@ -125,7 +126,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       }
 
       clue("sv4 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
-        val sv4Party = sv4.getSvcInfo().svParty
+        val sv4Party = sv4Backend.getSvcInfo().svParty
 
         val coinRules = sv4Participant.ledger_api_extensions.acs
           .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
@@ -139,7 +140,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
           .maxBy(_.data.round.number)
 
         sv4Participant.ledger_api_extensions.commands.submitWithResult(
-          sv4.config.ledgerApiUser,
+          sv4Backend.config.ledgerApiUser,
           actAs = Seq(sv4Party),
           readAs = Seq(svcParty),
           update = coinRules.id.exerciseCoinRules_DevNet_Tap(
@@ -165,8 +166,8 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       }
 
       clue("sv4 can restart") {
-        sv4.stop()
-        sv4.startSync()
+        sv4Backend.stop()
+        sv4Backend.startSync()
       }
   }
 
@@ -185,7 +186,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       amount: Double,
   )(implicit env: CNNodeTestConsoleEnvironment) =
     participant.ledger_api_extensions.commands.submitWithResult(
-      sv1.config.ledgerApiUser,
+      sv1Backend.config.ledgerApiUser,
       actAs = Seq(svcParty),
       readAs = Seq.empty,
       update = coin(amount, svcParty).create,

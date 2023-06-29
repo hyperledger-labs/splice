@@ -27,7 +27,7 @@ trait DirectoryPersistenceIntegrationTest extends CNNodeIntegrationTest {
       }
 
       // check directory is up and running.
-      directory.listEntries("", 1) shouldBe empty
+      directoryBackend.listEntries("", 1) shouldBe empty
     }
 
   }

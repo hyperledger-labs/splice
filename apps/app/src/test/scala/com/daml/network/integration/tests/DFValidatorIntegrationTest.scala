@@ -36,32 +36,32 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
 
   "start and restart cleanly" in { implicit env =>
     initSvcWithSv1Only()
-    splitwellValidator.startSync()
-    splitwellValidator.stop()
-    splitwellValidator.startSync()
+    splitwellValidatorBackend.startSync()
+    splitwellValidatorBackend.stop()
+    splitwellValidatorBackend.startSync()
   }
 
   "initialize svc and validator apps" in { implicit env =>
     initSvcWithSv1Only()
     // Check that there is exactly one CoinRule and OpenMiningRound
-    val coinRules = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+    val coinRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
     coinRules should have length 1
 
-    val openRounds = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+    val openRounds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
     openRounds should have length 3
 
     // Start Alice’s validator
-    aliceValidator.startSync()
+    aliceValidatorBackend.startSync()
 
     // check that alice's validator can see its license.
-    val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-    aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
       .awaitJava(ValidatorLicense.COMPANION)(aliceValidatorParty)
 
     // onboard end user
-    aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
+    aliceValidatorBackend.onboardUser(aliceWallet.config.ledgerApiUser)
   }
 
   // TODO(M3-46) clean up once every validator uses this onboarding flow
@@ -69,13 +69,13 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     initSvcWithSv1Only()
 
     clue("Start Bob’s validator, who is configured with a `ValidatorOnboardingConfig`") {
-      bobValidator.startSync()
+      bobValidatorBackend.startSync()
     }
-    val bobValidatorParty = bobValidator.getValidatorPartyId()
+    val bobValidatorParty = bobValidatorBackend.getValidatorPartyId()
 
     clue("Bob's validator can see its own ValidatorLicense") {
       inside(
-        bobValidator.participantClientWithAdminToken.ledger_api_extensions.acs
+        bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cc.validatorlicense.ValidatorLicense.COMPANION)(
             bobValidatorParty
           )
@@ -86,24 +86,25 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       }
     }
     clue("Bob's validator can restart cleanly.") {
-      bobValidator.stop()
-      bobValidator.startSync()
+      bobValidatorBackend.stop()
+      bobValidatorBackend.startSync()
     }
   }
 
   "onboard users with party hint sanitizer" in { implicit env =>
     initSvcWithSv1Only()
-    aliceValidator.startSync()
+    aliceValidatorBackend.startSync()
 
     // Make uniqueness of the user ID more probable when running the test multiple times in a row
     val randomId = (new scala.util.Random).nextInt(10000)
 
-    val partyIdFromBadUserId = aliceValidator.onboardUser(s"test@example!#+~-user|123|${randomId}")
+    val partyIdFromBadUserId =
+      aliceValidatorBackend.onboardUser(s"test@example!#+~-user|123|${randomId}")
     partyIdFromBadUserId.toString
       .split("::")
       .head should fullyMatch regex (s"test_0040example_0021_0023_002b_007e-user_007c123_007c${randomId}")
 
-    val partyIdFromGoodUserId = aliceValidator.onboardUser(s"other-_us:er-${randomId}")
+    val partyIdFromGoodUserId = aliceValidatorBackend.onboardUser(s"other-_us:er-${randomId}")
     partyIdFromGoodUserId.toString
       .split("::")
       .head should fullyMatch regex (s"other-__us:er-${randomId}")
@@ -111,20 +112,20 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
 
   "register user" in { implicit env =>
     initSvcWithSv1Only()
-    aliceValidator.startSync()
+    aliceValidatorBackend.startSync()
 
-    val partyIdFromTokenUser = aliceValidator.register()
+    val partyIdFromTokenUser = aliceValidatorBackend.register()
 
     partyIdFromTokenUser.toString
       .split("::")
       .head should be(
-      CNLedgerConnection.sanitizeUserIdToPartyString(aliceValidator.config.ledgerApiUser)
+      CNLedgerConnection.sanitizeUserIdToPartyString(aliceValidatorBackend.config.ledgerApiUser)
     )
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
     initSvcWithSv1Only()
-    aliceValidator.startSync()
+    aliceValidatorBackend.startSync()
 
     implicit val sys = env.actorSystem
     implicit val ec = env.executionContext
@@ -132,13 +133,13 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       () =>
         Http().shutdownAllConnectionPools().map(_ => Done)
     }
-    val registerPost = Post(s"${aliceValidator.httpClientConfig.url}/register")
+    val registerPost = Post(s"${aliceValidatorBackend.httpClientConfig.url}/register")
     def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
 
     val invalidSignatureToken = JWT
       .create()
-      .withAudience(aliceValidator.config.auth.audience)
-      .withSubject(aliceValidator.config.ledgerApiUser)
+      .withAudience(aliceValidatorBackend.config.auth.audience)
+      .withSubject(aliceValidatorBackend.config.ledgerApiUser)
       .sign(Algorithm.HMAC256("wrong-secret"))
 
     val responseForInvalidSignature = Http()
@@ -149,7 +150,7 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     val invalidAudienceToken = JWT
       .create()
       .withAudience("wrong-audience")
-      .withSubject(aliceValidator.config.ledgerApiUser)
+      .withSubject(aliceValidatorBackend.config.ledgerApiUser)
       .sign(AuthUtil.testSignatureAlgorithm)
 
     val responseForInvalidAudience = Http()
@@ -157,7 +158,7 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       .futureValue
     responseForInvalidAudience.status should be(StatusCodes.Unauthorized)
 
-    val headers = aliceValidator.headers
+    val headers = aliceValidatorBackend.headers
     val validResponse = Http()
       .singleRequest(registerPost.withHeaders(headers))
       .futureValue
@@ -166,33 +167,33 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
 
   "onboard user multiple times" in { implicit env =>
     initSvcWithSv1Only()
-    aliceValidator.startSync()
+    aliceValidatorBackend.startSync()
 
-    val party1 = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
-    val party2 = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
+    val party1 = aliceValidatorBackend.onboardUser(aliceWallet.config.ledgerApiUser)
+    val party2 = aliceValidatorBackend.onboardUser(aliceWallet.config.ledgerApiUser)
     party1 shouldBe party2
   }
 
   "register user multiple times" in { implicit env =>
     initSvcWithSv1Only()
-    aliceValidator.startSync()
+    aliceValidatorBackend.startSync()
 
-    val party1 = aliceValidator.register()
-    val party2 = aliceValidator.register()
+    val party1 = aliceValidatorBackend.register()
+    val party2 = aliceValidatorBackend.register()
     party1 shouldBe party2
   }
 
   "onboard, list and offboard users" in { implicit env =>
     initSvcWithSv1Only()
-    aliceValidator.startSync()
+    aliceValidatorBackend.startSync()
 
-    actAndCheck("Onboard a user", onboardWalletUser(aliceWallet, aliceValidator))(
+    actAndCheck("Onboard a user", onboardWalletUser(aliceWallet, aliceValidatorBackend))(
       "Wait for user to be listed",
       _ => {
         val usernames = aliceValidatorClient.listUsers()
         usernames should contain theSameElementsAs Seq(
           aliceWallet.config.ledgerApiUser,
-          aliceValidator.config.validatorWalletUser.value,
+          aliceValidatorBackend.config.validatorWalletUser.value,
         )
       },
     )
@@ -213,7 +214,7 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     )
 
     aliceWallet.tap(100.0)
-    assertUserFullyOnboarded(aliceWallet, aliceValidator)
+    assertUserFullyOnboarded(aliceWallet, aliceValidatorBackend)
 
     actAndCheck(
       "Offboard a user",
@@ -223,14 +224,14 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       _ => {
         val usernames = aliceValidatorClient.listUsers()
         usernames should contain theSameElementsAs (testUsers ++
-          Seq(aliceValidator.config.validatorWalletUser.value))
-        assertUserFullyOffboarded(aliceWallet, aliceValidator)
+          Seq(aliceValidatorBackend.config.validatorWalletUser.value))
+        assertUserFullyOffboarded(aliceWallet, aliceValidatorBackend)
       },
     )
 
     clue("Offboarding alice again - offboarding should be idempotent") {
       aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser)
-      assertUserFullyOffboarded(aliceWallet, aliceValidator)
+      assertUserFullyOffboarded(aliceWallet, aliceValidatorBackend)
     }
 
     actAndCheck(
@@ -269,8 +270,8 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
   "stop an uninitialized validator" in { implicit env =>
     // No svc initialized, so the validator will not succeed in initialization,
     // but we terminate it before any initialization timeout.
-    aliceValidator.start()
-    aliceValidator.stop()
+    aliceValidatorBackend.start()
+    aliceValidatorBackend.stop()
     // If the validator's shutdown left a dirty state this will throw an ERROR.
     initSvcWithSv1Only()
   }

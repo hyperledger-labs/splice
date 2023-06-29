@@ -23,7 +23,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       participant: CNParticipantClientReference
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val upgradeConfig =
-      providerSplitwellBackend.participantClient.domains.config(splitwellUpgradeAlias).value
+      splitwellBackend.participantClient.domains.config(splitwellUpgradeAlias).value
 
     import com.daml.nonempty.+-:
     val url = inside(upgradeConfig.sequencerConnections.connections.forgetNE) {
@@ -55,64 +55,64 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
   ) = clue("setup splitwell users and contracts") {
 
     val group = "group1"
-    val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-    val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
-    val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+    val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+    val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+    val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     // The provider's wallet is auto-onboarded, so we just need to wait for it to be ready
-    waitForWalletUser(splitwellProviderWallet)
+    waitForWalletUser(splitwellWalletClient)
 
-    val splitwellProviderParty = providerSplitwellBackend.getProviderPartyId()
+    val splitwellProviderParty = splitwellBackend.getProviderPartyId()
 
     clue("setup install contracts") {
       Seq(
-        (aliceSplitwell, aliceUserParty),
-        (bobSplitwell, bobUserParty),
-        (charlieSplitwell, charlieUserParty),
+        (aliceSplitwellClient, aliceUserParty),
+        (bobSplitwellClient, bobUserParty),
+        (charlieSplitwellClient, charlieUserParty),
       ).foreach { case (splitwell, party) =>
         createSplitwellInstalls(splitwell, party)
       }
     }
 
-    actAndCheck("create 'group1'", aliceSplitwell.requestGroup(group))(
+    actAndCheck("create 'group1'", aliceSplitwellClient.requestGroup(group))(
       "Alice sees 'group1'",
-      _ => aliceSplitwell.listGroups() should have size 1,
+      _ => aliceSplitwellClient.listGroups() should have size 1,
     )
 
     val invite = clue("create a generic invite for 'group1'") {
       // Wait for the group contract to be visible to Alice's Ledger API
-      aliceSplitwell.ledgerApi.ledger_api_extensions.acs
+      aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
         .awaitJava(splitwellCodegen.Group.COMPANION)(aliceUserParty)
-      aliceSplitwell.createGroupInvite(
+      aliceSplitwellClient.createGroupInvite(
         group
       )
     }
 
-    actAndCheck("bob asks to join 'group1'", bobSplitwell.acceptInvite(invite))(
+    actAndCheck("bob asks to join 'group1'", bobSplitwellClient.acceptInvite(invite))(
       "Alice sees the accepted invite",
-      _ => aliceSplitwell.listAcceptedGroupInvites(group) should not be empty,
+      _ => aliceSplitwellClient.listAcceptedGroupInvites(group) should not be empty,
     )
 
     actAndCheck(
       "bob joins 'group1'",
-      inside(aliceSplitwell.listAcceptedGroupInvites(group)) { case Seq(accepted) =>
-        aliceSplitwell.joinGroup(accepted.contractId)
+      inside(aliceSplitwellClient.listAcceptedGroupInvites(group)) { case Seq(accepted) =>
+        aliceSplitwellClient.joinGroup(accepted.contractId)
       },
     )(
       "bob is in 'group1'",
       _ => {
-        bobSplitwell.listGroups() should have size 1
-        aliceSplitwell.listAcceptedGroupInvites(group) should be(empty)
+        bobSplitwellClient.listGroups() should have size 1
+        aliceSplitwellClient.listAcceptedGroupInvites(group) should be(empty)
       },
     )
 
     val key = GrpcSplitwellAppClient.GroupKey(
       aliceUserParty,
-      aliceSplitwell.getProviderPartyId(),
+      aliceSplitwellClient.getProviderPartyId(),
       group,
     )
 
     clue("grant featured app right to splitwell provider") {
-      grantFeaturedAppRight(splitwellProviderWallet)
+      grantFeaturedAppRight(splitwellWalletClient)
     }
 
     (aliceUserParty, bobUserParty, charlieUserParty, splitwellProviderParty, key, invite)

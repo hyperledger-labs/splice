@@ -30,23 +30,23 @@ class DFScanIntegrationTest
       .withTrafficTopupsEnabled
 
   "restart cleanly" in { implicit env =>
-    sv1Scan.stop()
-    sv1Scan.startSync()
+    sv1ScanBackend.stop()
+    sv1ScanBackend.startSync()
   }
 
   "list total coin balances" in { implicit env =>
     val (aliceUserParty, _) = onboardAliceAndBob()
     aliceWallet.tap(100.0)
-    bobWallet.tap(150.0)
+    bobWalletClient.tap(150.0)
     eventually() {
-      val balances = sv1Scan.getTotalCoinBalance()
+      val balances = sv1ScanBackend.getTotalCoinBalance()
       balances.totalUnlocked should be(250.0)
       balances.totalLocked should be(0.0)
     }
 
     val (referenceId, _, reqC) =
       createSelfPaymentRequest(
-        aliceValidator.participantClientWithAdminToken,
+        aliceValidatorBackend.participantClientWithAdminToken,
         aliceWallet.config.ledgerApiUser,
         aliceUserParty,
       )
@@ -83,7 +83,7 @@ class DFScanIntegrationTest
       }
     }
     eventually() {
-      val balances = sv1Scan.getTotalCoinBalance()
+      val balances = sv1ScanBackend.getTotalCoinBalance()
       assertInRange(balances.totalUnlocked, (239.5, 240.0))
       assertInRange(balances.totalLocked, (10.0, 10.5))
     }

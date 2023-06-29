@@ -187,7 +187,7 @@ object CNNodeTests {
       with AppendedClues {
 
     def defaultTickDuration(implicit env: CNNodeTestConsoleEnvironment): NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofSeconds((sv1.config.onboarding match {
+      NonNegativeFiniteDuration.ofSeconds((sv1Backend.config.onboarding match {
         case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
           foundCollective.initialTickDuration.asJava
         case Some(_: SvOnboardingConfig.JoinWithKey) | None =>

@@ -36,23 +36,23 @@ class SplitwellUpgradeIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.upload_dar_unless_exists(darPath)
-        bobValidator.participantClient.upload_dar_unless_exists(darPath)
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
       })
 
   "splitwell with upgraded domain" should {
     "report both domains" in { implicit env =>
-      val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
+      val splitwellDomains = splitwellBackend.getSplitwellDomainIds()
       splitwellDomains.preferred.uid.id shouldBe "splitwellUpgrade"
       splitwellDomains.others.map(_.uid.id) shouldBe Seq("splitwell")
     }
 
     def installFirstAlice(alice: PartyId)(implicit env: FixtureParam) =
-      actAndCheck("alice creates install requests", aliceSplitwell.createInstallRequests())(
+      actAndCheck("alice creates install requests", aliceSplitwellClient.createInstallRequests())(
         "alice sees one install contracts",
         _ =>
           inside(
-            aliceSplitwell.ledgerApi.ledger_api_extensions.acs
+            aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
               .filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
               .toList
           ) { case Seq(domain) =>
@@ -88,7 +88,7 @@ class SplitwellUpgradeIntegrationTest
     def twoInstalls(alice: PartyId, install: splitwellCodegen.SplitwellInstall.Contract)(implicit
         env: FixtureParam
     ) = {
-      val contracts = aliceSplitwell.ledgerApi.ledger_api_extensions.acs
+      val contracts = aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
         .filterJava(splitwellCodegen.SplitwellInstall.COMPANION)(alice)
       inside(contracts.partition(_.id == install.id)) { case (Seq(`install`), Seq(newInstall)) =>
         (contracts, newInstall)
@@ -96,20 +96,20 @@ class SplitwellUpgradeIntegrationTest
     }
 
     "create per domain install contracts" in { implicit env =>
-      val alice = onboardWalletUser(aliceWallet, aliceValidator)
+      val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
       // val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
       val (_, install) = installFirstAlice(alice)
 
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
-        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
       ) {
-        actAndCheck("alice creates install requests", createInstalls(aliceSplitwell))(
+        actAndCheck("alice creates install requests", createInstalls(aliceSplitwellClient))(
           "alice sees one install contracts",
           _ => {
             val (contracts, newInstall) = twoInstalls(alice, install)
             val contractDomains =
-              aliceValidator.participantClient.transfer.lookup_contract_domain(
+              aliceValidatorBackend.participantClient.transfer.lookup_contract_domain(
                 contracts.map[LfContractId](_.id): _*
               )
             contractDomains shouldBe Map[LfContractId, DomainAlias](
@@ -122,23 +122,23 @@ class SplitwellUpgradeIntegrationTest
     }
 
     "balance update and invite contracts follow group, which follows installs" in { implicit env =>
-      val alice = onboardWalletUser(aliceWallet, aliceValidator)
-      val bob = onboardWalletUser(bobWallet, bobValidator)
-      createSplitwellInstalls(aliceSplitwell, alice)
-      createSplitwellInstalls(bobSplitwell, bob)
-      val (_, group) = actAndCheck("create 'group1'", aliceSplitwell.requestGroup("group1"))(
+      val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      createSplitwellInstalls(aliceSplitwellClient, alice)
+      createSplitwellInstalls(bobSplitwellClient, bob)
+      val (_, group) = actAndCheck("create 'group1'", aliceSplitwellClient.requestGroup("group1"))(
         "Alice sees 'group1'",
         _ =>
-          inside(aliceSplitwell.listGroups()) { case Seq(group) =>
+          inside(aliceSplitwellClient.listGroups()) { case Seq(group) =>
             group
           },
       )
-      val invite = aliceSplitwell.createGroupInvite(
+      val invite = aliceSplitwellClient.createGroupInvite(
         "group1"
       )
-      val acceptedInvite = bobSplitwell.acceptInvite(invite)
+      val acceptedInvite = bobSplitwellClient.acceptInvite(invite)
       val contractDomains =
-        providerSplitwellBackend.participantClient.transfer.lookup_contract_domain(
+        splitwellBackend.participantClient.transfer.lookup_contract_domain(
           group.contract.contractId,
           invite.contract.contractId,
           acceptedInvite,
@@ -149,23 +149,23 @@ class SplitwellUpgradeIntegrationTest
         acceptedInvite,
       ).map(cid => cid -> splitwellAlias.unwrap).toMap
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
-        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
       ) {
         bracket(
-          connectSplitwellUpgradeDomain(bobValidator.participantClient),
-          disconnectSplitwellUpgradeDomain(bobValidator.participantClient),
+          connectSplitwellUpgradeDomain(bobValidatorBackend.participantClient),
+          disconnectSplitwellUpgradeDomain(bobValidatorBackend.participantClient),
         ) {
           actAndCheck(
             "new installs for alice and bob",
-            createInstalls(aliceSplitwell, bobSplitwell),
+            createInstalls(aliceSplitwellClient, bobSplitwellClient),
           )(
             "group, balance update, and invite contracts all follow",
             { _ =>
               // group is transferred out by UpgradeGroupTrigger,
               // and in by the TransferInTrigger.
               val contractDomains =
-                providerSplitwellBackend.participantClient.transfer.lookup_contract_domain(
+                splitwellBackend.participantClient.transfer.lookup_contract_domain(
                   group.contract.contractId,
                   invite.contract.contractId,
                   acceptedInvite,
@@ -185,10 +185,10 @@ class SplitwellUpgradeIntegrationTest
 
     "fully upgrade an active model" in { implicit env =>
       val (alice, _) = clue("Setup some users on the old domain") {
-        val alice = onboardWalletUser(aliceWallet, aliceValidator)
-        val bob = onboardWalletUser(bobWallet, bobValidator)
-        createSplitwellInstalls(aliceSplitwell, alice)
-        createSplitwellInstalls(bobSplitwell, bob)
+        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+        createSplitwellInstalls(aliceSplitwellClient, alice)
+        createSplitwellInstalls(bobSplitwellClient, bob)
         (alice, bob)
       }
 
@@ -196,13 +196,13 @@ class SplitwellUpgradeIntegrationTest
       import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.GroupKey
       val abGroupKey = GroupKey(
         alice,
-        aliceSplitwell.getProviderPartyId(),
+        aliceSplitwellClient.getProviderPartyId(),
         abGroupName,
       )
       val aGroupName = "group2"
       val aGroupKey = GroupKey(
         alice,
-        aliceSplitwell.getProviderPartyId(),
+        aliceSplitwellClient.getProviderPartyId(),
         aGroupName,
       )
 
@@ -213,16 +213,16 @@ class SplitwellUpgradeIntegrationTest
         val (_, ((abGroup, aGroup), bGroup)) =
           actAndCheck(
             "create groups", {
-              aliceSplitwell.requestGroup(abGroupName)
-              aliceSplitwell.requestGroup(aGroupName)
-              bobSplitwell.requestGroup(bGroupName)
+              aliceSplitwellClient.requestGroup(abGroupName)
+              aliceSplitwellClient.requestGroup(aGroupName)
+              bobSplitwellClient.requestGroup(bGroupName)
             },
           )(
             "Alice and Bob see their own groups",
             _ =>
               (
                 inside(
-                  aliceSplitwell
+                  aliceSplitwellClient
                     .listGroups()
                     .groupMapReduce(_.contract.payload.id.unpack)(identity)((_, b) => b)
                 ) {
@@ -232,20 +232,23 @@ class SplitwellUpgradeIntegrationTest
                       groups.get(aGroupName).value,
                     )
                 },
-                inside(bobSplitwell.listGroups()) { case Seq(bGroup) =>
+                inside(bobSplitwellClient.listGroups()) { case Seq(bGroup) =>
                   bGroup
                 },
               ),
           )
 
         val invite = clue(s"alice invites bob to $abGroupName, and bob accepts") {
-          aliceSplitwell.createGroupInvite(abGroupName)
+          aliceSplitwellClient.createGroupInvite(abGroupName)
         }
         val (acceptedInvite, _) =
-          actAndCheck(s"bob accepts invite to $abGroupName", bobSplitwell.acceptInvite(invite))(
+          actAndCheck(
+            s"bob accepts invite to $abGroupName",
+            bobSplitwellClient.acceptInvite(invite),
+          )(
             "bob join is accepted",
             acceptedInviteId =>
-              inside(aliceSplitwell.listAcceptedGroupInvites(abGroupName)) {
+              inside(aliceSplitwellClient.listAcceptedGroupInvites(abGroupName)) {
                 case Seq(seenInvite) if seenInvite.contractId == acceptedInviteId =>
                   ()
               },
@@ -257,18 +260,18 @@ class SplitwellUpgradeIntegrationTest
           acceptedInvite,
         )
         val (_, newAbGroup) =
-          actAndCheck("bob join is finalized", aliceSplitwell.joinGroup(acceptedInvite))(
+          actAndCheck("bob join is finalized", aliceSplitwellClient.joinGroup(acceptedInvite))(
             s"new $abGroupName is ingested",
             newGroupId =>
-              aliceSplitwell.listGroups().find(_.contract.contractId == newGroupId).value,
+              aliceSplitwellClient.listGroups().find(_.contract.contractId == newGroupId).value,
           )
         val abBalanceUpdate = clue("Alice enters a payment") {
-          aliceSplitwell.enterPayment(abGroupKey, BigDecimal("42.42"), "the answer")
+          aliceSplitwellClient.enterPayment(abGroupKey, BigDecimal("42.42"), "the answer")
         }
-        bobWallet.tap(BigDecimal("100"))
+        bobWalletClient.tap(BigDecimal("100"))
         val (bobPyReqId, bobPyReq) = actAndCheck(
           "Bob initiates a transfer",
-          bobSplitwell.initiateTransfer(
+          bobSplitwellClient.initiateTransfer(
             abGroupKey,
             Seq(
               new walletCodegen.ReceiverCCAmount(
@@ -280,13 +283,13 @@ class SplitwellUpgradeIntegrationTest
         )(
           "bob sees payment request",
           prCid =>
-            bobWallet
+            bobWalletClient
               .listAppPaymentRequests()
               .collectFirst { case pr if prCid == pr.appPaymentRequest.contractId => pr }
               .value,
         )
         val aBalanceUpdate = clue("Alice enters another payment") {
-          aliceSplitwell.enterPayment(aGroupKey, BigDecimal("33.33"), "time left")
+          aliceSplitwellClient.enterPayment(aGroupKey, BigDecimal("33.33"), "time left")
         }
         eventually() { assertAllOn(globalAlias)(bobPyReqId, bobPyReq.deliveryOffer.contractId) }
         assertAllOn(splitwellAlias)(
@@ -302,15 +305,15 @@ class SplitwellUpgradeIntegrationTest
 
       // Switch splitwell preferred domain
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
-        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
       ) {
         bracket(
-          connectSplitwellUpgradeDomain(bobValidator.participantClient),
-          disconnectSplitwellUpgradeDomain(bobValidator.participantClient),
+          connectSplitwellUpgradeDomain(bobValidatorBackend.participantClient),
+          disconnectSplitwellUpgradeDomain(bobValidatorBackend.participantClient),
         ) {
           clue("Onboard user's participants gradually to new domain") {
-            actAndCheck("onboard alice to upgrade", createInstalls(aliceSplitwell))(
+            actAndCheck("onboard alice to upgrade", createInstalls(aliceSplitwellClient))(
               "alice and alice-only group are migrated",
               _ => assertAllOn(splitwellUpgradeAlias)(aGroup.contract.contractId, aBalanceUpdate),
             )
@@ -322,10 +325,10 @@ class SplitwellUpgradeIntegrationTest
           }
           val abBalanceUpdate2 = clue("Interleave that with more operations") {
             val abBalanceUpdate2 = clue("Alice enters a third payment") {
-              aliceSplitwell.enterPayment(abGroupKey, BigDecimal("42.42"), "the answer")
+              aliceSplitwellClient.enterPayment(abGroupKey, BigDecimal("42.42"), "the answer")
             }
             val aBalanceUpdate2 = clue("Alice enters a fourth payment") {
-              aliceSplitwell.enterPayment(aGroupKey, BigDecimal("33.33"), "time left")
+              aliceSplitwellClient.enterPayment(aGroupKey, BigDecimal("33.33"), "time left")
             }
             assertAllOn(splitwellAlias)(abBalanceUpdate2)
             assertAllOn(splitwellUpgradeAlias)(aBalanceUpdate2)
@@ -334,7 +337,7 @@ class SplitwellUpgradeIntegrationTest
           clue(
             "Test that once all users are migrated we eventually end up with everything being transferred to the new domain"
           ) {
-            createInstalls(bobSplitwell)
+            createInstalls(bobSplitwellClient)
             eventually() {
               assertAllOn(splitwellUpgradeAlias)(
                 abGroup.contract.contractId,
@@ -346,12 +349,13 @@ class SplitwellUpgradeIntegrationTest
 
             actAndCheck(
               "Alice accepts the payment after migration",
-              bobWallet.acceptAppPaymentRequest(bobPyReq.appPaymentRequest.contractId),
+              bobWalletClient.acceptAppPaymentRequest(bobPyReq.appPaymentRequest.contractId),
             )(
               "balance updated on the upgrade domain",
               _ =>
-                inside(bobSplitwell.listBalanceUpdates(abGroupKey)) { case ups @ Seq(_, _, _) =>
-                  assertAllOn(splitwellUpgradeAlias)(ups.map(_.contractId) *)
+                inside(bobSplitwellClient.listBalanceUpdates(abGroupKey)) {
+                  case ups @ Seq(_, _, _) =>
+                    assertAllOn(splitwellUpgradeAlias)(ups.map(_.contractId) *)
                 },
             )
           }

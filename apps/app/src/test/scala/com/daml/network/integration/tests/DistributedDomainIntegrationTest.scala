@@ -33,15 +33,15 @@ class DistributedDomainIntegrationTest
   "SV onboarding on distributed domain" in { implicit env =>
     initSvc()
     clue("Sequencers are initialized") {
-      sv1.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
-      sv2.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
-      sv3.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
-      sv4.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv1Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv2Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv3Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv4Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
     }
 
     clue("SV participants are connected to their own sequencers") {
       inside(
-        sv1.participantClient.domains
+        sv1Backend.participantClient.domains
           .config(globalDomain)
           .value
           .sequencerConnections
@@ -51,7 +51,7 @@ class DistributedDomainIntegrationTest
         endpoints shouldBe NonEmpty.mk(Seq, Endpoint("localhost", Port.tryCreate(5008)))
       }
       inside(
-        sv2.participantClient.domains
+        sv2Backend.participantClient.domains
           .config(globalDomain)
           .value
           .sequencerConnections
@@ -61,7 +61,7 @@ class DistributedDomainIntegrationTest
         endpoints shouldBe NonEmpty.mk(Seq, Endpoint("localhost", Port.tryCreate(5608)))
       }
       inside(
-        sv3.participantClient.domains
+        sv3Backend.participantClient.domains
           .config(globalDomain)
           .value
           .sequencerConnections
@@ -71,7 +71,7 @@ class DistributedDomainIntegrationTest
         endpoints shouldBe NonEmpty.mk(Seq, Endpoint("localhost", Port.tryCreate(5708)))
       }
       inside(
-        sv4.participantClient.domains
+        sv4Backend.participantClient.domains
           .config(globalDomain)
           .value
           .sequencerConnections
@@ -83,33 +83,33 @@ class DistributedDomainIntegrationTest
     }
 
     clue("Mediator 1 is initialized") {
-      sv1.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
-      sv2.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
-      sv3.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
-      sv4.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv1Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv2Backend.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv3Backend.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
+      sv4Backend.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
     }
 
     clue("SVC party is bootstrapped as a unionspace with SVs as owners") {
-      val svcParty = sv1.getSvcInfo().svcParty
+      val svcParty = sv1Backend.getSvcInfo().svcParty
       val domainId =
-        sv1.participantClient.domains.id_of(globalDomain)
-      val unionspaces = sv1.participantClient.topology.unionspaces
+        sv1Backend.participantClient.domains.id_of(globalDomain)
+      val unionspaces = sv1Backend.participantClient.topology.unionspaces
         .list(
           filterStore = domainId.filterString,
           filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
         )
       inside(unionspaces) { case Seq(unionspace) =>
-        unionspace.item.owners shouldBe Seq(sv1, sv2, sv3, sv4)
+        unionspace.item.owners shouldBe Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
           .map(_.participantClient.id.uid.namespace)
           .toSet
       }
     }
 
-    aliceValidator.startSync()
+    aliceValidatorBackend.startSync()
 
     // Check that things work for external validators
     clue("Alice can tap") {
-      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
       aliceWallet.tap(1000)
     }
 
@@ -118,11 +118,11 @@ class DistributedDomainIntegrationTest
     val newPrice = BigDecimal(42)
     actAndCheck(
       "SVs can change their coin price",
-      Seq(sv1, sv2, sv3, sv4).foreach(_.updateCoinPriceVote(newPrice)),
+      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(_.updateCoinPriceVote(newPrice)),
     )(
       "SVs observe each others coin price changes",
       (_: Unit) =>
-        forAll(Seq(sv1, sv2, sv3, sv4)) { sv =>
+        forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
           val votes = sv.listCoinPriceVotes()
           votes should have size 4
           forAll(votes) { vote =>

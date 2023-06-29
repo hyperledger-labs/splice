@@ -27,9 +27,10 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
   "SVs can update their CoinPriceVote contracts" in { implicit env =>
     initSvc()
-    val svParties = Seq(("sv1", sv1), ("sv2", sv2), ("sv3", sv3), ("sv4", sv4)).map {
-      case (svName, sv) => svName -> sv.getSvcInfo().svParty
-    }.toMap
+    val svParties =
+      Seq(("sv1", sv1Backend), ("sv2", sv2Backend), ("sv3", sv3Backend), ("sv4", sv4Backend)).map {
+        case (svName, sv) => svName -> sv.getSvcInfo().svParty
+      }.toMap
 
     clue("initially only sv1 and sv2 have set the CoinPriceVote") {
       // sv1 because it's the SVC founder and sv2 because we configured it to do so
@@ -45,9 +46,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "set CoinPriceVote of sv2, sv3 and sv4", {
-        sv2.updateCoinPriceVote(BigDecimal(4.0))
-        sv3.updateCoinPriceVote(BigDecimal(3.0))
-        sv4.updateCoinPriceVote(BigDecimal(2.0))
+        sv2Backend.updateCoinPriceVote(BigDecimal(4.0))
+        sv3Backend.updateCoinPriceVote(BigDecimal(3.0))
+        sv4Backend.updateCoinPriceVote(BigDecimal(2.0))
       },
     )(
       "CoinPriceVote contract for sv2, sv3 anc sv4 are updated",
@@ -63,7 +64,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "update CoinPriceVote of sv1", {
-        sv1.updateCoinPriceVote(BigDecimal(5.0))
+        sv1Backend.updateCoinPriceVote(BigDecimal(5.0))
       },
     )(
       "CoinPriceVote contract for sv1 are updated",
@@ -97,9 +98,10 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
   "archive duplicated and non-member CoinPriceVote contracts" in { implicit env =>
     initSvc()
-    val svParties = Seq(("sv1", sv1), ("sv2", sv2), ("sv3", sv3), ("sv4", sv4)).map {
-      case (svName, sv) => svName -> sv.getSvcInfo().svParty
-    }.toMap
+    val svParties =
+      Seq(("sv1", sv1Backend), ("sv2", sv2Backend), ("sv3", sv3Backend), ("sv4", sv4Backend)).map {
+        case (svName, sv) => svName -> sv.getSvcInfo().svParty
+      }.toMap
 
     eventually() {
       getCoinPriceVoteMap() shouldBe Map(
@@ -128,11 +130,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "execute an action to remove sv3 on svcRules contract to trigger `GarbageCollectCoinPriceVotesTrigger` to remove duplicated and non member votes", {
-        sv1.participantClient.ledger_api_extensions.commands.submitWithResult(
-          sv1.config.ledgerApiUser,
+        sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
+          sv1Backend.config.ledgerApiUser,
           actAs = Seq(svcParty),
           readAs = Seq.empty,
-          update = sv1
+          update = sv1Backend
             .getSvcInfo()
             .svcRules
             .contractId
@@ -158,7 +160,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     clue("Initialize SVC with 4 SVs") {
       initSvc()
       eventually() {
-        sv1.getSvcInfo().svcRules.payload.members should have size 4
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 4
       }
     }
 
@@ -166,22 +168,22 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "SV1 create a vote request for a new SvcRules Configuration", {
         val newConfig = new SvcRulesConfig(
           newNumUnclaimedRewardsThreshold,
-          sv1.getSvcInfo().svcRules.payload.config.actionConfirmationTimeout,
-          sv1.getSvcInfo().svcRules.payload.config.svOnboardingRequestTimeout,
-          sv1.getSvcInfo().svcRules.payload.config.svOnboardingConfirmedTimeout,
-          sv1.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
-          sv1.getSvcInfo().svcRules.payload.config.leaderInactiveTimeout,
-          sv1.getSvcInfo().svcRules.payload.config.domainNodeConfigLimits,
-          sv1.getSvcInfo().svcRules.payload.config.maxTextLength,
-          sv1.getSvcInfo().svcRules.payload.config.initialTrafficGrant,
-          sv1.getSvcInfo().svcRules.payload.config.globalDomain,
+          sv1Backend.getSvcInfo().svcRules.payload.config.actionConfirmationTimeout,
+          sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingRequestTimeout,
+          sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingConfirmedTimeout,
+          sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+          sv1Backend.getSvcInfo().svcRules.payload.config.leaderInactiveTimeout,
+          sv1Backend.getSvcInfo().svcRules.payload.config.domainNodeConfigLimits,
+          sv1Backend.getSvcInfo().svcRules.payload.config.maxTextLength,
+          sv1Backend.getSvcInfo().svcRules.payload.config.initialTrafficGrant,
+          sv1Backend.getSvcInfo().svcRules.payload.config.globalDomain,
         )
 
         val action: ActionRequiringConfirmation =
           new ARC_SvcRules(new SRARC_SetConfig(new SvcRules_SetConfig(newConfig)))
 
-        sv1.createVoteRequest(
-          sv1.getSvcInfo().svParty.toProtoPrimitive,
+        sv1Backend.createVoteRequest(
+          sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
           action,
           "url",
           "description",
@@ -191,20 +193,20 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "The vote request has been created, SV1 accepts as he created it and all other SVs observe it",
       _ => {
         svs.foreach { sv => sv.listVoteRequests() should not be empty }
-        val head = sv1.listVoteRequests().head.contractId
-        sv1.listVotes(Vector(head.contractId)) should have size 1
-        (head, sv1.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold)
+        val head = sv1Backend.listVoteRequests().head.contractId
+        sv1Backend.listVotes(Vector(head.contractId)) should have size 1
+        (head, sv1Backend.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold)
       },
     )
 
     actAndCheck(
       "SV2 votes on accepting the new configuration", {
-        sv2.castVote(voteRequestCid, true, "url", "description")
+        sv2Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority did not vote yet, thus the trigger should not change the svcRules",
       _ => {
-        sv2
+        sv2Backend
           .getSvcInfo()
           .svcRules
           .payload
@@ -215,12 +217,12 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV3 refuses the new configuration", {
-        sv3.castVote(voteRequestCid, false, "url", "description")
+        sv3Backend.castVote(voteRequestCid, false, "url", "description")
       },
     )(
       "The majority has voted but without an acceptance majority, the trigger should not change the svcRules",
       _ => {
-        sv3
+        sv3Backend
           .getSvcInfo()
           .svcRules
           .payload
@@ -231,12 +233,12 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV4 votes on accepting the new configuration", {
-        sv4.castVote(voteRequestCid, true, "url", "description")
+        sv4Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority accepts, the trigger should change the svcRules accordingly",
       _ => {
-        sv4
+        sv4Backend
           .getSvcInfo()
           .svcRules
           .payload
@@ -250,14 +252,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     clue("Initialize SVC with 4 SVs") {
       initSvc()
       eventually() {
-        sv1.getSvcInfo().svcRules.payload.members should have size 4
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 4
       }
     }
 
     val (_, (voteRequestCid, initialFutureValuesSize)) = actAndCheck(
       "SV1 create a vote request for a new Coin Configuration (changing the transfer config)", {
 
-        val initialValue = sv1.getSvcInfo().coinRules.payload.configSchedule.initialValue
+        val initialValue = sv1Backend.getSvcInfo().coinRules.payload.configSchedule.initialValue
         val transferConfig = initialValue.transferConfig
         val newTransferConfig = new TransferConfig[USD](
           transferConfig.createFee,
@@ -280,7 +282,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
             ),
           )
 
-        sv1.getSvcInfo().coinRules.payload.configSchedule.futureValues
+        sv1Backend.getSvcInfo().coinRules.payload.configSchedule.futureValues
         val futureValues = new util.ArrayList[
           com.daml.network.codegen.java.da.types.Tuple2[Instant, CoinConfig[USD]]
         ]();
@@ -293,12 +295,12 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
         val action: ActionRequiringConfirmation =
           new ARC_CoinRules(
-            sv1.getSvcInfo().coinRules.contractId,
+            sv1Backend.getSvcInfo().coinRules.contractId,
             new CRARC_SetConfigSchedule(new CoinRules_SetConfigSchedule(newConfig)),
           )
 
-        sv1.createVoteRequest(
-          sv1.getSvcInfo().svParty.toProtoPrimitive,
+        sv1Backend.createVoteRequest(
+          sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
           action,
           "url",
           "description",
@@ -307,21 +309,21 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )(
       "The vote request has been created and SV1 accepts as he created it",
       _ => {
-        sv1.listVoteRequests() should not be empty
-        val head = sv1.listVoteRequests().head.contractId
-        sv1.listVotes(Vector(head.contractId)) should have size 1
-        (head, sv1.getSvcInfo().coinRules.payload.configSchedule.futureValues.size())
+        sv1Backend.listVoteRequests() should not be empty
+        val head = sv1Backend.listVoteRequests().head.contractId
+        sv1Backend.listVotes(Vector(head.contractId)) should have size 1
+        (head, sv1Backend.getSvcInfo().coinRules.payload.configSchedule.futureValues.size())
       },
     )
 
     actAndCheck(
       "SV2 votes on accepting the new configuration", {
-        sv2.castVote(voteRequestCid, true, "url", "description")
+        sv2Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority did not vote yet, thus the trigger should not change the coin config futureValues",
       _ => {
-        sv2
+        sv2Backend
           .getSvcInfo()
           .coinRules
           .payload
@@ -333,12 +335,12 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV3 refuses the new configuration", {
-        sv3.castVote(voteRequestCid, false, "url", "description")
+        sv3Backend.castVote(voteRequestCid, false, "url", "description")
       },
     )(
       "The majority has voted but without an acceptance majority, the trigger should not change the coin config futureValues",
       _ => {
-        sv3
+        sv3Backend
           .getSvcInfo()
           .coinRules
           .payload
@@ -350,12 +352,12 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV4 votes on accepting the new configuration", {
-        sv4.castVote(voteRequestCid, true, "url", "description")
+        sv4Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority accepts, the trigger should change the coin config futureValues",
       _ => {
-        sv4
+        sv4Backend
           .getSvcInfo()
           .coinRules
           .payload
@@ -368,7 +370,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
   }
 
   private def getCoinPriceVoteMap()(implicit env: CNNodeTestConsoleEnvironment) =
-    sv1
+    sv1Backend
       .listCoinPriceVotes()
       .groupBy(_.payload.sv)
       .flatMap { case (sv, contracts) =>
@@ -386,8 +388,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       svParty: PartyId,
       coinPrice: Option[BigDecimal],
   )(implicit env: CNNodeTestConsoleEnvironment) =
-    sv1.participantClient.ledger_api_extensions.commands.submitWithResult(
-      sv1.config.ledgerApiUser,
+    sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
+      sv1Backend.config.ledgerApiUser,
       actAs = Seq(svcParty),
       readAs = Seq.empty,
       update = new cn.svc.coinprice.CoinPriceVote(

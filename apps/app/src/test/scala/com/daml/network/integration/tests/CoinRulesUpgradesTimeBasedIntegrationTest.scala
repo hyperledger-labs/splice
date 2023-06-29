@@ -46,42 +46,42 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
           })
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.upload_dar_unless_exists(splitwellDarPath)
-        bobValidator.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
 
   "App transfers through upgraded coinRules" in { implicit env =>
     clue("Query both coinRules from scan") {
-      sv1Scan.getCoinRules()
-      sv1Scan.getCoinRulesV1Test()
+      sv1ScanBackend.getCoinRules()
+      sv1ScanBackend.getCoinRulesV1Test()
     }
 
     val (alice, bob, _, splitwellProvider, key, _) = initSplitwellTest()
 
     // We can't currently tap in an upgraded validator, so tapping some coin for sv1 (whose wallet is not upgraded) and transferring it to Alice to use
     // (Direct transfers from an old wallet to a new wallet will go through the old coinRules, thus expected to work)
-    val sv1Party = onboardWalletUser(sv1Wallet, sv1Validator)
-    sv1Wallet.tap(100)
+    val sv1Party = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
+    sv1WalletClient.tap(100)
 
     actAndCheck(
       "Transfer from SV1's (old) wallet to Alice's (new) wallet",
-      p2pTransfer(sv1Validator, sv1Wallet, aliceWallet, alice, 90.0),
+      p2pTransfer(sv1ValidatorBackend, sv1WalletClient, aliceWallet, alice, 90.0),
     )(
       "Check balances",
       _ => {
         checkWallet(alice, aliceWallet, Seq((90, 90)))
-        checkWallet(sv1Party, sv1Wallet, Seq((9, 10)))
+        checkWallet(sv1Party, sv1WalletClient, Seq((9, 10)))
       },
     )
 
     actAndCheck(
       "Transfer from Alice to Bob through Splitwell",
-      splitwellTransfer(aliceSplitwell, aliceWallet, bob, BigDecimal(80.0), key),
+      splitwellTransfer(aliceSplitwellClient, aliceWallet, bob, BigDecimal(80.0), key),
     )(
       "Check balances",
       _ => {
         checkWallet(alice, aliceWallet, Seq((9, 10)))
-        checkWallet(bob, bobWallet, Seq((79, 80)))
+        checkWallet(bob, bobWalletClient, Seq((79, 80)))
       },
     )
 
@@ -90,7 +90,7 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
       Range(0, 3).map(_ => advanceRoundsByOneTick),
     )(
       "Provider can still collect rewards with an upgraded validator",
-      _ => checkWallet(splitwellProvider, splitwellProviderWallet, Seq((80, 85))),
+      _ => checkWallet(splitwellProvider, splitwellWalletClient, Seq((80, 85))),
     )
   }
 }

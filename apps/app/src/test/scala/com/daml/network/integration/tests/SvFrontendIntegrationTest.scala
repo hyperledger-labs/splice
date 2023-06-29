@@ -27,7 +27,7 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "login works with correct password", {
-            login(sv1Port, sv1.config.ledgerApiUser)
+            login(sv1Port, sv1Backend.config.ledgerApiUser)
           },
         )(
           "logged in in the sv ui",
@@ -63,7 +63,7 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "svc and coin infos are displayed in pretty json", {
-            login(sv1Port, sv1.config.ledgerApiUser)
+            login(sv1Port, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see the 5 tab panels",
@@ -91,10 +91,10 @@ class SvFrontendIntegrationTest
             val valueCells = findAll(className("general-svc-value-name")).toSeq
             valueCells should have length 9
             forExactly(1, valueCells)(
-              _.text should matchText(sv1.config.ledgerApiUser)
+              _.text should matchText(sv1Backend.config.ledgerApiUser)
             )
             forExactly(3, valueCells)(
-              _.text should matchText(sv1.getSvcInfo().svParty.toProtoPrimitive)
+              _.text should matchText(sv1Backend.getSvcInfo().svParty.toProtoPrimitive)
             )
           },
         )
@@ -114,7 +114,7 @@ class SvFrontendIntegrationTest
         val (_, rowSize) = actAndCheck(
           "sv1 operator can login and browse to the validator onboarding tab", {
             go to s"http://localhost:$sv1Port/validator-onboarding"
-            loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+            loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see a button for creating onboarding secret",
@@ -146,7 +146,7 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "onboard new validator using the secret",
-          sv1.onboardValidator(newValidatorParty, newSecret),
+          sv1Backend.onboardValidator(newValidatorParty, newSecret),
         )(
           "a new validator row is added",
           _ => {
@@ -159,7 +159,7 @@ class SvFrontendIntegrationTest
               row.childElement(className("validator-licenses-sponsor")).text
             val validator =
               row.childElement(className("validator-licenses-validator")).text
-            sponsor shouldBe sv1.getSvcInfo().svParty.toProtoPrimitive
+            sponsor shouldBe sv1Backend.getSvcInfo().svParty.toProtoPrimitive
             validator shouldBe newValidatorParty.toProtoPrimitive
           },
         )
@@ -171,7 +171,7 @@ class SvFrontendIntegrationTest
         actAndCheck(
           "sv1 operator can login and browse to the coin price tab", {
             go to s"http://localhost:$sv1Port/cc-price"
-            loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+            loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see a median coin price, desired coin price of SV1 and other SVs, open mining rounds",
@@ -184,9 +184,9 @@ class SvFrontendIntegrationTest
             }
             val rows = findAll(className("coin-price-table-row")).toSeq
             rows should have size 3
-            svCoinPriceShouldMatch(rows, sv2.getSvcInfo().svParty, "1 USD")
-            svCoinPriceShouldMatch(rows, sv3.getSvcInfo().svParty, "Not Set")
-            svCoinPriceShouldMatch(rows, sv4.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv2Backend.getSvcInfo().svParty, "1 USD")
+            svCoinPriceShouldMatch(rows, sv3Backend.getSvcInfo().svParty, "Not Set")
+            svCoinPriceShouldMatch(rows, sv4Backend.getSvcInfo().svParty, "Not Set")
 
             val roundRows = findAll(className("open-mining-round-row")).toSeq
             roundRows should have size 3
@@ -207,17 +207,17 @@ class SvFrontendIntegrationTest
           rows should have size 3
           svCoinPriceShouldMatch(
             rows,
-            sv2.getSvcInfo().svParty,
+            sv2Backend.getSvcInfo().svParty,
             if (otherValues.isDefinedAt(0)) s"${otherValues(0)} USD" else "Not Set",
           )
           svCoinPriceShouldMatch(
             rows,
-            sv3.getSvcInfo().svParty,
+            sv3Backend.getSvcInfo().svParty,
             if (otherValues.isDefinedAt(1)) s"${otherValues(1)} USD" else "Not Set",
           )
           svCoinPriceShouldMatch(
             rows,
-            sv4.getSvcInfo().svParty,
+            sv4Backend.getSvcInfo().svParty,
             if (otherValues.isDefinedAt(2)) s"${otherValues(2)} USD" else "Not Set",
           )
         }
@@ -256,7 +256,7 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv2 set the desired price", {
-            sv2.updateCoinPriceVote(BigDecimal(15.55))
+            sv2Backend.updateCoinPriceVote(BigDecimal(15.55))
           },
         )(
           "median coin price changed and coin price updated on the row for sv2",
@@ -267,7 +267,7 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv3 set the desired price", {
-            sv3.updateCoinPriceVote(BigDecimal(5))
+            sv3Backend.updateCoinPriceVote(BigDecimal(5))
           },
         )(
           "median coin price changed and coin price updated on the row for sv2",
@@ -278,7 +278,7 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv4 set the desired price", {
-            sv4.updateCoinPriceVote(BigDecimal(9.0))
+            sv4Backend.updateCoinPriceVote(BigDecimal(9.0))
           },
         )(
           "median coin price changed and coin price updated on the row for sv4",
@@ -289,7 +289,7 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv1 update the desired price", {
-            sv1.updateCoinPriceVote(BigDecimal(1.0))
+            sv1Backend.updateCoinPriceVote(BigDecimal(1.0))
           },
         )(
           "median coin price changed",
@@ -308,7 +308,7 @@ class SvFrontendIntegrationTest
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
               go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -355,7 +355,7 @@ class SvFrontendIntegrationTest
         val (_, reviewButton) = actAndCheck(
           "sv2 operator can login and browse to the governance tab", {
             go to s"http://localhost:$sv2Port/votes"
-            loginOnCurrentPage(sv2Port, sv2.config.ledgerApiUser)
+            loginOnCurrentPage(sv2Port, sv2Backend.config.ledgerApiUser)
           },
         )(
           "sv2 can see the new vote request",
@@ -393,7 +393,7 @@ class SvFrontendIntegrationTest
               element.text should matchText("SRARC_RemoveMember")
             }
             inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
-              element.text should matchText(sv1.getSvcInfo().svParty.toProtoPrimitive)
+              element.text should matchText(sv1Backend.getSvcInfo().svParty.toProtoPrimitive)
             }
             inside(find(id("vote-request-modal-reason-body"))) { case Some(element) =>
               element.text should matchText(requestReasonBody)
@@ -530,7 +530,7 @@ class SvFrontendIntegrationTest
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
               go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -642,7 +642,7 @@ class SvFrontendIntegrationTest
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
               go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -697,7 +697,7 @@ class SvFrontendIntegrationTest
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
               go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1.config.ledgerApiUser)
+              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",

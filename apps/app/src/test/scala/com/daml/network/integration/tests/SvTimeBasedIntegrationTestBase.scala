@@ -59,7 +59,7 @@ class SvTimeBasedIntegrationTestBase
       env: CNNodeTestConsoleEnvironment
   ): OpenMiningRoundsTriplet = {
     val rounds = getSortedOpenMiningRounds(
-      sv1.participantClientWithAdminToken,
+      sv1Backend.participantClientWithAdminToken,
       svcParty,
     )
     rounds should have length 3
@@ -69,7 +69,7 @@ class SvTimeBasedIntegrationTestBase
   protected def advanceTimeAndCheckOpenRounds(
       toAdvanceAt: Instant
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
+    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     val duration = JavaDuration.between(now.toInstant, toAdvanceAt)
     val timeShift = JavaDuration.ofSeconds(10)
     val skew = timeShift
@@ -106,7 +106,7 @@ class SvTimeBasedIntegrationTestBase
   protected def assertTickDurationOfIssuingRound(
       roundNumberToTickDuration: Map[Long, JavaDuration]
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = eventually() {
-    val issuingRounds = getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty)
+    val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, svcParty)
     issuingRounds.map(_.data.round.number) shouldBe roundNumberToTickDuration.keySet.toSeq.sorted
     issuingRounds.map { issuingRound =>
       val expectedDuration = roundNumberToTickDuration(issuingRound.data.round.number)

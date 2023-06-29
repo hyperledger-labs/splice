@@ -26,7 +26,7 @@ class WalletSubscriptionsIntegrationTest
 
   "A wallet" should {
     "fail to get a non-existent subscription request" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       val nonExistentName = "does not exist"
       val errorString =
@@ -39,13 +39,13 @@ class WalletSubscriptionsIntegrationTest
     }
 
     "allow a user to get, list and reject subscription requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
       val description = "this will be rejected"
       val request = createSelfSubscriptionRequest(
-        aliceValidator.participantClientWithAdminToken,
+        aliceValidatorBackend.participantClientWithAdminToken,
         aliceWallet.config.ledgerApiUser,
         aliceUserParty,
         description = description,
@@ -79,8 +79,8 @@ class WalletSubscriptionsIntegrationTest
     "allow a user to list and accept subscription requests, " +
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
-        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-        val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
         aliceWallet.listSubscriptionRequests() shouldBe empty
         aliceWallet.listSubscriptions() shouldBe empty
@@ -89,7 +89,7 @@ class WalletSubscriptionsIntegrationTest
         val (request, requestId) = actAndCheck(
           "Create self-subscription request",
           createSelfSubscriptionRequest(
-            aliceValidator.participantClientWithAdminToken,
+            aliceValidatorBackend.participantClientWithAdminToken,
             aliceWallet.config.ledgerApiUser,
             aliceUserParty,
             paymentInterval = Duration.ofMinutes(10),
@@ -127,7 +127,7 @@ class WalletSubscriptionsIntegrationTest
 
         val (_, (paymentId, paymentRound)) = actAndCheck(
           "Collect the initial payment (as the receiver), which creates the subscription", {
-            val transferContext = sv1Scan.getTransferContextWithInstances(
+            val transferContext = sv1ScanBackend.getTransferContextWithInstances(
               CantonTimestamp.now(),
               Some(initialPaymentRound),
             )
@@ -140,7 +140,7 @@ class WalletSubscriptionsIntegrationTest
               .commands
               .asScala
               .toSeq
-            aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
               .submitJava(
                 actAs = Seq(aliceUserParty),
                 readAs = Seq(aliceValidatorParty),
@@ -170,7 +170,10 @@ class WalletSubscriptionsIntegrationTest
         val (_, subscriptionStateId2) = actAndCheck(
           "Collect the second payment (as the receiver), which sets the subscription back to idle", {
             val transferContext =
-              sv1Scan.getTransferContextWithInstances(CantonTimestamp.now(), Some(paymentRound))
+              sv1ScanBackend.getTransferContextWithInstances(
+                CantonTimestamp.now(),
+                Some(paymentRound),
+              )
             val appTransferContext = transferContext.toUnfeaturedAppTransferContext()
             val roundContract = transferContext.openMiningRounds
               .find(c => c.contract.payload.round == paymentRound)
@@ -180,7 +183,7 @@ class WalletSubscriptionsIntegrationTest
               .commands
               .asScala
               .toSeq
-            aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
               .submitJava(
                 actAs = Seq(aliceUserParty),
                 readAs = Seq(aliceValidatorParty),

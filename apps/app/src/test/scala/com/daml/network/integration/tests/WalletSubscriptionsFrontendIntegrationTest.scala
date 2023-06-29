@@ -25,15 +25,15 @@ class WalletSubscriptionsFrontendIntegrationTest
 
     "show and cancel subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice.cns")
       val directoryParty = createDirectoryEntryForDirectoryItself
-      createDirectoryEntry(alicePartyId, aliceDirectory, aliceEntryName, aliceWallet)
+      createDirectoryEntry(alicePartyId, aliceDirectoryClient, aliceEntryName, aliceWallet)
       val directoryPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
       val selfSubscriptionDescription = "A recurring thing"
       createSelfSubscription(
-        aliceValidator.participantClientWithAdminToken,
+        aliceValidatorBackend.participantClientWithAdminToken,
         aliceDamlUser,
         alicePartyId,
         paymentAmount(42.0, paymentCodegen.Currency.CC),
@@ -94,11 +94,11 @@ class WalletSubscriptionsFrontendIntegrationTest
 
     "disable cancelling non-idle transactions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       aliceWallet.tap(50) // she'll need this for MakePayment to happen (but not collection)
       clue("Create subscription, the payment on which won't be collected") {
         createSelfSubscription(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceDamlUser,
           alicePartyId,
         )
@@ -123,14 +123,15 @@ class WalletSubscriptionsFrontendIntegrationTest
 
     "allow accepting subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceEntryName1 = perTestCaseName("alice.cns")
-      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceEntryName1, aliceWallet)
+      createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName1, aliceWallet)
 
       val directoryParty = createDirectoryEntryForDirectoryItself
       val directoryPaymentDue = LocalDate.now().plusDays(90)
       val newlyPurchasedName = perTestCaseName("new.cns")
-      val (_, subCid) = requestDirectoryEntry(aliceUserParty, aliceDirectory, newlyPurchasedName)
+      val (_, subCid) =
+        requestDirectoryEntry(aliceUserParty, aliceDirectoryClient, newlyPurchasedName)
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(

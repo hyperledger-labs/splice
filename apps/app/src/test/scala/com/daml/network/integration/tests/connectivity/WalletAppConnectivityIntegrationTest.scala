@@ -42,7 +42,9 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
   "wallet should recover after a short disconnect from the Scan HTTP API" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
 
-    toxiproxy.disableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceValidator.name))
+    toxiproxy.disableConnectionViaProxy(
+      UseToxiproxy.scanHttpApiProxyName(aliceValidatorBackend.name)
+    )
     val tapFuture =
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         Future(aliceWallet.tap(1))(env.executionContext),
@@ -58,7 +60,9 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
         },
       )
 
-    toxiproxy.enableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceValidator.name))
+    toxiproxy.enableConnectionViaProxy(
+      UseToxiproxy.scanHttpApiProxyName(aliceValidatorBackend.name)
+    )
 
     tapFuture.value // tap eventually succeeds
     eventually() { // ... and we see the coin it creates
@@ -72,7 +76,9 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
 
     actAndCheck(
       "disable proxy connection",
-      toxiproxy.disableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceValidator.name)),
+      toxiproxy.disableConnectionViaProxy(
+        UseToxiproxy.scanHttpApiProxyName(aliceValidatorBackend.name)
+      ),
     )(
       "tapping on alice wallet should fail",
       _ => {
@@ -91,7 +97,9 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
 
     actAndCheck(
       "enable back proxy connection",
-      toxiproxy.enableConnectionViaProxy(UseToxiproxy.scanHttpApiProxyName(aliceValidator.name)),
+      toxiproxy.enableConnectionViaProxy(
+        UseToxiproxy.scanHttpApiProxyName(aliceValidatorBackend.name)
+      ),
     )(
       "tapping on alice wallet should work",
       _ => {

@@ -57,13 +57,16 @@ class SvFrontendTimeBasedIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "log in to sv1 UI", {
-            login(sv1Port, sv1.config.ledgerApiUser)
+            login(sv1Port, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see the expected leader and epoch",
           _ => {
             click on "information-tab-general"
-            assertRowContentsMatch("svcLeaderPartyId", sv1.getSvcInfo().svParty.toProtoPrimitive)
+            assertRowContentsMatch(
+              "svcLeaderPartyId",
+              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+            )
             assertRowContentsMatch("svcEpoch", "0")
           },
         )
@@ -72,12 +75,12 @@ class SvFrontendTimeBasedIntegrationTest
       }
 
       clue("stop the leader sv1 long enough for an election to occur") {
-        val automationConfig = sv2.config.automation
+        val automationConfig = sv2Backend.config.automation
         val effectiveTimeoutPlusBuffer = SvUtil
           .fromRelTime(SvUtil.defaultSvcRulesConfig().leaderInactiveTimeout)
           .plus(automationConfig.pollingInterval.asJava)
           .plus(JavaDuration.ofSeconds(5))
-        sv1.stop()
+        sv1Backend.stop()
         advanceTime(tickDurationWithBuffer)
         advanceTime(effectiveTimeoutPlusBuffer)
       }
@@ -85,13 +88,16 @@ class SvFrontendTimeBasedIntegrationTest
       withFrontEnd("sv2") { implicit webDriver =>
         actAndCheck(
           "log in to sv2 UI", {
-            login(sv2Port, sv2.config.ledgerApiUser)
+            login(sv2Port, sv2Backend.config.ledgerApiUser)
           },
         )(
           "We see a new leader and epoch",
           _ => {
             click on "information-tab-general"
-            assertRowContentsDiffer("svcLeaderPartyId", sv2.getSvcInfo().svParty.toProtoPrimitive)
+            assertRowContentsDiffer(
+              "svcLeaderPartyId",
+              sv2Backend.getSvcInfo().svParty.toProtoPrimitive,
+            )
             assertRowContentsMatch("svcEpoch", "1")
           },
         )

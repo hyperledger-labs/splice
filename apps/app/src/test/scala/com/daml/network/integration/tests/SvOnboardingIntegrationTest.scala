@@ -29,7 +29,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
     initSvc()
-    sv1.startSync()
+    sv1Backend.startSync()
 
     implicit val sys = env.actorSystem
     implicit val ec = env.executionContext
@@ -38,14 +38,14 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         Http().shutdownAllConnectionPools().map(_ => Done)
     }
 
-    val registerGet = Get(s"${sv1.httpClientConfig.url}/admin/authorization")
+    val registerGet = Get(s"${sv1Backend.httpClientConfig.url}/admin/authorization")
 
     def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
 
     val invalidSignatureToken = JWT
       .create()
-      .withAudience(sv1.config.auth.audience)
-      .withSubject(sv1.config.ledgerApiUser)
+      .withAudience(sv1Backend.config.auth.audience)
+      .withSubject(sv1Backend.config.ledgerApiUser)
       .sign(Algorithm.HMAC256("wrong-secret"))
     val responseForInvalidSignature = Http()
       .singleRequest(registerGet.withHeaders(tokenHeader(invalidSignatureToken)))
@@ -55,7 +55,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     val invalidAudienceToken = JWT
       .create()
       .withAudience("wrong-audience")
-      .withSubject(sv1.config.ledgerApiUser)
+      .withSubject(sv1Backend.config.ledgerApiUser)
       .sign(AuthUtil.testSignatureAlgorithm)
     val responseForInvalidAudience = Http()
       .singleRequest(registerGet.withHeaders(tokenHeader(invalidAudienceToken)))
@@ -65,8 +65,8 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       {
         val invalidUserToken = JWT
           .create()
-          .withAudience(sv1.config.auth.audience)
-          .withSubject(sv2.config.ledgerApiUser)
+          .withAudience(sv1Backend.config.auth.audience)
+          .withSubject(sv2Backend.config.ledgerApiUser)
           .sign(AuthUtil.testSignatureAlgorithm)
         val responseForInvalidUser = Http()
           .singleRequest(registerGet.withHeaders(tokenHeader(invalidUserToken)))
@@ -80,19 +80,19 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     )
     loggerFactory.assertLogs(
       {
-        val svParty = sv1.participantClientWithAdminToken.ledger_api.users
-          .get(sv1.config.ledgerApiUser)
+        val svParty = sv1Backend.participantClientWithAdminToken.ledger_api.users
+          .get(sv1Backend.config.ledgerApiUser)
           .primaryParty
           .value
 
-        val testUser = sv1.participantClientWithAdminToken.ledger_api.users.create(
+        val testUser = sv1Backend.participantClientWithAdminToken.ledger_api.users.create(
           s"testUser-${Random.nextInt()}",
           actAs = Set.empty[PartyId],
           primaryParty = Some(svParty),
         )
         val userWithWrongActAs = JWT
           .create()
-          .withAudience(sv1.config.auth.audience)
+          .withAudience(sv1Backend.config.auth.audience)
           .withSubject(testUser.id)
           .sign(AuthUtil.testSignatureAlgorithm)
         val responseForUserWithWrongActAs =
@@ -107,7 +107,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       ),
     )
 
-    val headers = sv1.headers
+    val headers = sv1Backend.headers
     val validResponse = Http()
       .singleRequest(registerGet.withHeaders(headers))
       .futureValue
@@ -117,7 +117,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
   "Non-leader SVs can onboard new validators" in { implicit env =>
     initSvc()
-    val sv = sv4 // not a leader
+    val sv = sv4Backend // not a leader
     val svParty = sv.getSvcInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
     val secret = actAndCheck(
@@ -135,11 +135,12 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       },
     )._1
     // Not starting validator so we need to connect the participant manually.
-    val config = sv1.participantClient.domains.config(sv1.config.domains.global.alias).value
-    bobValidator.participantClient.domains.connect(config)
+    val config =
+      sv1Backend.participantClient.domains.config(sv1Backend.config.domains.global.alias).value
+    bobValidatorBackend.participantClient.domains.connect(config)
     val candidate = clue("create a dummy party") {
       val name = "dummy" + env.environment.config.name.getOrElse("")
-      bobValidator.participantClientWithAdminToken.ledger_api.parties
+      bobValidatorBackend.participantClientWithAdminToken.ledger_api.parties
         .allocate(
           name,
           name,
@@ -187,7 +188,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
   "Validator candidates can self-service at the validator onboarding tap" in { implicit env =>
     initSvc()
-    val sv = sv3 // a random sv
+    val sv = sv3Backend // a random sv
     sv.listOngoingValidatorOnboardings() should have length 0
     actAndCheck(
       "the validator candidate requests a secret from the validator onboarding tap", {
@@ -208,63 +209,75 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
   "SVs expect onboardings when asked to" in { implicit env =>
     initSvc()
     clue("SV1 has created as many ValidatorOnboarding contracts as it's configured to.") {
-      sv1.listOngoingValidatorOnboardings() should have length 4
+      sv1Backend.listOngoingValidatorOnboardings() should have length 4
     }
     clue("SV1 doesn't recreate ValidatorOnboarding contracts on restart...") {
-      sv1.stop()
-      sv1.startSync()
-      sv1.listOngoingValidatorOnboardings() should have length 4
+      sv1Backend.stop()
+      sv1Backend.startSync()
+      sv1Backend.listOngoingValidatorOnboardings() should have length 4
     }
     clue("...even if an onboarding was completed in the meantime...") {
-      bobValidator.startSync()
+      bobValidatorBackend.startSync()
       eventually() {
-        sv1.listOngoingValidatorOnboardings() should have length 3
+        sv1Backend.listOngoingValidatorOnboardings() should have length 3
       }
-      sv1.stop()
-      sv1.startSync()
-      sv1.listOngoingValidatorOnboardings() should have length 3
+      sv1Backend.stop()
+      sv1Backend.startSync()
+      sv1Backend.listOngoingValidatorOnboardings() should have length 3
     }
   }
 
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
-      startAllSync(sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
-      sv1.getSvcInfo().svcRules.payload.members should have size 3
+      startAllSync(
+        sv1ScanBackend,
+        sv1Backend,
+        sv2Backend,
+        sv3Backend,
+        sv1ValidatorBackend,
+        sv2ValidatorBackend,
+        sv3ValidatorBackend,
+      )
+      sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
     }
     clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
       inside(
-        sv3.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv3Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
-            sv3.getSvcInfo().svParty,
+            sv3Backend.getSvcInfo().svParty,
             c => c.data.candidateName == "Canton-Foundation-4",
           )
       ) {
         case Seq(approvedSvId) => {
-          sv3.participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
-            sv3.config.ledgerApiUser,
-            actAs = Seq(sv3.getSvcInfo().svParty),
-            readAs = Seq.empty,
-            update = approvedSvId.id.exerciseArchive(
-              new com.daml.network.codegen.java.da.internal.template.Archive()
-            ),
-          )
+          sv3Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              sv3Backend.config.ledgerApiUser,
+              actAs = Seq(sv3Backend.getSvcInfo().svParty),
+              readAs = Seq.empty,
+              update = approvedSvId.id.exerciseArchive(
+                new com.daml.network.codegen.java.da.internal.template.Archive()
+              ),
+            )
         }
       }
     }
     clue("Stop SV2 so that SV4 can't gather enough confirmations just yet") {
-      sv2.stop()
+      sv2Backend.stop()
       // We now need 2 confirmations to execute an action, but only sv1 is
       // active and sv3 hasn't approved sv4.
     }
     clue("SV4 starts") {
-      sv4Validator.start()
-      sv4.start()
+      sv4ValidatorBackend.start()
+      sv4Backend.start()
     }
-    val sv1Party = sv1.getSvcInfo().svParty
+    val sv1Party = sv1Backend.getSvcInfo().svParty
     // We are not using sv4.getSvcInfo() to get sv4's party id
     // because the SvApp is not completely initialized yet and hence the http service is not available.
     val sv4Party = eventually() {
-      sv4.participantClient.ledger_api.users.get(sv4.config.ledgerApiUser).primaryParty.value
+      sv4Backend.participantClient.ledger_api.users
+        .get(sv4Backend.config.ledgerApiUser)
+        .primaryParty
+        .value
     }
 
     val (token, svOnboardingRequestCid) =
@@ -272,7 +285,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         eventually()(
           // The onboarding is requested by SV4 during SvApp init.
           inside(
-            sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+            sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty)
           ) {
             case Seq(svOnboarding) => {
@@ -296,21 +309,21 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         )
       }
     clue("Attempting to start an onboarding multiple times has no effect") {
-      sv1.startSvOnboarding(token)
-      sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+      sv1Backend.startSvOnboarding(token)
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
     }
     clue(
       "SVs that haven't approved a candidate refuse to create a `SvOnboarding` contract for it."
     ) {
       assertThrowsAndLogsCommandFailures(
-        sv3.startSvOnboarding(token),
+        sv3Backend.startSvOnboarding(token),
         _.errorMessage should include("no matching approved SV identity found"),
       )
     }
     clue("All online and approving SVs confirm SV4's onboarding") {
       eventually() {
-        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action match {
             case a: ARC_SvcRules =>
@@ -322,42 +335,51 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
             case _ => false
           }) should have length 1
       }
-      sv1.getSvcInfo().svcRules.payload.members.keySet should not contain sv4Party.toProtoPrimitive
+      sv1Backend
+        .getSvcInfo()
+        .svcRules
+        .payload
+        .members
+        .keySet should not contain sv4Party.toProtoPrimitive
     }
     clue("SV4's onboarding status is reported correctly.") {
-      eventually()(inside(sv1.getSvOnboardingStatus(sv4Party)) {
+      eventually()(inside(sv1Backend.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Requested => {
           status.name shouldBe "Canton-Foundation-4"
           status.svOnboardingRequestCid shouldBe svOnboardingRequestCid
           status.confirmedBy.sorted shouldBe Vector("Canton-Foundation-1")
           status.requiredNumConfirmations shouldBe 2
-          sv1.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1.getSvOnboardingStatus(
-            sv4Party
-          )
+          sv1Backend.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1Backend
+            .getSvOnboardingStatus(
+              sv4Party
+            )
         }
       })
     }
-    actAndCheck("SV2 comes back online", sv2.start())(
+    actAndCheck("SV2 comes back online", sv2Backend.start())(
       "SV4's onboarding gathers suffcient confirmations and is completed",
       { _ =>
-        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty
-        sv1.getSvcInfo().svcRules.payload.members.keySet should contain(sv4Party.toProtoPrimitive)
+        sv1Backend.getSvcInfo().svcRules.payload.members.keySet should contain(
+          sv4Party.toProtoPrimitive
+        )
       },
     )
     clue("SV4's onboarding status is reported as completed.") {
-      eventually()(inside(sv1.getSvOnboardingStatus(sv4Party)) {
+      eventually()(inside(sv1Backend.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Completed => {
           status.name shouldBe "Canton-Foundation-4"
-          status.svcRulesCid shouldBe sv1.getSvcInfo().svcRules.contractId
-          sv1.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1.getSvOnboardingStatus(
-            sv4Party
-          )
+          status.svcRulesCid shouldBe sv1Backend.getSvcInfo().svcRules.contractId
+          sv1Backend.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1Backend
+            .getSvOnboardingStatus(
+              sv4Party
+            )
         }
       })
     }
-    sv4.waitForInitialization()
-    sv4Validator.waitForInitialization()
+    sv4Backend.waitForInitialization()
+    sv4ValidatorBackend.waitForInitialization()
   }
 
   // remaining states are tested as part of "SVs can onboard new SVs"
@@ -365,37 +387,38 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     implicit env =>
       // only 1 SV => slightly faster test
       clue("Initialize SVC with 1 SV") {
-        startAllSync(sv1Scan, sv1)
-        sv1.getSvcInfo().svcRules.payload.members should have size 1
+        startAllSync(sv1ScanBackend, sv1Backend)
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 1
       }
       // SV two’s party hasn't been allocated at this point because the SV app isn't running so we allocate it here.
       val (sv2Party, _) = actAndCheck(
         "allocate sv2 party",
-        sv2.participantClientWithAdminToken.ledger_api.parties
-          .allocate(sv2.config.ledgerApiUser, sv2.config.ledgerApiUser)
+        sv2Backend.participantClientWithAdminToken.ledger_api.parties
+          .allocate(sv2Backend.config.ledgerApiUser, sv2Backend.config.ledgerApiUser)
           .party,
       )(
         "sv1 sees sv2 party",
         party =>
-          sv1.participantClientWithAdminToken.parties
+          sv1Backend.participantClientWithAdminToken.parties
             .list(filterParty = party.toProtoPrimitive) should not be empty,
       )
 
       clue("Unknown parties have unknown SV onboarding status") {
-        inside(sv1.getSvOnboardingStatus(sv2Party)) { case SvOnboardingStatus.Unknown() =>
-          sv1.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1.getSvOnboardingStatus(
-            sv2Party
-          )
+        inside(sv1Backend.getSvOnboardingStatus(sv2Party)) { case SvOnboardingStatus.Unknown() =>
+          sv1Backend.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1Backend
+            .getSvOnboardingStatus(
+              sv2Party
+            )
         }
       }
       actAndCheck(
         "Moving sv2 to confirmed state",
-        sv1.participantClientWithAdminToken.ledger_api_extensions.commands
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitWithResult(
             userId = "svc",
             actAs = Seq(svcParty),
             readAs = Seq(),
-            update = sv1
+            update = sv1Backend
               .getSvcInfo()
               .svcRules
               .contractId
@@ -409,13 +432,14 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       )(
         "Confirmed SVs get told they are are confirmed",
         svOnboardingConfirmedCid =>
-          inside(sv1.getSvOnboardingStatus(sv2Party)) {
+          inside(sv1Backend.getSvOnboardingStatus(sv2Party)) {
             case status: SvOnboardingStatus.Confirmed => {
               status.name shouldBe "Canton-Foundation-2"
               status.svOnboardingConfirmedCid shouldBe svOnboardingConfirmedCid
-              sv1.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1.getSvOnboardingStatus(
-                sv2Party
-              )
+              sv1Backend.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1Backend
+                .getSvOnboardingStatus(
+                  sv2Party
+                )
             }
           },
       )
@@ -424,19 +448,27 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
   "The new sv with same name can be onboarded and overwrite existing member only in devnet" in {
     implicit env =>
       clue("Initialize SVC with 3 SVs") {
-        startAllSync(sv1Scan, sv1, sv2, sv3, sv1Validator, sv2Validator, sv3Validator)
-        sv1.getSvcInfo().svcRules.payload.members should have size 3
+        startAllSync(
+          sv1ScanBackend,
+          sv1Backend,
+          sv2Backend,
+          sv3Backend,
+          sv1ValidatorBackend,
+          sv2ValidatorBackend,
+          sv3ValidatorBackend,
+        )
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
       }
 
       val fakeSv4Party = allocateRandomSvParty("sv4")
-      val coinConfig = sv1Scan.getCoinConfigAsOf(env.environment.clock.now)
+      val coinConfig = sv1ScanBackend.getCoinConfigAsOf(env.environment.clock.now)
       actAndCheck(
         "Add a fake sv4 Party to SvcRules.members to simulate sv4 is already added to SVC", {
-          sv1.participantClient.ledger_api_extensions.commands.submitWithResult(
-            sv1.config.ledgerApiUser,
+          sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
+            sv1Backend.config.ledgerApiUser,
             actAs = Seq(svcParty),
             readAs = Seq.empty,
-            update = sv1
+            update = sv1Backend
               .getSvcInfo()
               .svcRules
               .contractId
@@ -452,7 +484,13 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         "sv4 is added as an SVC member with the fake party Id",
         _ =>
           inside(
-            sv1.getSvcInfo().svcRules.payload.members.asScala.get(fakeSv4Party.toProtoPrimitive)
+            sv1Backend
+              .getSvcInfo()
+              .svcRules
+              .payload
+              .members
+              .asScala
+              .get(fakeSv4Party.toProtoPrimitive)
           ) { case Some(memberInfo) =>
             memberInfo.name shouldBe "Canton-Foundation-4"
           },
@@ -460,19 +498,19 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
       actAndCheck(
         "start sv4 with a party id different from existing sv4 in SVC", {
-          startAllSync(sv4, sv4Validator)
+          startAllSync(sv4Backend, sv4ValidatorBackend)
         },
       )(
         "existing member sv4 is overwritten with different party id",
         _ => {
           inside(
-            sv1
+            sv1Backend
               .getSvcInfo()
               .svcRules
               .payload
               .members
               .asScala
-              .get(sv4.getSvcInfo().svParty.toProtoPrimitive)
+              .get(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
           ) { case Some(memberInfo) =>
             memberInfo.name shouldBe "Canton-Foundation-4"
           }
@@ -484,7 +522,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     clue("Initialize SVC with 4 SVs") {
       initSvc()
       eventually() {
-        sv1.getSvcInfo().svcRules.payload.members should have size 4
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 4
       }
     }
 
@@ -499,27 +537,27 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     )(
       "There should be 7 SVC members in total now",
       _ => {
-        sv1.getSvcInfo().svcRules.payload.members should have size 7
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 7
       },
     )
 
     actAndCheck(
       "SV1 to SV4 create confirmation to Confirm SVX", {
-        val svcRules = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        val svcRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
           .head
         val newMemberName = "Canton-Foundation-X"
         val newMemberPartyId = allocateRandomSvParty(newMemberName)
-        createSvOnboardingConfirmation(svcRules, sv1, newMemberPartyId, newMemberName)
-        createSvOnboardingConfirmation(svcRules, sv2, newMemberPartyId, newMemberName)
-        createSvOnboardingConfirmation(svcRules, sv3, newMemberPartyId, newMemberName)
-        createSvOnboardingConfirmation(svcRules, sv4, newMemberPartyId, newMemberName)
+        createSvOnboardingConfirmation(svcRules, sv1Backend, newMemberPartyId, newMemberName)
+        createSvOnboardingConfirmation(svcRules, sv2Backend, newMemberPartyId, newMemberName)
+        createSvOnboardingConfirmation(svcRules, sv3Backend, newMemberPartyId, newMemberName)
+        createSvOnboardingConfirmation(svcRules, sv4Backend, newMemberPartyId, newMemberName)
       },
     )(
       "There are 7 SVC members in total but only 4 confirmations are required to confirm a SV",
       _ =>
         inside(
-          sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty)
         ) { case Seq(svOnboardingConfirmed) =>
           svOnboardingConfirmed.data.svName shouldBe "Canton-Foundation-X"

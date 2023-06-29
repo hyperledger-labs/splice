@@ -39,15 +39,15 @@ class WalletTxLogIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // Some tests use the splitwell app to generate multi-party payments
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.upload_dar_unless_exists(splitwellDarPath)
-        bobValidator.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
   }
 
   "A wallet" should {
 
     "handle tap" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       clue("Tap to get some coins") {
         aliceWallet.tap(11.0)
@@ -72,18 +72,18 @@ class WalletTxLogIntegrationTest
     }
 
     "handle mint" in { implicit env =>
-      val sv1UserParty = onboardWalletUser(sv1Wallet, sv1Validator)
+      val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
       clue("Mint to get some coins") {
         mintCoin(
-          sv1Validator.participantClientWithAdminToken,
+          sv1ValidatorBackend.participantClientWithAdminToken,
           sv1UserParty,
           47.0,
         )
       }
 
       checkTxHistory(
-        sv1Wallet,
+        sv1WalletClient,
         Seq(
           { case logEntry: walletLogEntry.BalanceChange =>
             logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Mint
@@ -100,7 +100,7 @@ class WalletTxLogIntegrationTest
     }
 
     "handle collected self-payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       clue("Tap to get some coins") {
         aliceWallet.tap(10.0)
@@ -111,7 +111,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -134,7 +134,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Alice collects self-payment request",
         collectAcceptedAppPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           Seq(aliceUserParty),
           acceptedPayment,
@@ -190,7 +190,7 @@ class WalletTxLogIntegrationTest
     }
 
     "handle rejected self-payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       clue("Tap to get some coins") {
         aliceWallet.tap(10.0)
@@ -201,7 +201,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -221,7 +221,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Alice rejects the self-payment request",
         rejectAcceptedAppPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           acceptedPaymentCid,
@@ -271,9 +271,9 @@ class WalletTxLogIntegrationTest
     }
 
     "handle mixed currency payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
-      val aliceValidatorUserParty = aliceValidator.getValidatorPartyId()
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+      val aliceValidatorUserParty = aliceValidatorBackend.getValidatorPartyId()
 
       // Based on Numeric to make sure divisions match Decimal computation in Daml.
       val transferAmountCC = Numeric.assertFromBigDecimal(scale, 22.0)
@@ -290,7 +290,7 @@ class WalletTxLogIntegrationTest
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates payment request",
         createPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           Seq(
@@ -317,7 +317,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Receivers collect the payment request",
         collectAcceptedAppPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           Seq(aliceUserParty, charlieUserParty, aliceValidatorUserParty),
           acceptedPayment,
@@ -372,8 +372,8 @@ class WalletTxLogIntegrationTest
     }
 
     "handle completed transfer offers" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
       val transferAmount = 32.0
 
@@ -391,9 +391,9 @@ class WalletTxLogIntegrationTest
             CantonTimestamp.now().plus(Duration.ofMinutes(1)),
             UUID.randomUUID.toString,
           ),
-        )("Bob sees transfer offer", _ => bobWallet.listTransferOffers() should have length 1)
+        )("Bob sees transfer offer", _ => bobWalletClient.listTransferOffers() should have length 1)
 
-      actAndCheck("Bob accepts transfer offer", bobWallet.acceptTransferOffer(offerCid))(
+      actAndCheck("Bob accepts transfer offer", bobWalletClient.acceptTransferOffer(offerCid))(
         "Alice does not see transfer offer anymore",
         _ => aliceWallet.listTransferOffers() shouldBe empty,
       )
@@ -428,7 +428,7 @@ class WalletTxLogIntegrationTest
       )
 
       checkTxHistory(
-        bobWallet,
+        bobWalletClient,
         Seq(
           checkTransfer
         ),
@@ -444,22 +444,22 @@ class WalletTxLogIntegrationTest
       // Note: initSplitwellTest() adds Bob to the group, but not Charlie
       actAndCheck(
         "Charlie accepts the invite",
-        charlieSplitwell.acceptInvite(invite),
+        charlieSplitwellClient.acceptInvite(invite),
       )(
         "Alice sees the accepted invite",
-        _ => aliceSplitwell.listAcceptedGroupInvites(key.id) should not be empty,
+        _ => aliceSplitwellClient.listAcceptedGroupInvites(key.id) should not be empty,
       )
 
       actAndCheck(
         "Alice joins all accepted invites",
-        aliceSplitwell
+        aliceSplitwellClient
           .listAcceptedGroupInvites(key.id)
-          .foreach(accepted => aliceSplitwell.joinGroup(accepted.contractId)),
+          .foreach(accepted => aliceSplitwellClient.joinGroup(accepted.contractId)),
       )(
         "Charlie sees the group and Alice doesn't see any accepted invite",
         _ => {
-          charlieSplitwell.listGroups() should have size 1
-          aliceSplitwell.listAcceptedGroupInvites(key.id) should be(empty)
+          charlieSplitwellClient.listGroups() should have size 1
+          aliceSplitwellClient.listAcceptedGroupInvites(key.id) should be(empty)
         },
       )
 
@@ -470,7 +470,7 @@ class WalletTxLogIntegrationTest
 
       val (_, paymentRequest) = actAndCheck(
         "Alice initiates a transfer of CC to all other group members",
-        aliceSplitwell.initiateTransfer(
+        aliceSplitwellClient.initiateTransfer(
           key,
           Seq(
             new walletCodegen.ReceiverCCAmount(
@@ -495,8 +495,8 @@ class WalletTxLogIntegrationTest
         "All parties see new balances",
         _ => {
           aliceWallet.listAcceptedAppPayments() shouldBe empty
-          bobWallet.balance().unlockedQty should be > BigDecimal(0.0)
-          charlieWallet.balance().unlockedQty should be > BigDecimal(0.0)
+          bobWalletClient.balance().unlockedQty should be > BigDecimal(0.0)
+          charlieWalletClient.balance().unlockedQty should be > BigDecimal(0.0)
         },
       )
 
@@ -547,24 +547,24 @@ class WalletTxLogIntegrationTest
       )
 
       checkTxHistory(
-        bobWallet,
+        bobWalletClient,
         Seq(checkTransfer),
       )
 
       checkTxHistory(
-        charlieWallet,
+        charlieWalletClient,
         Seq(checkTransfer),
       )
     }
 
     "handle collected subscription payments" in { implicit env =>
       val aliceUserId = aliceWallet.config.ledgerApiUser
-      val charlieUserId = charlieWallet.config.ledgerApiUser
+      val charlieUserId = charlieWalletClient.config.ledgerApiUser
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val subscriptionPrice = 42.0
 
@@ -575,7 +575,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -603,7 +603,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the initial payment",
         collectAcceptedSubscriptionRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -611,7 +611,7 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Charlie's balance reflects the collected payment",
-        _ => charlieWallet.balance().unlockedQty should be > BigDecimal(40),
+        _ => charlieWalletClient.balance().unlockedQty should be > BigDecimal(40),
       )
 
       // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
@@ -633,7 +633,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the second payment",
         collectSubscriptionPayment(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -641,7 +641,7 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Charlie's balance reflects the collected payment",
-        _ => charlieWallet.balance().unlockedQty should be > BigDecimal(80),
+        _ => charlieWalletClient.balance().unlockedQty should be > BigDecimal(80),
       )
 
       // All parties see the same representation of the transfer
@@ -707,7 +707,7 @@ class WalletTxLogIntegrationTest
       )
 
       checkTxHistory(
-        charlieWallet,
+        charlieWalletClient,
         Seq(
           checkSubscriptionPaymentTransfer(
             walletLogEntry.Transfer.SubscriptionPaymentCollected
@@ -721,12 +721,12 @@ class WalletTxLogIntegrationTest
 
     "handle rejected subscription initial payments" in { implicit env =>
       val aliceUserId = aliceWallet.config.ledgerApiUser
-      val charlieUserId = charlieWallet.config.ledgerApiUser
+      val charlieUserId = charlieWalletClient.config.ledgerApiUser
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val subscriptionPrice = 42.0
 
@@ -737,7 +737,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -757,7 +757,7 @@ class WalletTxLogIntegrationTest
       )(
         "Request disappears from Alice's list",
         _ => {
-          charlieWallet.listSubscriptionInitialPayments()
+          charlieWalletClient.listSubscriptionInitialPayments()
           aliceWallet.listSubscriptionRequests() shouldBe empty
         },
       )
@@ -765,7 +765,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie rejects the initial payment",
         rejectAcceptedSubscriptionRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           initialPaymentCid,
@@ -804,19 +804,19 @@ class WalletTxLogIntegrationTest
       )
 
       checkTxHistory(
-        charlieWallet,
+        charlieWalletClient,
         Seq.empty,
       )
     }
 
     "handle rejected subscription payments" in { implicit env =>
       val aliceUserId = aliceWallet.config.ledgerApiUser
-      val charlieUserId = charlieWallet.config.ledgerApiUser
+      val charlieUserId = charlieWalletClient.config.ledgerApiUser
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val subscriptionPrice = BigDecimal(42.0)
 
@@ -827,7 +827,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -855,7 +855,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie collects the initial payment",
         collectAcceptedSubscriptionRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
@@ -863,7 +863,7 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Charlie's balance reflects the collected payment",
-        _ => charlieWallet.balance().unlockedQty should be > BigDecimal(40),
+        _ => charlieWalletClient.balance().unlockedQty should be > BigDecimal(40),
       )
 
       // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
@@ -885,7 +885,7 @@ class WalletTxLogIntegrationTest
       actAndCheck(
         "Charlie rejects the second payment",
         rejectSubscriptionPayment(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           charlieUserId,
           charlieUserParty,
           paymentCid,
@@ -965,7 +965,7 @@ class WalletTxLogIntegrationTest
       )
 
       checkTxHistory(
-        charlieWallet,
+        charlieWalletClient,
         Seq(
           checkSubscriptionPaymentTransfer(
             walletLogEntry.Transfer.SubscriptionInitialPaymentCollected
@@ -975,9 +975,9 @@ class WalletTxLogIntegrationTest
     }
 
     "handle failed automation (direct transfer)" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
-      val validatorTxLogBefore = aliceValidatorWallet.listTransactions(None, 1000)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
 
       val (offerCid, _) =
         actAndCheck(
@@ -991,11 +991,11 @@ class WalletTxLogIntegrationTest
           ),
         )(
           "Bob sees transfer offer",
-          _ => bobWallet.listTransferOffers() should have length 1,
+          _ => bobWalletClient.listTransferOffers() should have length 1,
         )
 
       clue("Bob accepts transfer offer") {
-        bobWallet.acceptTransferOffer(offerCid)
+        bobWalletClient.acceptTransferOffer(offerCid)
         // At this point, Alice's automation fails to complete the accepted offer
       }
 
@@ -1008,18 +1008,18 @@ class WalletTxLogIntegrationTest
       )
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter = aliceValidatorWallet.listTransactions(None, 1000)
+      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, 1000)
       validatorTxLogBefore should be(validatorTxLogAfter)
-      checkTxHistory(bobWallet, Seq.empty)
+      checkTxHistory(bobWalletClient, Seq.empty)
     }
 
     "handle failed automation (app payment)" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         ),
@@ -1043,13 +1043,13 @@ class WalletTxLogIntegrationTest
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -1075,13 +1075,13 @@ class WalletTxLogIntegrationTest
 
     "handle failed automation (subscription payment)" in { implicit env =>
       val aliceUserId = aliceWallet.config.ledgerApiUser
-      val charlieUserId = charlieWallet.config.ledgerApiUser
-      val validatorTxLogBefore = aliceValidatorWallet.listTransactions(None, 1000)
+      val charlieUserId = charlieWalletClient.config.ledgerApiUser
+      val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val subscriptionPrice = BigDecimal(75.0)
 
@@ -1092,7 +1092,7 @@ class WalletTxLogIntegrationTest
       val (_, request) = actAndCheck(
         "Create subscription request (Alice subscribing to Charlie's service)",
         createSubscriptionRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceUserId,
           aliceUserParty,
           charlieUserParty,
@@ -1131,7 +1131,7 @@ class WalletTxLogIntegrationTest
           val (subscriptionResult, _) = actAndCheck(
             "Charlie collects the initial payment",
             collectAcceptedSubscriptionRequest(
-              aliceValidator.participantClientWithAdminToken,
+              aliceValidatorBackend.participantClientWithAdminToken,
               charlieUserId,
               charlieUserParty,
               aliceUserParty,
@@ -1139,7 +1139,10 @@ class WalletTxLogIntegrationTest
             ),
           )(
             "Charlie's balance reflects the collected payment",
-            _ => charlieWallet.balance().unlockedQty should be > (subscriptionPrice - smallAmount),
+            _ =>
+              charlieWalletClient
+                .balance()
+                .unlockedQty should be > (subscriptionPrice - smallAmount),
           )
 
           clue("Failure notification appears") {
@@ -1153,7 +1156,7 @@ class WalletTxLogIntegrationTest
             // The subscription was created with a 10ms payment interval,
             // here we assume that at least 10ms have passed since the initial payment.
             expireUnpaidSubscription(
-              aliceValidator.participantClientWithAdminToken,
+              aliceValidatorBackend.participantClientWithAdminToken,
               charlieUserId,
               charlieUserParty,
               subscriptionResult._2,
@@ -1189,12 +1192,12 @@ class WalletTxLogIntegrationTest
           }
 
           // Validator should not see any notification (note that aliceValidator is shared between tests)
-          val validatorTxLogAfter = aliceValidatorWallet.listTransactions(None, 1000)
+          val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, 1000)
           validatorTxLogBefore should be(validatorTxLogAfter)
 
           // Charlie (the provider of the subscription) should see a notification
           checkTxHistory(
-            charlieWallet,
+            charlieWalletClient,
             Seq(
               { case logEntry: walletLogEntry.Notification =>
                 logEntry.transactionSubtype shouldBe walletLogEntry.Notification.SubscriptionExpired
@@ -1216,11 +1219,11 @@ class WalletTxLogIntegrationTest
 
     // Time based to avoid SV reward collection kicking in.
     "handle unexpected events" in { implicit env =>
-      val sv1UserId = sv1Wallet.config.ledgerApiUser
-      val sv1UserParty = onboardWalletUser(sv1Wallet, sv1Validator)
+      val sv1UserId = sv1WalletClient.config.ledgerApiUser
+      val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
       // Note: SV1 is reused between tests, ignore TxLog entries created by previous tests
-      val previousEventId = sv1Wallet
+      val previousEventId = sv1WalletClient
         .listTransactions(None, 10000)
         .headOption
         .map(_.indexRecord.eventId)
@@ -1230,7 +1233,7 @@ class WalletTxLogIntegrationTest
       val coin = loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
           createCoin(
-            sv1Validator.participantClientWithAdminToken,
+            sv1ValidatorBackend.participantClientWithAdminToken,
             sv1UserId,
             sv1UserParty,
             amount = coinAmount,
@@ -1244,7 +1247,12 @@ class WalletTxLogIntegrationTest
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
-          archiveCoin(sv1Validator.participantClientWithAdminToken, sv1UserId, sv1UserParty, coin)
+          archiveCoin(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserId,
+            sv1UserParty,
+            coin,
+          )
         },
         logs =>
           inside(logs) { case Seq(log) =>
@@ -1262,7 +1270,7 @@ class WalletTxLogIntegrationTest
       // - Log errors while reading the TxLog below (recovering the full entry from the index record also involves parsing)
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
         checkTxHistory(
-          sv1Wallet,
+          sv1WalletClient,
           Seq(
             { case _: walletLogEntry.Unknown => succeed },
             { case _: walletLogEntry.Unknown => succeed },

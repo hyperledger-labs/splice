@@ -24,11 +24,13 @@ class TimeBasedTestNetPreviewIntegrationTest
 
   "TestNet initializes correctly" in { implicit env =>
     clue("SVC contains 4 SV") {
-      Seq(sv1, sv2, sv3, sv4).map(_.getSvcInfo().svcRules.payload.members should have size 4)
+      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map(
+        _.getSvcInfo().svcRules.payload.members should have size 4
+      )
     }
 
-    val sv1Party = onboardWalletUser(sv1Wallet, sv1Validator)
-    val bobParty = onboardWalletUser(bobWallet, bobValidator)
+    val sv1Party = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
+    val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
     actAndCheck(
       "Advance round",
@@ -36,24 +38,24 @@ class TimeBasedTestNetPreviewIntegrationTest
     )(
       "Wait for SV rewards to be collected",
       _ => {
-        advanceTimeByPollingInterval(sv1)
-        sv1Wallet.balance().unlockedQty should be > BigDecimal(0)
+        advanceTimeByPollingInterval(sv1Backend)
+        sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
       },
     )
 
-    val sv1Balance = sv1Wallet.balance().unlockedQty
+    val sv1Balance = sv1WalletClient.balance().unlockedQty
     val amountToTransfer = 1
 
     actAndCheck(
       "Transfer from SV1 wallet to Bob wallet",
-      p2pTransfer(sv1Validator, sv1Wallet, bobWallet, bobParty, amountToTransfer),
+      p2pTransfer(sv1ValidatorBackend, sv1WalletClient, bobWalletClient, bobParty, amountToTransfer),
     )(
       "Check balances",
       _ => {
-        checkWallet(bobParty, bobWallet, Seq((amountToTransfer, amountToTransfer)))
+        checkWallet(bobParty, bobWalletClient, Seq((amountToTransfer, amountToTransfer)))
         checkWallet(
           sv1Party,
-          sv1Wallet,
+          sv1WalletClient,
           Seq((sv1Balance - amountToTransfer - smallAmount, sv1Balance - amountToTransfer)),
         )
       },

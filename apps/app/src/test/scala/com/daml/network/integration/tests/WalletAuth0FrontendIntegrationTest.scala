@@ -82,7 +82,7 @@ class WalletAuth0FrontendIntegrationTest
 
         val paymentRequestContractId = clue("A payment is created") {
           val (_, paymentRequestContractId, _) = createPaymentRequest(
-            aliceValidator.participantClientWithAdminToken,
+            aliceValidatorBackend.participantClientWithAdminToken,
             auth0User.id,
             userPartyId,
             Seq(

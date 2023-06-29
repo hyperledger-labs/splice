@@ -119,17 +119,17 @@ class SelfHostedSplitwellPreflightIntegrationTest
         v("validatorApp").onboardUser(aliceUserName)
       }
 
-      actAndCheck("Create spliwell install requests", aliceSplitwell.createInstallRequests())(
+      actAndCheck("Create spliwell install requests", aliceSplitwellClient.createInstallRequests())(
         "Wait for splitwell installs",
         requests => {
-          aliceSplitwell.listSplitwellInstalls().keys shouldBe requests.keys
+          aliceSplitwellClient.listSplitwellInstalls().keys shouldBe requests.keys
         },
       )
 
-      actAndCheck("Request groups", aliceSplitwell.requestGroup("mygroup"))(
+      actAndCheck("Request groups", aliceSplitwellClient.requestGroup("mygroup"))(
         "Wait for groups",
         _ => {
-          aliceSplitwell.listGroups() should have size 1
+          aliceSplitwellClient.listGroups() should have size 1
         },
       )
 

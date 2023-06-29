@@ -30,15 +30,20 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
     "show all types of transactions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice.cns")
 
-      waitForWalletUser(aliceValidatorWallet)
-      val aliceValidatorParty = aliceValidatorWallet.userStatus().party
+      waitForWalletUser(aliceValidatorWalletClient)
+      val aliceValidatorParty = aliceValidatorWalletClient.userStatus().party
 
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val charlieEntryName = perTestCaseName("charlie.cns")
-      createDirectoryEntry(charlieUserParty, charlieDirectory, charlieEntryName, charlieWallet)
+      createDirectoryEntry(
+        charlieUserParty,
+        charlieDirectoryClient,
+        charlieEntryName,
+        charlieWalletClient,
+      )
 
       val directoryExpectedCns = createDirectoryEntryForDirectoryItself
 
@@ -58,27 +63,27 @@ class WalletTransactionHistoryFrontendIntegrationTest
         val (_, txs) = actAndCheck(
           "Transactions are done", {
             // alice's directory - also taps 5 CC
-            createDirectoryEntry(aliceUserParty, aliceDirectory, aliceEntryName, aliceWallet)
+            createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName, aliceWallet)
             // charlie -> alice
-            charlieWallet.tap(50)
+            charlieWalletClient.tap(50)
             p2pTransfer(
-              aliceValidator,
-              charlieWallet,
+              aliceValidatorBackend,
+              charlieWalletClient,
               aliceWallet,
               aliceUserParty,
               BigDecimal("1.07"),
             )
             // alice -> charlie
             p2pTransfer(
-              aliceValidator,
+              aliceValidatorBackend,
               aliceWallet,
-              charlieWallet,
+              charlieWalletClient,
               charlieUserParty,
               BigDecimal("1.18"),
             )
             // one-time payment
             val (_, cid, _) = createPaymentRequest(
-              aliceValidator.participantClientWithAdminToken,
+              aliceValidatorBackend.participantClientWithAdminToken,
               aliceDamlUser,
               aliceUserParty,
               receiverAmounts = Seq(
@@ -154,13 +159,13 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
     "paginate transactions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice.cns")
-      waitForWalletUser(aliceValidatorWallet)
+      waitForWalletUser(aliceValidatorWalletClient)
 
-      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
       val bobEntryName = perTestCaseName("bob.cns")
-      waitForWalletUser(bobValidatorWallet)
+      waitForWalletUser(bobValidatorWalletClient)
 
       val transferAmounts = ParVector.range(1, 20)
 
@@ -176,8 +181,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
           },
         )
 
-        createDirectoryEntry(aliceUserParty, aliceDirectory, aliceEntryName, aliceWallet)
-        createDirectoryEntry(bobUserParty, bobDirectory, bobEntryName, bobWallet)
+        createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName, aliceWallet)
+        createDirectoryEntry(bobUserParty, bobDirectoryClient, bobEntryName, bobWalletClient)
 
         aliceWallet.tap(500)
 
@@ -185,9 +190,9 @@ class WalletTransactionHistoryFrontendIntegrationTest
           "Alice makes transfers to bob", {
             transferAmounts.foreach(amount =>
               p2pTransfer(
-                aliceValidator,
+                aliceValidatorBackend,
                 aliceWallet,
-                bobWallet,
+                bobWalletClient,
                 bobUserParty,
                 BigDecimal(amount),
               )

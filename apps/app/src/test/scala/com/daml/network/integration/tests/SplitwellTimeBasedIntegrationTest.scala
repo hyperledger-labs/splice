@@ -28,8 +28,8 @@ class SplitwellTimeBasedIntegrationTest
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.upload_dar_unless_exists(darPath)
-        bobValidator.participantClient.upload_dar_unless_exists(darPath)
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
       })
 
   "splitwell" should {
@@ -38,53 +38,59 @@ class SplitwellTimeBasedIntegrationTest
       val (aliceUserParty, bobUserParty, charlieUserParty, _, key, invite) =
         initSplitwellTest()
 
-      aliceSplitwell.enterPayment(
+      aliceSplitwellClient.enterPayment(
         key,
         4200.0,
         "payment",
       )
-      bobWallet.tap(4000)
-      splitwellTransfer(bobSplitwell, bobWallet, aliceUserParty, BigDecimal(1000.0), key)
+      bobWalletClient.tap(4000)
+      splitwellTransfer(
+        bobSplitwellClient,
+        bobWalletClient,
+        aliceUserParty,
+        BigDecimal(1000.0),
+        key,
+      )
 
       eventually() {
-        bobSplitwell.listBalanceUpdates(key) should have size 2
+        bobSplitwellClient.listBalanceUpdates(key) should have size 2
       }
-      bobSplitwell.listBalances(key) shouldBe Seq(aliceUserParty -> -1100).toMap
+      bobSplitwellClient.listBalances(key) shouldBe Seq(aliceUserParty -> -1100).toMap
 
-      aliceSplitwell.listBalanceUpdates(key) should have size 2
-      aliceSplitwell.listBalances(key) shouldBe Seq(bobUserParty -> 1100).toMap
+      aliceSplitwellClient.listBalanceUpdates(key) should have size 2
+      aliceSplitwellClient.listBalances(key) shouldBe Seq(bobUserParty -> 1100).toMap
 
-      charlieSplitwell.acceptInvite(invite)
+      charlieSplitwellClient.acceptInvite(invite)
 
       eventually() {
-        aliceSplitwell.listAcceptedGroupInvites("group1") should have size 1
+        aliceSplitwellClient.listAcceptedGroupInvites("group1") should have size 1
       }
-      inside(aliceSplitwell.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
-        aliceSplitwell.joinGroup(accepted.contractId)
+      inside(aliceSplitwellClient.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
+        aliceSplitwellClient.joinGroup(accepted.contractId)
       }
 
       eventually() {
-        inside(charlieSplitwell.listGroups()) { case Seq(singleGroup) =>
+        inside(charlieSplitwellClient.listGroups()) { case Seq(singleGroup) =>
           singleGroup.contract.payload.id shouldBe invite.contract.payload.group.id
         }
       }
 
-      charlieSplitwell.listBalances(key) shouldBe Map.empty
-      charlieSplitwell.enterPayment(key, 3300.0, "payment")
+      charlieSplitwellClient.listBalances(key) shouldBe Map.empty
+      charlieSplitwellClient.enterPayment(key, 3300.0, "payment")
       eventually() {
-        charlieSplitwell.listBalances(key) shouldBe Map(
+        charlieSplitwellClient.listBalances(key) shouldBe Map(
           aliceUserParty -> 1100,
           bobUserParty -> 1100,
         )
       }
 
-      eventually()(aliceSplitwell.listBalanceUpdates(key) should have size 3)
-      aliceSplitwell.listBalances(key) shouldBe Map(
+      eventually()(aliceSplitwellClient.listBalanceUpdates(key) should have size 3)
+      aliceSplitwellClient.listBalances(key) shouldBe Map(
         bobUserParty -> 1100,
         charlieUserParty -> -1100,
       )
 
-      aliceSplitwell.net(
+      aliceSplitwellClient.net(
         key,
         Map(
           aliceUserParty -> Map(bobUserParty -> -1100, charlieUserParty -> 1100),
@@ -93,10 +99,19 @@ class SplitwellTimeBasedIntegrationTest
         ),
       )
       eventually() {
-        aliceSplitwell.listBalances(key) shouldBe Map(bobUserParty -> 0, charlieUserParty -> 0)
-        bobSplitwell.listBalances(key) shouldBe Map(aliceUserParty -> 0, charlieUserParty -> -2200)
-        charlieSplitwell.listBalances(key) shouldBe Map(aliceUserParty -> 0, bobUserParty -> 2200)
-        splitwellProviderWallet.listAppRewardCoupons() should have length 1
+        aliceSplitwellClient.listBalances(key) shouldBe Map(
+          bobUserParty -> 0,
+          charlieUserParty -> 0,
+        )
+        bobSplitwellClient.listBalances(key) shouldBe Map(
+          aliceUserParty -> 0,
+          charlieUserParty -> -2200,
+        )
+        charlieSplitwellClient.listBalances(key) shouldBe Map(
+          aliceUserParty -> 0,
+          bobUserParty -> 2200,
+        )
+        splitwellWalletClient.listAppRewardCoupons() should have length 1
       }
     }
   }
@@ -105,15 +120,15 @@ class SplitwellTimeBasedIntegrationTest
     val (aliceUserParty, bobUserParty, _, _, key, _) =
       initSplitwellTest()
 
-    aliceSplitwell.enterPayment(
+    aliceSplitwellClient.enterPayment(
       key,
       100.0,
       "team lunch",
     )
-    bobWallet.tap(710)
+    bobWalletClient.tap(710)
     clue("Splitwell transfer with round change right after payment request") {
 
-      bobSplitwell.initiateTransfer(
+      bobSplitwellClient.initiateTransfer(
         key,
         Seq(
           new walletCodegen.ReceiverCCAmount(
@@ -122,19 +137,19 @@ class SplitwellTimeBasedIntegrationTest
           )
         ),
       )
-      eventually()(bobWallet.listAppPaymentRequests() should not be empty)
-      providerSplitwellBackend.stop() // to avoid the automation triggering before the round change
-      inside(bobWallet.listAppPaymentRequests()) { case Seq(request) =>
-        bobWallet.acceptAppPaymentRequest(request.appPaymentRequest.contractId)
+      eventually()(bobWalletClient.listAppPaymentRequests() should not be empty)
+      splitwellBackend.stop() // to avoid the automation triggering before the round change
+      inside(bobWalletClient.listAppPaymentRequests()) { case Seq(request) =>
+        bobWalletClient.acceptAppPaymentRequest(request.appPaymentRequest.contractId)
       }
-      eventually()(bobWallet.listAppPaymentRequests() shouldBe empty)
+      eventually()(bobWalletClient.listAppPaymentRequests() shouldBe empty)
       advanceRoundsByOneTick
-      providerSplitwellBackend.start()
+      splitwellBackend.start()
     }
     eventually() {
-      advanceTimeByPollingInterval(providerSplitwellBackend)
-      aliceSplitwell.listBalanceUpdates(key) should have size 2
+      advanceTimeByPollingInterval(splitwellBackend)
+      aliceSplitwellClient.listBalanceUpdates(key) should have size 2
     }
-    aliceSplitwell.listBalances(key) shouldBe Seq(bobUserParty -> 0).toMap
+    aliceSplitwellClient.listBalances(key) shouldBe Seq(bobUserParty -> 0).toMap
   }
 }

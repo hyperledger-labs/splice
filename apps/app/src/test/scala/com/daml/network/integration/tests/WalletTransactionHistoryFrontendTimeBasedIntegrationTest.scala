@@ -32,13 +32,13 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
 
     "show all subscription payments" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice.cns")
 
       val directoryExpectedCns = createDirectoryEntryForDirectoryItself
 
       withFrontEnd("alice") { implicit webDriver =>
-        createDirectoryEntry(aliceUserParty, aliceDirectory, aliceEntryName, aliceWallet)
+        createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName, aliceWallet)
         val (_, txsBefore) = actAndCheck(
           "Alice goes to wallet", {
             // alice's directory - also taps 5 CC
@@ -79,7 +79,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
 
     "show sv rewards collection in tx history" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
-        val sv1WalletUser = sv1Validator.config.validatorWalletUser.value
+        val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
         browseToSv1Wallet(sv1WalletUser)
         actAndCheck(
           "Advance round",
@@ -149,7 +149,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
               "Subscription Initial Payment Accepted"
             else "Subscription Payment Accepted",
           expectedPartyDescription =
-            Some(s"Automation via ${aliceValidator.getValidatorPartyId().toProtoPrimitive}"),
+            Some(s"Automation via ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
           expectedAmountCC = BigDecimal("-0.5"), // 1 USD
         )
       }

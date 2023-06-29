@@ -38,29 +38,29 @@ class SvGlobalLockIntegrationTest
   val dummyTraceId = "traceid"
 
   "global lock locks" in { implicit env =>
-    sv1.startSync();
+    sv1Backend.startSync();
 
-    sv1.acquireGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId)
 
     assertThrowsAndLogsCommandFailures(
-      sv1.acquireGlobalLock(dummyReason, dummyTraceId),
+      sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId),
       _.errorMessage should include("Lock is not free"),
     )
-    sv1.releaseGlobalLock(dummyReason, dummyTraceId)
-    sv1.acquireGlobalLock(dummyReason, dummyTraceId)
-    sv1.releaseGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId)
   }
 
   "global lock can be expired" in { implicit env =>
-    sv1.startSync();
+    sv1Backend.startSync();
 
-    sv1.acquireGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId)
     Threading.sleep(globalLockTimeout.asJava.toMillis)
 
     loggerFactory.assertLogs(
-      sv1.acquireGlobalLock(dummyReason, dummyTraceId),
+      sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId),
       _.warningMessage should include("Acquired expired lock held since"),
     )
-    sv1.releaseGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId)
   }
 }

@@ -20,31 +20,31 @@ import com.digitalasset.canton.topology.PartyId
 // however, this is likely only possible once we depend on Canton as a library
 trait CommonCNNodeAppInstanceReferences {
 
-  def svcParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = sv1Scan.getSvcPartyId()
+  def svcParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = sv1ScanBackend.getSvcPartyId()
 
-  def sv1(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
+  def sv1Backend(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
 
-  def sv1Local(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb(
+  def sv1LocalBackend(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb(
     "sv1Local"
   )
 
-  def sv2(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv2")
+  def sv2Backend(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv2")
 
-  def sv2Onboarded(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb(
+  def sv2OnboardedBackend(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb(
     "sv2Onboarded"
   )
 
-  def sv3(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv3")
+  def sv3Backend(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv3")
 
-  def sv4(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv4")
+  def sv4Backend(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv4")
 
   def sv1Client(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = svcl("sv1")
 
-  def sv1Scan(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference = scanb(
+  def sv1ScanBackend(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference = scanb(
     "sv1Scan"
   )
 
-  def sv2Scan(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference = scanb(
+  def sv2ScanBackend(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference = scanb(
     "sv2Scan"
   )
 
@@ -52,13 +52,15 @@ trait CommonCNNodeAppInstanceReferences {
     "aliceWallet"
   )
 
-  def aliceValidatorWallet(implicit
+  def aliceValidatorWalletClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): WalletAppClientReference = wc(
     "aliceValidatorWallet"
   )
 
-  def aliceValidator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+  def aliceValidatorBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
     "aliceValidator"
   )
 
@@ -69,58 +71,71 @@ trait CommonCNNodeAppInstanceReferences {
       "aliceValidatorClient"
     )
 
-  def bobWallet(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
+  def bobWalletClient(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
     "bobWallet"
   )
 
   // Note: this uses `wc` instead of `uwc` because we don't suffix the user names of SVs.
-  def sv1Wallet(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = wc(
+  def sv1WalletClient(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = wc(
     "sv1Wallet"
   )
 
-  def bobValidatorWallet(implicit
+  def bobValidatorWalletClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): WalletAppClientReference = wc(
     "bobValidatorWallet"
   )
 
-  def charlieWallet(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
-    "charlieWallet"
-  )
+  def charlieWalletClient(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference =
+    uwc(
+      "charlieWallet"
+    )
 
-  def bobValidator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+  def bobValidatorBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
     "bobValidator"
   )
 
-  def sv1Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+  def sv1ValidatorBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
     "sv1Validator"
   )
 
-  def sv2Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+  def sv2ValidatorBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
     "sv2Validator"
   )
 
-  def sv3Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+  def sv3ValidatorBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
     "sv3Validator"
   )
 
-  def sv4Validator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference = v(
+  def sv4ValidatorBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
     "sv4Validator"
   )
 
-  def splitwellValidator(implicit env: CNNodeTestConsoleEnvironment): ValidatorAppBackendReference =
+  def splitwellValidatorBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference =
     v(
       "splitwellValidator"
     )
 
-  def splitwellProviderWallet(implicit
+  def splitwellWalletClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): WalletAppClientReference =
     wc(
       "splitwellProviderWallet"
     )
 
-  def directory(implicit
+  def directoryBackend(implicit
       env: CNNodeTestConsoleEnvironment
   ): DirectoryAppBackendReference =
     env.directories.local.headOption.getOrElse(
@@ -129,43 +144,43 @@ trait CommonCNNodeAppInstanceReferences {
       )
     )
 
-  def aliceDirectory(implicit
+  def aliceDirectoryClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): DirectoryAppClientReference = rdp(
     "aliceDirectory"
   )
 
-  def bobDirectory(implicit
+  def bobDirectoryClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): DirectoryAppClientReference = rdp(
     "bobDirectory"
   )
 
-  def charlieDirectory(implicit
+  def charlieDirectoryClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): DirectoryAppClientReference = rdp(
     "charlieDirectory"
   )
 
-  def aliceSplitwell(implicit
+  def aliceSplitwellClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): SplitwellAppClientReference = rsw(
     "aliceSplitwell"
   )
 
-  def bobSplitwell(implicit
+  def bobSplitwellClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): SplitwellAppClientReference = rsw(
     "bobSplitwell"
   )
 
-  def charlieSplitwell(implicit
+  def charlieSplitwellClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): SplitwellAppClientReference = rsw(
     "charlieSplitwell"
   )
 
-  def providerSplitwellBackend(implicit
+  def splitwellBackend(implicit
       env: CNNodeTestConsoleEnvironment
   ): SplitwellAppBackendReference = sw(
     "providerSplitwellBackend"

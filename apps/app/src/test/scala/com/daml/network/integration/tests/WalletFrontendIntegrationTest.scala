@@ -107,7 +107,7 @@ class WalletFrontendIntegrationTest
 
       "fail when trying to use more than 10 decimal points" in { implicit env =>
         val aliceDamlUser = aliceWallet.config.ledgerApiUser
-        onboardWalletUser(aliceWallet, aliceValidator)
+        onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
         val manyDigits = "1.19191919191919199191"
 
@@ -145,7 +145,7 @@ class WalletFrontendIntegrationTest
     "featured app rights" should {
 
       "show featured status and support self-featuring" in { implicit env =>
-        onboardWalletUser(aliceWallet, aliceValidator)
+        onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
@@ -192,16 +192,16 @@ class WalletFrontendIntegrationTest
       // Create directory entry for alice
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
       val entryName = perTestCaseName("alice.cns")
-      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
 
       createDirectoryEntry(
         aliceParty,
-        aliceDirectory,
+        aliceDirectoryClient,
         entryName,
         aliceWallet,
       )
       eventuallySucceeds() {
-        directory.lookupEntryByName(entryName)
+        directoryBackend.lookupEntryByName(entryName)
       }
 
       withFrontEnd("alice") { implicit webDriver =>

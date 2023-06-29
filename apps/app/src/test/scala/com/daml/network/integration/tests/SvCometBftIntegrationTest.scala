@@ -62,7 +62,7 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
     initSvcWithSv1Only()
     withClue("Configured validator voting power is eventually reconciled") {
       eventually() {
-        sv1.cometBftNodeStatus().votingPower.doubleValue should be(1d)
+        sv1Backend.cometBftNodeStatus().votingPower.doubleValue should be(1d)
       }
     }
   }

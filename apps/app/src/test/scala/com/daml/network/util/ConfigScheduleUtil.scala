@@ -40,7 +40,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   )(implicit
       env: CNNodeTests.CNNodeTestConsoleEnvironment
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
-    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
+    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     val activeDomainId =
       CoinConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain
     defaultCoinConfig(
@@ -59,7 +59,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
       currentSchedule: Schedule[Instant, CoinConfig[USD]],
       newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
   )(implicit env: CNNodeTestConsoleEnvironment): Schedule[Instant, CoinConfig[USD]] = {
-    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
+    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     val configSchedule = {
       new cc.schedule.Schedule(
         mkUpdatedCoinConfig(currentSchedule, defaultTickDuration),
@@ -80,12 +80,12 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   def setConfigSchedule(configSchedule: Schedule[Instant, CoinConfig[USD]])(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
-    val svcRules = sv1.getSvcInfo().svcRules
-    val coinRulesCid = sv1Scan.getCoinRules().contract.contractId
-    val sv1Party = sv1.getSvcInfo().svParty
+    val svcRules = sv1Backend.getSvcInfo().svcRules
+    val coinRulesCid = sv1ScanBackend.getCoinRules().contract.contractId
+    val sv1Party = sv1Backend.getSvcInfo().svParty
 
     val formerConfigSchedule = clue("Get current coin config schedule") {
-      sv1Scan.getCoinRules().contract.payload.configSchedule
+      sv1ScanBackend.getCoinRules().contract.payload.configSchedule
     }
 
     val voteRequestCid = clue("request vote for config schedule change") {
@@ -97,7 +97,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
               new CoinRules_SetConfigSchedule(configSchedule)
             ),
           )
-          sv1.createVoteRequest(
+          sv1Backend.createVoteRequest(
             sv1Party.toProtoPrimitive,
             action,
             "url",
@@ -107,9 +107,9 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
       )(
         "The vote request has been created and sv1 accepts",
         _ => {
-          sv1.listVoteRequests() should not be empty
-          val head = sv1.listVoteRequests().head.contractId
-          sv1.listVotes(Vector(head.contractId)) should have size 1
+          sv1Backend.listVoteRequests() should not be empty
+          val head = sv1Backend.listVoteRequests().head.contractId
+          sv1Backend.listVotes(Vector(head.contractId)) should have size 1
           head
         },
       )
@@ -150,7 +150,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
           }
         })
       eventually() {
-        val currentConfigSchedule = sv1Scan.getCoinRules().contract.payload.configSchedule
+        val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
         currentConfigSchedule should not be formerConfigSchedule
       }
     }

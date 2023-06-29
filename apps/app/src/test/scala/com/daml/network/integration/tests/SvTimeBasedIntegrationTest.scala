@@ -21,7 +21,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     val rewardAmount = 0.1
 
     def getUnclaimedRewardContracts() =
-      sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(UnclaimedReward.COMPANION)(svcParty)
 
     val existingUnclaimedRewards = getUnclaimedRewardContracts().length
@@ -32,7 +32,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
           new UnclaimedReward(svcParty.toProtoPrimitive, BigDecimal(rewardAmount).bigDecimal)
         )
         if (!unclaimedRewards.isEmpty) {
-          sv1.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
             actAs = Seq(svcParty),
             optTimeout = None,
             commands = unclaimedRewards.flatMap(_.create.commands.asScala.toSeq),
@@ -42,7 +42,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     )(
       "Wait for the unclaimed rewards to get merged automagically",
       _ => {
-        advanceTimeByPollingInterval(sv1)
+        advanceTimeByPollingInterval(sv1Backend)
         getUnclaimedRewardContracts().length should (be < threshold)
       },
     )
@@ -51,25 +51,25 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
   "expire stale `Confirmation` contracts" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
       startAllSync(
-        sv1Scan,
-        sv1,
-        sv2,
-        sv3,
-        sv4,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-        sv4Validator,
+        sv1ScanBackend,
+        sv1Backend,
+        sv2Backend,
+        sv3Backend,
+        sv4Backend,
+        sv1ValidatorBackend,
+        sv2ValidatorBackend,
+        sv3ValidatorBackend,
+        sv4ValidatorBackend,
       )
-      sv1.getSvcInfo().svcRules.payload.members should have size 4
+      sv1Backend.getSvcInfo().svcRules.payload.members should have size 4
     }
     clue(
       "Stop three SVs so that actions can't gather enough confirmations"
     ) {
-      sv2.stop()
-      sv3.stop()
-      sv4.stop()
-      sv1.getSvcInfo().svcRules.payload.members should have size 4
+      sv2Backend.stop()
+      sv3Backend.stop()
+      sv4Backend.stop()
+      sv1Backend.getSvcInfo().svcRules.payload.members should have size 4
       // We now need 3 confirmations to execute an action, but only sv1 is active.
     }
 
@@ -77,7 +77,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
       "Sync with background automation that onboards validator"
     ) {
       eventually()({
-        val rounds = getSortedOpenMiningRounds(sv1.participantClientWithAdminToken, svcParty)
+        val rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, svcParty)
         rounds should have size 3
       })
     }
@@ -88,7 +88,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     )(
       "Find confirmation (for issuing rounds)",
       _ => {
-        val contractList = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        val contractList = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
         contractList should have length 1
@@ -108,7 +108,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     )(
       "The Confirmation expires and is archived",
       _ => {
-        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
           .filter(_.id == confirmationCid) should have length 0
@@ -117,11 +117,11 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
     actAndCheck(
       "Wait for one polling period",
-      advanceTimeByPollingInterval(sv1),
+      advanceTimeByPollingInterval(sv1Backend),
     )(
       "Find new confirmation (for issuing rounds)",
       _ => {
-        val contractList = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        val contractList = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
           .filter(_.data.action.toValue.getConstructor() == "ARC_CoinRules")
         contractList should have length 1
@@ -133,20 +133,21 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
   "detect an inactive leader" in { implicit env =>
     val svcRulesBeforeElection = clue("Initialize SVC with 4 SVs") {
       startAllSync(
-        sv1Scan,
-        sv1,
-        sv2,
-        sv3,
-        sv4,
-        sv1Validator,
-        sv2Validator,
-        sv3Validator,
-        sv4Validator,
+        sv1ScanBackend,
+        sv1Backend,
+        sv2Backend,
+        sv3Backend,
+        sv4Backend,
+        sv1ValidatorBackend,
+        sv2ValidatorBackend,
+        sv3ValidatorBackend,
+        sv4ValidatorBackend,
       )
-      val svcRulesBeforeElection = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
-        .head
-        .data
+      val svcRulesBeforeElection =
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+          .head
+          .data
       svcRulesBeforeElection.members should have size 4
       svcRulesBeforeElection
     }
@@ -157,7 +158,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
       "Wait for first three rounds to be opened"
     ) {
       eventually()({
-        rounds = getSortedOpenMiningRounds(sv1.participantClientWithAdminToken, svcParty)
+        rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, svcParty)
         rounds should have size 3
       })
     }
@@ -165,7 +166,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
     clue(
       "Stop the leader so we can detect its inactivity later"
     ) {
-      sv1.stop()
+      sv1Backend.stop()
     }
 
     clue(
@@ -189,7 +190,7 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
       "A new leader is elected and leader-based triggers resume operating normally"
     ) {
       // It doesn't really matter which sv we pick
-      val automationConfig = sv2.config.automation
+      val automationConfig = sv2Backend.config.automation
       val effectiveTimeout = SvUtil
         .fromRelTime(SvUtil.defaultSvcRulesConfig().leaderInactiveTimeout)
         .plus(automationConfig.pollingInterval.asJava)
@@ -198,16 +199,17 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBase {
 
       advanceTime(effectiveTimeout.plus(bufferDuration))
       eventually() {
-        val svcRulesAfterElection = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
-          .head
-          .data
+        val svcRulesAfterElection =
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+            .head
+            .data
         svcRulesAfterElection.epoch shouldBe svcRulesBeforeElection.epoch + 1
         svcRulesAfterElection.leader should not be svcRulesBeforeElection.leader
       }
 
       eventually() {
-        val newRounds = sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+        val newRounds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(OpenMiningRound.COMPANION)(
             svcParty,
             c => !rounds.contains(c),

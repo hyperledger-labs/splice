@@ -24,45 +24,45 @@ class SvAppLedgerApiConnectivityIntegrationTest extends CNNodeIntegrationTest {
 
   "sv1 app should recover and correctly report their activeness status after a disconnect" in {
     implicit env =>
-      startAllSync(sv1, sv1Scan)
+      startAllSync(sv1Backend, sv1ScanBackend)
 
       clue("sv1 app should report as active")(eventually() {
-        sv1.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
+        sv1Backend.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
       })
 
-      clue("alice's validator starts successfully")(aliceValidator.startSync())
+      clue("alice's validator starts successfully")(aliceValidatorBackend.startSync())
 
       clue("disable all SV connections to the ledger API server") {
-        toxiproxy.disableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1.name))
+        toxiproxy.disableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1Backend.name))
       }
 
       clue("sv1 app should report as inactive") {
         eventually() {
-          sv1.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe false
+          sv1Backend.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe false
         }
       }
 
       clue(
         "start bob's validator"
       ) {
-        bobValidator.start()
+        bobValidatorBackend.start()
       }
       clue("bob's validator reports as not active") {
         eventually() {
-          bobValidator.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe false
+          bobValidatorBackend.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe false
         }
       }
 
       clue("re-enable the connection and wait for sv1 app to report healthy again") {
-        toxiproxy.enableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1.name))
+        toxiproxy.enableConnectionViaProxy(UseToxiproxy.ledgerApiProxyName(sv1Backend.name))
         eventually() {
-          sv1.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
+          sv1Backend.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
         }
       }
 
       clue("wait for bob's validator app to become active") {
         eventually() {
-          bobValidator.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
+          bobValidatorBackend.httpHealth.successOption.map(_.active).getOrElse(false) shouldBe true
         }
       }
   }

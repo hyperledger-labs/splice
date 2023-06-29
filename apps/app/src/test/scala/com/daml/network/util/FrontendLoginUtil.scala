@@ -71,7 +71,7 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
     val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com")
     Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
       logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
-      val userPartyId = aliceValidator.onboardUser(user.id)
+      val userPartyId = aliceValidatorBackend.onboardUser(user.id)
 
       withFrontEnd(frontendDriverName) { implicit webDriver =>
         clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {

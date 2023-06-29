@@ -49,11 +49,11 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "rewards from older rounds are prioritized while respecting maxNumInputs" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
 
-    aliceValidatorWallet.tap(100)
-    createRewardsInRound(aliceValidator, aliceValidatorWallet, aliceWallet, alice, 1)
+    aliceValidatorWalletClient.tap(100)
+    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 1)
     advanceRoundsByOneTick
-    createRewardsInRound(aliceValidator, aliceValidatorWallet, aliceWallet, alice, 2)
-    aliceValidatorWallet.tap(50)
+    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 2)
+    aliceValidatorWalletClient.tap(50)
 
     // by advancing three rounds, both round 1 and round 2 are in their issuing phase.
     advanceRoundsByOneTick
@@ -61,10 +61,10 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     advanceRoundsByOneTick
 
     eventually() {
-      aliceValidatorWallet.list().coins should have length 2
-      aliceValidatorWallet
+      aliceValidatorWalletClient.list().coins should have length 2
+      aliceValidatorWalletClient
         .listValidatorRewardCoupons() should have length 2
-      aliceValidatorWallet
+      aliceValidatorWalletClient
         .listAppRewardCoupons() should have length 2
     }
 
@@ -72,24 +72,24 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       // Note that the rewards from round 2 are not merged as transfers allow at most 4 inputs
       // and the rewards from round 1 are prioritized
       p2pTransfer(
-        aliceValidator,
-        aliceValidatorWallet,
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
         aliceWallet,
         alice,
         5,
       )
       eventually() {
-        aliceValidatorWallet.list().coins should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 1
       }
@@ -97,19 +97,19 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     clue("rewards from round 2 are merged") {
       p2pTransfer(
-        aliceValidator,
-        aliceValidatorWallet,
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
         aliceWallet,
         alice,
         5,
       )
       eventually() {
         // fails here when p2p-ing above.
-        aliceValidatorWallet.list().coins should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 0
       }
@@ -119,11 +119,11 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "more valuable rewards are prioritized while respecting maxNumInputs" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
 
-    aliceValidatorWallet.tap(10000)
+    aliceValidatorWalletClient.tap(10000)
     // Execute three transfers that generate different amount of rewards.
     p2pTransfer(
-      aliceValidator,
-      aliceValidatorWallet,
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
       aliceWallet,
       alice,
       5,
@@ -133,15 +133,15 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // the app rewards, the app reward from the second transfer is prioritized over the validator reward from the
     // third (larger) transfer.
     p2pTransfer(
-      aliceValidator,
-      aliceValidatorWallet,
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
       aliceWallet,
       alice,
       2000,
     )
     p2pTransfer(
-      aliceValidator,
-      aliceValidatorWallet,
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
       aliceWallet,
       alice,
       2010,
@@ -153,18 +153,18 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     advanceRoundsByOneTick
 
     eventually() {
-      aliceValidatorWallet.list().coins should have length 1
-      aliceValidatorWallet.listValidatorRewardCoupons() should have length 3
-      aliceValidatorWallet.listAppRewardCoupons() should have length 3
+      aliceValidatorWalletClient.list().coins should have length 1
+      aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 3
+      aliceValidatorWalletClient.listAppRewardCoupons() should have length 3
     }
     val Seq(vrew1, vrew2, _) =
-      aliceValidatorWallet.listValidatorRewardCoupons().sortBy(_.payload.amount)
+      aliceValidatorWalletClient.listValidatorRewardCoupons().sortBy(_.payload.amount)
     val Seq(arew1, _, _) =
-      aliceValidatorWallet.listAppRewardCoupons().sortBy(_.payload.amount)
+      aliceValidatorWalletClient.listAppRewardCoupons().sortBy(_.payload.amount)
     clue("most valuable rewards are merged first.") {
       p2pTransfer(
-        aliceValidator,
-        aliceValidatorWallet,
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
         aliceWallet,
         alice,
         5,
@@ -173,12 +173,12 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       eventually() {
         // four inputs: 1 coin, 3 rewards.
         // only the most valuable validator reward is chosen as input because of the issuance curve.
-        aliceValidatorWallet.list().coins should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1)
           .toList shouldBe Seq(vrew1, vrew2)
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 1)
           .toList shouldBe Seq(arew1)
@@ -189,20 +189,20 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       // Note that the rewards from round 2 are not merged as transfers allow at most 4 inputs
       // and the rewards from round 1 are prioritized
       p2pTransfer(
-        aliceValidator,
-        aliceValidatorWallet,
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
         aliceWallet,
         alice,
         5,
       )
 
       eventually() {
-        aliceValidatorWallet.list().coins should have length 1
+        aliceValidatorWalletClient.list().coins should have length 1
 
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
       }
@@ -212,8 +212,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "respect scheduled change of maxNumInputs" in { implicit env =>
     // current config: maxNumInputs = 4
     // We then schedule a reduction of maxNumInputs to 3
-    val now = sv1.participantClientWithAdminToken.ledger_api.time.get()
-    val currentConfigSchedule = sv1Scan.getCoinRules().contract.payload.configSchedule
+    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+    val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
     val configSchedule = new cc.schedule.Schedule(
       mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 4),
       List(
@@ -227,25 +227,26 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     val (alice, _) = onboardAliceAndBob()
 
-    aliceValidatorWallet.tap(100)
-    createRewardsInRound(aliceValidator, aliceValidatorWallet, aliceWallet, alice, 1)
+    aliceValidatorWalletClient.tap(100)
+    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 1)
     advanceRoundsByOneTick
-    createRewardsInRound(aliceValidator, aliceValidatorWallet, aliceWallet, alice, 2)
+    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 2)
     advanceRoundsByOneTick
-    createRewardsInRound(aliceValidator, aliceValidatorWallet, aliceWallet, alice, 3)
+    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 3)
 
     // by advancing 2 rounds, both round 1 and round 2 are in their issuing phase
     advanceRoundsByOneTick
     advanceRoundsByOneTick
 
-    aliceValidatorWallet.tap(5)
+    aliceValidatorWalletClient.tap(5)
     eventually() {
-      val currentInstant = sv1.participantClientWithAdminToken.ledger_api.time.get().toInstant
+      val currentInstant =
+        sv1Backend.participantClientWithAdminToken.ledger_api.time.get().toInstant
       getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(1, 2)
-      aliceValidatorWallet.list().coins should have length 2
-      aliceValidatorWallet
+      aliceValidatorWalletClient.list().coins should have length 2
+      aliceValidatorWalletClient
         .listValidatorRewardCoupons() should have length 3
-      aliceValidatorWallet
+      aliceValidatorWalletClient
         .listAppRewardCoupons() should have length 3
     }
 
@@ -253,30 +254,30 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       // Note that the rewards from round 2 are not merged as transfers allow at most 4 inputs
       // and the rewards from round 1 are prioritized
       p2pTransfer(
-        aliceValidator,
-        aliceValidatorWallet,
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
         aliceWallet,
         alice,
         5,
       )
       eventually() {
-        aliceValidatorWallet.list().coins should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 3) should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 3) should have length 1
       }
@@ -286,34 +287,35 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     clue("rewards from round 2 are merged but not round 3") {
       p2pTransfer(
-        aliceValidator,
-        aliceValidatorWallet,
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
         aliceWallet,
         alice,
         5,
       )
       eventually() {
-        val currentInstant = sv1.participantClientWithAdminToken.ledger_api.time.get().toInstant
+        val currentInstant =
+          sv1Backend.participantClientWithAdminToken.ledger_api.time.get().toInstant
         getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(2, 3)
         // As the max number of input is reduced to 3
         // only 3 inputs are used: 1 coin, ValidatorRewardCoupon from round 2 and AppRewardCoupon from round 2
-        aliceValidatorWallet.list().coins should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 0
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 3) should have length 1
-        aliceValidatorWallet
+        aliceValidatorWalletClient
           .listAppRewardCoupons()
           .filter(_.payload.round.number == 3) should have length 1
 
@@ -323,23 +325,23 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
   "adjust maxNumInput if there is a tap operation in the batch" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
-    aliceValidatorWallet.tap(50)
+    aliceValidatorWalletClient.tap(50)
     p2pTransfer(
-      aliceValidator,
-      aliceValidatorWallet,
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
       aliceWallet,
       alice,
       5,
     )
     eventually() {
-      aliceValidatorWallet.list().coins should have length 1
+      aliceValidatorWalletClient.list().coins should have length 1
     }
-    aliceValidatorWallet.tap(50)
+    aliceValidatorWalletClient.tap(50)
 
     eventually() {
-      aliceValidatorWallet.list().coins should have length 2
-      aliceValidatorWallet.listValidatorRewardCoupons() should have length 1
-      aliceValidatorWallet.listAppRewardCoupons() should have length 1
+      aliceValidatorWalletClient.list().coins should have length 2
+      aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 1
+      aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
     }
 
     // advancing three rounds so the rewards are collectable.
@@ -349,11 +351,11 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       {
-        aliceValidatorWallet.tap(1)
+        aliceValidatorWalletClient.tap(1)
         eventually() {
-          aliceValidatorWallet.list().coins should have length 3
-          aliceValidatorWallet.listValidatorRewardCoupons() should have length 1
-          aliceValidatorWallet.listAppRewardCoupons() should have length 1
+          aliceValidatorWalletClient.list().coins should have length 3
+          aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 1
+          aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
         }
       },
       entries => {
@@ -393,14 +395,14 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       {
         p2pTransfer(
-          aliceValidator,
+          aliceValidatorBackend,
           aliceWallet,
-          bobWallet,
+          bobWalletClient,
           bob,
           1,
         )
         eventually() {
-          bobWallet.balance().unlockedQty should be > BigDecimal(0)
+          bobWalletClient.balance().unlockedQty should be > BigDecimal(0)
           // there is still >1 coin
           aliceWallet.list().coins.size should be > 1
         }
@@ -449,7 +451,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
       }
 
-      val Seq(_, issuingRound1) = sv1Scan.getOpenAndIssuingMiningRounds()._2
+      val Seq(_, issuingRound1) = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
 
       clue("create issuing round 2") {
         advanceRoundsByOneTick
@@ -485,7 +487,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   }
 
   private def getOpenIssuingRounds(now: Instant)(implicit env: CNNodeTestConsoleEnvironment) = {
-    val issuingRounds = getSortedIssuingRounds(sv1.participantClientWithAdminToken, svcParty)
+    val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, svcParty)
     issuingRounds.filter(r => now.isAfter(r.data.opensAt))
   }
 

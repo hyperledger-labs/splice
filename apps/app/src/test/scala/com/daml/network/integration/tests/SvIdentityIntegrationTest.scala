@@ -6,17 +6,17 @@ class SvIdentityIntegrationTest extends SvIntegrationTestBase {
 
   "SV Identity can be approved at runtime" in { implicit env =>
     initSvc()
-    sv1.participantClientWithAdminToken.ledger_api_extensions.acs
+    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
-        sv1.getSvcInfo().svParty
+        sv1Backend.getSvcInfo().svParty
       ) should have length 3
     val svXName = "Canton-Foundation-X"
     val svXKey =
       "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj6n2u5RWQdkq2cWvStGbIBe2JmoFs+vZGOVfd6oIm/FqfK2qV2fiHX9DieJ1c6BarDdsAD7IRnksD9BGisU3ZQ=="
-    sv1.approveSvIdentity(svXName, svXKey)
+    sv1Backend.approveSvIdentity(svXName, svXKey)
     inside(
-      sv1.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getSvcInfo().svParty)
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1Backend.getSvcInfo().svParty)
     ) {
       case approvedSvIds => {
         approvedSvIds should have size 4
@@ -32,8 +32,8 @@ class SvIdentityIntegrationTest extends SvIntegrationTestBase {
     initSvc()
     clue("SV1 has created an ApprovedSvIdentity contract as it's configured to.") {
       inside(
-        sv1.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1.getSvcInfo().svParty)
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1Backend.getSvcInfo().svParty)
       ) {
         case approvedSvIds => {
           // if this check fails:

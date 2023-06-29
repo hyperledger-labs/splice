@@ -24,14 +24,14 @@ class DirectoryFrontendIntegrationTest
         CNNodeConfigTransforms.onlySv1
       )
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
       })
 
   "A directory UI" should {
 
     "allow requesting an entry with subscription payments and then list it" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
       aliceWallet.tap(100.0)
 
       val entryName = "mycool+entry"

@@ -60,7 +60,7 @@ class WalletFrontendTimeBasedIntegrationTest
 
     "allow logging in & logging out" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
         actAndCheck(
@@ -73,18 +73,18 @@ class WalletFrontendTimeBasedIntegrationTest
 
     "show user details after login" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val entryName = perTestCaseName("alice.cns")
 
       createDirectoryEntry(
         aliceParty,
-        aliceDirectory,
+        aliceDirectoryClient,
         entryName,
         aliceWallet,
       )
 
       eventuallySucceeds() {
-        directory.lookupEntryByName(entryName)
+        directoryBackend.lookupEntryByName(entryName)
       }
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -99,7 +99,7 @@ class WalletFrontendTimeBasedIntegrationTest
     "show party id after login if user has no cns entry" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
 
-      val alicePartyId = onboardWalletUser(aliceWallet, aliceValidator)
+      val alicePartyId = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
@@ -112,18 +112,18 @@ class WalletFrontendTimeBasedIntegrationTest
 
     "show balances after login" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
       actAndCheck("alice taps", aliceWallet.tap(2))(
         "alice balance is bigger than 1",
         _ => aliceWallet.balance().unlockedQty should be > BigDecimal(1.5),
       )
       lockCoins(
-        aliceValidator,
+        aliceValidatorBackend,
         aliceParty,
-        aliceValidator.getValidatorPartyId(),
+        aliceValidatorBackend.getValidatorPartyId(),
         aliceWallet.list().coins,
         BigDecimal(1),
-        sv1Scan,
+        sv1ScanBackend,
         Duration.ofDays(1),
       )
 

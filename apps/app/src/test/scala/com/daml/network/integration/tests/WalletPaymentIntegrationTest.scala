@@ -28,7 +28,7 @@ class WalletPaymentIntegrationTest
 
   "A wallet" should {
     "fail to get a non-existent payment request" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       val nonExistentName = "does not exist"
       val errorString =
@@ -41,7 +41,7 @@ class WalletPaymentIntegrationTest
     }
 
     "allow a user to get, list, and reject app payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       clue("Check that no payment requests exist") {
         aliceWallet.listAppPaymentRequests() shouldBe empty
@@ -51,7 +51,7 @@ class WalletPaymentIntegrationTest
 
       val (_, cid, reqC) =
         createSelfPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
           description = description,
@@ -85,11 +85,11 @@ class WalletPaymentIntegrationTest
     }
 
     "allow a user to list and accept app payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       val (referenceId, cid, reqC) =
         createSelfPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
         )
@@ -145,18 +145,18 @@ class WalletPaymentIntegrationTest
       }
 
       clue("Alice transfers 39") {
-        p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 39)
+        p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bob, 39)
         checkWallet(alice, aliceWallet, Seq((30, 31)))
       }
       clue("Alice transfers 19") {
-        p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 19)
+        p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bob, 19)
         checkWallet(alice, aliceWallet, Seq((11, 12)))
       }
     }
 
     "allow two users to make direct transfers between them" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       aliceWallet.tap(100.0)
 
       val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
@@ -188,24 +188,24 @@ class WalletPaymentIntegrationTest
 
       eventually() {
         aliceWallet.listTransferOffers() should have length 3
-        bobWallet.listTransferOffers() should have length 3
+        bobWalletClient.listTransferOffers() should have length 3
       }
 
-      actAndCheck("Bob accepts one offer", bobWallet.acceptTransferOffer(offer))(
+      actAndCheck("Bob accepts one offer", bobWalletClient.acceptTransferOffer(offer))(
         "Accepted offer gets paid",
         _ => {
           aliceWallet.listTransferOffers() should have length 2
           aliceWallet.listAcceptedTransferOffers() should have length 0
-          bobWallet.listTransferOffers() should have length 2
-          bobWallet.listAcceptedTransferOffers() should have length 0
+          bobWalletClient.listTransferOffers() should have length 2
+          bobWalletClient.listAcceptedTransferOffers() should have length 0
           checkWallet(aliceUserParty, aliceWallet, Seq((98.8, 99.0)))
-          checkWallet(bobUserParty, bobWallet, Seq((1.0, 1.0)))
+          checkWallet(bobUserParty, bobWalletClient, Seq((1.0, 1.0)))
         },
       )
 
       actAndCheck(
         "Bob rejects one offer, alice withdraws the other", {
-          bobWallet.rejectTransferOffer(offer2)
+          bobWalletClient.rejectTransferOffer(offer2)
           aliceWallet.withdrawTransferOffer(offer3)
         },
       )(
@@ -213,15 +213,15 @@ class WalletPaymentIntegrationTest
         _ => {
           aliceWallet.listTransferOffers() should have length 0
           aliceWallet.listAcceptedTransferOffers() should have length 0
-          bobWallet.listTransferOffers() should have length 0
-          bobWallet.listAcceptedTransferOffers() should have length 0
+          bobWalletClient.listTransferOffers() should have length 0
+          bobWalletClient.listAcceptedTransferOffers() should have length 0
         },
       )
     }
 
     "deduplicate transfer offers" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       aliceWallet.tap(100.0)
 
       val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(5))

@@ -15,7 +15,7 @@ trait MultiDomainTestUtil extends CNNodeTestCommon {
       onDomain: DomainAlias
   )(cids: ContractId[?]*)(implicit env: CNNodeTestConsoleEnvironment, pos: source.Position) = {
     val lfIds = cids.map(c => c: LfContractId)
-    val domains = providerSplitwellBackend.participantClient.transfer.lookup_contract_domain(
+    val domains = splitwellBackend.participantClient.transfer.lookup_contract_domain(
       lfIds: _*
     )
     tForEvery(Table("contractId", lfIds: _*)) { lfId =>

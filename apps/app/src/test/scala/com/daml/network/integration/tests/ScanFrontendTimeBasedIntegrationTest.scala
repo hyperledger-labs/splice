@@ -38,29 +38,35 @@ class ScanFrontendTimeBasedIntegrationTest
     "see expected rewards leaderboards" in { implicit env =>
       val (_, bobUserParty) = onboardAliceAndBob()
 
-      waitForWalletUser(aliceValidatorWallet)
-      waitForWalletUser(bobValidatorWallet)
+      waitForWalletUser(aliceValidatorWalletClient)
+      waitForWalletUser(bobValidatorWalletClient)
 
-      grantFeaturedAppRight(aliceValidatorWallet)
+      grantFeaturedAppRight(aliceValidatorWalletClient)
 
       clue("Tap to get some coins") {
         aliceWallet.tap(500.0)
-        aliceValidatorWallet.tap(100.0)
+        aliceValidatorWalletClient.tap(100.0)
       }
 
       clue("Feature alice's validator and transfer some CC, to generate reward coupons")({
-        p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobUserParty, 40.0)
+        p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 40.0)
         advanceRoundsByOneTick
         advanceRoundsByOneTick
         advanceRoundsByOneTick
-        p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
+        p2pTransfer(
+          aliceValidatorBackend,
+          aliceValidatorWalletClient,
+          bobWalletClient,
+          bobUserParty,
+          10.0,
+        )
       })
 
       clue("Advance rounds to collect rewards") {
         Range(0, 5).foreach(_ => advanceRoundsByOneTick)
       }
 
-      val aliceValidatorWalletParty = aliceValidatorWallet.userStatus().party
+      val aliceValidatorWalletParty = aliceValidatorWalletClient.userStatus().party
 
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(

@@ -36,31 +36,31 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
     // TODO(#6193): also create an `ImportCrate` contract as a test contract, so it's easy to create a test-dump with a Coin, LockedCoin, and ImportCrate
 
     // Create three test contracts
-    val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-    val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+    val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     aliceWallet.tap(110.0)
     lockCoins(
-      aliceValidator,
+      aliceValidatorBackend,
       aliceUserParty,
       aliceValidatorParty,
       aliceWallet.list().coins,
       10,
-      sv1Scan,
+      sv1ScanBackend,
       Duration.ofDays(10),
     )
 
-    onboardWalletUser(bobWallet, bobValidator)
-    val id2 = bobWallet.tap(20.0)
+    onboardWalletUser(bobWalletClient, bobValidatorBackend)
+    val id2 = bobWalletClient.tap(20.0)
 
-    onboardWalletUser(charlieWallet, aliceValidator)
-    val id3 = charlieWallet.tap(30.0)
+    onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+    val id3 = charlieWalletClient.tap(30.0)
 
-    val aliceUnlockedIds = aliceValidator.participantClient.ledger_api_extensions.acs
+    val aliceUnlockedIds = aliceValidatorBackend.participantClient.ledger_api_extensions.acs
       .filterJava(cc.coin.Coin.COMPANION)(
         aliceUserParty
       )
       .map(co => co.id.contractId)
-    val aliceLockedIds = aliceValidator.participantClient.ledger_api_extensions.acs
+    val aliceLockedIds = aliceValidatorBackend.participantClient.ledger_api_extensions.acs
       .filterJava(cc.coin.LockedCoin.COMPANION)(
         aliceUserParty
       )
@@ -113,7 +113,7 @@ class AcsStoreDumpExportTimeBasedIntegrationTest
 
       eventually() {
         // Note: use eventually to ensure that the SvSvcStore ingests the change
-        val dump = sv1.getAcsStoreDump()
+        val dump = sv1Backend.getAcsStoreDump()
         checkDump(testContractIds, dump)
       }
     }

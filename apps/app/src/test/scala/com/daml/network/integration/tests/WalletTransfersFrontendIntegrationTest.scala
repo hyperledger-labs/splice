@@ -29,10 +29,10 @@ class WalletTransfersFrontendIntegrationTest
 
     "create a p2p transfer" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice.cns")
 
-      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob.cns")
 
       val cc = BigDecimal(10)
@@ -40,12 +40,18 @@ class WalletTransfersFrontendIntegrationTest
       val expiryDays = 10
 
       // setup alice and bob
-      onboardWalletUser(aliceWallet, aliceValidator)
-      onboardWalletUser(bobWallet, bobValidator)
-      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet, cc)
-      createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet, cc)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      createDirectoryEntry(
+        aliceUserParty,
+        aliceDirectoryClient,
+        aliceDirectoryName,
+        aliceWallet,
+        cc,
+      )
+      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient, cc)
 
-      bobWallet.listTransferOffers() shouldBe empty
+      bobWalletClient.listTransferOffers() shouldBe empty
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
@@ -59,8 +65,8 @@ class WalletTransfersFrontendIntegrationTest
           _ => {
             currentUrl should endWith("/transactions")
 
-            bobWallet.listTransferOffers() should have size 1
-            val transfer = bobWallet.listTransferOffers().head.payload
+            bobWalletClient.listTransferOffers() should have size 1
+            val transfer = bobWalletClient.listTransferOffers().head.payload
             val tenDaysFromNow = Instant.now().plus(expiryDays.toLong, ChronoUnit.DAYS)
             val timeDiff = ChronoUnit.MINUTES.between(transfer.expiresAt, tenDaysFromNow)
 
@@ -78,7 +84,7 @@ class WalletTransfersFrontendIntegrationTest
       withFrontEnd("bob") { implicit webDriver =>
         actAndCheck(
           "Bob goes to his wallet", {
-            browseToBobWallet(bobWallet.config.ledgerApiUser)
+            browseToBobWallet(bobWalletClient.config.ledgerApiUser)
           },
         )(
           "He sees the transfer offer",
@@ -109,10 +115,10 @@ class WalletTransfersFrontendIntegrationTest
 
     "show a list of transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice.cns")
 
-      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob.cns")
       val bobDirectoryDisplay = expectedCns(bobUserParty, bobDirectoryName)
 
@@ -123,14 +129,14 @@ class WalletTransfersFrontendIntegrationTest
           .ofPattern("MM/dd/yyyy HH:mm")
           .format(LocalDateTime.ofInstant(transferExpiry.toInstant, ZoneOffset.UTC))
 
-      onboardWalletUser(aliceWallet, aliceValidator)
-      onboardWalletUser(bobWallet, bobValidator)
-      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet)
-      createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceDirectoryName, aliceWallet)
+      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient)
 
       actAndCheck(
         " Bob creates transfer offer to alice",
-        bobWallet.createTransferOffer(
+        bobWalletClient.createTransferOffer(
           aliceUserParty,
           BigDecimal(1),
           "Bobo transfer to Alice",
@@ -171,18 +177,18 @@ class WalletTransfersFrontendIntegrationTest
 
     "not show transfer offers I created" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice.cns")
 
-      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob.cns")
 
       val transferExpiry = CantonTimestamp.now().plusSeconds(100)
 
-      onboardWalletUser(aliceWallet, aliceValidator)
-      onboardWalletUser(bobWallet, bobValidator)
-      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet)
-      createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceDirectoryName, aliceWallet)
+      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient)
 
       actAndCheck(
         "Alice creates transfer offer to bob",
@@ -210,26 +216,32 @@ class WalletTransfersFrontendIntegrationTest
 
     "allow accepting transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice.cns")
 
-      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob.cns")
 
       val cc = BigDecimal(10)
       val transferAmount = BigDecimal(3)
 
       // setup alice and bob
-      onboardWalletUser(aliceWallet, aliceValidator)
-      onboardWalletUser(bobWallet, bobValidator)
-      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet, cc)
-      createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet, cc)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      createDirectoryEntry(
+        aliceUserParty,
+        aliceDirectoryClient,
+        aliceDirectoryName,
+        aliceWallet,
+        cc,
+      )
+      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient, cc)
 
       // transfer from bob to alice
       actAndCheck(
         "bob creates transfer offer",
         withFrontEnd("bob") { implicit webDriver =>
-          browseToBobWallet(bobWallet.config.ledgerApiUser)
+          browseToBobWallet(bobWalletClient.config.ledgerApiUser)
           createTransferOffer(aliceUserParty, transferAmount, expiryDays = 1)
         },
       )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
@@ -249,7 +261,7 @@ class WalletTransfersFrontendIntegrationTest
           "Alice sees no more pending transfer offers",
           _ => {
             findAll(className("transfer-offer")).toList should have size (0)
-            assertInRange(bobWallet.balance().unlockedQty, (BigDecimal(6), BigDecimal(7)))
+            assertInRange(bobWalletClient.balance().unlockedQty, (BigDecimal(6), BigDecimal(7)))
             assertInRange(aliceWallet.balance().unlockedQty, (BigDecimal(12), BigDecimal(13)))
           },
         )
@@ -258,26 +270,32 @@ class WalletTransfersFrontendIntegrationTest
 
     "allow rejecting transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice.cns")
 
-      val bobUserParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob.cns")
 
       val cc = BigDecimal(10)
       val transferAmount = BigDecimal(3)
 
       // setup alice and bob
-      onboardWalletUser(aliceWallet, aliceValidator)
-      onboardWalletUser(bobWallet, bobValidator)
-      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet, cc)
-      createDirectoryEntry(bobUserParty, bobDirectory, bobDirectoryName, bobWallet, cc)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      createDirectoryEntry(
+        aliceUserParty,
+        aliceDirectoryClient,
+        aliceDirectoryName,
+        aliceWallet,
+        cc,
+      )
+      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient, cc)
 
       // transfer from bob to alice
       actAndCheck(
         "bob creates transfer offer",
         withFrontEnd("bob") { implicit webDriver =>
-          browseToBobWallet(bobWallet.config.ledgerApiUser)
+          browseToBobWallet(bobWalletClient.config.ledgerApiUser)
           createTransferOffer(aliceUserParty, transferAmount, expiryDays = 1)
         },
       )("alice observes transfer offer", _ => aliceWallet.listTransferOffers() should have size 1)
@@ -297,7 +315,7 @@ class WalletTransfersFrontendIntegrationTest
           "Alice sees no more pending transfer offers",
           _ => {
             findAll(className("transfer-offer")) should have size 0
-            assertInRange(bobWallet.balance().unlockedQty, (BigDecimal(9), BigDecimal(10)))
+            assertInRange(bobWalletClient.balance().unlockedQty, (BigDecimal(9), BigDecimal(10)))
             assertInRange(aliceWallet.balance().unlockedQty, (BigDecimal(9), BigDecimal(10)))
           },
         )

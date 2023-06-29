@@ -38,12 +38,12 @@ class WalletTxLogTimeBasedIntegrationTest
       )(
         "Wait for SV rewards to be collected",
         _ => {
-          advanceTimeByPollingInterval(sv1)
-          sv1Wallet.balance().unlockedQty should be > BigDecimal(0)
+          advanceTimeByPollingInterval(sv1Backend)
+          sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
         },
       )
       checkTxHistory(
-        sv1Wallet,
+        sv1WalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.BalanceChange =>
             logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.SvRewardCollected
@@ -55,20 +55,20 @@ class WalletTxLogTimeBasedIntegrationTest
 
     "handle app and validator rewards" in { implicit env =>
       val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
-      waitForWalletUser(aliceValidatorWallet)
-      waitForWalletUser(bobValidatorWallet)
+      waitForWalletUser(aliceValidatorWalletClient)
+      waitForWalletUser(bobValidatorWalletClient)
 
       clue("Tap to get some coins") {
         aliceWallet.tap(100.0)
-        aliceValidatorWallet.tap(100.0)
+        aliceValidatorWalletClient.tap(100.0)
       }
 
       actAndCheck(
         "Alice transfers some CC to Bob",
-        p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobUserParty, 40.0),
+        p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 40.0),
       )(
         "Bob has received the CC",
-        _ => bobWallet.balance().unlockedQty should be > BigDecimal(39.0),
+        _ => bobWalletClient.balance().unlockedQty should be > BigDecimal(39.0),
       )
 
       // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
@@ -80,28 +80,34 @@ class WalletTxLogTimeBasedIntegrationTest
 
       clue("Everyone still has their reward coupons") {
         eventually() {
-          aliceValidatorWallet.listAppRewardCoupons() should have size 1
-          aliceValidatorWallet.listValidatorRewardCoupons() should have size 1
+          aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
+          aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
         }
       }
 
-      val appRewards = aliceValidatorWallet.listAppRewardCoupons()
-      val validatorRewards = aliceValidatorWallet.listValidatorRewardCoupons()
+      val appRewards = aliceValidatorWalletClient.listAppRewardCoupons()
+      val validatorRewards = aliceValidatorWalletClient.listValidatorRewardCoupons()
       val (appRewardAmount, validatorRewardAmount) =
         getRewardCouponsValue(appRewards, validatorRewards, false)
 
       actAndCheck(
         "Alice's validator transfers some CC to Bob (using her app & validator rewards)",
-        p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0),
+        p2pTransfer(
+          aliceValidatorBackend,
+          aliceValidatorWalletClient,
+          bobWalletClient,
+          bobUserParty,
+          10.0,
+        ),
       )(
         "Bob has received the CC",
         _ => {
-          bobWallet.balance().unlockedQty should be > BigDecimal(49.0)
+          bobWalletClient.balance().unlockedQty should be > BigDecimal(49.0)
         },
       )
 
       checkTxHistory(
-        bobWallet,
+        bobWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.Transfer =>
             // Alice's validator sending 10CC to Bob, using their validator&app rewards and their coin
@@ -109,7 +115,7 @@ class WalletTxLogTimeBasedIntegrationTest
               (BigDecimal(10) - appRewardAmount - validatorRewardAmount) max BigDecimal(0)
             logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.P2PPaymentCompleted
             inside(logEntry.sender) { case (sender, amount) =>
-              sender shouldBe aliceValidator.getValidatorPartyId().toProtoPrimitive
+              sender shouldBe aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive
               amount should beWithin(-senderAmount - smallAmount, -senderAmount)
             }
             inside(logEntry.receivers) { case Seq((receiver, amount)) =>
@@ -141,19 +147,19 @@ class WalletTxLogTimeBasedIntegrationTest
 
     "include correct fees" in { implicit env =>
       // Note: all of the parties in this test must be hosted on the same participant
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
-      waitForWalletUser(aliceValidatorWallet)
-      val aliceValidatorUserParty = aliceValidator.getValidatorPartyId()
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+      waitForWalletUser(aliceValidatorWalletClient)
+      val aliceValidatorUserParty = aliceValidatorBackend.getValidatorPartyId()
 
       // Advance time to make sure we capture at least one round change in the tx history.
       val (latestRound, _) = eventuallySucceeds() {
         advanceRoundsByOneTick
-        sv1Scan.getRoundOfLatestData()
+        sv1ScanBackend.getRoundOfLatestData()
       }
 
       val coinConfig = clue("Get coin config") {
-        sv1Scan.getCoinConfigForRound(latestRound)
+        sv1ScanBackend.getCoinConfigForRound(latestRound)
       }
 
       val transferAmount = BigDecimal("32.1234567891").setScale(10)
@@ -173,14 +179,14 @@ class WalletTxLogTimeBasedIntegrationTest
         advanceRoundsByOneTick
       }
 
-      val balance0 = charlieWallet.balance().unlockedQty
+      val balance0 = charlieWalletClient.balance().unlockedQty
       actAndCheck(
         "Alice makes a complex transfer",
         rawTransfer(
-          aliceValidator,
+          aliceValidatorBackend,
           aliceWallet.config.ledgerApiUser,
           aliceUserParty,
-          aliceValidator.getValidatorPartyId(),
+          aliceValidatorBackend.getValidatorPartyId(),
           aliceWallet.list().coins.head,
           Seq(
             transferOutputCoin(
@@ -204,7 +210,7 @@ class WalletTxLogTimeBasedIntegrationTest
         ),
       )(
         "Charlie has received the CC",
-        _ => charlieWallet.balance().unlockedQty should be > balance0,
+        _ => charlieWalletClient.balance().unlockedQty should be > balance0,
       )
 
       val expectedAliceBalanceChange = BigDecimal(0)
@@ -229,7 +235,7 @@ class WalletTxLogTimeBasedIntegrationTest
       // - Here in the test, computing expected balance changes
       // Due to rounding, these numbers may all be different. We therefore only compare numbers up to 9 digits here.
       checkTxHistory(
-        charlieWallet,
+        charlieWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.Transfer =>
             inside(logEntry.sender) { case (sender, amount) =>
@@ -250,7 +256,7 @@ class WalletTxLogTimeBasedIntegrationTest
     }
 
     "handle expired coins in a transaction history" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       actAndCheck(
         "Tap to get a small coin",
@@ -283,8 +289,8 @@ class WalletTxLogTimeBasedIntegrationTest
     }
 
     "handle expired locked coins in a transaction history" in { implicit env =>
-      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+      val aliceParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
       actAndCheck(
         "Tap to get some coin",
@@ -297,12 +303,12 @@ class WalletTxLogTimeBasedIntegrationTest
       actAndCheck(
         "Lock a small coin",
         lockCoins(
-          aliceValidator,
+          aliceValidatorBackend,
           aliceParty,
           aliceValidatorParty,
           aliceWallet.list().coins,
           BigDecimal(0.000005),
-          sv1Scan,
+          sv1ScanBackend,
           java.time.Duration.ofMinutes(5),
         ),
       )(

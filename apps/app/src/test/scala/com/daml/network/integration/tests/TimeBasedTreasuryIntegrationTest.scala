@@ -33,16 +33,16 @@ class TimeBasedTreasuryIntegrationTest
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
     val (alice, bob) = onboardAliceAndBob()
-    waitForWalletUser(aliceValidatorWallet)
+    waitForWalletUser(aliceValidatorWalletClient)
 
     // create two coins in alice's wallet
     aliceWallet.tap(50)
     checkWallet(alice, aliceWallet, Seq(exactly(50)))
 
     // run a transfer such that alice's validator has some rewards
-    p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 40.0)
-    eventually()(aliceValidatorWallet.listAppRewardCoupons() should have size 1)
-    eventually()(aliceValidatorWallet.listValidatorRewardCoupons() should have size 1)
+    p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bob, 40.0)
+    eventually()(aliceValidatorWalletClient.listAppRewardCoupons() should have size 1)
+    eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
     // and give alice another coin.
     aliceWallet.tap(50)
     checkWallet(alice, aliceWallet, Seq((9, 10), exactly(50)))
@@ -56,13 +56,13 @@ class TimeBasedTreasuryIntegrationTest
 
     eventually()({
       // app rewards are automatically collected
-      aliceValidatorWallet
+      aliceValidatorWalletClient
         .listAppRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
       // and coins are automatically merged.
       checkWallet(alice, aliceWallet, Seq((59, 61)))
       // same for validator rewards
-      aliceValidatorWallet
+      aliceValidatorWalletClient
         .listValidatorRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
     })
@@ -70,8 +70,8 @@ class TimeBasedTreasuryIntegrationTest
 
   "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
     implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
       aliceWallet.tap(110)
 
       checkBalance(aliceWallet, Some(1), exactly(110), exactly(0), exactly(0))
@@ -79,12 +79,12 @@ class TimeBasedTreasuryIntegrationTest
       advanceRoundsByOneTick
 
       lockCoins(
-        aliceValidator,
+        aliceValidatorBackend,
         aliceUserParty,
         aliceValidatorParty,
         aliceWallet.list().coins,
         10,
-        sv1Scan,
+        sv1ScanBackend,
         Duration.ofDays(10),
       )
       checkBalance(
@@ -111,7 +111,7 @@ class TimeBasedTreasuryIntegrationTest
   "don't collect rewards if their collection is more expensive than they reward in coins" in {
     implicit env =>
       val (_, bob) = onboardAliceAndBob()
-      waitForWalletUser(aliceValidatorWallet)
+      waitForWalletUser(aliceValidatorWalletClient)
 
       // giving alice 2 coins...
       aliceWallet.tap(1)
@@ -121,10 +121,10 @@ class TimeBasedTreasuryIntegrationTest
       }
       // ..so when she pays bob, she doesn't have to pay a transfer fee which
       // will result in alice validator's reward being small enough that its not worth it to collect the reward
-      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 0.00001)
+      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bob, 0.00001)
       eventually() {
-        aliceValidatorWallet.listAppRewardCoupons() should have length 1
-        aliceValidatorWallet.listValidatorRewardCoupons() should have length 1
+        aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
+        aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 1
       }
 
       // advancing the rounds so the rewards would be collectable.
@@ -147,11 +147,11 @@ class TimeBasedTreasuryIntegrationTest
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
-          aliceValidatorWallet.tap(1)
+          aliceValidatorWalletClient.tap(1)
           eventually() {
-            aliceValidatorWallet.list().coins should have length 1
+            aliceValidatorWalletClient.list().coins should have length 1
           }
-          advanceTimeByPollingInterval(aliceValidator)
+          advanceTimeByPollingInterval(aliceValidatorBackend)
         },
         entries => {
           forAtLeast(

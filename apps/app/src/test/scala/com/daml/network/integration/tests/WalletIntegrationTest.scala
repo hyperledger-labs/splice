@@ -55,24 +55,24 @@ class WalletIntegrationTest
   "A wallet" should {
 
     "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
       aliceWallet.tap(50.0)
       checkWallet(aliceUserParty, aliceWallet, Seq((50, 50)))
 
-      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
-      charlieWallet.tap(50.0)
-      checkWallet(charlieUserParty, charlieWallet, Seq((50, 50)))
+      charlieWalletClient.tap(50.0)
+      checkWallet(charlieUserParty, charlieWalletClient, Seq((50, 50)))
     }
 
     "skip empty batches in the treasury service" in { implicit env =>
-      val alice = onboardWalletUser(aliceWallet, aliceValidator)
+      val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
       aliceWallet.tap(49)
       // create and reject request such that...
       val request =
         createSelfPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           alice,
         )._2
@@ -105,18 +105,18 @@ class WalletIntegrationTest
 
     "concurrent coin-operations" should {
       "be batched" in { implicit env =>
-        val alice = onboardWalletUser(aliceWallet, aliceValidator)
+        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
         aliceWallet.tap(50)
         val requestIds =
           (1 to 3).map(_ =>
             createSelfPaymentRequest(
-              aliceValidator.participantClientWithAdminToken,
+              aliceValidatorBackend.participantClientWithAdminToken,
               aliceWallet.config.ledgerApiUser,
               alice,
             )._2
           )
         val offsetBefore =
-          aliceValidator.participantClientWithAdminToken.ledger_api.transactions.end()
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.transactions.end()
         // sending three commands in short succession to the idle wallet should lead to two transactions being executed
         // tx 1: first command that arrived is immediately executed
         // tx 2: other commands that arrived after the first command was started are executed in one batch
@@ -125,8 +125,9 @@ class WalletIntegrationTest
         )
 
         // Wait until 2 transactions have been received
-        val txs = aliceValidator.participantClientWithAdminToken.ledger_api_extensions.transactions
-          .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
+        val txs =
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.transactions
+            .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_).size)
         val createdLockedCoinsInTx =
@@ -144,27 +145,28 @@ class WalletIntegrationTest
       }
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
-        val batchSize = aliceValidator.config.treasury.batchSize
-        val alice = onboardWalletUser(aliceWallet, aliceValidator)
+        val batchSize = aliceValidatorBackend.config.treasury.batchSize
+        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
         aliceWallet.tap(1000)
 
         val requests =
           (0 to batchSize + 1).map(_ =>
             createSelfPaymentRequest(
-              aliceValidator.participantClientWithAdminToken,
+              aliceValidatorBackend.participantClientWithAdminToken,
               aliceWallet.config.ledgerApiUser,
               alice,
             )._2
           )
 
         eventually() {
-          aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs.filterJava(
-            walletCodegen.AppPaymentRequest.COMPANION
-          )(alice) should have size (batchSize.toLong + 2)
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(
+              walletCodegen.AppPaymentRequest.COMPANION
+            )(alice) should have size (batchSize.toLong + 2)
         }
 
         val offsetBefore =
-          aliceValidator.participantClientWithAdminToken.ledger_api.transactions.end()
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.transactions.end()
 
         requests.foreach(request => Future(aliceWallet.acceptAppPaymentRequest(request)).discard)
 
@@ -172,8 +174,9 @@ class WalletIntegrationTest
         // tx 1: initial transfer
         // tx 2: batchSize subsequent batched transfers
         // tx 3: single transfer that was not picked due to the batch size limit
-        val txs = aliceValidator.participantClientWithAdminToken.ledger_api_extensions.transactions
-          .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
+        val txs =
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.transactions
+            .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_).size)
         val createdLockedCoinsInTx =
@@ -191,13 +194,13 @@ class WalletIntegrationTest
       }
 
       "filter stale actions from batches, and complete the rest" in { implicit env =>
-        val alice = onboardWalletUser(aliceWallet, aliceValidator)
+        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
         aliceWallet.tap(1)
         // creating payment request
         val request =
           createSelfPaymentRequest(
-            aliceValidator.participantClientWithAdminToken,
+            aliceValidatorBackend.participantClientWithAdminToken,
             aliceWallet.config.ledgerApiUser,
             alice,
           )._2
@@ -244,7 +247,7 @@ class WalletIntegrationTest
 
       val invalidSignatureToken = JWT
         .create()
-        .withAudience(aliceValidator.config.auth.audience)
+        .withAudience(aliceValidatorBackend.config.auth.audience)
         .withSubject(aliceWallet.config.ledgerApiUser)
         .sign(Algorithm.HMAC256("wrong-secret"))
 
@@ -295,36 +298,36 @@ class WalletIntegrationTest
     }
 
     "support featured app rewards" in { implicit env =>
-      val splitwellProvider = onboardWalletUser(splitwellProviderWallet, splitwellValidator)
-      splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
+      val splitwellProvider = onboardWalletUser(splitwellWalletClient, splitwellValidatorBackend)
+      splitwellWalletClient.userStatus().hasFeaturedAppRight shouldBe false
 
       clue("Canceling a featured app right before getting it, nothing bad should happen")(
-        splitwellProviderWallet.cancelFeaturedAppRight()
+        splitwellWalletClient.cancelFeaturedAppRight()
       )
 
       clue("grant a featured app right to splitwell provider") {
         eventually() {
-          noException should be thrownBy grantFeaturedAppRight(splitwellProviderWallet)
+          noException should be thrownBy grantFeaturedAppRight(splitwellWalletClient)
         }
       }
 
       clue("splitwell provider is featured") {
         eventually() {
-          inside(sv1Scan.listFeaturedAppRights()) { case Seq(r) =>
+          inside(sv1ScanBackend.listFeaturedAppRights()) { case Seq(r) =>
             r.payload.provider shouldBe splitwellProvider.toProtoPrimitive
           }
-          splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
+          splitwellWalletClient.userStatus().hasFeaturedAppRight shouldBe true
         }
       }
 
       actAndCheck(
         "splitwell cancels its own featured app right",
-        splitwellProviderWallet.cancelFeaturedAppRight(),
+        splitwellWalletClient.cancelFeaturedAppRight(),
       )(
         "splitwell provider is no longer featured",
         { _ =>
-          sv1Scan.listFeaturedAppRights() shouldBe empty
-          splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe false
+          sv1ScanBackend.listFeaturedAppRights() shouldBe empty
+          splitwellWalletClient.userStatus().hasFeaturedAppRight shouldBe false
         },
       )
 
@@ -332,30 +335,30 @@ class WalletIntegrationTest
         "Splitwell provider grants itself a featured app right",
         // We need to retry as the command might failed due to inactive cached CoinRules contract
         // The failed command submission will triggers a cache invalidation
-        retryCommandSubmission(splitwellProviderWallet.selfGrantFeaturedAppRight()),
+        retryCommandSubmission(splitwellWalletClient.selfGrantFeaturedAppRight()),
       )(
         "splitwell provider is featured",
         { featuredAppRight =>
           {
-            inside(sv1Scan.listFeaturedAppRights()) { case Seq(r) =>
+            inside(sv1ScanBackend.listFeaturedAppRights()) { case Seq(r) =>
               r.contractId shouldBe featuredAppRight
             }
-            splitwellProviderWallet.userStatus().hasFeaturedAppRight shouldBe true
+            splitwellWalletClient.userStatus().hasFeaturedAppRight shouldBe true
           }
         },
       )
     }
 
     "transfer AppPaymentRequest and DeliveryOffer to global domain" in { implicit env =>
-      val splitwellDomainId = aliceValidator.participantClientWithAdminToken.domains.id_of(
+      val splitwellDomainId = aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
         DomainAlias.tryCreate("splitwell")
       )
-      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
       aliceWallet.tap(50)
       val (_, (deliveryOfferId, requestId)) = actAndCheck(
         "Create payment request on private domain",
         createSelfPaymentRequest(
-          aliceValidator.participantClientWithAdminToken,
+          aliceValidatorBackend.participantClientWithAdminToken,
           aliceWallet.config.ledgerApiUser,
           aliceParty,
           domainId = Some(splitwellDomainId),
@@ -363,7 +366,7 @@ class WalletIntegrationTest
       )(
         "request and delivery offer get transferred to global domain",
         { case (offer, request, _) =>
-          val domains = aliceValidator.participantClientWithAdminToken.transfer
+          val domains = aliceValidatorBackend.participantClientWithAdminToken.transfer
             .lookup_contract_domain(offer, request)
           domains shouldBe Map[LfContractId, String](
             javaToScalaContractId(request) -> "global",

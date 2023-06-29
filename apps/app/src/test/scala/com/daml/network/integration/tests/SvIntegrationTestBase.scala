@@ -24,8 +24,8 @@ trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
       .withManualStart
       .withAdditionalSetup(implicit env => {
         // Some tests rely on those DARs being present without starting the SV/validator app which usually upload these.
-        sv2.participantClient.upload_dar_unless_exists(svcGovernanceDarPath)
-        bobValidator.participantClient.upload_dar_unless_exists(cantonCoinDarPath)
+        sv2Backend.participantClient.upload_dar_unless_exists(svcGovernanceDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(cantonCoinDarPath)
       })
 
 }

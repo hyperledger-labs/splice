@@ -45,34 +45,34 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       )
       .withTrafficTopupsEnabled
       .withAdditionalSetup(implicit env => {
-        aliceValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
-        bobValidator.participantClient.upload_dar_unless_exists(directoryDarPath)
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
       })
 
   "Directory service" should {
 
     "restart cleanly" in { implicit env =>
-      directory.stop()
-      directory.startSync()
+      directoryBackend.stop()
+      directoryBackend.startSync()
     }
 
     "not throw an error on shutdown" in { implicit env =>
       import env.*
 
       // The user of the directory service.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
       val offsetBefore =
-        directory.participantClientWithAdminToken.ledger_api.transactions.end()
+        directoryBackend.participantClientWithAdminToken.ledger_api.transactions.end()
 
       // Trigger three concurrent install requests
       for (_ <- 1 to 3)
         Future {
-          aliceDirectory.requestDirectoryInstall()
+          aliceDirectoryClient.requestDirectoryInstall()
         }.discard
 
       // Wait for one transaction, so that automation likely kicks-off but shutdown initiates quickly
       // and thus results in 'handleDirectoryInstallRequest' handlers being aborted due to shutdown.
-      directory.participantClientWithAdminToken.ledger_api.transactions
+      directoryBackend.participantClientWithAdminToken.ledger_api.transactions
         .flat(Set(aliceUserParty), completeAfter = 1, beginOffset = offsetBefore)
     }
 
@@ -82,7 +82,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         import env.*
 
         // The user of the directory service.
-        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
 
         def raceInstalls() = {
           val (_, installCid) = actAndCheck(
@@ -90,7 +90,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
               val installAttemptsFs = Range(0, 10).map(i =>
                 Future {
                   clue(s"creating and archiving request $i") {
-                    val requestId = aliceDirectory.requestDirectoryInstall()
+                    val requestId = aliceDirectoryClient.requestDirectoryInstall()
                     // Issue a concurrent archival for all except the first three requests
                     if (3 <= i) {
                       // TODO(tech-debt): get rid of this ugly archive argument once https://github.com/digital-asset/daml/issues/15540 is resolved
@@ -99,7 +99,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
                           new com.daml.network.codegen.java.da.internal.template.Archive()
                         )
                       try {
-                        aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
+                        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
                           .submitJava(
                             actAs = Seq(aliceUserParty),
                             optTimeout = None,
@@ -121,7 +121,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
               }
               clue("Waiting for all install requests to be archived") {
                 eventually() {
-                  aliceValidator.participantClient.ledger_api_extensions.acs.filterJava(
+                  aliceValidatorBackend.participantClient.ledger_api_extensions.acs.filterJava(
                     codegen.DirectoryInstallRequest.COMPANION
                   )(aliceUserParty) shouldBe empty
                 }
@@ -131,11 +131,11 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
             "there is exactly one install and no left-over request",
             _ => {
               val installs =
-                aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
+                aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
                   .filterJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
               installs should have size (1)
               val requests =
-                aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
+                aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
                   .filterJava(codegen.DirectoryInstallRequest.COMPANION)(aliceUserParty)
               requests shouldBe Seq.empty
               // return install-cid
@@ -214,7 +214,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
               .commands
               .asScala
               .toSeq
-            aliceValidator.participantClientWithAdminToken.ledger_api_extensions.commands
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
               .submitJava(
                 actAs = Seq(aliceUserParty),
                 commands = cmds,
@@ -224,7 +224,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         )(
           "There is no install contract left",
           _ =>
-            aliceValidator.participantClientWithAdminToken.ledger_api_extensions.acs
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(codegen.DirectoryInstall.COMPANION)(
                 aliceUserParty
               ) shouldBe empty,
@@ -261,14 +261,15 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         import env.*
 
         // The provider of the directory service
-        val providerParty = directory.getProviderPartyId()
+        val providerParty = directoryBackend.getProviderPartyId()
 
         // Setup alice
-        val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceWallet)
+        val aliceStaticRefs =
+          StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWallet)
         val aliceRefs = setupUser(aliceStaticRefs)
 
         // Setup bob
-        val bobStaticRefs = StaticUserRefs(bobValidator, bobDirectory, bobWallet)
+        val bobStaticRefs = StaticUserRefs(bobValidatorBackend, bobDirectoryClient, bobWalletClient)
         val bobRefs = setupUser(bobStaticRefs)
 
         // Concurrently, request an entry as alice and bob
@@ -290,7 +291,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         )
 
         val entry = eventuallySucceeds() {
-          directory.lookupEntryByName(testEntryName)
+          directoryBackend.lookupEntryByName(testEntryName)
         }
 
         val winnerUserParty = PartyId.tryFromProtoPrimitive(entry.payload.user)
@@ -307,20 +308,20 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         entry.payload shouldBe entryPayload
 
         // Read entries from provider
-        directory.listEntries("", 25) shouldBe Seq(entry)
-        directory.lookupEntryByName(testEntryName) shouldBe entry
-        directory.lookupEntryByParty(winnerUserParty) shouldBe entry
+        directoryBackend.listEntries("", 25) shouldBe Seq(entry)
+        directoryBackend.lookupEntryByName(testEntryName) shouldBe entry
+        directoryBackend.lookupEntryByParty(winnerUserParty) shouldBe entry
         assertThrowsAndLogsCommandFailures(
-          directory.lookupEntryByName("nonexistentname"),
+          directoryBackend.lookupEntryByName("nonexistentname"),
           _.errorMessage should include("nonexistentname"),
         )
     }
 
     "archive expired directory entries" in { implicit env =>
       clue("Creating a directory entry that expires immediately") {
-        directory.listEntries("", 25) shouldBe empty
-        val dirParty = directory.getProviderPartyId()
-        directory.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+        directoryBackend.listEntries("", 25) shouldBe empty
+        val dirParty = directoryBackend.getProviderPartyId()
+        directoryBackend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
           actAs = Seq(dirParty),
           commands = new codegen.DirectoryEntry(
             dirParty.toProtoPrimitive,
@@ -331,20 +332,20 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
           optTimeout = None,
         )
         eventually()(
-          directory.listEntries("", 25) should not be empty
+          directoryBackend.listEntries("", 25) should not be empty
         )
       }
       clue("Waiting for the backend to expire the entry...") {
         eventually()(
-          directory.listEntries("", 25) shouldBe empty
+          directoryBackend.listEntries("", 25) shouldBe empty
         )
       }
     }
 
     "support prefix lookup" in { implicit env =>
-      val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceWallet)
+      val aliceStaticRefs = StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWallet)
       val aliceRefs = setupUser(aliceStaticRefs)
-      val bobStaticRefs = StaticUserRefs(bobValidator, bobDirectory, bobWallet)
+      val bobStaticRefs = StaticUserRefs(bobValidatorBackend, bobDirectoryClient, bobWalletClient)
       val bobRefs = setupUser(bobStaticRefs)
 
       actAndCheck(
@@ -360,14 +361,14 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       )(
         "Lookup entries with prefixes",
         _ => {
-          directory.listEntries("", 25) should have length 7
-          directory.listEntries("a", 25) should have length 3
-          directory.listEntries("a", 2) should have length 2
-          directory.listEntries("b", 25) should have length 4
-          directory.listEntries("bobIs", 25) should have length 2
-          directory.listEntries("c", 25) should have length 0
-          directory.listEntries("a", 0) should have length 0
-          directory.listEntries("a", -1) should have length 0
+          directoryBackend.listEntries("", 25) should have length 7
+          directoryBackend.listEntries("a", 25) should have length 3
+          directoryBackend.listEntries("a", 2) should have length 2
+          directoryBackend.listEntries("b", 25) should have length 4
+          directoryBackend.listEntries("bobIs", 25) should have length 2
+          directoryBackend.listEntries("c", 25) should have length 0
+          directoryBackend.listEntries("a", 0) should have length 0
+          directoryBackend.listEntries("a", -1) should have length 0
         },
       )
     }

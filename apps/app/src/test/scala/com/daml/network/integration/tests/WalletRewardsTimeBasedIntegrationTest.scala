@@ -28,27 +28,27 @@ class WalletRewardsTimeBasedIntegrationTest
 
     "list and automatically collect app & validator rewards" in { implicit env =>
       val (alice, bob) = onboardAliceAndBob()
-      waitForWalletUser(aliceValidatorWallet)
-      waitForWalletUser(bobValidatorWallet)
+      waitForWalletUser(aliceValidatorWalletClient)
+      waitForWalletUser(bobValidatorWalletClient)
 
       // Tap coin and do a transfer from alice to bob
       aliceWallet.tap(50)
 
-      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bob, 40.0)
+      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bob, 40.0)
 
       // Retrieve transferred coin in bob's wallet and transfer part of it back to alice;
       // bob's validator will receive some app rewards
-      eventually()(bobWallet.list().coins should have size 1)
-      p2pTransfer(bobValidator, bobWallet, aliceWallet, alice, 30.0)
+      eventually()(bobWalletClient.list().coins should have size 1)
+      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWallet, alice, 30.0)
 
       eventually() {
-        bobValidatorWallet.listAppRewardCoupons() should have size 1
-        bobValidatorWallet.listValidatorRewardCoupons() should have size 1
-        aliceValidatorWallet.listAppRewardCoupons() should have size 1
-        aliceValidatorWallet.listValidatorRewardCoupons() should have size 1
+        bobValidatorWalletClient.listAppRewardCoupons() should have size 1
+        bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+        aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
+        aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
       }
 
-      val prevBalance = bobValidatorWallet.balance().unlockedQty
+      val prevBalance = bobValidatorWalletClient.balance().unlockedQty
 
       // Bob's validator collects rewards
       // it takes 3 ticks for the IssuingMiningRound 1 to be created and open.
@@ -56,10 +56,10 @@ class WalletRewardsTimeBasedIntegrationTest
       advanceRoundsByOneTick
       advanceRoundsByOneTick
 
-      eventually()(bobValidatorWallet.listAppRewardCoupons() should have size 0)
-      eventually()(bobValidatorWallet.listValidatorRewardCoupons() should have size 0)
+      eventually()(bobValidatorWalletClient.listAppRewardCoupons() should have size 0)
+      eventually()(bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0)
 
-      val newBalance = bobValidatorWallet.balance().unlockedQty
+      val newBalance = bobValidatorWalletClient.balance().unlockedQty
 
       // We just check that the balance has increased by roughly the right amount,
       // rather then repeating the calculation for the reward amount

@@ -63,19 +63,19 @@ class DFWalletSurviveCantonRestartIntegrationTest
   "Wallet" should {
     "survive Canton restarts" in { implicit env =>
       initSvc()
-      aliceValidator.start()
+      aliceValidatorBackend.start()
       clue("First run of Canton participant") {
         Using.resource(startCanton(cantonArgs, "wallet-survives-canton-restarts-1")) { _ =>
           clue("Wait for validator initialization") {
             // Need to wait for the participant node to startup for the user allocation to go through
             eventuallySucceeds(timeUntilSuccess = 40.seconds) {
-              CNNodeEnvironmentDefinition.withAllocatedValidatorUser(aliceValidator)
+              CNNodeEnvironmentDefinition.withAllocatedValidatorUser(aliceValidatorBackend)
             }
-            aliceValidator.waitForInitialization()
+            aliceValidatorBackend.waitForInitialization()
           }
           actAndCheck(
             "Onboard wallet user",
-            onboardWalletUser(aliceWallet, aliceValidator),
+            onboardWalletUser(aliceWallet, aliceValidatorBackend),
           )(
             "We can tap and list",
             _ => {

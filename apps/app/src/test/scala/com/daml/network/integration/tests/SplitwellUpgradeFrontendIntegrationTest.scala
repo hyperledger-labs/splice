@@ -37,7 +37,7 @@ class SplitwellUpgradeFrontendIntegrationTest
           .simpleTopology(this.getClass.getSimpleName)
           .setup(env)
         for {
-          validator <- Seq(aliceValidator, bobValidator)
+          validator <- Seq(aliceValidatorBackend, bobValidatorBackend)
         } validator.participantClient.upload_dar_unless_exists(darPath)
       })
 
@@ -45,25 +45,25 @@ class SplitwellUpgradeFrontendIntegrationTest
     "create per domain install contracts" in { implicit env =>
       val (splitwellPreferred, oldSplitwellDomain) = preferredAndPriorDomains
 
-      onboardWalletUser(aliceWallet, aliceValidator)
-      val aliceUser = aliceSplitwell.config.ledgerApiUser
+      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUser = aliceSplitwellClient.config.ledgerApiUser
       withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
         login(3002, aliceUser)
       }
 
       eventually() {
-        aliceSplitwell.listSplitwellInstalls().keys shouldBe Set(oldSplitwellDomain)
+        aliceSplitwellClient.listSplitwellInstalls().keys shouldBe Set(oldSplitwellDomain)
       }
 
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
-        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
       ) {
         withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
           reloadPage()
         }
         eventually() {
-          aliceSplitwell.listSplitwellInstalls().keys shouldBe Set(
+          aliceSplitwellClient.listSplitwellInstalls().keys shouldBe Set(
             oldSplitwellDomain,
             splitwellPreferred,
           )
@@ -72,9 +72,9 @@ class SplitwellUpgradeFrontendIntegrationTest
         // the provider’s backend automation times out on the reject call which can break shutdown.
         clue("Install requests get rejected") {
           eventually() {
-            val contracts = providerSplitwellBackend.participantClient.ledger_api_extensions.acs
+            val contracts = splitwellBackend.participantClient.ledger_api_extensions.acs
               .filterJava(splitwellCodegen.SplitwellInstallRequest.COMPANION)(
-                providerSplitwellBackend.getProviderPartyId()
+                splitwellBackend.getProviderPartyId()
               )
             contracts shouldBe empty
           }
@@ -84,14 +84,14 @@ class SplitwellUpgradeFrontendIntegrationTest
 
     "fully upgrade an active model" in { implicit env =>
       val (alice, _) = clue("Setup some users on the old domain") {
-        val alice = onboardWalletUser(aliceWallet, aliceValidator)
-        val bob = onboardWalletUser(bobWallet, bobValidator)
+        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
         (alice, bob)
       }
-      val aliceDamlUser = aliceSplitwell.config.ledgerApiUser
-      val bobDamlUser = bobSplitwell.config.ledgerApiUser
+      val aliceDamlUser = aliceSplitwellClient.config.ledgerApiUser
+      val bobDamlUser = bobSplitwellClient.config.ledgerApiUser
 
-      val provider = providerSplitwellBackend.getProviderPartyId()
+      val provider = splitwellBackend.getProviderPartyId()
 
       val abGroupName = "group1"
       val aGroupName = "group2"
@@ -145,7 +145,7 @@ class SplitwellUpgradeFrontendIntegrationTest
           enterPayment(abGroupName, "42.42", "the answer") withClue "Alice enters a payment"
         }
 
-        bobWallet.tap(BigDecimal("100"))
+        bobWalletClient.tap(BigDecimal("100"))
         val (_, bobWalletResume) = withFrontEnd(bobSplitwellFE) { implicit webDriver =>
           eventually() {
             checkSoleBalance("-21.2100000000")
@@ -178,12 +178,12 @@ class SplitwellUpgradeFrontendIntegrationTest
 
       // Switch splitwell preferred domain
       bracket(
-        connectSplitwellUpgradeDomain(aliceValidator.participantClient),
-        disconnectSplitwellUpgradeDomain(aliceValidator.participantClient),
+        connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
+        disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
       ) {
         bracket(
-          connectSplitwellUpgradeDomain(bobValidator.participantClient),
-          disconnectSplitwellUpgradeDomain(bobValidator.participantClient),
+          connectSplitwellUpgradeDomain(bobValidatorBackend.participantClient),
+          disconnectSplitwellUpgradeDomain(bobValidatorBackend.participantClient),
         ) {
           val (preferred, old) = preferredAndPriorDomains
 
@@ -206,7 +206,7 @@ class SplitwellUpgradeFrontendIntegrationTest
             withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
               actAndCheck("refresh so alice upgrades", reloadPage())(
                 "alice installs on new domain",
-                _ => aliceSplitwell.listSplitwellInstalls().keys shouldBe Set(preferred, old),
+                _ => aliceSplitwellClient.listSplitwellInstalls().keys shouldBe Set(preferred, old),
               )
 
               eventually() {
@@ -236,7 +236,7 @@ class SplitwellUpgradeFrontendIntegrationTest
                 "bob is back on splitwell and upgrading",
                 { _ =>
                   userIsLoggedIn()
-                  bobSplitwell.listSplitwellInstalls().keys shouldBe Set(preferred, old)
+                  bobSplitwellClient.listSplitwellInstalls().keys shouldBe Set(preferred, old)
                   groupOnPreferred(bGroupName)
                 },
               )
@@ -259,7 +259,7 @@ class SplitwellUpgradeFrontendIntegrationTest
                 _ => {
                   currentUrl should startWith(s"http://localhost:3003")
                   val balanceUpdates =
-                    bobSplitwell.listBalanceUpdates(GroupKey(alice, provider, abGroupName))
+                    bobSplitwellClient.listBalanceUpdates(GroupKey(alice, provider, abGroupName))
                   balanceUpdates should have size 3
                   assertAllOn(splitwellUpgradeAlias)(balanceUpdates.map(_.contractId): _*)
                 },
@@ -272,7 +272,7 @@ class SplitwellUpgradeFrontendIntegrationTest
   }
 
   private[this] def preferredAndPriorDomains(implicit env: FixtureParam) = {
-    val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
+    val splitwellDomains = splitwellBackend.getSplitwellDomainIds()
     (
       splitwellDomains.preferred,
       inside(splitwellDomains.others) { case Seq(d) =>

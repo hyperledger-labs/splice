@@ -51,35 +51,35 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
 
   "We can export a Canton participant identity and import it in a new participant" in {
     implicit env =>
-      startAllSync(sv1, sv1Scan, sv1Validator)
-      val svcInfoBefore = sv1.getSvcInfo()
+      startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
+      val svcInfoBefore = sv1Backend.getSvcInfo()
 
       val participantDump = clue("Getting participant identities dump") {
-        sv1Validator.dumpParticipantIdentities()
+        sv1ValidatorBackend.dumpParticipantIdentities()
       }
       clue("Checking exported users list") {
         val sv1Party = svcInfoBefore.svParty
         participantDump.users should contain(
-          ParticipantUser(sv1.config.ledgerApiUser, Some(sv1Party))
+          ParticipantUser(sv1Backend.config.ledgerApiUser, Some(sv1Party))
         )
         participantDump.users should contain(
-          ParticipantUser(sv1Validator.config.ledgerApiUser, Some(sv1Party))
+          ParticipantUser(sv1ValidatorBackend.config.ledgerApiUser, Some(sv1Party))
         )
         participantDump.users should contain(
-          ParticipantUser(sv1Validator.config.validatorWalletUser.value, Some(sv1Party))
+          ParticipantUser(sv1ValidatorBackend.config.validatorWalletUser.value, Some(sv1Party))
         )
       }
 
-      sv1Validator.stop()
-      sv1Scan.stop()
-      sv1.stop()
+      sv1ValidatorBackend.stop()
+      sv1ScanBackend.stop()
+      sv1Backend.stop()
 
       // TODO(#6128) run whole test once we have moved away from using a bootstrap script for upload OR have bumped Canton so that init_id works
       if (false) {
         Using.resource(startStandaloneCanton(participantDump)) { _ =>
-          sv1Local.startSync()
+          sv1LocalBackend.startSync()
 
-          val svcInfoAfter = sv1Local.getSvcInfo()
+          val svcInfoAfter = sv1LocalBackend.getSvcInfo()
 
           svcInfoAfter.svParty shouldBe svcInfoBefore.svParty
           svcInfoAfter.svcParty shouldBe svcInfoBefore.svcParty

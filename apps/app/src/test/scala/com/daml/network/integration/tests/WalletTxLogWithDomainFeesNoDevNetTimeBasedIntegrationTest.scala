@@ -35,29 +35,29 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
         advanceRoundsByOneTick,
       )(
         "Wait for SV rewards to be collected",
-        _ => sv1Wallet.balance().unlockedQty should be > BigDecimal(0),
+        _ => sv1WalletClient.balance().unlockedQty should be > BigDecimal(0),
       )
 
       val now = env.environment.clock.now
-      val domainFeesConfig = sv1Scan.getCoinConfigAsOf(now).globalDomain.fees
+      val domainFeesConfig = sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount, 1_000_000L)
       val (_, totalCostCc) = computeDomainFees(trafficAmount, now)
 
       actAndCheck(
         "Purchase extra traffic", {
-          buyExtraTraffic(sv1Validator, sv1Wallet.list().coins, trafficAmount, now)
+          buyExtraTraffic(sv1ValidatorBackend, sv1WalletClient.list().coins, trafficAmount, now)
         },
       )(
         "Check that an extra traffic purchase is registered in the transaction history",
         _ => {
           checkTxHistory(
-            sv1Wallet,
+            sv1WalletClient,
             Seq[CheckTxHistoryFn](
               { case logEntry: walletLogEntry.Transfer =>
                 // Payment of domain fees by validator to SVC
                 logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.ExtraTrafficPurchase
                 inside(logEntry.sender) { case (sender, amount) =>
-                  sender shouldBe sv1Validator.getValidatorPartyId().toProtoPrimitive
+                  sender shouldBe sv1ValidatorBackend.getValidatorPartyId().toProtoPrimitive
                   // amount actually paid will be more than totalCostCc due to fees
                   amount should beWithin(-totalCostCc - smallAmount, -totalCostCc)
                 }
@@ -69,7 +69,9 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
               },
               { case logEntry: walletLogEntry.BalanceChange =>
                 logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.SvRewardCollected
-                logEntry.receiver shouldBe sv1Validator.getValidatorPartyId().toProtoPrimitive
+                logEntry.receiver shouldBe sv1ValidatorBackend
+                  .getValidatorPartyId()
+                  .toProtoPrimitive
                 logEntry.amount should be > totalCostCc
               },
             ),

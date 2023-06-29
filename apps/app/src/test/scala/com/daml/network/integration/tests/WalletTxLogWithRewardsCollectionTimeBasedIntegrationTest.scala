@@ -28,28 +28,28 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
 
     "handle app and validator rewards that are collected" in { implicit env =>
       val (alice, _) = onboardAliceAndBob()
-      waitForWalletUser(aliceValidatorWallet)
-      waitForWalletUser(bobValidatorWallet)
+      waitForWalletUser(aliceValidatorWalletClient)
+      waitForWalletUser(bobValidatorWalletClient)
 
-      grantFeaturedAppRight(bobValidatorWallet)
+      grantFeaturedAppRight(bobValidatorWalletClient)
 
-      bobWallet.tap(50)
+      bobWalletClient.tap(50)
 
       actAndCheck(
         "Transfer from Bob to Alice",
-        p2pTransfer(bobValidator, bobWallet, aliceWallet, alice, 30.0),
+        p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWallet, alice, 30.0),
       )(
         "Bob's validator will receive some rewards",
         _ => {
-          bobValidatorWallet.listAppRewardCoupons() should have size 1
-          bobValidatorWallet.listValidatorRewardCoupons() should have size 1
+          bobValidatorWalletClient.listAppRewardCoupons() should have size 1
+          bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
         },
       )
 
-      val appRewards = bobValidatorWallet.listAppRewardCoupons()
-      val validatorRewards = bobValidatorWallet.listValidatorRewardCoupons()
+      val appRewards = bobValidatorWalletClient.listAppRewardCoupons()
+      val validatorRewards = bobValidatorWalletClient.listValidatorRewardCoupons()
 
-      val balanceBefore = bobValidatorWallet.balance().unlockedQty
+      val balanceBefore = bobValidatorWalletClient.balance().unlockedQty
       val (_, balanceAfter) = actAndCheck(
         "It takes 3 ticks for the IssuingMiningRound 1 to be created and open.", {
           advanceRoundsByOneTick
@@ -59,9 +59,9 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       )(
         "Bob's validator collects rewards",
         _ => {
-          bobValidatorWallet.listAppRewardCoupons() should have size 0
-          bobValidatorWallet.listValidatorRewardCoupons() should have size 0
-          val balanceAfter = bobValidatorWallet.balance().unlockedQty
+          bobValidatorWalletClient.listAppRewardCoupons() should have size 0
+          bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0
+          val balanceAfter = bobValidatorWalletClient.balance().unlockedQty
           balanceAfter should be > balanceBefore
           balanceAfter
         },
@@ -71,12 +71,12 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
         getRewardCouponsValue(appRewards, validatorRewards, true)
 
       checkTxHistory(
-        bobValidatorWallet,
+        bobValidatorWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.Transfer =>
             logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.WalletAutomation
             inside(logEntry.sender) { case (sender, amount) =>
-              sender shouldBe bobValidator.getValidatorPartyId().toProtoPrimitive
+              sender shouldBe bobValidatorBackend.getValidatorPartyId().toProtoPrimitive
               amount should be(balanceAfter - balanceBefore)
             }
             logEntry.receivers shouldBe empty

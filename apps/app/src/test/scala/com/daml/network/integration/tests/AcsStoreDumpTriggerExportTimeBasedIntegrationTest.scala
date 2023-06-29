@@ -38,7 +38,7 @@ abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: SvAcsS
 
       eventually() {
         // Note: use eventually to ensure if the propagation to the SvSvcStore has not completed
-        val response = sv1.triggerAcsDump()
+        val response = sv1Backend.triggerAcsDump()
 
         val dump = readDump(response.filename)
         val jsonDump = io.circe.parser

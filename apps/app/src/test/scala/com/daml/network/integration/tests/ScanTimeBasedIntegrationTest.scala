@@ -36,7 +36,8 @@ class ScanTimeBasedIntegrationTest
       .withoutAutomaticRewardsCollectionAndCoinMerging
 
   "report correct reference data" in { implicit env =>
-    def roundNum() = sv1Scan.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
+    def roundNum() =
+      sv1ScanBackend.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
     roundNum() shouldBe 1
 
     advanceRoundsByOneTick
@@ -53,7 +54,7 @@ class ScanTimeBasedIntegrationTest
 
     clue("Get config for round 3") {
       val cfg = eventuallySucceeds() {
-        sv1Scan.getCoinConfigForRound(3)
+        sv1ScanBackend.getCoinConfigForRound(3)
       }
       cfg.coinCreateFee.bigDecimal.setScale(10) should be(
         CNNodeUtil.defaultCreateFee.fee.setScale(10)
@@ -76,14 +77,14 @@ class ScanTimeBasedIntegrationTest
 
     clue("Try to get config for round 4 which does not yet exist") {
       assertThrowsAndLogsCommandFailures(
-        sv1Scan.getCoinConfigForRound(4),
+        sv1ScanBackend.getCoinConfigForRound(4),
         _.errorMessage should include("Round 4 not found"),
       )
     }
 
     val newHoldingFee = 0.1
     clue("schedule a config change, and advance time for it to take effect") {
-      val currentConfigSchedule = sv1Scan.getCoinRules().contract.payload.configSchedule
+      val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
       val configSchedule =
         createConfigSchedule(
           currentConfigSchedule,
@@ -103,72 +104,84 @@ class ScanTimeBasedIntegrationTest
     }
     clue("Round 4 should now be open, and have the new configuration") {
       eventuallySucceeds() {
-        sv1Scan.getCoinConfigForRound(4).holdingFee should be(newHoldingFee)
+        sv1ScanBackend.getCoinConfigForRound(4).holdingFee should be(newHoldingFee)
       }
     }
   }
 
   "support app and validator leaderboards" in { implicit env =>
     val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
-    waitForWalletUser(aliceValidatorWallet)
-    waitForWalletUser(bobValidatorWallet)
+    waitForWalletUser(aliceValidatorWalletClient)
+    waitForWalletUser(bobValidatorWalletClient)
 
     clue("Tap to get some coins") {
       aliceWallet.tap(500.0)
-      bobWallet.tap(500.0)
-      aliceValidatorWallet.tap(100.0)
-      bobValidatorWallet.tap(100.0)
+      bobWalletClient.tap(500.0)
+      aliceValidatorWalletClient.tap(100.0)
+      bobValidatorWalletClient.tap(100.0)
     }
     clue("No aggregate round data should be available yet")({
       assertThrowsAndLogsCommandFailures(
-        sv1Scan.getRoundOfLatestData(),
+        sv1ScanBackend.getRoundOfLatestData(),
         _.errorMessage should include("No data has been made available yet"),
       )
     })
     clue("Transfer some CC, to generate reward coupons")({
-      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobUserParty, 40.0)
-      p2pTransfer(bobValidator, bobWallet, aliceWallet, aliceUserParty, 100.0)
+      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 40.0)
+      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWallet, aliceUserParty, 100.0)
     })
     clue(
       "Advance a round and generate some more reward coupons - this time with alice's validator being featured"
     )({
       advanceRoundsByOneTick
-      grantFeaturedAppRight(aliceValidatorWallet)
-      p2pTransfer(aliceValidator, aliceWallet, bobWallet, bobUserParty, 41.0)
-      p2pTransfer(bobValidator, bobWallet, aliceWallet, aliceUserParty, 101.0)
+      grantFeaturedAppRight(aliceValidatorWalletClient)
+      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 41.0)
+      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWallet, aliceUserParty, 101.0)
     })
     clue("Advance 2 ticks for the first coupons to be collectable")({
       advanceRoundsByOneTick
       advanceRoundsByOneTick
     })
     clue("Alice's and Bob's validators use their app&validator rewards when transfering CC")({
-      p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
-      p2pTransfer(bobValidator, bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
+      p2pTransfer(
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
+        bobWalletClient,
+        bobUserParty,
+        10.0,
+      )
+      p2pTransfer(bobValidatorBackend, bobValidatorWalletClient, aliceWallet, aliceUserParty, 10.0)
     })
     clue("Some more transfers collect more rewards in round 5 (issued in round 1)")({
       advanceRoundsByOneTick
-      p2pTransfer(aliceValidator, aliceValidatorWallet, bobWallet, bobUserParty, 10.0)
-      p2pTransfer(bobValidator, bobValidatorWallet, aliceWallet, aliceUserParty, 10.0)
+      p2pTransfer(
+        aliceValidatorBackend,
+        aliceValidatorWalletClient,
+        bobWalletClient,
+        bobUserParty,
+        10.0,
+      )
+      p2pTransfer(bobValidatorBackend, bobValidatorWalletClient, aliceWallet, aliceUserParty, 10.0)
     })
     val baseRoundWithLatestData = clue(
       "Advance 1 more tick to make sure we capture at least one round change in the tx history"
     ) {
       advanceRoundsByOneTick
-      sv1Scan.getRoundOfLatestData()._1
+      sv1ScanBackend.getRoundOfLatestData()._1
     }
     clue("Advance one more tick to get to the next closed round") {
       advanceRoundsByOneTick
       val ledgerTime = getLedgerTime.toInstant
-      sv1Scan.getRoundOfLatestData() should be((baseRoundWithLatestData + 1, ledgerTime))
+      sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 1, ledgerTime))
     }
     clue("Data for a later round does not yet exist")({
       val laterRound = baseRoundWithLatestData + 2
       assertThrowsAndLogsCommandFailures(
-        sv1Scan.getTopProvidersByAppRewards(laterRound, 10),
+        sv1ScanBackend.getTopProvidersByAppRewards(laterRound, 10),
         _.errorMessage should include(s"Data for round $laterRound not yet computed"),
       )
       assertThrowsAndLogsCommandFailures(
-        sv1Scan.getTopValidatorsByValidatorRewards(laterRound, 10),
+        sv1ScanBackend.getTopValidatorsByValidatorRewards(laterRound, 10),
         _.errorMessage should include(s"Data for round $laterRound not yet computed"),
       )
     })
@@ -189,35 +202,35 @@ class ScanTimeBasedIntegrationTest
       "Test leaderboards for ends of rounds 4 and 5",
       _ => {
         val ledgerTime = getLedgerTime.toInstant
-        sv1Scan.getRoundOfLatestData() should be((baseRoundWithLatestData + 5, ledgerTime))
+        sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 5, ledgerTime))
 
         // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
         compareLeaderboard(
-          sv1Scan.getTopProvidersByAppRewards(baseRoundWithLatestData + 3, 10),
+          sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 3, 10),
           Seq(
-            (bobValidatorWallet, BigDecimal(0.6180000000)),
-            (aliceValidatorWallet, BigDecimal(0.2580000000)),
+            (bobValidatorWalletClient, BigDecimal(0.6180000000)),
+            (aliceValidatorWalletClient, BigDecimal(0.2580000000)),
           ),
         )
         compareLeaderboard(
-          sv1Scan.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 3, 10),
+          sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 3, 10),
           Seq(
-            (bobValidatorWallet, BigDecimal(0.2060000000)),
-            (aliceValidatorWallet, BigDecimal(0.0860000000)),
+            (bobValidatorWalletClient, BigDecimal(0.2060000000)),
+            (aliceValidatorWalletClient, BigDecimal(0.0860000000)),
           ),
         )
         compareLeaderboard(
-          sv1Scan.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
+          sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
           Seq(
-            (aliceValidatorWallet, BigDecimal(44.2580000000)),
-            (bobValidatorWallet, BigDecimal(1.2366000000)),
+            (aliceValidatorWalletClient, BigDecimal(44.2580000000)),
+            (bobValidatorWalletClient, BigDecimal(1.2366000000)),
           ),
         )
         compareLeaderboard(
-          sv1Scan.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 4, 10),
+          sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 4, 10),
           Seq(
-            (bobValidatorWallet, BigDecimal(0.4122000000)),
-            (aliceValidatorWallet, BigDecimal(0.1740000000)),
+            (bobValidatorWalletClient, BigDecimal(0.4122000000)),
+            (aliceValidatorWalletClient, BigDecimal(0.1740000000)),
           ),
         )
       },

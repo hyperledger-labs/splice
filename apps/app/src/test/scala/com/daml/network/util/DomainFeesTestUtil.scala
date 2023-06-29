@@ -28,7 +28,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   )(implicit env: CNNodeTestConsoleEnvironment): ValidatorTraffic.Contract = {
     val validatorParty = validatorApp.getValidatorPartyId()
     inside(
-      sv1Validator.participantClientWithAdminToken.ledger_api_extensions.acs
+      sv1ValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(ValidatorTraffic.COMPANION)(
           validatorParty,
           _.data.validator == validatorParty.toProtoPrimitive,
@@ -49,7 +49,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       ts: CantonTimestamp,
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
     val validatorParty = validatorApp.getValidatorPartyId()
-    val transferContext = sv1Scan.getTransferContextWithInstances(ts)
+    val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
     val prevTraffic = getValidatorTraffic(validatorApp)
     val walletInstall = inside(
       validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
@@ -108,7 +108,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       env: CNNodeTestConsoleEnvironment
   ): ExtraTrafficTopupParameters = {
     ExtraTrafficTopupParameters(
-      sv1Scan.getCoinConfigAsOf(ts).globalDomain.fees,
+      sv1ScanBackend.getCoinConfigAsOf(ts).globalDomain.fees,
       validatorApp.config.domains.global.buyExtraTraffic,
       validatorApp.config.automation.pollingInterval,
     )
@@ -117,9 +117,9 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   def computeDomainFees(trafficAmount: Long, ts: CantonTimestamp)(implicit
       env: CNNodeTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) = {
-    val trafficPriceUsd = sv1Scan.getCoinConfigAsOf(ts).globalDomain.fees.extraTrafficPrice
+    val trafficPriceUsd = sv1ScanBackend.getCoinConfigAsOf(ts).globalDomain.fees.extraTrafficPrice
     val totalCostUsd = BigDecimal(trafficAmount) / 1e6 * trafficPriceUsd
-    val coinPrice = sv1Scan.getLatestOpenMiningRound(ts).contract.payload.coinPrice
+    val coinPrice = sv1ScanBackend.getLatestOpenMiningRound(ts).contract.payload.coinPrice
     val totalCostCc = totalCostUsd / coinPrice
     (totalCostUsd, totalCostCc)
   }
