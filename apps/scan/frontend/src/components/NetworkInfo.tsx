@@ -1,6 +1,10 @@
 import * as React from 'react';
-import addDays from 'date-fns/addDays';
-import formatRelative from 'date-fns/formatRelative';
+import BigNumber from 'bignumber.js';
+import { ErrorDisplay, Loading, microsecondsToMinutes } from 'common-frontend';
+import { CoinConfig } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/CC/CoinConfig/module';
+import { SteppedRate } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/CC/Fees/module';
+import { useGetCoinRules } from 'common-frontend/scan-api';
+import { formatDistanceToNow } from 'date-fns';
 
 import {
   Card,
@@ -14,50 +18,84 @@ import {
   Typography,
 } from '@mui/material';
 
+import { getLatestActiveCoinConfig, getNextCoinConfigUpdateTime } from '../utils';
+
 const NetworkInfo: React.FC = () => {
-  const configurationUpdate = addDays(new Date(), 1);
+  const getCoinRulesQuery = useGetCoinRules();
+
+  switch (getCoinRulesQuery.status) {
+    case 'loading':
+      return <Loading />;
+    case 'error':
+      return <ErrorDisplay message="Failed to fetch coin rules" />;
+    case 'success':
+      return (
+        <Card>
+          <CardContent>
+            <Stack spacing={4}>
+              <Typography variant="h3">Current Canton Coin Configuration</Typography>
+              <Typography variant="body1">
+                The coin configuration details below are voted on by the SVC, and may be updated
+                over time.
+              </Typography>
+              <Stack spacing={1}>
+                <Typography variant="h3">Fees</Typography>
+                <Typography variant="body1">
+                  Fees exist because of x and z. Here are important things you should know...
+                </Typography>
+              </Stack>
+              <FeesTable coinConfig={getLatestActiveCoinConfig(getCoinRulesQuery.data)} />
+              <NextConfigUpdate />
+            </Stack>
+          </CardContent>
+        </Card>
+      );
+  }
+};
+
+const NextConfigUpdate: React.FC = () => {
+  const { data: coinRules } = useGetCoinRules();
+  const configurationUpdate = coinRules && getNextCoinConfigUpdateTime(coinRules);
+
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={4}>
-          <Typography variant="h3">Current Canton Coin Configuration</Typography>
-          <Typography variant="body1">
-            The details below fluctuate based on x and y.
-            <br />
-            Refresh for most up to date information.
-          </Typography>
-          <Stack spacing={1}>
-            <Typography variant="h3">Fees</Typography>
-            <Typography variant="body1">
-              Fees exist because of x and z. Here are important things you should know...
-            </Typography>
-          </Stack>
-          <FeesTable />
-          <Stack spacing={2}>
-            <Typography variant="h3">Next Configuration Update</Typography>
-            <Typography variant="body1">
-              {formatRelative(configurationUpdate, new Date())}
-            </Typography>
-          </Stack>
-        </Stack>
-      </CardContent>
-    </Card>
+    <Stack spacing={2}>
+      <Typography variant="h3">Next Configuration Update</Typography>
+      <Typography variant="body1">
+        {configurationUpdate ? (
+          formatDistanceToNow(configurationUpdate, { includeSeconds: true })
+        ) : (
+          <Typography variant="caption">No currently scheduled configuration changes</Typography>
+        )}
+      </Typography>
+    </Stack>
   );
 };
 
-const FeesTable: React.FC = () => {
+const FeesTable: React.FC<{ coinConfig: CoinConfig<'USD'> }> = ({ coinConfig }) => {
   const feesDescription = 'This fee is charged when x and y.';
   return (
     <TableContainer>
       <Table>
         <TableBody>
-          <FeeTableRow name="Coin Creation Fee" value="0.01 CC" description={feesDescription} />
-          <FeeTableRow name="Holding Fee" value="0.002 CC/Round" description={feesDescription} />
-          <FeeTableRow name="Lock Holder Fee" value="0.03 CC" description={feesDescription} />
-          <TransferFees />
+          <FeeTableRow
+            name="Coin Creation Fee"
+            value={`${BigNumber(coinConfig.transferConfig.createFee.fee)} CC`}
+            description={feesDescription}
+          />
+          <FeeTableRow
+            name="Holding Fee"
+            value={`${BigNumber(coinConfig.transferConfig.holdingFee.rate)} CC/Round`}
+            description={feesDescription}
+          />
+          <FeeTableRow
+            name="Lock Holder Fee"
+            value={`${BigNumber(coinConfig.transferConfig.lockHolderFee.fee)} CC`}
+            description={feesDescription}
+          />
+          <TransferFees transferFees={coinConfig.transferConfig.transferFee} />
           <FeeTableRow
             name="Round Tick Duration"
-            value="2.5 Minutes"
+            value={`${microsecondsToMinutes(coinConfig.tickDuration.microseconds)} Minutes`}
             description={feesDescription}
           />
         </TableBody>
@@ -72,7 +110,7 @@ const FeeTableRow: React.FC<{ name: string; description: string; value: string }
   value,
 }) => {
   return (
-    <TableRow>
+    <TableRow className="fee-table-row">
       <TableCell>
         <Typography variant="body1" fontWeight="bold" textTransform="uppercase">
           {name}
@@ -80,7 +118,11 @@ const FeeTableRow: React.FC<{ name: string; description: string; value: string }
         <Typography variant="caption">{description}</Typography>
       </TableCell>
       <TableCell align="right">
-        <Typography variant="h6" fontWeight="bold">
+        <Typography
+          variant="h6"
+          fontWeight="bold"
+          id={name.toLocaleLowerCase().replaceAll(' ', '-')}
+        >
           {value}
         </Typography>
       </TableCell>
@@ -88,7 +130,43 @@ const FeeTableRow: React.FC<{ name: string; description: string; value: string }
   );
 };
 
-const TransferFees = () => {
+const toPercentFmt = (rate: string): string => `${BigNumber(rate).multipliedBy(100)}%`;
+
+const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees }) => {
+  const transferFeeSteps = transferFees.steps.reduce<
+    { fee: string; range: string; last: boolean }[]
+  >(
+    (acc, current, index, array) => {
+      const nextStep = array[index + 1];
+      if (nextStep !== undefined) {
+        return [
+          ...acc,
+          {
+            fee: toPercentFmt(current._2),
+            range: `${BigNumber(current._1)} - ${BigNumber(nextStep._1)} CC`,
+            last: false,
+          },
+        ];
+      } else {
+        return [
+          ...acc,
+          {
+            fee: toPercentFmt(current._2),
+            range: `> ${BigNumber(current._1)} CC`,
+            last: true,
+          },
+        ];
+      }
+    },
+    [
+      {
+        fee: toPercentFmt(transferFees.initialRate),
+        range: `< ${BigNumber(transferFees.steps[0]._1)} CC`,
+        last: false,
+      },
+    ]
+  );
+
   return (
     <TableRow>
       <TableCell>
@@ -101,9 +179,9 @@ const TransferFees = () => {
         <TableContainer>
           <Table>
             <TableBody>
-              <TransferFeeRow range="< 100 CC" fee="1%" />
-              <TransferFeeRow range="100-1000 CC" fee="0.5%" />
-              <TransferFeeRow range="> 1000 CC" fee="0.25%" last />
+              {transferFeeSteps.map(step => (
+                <TransferFeeRow key={step.range} {...step} />
+              ))}
             </TableBody>
           </Table>
         </TableContainer>
@@ -118,7 +196,7 @@ const TransferFeeRow: React.FC<{ range: string; fee: string; last?: boolean }> =
   last,
 }) => {
   return (
-    <TableRow>
+    <TableRow className="transfer-fee-row">
       <TableCell sx={last ? { borderBottom: 'none' } : undefined}>
         <Typography variant="body1">{range}</Typography>
       </TableCell>

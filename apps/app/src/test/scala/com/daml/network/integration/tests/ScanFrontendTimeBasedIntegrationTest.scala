@@ -6,6 +6,9 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.daml.network.util.CNNodeUtil
+
+import scala.jdk.CollectionConverters.*
 
 class ScanFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
@@ -103,6 +106,43 @@ class ScanFrontendTimeBasedIntegrationTest
             Seq((aliceValidatorWalletParty, "0.083 CC")),
           )
         }
+      }
+    }
+
+    "see expected current coin config" in { implicit env =>
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck("Go to Scan UI main page", go to "http://localhost:3006")(
+          "Check the initial coin config matches the defaults",
+          _ => {
+            find(id("coin-creation-fee")).value.text should matchText(
+              s"${CNNodeUtil.defaultCreateFee.fee} CC"
+            )
+
+            find(id("holding-fee")).value.text should matchText(
+              s"${CNNodeUtil.defaultHoldingFee.rate} CC/Round"
+            )
+
+            find(id("lock-holder-fee")).value.text should matchText(
+              s"${CNNodeUtil.defaultLockHolderFee.fee} CC"
+            )
+
+            find(id("round-tick-duration")).value.text should matchText(
+              // For some reason the `.toMinutes` method rounds down to 0
+              s"${defaultTickDuration.duration.toSeconds / 60.toDouble} Minutes"
+            )
+
+            findAll(className("transfer-fee-row")).toList
+              .map(_.text)
+              .zip(CNNodeUtil.defaultTransferFee.steps.asScala.toList)
+              .foreach({
+                case (txFeeRow, defaultStep) => {
+                  txFeeRow should include(defaultStep._1.setScale(0).toString)
+                }
+              })
+          },
+        )
+
+      // TODO(#6307) -- schedule a change to coinconfig and check UI results
       }
     }
   }

@@ -16,6 +16,12 @@ export const microsecondsToInterval: (microseconds: string) => string = (microse
   return days + hours + mins + secs;
 };
 
+export const microsecondsToSeconds = (microseconds: string): BigNumber =>
+  new BigNumber(microseconds).div(1000000);
+
+export const microsecondsToMinutes = (microseconds: string): BigNumber =>
+  microsecondsToSeconds(microseconds).div(60);
+
 export interface FormattedDateTime {
   date: string;
   time: string;
