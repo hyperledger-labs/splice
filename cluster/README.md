@@ -1066,23 +1066,48 @@ Network. Steps to do this are as follows:
 1. Request that a project be created by sending a mail to
    `help@digitalasset.com`. The project should be derived from an
    existing CN project, and given the organization "'no
-   organization'." Rights to this project should be granted to
+   organization'." Rights to this project should also be granted to
    `team-canton-network@digitalasset.com`.
-2. Create a `deployment` directory for a cluster in the new
+2. Within the new project, create a Google Cloud Storage bucket named
+   `da-cn-pulumi-${PROJECT_BASE}-stacks`, to be used as the Pulumi
+   back end for the clusters in the project.
+3. Create a `deployment` directory for a cluster in the new
    project. This directory can be populated with `.envrc` and
    `.envrc.vars` from another deployment directory, but environment
-   specific configuration should be updated in `.envrc.var`.
-3. Change into the new deployment directory, and run `cncluster
+   specific configuration should be updated in `.envrc.var`. A few
+   variables to consider are these:
+      * `CLOUDSDK_CORE_PROJECT` - This should be the name of the newly
+        created GCP project.
+      * `PULUMI_BACKEND_URL` - This should be the `gs` URI for the
+        Pulumi backend bucket created above.
+4. Change into the new deployment directory, and run `cncluster
    activate` to authenticate to the project.
-4. Enable the required GCE services with the following command: `gcloud
+5. Enable the required GCE services with the following command: `gcloud
    services enable container.googleapis.com`.
-5. Start creating a new cluster with `cncluster create`. Once this
+6. Start creating a new cluster with `cncluster create`. Once this
    command starts working, you'll see in the GCE web UI that a new
    default service account has been created. It'll have a principal of
    the following form: '816347582626-compute@developer.gserviceaccount.com'.
-6. Add a role binding to enable the new default service account to
+7. Add a role binding to enable the new default service account to
    have access to `da-cn-images. The command to do this will look like
-   this: `gcloud projects add-iam-policy-binding da-cn-images --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' --role='roles/artifactregistry.serviceAgent'
+   this:
+
+   ```
+   gcloud projects add-iam-policy-binding da-cn-images \
+      --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' \
+      --role='roles/artifactregistry.serviceAgent'
+   ```
+8. Ensure the CCI Service account to be used for the project has the correct
+   IAM role bindings:
+
+   ```
+   for ii in roles/compute.viewer roles/container.serviceAgent roles/logging.privateLogViewer roles/storage.objectAdmin roles/viewer
+   do
+     gcloud projects add-iam-policy-binding da-cn-scratchnet2 \
+        --member='serviceAccount:circleci@da-cn-scratchnet.iam.gserviceaccount.com' \
+        --role="${ii}"
+   done
+   ```
 
 ## Cluster Data Dumps
 
