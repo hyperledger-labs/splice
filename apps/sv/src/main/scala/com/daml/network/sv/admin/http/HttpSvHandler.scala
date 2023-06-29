@@ -604,7 +604,9 @@ class HttpSvHandler(
                                   )
                                   Future.unit
                                 case Right(timestamp) =>
-                                  acsOffset = timestamp.toInstant
+                                  // The pruned timestamp is the latest timestamp that has been pruned
+                                  // so we need to increase it by one
+                                  acsOffset = timestamp.addMicros(1).toInstant
                                   submitDummyTransaction()
                               }
                           }
