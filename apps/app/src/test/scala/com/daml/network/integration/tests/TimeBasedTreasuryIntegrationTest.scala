@@ -36,16 +36,16 @@ class TimeBasedTreasuryIntegrationTest
     waitForWalletUser(aliceValidatorWalletClient)
 
     // create two coins in alice's wallet
-    aliceWallet.tap(50)
-    checkWallet(alice, aliceWallet, Seq(exactly(50)))
+    aliceWalletClient.tap(50)
+    checkWallet(alice, aliceWalletClient, Seq(exactly(50)))
 
     // run a transfer such that alice's validator has some rewards
-    p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bob, 40.0)
+    p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bob, 40.0)
     eventually()(aliceValidatorWalletClient.listAppRewardCoupons() should have size 1)
     eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
     // and give alice another coin.
-    aliceWallet.tap(50)
-    checkWallet(alice, aliceWallet, Seq((9, 10), exactly(50)))
+    aliceWalletClient.tap(50)
+    checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)))
 
     // advance by two ticks, so the issuing round of round 1 is created
     advanceRoundsByOneTick
@@ -60,7 +60,7 @@ class TimeBasedTreasuryIntegrationTest
         .listAppRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
       // and coins are automatically merged.
-      checkWallet(alice, aliceWallet, Seq((59, 61)))
+      checkWallet(alice, aliceWalletClient, Seq((59, 61)))
       // same for validator rewards
       aliceValidatorWalletClient
         .listValidatorRewardCoupons()
@@ -70,11 +70,11 @@ class TimeBasedTreasuryIntegrationTest
 
   "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
     implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
-      aliceWallet.tap(110)
+      aliceWalletClient.tap(110)
 
-      checkBalance(aliceWallet, Some(1), exactly(110), exactly(0), exactly(0))
+      checkBalance(aliceWalletClient, Some(1), exactly(110), exactly(0), exactly(0))
       // leads to archival of open round 0
       advanceRoundsByOneTick
 
@@ -82,13 +82,13 @@ class TimeBasedTreasuryIntegrationTest
         aliceValidatorBackend,
         aliceUserParty,
         aliceValidatorParty,
-        aliceWallet.list().coins,
+        aliceWalletClient.list().coins,
         10,
         sv1ScanBackend,
         Duration.ofDays(10),
       )
       checkBalance(
-        aliceWallet,
+        aliceWalletClient,
         Some(2),
         (99, 100),
         exactly(10),
@@ -100,7 +100,7 @@ class TimeBasedTreasuryIntegrationTest
       advanceRoundsByOneTick
 
       checkBalance(
-        aliceWallet,
+        aliceWalletClient,
         Some(3),
         (99, 100),
         (9, 10),
@@ -114,14 +114,14 @@ class TimeBasedTreasuryIntegrationTest
       waitForWalletUser(aliceValidatorWalletClient)
 
       // giving alice 2 coins...
-      aliceWallet.tap(1)
-      aliceWallet.tap(1)
+      aliceWalletClient.tap(1)
+      aliceWalletClient.tap(1)
       eventually() {
-        aliceWallet.list().coins should have length 2
+        aliceWalletClient.list().coins should have length 2
       }
       // ..so when she pays bob, she doesn't have to pay a transfer fee which
       // will result in alice validator's reward being small enough that its not worth it to collect the reward
-      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bob, 0.00001)
+      p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bob, 0.00001)
       eventually() {
         aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
         aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 1
@@ -169,11 +169,11 @@ class TimeBasedTreasuryIntegrationTest
 
   "don't run merge if rewards and coins are too small" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
-    aliceWallet.tap(0.001)
-    aliceWallet.tap(0.001)
+    aliceWalletClient.tap(0.001)
+    aliceWalletClient.tap(0.001)
 
     eventually() {
-      aliceWallet.list().coins should have length 2
+      aliceWalletClient.list().coins should have length 2
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(

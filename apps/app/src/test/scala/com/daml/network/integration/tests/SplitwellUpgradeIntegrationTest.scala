@@ -96,7 +96,7 @@ class SplitwellUpgradeIntegrationTest
     }
 
     "create per domain install contracts" in { implicit env =>
-      val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       // val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
       val (_, install) = installFirstAlice(alice)
 
@@ -122,7 +122,7 @@ class SplitwellUpgradeIntegrationTest
     }
 
     "balance update and invite contracts follow group, which follows installs" in { implicit env =>
-      val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       createSplitwellInstalls(aliceSplitwellClient, alice)
       createSplitwellInstalls(bobSplitwellClient, bob)
@@ -185,7 +185,7 @@ class SplitwellUpgradeIntegrationTest
 
     "fully upgrade an active model" in { implicit env =>
       val (alice, _) = clue("Setup some users on the old domain") {
-        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
         createSplitwellInstalls(aliceSplitwellClient, alice)
         createSplitwellInstalls(bobSplitwellClient, bob)

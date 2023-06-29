@@ -44,12 +44,12 @@ class ScanFrontendTimeBasedIntegrationTest
       grantFeaturedAppRight(aliceValidatorWalletClient)
 
       clue("Tap to get some coins") {
-        aliceWallet.tap(500.0)
+        aliceWalletClient.tap(500.0)
         aliceValidatorWalletClient.tap(100.0)
       }
 
       clue("Feature alice's validator and transfer some CC, to generate reward coupons")({
-        p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 40.0)
+        p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
         advanceRoundsByOneTick
         advanceRoundsByOneTick
         advanceRoundsByOneTick

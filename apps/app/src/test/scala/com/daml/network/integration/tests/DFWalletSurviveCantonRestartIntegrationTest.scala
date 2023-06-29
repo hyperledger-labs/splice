@@ -75,12 +75,12 @@ class DFWalletSurviveCantonRestartIntegrationTest
           }
           actAndCheck(
             "Onboard wallet user",
-            onboardWalletUser(aliceWallet, aliceValidatorBackend),
+            onboardWalletUser(aliceWalletClient, aliceValidatorBackend),
           )(
             "We can tap and list",
             _ => {
-              aliceWallet.tap(1)
-              aliceWallet.list()
+              aliceWalletClient.tap(1)
+              aliceWalletClient.list()
             },
           )
         }
@@ -89,9 +89,9 @@ class DFWalletSurviveCantonRestartIntegrationTest
         Using.resource(startCanton(cantonArgs, "wallet-survives-canton-restarts-2")) { _ =>
           clue("We can tap and list after Canton restart and domain reconnection") {
             eventuallySucceeds() {
-              aliceWallet.tap(2)
+              aliceWalletClient.tap(2)
             }
-            aliceWallet.list()
+            aliceWalletClient.list()
           }
         }
       }
@@ -104,7 +104,7 @@ class DFWalletSurviveCantonRestartIntegrationTest
         // Both failures lead to a CommandFailure exception here.
         // Timeouts log as WARN, so those need to be suppressed too.
         loggerFactory.suppressWarningsAndErrors(
-          an[CommandFailure] should be thrownBy aliceWallet.tap(3)
+          an[CommandFailure] should be thrownBy aliceWalletClient.tap(3)
         )
       }
     }

@@ -45,7 +45,7 @@ class SplitwellUpgradeFrontendIntegrationTest
     "create per domain install contracts" in { implicit env =>
       val (splitwellPreferred, oldSplitwellDomain) = preferredAndPriorDomains
 
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceUser = aliceSplitwellClient.config.ledgerApiUser
       withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
         login(3002, aliceUser)
@@ -84,7 +84,7 @@ class SplitwellUpgradeFrontendIntegrationTest
 
     "fully upgrade an active model" in { implicit env =>
       val (alice, _) = clue("Setup some users on the old domain") {
-        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
         (alice, bob)
       }

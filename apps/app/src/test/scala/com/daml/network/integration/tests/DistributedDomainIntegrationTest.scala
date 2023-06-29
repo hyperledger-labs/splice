@@ -109,8 +109,8 @@ class DistributedDomainIntegrationTest
 
     // Check that things work for external validators
     clue("Alice can tap") {
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
-      aliceWallet.tap(1000)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(1000)
     }
 
     // Check that SVs can all submit transactions through their own sequencers

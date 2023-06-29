@@ -48,7 +48,7 @@ trait CommonCNNodeAppInstanceReferences {
     "sv2Scan"
   )
 
-  def aliceWallet(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
+  def aliceWalletClient(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"
   )
 

@@ -69,7 +69,7 @@ class DirectoryTimeBasedIntegrationTest
     }
     "allocate directory entries following an initial subscription payment and renew entries on follow-up payments" in {
       implicit env =>
-        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val providerParty = directoryBackend.getProviderPartyId()
 
         clue("Request install and wait for provider to auto-accept") {
@@ -82,8 +82,8 @@ class DirectoryTimeBasedIntegrationTest
           aliceDirectoryClient.requestDirectoryEntry(testEntryName)
         }
         clue("Alice obtains some coins and accepts the subscription") {
-          aliceWallet.tap(50.0)
-          aliceWallet.acceptSubscriptionRequest(subReqId)
+          aliceWalletClient.tap(50.0)
+          aliceWalletClient.acceptSubscriptionRequest(subReqId)
         }
         val entry = clue("Getting Alice's new entry") {
           eventuallySucceeds()(
@@ -125,7 +125,7 @@ class DirectoryTimeBasedIntegrationTest
         }
     }
     "expire stale subscriptions" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectoryClient.requestDirectoryInstall()
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
@@ -135,15 +135,15 @@ class DirectoryTimeBasedIntegrationTest
       val (_, subReqId) = clue("Alice requests a directory entry") {
         aliceDirectoryClient.requestDirectoryEntry(testEntryName)
       }
-      aliceWallet.tap(50.0)
+      aliceWalletClient.tap(50.0)
       actAndCheck(
         "Alice accepts subscription and waits for entry", {
-          aliceWallet.acceptSubscriptionRequest(subReqId)
+          aliceWalletClient.acceptSubscriptionRequest(subReqId)
         },
       )(
         "Subscription and entry are created",
         _ => {
-          aliceWallet.listSubscriptions() should have length 1
+          aliceWalletClient.listSubscriptions() should have length 1
           inside(aliceDirectoryClient.listEntries("", 25)) { case Seq(entry) =>
             entry.payload.name shouldBe testEntryName
           }
@@ -167,8 +167,8 @@ class DirectoryTimeBasedIntegrationTest
     }
 
     "be able to collect subscription payments across round changes" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
-      aliceWallet.tap(50.0)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(50.0)
 
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectoryClient.requestDirectoryInstall()
@@ -182,7 +182,7 @@ class DirectoryTimeBasedIntegrationTest
       // to avoid automation triggering before the round change
       bracket(directoryBackend.stop(), directoryBackend.startSync()) {
         clue("Alice accepts the subscription") {
-          aliceWallet.acceptSubscriptionRequest(subReqId)
+          aliceWalletClient.acceptSubscriptionRequest(subReqId)
         }
 
         advanceRoundsByOneTick
@@ -198,7 +198,7 @@ class DirectoryTimeBasedIntegrationTest
         advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(1)))
         advanceTimeToRoundOpen
         eventually() {
-          aliceWallet
+          aliceWalletClient
             .listSubscriptions()
             .headOption
             .value

@@ -50,9 +50,21 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     val (alice, _) = onboardAliceAndBob()
 
     aliceValidatorWalletClient.tap(100)
-    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 1)
+    createRewardsInRound(
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
+      aliceWalletClient,
+      alice,
+      1,
+    )
     advanceRoundsByOneTick
-    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 2)
+    createRewardsInRound(
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
+      aliceWalletClient,
+      alice,
+      2,
+    )
     aliceValidatorWalletClient.tap(50)
 
     // by advancing three rounds, both round 1 and round 2 are in their issuing phase.
@@ -74,7 +86,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(
         aliceValidatorBackend,
         aliceValidatorWalletClient,
-        aliceWallet,
+        aliceWalletClient,
         alice,
         5,
       )
@@ -99,7 +111,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(
         aliceValidatorBackend,
         aliceValidatorWalletClient,
-        aliceWallet,
+        aliceWalletClient,
         alice,
         5,
       )
@@ -124,7 +136,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     p2pTransfer(
       aliceValidatorBackend,
       aliceValidatorWalletClient,
-      aliceWallet,
+      aliceWalletClient,
       alice,
       5,
     )
@@ -135,14 +147,14 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     p2pTransfer(
       aliceValidatorBackend,
       aliceValidatorWalletClient,
-      aliceWallet,
+      aliceWalletClient,
       alice,
       2000,
     )
     p2pTransfer(
       aliceValidatorBackend,
       aliceValidatorWalletClient,
-      aliceWallet,
+      aliceWalletClient,
       alice,
       2010,
     )
@@ -165,7 +177,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(
         aliceValidatorBackend,
         aliceValidatorWalletClient,
-        aliceWallet,
+        aliceWalletClient,
         alice,
         5,
       )
@@ -191,7 +203,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(
         aliceValidatorBackend,
         aliceValidatorWalletClient,
-        aliceWallet,
+        aliceWalletClient,
         alice,
         5,
       )
@@ -228,11 +240,29 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     val (alice, _) = onboardAliceAndBob()
 
     aliceValidatorWalletClient.tap(100)
-    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 1)
+    createRewardsInRound(
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
+      aliceWalletClient,
+      alice,
+      1,
+    )
     advanceRoundsByOneTick
-    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 2)
+    createRewardsInRound(
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
+      aliceWalletClient,
+      alice,
+      2,
+    )
     advanceRoundsByOneTick
-    createRewardsInRound(aliceValidatorBackend, aliceValidatorWalletClient, aliceWallet, alice, 3)
+    createRewardsInRound(
+      aliceValidatorBackend,
+      aliceValidatorWalletClient,
+      aliceWalletClient,
+      alice,
+      3,
+    )
 
     // by advancing 2 rounds, both round 1 and round 2 are in their issuing phase
     advanceRoundsByOneTick
@@ -256,7 +286,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(
         aliceValidatorBackend,
         aliceValidatorWalletClient,
-        aliceWallet,
+        aliceWalletClient,
         alice,
         5,
       )
@@ -289,7 +319,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(
         aliceValidatorBackend,
         aliceValidatorWalletClient,
-        aliceWallet,
+        aliceWalletClient,
         alice,
         5,
       )
@@ -329,7 +359,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     p2pTransfer(
       aliceValidatorBackend,
       aliceValidatorWalletClient,
-      aliceWallet,
+      aliceWalletClient,
       alice,
       5,
     )
@@ -377,16 +407,16 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "ignore expired-coins in the treasury service input" in { implicit env =>
     val (_, bob) = onboardAliceAndBob()
 
-    aliceWallet.tap(100)
+    aliceWalletClient.tap(100)
 
     // creating 5 soon-to-be-expired coins because the 'expire coin' automation expires
     // 4 coins at once by default & so even in the case it starts expiring coins, we have one unexpired coin for the test.
     // If this test flakes because the automation already expired all expired coins, increase the number of
     // soon-to-be-expired coins we create here
-    (1 to 5).map(_ => aliceWallet.tap(CNNodeUtil.defaultHoldingFee.rate))
+    (1 to 5).map(_ => aliceWalletClient.tap(CNNodeUtil.defaultHoldingFee.rate))
 
     eventually() {
-      aliceWallet.list().coins should have length 6
+      aliceWalletClient.list().coins should have length 6
     }
 
     // after one more tick, the coins have no value and should be ignored.
@@ -396,7 +426,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       {
         p2pTransfer(
           aliceValidatorBackend,
-          aliceWallet,
+          aliceWalletClient,
           bobWalletClient,
           bob,
           1,
@@ -404,7 +434,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         eventually() {
           bobWalletClient.balance().unlockedQty should be > BigDecimal(0)
           // there is still >1 coin
-          aliceWallet.list().coins.size should be > 1
+          aliceWalletClient.list().coins.size should be > 1
         }
       },
       entries => {
@@ -430,12 +460,12 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         advanceRoundsByOneTick
       }
       // run a tx so alice wallet's cache is hydrated up to issuing round 1.
-      aliceWallet.tap(5)
+      aliceWalletClient.tap(5)
 
       clue("check that the cache is used when tapping twice in a row.") {
         loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
           {
-            aliceWallet.tap(5)
+            aliceWalletClient.tap(5)
           },
           entries => {
             forAtLeast(
@@ -461,7 +491,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
         loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
           {
-            aliceWallet.tap(5)
+            aliceWalletClient.tap(5)
           },
           entries => {
             forAtLeast(

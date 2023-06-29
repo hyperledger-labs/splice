@@ -65,22 +65,22 @@ class CoinRulesUpgradesTimeBasedIntegrationTest
 
     actAndCheck(
       "Transfer from SV1's (old) wallet to Alice's (new) wallet",
-      p2pTransfer(sv1ValidatorBackend, sv1WalletClient, aliceWallet, alice, 90.0),
+      p2pTransfer(sv1ValidatorBackend, sv1WalletClient, aliceWalletClient, alice, 90.0),
     )(
       "Check balances",
       _ => {
-        checkWallet(alice, aliceWallet, Seq((90, 90)))
+        checkWallet(alice, aliceWalletClient, Seq((90, 90)))
         checkWallet(sv1Party, sv1WalletClient, Seq((9, 10)))
       },
     )
 
     actAndCheck(
       "Transfer from Alice to Bob through Splitwell",
-      splitwellTransfer(aliceSplitwellClient, aliceWallet, bob, BigDecimal(80.0), key),
+      splitwellTransfer(aliceSplitwellClient, aliceWalletClient, bob, BigDecimal(80.0), key),
     )(
       "Check balances",
       _ => {
-        checkWallet(alice, aliceWallet, Seq((9, 10)))
+        checkWallet(alice, aliceWalletClient, Seq((9, 10)))
         checkWallet(bob, bobWalletClient, Seq((79, 80)))
       },
     )

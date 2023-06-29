@@ -59,13 +59,13 @@ class WalletTxLogTimeBasedIntegrationTest
       waitForWalletUser(bobValidatorWalletClient)
 
       clue("Tap to get some coins") {
-        aliceWallet.tap(100.0)
+        aliceWalletClient.tap(100.0)
         aliceValidatorWalletClient.tap(100.0)
       }
 
       actAndCheck(
         "Alice transfers some CC to Bob",
-        p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 40.0),
+        p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0),
       )(
         "Bob has received the CC",
         _ => bobWalletClient.balance().unlockedQty should be > BigDecimal(39.0),
@@ -147,7 +147,7 @@ class WalletTxLogTimeBasedIntegrationTest
 
     "include correct fees" in { implicit env =>
       // Note: all of the parties in this test must be hosted on the same participant
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       waitForWalletUser(aliceValidatorWalletClient)
       val aliceValidatorUserParty = aliceValidatorBackend.getValidatorPartyId()
@@ -171,7 +171,7 @@ class WalletTxLogTimeBasedIntegrationTest
       val senderFeeRatio = (BigDecimal(1.0) - receiverFeeRatio).setScale(10)
 
       clue("Tap to get some coins") {
-        aliceWallet.tap(10000)
+        aliceWalletClient.tap(10000)
       }
 
       clue("Advance rounds to accumulate holding fees") {
@@ -184,10 +184,10 @@ class WalletTxLogTimeBasedIntegrationTest
         "Alice makes a complex transfer",
         rawTransfer(
           aliceValidatorBackend,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           aliceValidatorBackend.getValidatorPartyId(),
-          aliceWallet.list().coins.head,
+          aliceWalletClient.list().coins.head,
           Seq(
             transferOutputCoin(
               charlieUserParty,
@@ -256,14 +256,14 @@ class WalletTxLogTimeBasedIntegrationTest
     }
 
     "handle expired coins in a transaction history" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       actAndCheck(
         "Tap to get a small coin",
-        aliceWallet.tap(0.000005),
+        aliceWalletClient.tap(0.000005),
       )(
         "Wait for coin to appear",
-        _ => aliceWallet.list().coins should have size (1),
+        _ => aliceWalletClient.list().coins should have size (1),
       )
 
       actAndCheck(
@@ -271,11 +271,11 @@ class WalletTxLogTimeBasedIntegrationTest
         Range(0, 4).foreach(_ => advanceRoundsByOneTick),
       )(
         "Wait for coin to disappear",
-        _ => aliceWallet.list().coins should have size (0),
+        _ => aliceWalletClient.list().coins should have size (0),
       )
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.BalanceChange =>
             logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.CoinExpired
@@ -289,15 +289,15 @@ class WalletTxLogTimeBasedIntegrationTest
     }
 
     "handle expired locked coins in a transaction history" in { implicit env =>
-      val aliceParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
       actAndCheck(
         "Tap to get some coin",
-        aliceWallet.tap(100),
+        aliceWalletClient.tap(100),
       )(
         "Wait for coin to appear",
-        _ => aliceWallet.list().coins should have size (1),
+        _ => aliceWalletClient.list().coins should have size (1),
       )
 
       actAndCheck(
@@ -306,14 +306,14 @@ class WalletTxLogTimeBasedIntegrationTest
           aliceValidatorBackend,
           aliceParty,
           aliceValidatorParty,
-          aliceWallet.list().coins,
+          aliceWalletClient.list().coins,
           BigDecimal(0.000005),
           sv1ScanBackend,
           java.time.Duration.ofMinutes(5),
         ),
       )(
         "Wait for locked coin to appear",
-        _ => aliceWallet.list().lockedCoins should have size (1),
+        _ => aliceWalletClient.list().lockedCoins should have size (1),
       )
 
       actAndCheck(
@@ -321,11 +321,11 @@ class WalletTxLogTimeBasedIntegrationTest
         Range(0, 4).foreach(_ => advanceRoundsByOneTick),
       )(
         "Wait for locked coin to disappear",
-        _ => aliceWallet.list().lockedCoins should have size (0),
+        _ => aliceWalletClient.list().lockedCoins should have size (0),
       )
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.BalanceChange =>
             logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.LockedCoinExpired

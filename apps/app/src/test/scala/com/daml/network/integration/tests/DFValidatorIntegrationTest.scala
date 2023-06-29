@@ -62,7 +62,7 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       .awaitJava(ValidatorLicense.COMPANION)(aliceValidatorParty)
 
     // onboard end user
-    aliceValidatorBackend.onboardUser(aliceWallet.config.ledgerApiUser)
+    aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
   }
 
   // TODO(M3-46) clean up once every validator uses this onboarding flow
@@ -270,8 +270,8 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()
 
-    val party1 = aliceValidatorBackend.onboardUser(aliceWallet.config.ledgerApiUser)
-    val party2 = aliceValidatorBackend.onboardUser(aliceWallet.config.ledgerApiUser)
+    val party1 = aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+    val party2 = aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
     party1 shouldBe party2
   }
 
@@ -288,12 +288,12 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()
 
-    actAndCheck("Onboard a user", onboardWalletUser(aliceWallet, aliceValidatorBackend))(
+    actAndCheck("Onboard a user", onboardWalletUser(aliceWalletClient, aliceValidatorBackend))(
       "Wait for user to be listed",
       _ => {
         val usernames = aliceValidatorBackend.listUsers()
         usernames should contain theSameElementsAs Seq(
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceValidatorBackend.config.validatorWalletUser.value,
         )
       },
@@ -314,34 +314,34 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       },
     )
 
-    aliceWallet.tap(100.0)
-    assertUserFullyOnboarded(aliceWallet, aliceValidatorBackend)
+    aliceWalletClient.tap(100.0)
+    assertUserFullyOnboarded(aliceWalletClient, aliceValidatorBackend)
 
     actAndCheck(
       "Offboard a user",
-      aliceValidatorBackend.offboardUser(aliceWallet.config.ledgerApiUser),
+      aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser),
     )(
       "Wait for the validator and wallet to report the user offboarded",
       _ => {
         val usernames = aliceValidatorBackend.listUsers()
         usernames should contain theSameElementsAs (testUsers ++
           Seq(aliceValidatorBackend.config.validatorWalletUser.value))
-        assertUserFullyOffboarded(aliceWallet, aliceValidatorBackend)
+        assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend)
       },
     )
 
     clue("Offboarding alice again - offboarding should be idempotent") {
-      aliceValidatorBackend.offboardUser(aliceWallet.config.ledgerApiUser)
-      assertUserFullyOffboarded(aliceWallet, aliceValidatorBackend)
+      aliceValidatorBackend.offboardUser(aliceWalletClient.config.ledgerApiUser)
+      assertUserFullyOffboarded(aliceWalletClient, aliceValidatorBackend)
     }
 
     actAndCheck(
       "Onboarding alice back",
-      aliceValidatorBackend.onboardUser(aliceWallet.config.ledgerApiUser),
+      aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser),
     )(
       "Alice should have retained her coin",
       _ => {
-        val balance = Try(loggerFactory.suppressErrors((aliceWallet.balance())))
+        val balance = Try(loggerFactory.suppressErrors((aliceWalletClient.balance())))
           .getOrElse(fail(s"Could not get balance for alice"))
         balance.unlockedQty should be(100.0)
       },

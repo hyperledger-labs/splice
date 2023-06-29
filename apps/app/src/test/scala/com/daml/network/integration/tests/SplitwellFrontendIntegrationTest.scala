@@ -47,7 +47,7 @@ class SplitwellFrontendIntegrationTest
 
     "settle debts with multiple parties" in { implicit env =>
       val aliceDamlUser = aliceSplitwellClient.config.ledgerApiUser
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceParty = aliceUserParty.toProtoPrimitive
       val bobDamlUser = bobSplitwellClient.config.ledgerApiUser
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
@@ -159,7 +159,7 @@ class SplitwellFrontendIntegrationTest
 
       eventually() {
         // Check final amounts in the wallets
-        checkWallet(aliceUserParty, aliceWallet, Seq((399.75, 400)))
+        checkWallet(aliceUserParty, aliceWalletClient, Seq((399.75, 400)))
         checkWallet(bobUserParty, bobWalletClient, Seq((36.3, 36.7)))
         checkWallet(charlieUserParty, charlieWalletClient, Seq((110.75, 111)))
       }
@@ -167,14 +167,19 @@ class SplitwellFrontendIntegrationTest
 
     "settle debts with a single party" in { implicit env =>
       val aliceDamlUser = aliceSplitwellClient.config.ledgerApiUser
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobDamlUser = bobSplitwellClient.config.ledgerApiUser
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val groupName = "troika"
 
       val aliceEntryName = perTestCaseName("alice.cns")
       val bobEntryName = perTestCaseName("bob.cns")
-      initialiseDirectoryApp(aliceEntryName, aliceUserParty, aliceDirectoryClient, aliceWallet)
+      initialiseDirectoryApp(
+        aliceEntryName,
+        aliceUserParty,
+        aliceDirectoryClient,
+        aliceWalletClient,
+      )
       initialiseDirectoryApp(bobEntryName, bobUserParty, bobDirectoryClient, bobWalletClient)
       val aliceCns = expectedCns(aliceUserParty, aliceEntryName)
       val bobCns = expectedCns(bobUserParty, bobEntryName)
@@ -219,7 +224,7 @@ class SplitwellFrontendIntegrationTest
 
       eventually() {
         // Check final amounts in the wallets
-        checkWallet(aliceUserParty, aliceWallet, Seq((503.75, 504)))
+        checkWallet(aliceUserParty, aliceWalletClient, Seq((503.75, 504)))
         checkWallet(bobUserParty, bobWalletClient, Seq((12.3, 12.5)))
       }
 
@@ -235,7 +240,7 @@ class SplitwellFrontendIntegrationTest
 
     "handle multiple groups correctly" in { implicit env =>
       val aliceDamlUser = aliceSplitwellClient.config.ledgerApiUser
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobDamlUser = bobSplitwellClient.config.ledgerApiUser
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val charlieDamlUser = charlieSplitwellClient.config.ledgerApiUser

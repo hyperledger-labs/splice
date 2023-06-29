@@ -30,13 +30,13 @@ class DirectoryFrontendIntegrationTest
   "A directory UI" should {
 
     "allow requesting an entry with subscription payments and then list it" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
-      aliceWallet.tap(100.0)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(100.0)
 
       val entryName = "mycool+entry"
 
-      aliceWallet.listSubscriptionRequests() shouldBe empty
+      aliceWalletClient.listSubscriptionRequests() shouldBe empty
 
       withFrontEnd("alice") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session

@@ -31,14 +31,19 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
   "A wallet transaction history UI" should {
 
     "show all subscription payments" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice.cns")
 
       val directoryExpectedCns = createDirectoryEntryForDirectoryItself
 
       withFrontEnd("alice") { implicit webDriver =>
-        createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName, aliceWallet)
+        createDirectoryEntry(
+          aliceUserParty,
+          aliceDirectoryClient,
+          aliceEntryName,
+          aliceWalletClient,
+        )
         val (_, txsBefore) = actAndCheck(
           "Alice goes to wallet", {
             // alice's directory - also taps 5 CC

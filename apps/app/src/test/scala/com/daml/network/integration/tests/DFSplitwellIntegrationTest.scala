@@ -46,7 +46,7 @@ class DFSplitwellIntegrationTest
       implicit env =>
         import env.*
 
-        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
         createSplitwellInstalls(aliceSplitwellClient, aliceUserParty)
 
@@ -86,7 +86,7 @@ class DFSplitwellIntegrationTest
     "use its own app domain" in { implicit env =>
       val (_, bobUserParty, _, _, key, _) = initSplitwellTest()
 
-      aliceWallet.tap(50)
+      aliceWalletClient.tap(50)
 
       val installs = aliceSplitwellClient.listSplitwellInstalls()
       installs.keySet.map(_.uid.id) shouldBe Set("splitwell")
@@ -105,12 +105,12 @@ class DFSplitwellIntegrationTest
           ),
         )(
           "alice sees payment request on global domain",
-          _ => aliceWallet.listAppPaymentRequests().headOption.value,
+          _ => aliceWalletClient.listAppPaymentRequests().headOption.value,
         )
 
       actAndCheck(
         "alice initiates payment accept request on global domain",
-        aliceWallet.acceptAppPaymentRequest(paymentRequest.appPaymentRequest.contractId),
+        aliceWalletClient.acceptAppPaymentRequest(paymentRequest.appPaymentRequest.contractId),
       )(
         "alice sees balance update on splitwell domain",
         _ =>
@@ -130,7 +130,7 @@ class DFSplitwellIntegrationTest
     }
 
     "domain disconnect" in { implicit env =>
-      val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       createSplitwellInstalls(aliceSplitwellClient, alice)
       actAndCheck("alice creates group1", aliceSplitwellClient.requestGroup("group1"))(
         "alice observes group",

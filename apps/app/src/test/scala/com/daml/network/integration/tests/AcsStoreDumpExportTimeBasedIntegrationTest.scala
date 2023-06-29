@@ -36,14 +36,14 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
     // TODO(#6193): also create an `ImportCrate` contract as a test contract, so it's easy to create a test-dump with a Coin, LockedCoin, and ImportCrate
 
     // Create three test contracts
-    val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+    val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
-    aliceWallet.tap(110.0)
+    aliceWalletClient.tap(110.0)
     lockCoins(
       aliceValidatorBackend,
       aliceUserParty,
       aliceValidatorParty,
-      aliceWallet.list().coins,
+      aliceWalletClient.list().coins,
       10,
       sv1ScanBackend,
       Duration.ofDays(10),

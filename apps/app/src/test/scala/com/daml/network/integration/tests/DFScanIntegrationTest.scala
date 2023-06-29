@@ -36,7 +36,7 @@ class DFScanIntegrationTest
 
   "list total coin balances" in { implicit env =>
     val (aliceUserParty, _) = onboardAliceAndBob()
-    aliceWallet.tap(100.0)
+    aliceWalletClient.tap(100.0)
     bobWalletClient.tap(150.0)
     eventually() {
       val balances = sv1ScanBackend.getTotalCoinBalance()
@@ -47,12 +47,12 @@ class DFScanIntegrationTest
     val (referenceId, _, reqC) =
       createSelfPaymentRequest(
         aliceValidatorBackend.participantClientWithAdminToken,
-        aliceWallet.config.ledgerApiUser,
+        aliceWalletClient.config.ledgerApiUser,
         aliceUserParty,
       )
 
     val cid = eventually() {
-      inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
+      inside(aliceWalletClient.listAppPaymentRequests()) { case Seq(r) =>
         r.appPaymentRequest.payload shouldBe reqC
         r.appPaymentRequest.contractId
       }
@@ -60,11 +60,14 @@ class DFScanIntegrationTest
 
     clue("Accept payment request") {
       val (acceptedPaymentId, _) =
-        actAndCheck("Alice accepts payment request", aliceWallet.acceptAppPaymentRequest(cid))(
+        actAndCheck(
+          "Alice accepts payment request",
+          aliceWalletClient.acceptAppPaymentRequest(cid),
+        )(
           "Payment request disappears from list",
-          _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+          _ => aliceWalletClient.listAppPaymentRequests() shouldBe empty,
         )
-      inside(aliceWallet.listAcceptedAppPayments()) { case Seq(r) =>
+      inside(aliceWalletClient.listAcceptedAppPayments()) { case Seq(r) =>
         r.contractId shouldBe acceptedPaymentId
         r.payload shouldBe new walletCodegen.AcceptedAppPayment(
           aliceUserParty.toProtoPrimitive,

@@ -56,7 +56,7 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
 
   "sv1" should {
     "load the initial ACS dump" in { implicit env =>
-      val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val charlie = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val dora = aliceValidatorBackend.onboardUser("dora_xyz")
@@ -69,7 +69,7 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
       }
 
       // Note: we import two coins, but they get merged
-      checkWallet(alice, aliceWallet, Seq((109.0, 110.0)))
+      checkWallet(alice, aliceWalletClient, Seq((109.0, 110.0)))
       checkWallet(bob, bobWalletClient, Seq((20.0, 20.0)))
       checkWallet(charlie, charlieWalletClient, Seq((30.0, 30.0)))
     }

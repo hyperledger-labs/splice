@@ -29,8 +29,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
   "A wallet transaction history UI" should {
 
     "show all types of transactions" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice.cns")
 
       waitForWalletUser(aliceValidatorWalletClient)
@@ -63,20 +63,25 @@ class WalletTransactionHistoryFrontendIntegrationTest
         val (_, txs) = actAndCheck(
           "Transactions are done", {
             // alice's directory - also taps 5 CC
-            createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName, aliceWallet)
+            createDirectoryEntry(
+              aliceUserParty,
+              aliceDirectoryClient,
+              aliceEntryName,
+              aliceWalletClient,
+            )
             // charlie -> alice
             charlieWalletClient.tap(50)
             p2pTransfer(
               aliceValidatorBackend,
               charlieWalletClient,
-              aliceWallet,
+              aliceWalletClient,
               aliceUserParty,
               BigDecimal("1.07"),
             )
             // alice -> charlie
             p2pTransfer(
               aliceValidatorBackend,
-              aliceWallet,
+              aliceWalletClient,
               charlieWalletClient,
               charlieUserParty,
               BigDecimal("1.18"),
@@ -91,7 +96,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               ),
             )
             eventuallySucceeds() {
-              aliceWallet.acceptAppPaymentRequest(cid)
+              aliceWalletClient.acceptAppPaymentRequest(cid)
             }
           },
         )(
@@ -158,8 +163,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
     }
 
     "paginate transactions" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice.cns")
       waitForWalletUser(aliceValidatorWalletClient)
 
@@ -181,17 +186,22 @@ class WalletTransactionHistoryFrontendIntegrationTest
           },
         )
 
-        createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName, aliceWallet)
+        createDirectoryEntry(
+          aliceUserParty,
+          aliceDirectoryClient,
+          aliceEntryName,
+          aliceWalletClient,
+        )
         createDirectoryEntry(bobUserParty, bobDirectoryClient, bobEntryName, bobWalletClient)
 
-        aliceWallet.tap(500)
+        aliceWalletClient.tap(500)
 
         actAndCheck(
           "Alice makes transfers to bob", {
             transferAmounts.foreach(amount =>
               p2pTransfer(
                 aliceValidatorBackend,
-                aliceWallet,
+                aliceWalletClient,
                 bobWalletClient,
                 bobUserParty,
                 BigDecimal(amount),

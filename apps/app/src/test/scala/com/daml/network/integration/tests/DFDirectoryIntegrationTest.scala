@@ -60,7 +60,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       import env.*
 
       // The user of the directory service.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val offsetBefore =
         directoryBackend.participantClientWithAdminToken.ledger_api.transactions.end()
 
@@ -82,7 +82,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         import env.*
 
         // The user of the directory service.
-        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
         def raceInstalls() = {
           val (_, installCid) = actAndCheck(
@@ -265,7 +265,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
 
         // Setup alice
         val aliceStaticRefs =
-          StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWallet)
+          StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWalletClient)
         val aliceRefs = setupUser(aliceStaticRefs)
 
         // Setup bob
@@ -343,7 +343,8 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     }
 
     "support prefix lookup" in { implicit env =>
-      val aliceStaticRefs = StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWallet)
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWalletClient)
       val aliceRefs = setupUser(aliceStaticRefs)
       val bobStaticRefs = StaticUserRefs(bobValidatorBackend, bobDirectoryClient, bobWalletClient)
       val bobRefs = setupUser(bobStaticRefs)

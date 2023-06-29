@@ -51,66 +51,66 @@ class WalletTimeBasedIntegrationTest
   "A wallet" should {
 
     "list all coins, including locked coins, with additional position details" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
       clue("Alice taps 50 coins") {
-        aliceWallet.list().coins should have length 0
-        aliceWallet.tap(50)
+        aliceWalletClient.list().coins should have length 0
+        aliceWalletClient.tap(50)
         eventually() {
-          aliceWallet.list().coins should have length 1
-          aliceWallet.list().lockedCoins should have length 0
+          aliceWalletClient.list().coins should have length 1
+          aliceWalletClient.list().lockedCoins should have length 0
         }
       }
-      val startRound = aliceWallet.list().coins.head.round
+      val startRound = aliceWalletClient.list().coins.head.round
 
       lockCoins(
         aliceValidatorBackend,
         aliceUserParty,
         aliceValidatorParty,
-        aliceWallet.list().coins,
+        aliceWalletClient.list().coins,
         25,
         sv1ScanBackend,
         Duration.ofDays(10),
       )
 
       clue("Check wallet after locking coins") {
-        aliceWallet.list().coins should have length 1
-        eventually()(aliceWallet.list().lockedCoins should have length 1)
+        aliceWalletClient.list().coins should have length 1
+        eventually()(aliceWalletClient.list().lockedCoins should have length 1)
 
-        aliceWallet.list().coins.head.round shouldBe startRound
+        aliceWalletClient.list().coins.head.round shouldBe startRound
         // we have 0 holding fees because the coins were created in the same round we are currently in
-        aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().coins.head.effectiveAmount, (24.0, 25.0))
+        aliceWalletClient.list().coins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (24.0, 25.0))
 
-        aliceWallet.list().lockedCoins.head.round shouldBe startRound
-        aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveAmount, (24.0, 25.0))
+        aliceWalletClient.list().lockedCoins.head.round shouldBe startRound
+        aliceWalletClient.list().lockedCoins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWalletClient.list().lockedCoins.head.effectiveAmount, (24.0, 25.0))
       }
 
       // advance to next round.
       advanceRoundsByOneTick
 
       clue("Check wallet after advancing to next round") {
-        eventually()(aliceWallet.list().coins.head.round shouldBe startRound + 1)
-        assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
-        assertInRange(aliceWallet.list().coins.head.effectiveAmount, (24.0, 25.0))
+        eventually()(aliceWalletClient.list().coins.head.round shouldBe startRound + 1)
+        assertInRange(aliceWalletClient.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
+        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (24.0, 25.0))
 
-        aliceWallet.list().lockedCoins.head.round shouldBe startRound + 1
+        aliceWalletClient.list().lockedCoins.head.round shouldBe startRound + 1
         assertInRange(
-          aliceWallet.list().lockedCoins.head.accruedHoldingFee,
+          aliceWalletClient.list().lockedCoins.head.accruedHoldingFee,
           (0.000004, 0.000005),
         )
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveAmount, (24.0, 25.0))
+        assertInRange(aliceWalletClient.list().lockedCoins.head.effectiveAmount, (24.0, 25.0))
       }
     }
 
     "ensure balances are updated accordingly after a round" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
-      aliceWallet.tap(50)
+      aliceWalletClient.tap(50)
       val startingBalance = eventually() {
-        val startingBalance = aliceWallet.balance()
+        val startingBalance = aliceWalletClient.balance()
         startingBalance.unlockedQty shouldBe 50.0
         startingBalance
       }
@@ -122,7 +122,7 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorBackend,
         aliceUserParty,
         aliceValidatorParty,
-        aliceWallet.list().coins,
+        aliceWalletClient.list().coins,
         lockedQty,
         sv1ScanBackend,
         Duration.ofDays(10),
@@ -132,7 +132,7 @@ class WalletTimeBasedIntegrationTest
         eventually() {
           val expectedUnlockedCoins = startingBalance.unlockedQty - lockedQty
           checkBalance(
-            aliceWallet,
+            aliceWalletClient,
             Some(startingBalance.round + 1),
             (expectedUnlockedCoins - 1, expectedUnlockedCoins),
             (lockedQty - 1, lockedQty),
@@ -143,17 +143,17 @@ class WalletTimeBasedIntegrationTest
     }
 
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue("Alice gets some coins") {
-        aliceWallet.tap(50)
+        aliceWalletClient.tap(50)
       }
       clue("Setting up directory as provider for the created subscriptions") {
         aliceDirectoryClient.requestDirectoryInstall()
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
-      aliceWallet.listSubscriptions() shouldBe empty
+      aliceWalletClient.listSubscriptions() shouldBe empty
 
       bracket(
         clue("Creating 3 subscriptions, 10 days apart") {
@@ -166,19 +166,19 @@ class WalletTimeBasedIntegrationTest
             )(
               "the corresponding subscription request is created",
               { _ =>
-                inside(aliceWallet.listSubscriptionRequests()) { case Seq(r) =>
+                inside(aliceWalletClient.listSubscriptionRequests()) { case Seq(r) =>
                   r.subscriptionRequest.contractId
                 }
               },
             )
             actAndCheck(
               "Accept subscription request", {
-                aliceWallet.acceptSubscriptionRequest(requestId)
+                aliceWalletClient.acceptSubscriptionRequest(requestId)
               },
             )(
               "subscription is created",
               _ => {
-                val subs = aliceWallet.listSubscriptions()
+                val subs = aliceWalletClient.listSubscriptions()
                 subs should have length (i + 1L)
               },
             )
@@ -186,7 +186,7 @@ class WalletTimeBasedIntegrationTest
             advanceTimeToRoundOpen
           }
         },
-        cancelAllSubscriptions(aliceWallet, aliceValidatorBackend),
+        cancelAllSubscriptions(aliceWalletClient, aliceValidatorBackend),
       ) {
         bracket(
           clue("Stopping directory backend so that payments aren't collected.") {
@@ -206,7 +206,7 @@ class WalletTimeBasedIntegrationTest
           )(
             "2 idle subscriptions and 1 payment are listed",
             _ => {
-              val subs = aliceWallet.listSubscriptions()
+              val subs = aliceWalletClient.listSubscriptions()
               subs should have length 3
               subs
                 .collect(_.state match {
@@ -223,19 +223,19 @@ class WalletTimeBasedIntegrationTest
     }
 
     "auto-expire payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       actAndCheck(
         "Create a payment request, which expires after 1 minute",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           expirationTime = Duration.ofMinutes(1),
         ),
       )(
         "Check that we can see the created payment request",
-        _ => aliceWallet.listAppPaymentRequests() should have length 1,
+        _ => aliceWalletClient.listAppPaymentRequests() should have length 1,
       )
 
       actAndCheck(
@@ -243,20 +243,20 @@ class WalletTimeBasedIntegrationTest
         advanceTime(Duration.ofMinutes(3)),
       )(
         "Check that there are no more payment requests",
-        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+        _ => aliceWalletClient.listAppPaymentRequests() shouldBe empty,
       )
     }
 
     "support transfer offers" in { implicit env =>
       val (_, bob) = onboardAliceAndBob()
-      aliceWallet.tap(100.0)
+      aliceWalletClient.tap(100.0)
 
       val now = aliceValidatorBackend.participantClient.ledger_api.time.get()
       val expiration = now.plus(Duration.ofMinutes(1))
 
       val (_, _) = actAndCheck(
         "Alice creates a transfer offer", {
-          aliceWallet.createTransferOffer(
+          aliceWalletClient.createTransferOffer(
             bob,
             1.0,
             "should expire before accepted",
@@ -267,7 +267,7 @@ class WalletTimeBasedIntegrationTest
       )(
         "Wait for new offer to be ingested",
         _ => {
-          aliceWallet.listTransferOffers() should have length 1
+          aliceWalletClient.listTransferOffers() should have length 1
           bobWalletClient.listTransferOffers() should have length 1
         },
       )
@@ -275,40 +275,40 @@ class WalletTimeBasedIntegrationTest
       advanceTime(Duration.ofMinutes(3))
 
       clue("Wait for the offer to expire")(eventually() {
-        aliceWallet.listTransferOffers() should have length 0
-        aliceWallet.listAcceptedTransferOffers() should have length 0
+        aliceWalletClient.listTransferOffers() should have length 0
+        aliceWalletClient.listAcceptedTransferOffers() should have length 0
       })
     }
 
     "auto-expire coin" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue("Alice taps 0.000005 coins") {
-        aliceWallet.tap(0.000005)
+        aliceWalletClient.tap(0.000005)
         eventually() {
-          aliceWallet.list().coins should have length 1
-          aliceWallet.list().lockedCoins should have length 0
+          aliceWalletClient.list().coins should have length 1
+          aliceWalletClient.list().lockedCoins should have length 0
           // we have 0 holding fees because the coins were created in the same round we are currently in
-          aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
-          assertInRange(aliceWallet.list().coins.head.effectiveAmount, (0, 1))
+          aliceWalletClient.list().coins.head.accruedHoldingFee shouldBe 0
+          assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (0, 1))
         }
       }
 
-      val startRound = aliceWallet.list().coins.head.round
+      val startRound = aliceWalletClient.list().coins.head.round
 
       // advance 2 rounds.
       advanceRoundsByOneTick
       advanceRoundsByOneTick
 
       clue("Check wallet after advancing to next 2 round") {
-        eventually()(aliceWallet.list().coins.head.round shouldBe startRound + 2)
-        aliceWallet.list().coins should have length 1
+        eventually()(aliceWalletClient.list().coins.head.round shouldBe startRound + 2)
+        aliceWalletClient.list().coins should have length 1
 
         // The coin is expired but not yet archived.
         // They will be archived when no coins can be used as transfer input.
         // ie, in 2 round
-        assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000009, 0.00001))
-        assertInRange(aliceWallet.list().coins.head.effectiveAmount, (-0.000005, -0.000004))
+        assertInRange(aliceWalletClient.list().coins.head.accruedHoldingFee, (0.000009, 0.00001))
+        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (-0.000005, -0.000004))
       }
 
       // advance 2 more rounds.
@@ -316,45 +316,45 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsByOneTick
 
       clue("Check wallet after advancing to next 2 rounds") {
-        eventually()(aliceWallet.list().coins shouldBe empty)
+        eventually()(aliceWalletClient.list().coins shouldBe empty)
       }
     }
 
     "auto-expire locked coin" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
       clue("Alice taps 0.11001 coins") {
-        aliceWallet.tap(0.11001)
+        aliceWalletClient.tap(0.11001)
         eventually() {
-          aliceWallet.list().coins should have length 1
-          aliceWallet.list().lockedCoins should have length 0
+          aliceWalletClient.list().coins should have length 1
+          aliceWalletClient.list().lockedCoins should have length 0
         }
       }
-      val startRound = aliceWallet.list().coins.head.round
+      val startRound = aliceWalletClient.list().coins.head.round
 
       lockCoins(
         aliceValidatorBackend,
         aliceUserParty,
         aliceValidatorParty,
-        aliceWallet.list().coins,
+        aliceWalletClient.list().coins,
         0.000005,
         sv1ScanBackend,
         Duration.ofMinutes(1),
       )
 
       clue("Check wallet after locking coins") {
-        aliceWallet.list().coins should have length 1
-        eventually()(aliceWallet.list().lockedCoins should have length 1)
+        aliceWalletClient.list().coins should have length 1
+        eventually()(aliceWalletClient.list().lockedCoins should have length 1)
 
-        aliceWallet.list().coins.head.round shouldBe startRound
+        aliceWalletClient.list().coins.head.round shouldBe startRound
         // we have 0 holding fees because the coins were created in the same round we are currently in
-        aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().coins.head.effectiveAmount, (0, 1))
+        aliceWalletClient.list().coins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (0, 1))
 
-        aliceWallet.list().lockedCoins.head.round shouldBe startRound
-        aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveAmount, (0, 1))
+        aliceWalletClient.list().lockedCoins.head.round shouldBe startRound
+        aliceWalletClient.list().lockedCoins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWalletClient.list().lockedCoins.head.effectiveAmount, (0, 1))
       }
 
       // advance 2 rounds.
@@ -362,15 +362,21 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsByOneTick
 
       clue("Check wallet after advancing to next 2 round") {
-        eventually()(aliceWallet.list().lockedCoins.head.round shouldBe startRound + 2)
-        aliceWallet.list().lockedCoins should have length 1
+        eventually()(aliceWalletClient.list().lockedCoins.head.round shouldBe startRound + 2)
+        aliceWalletClient.list().lockedCoins should have length 1
 
         // The locked coin is expired but not yet archived.
         // It will be archived when no coins can be used as transfer input.
         // ie, in 2 rounds
-        aliceWallet.list().lockedCoins.head.round shouldBe startRound + 2
-        assertInRange(aliceWallet.list().lockedCoins.head.accruedHoldingFee, (0.000009, 0.00001))
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveAmount, (-0.000005, -0.000004))
+        aliceWalletClient.list().lockedCoins.head.round shouldBe startRound + 2
+        assertInRange(
+          aliceWalletClient.list().lockedCoins.head.accruedHoldingFee,
+          (0.000009, 0.00001),
+        )
+        assertInRange(
+          aliceWalletClient.list().lockedCoins.head.effectiveAmount,
+          (-0.000005, -0.000004),
+        )
       }
 
       // advance 2 more rounds.
@@ -378,41 +384,44 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsByOneTick
 
       clue("Check wallet after advancing to next 2 rounds") {
-        eventually()(aliceWallet.list().lockedCoins shouldBe empty)
+        eventually()(aliceWalletClient.list().lockedCoins shouldBe empty)
       }
     }
 
     "generate app rewards correctly" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       grantFeaturedAppRight(aliceValidatorWalletClient)
-      aliceWallet.tap(20.0)
+      aliceWalletClient.tap(20.0)
 
       eventually() {
         aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
       }
 
       clue("Check that no payment requests exist") {
-        aliceWallet.listAppPaymentRequests() shouldBe empty
+        aliceWalletClient.listAppPaymentRequests() shouldBe empty
       }
 
       actAndCheck(
         "Alice creates a self-payment request",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
         ),
       )(
         "Wait for request to be ingested",
-        _ => aliceWallet.listAppPaymentRequests() should have length 1,
+        _ => aliceWalletClient.listAppPaymentRequests() should have length 1,
       )
 
       actAndCheck(
         "Alice accepts the payment request",
-        aliceWallet
+        aliceWalletClient
           .listAppPaymentRequests()
-          .map(req => aliceWallet.acceptAppPaymentRequest(req.appPaymentRequest.contractId)),
-      )("Request no longer exists", _ => aliceWallet.listAppPaymentRequests() should have length 0)
+          .map(req => aliceWalletClient.acceptAppPaymentRequest(req.appPaymentRequest.contractId)),
+      )(
+        "Request no longer exists",
+        _ => aliceWalletClient.listAppPaymentRequests() should have length 0,
+      )
 
       actAndCheck(
         "Advance rounds until reward coupons are issued",
@@ -454,11 +463,17 @@ class WalletTimeBasedIntegrationTest
       val (_, bobUserParty, _, splitwellProviderParty, key, _) =
         initSplitwellTest()
 
-      aliceWallet.tap(350.0)
+      aliceWalletClient.tap(350.0)
 
       def transferAndCheckRewards(expectedAppRewardsRange: (BigDecimal, BigDecimal)) = {
         clue("Transfer some cc through splitwell") {
-          splitwellTransfer(aliceSplitwellClient, aliceWallet, bobUserParty, BigDecimal(100.0), key)
+          splitwellTransfer(
+            aliceSplitwellClient,
+            aliceWalletClient,
+            bobUserParty,
+            BigDecimal(100.0),
+            key,
+          )
         }
 
         val aliceValidatorStartBalance = aliceValidatorWalletClient.balance()
@@ -526,7 +541,7 @@ class WalletTimeBasedIntegrationTest
     }
 
     "generate rewards for subscriptions" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       val dirParty = clue(
         "Getting directory party ID (will fail if another test stopped the directory and failed before starting it again)"
@@ -551,10 +566,10 @@ class WalletTimeBasedIntegrationTest
       }
       bracket(
         clue("Alice obtains some coins and accepts the subscription") {
-          aliceWallet.tap(50.0)
-          aliceWallet.acceptSubscriptionRequest(subReqId)
+          aliceWalletClient.tap(50.0)
+          aliceWalletClient.acceptSubscriptionRequest(subReqId)
         },
-        cancelAllSubscriptions(aliceWallet, aliceValidatorBackend),
+        cancelAllSubscriptions(aliceWalletClient, aliceValidatorBackend),
       ) {
         clue("Getting Alice's new entry") {
           eventuallySucceeds() {
@@ -610,11 +625,11 @@ class WalletTimeBasedIntegrationTest
       val couponsBefore = aliceValidatorWalletClient.listAppRewardCoupons().length.toLong
 
       clue("Tap to get some coins") {
-        aliceWallet.tap(500.0)
+        aliceWalletClient.tap(500.0)
       }
 
       grantFeaturedAppRight(aliceValidatorWalletClient)
-      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 40.0)
+      p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
       eventually()({
         bobWalletClient.balance().unlockedQty should not be (BigDecimal(0.0))
         aliceValidatorWalletClient.listAppRewardCoupons() should have length (couponsBefore + 1)

@@ -55,10 +55,10 @@ class WalletIntegrationTest
   "A wallet" should {
 
     "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-      aliceWallet.tap(50.0)
-      checkWallet(aliceUserParty, aliceWallet, Seq((50, 50)))
+      aliceWalletClient.tap(50.0)
+      checkWallet(aliceUserParty, aliceWalletClient, Seq((50, 50)))
 
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
@@ -67,16 +67,16 @@ class WalletIntegrationTest
     }
 
     "skip empty batches in the treasury service" in { implicit env =>
-      val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
-      aliceWallet.tap(49)
+      val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(49)
       // create and reject request such that...
       val request =
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           alice,
         )._2
-      aliceWallet.rejectAppPaymentRequest(request)
+      aliceWalletClient.rejectAppPaymentRequest(request)
 
       // The action is completed before the batch is skipped, so we need an eventuallyLogs here
       // to make sure we wait for the message.
@@ -85,7 +85,7 @@ class WalletIntegrationTest
           def submitRequest() =
             try {
               // ... lookup on the payment request fails
-              aliceWallet.acceptAppPaymentRequest(request)
+              aliceWalletClient.acceptAppPaymentRequest(request)
             } catch {
               case _: CommandFailure =>
             }
@@ -105,13 +105,13 @@ class WalletIntegrationTest
 
     "concurrent coin-operations" should {
       "be batched" in { implicit env =>
-        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
-        aliceWallet.tap(50)
+        val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        aliceWalletClient.tap(50)
         val requestIds =
           (1 to 3).map(_ =>
             createSelfPaymentRequest(
               aliceValidatorBackend.participantClientWithAdminToken,
-              aliceWallet.config.ledgerApiUser,
+              aliceWalletClient.config.ledgerApiUser,
               alice,
             )._2
           )
@@ -121,7 +121,7 @@ class WalletIntegrationTest
         // tx 1: first command that arrived is immediately executed
         // tx 2: other commands that arrived after the first command was started are executed in one batch
         requestIds.foreach(requestId =>
-          Future(aliceWallet.acceptAppPaymentRequest(requestId)).discard
+          Future(aliceWalletClient.acceptAppPaymentRequest(requestId)).discard
         )
 
         // Wait until 2 transactions have been received
@@ -146,14 +146,14 @@ class WalletIntegrationTest
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
         val batchSize = aliceValidatorBackend.config.treasury.batchSize
-        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
-        aliceWallet.tap(1000)
+        val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        aliceWalletClient.tap(1000)
 
         val requests =
           (0 to batchSize + 1).map(_ =>
             createSelfPaymentRequest(
               aliceValidatorBackend.participantClientWithAdminToken,
-              aliceWallet.config.ledgerApiUser,
+              aliceWalletClient.config.ledgerApiUser,
               alice,
             )._2
           )
@@ -168,7 +168,9 @@ class WalletIntegrationTest
         val offsetBefore =
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api.transactions.end()
 
-        requests.foreach(request => Future(aliceWallet.acceptAppPaymentRequest(request)).discard)
+        requests.foreach(request =>
+          Future(aliceWalletClient.acceptAppPaymentRequest(request)).discard
+        )
 
         // 3 txs; usually (but not always):
         // tx 1: initial transfer
@@ -194,27 +196,27 @@ class WalletIntegrationTest
       }
 
       "filter stale actions from batches, and complete the rest" in { implicit env =>
-        val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-        aliceWallet.tap(1)
+        aliceWalletClient.tap(1)
         // creating payment request
         val request =
           createSelfPaymentRequest(
             aliceValidatorBackend.participantClientWithAdminToken,
-            aliceWallet.config.ledgerApiUser,
+            aliceWalletClient.config.ledgerApiUser,
             alice,
           )._2
         // Reject it so that we have a reference to an already archived app payment request
-        aliceWallet.rejectAppPaymentRequest(request)
+        aliceWalletClient.rejectAppPaymentRequest(request)
 
         loggerFactory.suppressErrors({
 
-          val tapsBefore = Range(0, 3).map(_ => Future(Try(aliceWallet.tap(10))))
+          val tapsBefore = Range(0, 3).map(_ => Future(Try(aliceWalletClient.tap(10))))
 
           // fails because we don't have a payment request - so removed from batch & error is reported back
-          val failedAcceptF = Future(Try(aliceWallet.acceptAppPaymentRequest(request)))
+          val failedAcceptF = Future(Try(aliceWalletClient.acceptAppPaymentRequest(request)))
 
-          val tapsAfter = Range(0, 3).map(_ => Future(Try(aliceWallet.tap(10))))
+          val tapsAfter = Range(0, 3).map(_ => Future(Try(aliceWalletClient.tap(10))))
 
           // Wait for all futures to complete
           val successfulTaps = (tapsBefore ++ tapsAfter).map(_.futureValue).count(_.isSuccess)
@@ -226,7 +228,7 @@ class WalletIntegrationTest
           ) withClue ("All taps should succeed")
 
           checkBalance(
-            aliceWallet,
+            aliceWalletClient,
             None,
             (1 + successfulTaps * 10 - 1, 1 + successfulTaps * 10),
             exactly(0),
@@ -248,12 +250,12 @@ class WalletIntegrationTest
       val invalidSignatureToken = JWT
         .create()
         .withAudience(aliceValidatorBackend.config.auth.audience)
-        .withSubject(aliceWallet.config.ledgerApiUser)
+        .withSubject(aliceWalletClient.config.ledgerApiUser)
         .sign(Algorithm.HMAC256("wrong-secret"))
 
       implicit val httpClient: HttpRequest => Future[HttpResponse] =
         request => Http().singleRequest(request = request)
-      val walletClient = WalletClient(aliceWallet.httpClientConfig.url.toString())
+      val walletClient = WalletClient(aliceWalletClient.httpClientConfig.url.toString())
 
       def tokenHeader(token: String) = List(Authorization(OAuth2BearerToken(token)))
 
@@ -278,12 +280,12 @@ class WalletIntegrationTest
       val invalidAudienceToken = JWT
         .create()
         .withAudience("wrong-audience")
-        .withSubject(aliceWallet.config.ledgerApiUser)
+        .withSubject(aliceWalletClient.config.ledgerApiUser)
         .sign(AuthUtil.testSignatureAlgorithm)
 
       implicit val httpClient: HttpRequest => Future[HttpResponse] =
         request => Http().singleRequest(request = request)
-      val walletClient = WalletClient(aliceWallet.httpClientConfig.url.toString())
+      val walletClient = WalletClient(aliceWalletClient.httpClientConfig.url.toString())
 
       def tokenHeader(token: String) = List(Authorization(OAuth2BearerToken(token)))
 
@@ -353,13 +355,13 @@ class WalletIntegrationTest
       val splitwellDomainId = aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
         DomainAlias.tryCreate("splitwell")
       )
-      val aliceParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
-      aliceWallet.tap(50)
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(50)
       val (_, (deliveryOfferId, requestId)) = actAndCheck(
         "Create payment request on private domain",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceParty,
           domainId = Some(splitwellDomainId),
         ),
@@ -376,7 +378,7 @@ class WalletIntegrationTest
         },
       )
       val request = eventually() {
-        inside(aliceWallet.listAppPaymentRequests()) { case Seq(req) =>
+        inside(aliceWalletClient.listAppPaymentRequests()) { case Seq(req) =>
           req
         }
       }
@@ -385,11 +387,11 @@ class WalletIntegrationTest
       request.deliveryOffer.contractId.contractId shouldBe deliveryOfferId.contractId
       actAndCheck(
         "Accept payment request",
-        aliceWallet.acceptAppPaymentRequest(request.appPaymentRequest.contractId),
+        aliceWalletClient.acceptAppPaymentRequest(request.appPaymentRequest.contractId),
       )(
         "wait for the accepted payment to appear",
         _ =>
-          inside(aliceWallet.listAcceptedAppPayments()) { case Seq(accepted) =>
+          inside(aliceWalletClient.listAcceptedAppPayments()) { case Seq(accepted) =>
             accepted
           },
       )

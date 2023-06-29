@@ -47,7 +47,7 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
     )
     val tapFuture =
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        Future(aliceWallet.tap(1))(env.executionContext),
+        Future(aliceWalletClient.tap(1))(env.executionContext),
         entries => {
           forAtLeast(
             1,
@@ -66,7 +66,7 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
 
     tapFuture.value // tap eventually succeeds
     eventually() { // ... and we see the coin it creates
-      aliceWallet.list().coins should have length 1
+      aliceWalletClient.list().coins should have length 1
     }
 
   }
@@ -83,7 +83,7 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
       "tapping on alice wallet should fail",
       _ => {
         loggerFactory.assertThrowsAndLogsSeq[CommandFailure](
-          aliceWallet.tap(2),
+          aliceWalletClient.tap(2),
           entries => {
             forAtLeast(1, entries)(
               _.message should include(
@@ -103,9 +103,9 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
     )(
       "tapping on alice wallet should work",
       _ => {
-        aliceWallet.tap(3)
+        aliceWalletClient.tap(3)
         eventually() {
-          aliceWallet.list().coins should have length 1
+          aliceWalletClient.list().coins should have length 1
         }
       },
     )

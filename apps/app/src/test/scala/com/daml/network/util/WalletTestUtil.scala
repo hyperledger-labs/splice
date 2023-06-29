@@ -174,7 +174,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   def onboardAliceAndBob()(implicit
       env: CNNodeTestConsoleEnvironment
   ): (PartyId, PartyId) = {
-    val alice = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+    val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     (alice, bob)
   }
@@ -869,7 +869,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
 
     participantClient.ledger_api_extensions.commands.submitWithResult(
-      userId = aliceWallet.config.ledgerApiUser,
+      userId = aliceWalletClient.config.ledgerApiUser,
       actAs = Seq(svcParty, receiver),
       readAs = Seq.empty,
       update = tc.coinRules.contract.contractId.exerciseCoinRules_Mint(

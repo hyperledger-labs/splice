@@ -95,19 +95,19 @@ class WalletFrontendIntegrationTest
 
       "allow a random user to onboard themselves and show updated balances after tapping" in {
         implicit env =>
-          val aliceDamlUser = aliceWallet.config.ledgerApiUser
+          val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
           onboardAndTapTest(aliceDamlUser)
       }
 
       "allow a random user with uppercase characters to onboard themselves, then tap and list coins" in {
         implicit env =>
-          val damlUser = "UPPERCASE" + aliceWallet.config.ledgerApiUser
+          val damlUser = "UPPERCASE" + aliceWalletClient.config.ledgerApiUser
           onboardAndTapTest(damlUser)
       }
 
       "fail when trying to use more than 10 decimal points" in { implicit env =>
-        val aliceDamlUser = aliceWallet.config.ledgerApiUser
-        onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
         val manyDigits = "1.19191919191919199191"
 
@@ -145,12 +145,12 @@ class WalletFrontendIntegrationTest
     "featured app rights" should {
 
       "show featured status and support self-featuring" in { implicit env =>
-        onboardWalletUser(aliceWallet, aliceValidatorBackend)
+        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
         withFrontEnd("alice") { implicit webDriver =>
           actAndCheck(
             "Alice logs in", {
-              browseToAliceWallet(aliceWallet.config.ledgerApiUser)
+              browseToAliceWallet(aliceWalletClient.config.ledgerApiUser)
             },
           )(
             "Alice is initially NOT featured",
@@ -190,15 +190,15 @@ class WalletFrontendIntegrationTest
 
     "show logged in directory name" in { implicit env =>
       // Create directory entry for alice
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val entryName = perTestCaseName("alice.cns")
-      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
+      val aliceParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
 
       createDirectoryEntry(
         aliceParty,
         aliceDirectoryClient,
         entryName,
-        aliceWallet,
+        aliceWalletClient,
       )
       eventuallySucceeds() {
         directoryBackend.lookupEntryByName(entryName)

@@ -115,7 +115,7 @@ class ScanTimeBasedIntegrationTest
     waitForWalletUser(bobValidatorWalletClient)
 
     clue("Tap to get some coins") {
-      aliceWallet.tap(500.0)
+      aliceWalletClient.tap(500.0)
       bobWalletClient.tap(500.0)
       aliceValidatorWalletClient.tap(100.0)
       bobValidatorWalletClient.tap(100.0)
@@ -127,16 +127,16 @@ class ScanTimeBasedIntegrationTest
       )
     })
     clue("Transfer some CC, to generate reward coupons")({
-      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 40.0)
-      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWallet, aliceUserParty, 100.0)
+      p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
+      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWalletClient, aliceUserParty, 100.0)
     })
     clue(
       "Advance a round and generate some more reward coupons - this time with alice's validator being featured"
     )({
       advanceRoundsByOneTick
       grantFeaturedAppRight(aliceValidatorWalletClient)
-      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 41.0)
-      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWallet, aliceUserParty, 101.0)
+      p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 41.0)
+      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWalletClient, aliceUserParty, 101.0)
     })
     clue("Advance 2 ticks for the first coupons to be collectable")({
       advanceRoundsByOneTick
@@ -150,7 +150,13 @@ class ScanTimeBasedIntegrationTest
         bobUserParty,
         10.0,
       )
-      p2pTransfer(bobValidatorBackend, bobValidatorWalletClient, aliceWallet, aliceUserParty, 10.0)
+      p2pTransfer(
+        bobValidatorBackend,
+        bobValidatorWalletClient,
+        aliceWalletClient,
+        aliceUserParty,
+        10.0,
+      )
     })
     clue("Some more transfers collect more rewards in round 5 (issued in round 1)")({
       advanceRoundsByOneTick
@@ -161,7 +167,13 @@ class ScanTimeBasedIntegrationTest
         bobUserParty,
         10.0,
       )
-      p2pTransfer(bobValidatorBackend, bobValidatorWalletClient, aliceWallet, aliceUserParty, 10.0)
+      p2pTransfer(
+        bobValidatorBackend,
+        bobValidatorWalletClient,
+        aliceWalletClient,
+        aliceUserParty,
+        10.0,
+      )
     })
     val baseRoundWithLatestData = clue(
       "Advance 1 more tick to make sure we capture at least one round change in the tx history"

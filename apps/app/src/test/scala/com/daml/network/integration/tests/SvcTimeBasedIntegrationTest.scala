@@ -40,7 +40,7 @@ class SvcTimeBasedIntegrationTest
   "coin rules cache should be invalidated when the coin rules change" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
     // tap once so the CoinRules are cached...
-    aliceWallet.tap(5)
+    aliceWalletClient.tap(5)
     val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
     clue("schedule a config change, so the coinrules change, invalidating the cache.") {
       val configSchedule =
@@ -60,7 +60,7 @@ class SvcTimeBasedIntegrationTest
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
       // tapping again..
-      aliceWallet.tap(5),
+      aliceWalletClient.tap(5),
       entries => {
         forAtLeast(
           1,

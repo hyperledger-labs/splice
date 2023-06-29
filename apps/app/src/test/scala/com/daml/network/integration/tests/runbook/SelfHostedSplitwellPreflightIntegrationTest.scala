@@ -113,7 +113,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       v("validatorApp").participantClient.dars
         .upload("./daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
 
-      val aliceUserName = aliceWallet.config.ledgerApiUser
+      val aliceUserName = aliceWalletClient.config.ledgerApiUser
 
       clue("Onboarding Alice") {
         v("validatorApp").onboardUser(aliceUserName)

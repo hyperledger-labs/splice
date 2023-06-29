@@ -47,15 +47,15 @@ class WalletTxLogIntegrationTest
   "A wallet" should {
 
     "handle tap" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue("Tap to get some coins") {
-        aliceWallet.tap(11.0)
-        aliceWallet.tap(12.0)
+        aliceWalletClient.tap(11.0)
+        aliceWalletClient.tap(12.0)
       }
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq(
           { case logEntry: walletLogEntry.BalanceChange =>
             logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
@@ -100,34 +100,34 @@ class WalletTxLogIntegrationTest
     }
 
     "handle collected self-payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue("Tap to get some coins") {
-        aliceWallet.tap(10.0)
-        aliceWallet.tap(20.0)
-        aliceWallet.tap(30.0)
+        aliceWalletClient.tap(10.0)
+        aliceWalletClient.tap(20.0)
+        aliceWalletClient.tap(30.0)
       }
 
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
         ),
       )(
         "Alice sees the self-payment request",
-        _ => aliceWallet.listAppPaymentRequests() should not be empty,
+        _ => aliceWalletClient.listAppPaymentRequests() should not be empty,
       )
 
       val (_, acceptedPayment) = actAndCheck(
         "Alice accepts the self-payment request",
-        aliceWallet.acceptAppPaymentRequest(reqCid),
+        aliceWalletClient.acceptAppPaymentRequest(reqCid),
       )(
         "Payment request disappears from list",
         acceptedPaymentCid => {
-          aliceWallet.listAppPaymentRequests() shouldBe empty
-          aliceWallet.listAcceptedAppPayments().find(_.contractId == acceptedPaymentCid).value
+          aliceWalletClient.listAppPaymentRequests() shouldBe empty
+          aliceWalletClient.listAcceptedAppPayments().find(_.contractId == acceptedPaymentCid).value
         },
       )
 
@@ -135,17 +135,17 @@ class WalletTxLogIntegrationTest
         "Alice collects self-payment request",
         collectAcceptedAppPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           Seq(aliceUserParty),
           acceptedPayment,
         ),
       )(
         "Accepted app payment disappears",
-        _ => aliceWallet.listAcceptedAppPayments() shouldBe empty,
+        _ => aliceWalletClient.listAcceptedAppPayments() shouldBe empty,
       )
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq(
           { case logEntry: walletLogEntry.Transfer =>
             // Second part of collecting the payment: Transferring the coin to ourselves.
@@ -190,49 +190,49 @@ class WalletTxLogIntegrationTest
     }
 
     "handle rejected self-payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue("Tap to get some coins") {
-        aliceWallet.tap(10.0)
-        aliceWallet.tap(20.0)
-        aliceWallet.tap(30.0)
+        aliceWalletClient.tap(10.0)
+        aliceWalletClient.tap(20.0)
+        aliceWalletClient.tap(30.0)
       }
 
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
         ),
       )(
         "Alice sees the self-payment request",
-        _ => aliceWallet.listAppPaymentRequests() should not be empty,
+        _ => aliceWalletClient.listAppPaymentRequests() should not be empty,
       )
 
       val (acceptedPaymentCid, _) = actAndCheck(
         "Alice accepts the self-payment request",
-        aliceWallet.acceptAppPaymentRequest(reqCid),
+        aliceWalletClient.acceptAppPaymentRequest(reqCid),
       )(
         "Payment request disappears from list",
-        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+        _ => aliceWalletClient.listAppPaymentRequests() shouldBe empty,
       )
 
       actAndCheck(
         "Alice rejects the self-payment request",
         rejectAcceptedAppPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           acceptedPaymentCid,
         ),
       )(
         "Accepted app payment disappears",
-        _ => aliceWallet.listAcceptedAppPayments() shouldBe empty,
+        _ => aliceWalletClient.listAcceptedAppPayments() shouldBe empty,
       )
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq(
           { case logEntry: walletLogEntry.BalanceChange =>
             // Rejecting the accepted self-payment request returned the 10CC locked coin.
@@ -271,7 +271,7 @@ class WalletTxLogIntegrationTest
     }
 
     "handle mixed currency payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val aliceValidatorUserParty = aliceValidatorBackend.getValidatorPartyId()
 
@@ -284,14 +284,14 @@ class WalletTxLogIntegrationTest
       val transferAmountTotalCC = transferAmountCC.add(transferAmountUSDinCC)
 
       clue("Tap to get some coins") {
-        aliceWallet.tap(100.0)
+        aliceWalletClient.tap(100.0)
       }
 
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates payment request",
         createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
             receiverAmount(charlieUserParty, transferAmountCC, walletCodegen.Currency.CC),
@@ -300,17 +300,17 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Alice sees the payment request",
-        _ => aliceWallet.listAppPaymentRequests() should not be empty,
+        _ => aliceWalletClient.listAppPaymentRequests() should not be empty,
       )
 
       val (_, acceptedPayment) = actAndCheck(
         "Alice accepts the payment request",
-        aliceWallet.acceptAppPaymentRequest(reqCid),
+        aliceWalletClient.acceptAppPaymentRequest(reqCid),
       )(
         "Payment request disappears from list",
         acceptedPaymentCid => {
-          aliceWallet.listAppPaymentRequests() shouldBe empty
-          aliceWallet.listAcceptedAppPayments().find(_.contractId == acceptedPaymentCid).value
+          aliceWalletClient.listAppPaymentRequests() shouldBe empty
+          aliceWalletClient.listAcceptedAppPayments().find(_.contractId == acceptedPaymentCid).value
         },
       )
 
@@ -318,17 +318,17 @@ class WalletTxLogIntegrationTest
         "Receivers collect the payment request",
         collectAcceptedAppPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           Seq(aliceUserParty, charlieUserParty, aliceValidatorUserParty),
           acceptedPayment,
         ),
       )(
         "Accepted app payment disappears",
-        _ => aliceWallet.listAcceptedAppPayments() shouldBe empty,
+        _ => aliceWalletClient.listAcceptedAppPayments() shouldBe empty,
       )
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq(
           { case logEntry: walletLogEntry.Transfer =>
             // Collecting the payment: Transferring the coin to the receivers
@@ -372,19 +372,19 @@ class WalletTxLogIntegrationTest
     }
 
     "handle completed transfer offers" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
       val transferAmount = 32.0
 
       clue("Alice taps some coins") {
-        aliceWallet.tap(100.0)
+        aliceWalletClient.tap(100.0)
       }
 
       val (offerCid, _) =
         actAndCheck(
           "Alice creates transfer offer",
-          aliceWallet.createTransferOffer(
+          aliceWalletClient.createTransferOffer(
             bobUserParty,
             transferAmount,
             "direct transfer test",
@@ -395,7 +395,7 @@ class WalletTxLogIntegrationTest
 
       actAndCheck("Bob accepts transfer offer", bobWalletClient.acceptTransferOffer(offerCid))(
         "Alice does not see transfer offer anymore",
-        _ => aliceWallet.listTransferOffers() shouldBe empty,
+        _ => aliceWalletClient.listTransferOffers() shouldBe empty,
       )
 
       // Both Alice and Bob see the same representation of the transfer
@@ -416,7 +416,7 @@ class WalletTxLogIntegrationTest
       }
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq(
           checkTransfer,
           { case logEntry: walletLogEntry.BalanceChange =>
@@ -463,9 +463,9 @@ class WalletTxLogIntegrationTest
         },
       )
 
-      actAndCheck("Alice taps some coins", aliceWallet.tap(100.0))(
+      actAndCheck("Alice taps some coins", aliceWalletClient.tap(100.0))(
         "Alice has some coins",
-        _ => aliceWallet.balance().unlockedQty should be > BigDecimal(0),
+        _ => aliceWalletClient.balance().unlockedQty should be > BigDecimal(0),
       )
 
       val (_, paymentRequest) = actAndCheck(
@@ -485,16 +485,16 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Alice sees the app payment request on the global domain",
-        _ => aliceWallet.listAppPaymentRequests().headOption.value,
+        _ => aliceWalletClient.listAppPaymentRequests().headOption.value,
       )
 
       actAndCheck(
         "Alice confirms the payment request",
-        aliceWallet.acceptAppPaymentRequest(paymentRequest.appPaymentRequest.contractId),
+        aliceWalletClient.acceptAppPaymentRequest(paymentRequest.appPaymentRequest.contractId),
       )(
         "All parties see new balances",
         _ => {
-          aliceWallet.listAcceptedAppPayments() shouldBe empty
+          aliceWalletClient.listAcceptedAppPayments() shouldBe empty
           bobWalletClient.balance().unlockedQty should be > BigDecimal(0.0)
           charlieWalletClient.balance().unlockedQty should be > BigDecimal(0.0)
         },
@@ -523,7 +523,7 @@ class WalletTxLogIntegrationTest
       }
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq[CheckTxHistoryFn](
           checkTransfer,
           { case logEntry: walletLogEntry.Transfer =>
@@ -558,18 +558,18 @@ class WalletTxLogIntegrationTest
     }
 
     "handle collected subscription payments" in { implicit env =>
-      val aliceUserId = aliceWallet.config.ledgerApiUser
+      val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val charlieUserId = charlieWalletClient.config.ledgerApiUser
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val subscriptionPrice = 42.0
 
       clue("Alice taps some coins") {
-        aliceWallet.tap(100.0)
+        aliceWalletClient.tap(100.0)
       }
 
       val (_, request) = actAndCheck(
@@ -586,17 +586,20 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Request appears in Alices' wallet",
-        _ => aliceWallet.listSubscriptionRequests().headOption.value,
+        _ => aliceWalletClient.listSubscriptionRequests().headOption.value,
       )
 
       val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
-        aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {
-          aliceWallet.listSubscriptionRequests() shouldBe empty
-          aliceWallet.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid).value
+          aliceWalletClient.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient
+            .listSubscriptionInitialPayments()
+            .find(_.contractId == initPaymentCid)
+            .value
         },
       )
 
@@ -617,7 +620,7 @@ class WalletTxLogIntegrationTest
       // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
       val paymentCid = clue("Alice's automation triggers the second payment") {
         eventually() {
-          inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
+          inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
             sub.subscription.payload should equal(
               request.subscriptionRequest.payload.subscriptionData
             )
@@ -666,7 +669,7 @@ class WalletTxLogIntegrationTest
       }
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq[CheckTxHistoryFn](
           checkSubscriptionPaymentTransfer(
             walletLogEntry.Transfer.SubscriptionPaymentCollected
@@ -720,18 +723,18 @@ class WalletTxLogIntegrationTest
     }
 
     "handle rejected subscription initial payments" in { implicit env =>
-      val aliceUserId = aliceWallet.config.ledgerApiUser
+      val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val charlieUserId = charlieWalletClient.config.ledgerApiUser
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val subscriptionPrice = 42.0
 
       clue("Alice taps some coins") {
-        aliceWallet.tap(100.0)
+        aliceWalletClient.tap(100.0)
       }
 
       val (_, request) = actAndCheck(
@@ -748,17 +751,17 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Request appears in Alices' wallet",
-        _ => aliceWallet.listSubscriptionRequests().headOption.value,
+        _ => aliceWalletClient.listSubscriptionRequests().headOption.value,
       )
 
       val (initialPaymentCid, _) = actAndCheck(
         "Alice accepts the request",
-        aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
         _ => {
           charlieWalletClient.listSubscriptionInitialPayments()
-          aliceWallet.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient.listSubscriptionRequests() shouldBe empty
         },
       )
 
@@ -772,11 +775,11 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Alice's balance reflects the returned locked coin",
-        _ => aliceWallet.balance().unlockedQty should be > (BigDecimal(100) - smallAmount),
+        _ => aliceWalletClient.balance().unlockedQty should be > (BigDecimal(100) - smallAmount),
       )
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.BalanceChange =>
             // Rejecting the accepted subscription request returned the 42CC locked coin.
@@ -810,18 +813,18 @@ class WalletTxLogIntegrationTest
     }
 
     "handle rejected subscription payments" in { implicit env =>
-      val aliceUserId = aliceWallet.config.ledgerApiUser
+      val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val charlieUserId = charlieWalletClient.config.ledgerApiUser
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val subscriptionPrice = BigDecimal(42.0)
 
       clue("Alice taps some coins") {
-        aliceWallet.tap(100.0)
+        aliceWalletClient.tap(100.0)
       }
 
       val (_, request) = actAndCheck(
@@ -838,17 +841,20 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Request appears in Alices' wallet",
-        _ => aliceWallet.listSubscriptionRequests().headOption.value,
+        _ => aliceWalletClient.listSubscriptionRequests().headOption.value,
       )
 
       val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
-        aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {
-          aliceWallet.listSubscriptionRequests() shouldBe empty
-          aliceWallet.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid).value
+          aliceWalletClient.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient
+            .listSubscriptionInitialPayments()
+            .find(_.contractId == initPaymentCid)
+            .value
         },
       )
 
@@ -869,7 +875,7 @@ class WalletTxLogIntegrationTest
       // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
       val paymentCid = clue("Alice's automation triggers the second payment") {
         eventually() {
-          inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
+          inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
             sub.subscription.payload should equal(
               request.subscriptionRequest.payload.subscriptionData
             )
@@ -893,7 +899,7 @@ class WalletTxLogIntegrationTest
       )(
         "Alice's balance reflects the returned locked coin",
         _ =>
-          aliceWallet.balance().unlockedQty should be > (BigDecimal(
+          aliceWalletClient.balance().unlockedQty should be > (BigDecimal(
             100
           ) - subscriptionPrice - smallAmount),
       )
@@ -920,7 +926,7 @@ class WalletTxLogIntegrationTest
       }
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: walletLogEntry.BalanceChange =>
             // Rejecting the second payment returned the 42CC locked coin.
@@ -975,14 +981,14 @@ class WalletTxLogIntegrationTest
     }
 
     "handle failed automation (direct transfer)" in { implicit env =>
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
 
       val (offerCid, _) =
         actAndCheck(
           "Alice creates transfer offer",
-          aliceWallet.createTransferOffer(
+          aliceWalletClient.createTransferOffer(
             bobUserParty,
             100.0,
             "direct transfer test",
@@ -1000,7 +1006,7 @@ class WalletTxLogIntegrationTest
       }
 
       checkTxHistory(
-        aliceWallet,
+        aliceWalletClient,
         Seq({ case logEntry: walletLogEntry.Notification =>
           logEntry.transactionSubtype shouldBe walletLogEntry.Notification.DirectTransferFailed
           logEntry.details should startWith("ITR_InsufficientFunds")
@@ -1014,36 +1020,36 @@ class WalletTxLogIntegrationTest
     }
 
     "handle failed automation (app payment)" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       val ((_, reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
-          aliceWallet.config.ledgerApiUser,
+          aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
         ),
       )(
         "Alice sees the self-payment request",
-        _ => aliceWallet.listAppPaymentRequests() should not be empty,
+        _ => aliceWalletClient.listAppPaymentRequests() should not be empty,
       )
 
       clue("Alice tries to accept the self-payment request and fails") {
         assertCommandFailsDueToInsufficientFunds(
-          aliceWallet.acceptAppPaymentRequest(reqCid)
+          aliceWalletClient.acceptAppPaymentRequest(reqCid)
         )
       }
 
       // Accepting an app payment fails synchronously and should not include a notification
-      checkTxHistory(aliceWallet, Seq.empty)
+      checkTxHistory(aliceWalletClient, Seq.empty)
     }
 
     "handle failed automation (subscription initial payment)" in { implicit env =>
-      val aliceUserId = aliceWallet.config.ledgerApiUser
+      val aliceUserId = aliceWalletClient.config.ledgerApiUser
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val (_, request) = actAndCheck(
@@ -1060,33 +1066,33 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Request appears in Alices' wallet",
-        _ => aliceWallet.listSubscriptionRequests().headOption.value,
+        _ => aliceWalletClient.listSubscriptionRequests().headOption.value,
       )
 
       clue("Alice tries to accept the request and fails") {
         assertCommandFailsDueToInsufficientFunds(
-          aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId)
+          aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId)
         )
       }
 
       // Accepting a subscription fails synchronously and should not include a notification
-      checkTxHistory(aliceWallet, Seq.empty)
+      checkTxHistory(aliceWalletClient, Seq.empty)
     }
 
     "handle failed automation (subscription payment)" in { implicit env =>
-      val aliceUserId = aliceWallet.config.ledgerApiUser
+      val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val charlieUserId = charlieWalletClient.config.ledgerApiUser
       val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
       val subscriptionPrice = BigDecimal(75.0)
 
       clue("Alice taps just enough coins for one payment") {
-        aliceWallet.tap(100.0)
+        aliceWalletClient.tap(100.0)
       }
 
       val (_, request) = actAndCheck(
@@ -1103,18 +1109,18 @@ class WalletTxLogIntegrationTest
         ),
       )(
         "Request appears in Alices' wallet",
-        _ => aliceWallet.listSubscriptionRequests().headOption.value,
+        _ => aliceWalletClient.listSubscriptionRequests().headOption.value,
       )
 
       val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
-        aliceWallet.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {
-          aliceWallet.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient.listSubscriptionRequests() shouldBe empty
           inside(
-            aliceWallet.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid)
+            aliceWalletClient.listSubscriptionInitialPayments().find(_.contractId == initPaymentCid)
           ) { case Some(initPayment) =>
             initPayment
           }
@@ -1147,7 +1153,7 @@ class WalletTxLogIntegrationTest
 
           clue("Failure notification appears") {
             eventually() {
-              aliceWallet.listTransactions(None, 100).size should be > 3
+              aliceWalletClient.listTransactions(None, 100).size should be > 3
             }
           }
 
@@ -1163,10 +1169,10 @@ class WalletTxLogIntegrationTest
             ),
           )(
             "Alice doesn't see any subscription",
-            _ => aliceWallet.listSubscriptions() shouldBe empty,
+            _ => aliceWalletClient.listSubscriptions() shouldBe empty,
           )
 
-          val entries = aliceWallet.listTransactions(None, 100)
+          val entries = aliceWalletClient.listTransactions(None, 100)
           val notifications = entries.dropRight(3)
           forExactly(notifications.size - 1, notifications) {
             case logEntry: walletLogEntry.Notification =>

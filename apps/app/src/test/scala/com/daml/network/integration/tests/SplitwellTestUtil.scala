@@ -55,7 +55,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
   ) = clue("setup splitwell users and contracts") {
 
     val group = "group1"
-    val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+    val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
     val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     // The provider's wallet is auto-onboarded, so we just need to wait for it to be ready

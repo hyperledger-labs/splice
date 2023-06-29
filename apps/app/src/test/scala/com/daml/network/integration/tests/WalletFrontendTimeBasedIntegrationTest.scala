@@ -34,7 +34,7 @@ class WalletFrontendTimeBasedIntegrationTest
 
     "onboard a new user" in { implicit env =>
       // Note: the test generates a unique user for each test
-      val newRandomUser = aliceWallet.config.ledgerApiUser
+      val newRandomUser = aliceWalletClient.config.ledgerApiUser
 
       withFrontEnd("alice") { implicit webDriver =>
         login(3000, newRandomUser)
@@ -59,8 +59,8 @@ class WalletFrontendTimeBasedIntegrationTest
     }
 
     "allow logging in & logging out" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
         actAndCheck(
@@ -72,15 +72,15 @@ class WalletFrontendTimeBasedIntegrationTest
     }
 
     "show user details after login" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
       val entryName = perTestCaseName("alice.cns")
 
       createDirectoryEntry(
         aliceParty,
         aliceDirectoryClient,
         entryName,
-        aliceWallet,
+        aliceWalletClient,
       )
 
       eventuallySucceeds() {
@@ -97,9 +97,9 @@ class WalletFrontendTimeBasedIntegrationTest
     }
 
     "show party id after login if user has no cns entry" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
 
-      val alicePartyId = onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
@@ -111,17 +111,17 @@ class WalletFrontendTimeBasedIntegrationTest
     }
 
     "show balances after login" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceParty = onboardWalletUser(aliceWallet, aliceValidatorBackend)
-      actAndCheck("alice taps", aliceWallet.tap(2))(
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      actAndCheck("alice taps", aliceWalletClient.tap(2))(
         "alice balance is bigger than 1",
-        _ => aliceWallet.balance().unlockedQty should be > BigDecimal(1.5),
+        _ => aliceWalletClient.balance().unlockedQty should be > BigDecimal(1.5),
       )
       lockCoins(
         aliceValidatorBackend,
         aliceParty,
         aliceValidatorBackend.getValidatorPartyId(),
-        aliceWallet.list().coins,
+        aliceWalletClient.list().coins,
         BigDecimal(1),
         sv1ScanBackend,
         Duration.ofDays(1),

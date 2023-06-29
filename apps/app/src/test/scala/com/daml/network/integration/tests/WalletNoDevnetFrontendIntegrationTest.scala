@@ -21,8 +21,8 @@ class WalletNoDevNetFrontendIntegrationTest
   "A wallet UI when isDevNet=false" should {
 
     "not show the dev-net buttons" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      onboardWalletUser(aliceWallet, aliceValidatorBackend)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(

@@ -24,11 +24,11 @@ class WalletSubscriptionsFrontendIntegrationTest
   "A wallet UI" should {
 
     "show and cancel subscriptions" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val alicePartyId = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice.cns")
       val directoryParty = createDirectoryEntryForDirectoryItself
-      createDirectoryEntry(alicePartyId, aliceDirectoryClient, aliceEntryName, aliceWallet)
+      createDirectoryEntry(alicePartyId, aliceDirectoryClient, aliceEntryName, aliceWalletClient)
       val directoryPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
       val selfSubscriptionDescription = "A recurring thing"
@@ -93,9 +93,9 @@ class WalletSubscriptionsFrontendIntegrationTest
     }
 
     "disable cancelling non-idle transactions" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val alicePartyId = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
-      aliceWallet.tap(50) // she'll need this for MakePayment to happen (but not collection)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val alicePartyId = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(50) // she'll need this for MakePayment to happen (but not collection)
       clue("Create subscription, the payment on which won't be collected") {
         createSelfSubscription(
           aliceValidatorBackend.participantClientWithAdminToken,
@@ -122,10 +122,10 @@ class WalletSubscriptionsFrontendIntegrationTest
     }
 
     "allow accepting subscriptions" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidatorBackend)
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName1 = perTestCaseName("alice.cns")
-      createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName1, aliceWallet)
+      createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName1, aliceWalletClient)
 
       val directoryParty = createDirectoryEntryForDirectoryItself
       val directoryPaymentDue = LocalDate.now().plusDays(90)

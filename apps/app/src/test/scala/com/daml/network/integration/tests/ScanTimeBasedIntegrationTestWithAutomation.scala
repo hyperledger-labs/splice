@@ -30,14 +30,14 @@ class ScanTimeBasedIntegrationTestWithAutomation
     waitForWalletUser(bobValidatorWalletClient)
 
     clue("Tap to get some coins") {
-      aliceWallet.tap(100.0)
+      aliceWalletClient.tap(100.0)
       aliceValidatorWalletClient.tap(100.0)
     }
 
     // First transfer
     actAndCheck(
       "Alice transfers some CC to Bob",
-      p2pTransfer(aliceValidatorBackend, aliceWallet, bobWalletClient, bobUserParty, 40.0),
+      p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0),
     )(
       "Bob has received the CC",
       _ => bobWalletClient.balance().unlockedQty should be > BigDecimal(39.0),
