@@ -7,7 +7,7 @@ spec:
   hosts:
   - "wallet.{{ (.Values.cluster).svNamespace }}.svc.{{ (.Values.cluster).hostname }}"
   gateways:
-  - cluster-ingress/http-gateway
+  - cluster-ingress/cn-http-gateway
   http:
   - match:
     - port: 443
@@ -37,7 +37,7 @@ spec:
   hosts:
   - "sv.{{ (.Values.cluster).svNamespace }}.svc.{{ (.Values.cluster).hostname }}"
   gateways:
-  - cluster-ingress/http-gateway
+  - cluster-ingress/cn-http-gateway
   http:
   - match:
     - port: 443
@@ -68,7 +68,7 @@ spec:
   hosts:
   - "scan.{{ (.Values.cluster).svNamespace }}.svc.{{ (.Values.cluster).hostname }}"
   gateways:
-  - cluster-ingress/http-gateway
+  - cluster-ingress/cn-http-gateway
   http:
   - match:
     - port: 443
@@ -99,7 +99,7 @@ spec:
   hosts:
     - "directory.{{ (.Values.cluster).svNamespace }}.svc.{{ (.Values.cluster).hostname }}"
   gateways:
-    - cluster-ingress/http-gateway
+    - cluster-ingress/cn-http-gateway
   http:
     - match:
         - port: 443

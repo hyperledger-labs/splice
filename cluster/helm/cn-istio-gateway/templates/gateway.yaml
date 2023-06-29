@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: http-gateway
+  name: cn-http-gateway
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
@@ -31,7 +31,7 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: apps-gateway
+  name: cn-apps-gateway
   namespace: {{ .Release.Namespace }}
 spec:
   selector:

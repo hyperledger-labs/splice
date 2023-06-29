@@ -96,7 +96,7 @@ export function installCometBftNode(
     founder: founder,
     istioVirtualService: {
       enabled: true,
-      gateway: 'cluster-ingress/apps-gateway',
+      gateway: 'cluster-ingress/cn-apps-gateway',
       port: nodeConfigs[nodename].istioPort,
     },
     node: nodeConfigs[nodename],

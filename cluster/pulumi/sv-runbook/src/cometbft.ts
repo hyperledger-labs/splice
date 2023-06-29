@@ -51,7 +51,7 @@ export function installCometBftNode(xns: ExactNamespace): void {
       },
       istioVirtualService: {
         enabled: true,
-        gateway: 'cluster-ingress/apps-gateway',
+        gateway: 'cluster-ingress/cn-apps-gateway',
         port: 26696,
       },
     }),

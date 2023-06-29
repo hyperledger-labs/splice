@@ -311,7 +311,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26696
         },
         "node": {

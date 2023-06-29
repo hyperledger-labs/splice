@@ -1923,7 +1923,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26656
         },
         "node": {
@@ -2663,7 +2663,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26666
         },
         "node": {
@@ -3305,7 +3305,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26676
         },
         "node": {
@@ -3947,7 +3947,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "istioVirtualService": {
           "enabled": true,
-          "gateway": "cluster-ingress/apps-gateway",
+          "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26686
         },
         "node": {

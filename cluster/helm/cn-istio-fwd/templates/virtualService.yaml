@@ -13,8 +13,8 @@ spec:
   - "splitwell.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
   - "wallet.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
   gateways:
-  - http-gateway
-  - apps-gateway
+  - cn-http-gateway
+  - cn-apps-gateway
   http:
   - match:
     - port: 443
