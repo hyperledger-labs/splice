@@ -1,8 +1,12 @@
 package com.daml.network.sv.admin.http
 
 import cats.data.OptionT
-import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
+import cats.syntax.applicative.*
+import cats.syntax.foldable.*
+import cats.syntax.option.*
+import com.daml.error.utils.ErrorDetails
 import com.daml.network.admin.http.HttpErrorHandler
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
@@ -30,6 +34,7 @@ import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract, GcpBucket}
+import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -525,16 +530,31 @@ class HttpSvHandler(
       .map(_.isDefined)
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def authorizeParticipantForHostingSvcParty(
       participantId: ParticipantId
   )(implicit tc: TraceContext) = {
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
+
+    def submitDummyTransaction(): Future[Unit] =
+      svStoreWithIngestion.connection.submitCommandsNoDedup(
+        Seq(svParty),
+        Seq.empty,
+        // The transaction here is arbitrary with the restriction that it should not have the SVC as a stakeholder.
+        // FeaturedAppRight just happens to be one of the simplest templates we have.
+        new FeaturedAppRight(svParty.toProtoPrimitive, svParty.toProtoPrimitive).createAnd
+          .exerciseArchive(new com.daml.network.codegen.java.da.internal.template.Archive())
+          .commands
+          .asScala
+          .toSeq,
+        globalDomain,
+      )
     for {
       // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
       // We need both locks here to prevent topology transactions and Daml transactions.
       // This is the only place that calls svcRulesLock.lock() so there is no chance of a deadlock.
-      authorizedAt <- withAcquiredGlobalLock(
+      acsBytes <- withAcquiredGlobalLock(
         s"Authorizing SVC party to participant $participantId", {
           for {
             _ <- svcRulesLock.lock()
@@ -547,6 +567,54 @@ class HttpSvHandler(
               globalDomain,
               participantId,
             )
+            // Acquiring the ACS snapshot is tricky due to two issues:
+            // 1. The snapshot can only be acquired at a "clean" timestamp which means there are no outstanding ACS commitments.
+            //    To ensure that the timestamp will eventually be clean we need to submit a transaction visible to the participant (submitDummyTransaction) and
+            //    retry the download afterwards. Note that due to the second issue, this transaction must not change contracts with SVC as the stakeholder.
+            // 2. Concurrent ACS pruning in Canton can prune the data for that timestamp. In that case, we need to fetch the data at a later timestamp.
+            //    Of course this is only safe if there have not been any relevant changes in between. We ensure this using the SvcRules lock.
+            //    In that case, we again need to submit a dummy transaction to ensure that the updated timestamp is clean.
+            _ <- submitDummyTransaction()
+            acsBytes <- {
+              var acsOffset = authorizedAt
+              retryProvider.retryForAutomation(
+                show"Download ACS snapshot for SVC at $authorizedAt",
+                participantAdminConnection
+                  .downloadAcsSnapshot(
+                    Set(svcParty),
+                    filterDomainId = globalDomain.toProtoPrimitive,
+                    timestamp = Some(acsOffset),
+                  )
+                  .recoverWith { case ex: StatusRuntimeException =>
+                    val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
+                    for {
+                      _ <- errorDetails.traverse_ {
+                        case ErrorDetails.ErrorInfoDetail("UNAVAILABLE_ACS_SNAPSHOT", metadata) =>
+                          metadata.get("prunedTimestamp") match {
+                            case None =>
+                              logger.warn(
+                                s"UNAVAILABLE_ACS_SNAPSHOT has no prunedTimestamp field: $metadata"
+                              )
+                              Future.unit
+                            case Some(timestamp) =>
+                              LfTimestamp.fromString(timestamp) match {
+                                case Left(err) =>
+                                  logger.warn(
+                                    s"Failed to convert pruned timestamp from error details into an LfTimestamp: $err"
+                                  )
+                                  Future.unit
+                                case Right(timestamp) =>
+                                  acsOffset = timestamp.toInstant
+                                  submitDummyTransaction()
+                              }
+                          }
+                        case _ => Future.unit
+                      }
+                    } yield throw ex
+                  },
+                logger,
+              )
+            }
             _ = logger
               .info(
                 s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
@@ -563,17 +631,8 @@ class HttpSvHandler(
               participantId.uid.namespace,
               ourParticipant.uid.namespace.fingerprint,
             )
-          } yield authorizedAt
+          } yield acsBytes
         },
-      )
-      acsBytes <- retryProvider.retryForAutomation(
-        show"Download ACS snapshot for SVC at $authorizedAt",
-        participantAdminConnection.downloadAcsSnapshot(
-          Set(svcParty),
-          filterDomainId = globalDomain.toProtoPrimitive,
-          timestamp = Some(authorizedAt),
-        ),
-        logger,
       )
       // TODO(M3-57) consider if a more space-efficient encoding is necessary
       encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
