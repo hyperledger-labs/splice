@@ -1,52 +1,68 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, TitledTable } from 'common-frontend';
+import { AmountDisplay, ErrorDisplay, Loading, TitledTable } from 'common-frontend';
+import { useGetTopValidatorsByPurchasedTraffic } from 'common-frontend/scan-api';
 
-import { TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
 export const DomainFeesLeaderboardTable: React.FC = () => {
-  const validators = new Array(20).fill(1).map((_, i) => {
-    return {
-      name: 'SVS.cns',
-      numPurchases: 10,
-      totalTrafficPurchased: 123456,
-      totalCcSpent: BigNumber(12345.12345),
-      totalUsdSpent: BigNumber(12345.12345),
-      lastPurchasedInRound: 4,
-    };
-  });
-  return (
-    <TitledTable title="Domain Fees Leaderboard">
-      <TableHead>
-        <TableRow>
-          <TableCell>Name</TableCell>
-          <TableCell align="right">Number of Purchases</TableCell>
-          <TableCell align="right">Total Traffic Purchased</TableCell>
-          <TableCell align="right">Total CC Spent</TableCell>
-          <TableCell align="right">Last Purchased In Round</TableCell>
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {validators.map((app, index) => {
-          return <ValidatorRow key={'app-' + index} app={app} />;
-        })}
-      </TableBody>
-    </TitledTable>
-  );
+  const topValidatorsQuery = useGetTopValidatorsByPurchasedTraffic();
+
+  switch (topValidatorsQuery.status) {
+    case 'loading':
+      return <Loading />;
+    case 'error':
+      return <ErrorDisplay message={'Could not retrieve validator leaderboard'} />;
+    case 'success':
+      const topValidators = topValidatorsQuery.data.validatorsByPurchasedTraffic.map(validator => ({
+        name: validator.validator,
+        numPurchases: validator.numPurchases,
+        totalTrafficPurchased: validator.totalTrafficPurchased,
+        totalCcSpent: BigNumber(validator.totalCcSpent),
+        lastPurchasedInRound: validator.lastPurchasedInRound,
+      }));
+
+      return topValidators.length === 0 ? (
+        <Stack spacing={0} alignItems={'center'} marginTop={3}>
+          <Typography variant="h6" fontWeight="bold">
+            No Validator Activity Yet
+          </Typography>
+        </Stack>
+      ) : (
+        <TitledTable title="Domain Fees Leaderboard">
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell align="right">Number of Purchases</TableCell>
+              <TableCell align="right">Total Traffic Purchased</TableCell>
+              <TableCell align="right">Total CC Spent</TableCell>
+              <TableCell align="right">Last Purchased In Round</TableCell>
+            </TableRow>
+          </TableHead>
+
+          <TableBody>
+            {topValidators.map(validator => {
+              return <ValidatorRow key={validator.name} validator={validator} />;
+            })}
+          </TableBody>
+        </TitledTable>
+      );
+  }
 };
 
 export default DomainFeesLeaderboardTable;
 
 const ValidatorRow: React.FC<{
-  app: {
+  validator: {
     name: string;
     numPurchases: number;
     totalTrafficPurchased: number;
     totalCcSpent: BigNumber;
     lastPurchasedInRound: number;
   };
-}> = ({ app }) => {
-  const { name, numPurchases, totalTrafficPurchased, totalCcSpent, lastPurchasedInRound } = app;
+}> = ({ validator }) => {
+  const { name, numPurchases, totalTrafficPurchased, totalCcSpent, lastPurchasedInRound } =
+    validator;
   return (
     <TableRow>
       <TableCell>{name}</TableCell>
