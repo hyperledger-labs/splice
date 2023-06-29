@@ -377,6 +377,14 @@ class FoundingNodeInitializer(
           svcRulesConfig.initialTrafficGrant,
           participantId.uid.namespace.fingerprint,
         )
+        // TODO(#6256): Remove this and make SvApp pay for mediator traffic as well
+        mediatorId <- localDomainNode.mediatorAdminConnection.getMediatorId
+        _ <- participantAdminConnection.ensureTrafficControlState(
+          domainId,
+          mediatorId,
+          Long.MaxValue,
+          participantId.uid.namespace.fingerprint,
+        )
         founderDomainNodes <- SvUtil
           .getFounderDomainNodeConfig(cometBftNode)
         _ <- svcStore.lookupSvcRulesWithOffset().flatMap {

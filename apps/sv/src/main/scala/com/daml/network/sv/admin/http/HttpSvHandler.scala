@@ -686,6 +686,20 @@ class HttpSvHandler(
       )
     } yield ()
 
+  // TODO(#6256): Remove this and make SvApp pay for mediator traffic as well
+  private def grantMediatorUnlimitedTraffic(
+      mediatorId: MediatorId
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    for {
+      ourParticipant <- participantAdminConnection.getParticipantId()
+      _ <- participantAdminConnection.ensureTrafficControlState(
+        globalDomain,
+        mediatorId,
+        Long.MaxValue,
+        ourParticipant.uid.namespace.fingerprint,
+      )
+    } yield ()
+
   // TODO(#5196) Replace this in favor of a Daml based flow. Note that for now
   // there is no authorization check here. The daml flow will naturally give us one
   // so implementing it here seems like wasted effort.
@@ -694,6 +708,7 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext) = {
     for {
       _ <- addMediatorToTopologyState(mediatorId)
+      _ <- grantMediatorUnlimitedTraffic(mediatorId)
     } yield ()
   }
 
