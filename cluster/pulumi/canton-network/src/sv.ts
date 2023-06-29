@@ -119,55 +119,60 @@ export type GcpBucketConfig = {
   jsonCredentials: Output<string>;
 };
 
-export async function installSvNode(
-  auth0Client: Auth0Client,
-  nodename: string,
-  onboardingName: string,
-  validatorWalletUser: string,
-  onboarding: SvOnboarding,
-  withDomainFees: boolean,
-  approvedSvIdentities: ApprovedSvIdentity[],
-  withScan = false,
-  withDirectoryBackend = false,
-  expectedValidatorOnboardings: ValidatorOnboarding[] = [],
-  isDevNet?: boolean,
-  acsStoreDump?: GcpBucketConfig
-): Promise<pulumi.Resource> {
-  const xns = exactNamespace(nodename);
+export type SvConfig = {
+  auth0Client: Auth0Client;
+  nodename: string;
+  onboardingName: string;
+  validatorWalletUser: string;
+  onboarding: SvOnboarding;
+  withDomainFees: boolean;
+  approvedSvIdentities: ApprovedSvIdentity[];
+  withScan: boolean;
+  withDirectoryBackend: boolean;
+  expectedValidatorOnboardings: ValidatorOnboarding[];
+  isDevNet: boolean;
+  acsStoreDump?: GcpBucketConfig;
+  withDomainNode: boolean;
+};
+
+export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> {
+  const xns = exactNamespace(config.nodename);
 
   const auth0BackendSecrets: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = [
-    await installAuth0Secret(auth0Client, xns, 'sv', nodename),
-    await installAuth0Secret(auth0Client, xns, 'validator', 'validator'),
+    await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
+    await installAuth0Secret(config.auth0Client, xns, 'validator', 'validator'),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
-    await installAuth0UISecret(auth0Client, xns, 'sv', nodename),
-    await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
-    await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
+    await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
+    await installAuth0UISecret(config.auth0Client, xns, 'wallet', 'wallet'),
+    await installAuth0UISecret(config.auth0Client, xns, 'directory', 'directory'),
   ];
 
   const dependsOn: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = auth0BackendSecrets
     .concat(auth0UISecrets)
     .concat(
-      onboarding.type == 'join-with-key'
-        ? [installSvKeySecret(xns, onboarding.publicKey, onboarding.privateKey)]
+      config.onboarding.type == 'join-with-key'
+        ? [installSvKeySecret(xns, config.onboarding.publicKey, config.onboarding.privateKey)]
         : []
     )
     .concat(
-      onboarding.type == 'join-with-key' && onboarding.sponsorRelease
-        ? [onboarding.sponsorRelease]
+      config.onboarding.type == 'join-with-key' && config.onboarding.sponsorRelease
+        ? [config.onboarding.sponsorRelease]
         : []
     )
     .concat(
-      expectedValidatorOnboardings.map(onboarding =>
+      config.expectedValidatorOnboardings.map(onboarding =>
         installValidatorOnboardingSecret(xns, onboarding)
       )
     )
-    .concat(acsStoreDump ? [installGcpBucketSecret(xns, acsStoreDump)] : []);
+    .concat(config.acsStoreDump ? [installGcpBucketSecret(xns, config.acsStoreDump)] : []);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
-  const domain = installGlobalDomain(xns, 'global-domain', postgresDb, withDomainFees);
+  const domain = config.withDomainNode
+    ? installGlobalDomain(xns, 'global-domain', postgresDb, config.withDomainFees)
+    : undefined;
 
   const participant = installParticipant(
     xns,
@@ -187,15 +192,15 @@ export async function installSvNode(
     [auth0UserNameEnvVar('sv')],
     auth0BackendSecrets
   );
-  const cometbft = installCometBftNode(xns, nodename, onboardingName);
+  const cometbft = installCometBftNode(xns, config.nodename, config.onboardingName);
 
   const svValues = {
-    onboardingType: onboarding.type,
-    onboardingName,
+    onboardingType: config.onboarding.type,
+    onboardingName: config.onboardingName,
     cometBFT: {
       enabled: true,
       automationEnabled: false,
-      connectionUri: `http://cometbft-${nodename}-cometbft-rpc:26657`,
+      connectionUri: `http://cometbft-${config.nodename}-cometbft-rpc:26657`,
     },
     globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
     foundingSvApiUrl: 'http://sv-app.sv-1:5014',
@@ -203,8 +208,8 @@ export async function installSvNode(
       // defaults for ports and address are fine,
       // we need to include a dummy value though
       // because helm does not distinguish between an empty object and unset.
-      { enable: true },
-    expectedValidatorOnboardings: expectedValidatorOnboardings.map(onboarding => ({
+      { enable: config.withDomainNode },
+    expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,
       secretFrom: {
         secretKeyRef: {
@@ -214,39 +219,39 @@ export async function installSvNode(
         },
       },
     })),
-    isDevNet,
-    approvedSvIdentities,
-    acsStoreDump: acsStoreDump
+    isDevNet: config.isDevNet,
+    approvedSvIdentities: config.approvedSvIdentities,
+    acsStoreDump: config.acsStoreDump
       ? {
-          projectId: acsStoreDump.projectId,
-          bucketName: acsStoreDump.bucketName,
+          projectId: config.acsStoreDump.projectId,
+          bucketName: config.acsStoreDump.bucketName,
           secretName: gcpBucketSecretName,
         }
       : undefined,
   } as ChartValues;
 
-  if (onboarding.type == 'join-with-key') {
+  if (config.onboarding.type == 'join-with-key') {
     svValues.joinWithKeyOnboarding = {
-      sponsorApiUrl: onboarding.sponsorApiUrl,
+      sponsorApiUrl: config.onboarding.sponsorApiUrl,
     };
   }
 
   const svApp = installCNHelmChart(
     xns,
-    nodename + '-sv-app',
+    config.nodename + '-sv-app',
     'cn-sv-node',
     svValues,
-    dependsOn.concat([participant, domain, cometbft])
+    dependsOn.concat([participant, cometbft].concat(domain ? [domain] : []))
   );
 
-  if (onboarding.type == 'found-collective' && !withScan) {
+  if (config.onboarding.type == 'found-collective' && !config.withScan) {
     console.error('Founding node always needs to have CC Scan enabled');
     process.exit(1);
   }
 
-  if (withScan) {
+  if (config.withScan) {
     const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', {}, [svApp]);
-    if (onboarding.type == 'found-collective') {
+    if (config.onboarding.type == 'found-collective') {
       installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', {}, [scanApp]);
     }
   }
@@ -258,10 +263,10 @@ export async function installSvNode(
     {
       additionalUsers: [],
       appDars: [],
-      validatorWalletUser,
+      validatorWalletUser: config.validatorWalletUser,
       globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
       foundingSvApiUrl: 'http://sv-app.sv-1:5014',
-      topup: withDomainFees
+      topup: config.withDomainFees
         ? {
             enabled: true,
             targetThroughput: domainFeesConfig.targetThroughput,
@@ -277,8 +282,8 @@ export async function installSvNode(
     'ingress-sv-' + xns.logicalName,
     'cn-cluster-ingress-sv',
     {
-      withScan: withScan,
-      withDirectoryBackend: withDirectoryBackend,
+      withScan: config.withScan,
+      withDirectoryBackend: config.withDirectoryBackend,
       cluster: {
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: xns.logicalName,

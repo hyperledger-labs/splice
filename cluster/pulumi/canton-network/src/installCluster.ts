@@ -18,16 +18,16 @@ if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
-const singleSv = (process.env.SINGLE_SV !== undefined && process.env.SINGLE_SV !== '') || !isDevNet;
-if (singleSv) {
-  console.error('Launching with a single SV');
+const doubleSv = (process.env.DOUBLE_SV !== undefined && process.env.DOUBLE_SV !== '') || !isDevNet;
+if (doubleSv) {
+  console.error('Launching with a double SV');
 }
 
 const withDomainFees =
   (process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '') || !isDevNet;
-if (withDomainFees && !singleSv) {
+if (withDomainFees && !doubleSv) {
   console.error(
-    `Currently, you cannot enable domain fees with more than one SV, please also set SINGLE_SV to 1 and rerun (${singleSv})`
+    `Currently, you cannot enable domain fees with more than one SV, please also set DOUBLE_SV to 1 and rerun (${doubleSv})`
   );
   exit(1);
 }
@@ -65,17 +65,17 @@ const nonDevNetApprovedSvIdentities = [
       'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw==',
   },
   {
-    name: 'damlHub',
+    name: isDevNet ? 'Canton-Foundation-2' : 'Digital-Asset',
     publicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==',
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==',
   },
 ];
 
-const sv234ApprovedSvIdentities = [
+const sv34ApprovedSvIdentities = [
   {
-    name: 'Canton-Foundation-2',
+    name: 'damlHub',
     publicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==',
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==',
   },
   {
     name: 'Canton-Foundation-3',
@@ -110,7 +110,7 @@ const additionalDevNetApprovedSvIdentities = [
 
 const approvedSvIdentities = nonDevNetApprovedSvIdentities
   .concat(isDevNet ? additionalDevNetApprovedSvIdentities : [])
-  .concat(singleSv ? [] : sv234ApprovedSvIdentities);
+  .concat(doubleSv ? [] : sv34ApprovedSvIdentities);
 
 function joinViaSv1(
   sv1: pulumi.Resource,
@@ -150,56 +150,70 @@ function configureGcpBucketKey(): Key {
 }
 
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
-  const sv1 = await installSvNode(
+  const sv1 = await installSvNode({
     auth0Client,
-    'sv-1',
-    'Canton-Foundation-1',
-    'auth0|64529b128448ded6aa68048f',
-    { type: 'found-collective' },
+    nodename: 'sv-1',
+    onboardingName: isDevNet ? 'Canton-Foundation-1' : 'Canton-Foundation',
+    validatorWalletUser: 'auth0|64529b128448ded6aa68048f',
+    onboarding: { type: 'found-collective' },
     withDomainFees,
     approvedSvIdentities,
-    true,
-    true,
-    [splitwellOnboarding, validator1Onboarding],
+    withScan: true,
+    withDirectoryBackend: true,
+    expectedValidatorOnboardings: [splitwellOnboarding, validator1Onboarding],
     isDevNet,
-    isDevNet
+    acsStoreDump: isDevNet
       ? undefined
       : {
           projectId: 'da-cn-devnet',
           bucketName: 'da-cn-data-dumps',
           jsonCredentials: configureGcpBucketKey().privateKey,
-        }
-  );
-  if (!singleSv) {
-    await installSvNode(
+        },
+    withDomainNode: true,
+  });
+  await installSvNode({
+    auth0Client,
+    nodename: 'sv-2',
+    onboardingName: isDevNet ? 'Canton-Foundation-2' : 'Digital-Asset',
+    validatorWalletUser: 'auth0|64529b6852dd694167351045',
+    onboarding: joinViaSv1(sv1, SV2_KEY),
+    withDomainFees,
+    approvedSvIdentities,
+    withScan: true,
+    withDirectoryBackend: false,
+    expectedValidatorOnboardings: [],
+    isDevNet,
+    withDomainNode: isDevNet,
+  });
+  if (!doubleSv) {
+    await installSvNode({
       auth0Client,
-      'sv-2',
-      'Canton-Foundation-2',
-      'auth0|64529b6852dd694167351045',
-      joinViaSv1(sv1, SV2_KEY),
+      nodename: 'sv-3',
+      onboardingName: 'Canton-Foundation-3',
+      validatorWalletUser: 'auth0|64529bb10c1aee4f2c819218',
+      onboarding: joinViaSv1(sv1, SV3_KEY),
       withDomainFees,
       approvedSvIdentities,
-      true,
-      false
-    );
-    await installSvNode(
+      withScan: false,
+      withDirectoryBackend: false,
+      expectedValidatorOnboardings: [],
+      isDevNet,
+      withDomainNode: isDevNet,
+    });
+    await installSvNode({
       auth0Client,
-      'sv-3',
-      'Canton-Foundation-3',
-      'auth0|64529bb10c1aee4f2c819218',
-      joinViaSv1(sv1, SV3_KEY),
+      nodename: 'sv-4',
+      onboardingName: 'Canton-Foundation-4',
+      validatorWalletUser: 'auth0|64529bc58d30358eacae5611',
+      onboarding: joinViaSv1(sv1, SV4_KEY),
       withDomainFees,
-      approvedSvIdentities
-    );
-    await installSvNode(
-      auth0Client,
-      'sv-4',
-      'Canton-Foundation-4',
-      'auth0|64529bc58d30358eacae5611',
-      joinViaSv1(sv1, SV4_KEY),
-      withDomainFees,
-      approvedSvIdentities
-    );
+      approvedSvIdentities,
+      withScan: false,
+      withDirectoryBackend: false,
+      expectedValidatorOnboardings: [],
+      isDevNet,
+      withDomainNode: isDevNet,
+    });
   }
 
   const validator = await installValidator(

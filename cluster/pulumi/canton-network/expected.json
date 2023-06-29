@@ -1991,8 +1991,8 @@
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw=="
           },
           {
-            "name": "damlHub",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA=="
+            "name": "Canton-Foundation-2",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
           },
           {
             "name": "DA-Test-Node",
@@ -2007,8 +2007,8 @@
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESxcNzqTXgL+ocVESayKc4nddN6taa/uFI9ca7GGIJs1Ns3yKFDDu6UCDKH+qlXA0+CcmyW6ytvZ9WPVeD7JsMw=="
           },
           {
-            "name": "Canton-Foundation-2",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
+            "name": "damlHub",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA=="
           },
           {
             "name": "Canton-Foundation-3",
@@ -2732,8 +2732,8 @@
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw=="
           },
           {
-            "name": "damlHub",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA=="
+            "name": "Canton-Foundation-2",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
           },
           {
             "name": "DA-Test-Node",
@@ -2748,8 +2748,8 @@
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESxcNzqTXgL+ocVESayKc4nddN6taa/uFI9ca7GGIJs1Ns3yKFDDu6UCDKH+qlXA0+CcmyW6ytvZ9WPVeD7JsMw=="
           },
           {
-            "name": "Canton-Foundation-2",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
+            "name": "damlHub",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA=="
           },
           {
             "name": "Canton-Foundation-3",
@@ -2822,6 +2822,7 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
@@ -3379,8 +3380,8 @@
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw=="
           },
           {
-            "name": "damlHub",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA=="
+            "name": "Canton-Foundation-2",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
           },
           {
             "name": "DA-Test-Node",
@@ -3395,8 +3396,8 @@
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESxcNzqTXgL+ocVESayKc4nddN6taa/uFI9ca7GGIJs1Ns3yKFDDu6UCDKH+qlXA0+CcmyW6ytvZ9WPVeD7JsMw=="
           },
           {
-            "name": "Canton-Foundation-2",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
+            "name": "damlHub",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA=="
           },
           {
             "name": "Canton-Foundation-3",
@@ -3469,6 +3470,7 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
@@ -4026,8 +4028,8 @@
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw=="
           },
           {
-            "name": "damlHub",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA=="
+            "name": "Canton-Foundation-2",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
           },
           {
             "name": "DA-Test-Node",
@@ -4042,8 +4044,8 @@
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESxcNzqTXgL+ocVESayKc4nddN6taa/uFI9ca7GGIJs1Ns3yKFDDu6UCDKH+qlXA0+CcmyW6ytvZ9WPVeD7JsMw=="
           },
           {
-            "name": "Canton-Foundation-2",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
+            "name": "damlHub",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA=="
           },
           {
             "name": "Canton-Foundation-3",
@@ -4116,6 +4118,7 @@
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },

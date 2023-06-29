@@ -16,7 +16,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.nio.file.Paths
 
-class NonDevNetPreflightIntegrationTest
+abstract class SvNonDevNetPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with SvUiIntegrationTestUtil
     with FrontendLoginUtil {
@@ -27,25 +27,25 @@ class NonDevNetPreflightIntegrationTest
       this.getClass.getSimpleName()
     )
 
-  override def sv1Client(implicit env: CNNodeTestConsoleEnvironment) = svcl("sv1")
-  def sv1ValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc("sv1Validator")
-  def validator1Client(implicit env: CNNodeTestConsoleEnvironment) = vc("validator1")
-  def sv1ScanClient(implicit env: CNNodeTestConsoleEnvironment) = scancl("sv1Scan")
-  def sv1DirectoryClient(implicit env: CNNodeTestConsoleEnvironment) = rdp("sv1Directory")
-  def splitwellClient(implicit env: CNNodeTestConsoleEnvironment) = rsw("splitwell")
-  def splitwellValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc(
-    "splitwellValidator"
-  )
+  protected def svNumber: Int
+  protected val svName = s"sv$svNumber"
+  protected val svUrlPrefix = s"sv-$svNumber"
 
-  "SVs 1 reports devnet=false" in { implicit env =>
-    sv1Client.getSvcInfo().svcRules.payload.isDevNet shouldBe false
+  protected def svClient(implicit env: CNNodeTestConsoleEnvironment) = svcl(svName)
+  protected def svValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc(
+    s"${svName}Validator"
+  )
+  protected def svScanClient(implicit env: CNNodeTestConsoleEnvironment) = scancl(s"${svName}Scan")
+
+  "SV reports devnet=false" in { implicit env =>
+    svClient.getSvcInfo().svcRules.payload.isDevNet shouldBe false
   }
 
-  val svUsername = s"admin@sv1.com"
+  val svUsername = s"admin@${svName}.com"
   val svPassword = sys.env(s"SV_WEB_UI_PASSWORD")
 
-  "SV1 can login to the SV UI" in { _ =>
-    val svUiUrl = s"https://sv.sv-1.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  "SV can login to the SV UI" in { _ =>
+    val svUiUrl = s"https://sv.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
     withFrontEnd("sv") { implicit webDriver =>
       completeAuth0LoginWithAuthorization(
@@ -57,8 +57,8 @@ class NonDevNetPreflightIntegrationTest
     }
   }
 
-  "SV1 can login to the directory UI" in { _ =>
-    val directoryUrl = s"https://directory.sv-1.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+  "SV can login to the directory UI" in { _ =>
+    val directoryUrl = s"https://directory.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
 
     withFrontEnd("sv") { implicit webDriver =>
       completeAuth0LoginWithAuthorization(
@@ -70,8 +70,8 @@ class NonDevNetPreflightIntegrationTest
     }
   }
 
-  "SV1 can login to the wallet UI" in { _ =>
-    val walletUrl = s"https://wallet.sv-1.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  "SV can login to the wallet UI" in { _ =>
+    val walletUrl = s"https://wallet.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
     withFrontEnd("sv") { implicit webDriver =>
       completeAuth0LoginWithAuthorization(
@@ -84,7 +84,7 @@ class NonDevNetPreflightIntegrationTest
   }
 
   "The Scan UI is working" in { _ =>
-    val scanUrl = s"https://scan.sv-1.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+    val scanUrl = s"https://scan.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
 
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
@@ -97,37 +97,51 @@ class NonDevNetPreflightIntegrationTest
     }
   }
 
-  "Check readiness of applications" in { implicit env =>
+  "Check readiness of SV applications" in { implicit env =>
     eventually() {
       forAll(
         Seq(
-          sv1Client,
-          sv1ValidatorClient,
-          sv1ScanClient,
-          sv1DirectoryClient,
-          validator1Client,
-          splitwellValidatorClient,
+          svClient,
+          svValidatorClient,
+          svScanClient,
         )
       )(_.httpReady shouldBe true)
-      splitwellClient.health.status.isActive shouldBe Some(true)
     }
   }
 
-  "Check latest open mining round from SV1 scan-app has been open for < 1.3 ticks" in {
+  "Check latest open mining round from SV scan-app has been open for < 1.3 ticks" in {
     implicit env =>
-      val round = sv1ScanClient.getLatestOpenMiningRound(env.environment.clock.now).contract.payload
+      val round = svScanClient.getLatestOpenMiningRound(env.environment.clock.now).contract.payload
       checkRoundWithinTickDuration(round.opensAt, 1.3)
   }
 
-  "Check latest open mining round from SV1 sv-app has been open for < 1.3 ticks" in {
-    implicit env =>
-      val round = sv1Client.getSvcInfo().latestMiningRound.payload
-      checkRoundWithinTickDuration(round.opensAt, 1.3)
+  "Check latest open mining round from SV sv-app has been open for < 1.3 ticks" in { implicit env =>
+    val round = svClient.getSvcInfo().latestMiningRound.payload
+    checkRoundWithinTickDuration(round.opensAt, 1.3)
   }
 
-  "Check health status of sv1 cometBft node" in { implicit env =>
-    sv1Client.cometBftNodeStatus().catchingUp shouldBe false
+  "Check health status of sv cometBft node" in { implicit env =>
+    svClient.cometBftNodeStatus().catchingUp shouldBe false
   }
+
+  private def checkRoundWithinTickDuration(round: Instant, factor: Double)(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): Unit = {
+    val tickDuration: RelTime = CoinConfigSchedule(
+      svScanClient
+        .getCoinRules()
+        .toReadyContract
+        .getOrElse(fail("coinRules is currently in-flight"))
+    ).getConfigAsOf(env.environment.clock.now).tickDuration
+    (env.environment.clock.now - CantonTimestamp.assertFromInstant(
+      round
+    )) should be < Duration.ofNanos(tickDuration.microseconds * (1000 * factor).longValue())
+  }
+}
+
+final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightIntegrationTestBase {
+
+  override protected def svNumber = 1
 
   // TODO(#6073) Replace this by only checking that a recent snapshot exists
   // instead of triggering one.
@@ -139,18 +153,8 @@ class NonDevNetPreflightIntegrationTest
       case Right(_) =>
     }
   }
+}
 
-  private def checkRoundWithinTickDuration(round: Instant, factor: Double)(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): Unit = {
-    val tickDuration: RelTime = CoinConfigSchedule(
-      sv1ScanClient
-        .getCoinRules()
-        .toReadyContract
-        .getOrElse(fail("coinRules is currently in-flight"))
-    ).getConfigAsOf(env.environment.clock.now).tickDuration
-    (env.environment.clock.now - CantonTimestamp.assertFromInstant(
-      round
-    )) should be < Duration.ofNanos(tickDuration.microseconds * (1000 * factor).longValue())
-  }
+final class Sv2NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightIntegrationTestBase {
+  override protected def svNumber = 2
 }

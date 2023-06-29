@@ -71,6 +71,7 @@ spec:
             {{- end }}
             # Checking .Values.domain does not differentiate between
             # it being unset and set to an empty object
+            {{- if (.Values.domain).enable }}
             {{- with .Values.domain }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
               value: |
@@ -92,6 +93,7 @@ spec:
                     }
                   }
                 }
+            {{- end }}
             {{- end }}
             - name: CN_APP_SV_GLOBAL_DOMAIN_URL
               value: {{ .Values.globalDomainUrl | quote }}

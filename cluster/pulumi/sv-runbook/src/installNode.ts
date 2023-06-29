@@ -27,6 +27,11 @@ import {
 } from './secrets';
 import { CLUSTER_BASENAME, TARGET_CLUSTER, REPO_ROOT, SV_NAME } from './utils';
 
+const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
+if (!isDevNet) {
+  console.error('Launching in non-devnet mode');
+}
+
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const version = process.env.CHARTS_VERSION;
   const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
@@ -106,6 +111,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: SV_NAME,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      'Digital-Asset': isDevNet ? 'Canton-Foundation-2' : 'Digital-Asset',
     }
   );
 
