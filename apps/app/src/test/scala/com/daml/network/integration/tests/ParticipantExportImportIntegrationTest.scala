@@ -38,14 +38,13 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
         // Config that runs against Canton started from this test; sv1-local defined here
         svAppsPath / "app.conf",
       )
-      // Notably, we also don't use fresh Daml names. Apart from creating users we need,
-      // we only read from the long-running Canton, so this should be fine.
-      // TODO(#6128) use per-run Daml names
       .clearConfigTransforms()
       .addConfigTransforms(
+        (_, config) => CNNodeConfigTransforms.ensureNovelDamlNames()(config),
         (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
         (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
       )
+      .withAllocatedUsers()
       .withManualStart
   }
 
@@ -74,22 +73,21 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       sv1ScanBackend.stop()
       sv1Backend.stop()
 
-      // TODO(#6128) run whole test once we have moved away from using a bootstrap script for upload OR have bumped Canton so that init_id works
-      if (false) {
-        Using.resource(startStandaloneCanton(participantDump)) { _ =>
-          sv1LocalBackend.startSync()
+      Using.resource(startStandaloneCanton(participantDump)(env)) { _ =>
+        sv1LocalBackend.startSync()
 
-          val svcInfoAfter = sv1LocalBackend.getSvcInfo()
+        val svcInfoAfter = sv1LocalBackend.getSvcInfo()
 
-          svcInfoAfter.svParty shouldBe svcInfoBefore.svParty
-          svcInfoAfter.svcParty shouldBe svcInfoBefore.svcParty
+        svcInfoAfter.svParty shouldBe svcInfoBefore.svParty
+        svcInfoAfter.svcParty shouldBe svcInfoBefore.svcParty
 
-        // TODO(#6073) also spin up a new validator app and compare the exported participant identity
-        }
+      // TODO(#6073) also spin up a new validator app and compare the exported participant identity
       }
   }
 
-  private def startStandaloneCanton(participantDump: ParticipantIdentitiesDump) = {
+  private def startStandaloneCanton(
+      participantDump: ParticipantIdentitiesDump
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
     // TODO(#6073) Remove this complicated mess once identity upload is handled by the validator and SV app init
     val txes = "Seq(" + participantDump.bootstrapTxes
       .map(tx =>
@@ -100,7 +98,7 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       .mkString(", ") + ")"
     val txesUploadCommand = s"""
     |import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
-    |svc_participant.topology.transactions.load($txes)
+    |sv_participant.topology.transactions.load($txes)
     """
 
     val keyUploadCommands = participantDump.keys.zipWithIndex
@@ -109,7 +107,7 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
           val keyFile: File = Files.createTempFile(s"$i", ".key")
           keyFile.appendByteArray(k.keyPair)
           s"""
-          |svc_participant.keys.secret.upload("${keyFile.toString}", ${k.name.fold("None")(n =>
+          |sv_participant.keys.secret.upload("${keyFile.toString}", ${k.name.fold("None")(n =>
               s"Some(\"$n\")"
             )})
           """
@@ -118,22 +116,23 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       .mkString("\n")
 
     val participantInitializationCommand = s"""
-    |svc_participant.topology.init_id("${participantDump.id.uid.id}", "${participantDump.id.uid.namespace.fingerprint}")
+    |import com.digitalasset.canton.topology.ParticipantId
+    |sv_participant.topology.init_id(ParticipantId.tryFromProtoPrimitive("${participantDump.id.toProtoPrimitive}").uid)
     """
 
     val bootstrapScript = s"""
       |println("Loading bootstrap topology transactions")
-      |svc_participant.keys.secret.list()
+      |sv_participant.keys.secret.list()
       $txesUploadCommand
-      |println(svc_participant.topology.transactions.list())
+      |println(sv_participant.topology.transactions.list())
       |println("Uploading participant keys")
       $keyUploadCommands
-      |println(svc_participant.keys.secret.list())
+      |println(sv_participant.keys.secret.list())
       |println("Initializing participant with uid ${participantDump.id.toString}")
       $participantInitializationCommand
       |println("Creating sv1 user")
-      |svc_participant.ledger_api.users.create(
-      |  id = "sv1",
+      |sv_participant.ledger_api.users.create(
+      |  id = "${sv1LocalBackend.config.ledgerApiUser}",
       |  actAs = Set.empty,
       |  readAs = Set.empty,
       |  primaryParty = None,
@@ -150,7 +149,7 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       "-c",
       (svDomainPath / "canton.conf").toString,
       "-C",
-      "canton.participants-x.svc_participant.init.auto-init=false", // avoid creating new identity
+      "canton.participants-x.sv_participant.init.auto-init=false", // avoid creating new identity
       "--bootstrap",
       bootstrapFile.toString,
     )
