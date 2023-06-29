@@ -9,6 +9,7 @@ import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.wallet.store.UserWalletStore.TxLogIndexRecord
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
 import com.digitalasset.canton.DomainAlias
@@ -19,6 +20,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.Json
 import slick.dbio
+import slick.dbio.DBIO
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.*
@@ -58,7 +60,7 @@ class DbUserWalletStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionInsert(
+  override def ingestionAcsInsert(
       createdEvent: CreatedEvent
   )(implicit tc: TraceContext): Either[String, dbio.DBIO[_]] = {
     UserWalletAcsStoreRowData
@@ -86,6 +88,11 @@ class DbUserWalletStore(
             """
       }
   }
+
+  // TODO (#6239): implement this
+  override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit
+      tc: TraceContext
+  ): Either[String, DBIO[_]] = Right(DBIO.successful(())) // avoid blowing up until implemented
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 

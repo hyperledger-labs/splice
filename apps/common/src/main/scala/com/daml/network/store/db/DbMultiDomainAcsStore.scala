@@ -43,7 +43,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     contractFilter: MultiDomainAcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     @unused retryProvider: RetryProvider,
-    ingestInsert: (CreatedEvent, TraceContext) => Either[String, slick.dbio.DBIO[?]],
+    ingestAcsInsert: (CreatedEvent, TraceContext) => Either[String, slick.dbio.DBIO[?]],
+    ingestTxLogInsert: (TXI, TraceContext) => Either[String, slick.dbio.DBIO[?]],
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -371,8 +372,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         traceContext: TraceContext
     ): Future[Unit] = {
       for {
-        (offset, todo) <- getIngestionWork(transfer)
-        _ <- ingestWork(offset, todo)
+        (offset, todo, txEntries) <- getIngestionWork(transfer)
+        _ <- ingestWork(offset, todo, txEntries)
       } yield {
         notifyStreamsOfNewOffset()
       }
@@ -383,46 +384,50 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       previousPromise.success(())
     }
 
-    private def getIngestionWork(transfer: TreeUpdate): Future[(String, WorkTodo)] = {
+    private def getIngestionWork(
+        transfer: TreeUpdate
+    )(implicit tc: TraceContext): Future[(String, WorkTodo, Seq[TXE])] = {
       transfer match {
         case TransferUpdate(_) =>
           // TODO (#5314): support transfers
           Future.failed(new UnsupportedOperationException("Transfers are unsupported."))
         case TransactionTreeUpdate(tree) =>
           Future {
+            val workTodo = Trees.foldTree(tree, WorkTodo(VectorMap.empty))(
+              onCreate = (st, ev, _) => {
+                if (contractFilter.contains(ev)) {
+                  WorkTodo(st.todo + (ev.getContractId -> Insert(ev)))
+                } else {
+                  st
+                }
+              },
+              onExercise = (st, ev, _) => {
+                if (ev.isConsuming) {
+                  // optimization: a delete on a contract cancels-out with the corresponding insert
+                  if (st.todo.contains(ev.getContractId)) {
+                    WorkTodo(st.todo - ev.getContractId)
+                  } else {
+                    WorkTodo(
+                      st.todo + (ev.getContractId -> Delete(
+                        new ContractId[Any](ev.getContractId)
+                      ))
+                    )
+                  }
+                } else {
+                  st
+                }
+              },
+            )
             (
               tree.getOffset,
-              Trees.foldTree(tree, WorkTodo(VectorMap.empty))(
-                onCreate = (st, ev, _) => {
-                  if (contractFilter.contains(ev)) {
-                    WorkTodo(st.todo + (ev.getContractId -> Insert(ev)))
-                  } else {
-                    st
-                  }
-                },
-                onExercise = (st, ev, _) => {
-                  if (ev.isConsuming) {
-                    // optimization: a delete on a contract cancels-out with the corresponding insert
-                    if (st.todo.contains(ev.getContractId)) {
-                      WorkTodo(st.todo - ev.getContractId)
-                    } else {
-                      WorkTodo(
-                        st.todo + (ev.getContractId -> Delete(
-                          new ContractId[Any](ev.getContractId)
-                        ))
-                      )
-                    }
-                  } else {
-                    st
-                  }
-                },
-              ),
+              workTodo,
+              txLogParser.parse(tree, logger),
             )
           }
       }
     }
 
-    private def ingestWork(offset: String, workTodo: WorkTodo)(implicit
+    private def ingestWork(offset: String, workTodo: WorkTodo, txEntries: Seq[TXE])(implicit
         tc: TraceContext
     ): Future[Unit] = {
       storage
@@ -433,7 +438,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
               // TODO (#5645): implement a summary of changes
               workTodo.todo.toVector.map {
                 case (_, Insert(evt)) =>
-                  ingestInsert(evt, tc) match {
+                  ingestAcsInsert(evt, tc) match {
                     case Left(err) =>
                       val errMsg =
                         s"Item at offset $offset with contract id ${evt.getContractId} cannot be ingested: $err"
@@ -447,7 +452,17 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                          delete from #$tableName
                          where contract_id = $contractId
                         """.map(_ => ())
-              } :+ updateOffset(offset)
+              } ++ txEntries.map(txe =>
+                ingestTxLogInsert(txe.indexRecord, tc) match {
+                  case Left(err) =>
+                    val errMsg =
+                      s"Tx at offset $offset with event id ${txe.indexRecord.eventId} cannot be ingested: $err"
+                    logger.error(errMsg)
+                    throw new IllegalArgumentException(errMsg)
+                  case Right(action) =>
+                    action.map(_ => ())
+                }
+              ) :+ updateOffset(offset)
             )
             .transactionally
             .map(_ => ()),

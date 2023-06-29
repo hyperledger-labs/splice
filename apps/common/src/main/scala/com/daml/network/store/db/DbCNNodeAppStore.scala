@@ -38,7 +38,8 @@ abstract class DbCNNodeAppStore[
       acsContractFilter,
       txLogParser,
       retryProvider,
-      (evt, tc) => ingestionInsert(evt)(tc),
+      (evt, tc) => ingestionAcsInsert(evt)(tc),
+      (evt, tc) => ingestionTxLogInsert(evt)(tc),
     )
 
   override def txLog: TxLogStore[TXI, TXE] = new InMemoryMultiDomainAcsStore(
@@ -55,7 +56,11 @@ abstract class DbCNNodeAppStore[
       retryProvider,
     )
 
-  def ingestionInsert(createdEvent: CreatedEvent)(implicit
+  def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
+      tc: TraceContext
+  ): Either[String, DBIO[?]]
+
+  def ingestionTxLogInsert(record: TXI)(implicit
       tc: TraceContext
   ): Either[String, DBIO[?]]
 
@@ -74,7 +79,13 @@ abstract class DbCNNodeAppStoreWithoutHistory(
       storage,
       tableName,
       storeDescriptor,
-    ) { this: ConfiguredDefaultDomain => }
+    ) { this: ConfiguredDefaultDomain =>
+
+  override def ingestionTxLogInsert(record: TxLogStore.IndexRecord)(implicit
+      tc: TraceContext
+  ): Either[String, DBIO[?]] = Right(DBIO.successful(()))
+
+}
 
 abstract class DbCNNodeAppStoreWithHistory[
     TXI <: TxLogStore.IndexRecord,

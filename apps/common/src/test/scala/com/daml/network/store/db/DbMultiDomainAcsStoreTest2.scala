@@ -48,6 +48,7 @@ class DbMultiDomainAcsStoreTest2
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
       // TODO (#5483): when merging with DbMultiDomainAcsStoreTest(1), replace with the implementation there
       (_, _) => Left("unimplemented"),
+      (_, _) => Left("unimplemented"),
     )
   }
 

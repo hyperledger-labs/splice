@@ -87,6 +87,7 @@ class DbMultiDomainAcsStoreTest
         TestTxLogStoreParser,
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
         (evt, _) => Right(create(store.storeId, evt)),
+        (_, _) => Right(DBIO.successful(())),
       )
     store
   }

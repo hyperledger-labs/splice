@@ -59,7 +59,7 @@ class DbDirectoryStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionInsert(
+  override def ingestionAcsInsert(
       createdEvent: CreatedEvent
   )(implicit tc: TraceContext): Either[String, dbio.DBIO[_]] = {
     DirectoryAcsStoreRowData.fromCreatedEvent(createdEvent).map {

@@ -56,7 +56,7 @@ class DbScanStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionInsert(createdEvent: CreatedEvent)(implicit
+  override def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
       tc: TraceContext
   ): Either[String, DBIO[_]] = {
     ScanAcsStoreRowData.fromCreatedEvent(createdEvent, scanConfig).map {
@@ -88,6 +88,11 @@ class DbScanStore(
               """
     }
   }
+
+  // TODO (#6218): implement this
+  override def ingestionTxLogInsert(record: ScanTxLogParser.TxLogIndexRecord)(implicit
+      tc: TraceContext
+  ): Either[String, DBIO[_]] = Right(DBIO.successful(())) // avoid blowing up until implemented
 
   override def lookupCoinRules()(implicit
       tc: TraceContext
