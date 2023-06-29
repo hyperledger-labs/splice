@@ -47,6 +47,7 @@
           "*.sv-2.svc.test-stack.network.canton.global",
           "*.sv-3.svc.test-stack.network.canton.global",
           "*.sv-4.svc.test-stack.network.canton.global",
+          "*.sv-5.svc.test-stack.network.canton.global",
           "*.sv.svc.test-stack.network.canton.global"
         ],
         "issuerRef": {
@@ -66,7 +67,9 @@
       "apiVersion": "v1",
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {}
+        "value": {
+          "key.json": "bW9jay1qc29u"
+        }
       },
       "kind": "Secret",
       "metadata": {
@@ -141,17 +144,6 @@
     "name": "default",
     "provider": "",
     "type": "gcp:compute/network:Network"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "publicKeyType": "TYPE_X509_PEM_FILE",
-      "serviceAccountId": "projects/da-gcp-canton-domain/serviceAccounts/dns01-solver@da-gcp-canton-domain.iam.gserviceaccount.com"
-    },
-    "name": "dns01-test-stack",
-    "provider": "",
-    "type": "gcp:serviceAccount/key:Key"
   },
   {
     "custom": false,

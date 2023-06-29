@@ -434,21 +434,96 @@ function subcmd_set_machine_type() {
 
 subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
 
+function _get_dns01_secret() {
+    gcloud secrets versions access 1 --secret="${DNS01_SA_KEY_SECRET}"
+}
+
 function subcmd_get_dns01_key_id() {
-    subcmd_pulumi infra stack output --show-secrets dnsPrivateKey | base64 -d | jq -r '.private_key_id'
+    _get_dns01_secret | jq -r '.private_key_id'
 }
 
-subcommand_whitelist[update_dns01_secret]='Update the gcloud service account key used for letsencrypt dns challenges.'
+###
 
-function subcmd_update_dns01_secret() {
-    if kubectl get secret "$GCP_DNS_SA_SECRET" > /dev/null 2>&1; then
-      kubectl delete secret "$GCP_DNS_SA_SECRET"
+subcommand_whitelist[install_dns01_key]='Allocate an DNS SA Key for the project and store it in a secret.'
+
+function subcmd_install_dns01_key() {
+    _prompt_to_confirm --no-lock
+
+    SECRET=$(gcloud secrets list --filter "name:${DNS01_SA_KEY_SECRET}" --format 'value(name)')
+
+    if [ -z "${SECRET}" ]; then
+        _info "Allocating service account key and storing as secret."
+        gcloud iam service-accounts keys create /tmp/key.json \
+               --iam-account "${DNS01_SA_IAM_ACCOUNT}"
+
+        gcloud secrets create "${DNS01_SA_KEY_SECRET}" --data-file=/tmp/key.json
+
+        rm /tmp/key.json
+    else
+        SA_KEY_ID=$(subcmd_get_dns01_key_id)
+
+        _info "DNS Service Account key secret already exists: ${SA_KEY_ID}"
     fi
-    subcmd_pulumi infra stack output --show-secrets dnsPrivateKey | base64 --decode > /tmp/key.json
-    kubectl create secret generic "$GCP_DNS_SA_SECRET" \
-            --from-file=key.json=/tmp/key.json
-    rm /tmp/key.json
 }
+###
+
+subcommand_whitelist[uninstall_dns01_key]='Delete the DNS SA Key for the project and the corresponding secret'
+
+function subcmd_uninstall_dns01_key() {
+    _prompt_to_confirm --no-lock
+
+    SECRET=$(gcloud secrets list --filter "name:${DNS01_SA_KEY_SECRET}" --format 'value(name)')
+
+    if [ -z "${SECRET}" ]; then
+        _warning "No service account key secret to delete."
+    else
+        SA_KEY_ID=$(subcmd_get_dns01_key_id)
+
+        _info "Deleting SA Key: ${SA_KEY_ID}"
+
+        gcloud iam service-accounts keys delete \
+               --iam-account "${DNS01_SA_IAM_ACCOUNT}" \
+               --quiet \
+               "${SA_KEY_ID}" || true
+
+        gcloud secrets delete --quiet "${DNS01_SA_KEY_SECRET}"
+
+        _info "Service account key deleted."
+    fi
+}
+
+###
+
+subcommand_whitelist[infra_up]='Apply the infra Pulumi stack.'
+
+function subcmd_infra_up() {
+    _info "Activating infrastructure Pulumi stack"
+
+    subcmd_install_dns01_key
+
+    _uses_pulumi_stack infra
+
+    _get_dns01_secret | subcmd_pulumi infra config set DNA01_SA_KEY_JSON
+    subcmd_pulumi infra config set CLUSTER_BASENAME "${GCP_CLUSTER_BASENAME}"
+
+    subcmd_pulumi infra up --yes --skip-preview
+}
+
+###
+
+subcommand_whitelist[infra_down]='Take the current Pulumi infra stack down.'
+
+function subcmd_infra_down() {
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _info "Deactivating infrastructure Pulumi stack"
+
+    _uses_pulumi_stack infra
+    subcmd_pulumi infra down --yes --skip-preview
+}
+
+###
 
 subcommand_whitelist[create]='Create a cluster from scratch.'
 
@@ -458,6 +533,7 @@ function subcmd_create() {
     if _cluster_exists; then
         _error "Cluster already exists."
     else
+
         #### Cluster can be resized from deployment directories with the following command:
         ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
         gcloud container clusters create "${GCP_CLUSTER_NAME}" \
@@ -500,13 +576,7 @@ function subcmd_create() {
     FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-master" --format=json | jq -r '.[].name')
     gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
 
-    _log "Activating infrastructure Pulumi stack"
-    subcmd_pulumi infra up --yes -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}"
-
-    _log "Updating DNS01 secret"
-    #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
-    #### TODO(#1447)
-    subcmd_update_dns01_secret
+    subcmd_infra_up
 
     _log "Determining cluster ingress IP address"
     IPADDR=$(_cluster_ip)

@@ -1030,25 +1030,56 @@ and create a new key through `manage keys` and revoke the old one. The full JSON
 The above creates the key for `GCP_DA_CN_IMAGES_KEY`, for `GCP_DA_CN_DEVNET_KEY` and `GCP_DA_CN_SCRATCHNET_KEY` change the project in the drop down at the top
 and go through the same steps.
 
-### GCP Token in the cluster DNS challenge
+### GCP Service Account Key for the cluster DNS challenge
 
-cert-manager on the cluster uses gcloud to solve the DNS challenge. It therefore needs the latest gcloud credentials. These are stored in a secret clouddns-dns01-solver-svc-acct.
-You can view the keys currently in use at https://console.cloud.google.com/iam-admin/serviceaccounts/details/111557570113518692244/keys?project=da-gcp-canton-domain.
+The certficates managed by `cert-manager` are confirmed via DNS
+challenge/response to confirm we have authority over the domain
+name. For this to work, the cluster must have credentials to
+manipulate its own DNS records. This is accomplished by allocating a
+service account key for the appropriate Google Cloud service account
+and making it available as a Kubernetes secret.  To avoid running into
+Google Cloud's limit of 10 keys per service account, these keys are
+allocated on a Google Cloud _project_ basis. Allocating keys
+per-project allows the same key to be used for all Canton Network
+clusters in a given project.
 
-To see which key is used for a given cluster, go to the cluster directory and run this command:
+This process is usually handled automatically in the following way:
+
+* When the cluster is created (`cncluster create`), the infrastructure
+  Pulumi stack is applied with `cncluster infra_up`.
+* `cncluster infra_up` uses `cncluster install_dns01_key` to install a
+  DNS key for the project if one is missing. Key installation is
+  idempotent, so a key will not be re-created if not necessary.
+* `cncluster infra_up` makes the DNS key's JSON available to Pulumi via a
+  Pulumi configuration setting (`pulumi config set`).
+
+If there is need for manual intervention, there are several commands that can
+be used to inspect and manage the current key state for the project:
+
+* `cncluster install_dns01_key` - Idempotently allocate a new SA key for the DNS
+  account, and install it as a Google Cloud Secret.
+* `cncluster uninstall_dns01_key` - Delete the DNS SA key for the
+  project and remove the secret.
+* `cncluster get_dns01_key_id` - Print the ID of the key currently
+  stored in the Google Cloud secret for the project.
+
+Communication of the project scoped key into a specific cluster is
+done via the infrastructure Pulumi stack. `cncluster install_dns01_key`
+is not enough to enough to update a cluster. You must also update the
+infrastructure stack for the cluster with `cncluster infra_up`.
+
+Because we do not have script for creating and deleting Google Cloud
+projects, we have no automatic deletion of SA keys for the DNS
+account. This must be done manually when deleting a project through
+`cnsluter uninstall_dns01_key`.
+
+To the keys currently allocated, you can go to  https://console.cloud.google.com/iam-admin/serviceaccounts/details/111557570113518692244/keys?project=da-gcp-canton-domain.
+
+To see which key is used for a given cluster, go to the cluster
+directory and run this command. The DNS SA key is stored under `DNA01_SA_KEY_JSON`:
 
 ```
-cncluster get_dns01_key_id
-```
-
-The resulting key id matches the one you see in gcloud console.
-
-To update the secret, run this command. Afterwards, you can delete the
-old key from the gcloud console. Note that at any point in time, there
-can only be 10 keys. Otherwise you will see `precondition failed` errors.
-
-```
-cncluster update_dns01_secret
+cncluster pulumi infra config
 ```
 
 ### Github Tokens
