@@ -12,3 +12,5 @@ spec:
   resources:
     requests:
       storage: {{ $.Values.db.volumeSize }}
+  storageClassName: {{ $.Values.db.volumeStorageClass }}
+  volumeMode: Filesystem

@@ -50,4 +50,5 @@ genesis:
   chainId: ""
 
 db:
-  volumeSize: 10Gi
+  volumeSize: 20Gi
+  volumeStorageClass: standard-rwo

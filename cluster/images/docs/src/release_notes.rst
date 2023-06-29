@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2023-07-09
+----------
+
+* Deployment
+    * Ensured that both the `cn-cometbft` and `cn-postgres` charts support the `db.volumeSize` and `db.volumeStorageClass` values for configuring persistent storage.
+
+
 2023-07-02
 ----------
 
@@ -49,6 +56,7 @@ Release Notes
      environment variable matching the SV app and the validator app. The helm charts set the right default so
      if you are using them, there is no need to configure anything.
    * The `audience` which defines the intended consumer of the token is now configurable in Participant, Validator app, Validator web UI, SV app, SV web UI and Directory web UI.
+
    * Validator apps and SV apps now configure the address of the founding SV app to allow for synchronization across nodes until all aspects of the BFT domain are robust under concurrent operations.
 
 * All CN apps now have ``/readyz`` and ``/livez`` endpoints which can be used for Kubernetes readiness and liveness probes.

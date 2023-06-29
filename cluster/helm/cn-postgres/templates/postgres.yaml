@@ -72,8 +72,8 @@ spec:
       - ReadWriteOnce
       resources:
         requests:
-          storage: 20Gi
-      storageClassName: standard-rwo
+          storage: {{ $.Values.db.volumeSize }}
+      storageClassName: {{ $.Values.db.volumeStorageClass }}
       volumeMode: Filesystem
 ---
 apiVersion: v1
