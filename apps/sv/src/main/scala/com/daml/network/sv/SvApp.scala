@@ -12,7 +12,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.auth.{AuthConfig, HMACVerifier, RSAVerifier}
+import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.{cc, cn}
@@ -25,7 +25,6 @@ import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
-import com.daml.network.sv.auth.SvAuthExtractor
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.{
   CometBftClient,
@@ -334,7 +333,7 @@ class SvApp(
                 ),
                 SvAdminResource.routes(
                   adminHandler,
-                  SvAuthExtractor(
+                  AdminAuthExtractor(
                     verifier,
                     svStore.key.svParty,
                     svAutomation.connection,

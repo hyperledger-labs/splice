@@ -23,7 +23,8 @@ export async function installValidator(
   name: string,
   validatorWalletUser: string,
   onboarding: ValidatorOnboarding,
-  withDomainFees = false
+  withDomainFees = false,
+  isDevNet: boolean
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
@@ -92,6 +93,9 @@ export async function installValidator(
             minTopupInterval: domainFeesConfig.minTopupInterval,
           }
         : {},
+      // TODO(#6247) Enable auth here once Validator1PreflightIntegrationTest
+      // supports this.
+      disableAdminAuth: isDevNet,
     },
     dependsOn
   );

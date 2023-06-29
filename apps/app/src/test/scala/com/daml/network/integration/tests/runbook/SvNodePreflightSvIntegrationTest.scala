@@ -136,9 +136,14 @@ class SvNodePreflightSvIntegrationTest
     }
   }
 
-  // TODO(#5979): Revise this after adding auth...
+  // The SV node runs only once per cluster deployment and only on some clusters
+  // so for now we accept that each this queries a new token on Auth0 and contributes
+  // to our token limit.
   "Dumping participant identities works" in { implicit env =>
-    def svValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc("svTestValidator")
+    val auth0 = auth0UtilFromEnvVars("https://canton-network-sv-test.us.auth0.com", Some("sv"))
+    val token =
+      auth0.getToken("bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn", "https://validator.example.com/api")
+    val svValidatorClient = vc("svTestValidator").copy(token = Some(token))
     svValidatorClient.dumpParticipantIdentities()
   }
 }

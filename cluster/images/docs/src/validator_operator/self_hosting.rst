@@ -463,14 +463,30 @@ We cover these steps in the following.
 Backing Up Participant Identities Data
 ++++++++++++++++++++++++++++++++++++++
 
-Backed-up participant identities data is necessary for enabling validator users to reclaim their coin balances after a network reset.
-Obtaining the necessary data is currently as simple as:
+Backed-up participant identities data is necessary for enabling
+validator users to reclaim their coin balances after a network reset.
+To backup a token you need a token for the admin API of your
+validator. This token needs to have ``sub`` set to the user id of a
+user that has the validator operator party as the primary party and
+the ``actAs`` rights for that party. The validator user configured in
+``ledger-api-user`` satisfies those requirements. If you are running a
+super validator, the super validator user configured in the
+``ledger-api-user`` field of the SV app also satisfies them.  The
+``audience`` needs to be set fo the audience you configured your
+validator with. In the example above, this is
+``https://cn_api.example.com``. In the super validator runbook, it is
+``https://validator.example.com/api``.
 
-.. parsed-literal::
+If you are using Auth0 you can obtain the token by going to the Auth0
+app for the validator backend in the Auth0 UI and running the curl
+command found in the `Quick Start` section.  The token is found in the
+``access_token`` field of the response.
 
-  curl <YOUR_VALIDATOR_API_URL>/admin/participant/identities > participant-dump.json
+Once you obtained the token, obtaining the data can be done as follows:
 
-.. TODO(#5979): !!! We need auth here !!!
+.. code-block:: bash
+
+    curl -H "Authorization: Bearer <YOUR_TOKEN>" <YOUR_VALIDATOR_API_URL>/admin/participant/identities > participant-dump.json
 
 If your are following this runbook, you can replace ``YOUR_VALIDATOR_API_URL`` with ``http://localhost:5003``.
 If you are following the :ref:`Kubernetes-based SV runbook <sv-helm>`, you can replace it with ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator``.

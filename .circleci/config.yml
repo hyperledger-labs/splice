@@ -1378,7 +1378,9 @@ jobs:
           cmd_name: Run SV preflight tests
           additional_nix_args: "--keep SV_WEB_UI_PASSWORD \
             --keep ARTIFACTORY_USER \
-            --keep ARTIFACTORY_PASSWORD"
+            --keep ARTIFACTORY_PASSWORD \
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
           cluster: << parameters.cluster >>
           cmd: |
             cncluster preflight_sv

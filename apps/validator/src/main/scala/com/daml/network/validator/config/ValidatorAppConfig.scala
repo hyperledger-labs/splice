@@ -87,6 +87,8 @@ case class ValidatorAppBackendConfig(
     treasury: TreasuryConfig = TreasuryConfig(),
     // TODO(#5855) so we can lock; remove this again
     foundingSvClient: SvAppClientConfig,
+    // TODO(#6247) Remove the option to disable this
+    enableAdminAuth: Boolean = true,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

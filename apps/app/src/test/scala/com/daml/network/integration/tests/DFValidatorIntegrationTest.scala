@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.client.RequestBuilding.Post
+import akka.http.scaladsl.client.RequestBuilding.{Get, Post}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.auth0.jwt.JWT
@@ -20,10 +20,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.PartyId
 import org.slf4j.event.Level
 
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Random, Try}
 
 class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
@@ -165,6 +166,106 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     validResponse.status should be(StatusCodes.OK)
   }
 
+  "fail admin endpoint when not authenticated as validator operator" in { implicit env =>
+    initSvcWithSv1Only()
+    aliceValidatorBackend.startSync()
+
+    implicit val sys = env.actorSystem
+    implicit val ec = env.executionContext
+    CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+      () =>
+        Http().shutdownAllConnectionPools().map(_ => Done)
+    }
+
+    val listUsersGet = Get(s"${aliceValidatorBackend.httpClientConfig.url}/admin/users")
+
+    def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
+
+    def makeRequest(userId: String) = {
+      val invalidUserToken = JWT
+        .create()
+        .withAudience(aliceValidatorBackend.config.auth.audience)
+        .withSubject(userId)
+        .sign(AuthUtil.testSignatureAlgorithm)
+      Http()
+        .singleRequest(listUsersGet.withHeaders(tokenHeader(invalidUserToken)))
+        .futureValue
+    }
+
+    clue("Invalid user id gets rejected") {
+      loggerFactory.assertLogs(
+        {
+          val responseForInvalidUser = makeRequest("wrong_user")
+          responseForInvalidUser.status should be(StatusCodes.Forbidden)
+          responseForInvalidUser.entity.getContentType().toString should be("application/json")
+        },
+        _.warningMessage should include(
+          "Authorization Failed"
+        ),
+      )
+    }
+
+    clue("User without actAs permissions for validator party gets rejected") {
+      loggerFactory.assertLogs(
+        {
+          val validatorParty =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+              .get(aliceValidatorBackend.config.ledgerApiUser)
+              .primaryParty
+              .value
+          val testUser =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
+              s"testUser-${Random.nextInt()}",
+              actAs = Set.empty[PartyId],
+              primaryParty = Some(validatorParty),
+            )
+          val response = makeRequest(testUser.id)
+          response.status should be(StatusCodes.Forbidden)
+        },
+        _.warningMessage should include(
+          "Authorization Failed"
+        ),
+      )
+    }
+
+    clue("User without validator party as primaryParty gets rejected") {
+      loggerFactory.assertLogs(
+        {
+          val validatorParty =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+              .get(aliceValidatorBackend.config.ledgerApiUser)
+              .primaryParty
+              .value
+          val testUser =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
+              s"testUser-${Random.nextInt()}",
+              actAs = Set(validatorParty),
+              primaryParty = None,
+            )
+          val response = makeRequest(testUser.id)
+          response.status should be(StatusCodes.Forbidden)
+        },
+        _.warningMessage should include(
+          "Authorization Failed"
+        ),
+      )
+    }
+
+    clue("User with actas rights and primaryParty gets accepted") {
+      val validatorParty = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+        .get(aliceValidatorBackend.config.ledgerApiUser)
+        .primaryParty
+        .value
+      val testUser = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.create(
+        s"testUser-${Random.nextInt()}",
+        actAs = Set(validatorParty),
+        primaryParty = Some(validatorParty),
+      )
+      val response = makeRequest(testUser.id)
+      response.status should be(StatusCodes.OK)
+    }
+  }
+
   "onboard user multiple times" in { implicit env =>
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()
@@ -190,7 +291,7 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     actAndCheck("Onboard a user", onboardWalletUser(aliceWallet, aliceValidatorBackend))(
       "Wait for user to be listed",
       _ => {
-        val usernames = aliceValidatorClient.listUsers()
+        val usernames = aliceValidatorBackend.listUsers()
         usernames should contain theSameElementsAs Seq(
           aliceWallet.config.ledgerApiUser,
           aliceValidatorBackend.config.validatorWalletUser.value,
@@ -203,7 +304,7 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     val testUsers = Range(0, numTestUsers).map(i => s"${prefix}-${i}")
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-      testUsers.foreach(aliceValidatorClient.onboardUser(_)),
+      testUsers.foreach(aliceValidatorBackend.onboardUser(_)),
       entries => {
         forAtLeast(numTestUsers, entries)(
           _.message should include(
@@ -218,11 +319,11 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
 
     actAndCheck(
       "Offboard a user",
-      aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser),
+      aliceValidatorBackend.offboardUser(aliceWallet.config.ledgerApiUser),
     )(
       "Wait for the validator and wallet to report the user offboarded",
       _ => {
-        val usernames = aliceValidatorClient.listUsers()
+        val usernames = aliceValidatorBackend.listUsers()
         usernames should contain theSameElementsAs (testUsers ++
           Seq(aliceValidatorBackend.config.validatorWalletUser.value))
         assertUserFullyOffboarded(aliceWallet, aliceValidatorBackend)
@@ -230,13 +331,13 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     )
 
     clue("Offboarding alice again - offboarding should be idempotent") {
-      aliceValidatorClient.offboardUser(aliceWallet.config.ledgerApiUser)
+      aliceValidatorBackend.offboardUser(aliceWallet.config.ledgerApiUser)
       assertUserFullyOffboarded(aliceWallet, aliceValidatorBackend)
     }
 
     actAndCheck(
       "Onboarding alice back",
-      aliceValidatorClient.onboardUser(aliceWallet.config.ledgerApiUser),
+      aliceValidatorBackend.onboardUser(aliceWallet.config.ledgerApiUser),
     )(
       "Alice should have retained her coin",
       _ => {
@@ -253,7 +354,7 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       // several offboarding requests in parallel.
       val offboardFutures =
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-          testUsers.map(user => Future { aliceValidatorClient.offboardUser(user) }),
+          testUsers.map(user => Future { aliceValidatorBackend.offboardUser(user) }),
           entries => {
             forAtLeast(numTestUsers, entries)(
               _.message should (include(

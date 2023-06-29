@@ -276,6 +276,13 @@ class Validator1PreflightIntegrationTest
     }
   }
 
+  // TODO(#6247): Adjust this once this endpoint requires auth.
+  "can dump participant identities of validator1" in { _ =>
+    val env = provideEnvironment
+    val validator1Client = env.validators.remote.find(_.name == "validator1").value
+    validator1Client.dumpParticipantIdentities()
+  }
+
   private def auth0Login(
       user: Auth0User,
       url: String,

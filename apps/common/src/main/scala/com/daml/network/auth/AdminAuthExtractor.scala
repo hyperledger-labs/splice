@@ -1,4 +1,4 @@
-package com.daml.network.sv.auth
+package com.daml.network.auth
 
 import akka.http.scaladsl.model.{HttpEntity, HttpResponse, MediaTypes, StatusCodes}
 import akka.http.scaladsl.server.Directive1
@@ -16,17 +16,17 @@ import scala.util.Success
 
 final case class Response(user: String)
 
-object SvAuthExtractor {
+object AdminAuthExtractor {
   def apply(
       verifier: SignatureVerifier,
-      svParty: PartyId,
+      adminParty: PartyId,
       ledgerConnection: CNLedgerConnection,
       loggerFactory: NamedLoggerFactory,
       realm: String,
   ): String => Directive1[String] = {
-    new SvAuthExtractor(
+    new AdminAuthExtractor(
       verifier,
-      svParty,
+      adminParty,
       ledgerConnection,
       loggerFactory,
       realm,
@@ -34,9 +34,12 @@ object SvAuthExtractor {
   }
 }
 
-final class SvAuthExtractor(
+// Auth extractor for admin APIs that only
+// allow access to users that have actAs rights for a specific admin party, e.g.,
+// the sv party or the validator operator party.
+final class AdminAuthExtractor(
     verifier: SignatureVerifier,
-    svParty: PartyId,
+    adminParty: PartyId,
     ledgerConnection: CNLedgerConnection,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,
@@ -49,14 +52,14 @@ final class SvAuthExtractor(
         onComplete(
           ledgerConnection.getOptionalPrimaryParty(user) zip ledgerConnection.getUserActAs(user)
         ).flatMap {
-          case Success((Some(party), actAs)) if party == svParty && actAs.contains(svParty) =>
+          case Success((Some(party), actAs)) if party == adminParty && actAs.contains(adminParty) =>
             provide(user)
           case _ =>
-            logger.warn(s"Authorization Failed for $svParty")
+            logger.warn(s"Authorization Failed for $adminParty")
             val contentType = MediaTypes.`application/json`
             val errorResponse =
               ErrorResponse(
-                s"Authorization Failed for $svParty"
+                s"Authorization Failed for $adminParty"
               )
             val responseEntity = HttpEntity(
               contentType = contentType,

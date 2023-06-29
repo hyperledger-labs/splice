@@ -149,10 +149,11 @@ final class ValidatorAppBackendReference(
 /** Client (aka remote) reference to a validator app in the style of CNParticipantClientReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
-final class ValidatorAppClientReference(
+final case class ValidatorAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
-    name: String,
+    override val name: String,
     val config: ValidatorAppClientConfig,
+    override val token: Option[String] = None,
 ) extends ValidatorAppReference(consoleEnvironment, name)
     with BaseInspection[ParticipantNode] {
 

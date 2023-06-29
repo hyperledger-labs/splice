@@ -43,6 +43,13 @@ class Auth0Util(
     page.getItems().asScala.toList
   }
 
+  def getToken(clientId: String, audience: String) = {
+    val client = api.clients().get(clientId).execute()
+    val clientSecret = client.getClientSecret()
+    val appApi = new AuthAPI(domain, clientId, clientSecret)
+    appApi.requestToken(audience).execute().getAccessToken()
+  }
+
   private def requestManagementAPIToken(): String =
     auth.requestToken(s"${domain}/api/v2/").execute().getAccessToken()
 }

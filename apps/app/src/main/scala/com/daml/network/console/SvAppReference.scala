@@ -110,6 +110,7 @@ class SvAppClientReference(
     with BaseInspection[ParticipantNode] {
 
   override def httpClientConfig = config.adminApi
+
 }
 
 /** Single sv app backend reference. Defines the console commands that can be run against a backend SV

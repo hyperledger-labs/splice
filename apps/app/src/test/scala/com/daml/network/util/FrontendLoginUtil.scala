@@ -65,13 +65,19 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
     click on "subscriptions-button"
   }
 
-  protected def withAuth0LoginCheck[A](frontendDriverName: String, localHostPort: Int)(
+  protected def withAuth0LoginCheck[A](
+      frontendDriverName: String,
+      localHostPort: Int,
+      onboardThroughWalletUI: Boolean = false,
+  )(
       afterLoginChecks: (Auth0User, PartyId, WebDriverType) => A
   )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment): A = {
     val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com")
     Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
       logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
-      val userPartyId = aliceValidatorBackend.onboardUser(user.id)
+      if (!onboardThroughWalletUI) {
+        aliceValidatorBackend.onboardUser(user.id)
+      }
 
       withFrontEnd(frontendDriverName) { implicit webDriver =>
         clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
@@ -79,11 +85,24 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
             s"http://localhost:$localHostPort",
             user.email,
             user.password,
-            () => find(id("logged-in-user")).value.text shouldBe userPartyId.toProtoPrimitive,
+            () =>
+              if (onboardThroughWalletUI) {
+                find(id("onboard-button")).value.text should not be empty
+              } else {
+                find(id("logged-in-user")).value.text should not be empty
+              },
           )
         }
+        val userPartyId = if (onboardThroughWalletUI) {
+          actAndCheck("onboard user", click on "onboard-button")(
+            "user is onboarded",
+            _ => find(id("logged-in-user")).value.text,
+          )._2
+        } else {
+          find(id("logged-in-user")).value.text
+        }
 
-        afterLoginChecks(user, userPartyId, webDriver)
+        afterLoginChecks(user, PartyId.tryFromProtoPrimitive(userPartyId), webDriver)
       }
     }
   }

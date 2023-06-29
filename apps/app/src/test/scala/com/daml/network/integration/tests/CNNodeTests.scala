@@ -313,11 +313,13 @@ object CNNodeTests {
       }
     }
 
-    def auth0UtilFromEnvVars(domain: String): Auth0Util = {
-      val tenant = System.getProperty("AUTH0_TENANT")
+    def auth0UtilFromEnvVars(domain: String, tenantO: Option[String] = None): Auth0Util = {
+      val tenant = tenantO.getOrElse(System.getProperty("AUTH0_TENANT"))
       val prefix = tenant match {
         // Used for preflight checks
         case "dev" => "AUTH0_CN"
+        // Used for sv preflight checks
+        case "sv" => "AUTH0_SV"
         // Used locally
         case "test" | "" | null => "AUTH0_TESTS"
         case _ => fail(s"Invalid value for AUTH0_TENANT property: $tenant")
