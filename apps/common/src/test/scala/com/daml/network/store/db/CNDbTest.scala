@@ -15,6 +15,7 @@ import slick.lifted.{Rep, TableQuery}
 import java.net.ServerSocket
 import scala.concurrent.Future
 import scala.util.Try
+import scala.concurrent.duration.DurationInt
 
 trait CNDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
 
@@ -68,12 +69,17 @@ trait CNDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
     val dbLockPort: Int = 54321
     implicit val tc: TraceContext = TraceContext.empty
     logger.info("Acquiring CNDbTest lock")
-    dbLockSocket = BaseTest.eventually()(
+    val lockTimeout = 5.minutes // expectation: Db tests won't take longer than 5m
+    dbLockSocket = BaseTest.eventually(lockTimeout)(
       Try(new ServerSocket(dbLockPort))
         .fold(
           e => {
             logger.debug(s"Acquiring CNDbTest lock: port $dbLockPort is in use")
-            throw new TestFailedException("", e, 0)
+            throw new TestFailedException(
+              s"Failed to acquire lock within timeout ($lockTimeout).",
+              e,
+              0,
+            )
           },
           Some(_),
         )
