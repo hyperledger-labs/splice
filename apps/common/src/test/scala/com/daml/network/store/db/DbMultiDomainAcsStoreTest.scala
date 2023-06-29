@@ -55,14 +55,39 @@ class DbMultiDomainAcsStoreTest
       }
     }
 
+    "allow creating same contract id in different stores" in {
+      val store1 = mkStore(id = 1)
+      val store2 = mkStore(id = 2)
+      val coupon = appRewardCoupon(1, svcParty)
+      for {
+        _ <- store1.ingestionSink.initialize()
+        _ <- store1.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty)
+        _ <- store2.ingestionSink.initialize()
+        _ <- store2.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty)
+        _ <- dummyDomain.create(coupon)(store1)
+        _ <- dummyDomain.create(coupon)(store2)
+      } yield {
+        eventually() {
+          store1
+            .listContracts(AppRewardCoupon.COMPANION)
+            .futureValue
+            .map(_.contract) should be(Seq(coupon))
+          store2
+            .listContracts(AppRewardCoupon.COMPANION)
+            .futureValue
+            .map(_.contract) should be(Seq(coupon))
+        }
+      }
+    }
+
   }
 
-  private val storeDescriptor =
+  private def storeDescriptor(id: Int) =
     io.circe.parser
-      .parse(raw"""{"test": "DbMultiDomainAcsStoreTest"}""")
+      .parse(raw"""{"test": "DbMultiDomainAcsStoreTest", "id": $id}""")
       .getOrElse(sys.error("Why is it so hard to define a JSON literal"))
 
-  private def mkStore() = {
+  private def mkStore(id: Int = 1) = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResource("dar/canton-coin-0.1.0.dar")
     implicit val templateJsonDecoder: TemplateJsonDecoder =
@@ -80,7 +105,7 @@ class DbMultiDomainAcsStoreTest
       new DbMultiDomainAcsStore(
         storage,
         "acs_store_template",
-        storeDescriptor,
+        storeDescriptor(id),
         _ => Future.successful(DomainId.tryFromString("domain1::domain")),
         loggerFactory,
         contractFilter,
@@ -120,7 +145,7 @@ class DbMultiDomainAcsStoreTest
       contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray,
     )
     insertRowIfNotExists(AcsStoreTemplateTable)(
-      _.contractId === contractId,
+      row => row.contractId === contractId && row.storeId === storeId,
       row,
     ).map { result =>
       eventNumber += 1
