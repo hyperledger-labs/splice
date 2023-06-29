@@ -33,7 +33,7 @@ import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
-import com.daml.network.util.{Codec, Contract, GcpBucket}
+import com.daml.network.util.{BackupDump, Codec, Contract}
 import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -452,28 +452,17 @@ class HttpSvHandler(
               val fileDesc =
                 s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $filename"
               logger.debug(s"Attempting to write $fileDesc")
-              val path = acsDumpConfig match {
-                case BackupDumpConfig.Directory(directory, _) =>
-                  import better.files.File
-                  // create output directories
-                  val file = File(directory) / filename.toString
-                  file.parent.createDirectories()
-                  file.write(httpSnapshot.asJson.noSpaces)
-                  filename.toString
-                case BackupDumpConfig.Gcp(bucketConfig, prefix, _) =>
-                  val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
-                  val path = prefix.fold(filename.toString)(prefix => s"$prefix/${filename}")
-                  gcpBucket.dumpStringToBucket(
-                    httpSnapshot.asJson.noSpaces,
-                    path,
-                  )
-                  path
-              }
+              val path = BackupDump.write(
+                acsDumpConfig,
+                filename,
+                httpSnapshot.asJson.noSpaces,
+                loggerFactory,
+              )
 
               logger.info(s"Wrote $fileDesc")
               v0.SvResource.TriggerAcsDumpResponseOK(
                 definitions.TriggerAcsDumpResponse(
-                  filename = path,
+                  filename = path.toString,
                   numEvents = snapshot.contracts.size,
                   offset = snapshot.offset,
                 )

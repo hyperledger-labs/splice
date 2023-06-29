@@ -1,12 +1,12 @@
 package com.daml.network.util
 
-import com.daml.network.config.{GcpBucketConfig}
+import com.daml.network.config.GcpBucketConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-
 import com.google.cloud.storage.{BlobId, BlobInfo, Storage, StorageOptions}
 
 import java.nio.charset.StandardCharsets
+import java.nio.file.Path
 
 class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {
@@ -19,13 +19,13 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     .build()
     .getService()
 
-  def dumpStringToBucket(data: String, fileName: String)(implicit
+  def dumpStringToBucket(data: String, fileName: Path)(implicit
       traceContext: TraceContext
   ): Unit =
-    dumpBytesToBucket(data.getBytes(StandardCharsets.UTF_8), fileName)
+    dumpBytesToBucket(data.getBytes(StandardCharsets.UTF_8), fileName.toString)
 
-  def readStringFromBucket(fileName: String): String =
-    new String(readBytesFromBucket(fileName), StandardCharsets.UTF_8)
+  def readStringFromBucket(fileName: Path): String =
+    new String(readBytesFromBucket(fileName.toString), StandardCharsets.UTF_8)
 
   private def dumpBytesToBucket(data: Array[Byte], fileName: String)(implicit
       traceContext: TraceContext

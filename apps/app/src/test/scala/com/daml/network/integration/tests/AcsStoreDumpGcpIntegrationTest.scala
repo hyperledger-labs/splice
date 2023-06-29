@@ -5,6 +5,8 @@ import com.daml.network.util.GcpBucket
 import com.digitalasset.canton.BaseTest
 import org.scalatest.wordspec.AsyncWordSpec
 
+import java.nio.file.Paths
+
 // Integration test to see that we can write to and read from a GCP bucket
 class AcsStoreDumpGcpIntegrationTest extends AsyncWordSpec with BaseTest {
 
@@ -15,7 +17,7 @@ class AcsStoreDumpGcpIntegrationTest extends AsyncWordSpec with BaseTest {
       // Dump bytes to GCP bucket
       val originalText = "Hello, GCP!"
       val dataToDump = originalText
-      val fileName = "integration-test/dummyfile.txt"
+      val fileName = Paths.get("integration-test", "dummyfile.txt")
       bucket.dumpStringToBucket(dataToDump, fileName)
 
       // Read bytes from GCP bucket

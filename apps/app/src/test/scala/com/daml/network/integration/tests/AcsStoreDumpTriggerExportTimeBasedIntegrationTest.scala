@@ -70,5 +70,5 @@ final class GcpBucketAcsStoreDumpTriggerExportTimeBasedIntegrationTest
   override def acsStoreDumpConfig =
     BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None, None)
   val bucket = new GcpBucket(acsStoreDumpConfig.bucket, loggerFactory)
-  override def readDump(filename: String) = bucket.readStringFromBucket(filename)
+  override def readDump(filename: String) = bucket.readStringFromBucket(Paths.get(filename))
 }

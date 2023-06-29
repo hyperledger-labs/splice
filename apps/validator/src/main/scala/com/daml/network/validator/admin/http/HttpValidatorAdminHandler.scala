@@ -1,10 +1,9 @@
 package com.daml.network.validator.admin.http
 
-import cats.syntax.traverse.*
-import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validatorAdmin as v0}
-import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.ValidatorUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
@@ -12,12 +11,11 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.OptionConverters.*
 
 class HttpValidatorAdminHandler(
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
+    identitiesStore: ParticipantIdentitiesStore,
     validatorUserName: String,
     validatorWalletUserName: Option[String],
     domainId: DomainId,
@@ -72,40 +70,11 @@ class HttpValidatorAdminHandler(
       respond: v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.type
   )()(
       fake: Unit
-  ): scala.concurrent.Future[v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse] =
+  ): Future[v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      for {
-        id <- participantAdminConnection.getParticipantId()
-        keysMetadata <- participantAdminConnection.listMyKeys()
-        keys <- keysMetadata.traverse(keyM =>
-          participantAdminConnection
-            .exportKeyPair(keyM.publicKeyWithName.publicKey.id)
-            .map(keyBytes =>
-              definitions.ParticipantKeyPair(
-                Base64.getEncoder().encodeToString(keyBytes.toByteArray),
-                keyM.publicKeyWithName.name.map(_.toString),
-              )
-            )
-        )
-        bootstrapTxs <- participantAdminConnection
-          .getIdentityBootstrapTransactions(id.uid)
-          .map(txes => txes.map(tx => Base64.getEncoder().encodeToString(tx.toByteArray)))
-        users <- storeWithIngestion.connection
-          .listUsers()
-          .map(users =>
-            users.map(user =>
-              definitions.ParticipantUser(
-                user.getId(),
-                user.getPrimaryParty().toScala,
-              )
-            )
-          )
-      } yield definitions.DumpParticipantIdentitiesResponse(
-        id.toProtoPrimitive,
-        keys.toVector,
-        bootstrapTxs.toVector,
-        users.toVector,
-      )
+      identitiesStore
+        .getParticipantIdentitiesDump()
+        .map(response => v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.OK(response))
     }
 
   private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {

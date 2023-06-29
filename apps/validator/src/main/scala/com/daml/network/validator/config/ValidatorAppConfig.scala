@@ -89,6 +89,7 @@ case class ValidatorAppBackendConfig(
     foundingSvClient: SvAppClientConfig,
     // TODO(#6247) Remove the option to disable this
     enableAdminAuth: Boolean = true,
+    participantIdentitiesBackup: Option[BackupDumpConfig] = None,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

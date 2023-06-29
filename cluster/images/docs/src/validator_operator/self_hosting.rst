@@ -495,7 +495,7 @@ Please store the resulting ``participant-dump.json`` in a safe location.
 We recommend performing a fresh participant identities dump (on your "old" network validator) just before re-initializing your participant and validator on a freshly reset ("new") network.
 To account for cases where this is not possible, we additionally recommend setting up periodical backups of your validator's participant identities data.
 
-.. TODO(#6217): Consider covering dumping to GCP buckets as well
+.. TODO(#6290): Cover the config for periodic backup to GCP buckets or a directory as well
 
 Initialize With Existing Identities Data
 ++++++++++++++++++++++++++++++++++++++++

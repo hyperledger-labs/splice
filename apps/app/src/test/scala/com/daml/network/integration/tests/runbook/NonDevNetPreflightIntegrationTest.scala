@@ -14,6 +14,8 @@ import java.time.{Duration, Instant}
 import com.daml.network.util.{FrontendLoginUtil, GcpBucket}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import java.nio.file.Paths
+
 class NonDevNetPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with SvUiIntegrationTestUtil
@@ -132,7 +134,7 @@ class NonDevNetPreflightIntegrationTest
   "trigger ACS snapshot and check that it can be downloaded and decoded" in { implicit env =>
     val result = sv1Client.triggerAcsDump()
     val bucket = new GcpBucket(GcpBucketConfig.inferForCluster, loggerFactory)
-    val dump = bucket.readStringFromBucket(result.filename)
+    val dump = bucket.readStringFromBucket(Paths.get(result.filename))
     io.circe.parser.decode[http.GetAcsStoreDumpResponse](dump) should matchPattern {
       case Right(_) =>
     }

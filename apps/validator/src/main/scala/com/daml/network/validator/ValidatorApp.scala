@@ -45,7 +45,7 @@ import com.daml.network.validator.config.{
   ValidatorAppBackendConfig,
   ValidatorOnboardingConfig,
 }
-import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.HttpWalletHandler
@@ -316,6 +316,13 @@ class ValidatorApp(
         clock,
       )
       _ <- setupWalletDars(participantAdminConnection)
+      participantIdentitiesStore = new ParticipantIdentitiesStore(
+        participantAdminConnection,
+        ledgerClient.connection("ParticipantIdentitiesStore", loggerFactory),
+        config.participantIdentitiesBackup,
+        clock,
+        loggerFactory,
+      )
       scanConnection <- ScanConnection(
         ledgerClient,
         config.scanClient,
@@ -350,6 +357,7 @@ class ValidatorApp(
         )
       automation = new ValidatorAutomationService(
         config.automation,
+        config.participantIdentitiesBackup,
         config.domains.global.buyExtraTraffic,
         clock,
         walletManager,
@@ -357,6 +365,7 @@ class ValidatorApp(
         scanConnection,
         ledgerClient,
         participantAdminConnection,
+        participantIdentitiesStore,
         retryProvider,
         loggerFactory,
       )
@@ -411,6 +420,7 @@ class ValidatorApp(
         Future.successful(
           new HttpValidatorAdminHandler(
             automation,
+            participantIdentitiesStore,
             validatorUserName = config.ledgerApiUser,
             validatorWalletUserName = config.validatorWalletUser,
             domainId = domainId,

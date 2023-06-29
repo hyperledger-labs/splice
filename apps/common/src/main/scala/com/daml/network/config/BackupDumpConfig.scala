@@ -6,6 +6,8 @@ import java.nio.file.Path
 
 sealed abstract class BackupDumpConfig {
   def locationDescription: String
+
+  // TODO(#6228): make this required once it is also supported for AcsStoreDumps
   def backupInterval: Option[NonNegativeFiniteDuration]
 }
 

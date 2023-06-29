@@ -270,6 +270,13 @@ object CNNodeConfigTransforms {
   ): CNNodeConfigTransform =
     updateAllValidatorConfigs((_, config) => update(config))
 
+  def updateAllValidatorAppConfigs_(
+      update: ValidatorAppTransform
+  ): CNNodeConfigTransform =
+    _.focus(_.validatorApps).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
   def updateAllSplitwellAppConfigs_(
       update: SplitwellAppTransform
   ): CNNodeConfigTransform =

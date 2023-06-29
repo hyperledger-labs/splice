@@ -84,7 +84,7 @@ final class FileAcsStoreDumpIntegrationTest
 
 final class GcpAcsStoreDumpIntegrationTest
     extends AcsStoreDumpImportIntegrationTest[SvBootstrapDumpConfig.Gcp] {
-  private val bucketPath = "acs/import-test/dummy.json"
+  private val bucketPath = Paths.get("acs/import-test/dummy.json")
   override def bootstrapDumpConfig =
     SvBootstrapDumpConfig.Gcp(GcpBucketConfig.inferForTesting, bucketPath)
 

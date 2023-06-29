@@ -49,7 +49,7 @@ object SvBootstrapDumpConfig {
   }
   final case class Gcp(
       bucket: GcpBucketConfig,
-      path: String,
+      path: Path,
   ) extends SvBootstrapDumpConfig {
     override val description = s"Path $path in ${bucket.description}"
   }
