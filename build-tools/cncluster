@@ -119,6 +119,7 @@ function _cluster_apply() {
         args+=(-c "FIXED_TOKENS=0")
     fi
 
+    subcmd_infra_up
     _cluster_install_network_gateway
 
     _info "Applying Pulumi Stack"
@@ -1044,6 +1045,7 @@ function subcmd_apply() {
             fi
         fi
 
+        subcmd_infra_up
         _cluster_install_network_gateway
         subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
     fi
@@ -1098,6 +1100,7 @@ function subcmd_apply_sv(){
 
     local -x CHARTS_VERSION="${2-}"
 
+    subcmd_infra_up
     subcmd_pulumi sv-runbook up --yes --skip-preview --show-sames "${args[@]}"
 }
 
@@ -1130,6 +1133,7 @@ function subcmd_ci_apply_sv() {
 
     local -x CHARTS_VERSION="${1-}"
 
+    subcmd_infra_up
     subcmd_pulumi sv-runbook up --yes --skip-preview "${args[@]}"
 }
 
