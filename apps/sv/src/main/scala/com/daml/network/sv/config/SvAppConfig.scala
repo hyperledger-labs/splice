@@ -3,9 +3,9 @@ package com.daml.network.sv.config
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
+  BackupDumpConfig,
   CNNodeBackendConfig,
   CNParticipantClientConfig,
-  GcpBucketConfig,
   HttpCNNodeClientConfig,
   NetworkAppClientConfig,
 }
@@ -13,7 +13,6 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
-import java.nio.file.Path
 
 case class ExpectedValidatorOnboardingConfig(
     secret: String,
@@ -77,24 +76,6 @@ final case class SvDomainConfig(
     global: SvGlobalDomainConfig
 )
 
-sealed abstract class SvAcsStoreDumpConfig {
-  def locationDescription: String
-}
-
-object SvAcsStoreDumpConfig {
-  final case class Directory(
-      directory: Path
-  ) extends SvAcsStoreDumpConfig {
-    override val locationDescription = s"directory $directory"
-  }
-  final case class Gcp(
-      bucket: GcpBucketConfig,
-      prefix: Option[String],
-  ) extends SvAcsStoreDumpConfig {
-    override val locationDescription = s"GCP bucket ${bucket.bucketName}"
-  }
-}
-
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
@@ -119,7 +100,7 @@ case class SvAppBackendConfig(
     localDomainNode: Option[SvDomainNodeConfig],
     // TODO(#5855) so we can lock; remove this again
     foundingSvClient: SvAppClientConfig,
-    acsStoreDump: Option[SvAcsStoreDumpConfig] = None,
+    acsStoreDump: Option[BackupDumpConfig] = None,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

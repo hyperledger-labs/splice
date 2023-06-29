@@ -1,18 +1,17 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.{CNNodeConfigTransforms, GcpBucketConfig}
+import com.daml.network.config.{CNNodeConfigTransforms, BackupDumpConfig, GcpBucketConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.sv.config.SvAcsStoreDumpConfig
 import com.daml.network.util.GcpBucket
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
 
-abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: SvAcsStoreDumpConfig]
+abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: BackupDumpConfig]
     extends AcsStoreDumpExportTimeBasedIntegrationTestBase {
 
   protected def acsStoreDumpConfig: T
@@ -55,8 +54,8 @@ abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: SvAcsS
 }
 
 final class DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest
-    extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[SvAcsStoreDumpConfig.Directory] {
-  override def acsStoreDumpConfig = SvAcsStoreDumpConfig.Directory(Paths.get("dumps/testing"))
+    extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[BackupDumpConfig.Directory] {
+  override def acsStoreDumpConfig = BackupDumpConfig.Directory(Paths.get("dumps/testing"), None)
 
   override def readDump(filename: String) = {
     import better.files.File
@@ -68,8 +67,9 @@ final class DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest
 }
 
 final class GcpBucketAcsStoreDumpTriggerExportTimeBasedIntegrationTest
-    extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[SvAcsStoreDumpConfig.Gcp] {
-  override def acsStoreDumpConfig = SvAcsStoreDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None)
+    extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[BackupDumpConfig.Gcp] {
+  override def acsStoreDumpConfig =
+    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None, None)
   val bucket = new GcpBucket(acsStoreDumpConfig.bucket, loggerFactory)
   override def readDump(filename: String) = {
     new String(bucket.readBytesFromBucket(filename), StandardCharsets.UTF_8)

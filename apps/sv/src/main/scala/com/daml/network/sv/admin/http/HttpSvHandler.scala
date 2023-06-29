@@ -22,12 +22,12 @@ import com.daml.network.http.v0.definitions.{
   CometBftStatusOrError,
   ErrorResponse,
 }
+import com.daml.network.config.BackupDumpConfig
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.cometbft.CometBftClient
-import com.daml.network.sv.config.SvAcsStoreDumpConfig
 import com.daml.network.sv.setup.SvcPartyHosting
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -52,7 +52,7 @@ import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
     globalDomain: DomainId,
-    optAcsDumpConfig: Option[SvAcsStoreDumpConfig],
+    optAcsDumpConfig: Option[BackupDumpConfig],
     svUserName: String,
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
@@ -424,7 +424,7 @@ class HttpSvHandler(
             .withDescription("No ACS store dump directory configured")
             .asRuntimeException()
         )
-      case Some(acsDumpConfig: SvAcsStoreDumpConfig) =>
+      case Some(acsDumpConfig: BackupDumpConfig) =>
         logger.debug(s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription}")
         for {
           // TODO(#6073): this doesn't work for larger ACS as the client will timeout -- we can change its semantics to start a dump process and return a handle to the operation that can be checked for completion
@@ -454,14 +454,14 @@ class HttpSvHandler(
                 s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $filename"
               logger.debug(s"Attempting to write $fileDesc")
               val path = acsDumpConfig match {
-                case SvAcsStoreDumpConfig.Directory(directory) =>
+                case BackupDumpConfig.Directory(directory, _) =>
                   import better.files.File
                   // create output directories
                   val file = File(directory) / filename.toString
                   file.parent.createDirectories()
                   file.write(httpSnapshot.asJson.noSpaces)
                   filename.toString
-                case SvAcsStoreDumpConfig.Gcp(bucketConfig, prefix) =>
+                case BackupDumpConfig.Gcp(bucketConfig, prefix, _) =>
                   val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
                   val path = prefix.fold(filename.toString)(prefix => s"$prefix/${filename}")
                   gcpBucket.dumpBytesToBucket(

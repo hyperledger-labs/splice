@@ -434,13 +434,13 @@ object CNNodeConfig {
       deriveReader[SvGlobalDomainConfig]
     implicit val svDomainConfigReader: ConfigReader[SvDomainConfig] =
       deriveReader[SvDomainConfig]
-    implicit val svAcsStoreDumpConfigHint = new FieldCoproductHint[SvAcsStoreDumpConfig]("type")
-    implicit val svAcsStoreDumpConfigDirectoryReader: ConfigReader[SvAcsStoreDumpConfig.Directory] =
-      deriveReader[SvAcsStoreDumpConfig.Directory]
-    implicit val svAcsStoreDumpConfigGcpReader: ConfigReader[SvAcsStoreDumpConfig.Gcp] =
-      deriveReader[SvAcsStoreDumpConfig.Gcp]
-    implicit val svAcsStoreDumpConfigReader: ConfigReader[SvAcsStoreDumpConfig] =
-      deriveReader[SvAcsStoreDumpConfig]
+    implicit val backupDumpConfigHint = new FieldCoproductHint[BackupDumpConfig]("type")
+    implicit val backupDumpConfigDirectoryReader: ConfigReader[BackupDumpConfig.Directory] =
+      deriveReader[BackupDumpConfig.Directory]
+    implicit val backupDumpConfigGcpReader: ConfigReader[BackupDumpConfig.Gcp] =
+      deriveReader[BackupDumpConfig.Gcp]
+    implicit val backupDumpConfigReader: ConfigReader[BackupDumpConfig] =
+      deriveReader[BackupDumpConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         // We support joining nodes without sequencers/mediators but
@@ -604,13 +604,13 @@ object CNNodeConfig {
       deriveWriter[SvGlobalDomainConfig]
     implicit val svDomainConfigWriter: ConfigWriter[SvDomainConfig] =
       deriveWriter[SvDomainConfig]
-    implicit val svAcsStoreDumpConfigHint = new FieldCoproductHint[SvAcsStoreDumpConfig]("type")
-    implicit val svAcsStoreDumpConfigDirectoryWriter: ConfigWriter[SvAcsStoreDumpConfig.Directory] =
-      deriveWriter[SvAcsStoreDumpConfig.Directory]
-    implicit val svAcsStoreDumpConfigGcpWriter: ConfigWriter[SvAcsStoreDumpConfig.Gcp] =
-      deriveWriter[SvAcsStoreDumpConfig.Gcp]
-    implicit val svAcsStoreDumpConfigWriter: ConfigWriter[SvAcsStoreDumpConfig] =
-      deriveWriter[SvAcsStoreDumpConfig]
+    implicit val backupDumpConfigHint = new FieldCoproductHint[BackupDumpConfig]("type")
+    implicit val backupDumpConfigDirectoryWriter: ConfigWriter[BackupDumpConfig.Directory] =
+      deriveWriter[BackupDumpConfig.Directory]
+    implicit val backupDumpConfigGcpWriter: ConfigWriter[BackupDumpConfig.Gcp] =
+      deriveWriter[BackupDumpConfig.Gcp]
+    implicit val backupDumpConfigWriter: ConfigWriter[BackupDumpConfig] =
+      deriveWriter[BackupDumpConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 
