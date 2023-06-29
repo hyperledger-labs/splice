@@ -11,6 +11,10 @@ env: &env
   CI: "true"
   USER: circleci
 
+non_devnet_preflight_params: &non_devnet_preflight_params
+  parallelism: 1
+  test_names_file: "test-full-class-names-preflight-non-devnet.log"
+
 parameters:
   # Bump this when you change the definition of what is being cached to make sure
   # old files don’t pollute your build.
@@ -2230,6 +2234,7 @@ workflows:
            - wait_for_previous_pipeline
     - preflight_check:
         <<: *main-branch-only
+        <<: *non_devnet_preflight_params
         context:
           - artifactory
           - canton-network-vpn
@@ -2278,8 +2283,7 @@ workflows:
            - wait_for_previous_pipeline
     - preflight_check:
         cluster: "testnet-preview"
-        parallelism: 1
-        test_names_file: "test-full-class-names-preflight-non-devnet.log"
+        <<: *non_devnet_preflight_params
         # TODO(#6032) Remove this if we don't remove the whole cluster before.
         # <<: *main-branch-only
         context:
@@ -2306,6 +2310,7 @@ workflows:
           workflow_names: "deploy_testnet"
       - preflight_check:
           <<: *main-branch-only
+          <<: *non_devnet_preflight_params
           cluster: "testnet"
           context:
             - artifactory
@@ -2355,8 +2360,7 @@ workflows:
           # TODO(#6032) Remove this if we don't remove the whole cluster before.
           # <<: *main-branch-only
           cluster: "testnet-preview"
-          parallelism: 1
-          test_names_file: "test-full-class-names-preflight-non-devnet.log"
+          <<: *non_devnet_preflight_params
           context:
             - artifactory
             - canton-network-vpn
