@@ -14,7 +14,7 @@ import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{ExpiringLock, SvUtil, SvcRulesLock}
 import com.daml.network.util.CNNodeUtil.{
@@ -22,7 +22,7 @@ import com.daml.network.util.CNNodeUtil.{
   defaultCoinConfigSchedule,
   defaultEnabledChoices,
 }
-import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -49,6 +49,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
+import java.nio.charset.StandardCharsets
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
@@ -329,17 +330,26 @@ class FoundingNodeInitializer(
 
     private def importAcsSnapshot(): Future[Unit] = foundingConfig.bootstrappingDump match {
       case None => Future.unit
-      case Some(dumpFilename) =>
+      case Some(config) =>
         for {
           cmds <- Future {
             blocking {
-              val file = better.files.File(dumpFilename)
-              logger.info(s"Parsing contracts in ACS store dump: ${file.path.toAbsolutePath}")
-              val jsonString = file.contentAsString
+              val jsonString = config match {
+                case SvBootstrapDumpConfig.File(file) =>
+                  logger.info(s"Parsing contracts in ACS store dump: ${file.toAbsolutePath}")
+                  better.files.File(file).contentAsString
+                case SvBootstrapDumpConfig.Gcp(bucketConfig, path) =>
+                  val bucket = new GcpBucket(bucketConfig, loggerFactory)
+                  val byte = bucket.readBytesFromBucket(path)
+                  new String(byte, StandardCharsets.UTF_8)
+              }
               val jsonDump = io.circe.parser
                 .decode[http.GetAcsStoreDumpResponse](jsonString)
                 .fold(
-                  err => throw new IllegalArgumentException(s"Failed to parse $file: $err"),
+                  err =>
+                    throw new IllegalArgumentException(
+                      s"Failed to parse ${config.description}: $err"
+                    ),
                   result => result,
                 )
               AcsStoreDump.extractImportCommandsFromJsonDump(svcParty, productionMode = false)(

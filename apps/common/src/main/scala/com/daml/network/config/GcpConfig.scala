@@ -41,7 +41,9 @@ final case class GcpBucketConfig(
     credentials: GcpCredentialsConfig,
     projectId: String,
     bucketName: String,
-)
+) {
+  def description: String = s"GCP bucket $bucketName in project $projectId"
+}
 
 object GcpBucketConfig {
   def inferForTesting: GcpBucketConfig =

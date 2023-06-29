@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.{CNNodeConfigTransforms, GcpBucketConfig}
 import com.daml.network.config.CNNodeConfigTransforms.updateAllSvAppConfigs_
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -8,21 +8,27 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.config.SvOnboardingConfig
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.sv.config.{SvBootstrapDumpConfig, SvOnboardingConfig}
+import com.daml.network.util.{GcpBucket, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.Paths
+
 // Separate from the export as we need a different config for SV1
-class AcsStoreDumpImportIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
+    extends CNNodeIntegrationTest
+    with WalletTestUtil {
+
+  def bootstrapDumpConfig: T
 
   // We use fixed dumps to test data continuity.
   // We expect to add new dumps and a corresponding test from test-net releases that fail staging
   // and required adaption of the dump import code.
 
   // TODO(#6073): move to test/resources and remove the `./dumps` directory and its .gitignore once we dump to a Google Cloud Storage bucket
-  private val bootstrappingDumpFilename = {
-    "dumps/static_test_data/test-dump_changed-package-ids.json"
-  }
+  protected val bootstrappingDumpFilename =
+    Paths.get("dumps/static_test_data/test-dump_changed-package-ids.json")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -40,7 +46,7 @@ class AcsStoreDumpImportIntegrationTest extends CNNodeIntegrationTest with Walle
               case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
                 Some(
                   foundCollective.copy(
-                    bootstrappingDump = Some(bootstrappingDumpFilename)
+                    bootstrappingDump = Some(bootstrapDumpConfig)
                   )
                 )
               case other => other
@@ -70,4 +76,23 @@ class AcsStoreDumpImportIntegrationTest extends CNNodeIntegrationTest with Walle
     }
   }
 
+}
+
+final class FileAcsStoreDumpIntegrationTest
+    extends AcsStoreDumpImportIntegrationTest[SvBootstrapDumpConfig.File] {
+  override def bootstrapDumpConfig = SvBootstrapDumpConfig.File(bootstrappingDumpFilename)
+}
+
+final class GcpAcsStoreDumpIntegrationTest
+    extends AcsStoreDumpImportIntegrationTest[SvBootstrapDumpConfig.Gcp] {
+  private val bucketPath = "acs/import-test/dummy.json"
+  override def bootstrapDumpConfig =
+    SvBootstrapDumpConfig.Gcp(GcpBucketConfig.inferForTesting, bucketPath)
+
+  override def beforeAll() = {
+    super.beforeAll()
+    val gcpBucket = new GcpBucket(GcpBucketConfig.inferForTesting, loggerFactory)
+    val fileContent = better.files.File(bootstrappingDumpFilename).contentAsString
+    gcpBucket.dumpBytesToBucket(fileContent.getBytes(StandardCharsets.UTF_8), bucketPath)
+  }
 }

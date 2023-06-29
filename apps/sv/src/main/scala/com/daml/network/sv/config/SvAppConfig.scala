@@ -6,6 +6,7 @@ import com.daml.network.config.{
   BackupDumpConfig,
   CNNodeBackendConfig,
   CNParticipantClientConfig,
+  GcpBucketConfig,
   HttpCNNodeClientConfig,
   NetworkAppClientConfig,
 }
@@ -13,6 +14,8 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
+
+import java.nio.file.Path
 
 case class ExpectedValidatorOnboardingConfig(
     secret: String,
@@ -35,6 +38,23 @@ case class ApprovedSvIdentityConfig(
 sealed trait SvOnboardingConfig {
   val name: String // the human-readable name we want others to use for us
 }
+
+sealed abstract class SvBootstrapDumpConfig {
+  def description: String
+}
+
+object SvBootstrapDumpConfig {
+  final case class File(file: Path) extends SvBootstrapDumpConfig {
+    override val description = s"Local file $file"
+  }
+  final case class Gcp(
+      bucket: GcpBucketConfig,
+      path: String,
+  ) extends SvBootstrapDumpConfig {
+    override val description = s"Path $path in ${bucket.description}"
+  }
+}
+
 object SvOnboardingConfig {
   case class FoundCollective(
       name: String,
@@ -45,7 +65,7 @@ object SvOnboardingConfig {
       // TODO(#5855) remove this again
       globalLockTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(120),
       isDevNet: Boolean = false,
-      bootstrappingDump: Option[String] = None,
+      bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

@@ -410,6 +410,13 @@ object CNNodeConfig {
     implicit val gcpCredentialsConfigReader: ConfigReader[GcpCredentialsConfig] =
       deriveReader[GcpCredentialsConfig]
     implicit val gcpBucketConfig: ConfigReader[GcpBucketConfig] = deriveReader[GcpBucketConfig]
+    implicit val svBootstrapDumpConfigHint = new FieldCoproductHint[SvBootstrapDumpConfig]("type")
+    implicit val svBootstrapDumpConfigFileReader: ConfigReader[SvBootstrapDumpConfig.File] =
+      deriveReader[SvBootstrapDumpConfig.File]
+    implicit val svBootstrapDumpConfigGcpReader: ConfigReader[SvBootstrapDumpConfig.Gcp] =
+      deriveReader[SvBootstrapDumpConfig.Gcp]
+    implicit val svBootstrapDumpConfigReader: ConfigReader[SvBootstrapDumpConfig] =
+      deriveReader[SvBootstrapDumpConfig]
     implicit val svOnboardingConfigHint = new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val svOnboardingFoundCollectiveReader
         : ConfigReader[SvOnboardingConfig.FoundCollective] =
@@ -576,6 +583,13 @@ object CNNodeConfig {
     implicit val gcpCredentialsConfigWriter: ConfigWriter[GcpCredentialsConfig] =
       confidentialWriter[GcpCredentialsConfig](GcpCredentialsConfig.hideConfidential)
     implicit val gcpBucketConfig: ConfigWriter[GcpBucketConfig] = deriveWriter[GcpBucketConfig]
+    implicit val svBootstrapDumpConfigHint = new FieldCoproductHint[SvBootstrapDumpConfig]("type")
+    implicit val svBootstrapDumpConfigFileWriter: ConfigWriter[SvBootstrapDumpConfig.File] =
+      deriveWriter[SvBootstrapDumpConfig.File]
+    implicit val svBootstrapDumpConfigGcpWriter: ConfigWriter[SvBootstrapDumpConfig.Gcp] =
+      deriveWriter[SvBootstrapDumpConfig.Gcp]
+    implicit val svBootstrapDumpConfigWriter: ConfigWriter[SvBootstrapDumpConfig] =
+      deriveWriter[SvBootstrapDumpConfig]
     implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
       new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val svOnboardingFoundCollectiveWriter
