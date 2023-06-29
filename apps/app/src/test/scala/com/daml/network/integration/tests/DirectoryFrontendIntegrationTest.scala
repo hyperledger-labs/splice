@@ -34,7 +34,7 @@ class DirectoryFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(100.0)
 
-      val entryName = "mycool+entry"
+      val entryName = "mycool_entry.unverified.cns"
 
       aliceWalletClient.listSubscriptionRequests() shouldBe empty
 

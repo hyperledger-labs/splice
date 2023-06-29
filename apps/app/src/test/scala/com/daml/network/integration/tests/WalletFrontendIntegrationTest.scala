@@ -191,7 +191,7 @@ class WalletFrontendIntegrationTest
     "show logged in directory name" in { implicit env =>
       // Create directory entry for alice
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val entryName = perTestCaseName("alice.cns")
+      val entryName = perTestCaseName("alice")
       val aliceParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
 
       createDirectoryEntry(

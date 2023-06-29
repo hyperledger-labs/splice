@@ -32,7 +32,7 @@ class WalletPaymentFrontendIntegrationTest
       "allow accepting payments in CC" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-        val aliceEntryName = perTestCaseName("alice.cns")
+        val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
           aliceDirectoryClient,
@@ -41,7 +41,7 @@ class WalletPaymentFrontendIntegrationTest
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-        val charlieEntryName = perTestCaseName("charlie.cns")
+        val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
           charlieUserParty,
           charlieDirectoryClient,
@@ -113,7 +113,7 @@ class WalletPaymentFrontendIntegrationTest
       "allow accepting payments in USD" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-        val aliceEntryName = perTestCaseName("alice.cns")
+        val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
           aliceDirectoryClient,
@@ -122,7 +122,7 @@ class WalletPaymentFrontendIntegrationTest
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-        val charlieEntryName = perTestCaseName("charlie.cns")
+        val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
           charlieUserParty,
           charlieDirectoryClient,
@@ -198,7 +198,7 @@ class WalletPaymentFrontendIntegrationTest
       "allow accepting payments in CC" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-        val aliceEntryName = perTestCaseName("alice.cns")
+        val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
           aliceDirectoryClient,
@@ -207,7 +207,7 @@ class WalletPaymentFrontendIntegrationTest
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-        val charlieEntryName = perTestCaseName("charlie.cns")
+        val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
           charlieUserParty,
           charlieDirectoryClient,
@@ -282,7 +282,7 @@ class WalletPaymentFrontendIntegrationTest
       "allow accepting payments in USD" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-        val aliceEntryName = perTestCaseName("alice.cns")
+        val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
           aliceDirectoryClient,
@@ -291,7 +291,7 @@ class WalletPaymentFrontendIntegrationTest
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-        val charlieEntryName = perTestCaseName("charlie.cns")
+        val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
           charlieUserParty,
           charlieDirectoryClient,
@@ -366,7 +366,7 @@ class WalletPaymentFrontendIntegrationTest
       "allow accepting payments in both CC & USD" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-        val aliceEntryName = perTestCaseName("alice.cns")
+        val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
           aliceDirectoryClient,
@@ -375,7 +375,7 @@ class WalletPaymentFrontendIntegrationTest
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-        val charlieEntryName = perTestCaseName("charlie.cns")
+        val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
           charlieUserParty,
           charlieDirectoryClient,

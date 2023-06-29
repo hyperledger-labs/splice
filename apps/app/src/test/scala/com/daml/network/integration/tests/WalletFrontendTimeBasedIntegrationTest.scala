@@ -74,7 +74,7 @@ class WalletFrontendTimeBasedIntegrationTest
     "show user details after login" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-      val entryName = perTestCaseName("alice.cns")
+      val entryName = perTestCaseName("alice")
 
       createDirectoryEntry(
         aliceParty,

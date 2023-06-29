@@ -82,9 +82,9 @@ def ensureDirectoryEntry(
     }
   }
 }
-ensureDirectoryEntry(aliceUserParty, "alice.cns", aliceDirectory, aliceWallet)
-ensureDirectoryEntry(bobUserParty, "bob.cns", bobDirectory, bobWallet)
-ensureDirectoryEntry(charlieUserParty, "charlie.cns", charlieDirectory, charlieWallet)
+ensureDirectoryEntry(aliceUserParty, "alice.unverified.cns", aliceDirectory, aliceWallet)
+ensureDirectoryEntry(bobUserParty, "bob.unverified.cns", bobDirectory, bobWallet)
+ensureDirectoryEntry(charlieUserParty, "charlie.unverified.cns", charlieDirectory, charlieWallet)
 
 println("Waiting for splitwell initialization...")
 providerSplitwellBackend.waitForInitialization()

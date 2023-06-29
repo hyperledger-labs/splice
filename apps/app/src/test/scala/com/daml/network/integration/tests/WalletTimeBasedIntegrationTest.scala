@@ -27,7 +27,7 @@ class WalletTimeBasedIntegrationTest
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
-  private val testEntryName = "mycoolentry"
+  private val testEntryName = "mycoolentry.unverified.cns"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

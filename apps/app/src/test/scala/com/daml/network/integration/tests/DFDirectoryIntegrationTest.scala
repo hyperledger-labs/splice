@@ -33,7 +33,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
 
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
-  private val testEntryName = "mycoolentry"
+  private val testEntryName = "mycoolentry.unverified.cns"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -351,13 +351,13 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
 
       actAndCheck(
         "Setup entries", {
-          requestAndPayForEntry(aliceRefs, "alice.cns")
-          requestAndPayForEntry(aliceRefs, "aliceAndCo.cns")
-          requestAndPayForEntry(aliceRefs, "aliceAndSons.cns")
-          requestAndPayForEntry(aliceRefs, "bobIsntHere.cns")
-          requestAndPayForEntry(bobRefs, "bob.cns")
-          requestAndPayForEntry(bobRefs, "bobIsCool.cns")
-          requestAndPayForEntry(bobRefs, "bobAndFriends.cns")
+          requestAndPayForEntry(aliceRefs, "alice.unverified.cns")
+          requestAndPayForEntry(aliceRefs, "alice-and-co.unverified.cns")
+          requestAndPayForEntry(aliceRefs, "alice-and-sons.unverified.cns")
+          requestAndPayForEntry(aliceRefs, "bob-isnt_here.unverified.cns")
+          requestAndPayForEntry(bobRefs, "bob.unverified.cns")
+          requestAndPayForEntry(bobRefs, "bob-is-cool.unverified.cns")
+          requestAndPayForEntry(bobRefs, "bob_and_friends.unverified.cns")
         },
       )(
         "Lookup entries with prefixes",
@@ -366,12 +366,31 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
           directoryBackend.listEntries("a", 25) should have length 3
           directoryBackend.listEntries("a", 2) should have length 2
           directoryBackend.listEntries("b", 25) should have length 4
-          directoryBackend.listEntries("bobIs", 25) should have length 2
+          directoryBackend.listEntries("bob-is", 25) should have length 2
           directoryBackend.listEntries("c", 25) should have length 0
           directoryBackend.listEntries("a", 0) should have length 0
           directoryBackend.listEntries("a", -1) should have length 0
         },
       )
+    }
+
+    "reject invalid entry names" in { implicit env =>
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+
+      clue("invalid entries are rejected") {
+        val invalidNames =
+          Seq("alice.company.unverified.cns", "alice$company.unverified.cns", "alice.cns")
+        invalidNames.foreach { name =>
+          loggerFactory.assertLogs(
+            {
+              requestAndPayForEntry(aliceRefs, name)
+            },
+            _.warningMessage should include(s"entry name ($name) is not valid"),
+          )
+        }
+      }
     }
 
     def setupUser(refs: StaticUserRefs): DynamicUserRefs = {

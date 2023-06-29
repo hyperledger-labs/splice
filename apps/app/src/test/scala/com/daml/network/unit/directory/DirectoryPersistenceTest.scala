@@ -67,7 +67,7 @@ class DirectoryPersistenceTest
           contractMetadataDriverInternal = Array(255.toByte, 0.toByte, 255.toByte, 0.toByte),
           contractExpiresAt = Some(Timestamp.Epoch.add(Duration.ofDays(2))),
           directoryInstallUser = Some(PartyId.tryFromProtoPrimitive("alice::test")),
-          directoryEntryName = Some("alice.cns"),
+          directoryEntryName = Some("alice.unverified.cns"),
           directoryEntryOwner = Some(PartyId.tryFromProtoPrimitive("alice_owner::test")),
           subscriptionContextContractId = None,
           subscriptionNextPaymentDueAt = Some(Timestamp.Epoch.add(Duration.ofDays(3))),

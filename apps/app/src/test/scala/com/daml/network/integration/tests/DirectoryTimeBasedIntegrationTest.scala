@@ -25,7 +25,7 @@ class DirectoryTimeBasedIntegrationTest
 
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
-  private val testEntryName = "mycoolentry"
+  private val testEntryName = "mycoolentry.unverified.cns"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -41,6 +41,7 @@ class DirectoryTimeBasedIntegrationTest
       })
 
   "Directory service" should {
+
     "archive expired directory entries also when running on simtime" in { implicit env =>
       clue("Creating a directory entry that expires immediately") {
         directoryBackend.listEntries("", 25) shouldBe empty
@@ -67,6 +68,7 @@ class DirectoryTimeBasedIntegrationTest
         )
       }
     }
+
     "allocate directory entries following an initial subscription payment and renew entries on follow-up payments" in {
       implicit env =>
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
@@ -124,6 +126,7 @@ class DirectoryTimeBasedIntegrationTest
           renewedEntry.payload shouldBe newEntry
         }
     }
+
     "expire stale subscriptions" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       clue("Request install and wait for provider to auto-accept") {

@@ -172,8 +172,8 @@ class SplitwellFrontendIntegrationTest
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val groupName = "troika"
 
-      val aliceEntryName = perTestCaseName("alice.cns")
-      val bobEntryName = perTestCaseName("bob.cns")
+      val aliceEntryName = perTestCaseName("alice")
+      val bobEntryName = perTestCaseName("bob")
       initialiseDirectoryApp(
         aliceEntryName,
         aliceUserParty,

@@ -92,6 +92,7 @@ class SubscriptionInitialPaymentTrigger(
           )
       } yield TaskSuccess("created directory entry.")
     }
+
     for {
       context <- store.multiDomainAcsStore
         .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
@@ -113,24 +114,32 @@ class SubscriptionInitialPaymentTrigger(
         case Right((transferContext, disclosedContracts)) =>
           // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
           val entryName = context.payload.name
-          // check whether the entry already exists
-          store.lookupEntryByNameWithOffset(entryName).flatMap {
-            case QueryResult(_, Some(entry)) =>
-              rejectPayment(
-                s"entry already exists and owned by ${entry.payload.user}.",
-                transferContext,
-                disclosedContracts,
-              )
-            case QueryResult(offset, None) =>
-              // collect the payment and create the entry
-              collectPayment(
-                entryName,
-                offset,
-                transferContext,
-                disclosedContracts,
-              )
-          }
 
+          if (!DirectoryUtil.isValidEntryName(entryName)) {
+            rejectPayment(
+              s"entry name ($entryName) is not valid",
+              transferContext,
+              disclosedContracts,
+            )
+          } else {
+            // check whether the entry already exists
+            store.lookupEntryByNameWithOffset(entryName).flatMap {
+              case QueryResult(_, Some(entry)) =>
+                rejectPayment(
+                  s"entry already exists and owned by ${entry.payload.user}.",
+                  transferContext,
+                  disclosedContracts,
+                )
+              case QueryResult(offset, None) =>
+                // collect the payment and create the entry
+                collectPayment(
+                  entryName,
+                  offset,
+                  transferContext,
+                  disclosedContracts,
+                )
+            }
+          }
         case Left(err) =>
           scanConnection
             .getAppTransferContext(store.svcParty)

@@ -26,7 +26,7 @@ class WalletSubscriptionsFrontendIntegrationTest
     "show and cancel subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val alicePartyId = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-      val aliceEntryName = perTestCaseName("alice.cns")
+      val aliceEntryName = perTestCaseName("alice")
       val directoryParty = createDirectoryEntryForDirectoryItself
       createDirectoryEntry(alicePartyId, aliceDirectoryClient, aliceEntryName, aliceWalletClient)
       val directoryPaymentDue = LocalDate.now().plusDays(90)
@@ -124,12 +124,12 @@ class WalletSubscriptionsFrontendIntegrationTest
     "allow accepting subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-      val aliceEntryName1 = perTestCaseName("alice.cns")
+      val aliceEntryName1 = perTestCaseName("alice")
       createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName1, aliceWalletClient)
 
       val directoryParty = createDirectoryEntryForDirectoryItself
       val directoryPaymentDue = LocalDate.now().plusDays(90)
-      val newlyPurchasedName = perTestCaseName("new.cns")
+      val newlyPurchasedName = perTestCaseName("new")
       val (_, subCid) =
         requestDirectoryEntry(aliceUserParty, aliceDirectoryClient, newlyPurchasedName)
 

@@ -33,7 +33,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
     "show all subscription payments" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
-      val aliceEntryName = perTestCaseName("alice.cns")
+      val aliceEntryName = perTestCaseName("alice")
 
       val directoryExpectedCns = createDirectoryEntryForDirectoryItself
 
