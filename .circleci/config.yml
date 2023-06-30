@@ -2149,7 +2149,6 @@ workflows:
       - hold:
           <<: *main-branch-never
           type: approval
-      # Deployment
       - docker_images_push:
           <<: *main-branch-never
           context:
@@ -2174,6 +2173,7 @@ workflows:
             - slack-context
           cluster: "scratchnetg"
           requires:
+            - hold
             - deployment_test
             - docker_images_push
       - deploy_sv_runbook:

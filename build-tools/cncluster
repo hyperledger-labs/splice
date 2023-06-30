@@ -146,6 +146,7 @@ function _cluster_show() {
     _log "GCP_CLUSTER_BASENAME    : ${GCP_CLUSTER_BASENAME}"
     _log "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
     _log "CLUSTER_DNS_NAME        : ${CLUSTER_DNS_NAME}"
+    _log "PULUMI_BACKEND_URL      : ${PULUMI_BACKEND_URL}"
 
     _log ""
 }
@@ -172,6 +173,9 @@ function _pulumi() {
         # shellcheck disable=SC2016
       	_error 'The `PULUMI_BACKEND_URL` variable is not set. It should point to a GCP bucket, e.g. `gs://a-bucket-name`.'
     fi
+
+    # shellcheck disable=SC2145
+    _log "Running Pulumi Command : pulumi $@"
 
     #TODO(#6096): remove this retry once our Pulumi commands are more reliable
     if [ -n "${CI-}" ] || [ -n "${RETRY_PULUMI-}" ]; then
@@ -268,10 +272,10 @@ declare -A subcommand_whitelist
 
 function _prompt_to_confirm() {
     # Many subcommands invoke other subcommands to do their work. This
-    # keeps a record of the first confirmation prompt to avoid prompting
-    # the user at every one of these steps.
-    # We also autoconfirm on CI instead of having to be careful to avoid all calls to
-    # _prompt_to_confirm.
+    # keeps a record of the first confirmation prompt to avoid
+    # prompting the user at every one of these steps.  We also
+    # autoconfirm on CI instead of having to be careful to avoid all
+    # calls to _prompt_to_confirm.
     if [ -n "${USER_PROMPT_CONFIRMED:-}" ] || [ -n "${CI:-}" ]; then
         return
     fi
@@ -708,7 +712,10 @@ function subcmd_ci_apply() {
 
     _cluster_show
 
+    _info "Resetting cluster for CI deployment."
     _cluster_reset
+
+    _info "Applying CI deployment."
     _cluster_apply "${SOURCE_IMAGE_TAG}"
 }
 
