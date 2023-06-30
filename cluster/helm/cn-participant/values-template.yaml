@@ -25,4 +25,4 @@ extraEnvVars:
       name: cn-app-sv1-ledger-api-auth
       optional: false
 
-participantUsers: '[{"actAs":[],"admin":true,"name":{"env":"CN_APP_SV1_LEDGER_API_AUTH_USER_NAME"},"readAs":[]}]'
+participantUsers: '["CN_APP_SV1_LEDGER_API_AUTH_USER_NAME"]'

@@ -37,6 +37,9 @@ Release Notes
   The ``validator-values.yaml`` file contains initial recommended values for those.
 * SV and validator operators are now asked to perform backups of participant identities data, to enable continuity across network resets.
   This is covered in a :ref:`new section of the runbook <validator_continuity>`.
+* The environment variable ``CANTON_PARTICIPANT_USERS`` defining the admin users to be allocated as part of participant
+  bootstrapping is now a simple JSON array of strings, where each element is the name of another environment variable
+  storing the name of the user to be allocated.
 
 2023-06-25
 ----------

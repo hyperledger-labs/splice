@@ -43,7 +43,7 @@ export function installParticipant(
   name: string,
   postgresDb: pulumi.Output<string>,
   extraDomains: Domain[],
-  participantUsers: ParticipantUser[],
+  participantUserEnvVars: string[],
   extraEnvVars: k8s.types.input.core.v1.EnvVar[],
   dependsOn: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = []
 ): pulumi.Resource {
@@ -55,22 +55,12 @@ export function installParticipant(
       postgres: postgresDb,
       postgresSchema: xns.logicalName + '_participant',
       extraDomains: JSON.stringify(extraDomains),
-      participantUsers: JSON.stringify(participantUsers),
+      participantUsers: JSON.stringify(participantUserEnvVars),
       extraEnvVars,
     },
     dependsOn
   );
 }
-
-export type ParticipantUser = {
-  name: StringOrEnv;
-  actAs: Party[];
-  primaryParty?: Party;
-  readAs: Party[];
-  admin: boolean;
-};
-
-type Party = { fromUser: StringOrEnv } | { allocate: StringOrEnv };
 
 type Domain = { alias: StringOrEnv; url: StringOrEnv };
 

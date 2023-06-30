@@ -179,16 +179,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     'participant',
     postgresDb,
     [],
-    [
-      {
-        actAs: [],
-        admin: true,
-        name: {
-          env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME',
-        },
-        readAs: [],
-      },
-    ],
+    ['CN_APP_SV_LEDGER_API_AUTH_USER_NAME'],
     [auth0UserNameEnvVar('sv')],
     auth0BackendSecrets
   );

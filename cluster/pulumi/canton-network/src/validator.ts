@@ -35,16 +35,7 @@ export async function installValidator(
     'participant',
     postgresDb,
     [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
-    [
-      {
-        actAs: [],
-        admin: true,
-        name: {
-          env: 'CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME',
-        },
-        readAs: [],
-      },
-    ],
+    ['CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
     [auth0UserNameEnvVar('validator')]
   );
 

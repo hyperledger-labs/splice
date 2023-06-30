@@ -136,18 +136,17 @@ def resolvePartyRef(
         .getOrElse(sys.error(s"User $otherId has no primary party"))
   }
 
-def createUser(p: ParticipantReferenceCommon, user: UserDef) = {
-  val userId = resolveEnv(user.name)
+// Creates a user that is used as the initial participant admin user: it has admin rights, and no actAs/readAs rights.
+def createParticipantAdminUser(p: ParticipantReferenceCommon, userId: String) = {
   ensureParticipantUser(
     p,
     userId, {
-      val party = user.primaryParty.map(resolvePrimaryParty(p, _))
       p.ledger_api.users.create(
         id = userId,
-        primaryParty = party,
-        actAs = user.actAs.map(resolvePartyRef(p, userId, party, _)).toSet,
-        readAs = user.readAs.map(resolvePartyRef(p, userId, party, _)).toSet,
-        participantAdmin = user.admin,
+        primaryParty = None,
+        actAs = Set.empty,
+        readAs = Set.empty,
+        participantAdmin = true,
       )
     },
   )

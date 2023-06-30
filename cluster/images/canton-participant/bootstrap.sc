@@ -2,24 +2,17 @@ import $file.tools
 
 import io.circe._, io.circe.generic.auto._, io.circe.parser._, io.circe.syntax._
 
-final case class EnvSubst(
-    env: String
-)
-
-sealed trait PrimaryParty
-final case class AllocateParty(allocate: String) extends PrimaryParty
-final case class PartyFromUser(fromUser: EnvSubst) extends PrimaryParty
-
 def main() {
-  val users = decode[Seq[tools.UserDef]](sys.env("CANTON_PARTICIPANT_USERS")).getOrElse(
+  val userEnvVars = decode[Seq[String]](sys.env("CANTON_PARTICIPANT_USERS")).getOrElse(
     sys.error("Failed to parse users config")
   )
-  users.foreach { user =>
-    tools.createUser(participant, user)
+  userEnvVars.foreach { userEnvVar =>
+    val user = sys.env.getOrElse(userEnvVar, sys.error(s"Failed to parse users config: environment variable $userEnvVar not found"))
+    tools.createParticipantAdminUser(participant, user)
   }
 
   val domains =
-    decode[Seq[tools.DomainDef]](sys.env.get("CANTON_PARTICIPANT_EXTRA_DOMAINS").getOrElse("[]"))
+    decode[Seq[tools.DomainDef]](sys.env.getOrElse("CANTON_PARTICIPANT_EXTRA_DOMAINS", "[]"))
       .getOrElse(
         sys.error("Failed to parse domains config")
       )

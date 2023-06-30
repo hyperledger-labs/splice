@@ -830,17 +830,13 @@ for those changes to also persist for future cluster deployments.
 
 ## Participant User Configuration
 
-At least one user needs to be allocated as part of the bootstrap file
+The participant admin users need to be allocated as part of the bootstrap file
 of a participant for bootstrapping. The configuration for those users
 is specified through a `CANTON_PARTICIPANT_USERS` environment
-variable. That variable specifies an array of users in JSON format
-that will be allocated in the given order. Each user specifies the
-user name and, optionally, the primary party which can either be taken from another
-user or allocated freshly as well as `actAs`, `readAs` and `admin`
-claims. `actAs` and `readAs` claims can also be set to the primary
-party of another user. References can go through environment variables
-which allows us to pick up k8s secrets which are exposed through other
-environment variables.
+variable. That variable specifies an array of strings in JSON format,
+where each string is the name of another environment variable that stores the name
+of the user to be allocated. Going through environment variables allows us to pick up k8s secrets.
+The users will be allocated in the given order.
 
 Note that you typically don't need to allocate parties manually at all,
 only (admin) users. Party allocation is handled by CN apps themselves
@@ -852,18 +848,9 @@ if the SV is the SVC founder, also the SVC party.
 
 ```json
 [
-  {
-    name: {
-      env: 'CN_APP_SV_LEDGER_API_AUTH_USER_NAME',
-    },
-    actAs: [],
-    readAs: [],
-    admin: true,
-  },
+  'CN_APP_SV_LEDGER_API_AUTH_USER_NAME'
 ]
 ```
-
-The exact JSON format is defined in `tools.sc`.
 
 ## Token configuration
 

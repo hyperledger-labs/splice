@@ -1102,7 +1102,7 @@
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"actAs\":[],\"admin\":true,\"name\":{\"env\":\"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"readAs\":[]}]",
+        "participantUsers": "[\"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"]",
         "postgres": "postgres.splitwell.svc.cluster.local",
         "postgresSchema": "splitwell_participant",
         "resources": {
@@ -1685,7 +1685,7 @@
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"actAs\":[],\"admin\":true,\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"readAs\":[]}]",
+        "participantUsers": "[\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"]",
         "postgres": "postgres.sv-1.svc.cluster.local",
         "postgresSchema": "sv-1_participant",
         "resources": {
@@ -2430,7 +2430,7 @@
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"actAs\":[],\"admin\":true,\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"readAs\":[]}]",
+        "participantUsers": "[\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"]",
         "postgres": "postgres.sv-2.svc.cluster.local",
         "postgresSchema": "sv-2_participant",
         "resources": {
@@ -3153,7 +3153,7 @@
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"actAs\":[],\"admin\":true,\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"readAs\":[]}]",
+        "participantUsers": "[\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"]",
         "postgres": "postgres.sv-3.svc.cluster.local",
         "postgresSchema": "sv-3_participant",
         "resources": {
@@ -3801,7 +3801,7 @@
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"actAs\":[],\"admin\":true,\"name\":{\"env\":\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"},\"readAs\":[]}]",
+        "participantUsers": "[\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"]",
         "postgres": "postgres.sv-4.svc.cluster.local",
         "postgresSchema": "sv-4_participant",
         "resources": {
@@ -4299,7 +4299,7 @@
           }
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[{\"actAs\":[],\"admin\":true,\"name\":{\"env\":\"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"},\"readAs\":[]}]",
+        "participantUsers": "[\"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"]",
         "postgres": "postgres.validator1.svc.cluster.local",
         "postgresSchema": "validator1_participant",
         "resources": {
