@@ -98,7 +98,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/DumpParticipantIdentitiesResponse"
+                "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ParticipantIdentitiesDump"
 
 components:
   schemas:
@@ -150,46 +150,3 @@ components:
           type: array
           items:
             type: string
-
-    DumpParticipantIdentitiesResponse:
-      type: object
-      required:
-        - id
-        - keys
-        - bootstrapTxes
-        - users
-      properties:
-        id:
-          type: string
-        keys:
-          type: array
-          items:
-            $ref: "#/components/schemas/ParticipantKeyPair"
-        bootstrapTxes:
-          type: array
-          items:
-            type: string
-        users:
-          type: array
-          items:
-            $ref: "#/components/schemas/ParticipantUser"
-
-    ParticipantKeyPair:
-      type: object
-      required:
-        - keyPair
-      properties:
-        keyPair:
-          type: string
-        name:
-          type: string
-
-    ParticipantUser:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: string
-        primaryParty:
-          type: string

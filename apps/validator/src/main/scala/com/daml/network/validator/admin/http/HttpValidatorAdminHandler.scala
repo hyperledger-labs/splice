@@ -74,7 +74,9 @@ class HttpValidatorAdminHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       identitiesStore
         .getParticipantIdentitiesDump()
-        .map(response => v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.OK(response))
+        .map(response =>
+          v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.OK(response.toHttp)
+        )
     }
 
   private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {

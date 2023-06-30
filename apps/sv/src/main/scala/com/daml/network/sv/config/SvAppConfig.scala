@@ -9,6 +9,7 @@ import com.daml.network.config.{
   GcpBucketConfig,
   HttpCNNodeClientConfig,
   NetworkAppClientConfig,
+  ParticipantBootstrapDumpConfig,
 }
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
@@ -120,6 +121,7 @@ case class SvAppBackendConfig(
     localDomainNode: Option[SvDomainNodeConfig],
     // TODO(#5855) so we can lock; remove this again
     foundingSvClient: SvAppClientConfig,
+    participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     acsStoreDump: Option[BackupDumpConfig] = None,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"

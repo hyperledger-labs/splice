@@ -3,15 +3,13 @@ package com.daml.network.validator.store
 import cats.syntax.traverse.*
 import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.{BuildInfo, CNLedgerConnection, ParticipantAdminConnection}
-import com.daml.network.http.v0.definitions as http
-import com.daml.network.util.BackupDump
+import com.daml.network.util.{BackupDump, ParticipantIdentitiesDump}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.syntax.*
 
 import java.nio.file.Path
-import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.OptionConverters.*
 
@@ -27,7 +25,7 @@ class ParticipantIdentitiesStore(
 
   def getParticipantIdentitiesDump()(implicit
       tc: TraceContext
-  ): Future[http.DumpParticipantIdentitiesResponse] =
+  ): Future[ParticipantIdentitiesDump] =
     for {
       id <- participantAdminConnection.getParticipantId()
       keysMetadata <- participantAdminConnection.listMyKeys()
@@ -35,31 +33,26 @@ class ParticipantIdentitiesStore(
         participantAdminConnection
           .exportKeyPair(keyM.publicKeyWithName.publicKey.id)
           .map(keyBytes =>
-            http.ParticipantKeyPair(
-              Base64.getEncoder().encodeToString(keyBytes.toByteArray),
+            ParticipantIdentitiesDump.ParticipantKey(
+              keyBytes.toByteArray,
               keyM.publicKeyWithName.name.map(_.toString),
             )
           )
       )
       bootstrapTxs <- participantAdminConnection
         .getIdentityBootstrapTransactions(id.uid)
-        .map(txes => txes.map(tx => Base64.getEncoder().encodeToString(tx.toByteArray)))
+        .map(txs => txs.map(tx => tx.toByteArray))
       users <- connection
         .listUsers()
         .map(users =>
           users.map(user =>
-            http.ParticipantUser(
+            ParticipantIdentitiesDump.ParticipantUser(
               user.getId(),
-              user.getPrimaryParty().toScala,
+              user.getPrimaryParty().toScala.map(PartyId.tryFromProtoPrimitive),
             )
           )
         )
-    } yield http.DumpParticipantIdentitiesResponse(
-      id.toProtoPrimitive,
-      keys.toVector,
-      bootstrapTxs.toVector,
-      users.toVector,
-    )
+    } yield ParticipantIdentitiesDump(id, keys, bootstrapTxs, users)
 
   /** Write a dump of the participant identities to the configured backup location.
     *
@@ -87,7 +80,7 @@ class ParticipantIdentitiesStore(
         // then makes all the logging stuff below very confusing.
         val filename = Paths.get(
           BuildInfo.compiledVersion,
-          dump.id,
+          dump.id.toProtoPrimitive,
           s"participant_identities_${dump.id}_${now}.json",
         )
         // TODO(#6073): compress output file
@@ -97,7 +90,7 @@ class ParticipantIdentitiesStore(
         val path = BackupDump.write(
           dumpConfig,
           filename,
-          dump.asJson.noSpaces,
+          dump.toJson.noSpaces,
           loggerFactory,
         )
         logger.info(s"Wrote $fileDesc")

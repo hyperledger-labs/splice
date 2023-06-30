@@ -85,6 +85,7 @@ case class ValidatorAppBackendConfig(
     onboarding: Option[ValidatorOnboardingConfig],
     enableCoinRulesUpgrade: Boolean = false,
     treasury: TreasuryConfig = TreasuryConfig(),
+    participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     // TODO(#5855) so we can lock; remove this again
     foundingSvClient: SvAppClientConfig,
     // TODO(#6247) Remove the option to disable this

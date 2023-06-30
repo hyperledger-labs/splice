@@ -6,13 +6,11 @@ import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.validatorAdmin as http
 import com.daml.network.http.v0.definitions.OnboardUserRequest
-import com.daml.network.util.{Codec, TemplateJsonDecoder}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.daml.network.util.{Codec, ParticipantIdentitiesDump, TemplateJsonDecoder}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 object HttpValidatorAdminAppClient {
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -70,21 +68,6 @@ object HttpValidatorAdminAppClient {
     }
   }
 
-  final case class ParticipantIdentitiesDump(
-      id: ParticipantId,
-      keys: Seq[ParticipantKey],
-      bootstrapTxes: Seq[Array[Byte]],
-      users: Seq[ParticipantUser],
-  )
-  final case class ParticipantKey(
-      keyPair: Array[Byte],
-      name: Option[String],
-  )
-  final case class ParticipantUser(
-      id: String,
-      primaryParty: Option[PartyId],
-  )
-
   case class DumpParticipantIdentities()
       extends BaseCommand[
         http.DumpParticipantIdentitiesResponse,
@@ -99,18 +82,7 @@ object HttpValidatorAdminAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.DumpParticipantIdentitiesResponse.OK(response) =>
-        Try(
-          ParticipantIdentitiesDump(
-            id = ParticipantId.tryFromProtoPrimitive(response.id),
-            keys = response.keys.toSeq.map(k =>
-              ParticipantKey(Base64.getDecoder.decode(k.keyPair), k.name)
-            ),
-            bootstrapTxes = response.bootstrapTxes.toSeq.map(t => Base64.getDecoder.decode(t)),
-            users = response.users.toSeq.map(user =>
-              ParticipantUser(user.id, user.primaryParty.map(PartyId.tryFromProtoPrimitive(_)))
-            ),
-          )
-        ).toEither.left.map(_.getMessage())
+        ParticipantIdentitiesDump.fromHttp(response)
     }
   }
 }

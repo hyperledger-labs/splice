@@ -410,6 +410,17 @@ object CNNodeConfig {
     implicit val gcpCredentialsConfigReader: ConfigReader[GcpCredentialsConfig] =
       deriveReader[GcpCredentialsConfig]
     implicit val gcpBucketConfig: ConfigReader[GcpBucketConfig] = deriveReader[GcpBucketConfig]
+    implicit val participantBootstrapDumpConfigHint =
+      new FieldCoproductHint[ParticipantBootstrapDumpConfig]("type")
+    implicit val participantBootstrapDumpConfigFileReader
+        : ConfigReader[ParticipantBootstrapDumpConfig.File] =
+      deriveReader[ParticipantBootstrapDumpConfig.File]
+    implicit val participantBootstrapDumpConfigGcpReader
+        : ConfigReader[ParticipantBootstrapDumpConfig.Gcp] =
+      deriveReader[ParticipantBootstrapDumpConfig.Gcp]
+    implicit val participantBootstrapDumpConfigReader
+        : ConfigReader[ParticipantBootstrapDumpConfig] =
+      deriveReader[ParticipantBootstrapDumpConfig]
     implicit val svBootstrapDumpConfigHint = new FieldCoproductHint[SvBootstrapDumpConfig]("type")
     implicit val svBootstrapDumpConfigFileReader: ConfigReader[SvBootstrapDumpConfig.File] =
       deriveReader[SvBootstrapDumpConfig.File]
@@ -583,6 +594,17 @@ object CNNodeConfig {
     implicit val gcpCredentialsConfigWriter: ConfigWriter[GcpCredentialsConfig] =
       confidentialWriter[GcpCredentialsConfig](GcpCredentialsConfig.hideConfidential)
     implicit val gcpBucketConfig: ConfigWriter[GcpBucketConfig] = deriveWriter[GcpBucketConfig]
+    implicit val participantBootstrapDumpConfigHint =
+      new FieldCoproductHint[ParticipantBootstrapDumpConfig]("type")
+    implicit val participantBootstrapDumpConfigFileWriter
+        : ConfigWriter[ParticipantBootstrapDumpConfig.File] =
+      deriveWriter[ParticipantBootstrapDumpConfig.File]
+    implicit val participantBootstrapDumpConfigGcpWriter
+        : ConfigWriter[ParticipantBootstrapDumpConfig.Gcp] =
+      deriveWriter[ParticipantBootstrapDumpConfig.Gcp]
+    implicit val participantBootstrapDumpConfigWriter
+        : ConfigWriter[ParticipantBootstrapDumpConfig] =
+      deriveWriter[ParticipantBootstrapDumpConfig]
     implicit val svBootstrapDumpConfigHint = new FieldCoproductHint[SvBootstrapDumpConfig]("type")
     implicit val svBootstrapDumpConfigFileWriter: ConfigWriter[SvBootstrapDumpConfig.File] =
       deriveWriter[SvBootstrapDumpConfig.File]

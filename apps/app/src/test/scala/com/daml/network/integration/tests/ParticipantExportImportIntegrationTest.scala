@@ -1,18 +1,18 @@
 package com.daml.network.integration.tests
 
 import better.files.{File, *}
-import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
+import com.daml.network.config.{
+  CNNodeConfig,
+  CNNodeConfigTransforms,
+  ParticipantBootstrapDumpConfig,
+}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.ProcessTestUtil
-import com.daml.network.validator.admin.api.client.commands.HttpValidatorAdminAppClient.{
-  ParticipantIdentitiesDump,
-  ParticipantUser,
-}
+import com.daml.network.util.{ParticipantIdentitiesDump, ProcessTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 
@@ -27,6 +27,8 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
   val svParticipantPath: File = svNodePath / "canton-participant"
   val svDomainPath: File = svNodePath / "canton-domain"
   val svAppsPath: File = svNodePath / "sv-apps"
+
+  lazy val dumpFile: File = Files.createTempFile("participant-dump", ".json")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
@@ -43,6 +45,17 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
         (_, config) => CNNodeConfigTransforms.ensureNovelDamlNames()(config),
         (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
         (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
+        (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
+        (_, config) =>
+          CNNodeConfigTransforms.updateAllSvAppConfigs { case (name, c) =>
+            if (name == "sv1Local") {
+              c.copy(participantBootstrappingDump =
+                Some(ParticipantBootstrapDumpConfig.File(dumpFile.path))
+              )
+            } else {
+              c
+            }
+          }(config),
       )
       .withAllocatedUsers()
       .withManualStart
@@ -59,15 +72,23 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       clue("Checking exported users list") {
         val sv1Party = svcInfoBefore.svParty
         participantDump.users should contain(
-          ParticipantUser(sv1Backend.config.ledgerApiUser, Some(sv1Party))
+          ParticipantIdentitiesDump.ParticipantUser(sv1Backend.config.ledgerApiUser, Some(sv1Party))
         )
         participantDump.users should contain(
-          ParticipantUser(sv1ValidatorBackend.config.ledgerApiUser, Some(sv1Party))
+          ParticipantIdentitiesDump.ParticipantUser(
+            sv1ValidatorBackend.config.ledgerApiUser,
+            Some(sv1Party),
+          )
         )
         participantDump.users should contain(
-          ParticipantUser(sv1ValidatorBackend.config.validatorWalletUser.value, Some(sv1Party))
+          ParticipantIdentitiesDump.ParticipantUser(
+            sv1ValidatorBackend.config.validatorWalletUser.value,
+            Some(sv1Party),
+          )
         )
       }
+
+      dumpFile.overwrite(participantDump.toJson.spaces2)
 
       sv1ValidatorBackend.stop()
       sv1ScanBackend.stop()
@@ -89,16 +110,16 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       participantDump: ParticipantIdentitiesDump
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     // TODO(#6073) Remove this complicated mess once identity upload is handled by the validator and SV app init
-    val txes = "Seq(" + participantDump.bootstrapTxes
+    val txs = "Seq(" + participantDump.bootstrapTxs
       .map(tx =>
         s"""SignedTopologyTransactionX.fromByteArray(Array(${tx.mkString(
             ", "
           )})).getOrElse(sys.error("encoding error"))"""
       )
       .mkString(", ") + ")"
-    val txesUploadCommand = s"""
+    val txsUploadCommand = s"""
     |import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
-    |sv_participant.topology.transactions.load($txes)
+    |sv_participant.topology.transactions.load($txs)
     """
 
     val keyUploadCommands = participantDump.keys.zipWithIndex
@@ -123,7 +144,7 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
     val bootstrapScript = s"""
       |println("Loading bootstrap topology transactions")
       |sv_participant.keys.secret.list()
-      $txesUploadCommand
+      $txsUploadCommand
       |println(sv_participant.topology.transactions.list())
       |println("Uploading participant keys")
       $keyUploadCommands

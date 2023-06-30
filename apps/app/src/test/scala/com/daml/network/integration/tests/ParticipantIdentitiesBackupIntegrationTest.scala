@@ -3,13 +3,12 @@ package com.daml.network.integration.tests
 import com.daml.network.config.{BackupDumpConfig, CNNodeConfigTransforms, GcpBucketConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.GcpBucket
+import com.daml.network.util.{GcpBucket, ParticipantIdentitiesDump}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
@@ -56,8 +55,8 @@ abstract class ParticipantIdentitiesBackupIntegrationTestBase[T <: BackupDumpCon
           )(logEntry => {
             inside(logEntry.message) { case logLineRegex(subDir, dumpId, filename) =>
               val dump = readDump(Paths.get(subDir, dumpId, filename).toString)
-              val jsonDump = io.circe.parser
-                .decode[http.DumpParticipantIdentitiesResponse](dump)
+              val jsonDump = ParticipantIdentitiesDump
+                .fromJsonString(dump)
                 .fold(
                   err =>
                     throw new IllegalArgumentException(
@@ -65,7 +64,7 @@ abstract class ParticipantIdentitiesBackupIntegrationTestBase[T <: BackupDumpCon
                     ),
                   result => result,
                 )
-              jsonDump.id shouldBe dumpId
+              jsonDump.id.toProtoPrimitive shouldBe dumpId
               dumpId should startWith("PAR::aliceParticipant")
             }
           })

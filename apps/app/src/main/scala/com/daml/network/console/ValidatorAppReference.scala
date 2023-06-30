@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.util.ParticipantIdentitiesDump
 import com.daml.network.validator.admin.api.client.commands.{
   HttpValidatorAdminAppClient,
   HttpValidatorAppClient,
@@ -87,7 +88,7 @@ abstract class ValidatorAppReference(
   @Help.Description(
     "Exports participant ID, secret keys, and necessary topology transactions for cloning to a new participant"
   )
-  def dumpParticipantIdentities(): HttpValidatorAdminAppClient.ParticipantIdentitiesDump = {
+  def dumpParticipantIdentities(): ParticipantIdentitiesDump = {
     consoleEnvironment.run {
       httpCommand(
         HttpValidatorAdminAppClient.DumpParticipantIdentities()

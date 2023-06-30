@@ -229,3 +229,47 @@ components:
       properties:
         error:
           type: string
+
+    # IMPORTANT: only modify this message in a backwards compatible fashion. It is used to read old dumps.
+    ParticipantIdentitiesDump:
+      type: object
+      required:
+        - id
+        - keys
+        - bootstrapTxs
+        - users
+      properties:
+        id:
+          type: string
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantKey"
+        bootstrapTxs:
+          type: array
+          items:
+            type: string
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantUser"
+
+    ParticipantKey:
+      type: object
+      required:
+        - keyPair
+      properties:
+        keyPair:
+          type: string
+        name:
+          type: string
+
+    ParticipantUser:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        primaryParty:
+          type: string
