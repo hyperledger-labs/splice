@@ -228,8 +228,12 @@ data SvcRulesConfig = SvcRulesConfig with
     leaderInactiveTimeout: RelTime -- ^ The amount of time given to the leader to complete an action it should take care of
     domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the members' `DomainNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
-    initialTrafficGrant: Int -- ^ Granted extra traffic to SVs at the time of joining
+    initialTrafficGrant: Int -- ^ Extra traffic granted to SVs at the time of joining
     globalDomain : GlobalDomainConfig
+  deriving (Eq, Show)
+
+data TrafficState = TrafficState with
+    consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the SVC was founded.
   deriving (Eq, Show)
 
 -- | Rules governing the collective.
@@ -239,6 +243,7 @@ template SvcRules with
     members : Map.Map Party MemberInfo
     leader : Party
     config : SvcRulesConfig
+    initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of SVC founding. Used for testing, empty in prod.
     isDevNet : Bool
     lock : Bool -- ^ If it is true, all choices are disabled. TODO(#3933) We should remove this as it is a workaround to protect participants from crashing due to #3933
   where
@@ -288,6 +293,7 @@ template SvcRules with
           -- this should only happen if it is in devnet
           members = Map.insert newMemberParty info membersNotMatchingNewMemberName
           config
+          initialTrafficState
           isDevNet
           lock
 
@@ -315,6 +321,7 @@ template SvcRules with
           leader = newLeader
           members = newMembers
           config
+          initialTrafficState
           isDevNet
           lock
 

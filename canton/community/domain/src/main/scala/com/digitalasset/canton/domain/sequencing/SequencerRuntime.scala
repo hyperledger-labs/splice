@@ -211,7 +211,8 @@ class SequencerRuntime(
     }
   }
 
-  private val sequencerAdministrationService = new GrpcSequencerAdministrationService(sequencer)
+  private val sequencerAdministrationService =
+    new GrpcSequencerAdministrationService(sequencer, loggerFactory)
 
   private case class AuthenticationServices(
       memberAuthenticationService: MemberAuthenticationService,

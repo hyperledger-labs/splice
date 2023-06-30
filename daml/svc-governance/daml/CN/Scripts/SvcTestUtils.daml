@@ -84,6 +84,7 @@ initCollective isDevNet = do
       coinConfig
       coinPrice = 1.0
       config
+      initialTrafficState = Map.empty
       enabledChoices = API.enableAllChoices
       isDevNet
     SvcBootstrap_Bootstrap

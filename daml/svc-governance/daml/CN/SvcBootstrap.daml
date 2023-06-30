@@ -22,6 +22,7 @@ template SvcBootstrap with
     coinConfig : CoinConfig USD
     coinPrice : Decimal
     config : SvcRulesConfig
+    initialTrafficState: Map.Map Text TrafficState
     enabledChoices : API.EnabledChoices
     isDevNet : Bool
   where
@@ -42,6 +43,7 @@ template SvcBootstrap with
           members = Map.fromList [(founderParty, founderInfo)]
           leader = founderParty
           config
+          initialTrafficState
           isDevNet
           lock = False
 

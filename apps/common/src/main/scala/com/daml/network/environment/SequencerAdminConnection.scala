@@ -2,6 +2,7 @@ package com.daml.network.environment
 
 import com.digitalasset.canton.admin.api.client.commands.{
   EnterpriseSequencerAdminCommands,
+  SequencerAdminCommands,
   StatusAdminCommands,
 }
 import com.digitalasset.canton.config.ClientConfig
@@ -12,9 +13,10 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.SequencerId
+import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficStatus
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -66,5 +68,12 @@ class SequencerAdminConnection(
         domainParameters,
         sequencerSnapshot,
       )
+    )
+
+  def getSequencerTrafficStatus(filterMembers: Seq[Member] = Seq.empty)(implicit
+      traceContext: TraceContext
+  ): Future[SequencerTrafficStatus] =
+    runCmd(
+      SequencerAdminCommands.GetTrafficControlState(filterMembers)
     )
 }

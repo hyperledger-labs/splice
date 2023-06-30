@@ -379,10 +379,18 @@ class FoundingNodeInitializer(
         coinRules <- svcStore.lookupCoinRules()
         participantId <- participantAdminConnection.getParticipantId()
         svcRulesConfig = SvUtil.defaultSvcRulesConfig()
+        trafficStateForAllMembers <- localDomainNode.sequencerAdminConnection
+          .getSequencerTrafficStatus()
+          .map(_.members)
+        participantTrafficState = trafficStateForAllMembers
+          .find(_.member == participantId)
+          .map(_.trafficState)
         _ <- participantAdminConnection.ensureTrafficControlState(
           domainId,
           participantId,
-          svcRulesConfig.initialTrafficGrant,
+          participantTrafficState.fold(0L)(
+            _.extraTrafficConsumed.value
+          ) + svcRulesConfig.initialTrafficGrant,
           participantId.uid.namespace.fingerprint,
         )
         // TODO(#6256): Remove this and make SvApp pay for mediator traffic as well
@@ -421,6 +429,14 @@ class FoundingNodeInitializer(
                       ),
                       foundingConfig.initialCoinPrice.bigDecimal,
                       svcRulesConfig,
+                      trafficStateForAllMembers
+                        .map(m =>
+                          m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(
+                            m.trafficState.extraTrafficConsumed.value
+                          )
+                        )
+                        .toMap
+                        .asJava,
                       defaultEnabledChoices,
                       foundingConfig.isDevNet,
                     ).createAnd

@@ -148,7 +148,11 @@ trait Sequencer
     */
   private[sequencing] def firstSequencerCounterServeableForSequencer: SequencerCounter
 
-  def trafficStatus(implicit traceContext: TraceContext): Future[SequencerTrafficStatus]
+  /** Return the status of the specified members. If the list is empty, return the status of all members.
+    */
+  def trafficStatus(members: Seq[Member])(implicit
+      traceContext: TraceContext
+  ): Future[SequencerTrafficStatus]
 }
 
 /** Sequencer pruning interface.

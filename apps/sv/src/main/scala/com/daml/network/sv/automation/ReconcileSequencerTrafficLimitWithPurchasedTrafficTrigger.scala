@@ -18,6 +18,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
     override protected val context: TriggerContext,
@@ -64,11 +65,16 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
     val validatorPartyId = PartyId.tryFromProtoPrimitive(validatorTraffic_.validator)
     for {
       validatorParticipant <- getValidatorParticipant(domainId, validatorPartyId)
-      totalExtraTrafficLimit <- participantAdminConnection
+      svcRules <- store.getSvcRules()
+      trafficLimitOffset = svcRules.payload.initialTrafficState.asScala
+        .get(validatorParticipant.participantId.toProtoPrimitive)
+        .fold(0L)(_.consumedTraffic)
+      newExtraTrafficLimit = trafficLimitOffset + validatorTraffic_.totalPurchased
+      currentExtraTrafficLimit <- participantAdminConnection
         .lookupTrafficControlState(domainId, validatorParticipant.participantId)
         .map(_.fold(0L)(_.mapping.totalExtraTrafficLimit.value))
       taskOutcome <-
-        if (totalExtraTrafficLimit < validatorTraffic_.totalPurchased)
+        if (currentExtraTrafficLimit < newExtraTrafficLimit)
           participantAdminConnection
             .getParticipantId()
             .flatMap(svParticipantId =>
@@ -80,14 +86,14 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
                     .ensureTrafficControlState(
                       domainId,
                       validatorParticipant.participantId,
-                      validatorTraffic_.totalPurchased,
+                      newExtraTrafficLimit,
                       svParticipantId.uid.namespace.fingerprint,
                     )
                 )
                 .map(_ =>
                   TaskSuccess(
                     s"Updated extra traffic limit for validator ${validatorTraffic_.validator} " +
-                      s"hosted on ${validatorParticipant} to ${validatorTraffic_.totalPurchased}"
+                      s"hosted on ${validatorParticipant} to ${newExtraTrafficLimit}"
                   )
                 )
             )
