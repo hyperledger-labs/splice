@@ -1211,7 +1211,7 @@ function subcmd_lock() {
         lockholder=$(whoami)
         kubectl create secret generic cluster-lock --from-literal=lockholder="$lockholder" > /dev/null
         _info "Cluster lock claimed successfully."
-        if ! jq --arg login "$lockholder" -e 'any(to_entries | map(.value) | flatten; . == $login)' "$REPO_ROOT/.circleci/cluster-lock-users.json" >/dev/null; then
+        if ! jq --arg login "$lockholder" -e 'to_entries | map(.value) | flatten | any(. == $login)' "$REPO_ROOT/.circleci/cluster-lock-users.json" >/dev/null; then
             echo
             _warning \
                 "There is no corresponding entry for $lockholder in '$REPO_ROOT/.circleci/cluster-lock-users.json'.\n" \
