@@ -73,7 +73,7 @@ function _info(){
 function _warning(){
   local first_line="WARNING: "
   while read -r; do
-    printf -- "\e[33;1m%s%s\e[0m\n" "${first_line:-         }" "${REPLY}"
+    printf -- "\e[33;1m%s%s\e[0m\n" "${first_line:-        }" "${REPLY}"
     unset first_line
   done < <(echo -e "$@")
 }

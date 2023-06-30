@@ -26,6 +26,17 @@ CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 ### Utilities
 ################################
 
+function _contained() {
+    local needle="$1" item
+    shift
+    for item; do
+        if [[ "$item" == "$needle" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 function _cluster_exists() {
   CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)')
 
@@ -183,7 +194,7 @@ function _uses_pulumi_stack() {
             stack init 2> /dev/null || true
 }
 
-### Cluster manageent
+### Cluster management
 
 
 function _current_lockholder() {
@@ -202,26 +213,43 @@ function _current_lock_age_formatted() {
     echo "$((age_secs / 86400)) days(s), $(((age_secs % 86400) / 3600)) hour(s), $(((age_secs % 3600) / 60)) minute(s)"
 }
 
+function _get_holder_names() {
+    jq -r --arg login "$1" '.[$login][]?' "$REPO_ROOT/.circleci/cluster-lock-users.json"
+}
+
 function _assert_lock() {
     if [ -z "${SHARED_CLUSTER:-}" ]; then
         return
     fi
 
     if lockholder=$(_current_lockholder); then
-        # CI asserts lock in shared cluster with a reduced strength
-        # compared to the lock assert on developer workstations. The
-        # cluster lock must be held, but we do not check user ID
-        # (because we don't have a reliable way of finding the user ID
-        # of the requesting user in CI.)
         if [ "${1-}" != "--for-ci" ]; then
             if [ "${lockholder}" != "$(whoami)" ]; then
                 _error "Cluster already locked by: ${lockholder}"
             fi
+            return
+        fi
+
+        # Check lock for CI...
+        if ! approver=$( "$REPO_ROOT/.circleci/approved-by.sh" ); then
+            _error "Could not determine approver for CI workflow"
+        fi
+
+        if [[ -n "$approver" ]]; then
+            local -a names
+            readarray -t names < <( _get_holder_names "$approver" )
+
+            if _contained "$lockholder" "${names[@]}"; then
+                _info "CI workflow approved by $approver and locked by ${lockholder}"
+            else
+                _error "CI workflow approved by $approver alias ${names[*]}, but cluster locked by ${lockholder}"
+            fi
         else
+            # running for CI, but no approved workflow; we only require the lock
             _info "CI running with cluster lock held by: ${lockholder}"
         fi
     else
-        _error "Cluster not locked. (See: https://github.com/DACH-NY/canton-network-node#deploy-a-build-to-a-cluster))"
+        _error "Cluster not locked. (See: https://github.com/DACH-NY/canton-network-node/tree/main/cluster#deploy-a-build-to-a-cluster))"
     fi
 }
 
@@ -1172,8 +1200,16 @@ function subcmd_lock() {
             _error "Cluster already locked by: ${lockholder}. Lock age: $(_current_lock_age_formatted)."
         fi
     else
-        kubectl create secret generic cluster-lock --from-literal=lockholder="$(whoami)" > /dev/null
+        local lockholder
+        lockholder=$(whoami)
+        kubectl create secret generic cluster-lock --from-literal=lockholder="$lockholder" > /dev/null
         _info "Cluster lock claimed successfully."
+        if ! jq --arg login "$lockholder" -e 'any(to_entries | map(.value) | flatten; . == $login)' "$REPO_ROOT/.circleci/cluster-lock-users.json" >/dev/null; then
+            echo
+            _warning \
+                "There is no corresponding entry for $lockholder in '$REPO_ROOT/.circleci/cluster-lock-users.json'.\n" \
+                "You will not be able to run preflight checks on CI, until you add an entry with your CI username to that file."
+        fi
     fi
 }
 
