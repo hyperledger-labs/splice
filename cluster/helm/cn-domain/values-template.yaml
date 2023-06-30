@@ -11,3 +11,5 @@ resources:
     memory: 8Gi
 
 postgres: postgres.sv-1.svc.cluster.local
+postgresPassword: ""
+

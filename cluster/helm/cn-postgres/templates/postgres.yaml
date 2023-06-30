@@ -8,7 +8,6 @@ data:
   PGDATA: "/var/lib/postgresql/data/pgdata"
   POSTGRES_DB: "cantonnet"
   POSTGRES_USER: "cnadmin"
-  POSTGRES_PASSWORD: "cnadmin"
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -34,6 +33,12 @@ spec:
         image: postgres:14
         imagePullPolicy: IfNotPresent
         args: ["-c", "max_connections=300"]
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+           secretKeyRef:
+              name: "{{ .Release.Name }}-secrets"
+              key: postgresPassword
         envFrom:
         - configMapRef:
             name: "{{ .Release.Name }}-configuration"

@@ -25,6 +25,11 @@ spec:
           value: {{ .Values.defaultJvmOptions }}
         - name: CANTON_DOMAIN_POSTGRES_SERVER
           value: {{ .Values.postgres }}
+        - name: CANTON_DOMAIN_POSTGRES_PASSWORD
+          valueFrom:
+           secretKeyRef:
+              name: "{{ .Release.Name }}-secrets"
+              key: cantonDomainPostgresPassword
         imagePullPolicy: Always
         ports:
         - containerPort: 5008

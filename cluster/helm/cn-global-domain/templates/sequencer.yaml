@@ -25,8 +25,18 @@ spec:
           value: {{ .Values.defaultJvmOptions }}
         - name: CANTON_DOMAIN_POSTGRES_SERVER
           value: {{ .Values.postgres }}
+        - name: CANTON_DOMAIN_POSTGRES_PASSWORD
+          valueFrom:
+           secretKeyRef:
+              name: "{{ .Release.Name }}-secrets"
+              key: cantonDomainPostgresPassword
         - name: SEQUENCER_DRIVER_DATABASE_ADDRESS
           value: {{ .Values.sequencerDriver.address }}
+        - name: SEQUENCER_DRIVER_DATABASE_PASSWORD
+          valueFrom:
+           secretKeyRef:
+              name: "{{ .Release.Name }}-secrets"
+              key: sequencerDriverPostgresPassword
         {{- if (.Values.trafficControl).enabled }}
         - name: ADDITIONAL_CONFIG_TRAFFIC_CONTROL
           value: |

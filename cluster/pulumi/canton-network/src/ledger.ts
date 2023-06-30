@@ -7,10 +7,12 @@ import { domainFeesConfig } from './domainFeesCfg';
 export function installDomain(
   xns: ExactNamespace,
   name: string,
-  postgresDb: pulumi.Output<string>
+  postgresDb: pulumi.Output<string>,
+  postgresPassword: pulumi.Input<string>
 ): pulumi.Resource {
   return installCNHelmChart(xns, name, 'cn-domain', {
     postgres: postgresDb,
+    postgresPassword,
   });
 }
 
@@ -18,15 +20,19 @@ export function installGlobalDomain(
   xns: ExactNamespace,
   name: string,
   postgresDb: pulumi.Output<string>,
-  withDomainFees: boolean
+  withDomainFees: boolean,
+  postgresPassword: pulumi.Input<string>,
+  postgresSequencerPassword: undefined | pulumi.Input<string> = undefined
 ): pulumi.Resource {
   if (withDomainFees) {
     console.error('Running with domain fees');
   }
   return installCNHelmChart(xns, name, 'cn-global-domain', {
     postgres: postgresDb,
+    postgresPassword,
     sequencerDriver: {
       address: 'postgres.sv-1',
+      password: postgresSequencerPassword,
     },
     trafficControl: withDomainFees
       ? {
@@ -45,7 +51,8 @@ export function installParticipant(
   extraDomains: Domain[],
   participantUserEnvVars: string[],
   extraEnvVars: k8s.types.input.core.v1.EnvVar[],
-  dependsOn: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = []
+  postgresPassword: pulumi.Input<string>,
+  dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource {
   return installCNHelmChart(
     xns,
@@ -53,6 +60,7 @@ export function installParticipant(
     'cn-participant',
     {
       postgres: postgresDb,
+      postgresPassword,
       postgresSchema: xns.logicalName + '_participant',
       extraDomains: JSON.stringify(extraDomains),
       participantUsers: JSON.stringify(participantUserEnvVars),

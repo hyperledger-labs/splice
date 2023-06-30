@@ -52,6 +52,7 @@ export type SvOnboarding =
       type: 'join-with-key';
       publicKey: string;
       privateKey: string;
+      postgresPassword: pulumi.Input<string>;
       sponsorRelease?: pulumi.Resource;
       sponsorApiUrl: string;
     };
@@ -129,6 +130,7 @@ export type SvConfig = {
   approvedSvIdentities: ApprovedSvIdentity[];
   withScan: boolean;
   withDirectoryBackend: boolean;
+  postgresPassword: pulumi.Input<string>;
   expectedValidatorOnboardings: ValidatorOnboarding[];
   isDevNet: boolean;
   acsStoreDump?: GcpBucketConfig;
@@ -168,11 +170,25 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     )
     .concat(config.acsStoreDump ? [installGcpBucketSecret(xns, config.acsStoreDump)] : []);
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres');
+  const postgresDb = postgres.installPostgres(xns, 'postgres', config.postgresPassword);
 
-  const domain = config.withDomainNode
-    ? installGlobalDomain(xns, 'global-domain', postgresDb, config.withDomainFees)
-    : undefined;
+  const domain = undefined;
+
+  if (config.withDomainNode) {
+    const sequencerPassword =
+      config.onboarding.type === 'join-with-key'
+        ? config.onboarding.postgresPassword
+        : config.postgresPassword;
+
+    installGlobalDomain(
+      xns,
+      'global-domain',
+      postgresDb,
+      config.withDomainFees,
+      config.postgresPassword,
+      sequencerPassword
+    );
+  }
 
   const participant = installParticipant(
     xns,
@@ -181,7 +197,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     [],
     ['CN_APP_SV_LEDGER_API_AUTH_USER_NAME'],
     [auth0UserNameEnvVar('sv')],
-    auth0BackendSecrets
+    config.postgresPassword
   );
   const cometbft = installCometBftNode(xns, config.nodename, config.onboardingName);
 

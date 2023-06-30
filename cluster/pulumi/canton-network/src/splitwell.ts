@@ -23,13 +23,14 @@ export async function installSplitwell(
   svc: pulumi.Resource,
   providerWalletUser: string,
   onboarding: ValidatorOnboarding,
-  withDomainFees = false
+  withDomainFees = false,
+  postgresPassword: pulumi.Input<string>
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell');
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres');
+  const postgresDb = postgres.installPostgres(xns, 'postgres', postgresPassword);
 
-  const domain = installDomain(xns, 'domain', postgresDb);
+  const domain = installDomain(xns, 'domain', postgresDb, postgresPassword);
 
   const participant = installParticipant(
     xns,
@@ -38,6 +39,7 @@ export async function installSplitwell(
     [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     ['CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
     [auth0UserNameEnvVar('splitwell_validator', 'validator')],
+    postgresPassword,
     [domain]
   );
 
@@ -47,6 +49,7 @@ export async function installSplitwell(
     'cn-splitwell-app',
     {
       postgres: postgresDb,
+      postgresPassword,
     },
     [svc, participant]
   );

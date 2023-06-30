@@ -21,14 +21,15 @@ export async function installValidator(
   auth0Client: Auth0Client,
   svc: pulumi.Resource,
   name: string,
-  validatorWalletUser: string,
   onboarding: ValidatorOnboarding,
   withDomainFees = false,
-  isDevNet: boolean
+  isDevNet: boolean,
+  postgresPassword: pulumi.Input<string>,
+  validatorWalletUser?: string
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres');
+  const postgresDb = postgres.installPostgres(xns, 'postgres', postgresPassword);
 
   const participant = installParticipant(
     xns,
@@ -36,7 +37,8 @@ export async function installValidator(
     postgresDb,
     [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     ['CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
-    [auth0UserNameEnvVar('validator')]
+    [auth0UserNameEnvVar('validator')],
+    postgresPassword
   );
 
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [

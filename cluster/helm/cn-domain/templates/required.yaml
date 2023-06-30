@@ -5,3 +5,4 @@
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 {{ $_ := required ".Values.postgres is required." .Values.postgres }}
+{{ $_ := required ".Values.postgresPassword is required." .Values.postgresPassword }}

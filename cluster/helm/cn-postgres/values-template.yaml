@@ -12,3 +12,6 @@ resources:
 db:
   volumeSize: 60Gi
   volumeStorageClass: standard-rwo
+
+postgresPassword: ""
+

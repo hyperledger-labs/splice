@@ -1,5 +1,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
+import * as random from '@pulumi/random';
 import { Key } from '@pulumi/gcp/serviceaccount';
 import { Auth0Client } from 'cn-pulumi-common';
 import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
@@ -114,12 +115,14 @@ const approvedSvIdentities = nonDevNetApprovedSvIdentities
 
 function joinViaSv1(
   sv1: pulumi.Resource,
-  keys: { publicKey: string; privateKey: string }
+  keys: { publicKey: string; privateKey: string },
+  postgresPassword: pulumi.Input<string>
 ): SvOnboarding {
   return {
     type: 'join-with-key',
     sponsorApiUrl: 'http://sv-app.sv-1:5014',
     sponsorRelease: sv1,
+    postgresPassword,
     ...keys,
   };
 }
@@ -149,7 +152,16 @@ function configureGcpBucketKey(): Key {
   return key;
 }
 
+function generatePassword(name: string): random.RandomPassword {
+  return new random.RandomPassword(name, {
+    length: 16,
+    overrideSpecial: '_%@',
+    special: true,
+  });
+}
+
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
+  const sv1PostgresPassword = generatePassword(`sv-1-postgres-passwd`);
   const sv1 = await installSvNode({
     auth0Client,
     nodename: 'sv-1',
@@ -160,6 +172,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     approvedSvIdentities,
     withScan: true,
     withDirectoryBackend: true,
+    postgresPassword: sv1PostgresPassword.result,
     expectedValidatorOnboardings: [splitwellOnboarding, validator1Onboarding],
     isDevNet,
     acsStoreDump: isDevNet
@@ -171,66 +184,78 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         },
     withDomainNode: true,
   });
+
+  const sv2PostgresPassword = generatePassword(`sv-2-postgres-passwd`);
   await installSvNode({
     auth0Client,
     nodename: 'sv-2',
     onboardingName: isDevNet ? 'Canton-Foundation-2' : 'Digital-Asset',
     validatorWalletUser: 'auth0|64529b6852dd694167351045',
-    onboarding: joinViaSv1(sv1, SV2_KEY),
+    onboarding: joinViaSv1(sv1, SV2_KEY, sv1PostgresPassword.result),
     withDomainFees,
     approvedSvIdentities,
     withScan: true,
     withDirectoryBackend: false,
+    postgresPassword: sv2PostgresPassword.result,
     expectedValidatorOnboardings: [],
     isDevNet,
     withDomainNode: isDevNet,
   });
   if (!doubleSv) {
+    const sv3PostgresPassword = generatePassword(`sv-3-postgres-passwd`);
     await installSvNode({
       auth0Client,
       nodename: 'sv-3',
       onboardingName: 'Canton-Foundation-3',
       validatorWalletUser: 'auth0|64529bb10c1aee4f2c819218',
-      onboarding: joinViaSv1(sv1, SV3_KEY),
+      onboarding: joinViaSv1(sv1, SV3_KEY, sv1PostgresPassword.result),
       withDomainFees,
       approvedSvIdentities,
       withScan: false,
       withDirectoryBackend: false,
+      postgresPassword: sv3PostgresPassword.result,
       expectedValidatorOnboardings: [],
       isDevNet,
       withDomainNode: isDevNet,
     });
+
+    const sv4PostgresPassword = generatePassword(`sv-4-postgres-passwd`);
     await installSvNode({
       auth0Client,
       nodename: 'sv-4',
       onboardingName: 'Canton-Foundation-4',
       validatorWalletUser: 'auth0|64529bc58d30358eacae5611',
-      onboarding: joinViaSv1(sv1, SV4_KEY),
+      onboarding: joinViaSv1(sv1, SV4_KEY, sv1PostgresPassword.result),
       withDomainFees,
       approvedSvIdentities,
       withScan: false,
       withDirectoryBackend: false,
+      postgresPassword: sv4PostgresPassword.result,
       expectedValidatorOnboardings: [],
       isDevNet,
       withDomainNode: isDevNet,
     });
   }
 
+  const validatorPostgresPassword = generatePassword('validator1-password');
   const validator = await installValidator(
     auth0Client,
     sv1,
     'validator1',
-    'auth0|63e3d75ff4114d87a2c1e4f5',
     validator1Onboarding,
     withDomainFees,
-    isDevNet
+    isDevNet,
+    validatorPostgresPassword.result
   );
+
+  const splitwellPostgresPassword = generatePassword('splitwell');
   const splitwell = await installSplitwell(
     auth0Client,
     sv1,
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding,
-    withDomainFees
+    withDomainFees,
+    splitwellPostgresPassword.result
   );
 
   const docs = installDocs();

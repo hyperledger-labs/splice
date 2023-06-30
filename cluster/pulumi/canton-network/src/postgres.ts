@@ -10,7 +10,11 @@ const privateNetwork = gcp.compute.Network.get(
   pulumi.interpolate`https://www.googleapis.com/compute/v1/projects/${project.name}/global/networks/default`
 );
 
-function installCloudPostgres(xns: ExactNamespace, name: string): pulumi.Output<string> {
+function installCloudPostgres(
+  xns: ExactNamespace,
+  name: string,
+  password: pulumi.Input<string>
+): pulumi.Output<string> {
   const logicalName = xns.logicalName + '-' + name;
   const pgSvc = new gcp.sql.DatabaseInstance(logicalName, {
     databaseVersion: 'POSTGRES_14',
@@ -50,7 +54,7 @@ function installCloudPostgres(xns: ExactNamespace, name: string): pulumi.Output<
     {
       instance: pgSvc.name,
       name: 'cnadmin',
-      password: 'cnadmin',
+      password: password,
     },
     {
       dependsOn: pgSvc,
@@ -62,9 +66,14 @@ function installCloudPostgres(xns: ExactNamespace, name: string): pulumi.Output<
 
 /// Database
 
-function installCNPostgres(xns: ExactNamespace, name: string): pulumi.Output<string> {
-  const pg = installCNHelmChart(xns, name, 'cn-postgres');
-
+function installCNPostgres(
+  xns: ExactNamespace,
+  name: string,
+  password: pulumi.Input<string>
+): pulumi.Output<string> {
+  const pg = installCNHelmChart(xns, name, 'cn-postgres', {
+    postgresPassword: password,
+  });
   return pg.id.apply(() => `${name}.${xns.logicalName}.svc.cluster.local`);
 }
 
@@ -72,10 +81,14 @@ function installCNPostgres(xns: ExactNamespace, name: string): pulumi.Output<str
 
 const ENABLE_CLOUD_SQL = 'true' === (process.env.ENABLE_CLOUD_SQL ?? 'false');
 
-export function installPostgres(xns: ExactNamespace, name: string): pulumi.Output<string> {
+export function installPostgres(
+  xns: ExactNamespace,
+  name: string,
+  password: pulumi.Input<string>
+): pulumi.Output<string> {
   if (ENABLE_CLOUD_SQL) {
-    return installCloudPostgres(xns, name);
+    return installCloudPostgres(xns, name, password);
   } else {
-    return installCNPostgres(xns, name);
+    return installCNPostgres(xns, name, password);
   }
 }

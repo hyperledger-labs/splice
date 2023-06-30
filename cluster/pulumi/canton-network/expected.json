@@ -4560,8 +4560,7 @@
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "topup": {},
-        "validatorPartyHint": "validator1_validator_service_user",
-        "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
+        "validatorPartyHint": "validator1_validator_service_user"
       }
     },
     "name": "helm-validator1-validator-validator1",
@@ -4597,6 +4596,30 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "splitwell",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-1-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -4607,6 +4630,18 @@
     "name": "sv-1",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-2-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
   },
   {
     "custom": true,
@@ -4627,6 +4662,18 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-3-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -4642,6 +4689,18 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-4-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -4652,6 +4711,18 @@
     "name": "sv-4",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-password",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
   },
   {
     "custom": true,

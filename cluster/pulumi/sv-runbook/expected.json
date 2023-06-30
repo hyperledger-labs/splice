@@ -490,6 +490,18 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {

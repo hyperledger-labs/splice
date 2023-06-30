@@ -1,4 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
+import * as random from '@pulumi/random';
 import {
   Auth0Client,
   ChartValues,
@@ -58,11 +59,19 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const svImagePullDeps = localCharts ? [] : imagePullSecret(svNamespace);
 
+  const password = new random.RandomPassword(`${svNamespace.logicalName}-postgres-passwd`, {
+    length: 16,
+    overrideSpecial: '_%@',
+    special: true,
+  }).result;
+
   const postgres = installCNSVHelmChart(
     svNamespace,
     'postgres',
     'cn-postgres',
-    {},
+    {
+      postgresPassword: password,
+    },
     localCharts,
     version
   );
@@ -81,6 +90,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       ...participantValues.auth,
       targetAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
+    postgresPassword: password,
   };
 
   const participant = installCNSVHelmChart(

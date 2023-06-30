@@ -34,6 +34,11 @@ spec:
           value: {{ .Values.auth.jwksUrl }}
         - name: AUTH_TARGET_AUDIENCE
           value: {{ .Values.auth.targetAudience }}
+        - name: CANTON_PARTICIPANT_POSTGRES_PASSWORD
+          valueFrom:
+           secretKeyRef:
+              name: "{{ .Release.Name }}-secrets"
+              key: cantonParticipantPostgresPassword
         {{ .Values.extraEnvVars | toYaml | nindent 8 }}
         {{- with .Values.globalDomain }}
         {{- if .alias }}
