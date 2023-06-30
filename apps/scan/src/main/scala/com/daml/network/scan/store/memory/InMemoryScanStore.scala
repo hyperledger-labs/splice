@@ -120,29 +120,6 @@ class InMemoryScanStore(
       .map(r => r.round -> r.effectiveAt)
   }
 
-  override def verifyDataExistsForEndOfRound(
-      asOfEndOfRound: Long
-  )(implicit tc: TraceContext): Future[Unit] = {
-    if (asOfEndOfRound < 0) {
-      throw Status.OUT_OF_RANGE
-        .withDescription("Round numbers cannot be negative")
-        .asRuntimeException()
-    }
-    // TODO(#2930): For now, we support querying data for any round up to the latest closed one. This should
-    // be revisited once we add some backfilling (historical or ACS-based) in the scan bootstrap.
-    getRoundOfLatestData().flatMap { case (round, _) =>
-      if (asOfEndOfRound > round) {
-        Future.failed(
-          Status.NOT_FOUND
-            .withDescription(s"Data for round ${asOfEndOfRound} not yet computed")
-            .asRuntimeException()
-        )
-      } else {
-        Future.successful(())
-      }
-    }
-  }
-
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
     getRewardsCollected(None)
 
@@ -327,15 +304,6 @@ class InMemoryScanStore(
       )
     )
 
-  override def getTotalPaidValidatorTraffic(
-      validatorParty: PartyId
-  )(implicit tc: TraceContext): Future[Long] = {
-    lookupValidatorTraffic(validatorParty).map {
-      case None => 0L
-      case Some(validatorTraffic) => validatorTraffic.payload.totalPurchased
-    }
-  }
-
   def listImportCrates(receiverName: String)(implicit
       tc: TraceContext
   ): Future[
@@ -350,7 +318,7 @@ class InMemoryScanStore(
   override def findFeaturedAppRight(
       domainId: DomainId,
       providerPartyId: PartyId,
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
   ] = {
     multiDomainAcsStore.findContractOnDomain(

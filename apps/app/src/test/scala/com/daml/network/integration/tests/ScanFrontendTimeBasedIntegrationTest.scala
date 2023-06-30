@@ -115,7 +115,7 @@ class ScanFrontendTimeBasedIntegrationTest
           "Check the initial coin config matches the defaults",
           _ => {
             find(id("coin-creation-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultCreateFee.fee} CC"
+              s"${CNNodeUtil.defaultCreateFee.fee.doubleValue()} CC"
             )
 
             find(id("holding-fee")).value.text should matchText(
@@ -123,7 +123,7 @@ class ScanFrontendTimeBasedIntegrationTest
             )
 
             find(id("lock-holder-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultLockHolderFee.fee} CC"
+              s"${CNNodeUtil.defaultLockHolderFee.fee.doubleValue()} CC"
             )
 
             find(id("round-tick-duration")).value.text should matchText(

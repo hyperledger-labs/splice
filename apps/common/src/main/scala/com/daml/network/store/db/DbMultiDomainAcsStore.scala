@@ -478,7 +478,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
   override def close(): Unit = ()
 
-  private def contractWithStateFromRow[C, TCid <: ContractId[_], T](companion: C)(
+  def contractWithStateFromRow[C, TCid <: ContractId[_], T](companion: C)(
       row: AcsStoreRowTemplate
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],

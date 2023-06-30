@@ -113,7 +113,7 @@ object CNNodeUtil {
   lazy val defaultHoldingFee = // ~= 4.822530864197531E-6 ~= 4.8E-6
     new cc.fees.RatePerRound(damlDecimal(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
 
-  // TODO(tech-debt) surely there's a better way to define Daml Numeric values in Scala
+  // TODO (#6285) surely there's a better way to define Daml Numeric values in Scala
   def damlDecimal(x: Double): java.math.BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
@@ -151,18 +151,18 @@ object CNNodeUtil {
       ).asJava,
     )
 
-  val defaultCreateFee = new cc.fees.FixedFee(BigDecimal(0.03).bigDecimal)
+  val defaultCreateFee = new cc.fees.FixedFee(damlDecimal(0.03))
 
   val defaultTransferFee = new cc.fees.SteppedRate(
-    BigDecimal(0.01).bigDecimal,
+    damlDecimal(0.01),
     Seq(
-      new Tuple2(BigDecimal(100.0).bigDecimal, BigDecimal(0.001).bigDecimal),
-      new Tuple2(BigDecimal(1000.0).bigDecimal, BigDecimal(0.0001).bigDecimal),
-      new Tuple2(BigDecimal(1000000.0).bigDecimal, BigDecimal(0.00001).bigDecimal),
+      new Tuple2(damlDecimal(100.0), damlDecimal(0.001)),
+      new Tuple2(damlDecimal(1000.0), damlDecimal(0.0001)),
+      new Tuple2(damlDecimal(1000000.0), damlDecimal(0.00001)),
     ).asJava,
   )
 
-  val defaultLockHolderFee = new cc.fees.FixedFee(BigDecimal(0.005).bigDecimal)
+  val defaultLockHolderFee = new cc.fees.FixedFee(damlDecimal(0.005))
 
   val defaultExtraTrafficPrice = damlDecimal(1.0) // extraTrafficPrice (in $/MB)
   val defaultReadScalingFactor = damlDecimal(0.02) // charge 2% of write cost for every read

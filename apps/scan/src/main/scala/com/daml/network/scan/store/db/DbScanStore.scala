@@ -12,22 +12,25 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
-import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.store.db.{AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.store.{Limit, LimitHelpers, MultiDomainAcsStore}
+import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
+import cats.implicits.*
 import slick.dbio.DBIO
 
 import java.time.Instant
 import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 
 class DbScanStore(
     override val svcParty: PartyId,
@@ -50,9 +53,13 @@ class DbScanStore(
       ),
     )
     with ScanStore
-    with AcsTables {
+    with AcsTables
+    with AcsQueries
+    with NamedLogging
+    with LimitHelpers {
 
   import storage.DbStorageConverters.setParameterByteArray
+  import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
 
@@ -94,61 +101,149 @@ class DbScanStore(
       tc: TraceContext
   ): Either[String, DBIO[_]] = Right(DBIO.successful(())) // avoid blowing up until implemented
 
+  // TODO (#5314): most queries do not properly handle multi-domain
+
   override def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[MultiDomainAcsStore.ReadyContract[CoinRules.ContractId, CoinRules]]] = ???
+  ): Future[Option[MultiDomainAcsStore.ReadyContract[CoinRules.ContractId, CoinRules]]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            (selectFromAcsTable(DbScanStore.tableName) ++
+              sql"""
+              where store_id = $storeId
+                and template_id = ${CoinRules.TEMPLATE_ID}
+              order by event_number desc
+              limit 1;
+             """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            "lookupCoinRules",
+          )
+          .value
+        contractWithState <- row.traverse(
+          multiDomainAcsStore.contractWithStateFromRow(CoinRules.COMPANION)(_)
+        )
+      } yield contractWithState.flatMap(_.toReadyContract)
+    }
 
   override def lookupCoinRulesV1Test()(implicit tc: TraceContext): Future[
     Option[MultiDomainAcsStore.ReadyContract[CoinRulesV1Test.ContractId, CoinRulesV1Test]]
-  ] = ???
+  ] = waitUntilAcsIngested {
+    for {
+      row <- storage
+        .querySingle(
+          (selectFromAcsTable(DbScanStore.tableName) ++
+            sql"""
+                where store_id = $storeId
+                  and template_id = ${CoinRulesV1Test.TEMPLATE_ID}
+                order by event_number desc
+                limit 1;
+               """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+          "lookupCoinRulesV1Test",
+        )
+        .value
+      contractWithState <- row.traverse(
+        multiDomainAcsStore.contractWithStateFromRow(CoinRulesV1Test.COMPANION)(_)
+      )
+    } yield contractWithState.flatMap(_.toReadyContract)
+  }
 
   override def lookupValidatorTraffic(validatorParty: PartyId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]] = ???
-
-  override def listImportCrates(receiver: String)(implicit
-      tc: TraceContext
-  ): Future[Seq[MultiDomainAcsStore.ContractWithState[ImportCrate.ContractId, ImportCrate]]] = ???
+  ): Future[Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            (selectFromAcsTable(DbScanStore.tableName) ++
+              sql"""
+                  where store_id = $storeId
+                    and template_id = ${ValidatorTraffic.TEMPLATE_ID}
+                    and validator = $validatorParty
+                  order by event_number desc
+                  limit 1;
+                 """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            "lookupValidatorTraffic",
+          )
+          .value
+      } yield row.map(contractFromRow(ValidatorTraffic.COMPANION)(_))
+    }
 
   override def getTotalCoinBalance()(implicit tc: TraceContext): Future[(BigDecimal, BigDecimal)] =
-    ???
+    ??? // TODO (#6194): this requires scan_txlog_store
 
-  override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] = ???
+  override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
+    ??? // TODO (#6194): this requires scan_txlog_store
 
   override def getRewardsCollectedInRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[BigDecimal] = ???
+  ): Future[BigDecimal] = ??? // TODO (#6194): this requires scan_txlog_store
 
   override def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] = ???
+  ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] =
+    ??? // TODO (#6194): this requires scan_txlog_store
 
-  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] = ???
-
-  override def verifyDataExistsForEndOfRound(asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[Unit] = ???
+  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
+    ??? // TODO (#6194): this requires scan_txlog_store
 
   override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[(PartyId, BigDecimal)]] = ???
+  ): Future[Seq[(PartyId, BigDecimal)]] = ??? // TODO (#6194): this requires scan_txlog_store
 
   override def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[(PartyId, BigDecimal)]] = ???
+  ): Future[Seq[(PartyId, BigDecimal)]] = ??? // TODO (#6194): this requires scan_txlog_store
 
   override def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] = ???
+  ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] =
+    ??? // TODO (#6194): this requires scan_txlog_store
 
-  override def getTotalPaidValidatorTraffic(validatorParty: PartyId)(implicit
+  override def listImportCrates(receiver: String)(implicit
       tc: TraceContext
-  ): Future[Long] = ???
+  ): Future[Seq[MultiDomainAcsStore.ContractWithState[ImportCrate.ContractId, ImportCrate]]] =
+    waitUntilAcsIngested {
+      for {
+        rows <- storage
+          .query(
+            (selectFromAcsTable(DbScanStore.tableName) ++
+              sql"""
+                  where store_id = $storeId
+                    and template_id = ${ImportCrate.TEMPLATE_ID}
+                    and import_crate_receiver_name = ${lengthLimited(receiver)}
+                  limit ${sqlLimit(Limit.DefaultLimit)};
+                 """).toActionBuilder.as[AcsStoreRowTemplate],
+            "listImportCrates",
+          )
+        limited = applyLimit(Limit.DefaultLimit, rows)
+        withState <- limited.traverse(
+          multiDomainAcsStore.contractWithStateFromRow(ImportCrate.COMPANION)(_)
+        )
+      } yield withState
+    }
 
   override def findFeaturedAppRight(
       domainId: DomainId,
       providerPartyId: PartyId,
-  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = ???
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
+    waitUntilAcsIngested {
+      (for {
+        row <- storage
+          .querySingle(
+            (selectFromAcsTable(DbScanStore.tableName) ++
+              sql"""
+                  where store_id = $storeId
+                    and template_id = ${FeaturedAppRight.TEMPLATE_ID}
+                    and featured_app_right_provider = $providerPartyId
+                  limit 1;
+                 """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            "findFeaturedAppRight",
+          )
+      } yield contractFromRow(FeaturedAppRight.COMPANION)(row)).value
+    }
 }
 
 object DbScanStore {
