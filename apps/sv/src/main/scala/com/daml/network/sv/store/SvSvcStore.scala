@@ -782,8 +782,6 @@ object SvSvcStore {
     cc.coin.AppRewardCoupon.COMPANION.TEMPLATE_ID,
     cc.coin.ValidatorRewardCoupon.COMPANION.TEMPLATE_ID,
     cc.round.ClosedMiningRound.COMPANION.TEMPLATE_ID,
-    // TODO(#6313): remove this ignore once we don't have left-over confirmations anymore
-    cn.svcrules.Confirmation.COMPANION.TEMPLATE_ID,
   )
 
   /** Contract filter of an sv acs store for a specific acs party. */

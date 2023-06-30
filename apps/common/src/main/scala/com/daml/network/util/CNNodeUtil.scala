@@ -167,8 +167,11 @@ object CNNodeUtil {
   val defaultExtraTrafficPrice = damlDecimal(1.0) // extraTrafficPrice (in $/MB)
   val defaultReadScalingFactor = damlDecimal(0.02) // charge 2% of write cost for every read
   val defaultDomainFeesConfig = domainFeesConfig(
-    // 10 txs of 20kB each in a window of 10 mins
-    damlDecimal(333.0),
+    // Please keep these values in sync with
+    //   - domain-fees-overrides.conf
+    //   - domainFeesCfg.ts
+    // TODO(#6322): configure these values in at most one place
+    damlDecimal(3333.0),
     NonNegativeFiniteDuration.ofMinutes(10),
     // TODO(#6032): determine the best defaults here
     1_000, // minTopupAmount = 1KB
