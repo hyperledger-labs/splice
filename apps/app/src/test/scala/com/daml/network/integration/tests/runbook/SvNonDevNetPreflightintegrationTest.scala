@@ -65,7 +65,10 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
         directoryUrl,
         svUsername,
         svPassword,
-        () => find(id("logout-button")) should not be empty,
+        // if id("directory-entries") is visible, that implies:
+        // 1) the logout button is visible
+        // 2) the DirectoryInstall has been created (and therefore the request won't be aborted and thus flake)
+        () => find(id("directory-entries")) should not be empty,
       )
     }
   }

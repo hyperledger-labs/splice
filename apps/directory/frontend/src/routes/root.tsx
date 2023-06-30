@@ -77,7 +77,8 @@ const Root: React.FC = () => {
             </Button>
           </Toolbar>
         </Box>
-        <Outlet />
+        {/* no need to show the app if it won't be usable. Creating DirectoryInstall should be fast. */}
+        {directoryInstallContract ? <Outlet /> : <Loading />}
       </Box>
     </ErrorBoundary>
   );

@@ -9,7 +9,7 @@ const DirectoryEntries: React.FC = () => {
   const ownedEntries = useEntriesWithPayData();
 
   return (
-    <div>
+    <div id="directory-entries">
       <Typography variant="h5">Your Directory Entries</Typography>
       <Table sx={{ marginTop: '16px' }} id="entries-table">
         <TableHead>
