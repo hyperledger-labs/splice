@@ -388,12 +388,17 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       )
   }
 
+  private def nextTransactionId(): String = java.util.UUID.randomUUID().toString.replace("-", "")
+
   protected def mkTx(offset: String, events: Seq[TreeEvent]): TransactionTree = {
-    val eventsWithId = events.zipWithIndex.map { case (e, i) => withEventId(e, s"$offset:$i") }
+    val transactionId = nextTransactionId()
+    val eventsWithId = events.zipWithIndex.map { case (e, i) =>
+      withEventId(e, s"$transactionId:$i")
+    }
     val eventsById = eventsWithId.map(e => e.getEventId -> e).toMap
     val rootEventIds = eventsWithId.map(_.getEventId)
     new TransactionTree(
-      transactionId = "",
+      transactionId = transactionId,
       commandId = "",
       workflowId = "",
       effectiveAt = effectiveAt,
@@ -408,14 +413,16 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       root: ExercisedEvent,
       children: Seq[TreeEvent],
   ): TransactionTree = {
+    val transactionId = nextTransactionId()
     val childrenWithId = children.zipWithIndex.map { case (e, i) =>
-      withEventId(e, s"$offset:${i + 1}")
+      withEventId(e, s"$transactionId:${i + 1}")
     }
-    val rootWithId = withEventId(withChildren(root, childrenWithId.map(_.getEventId)), s"$offset:0")
+    val rootWithId =
+      withEventId(withChildren(root, childrenWithId.map(_.getEventId)), s"$transactionId:0")
     val eventsById = (rootWithId +: childrenWithId).map(e => e.getEventId -> e).toMap
     val rootEventIds = Seq(rootWithId.getEventId)
     new TransactionTree(
-      transactionId = "",
+      transactionId = transactionId,
       commandId = "",
       workflowId = "",
       effectiveAt = effectiveAt,
