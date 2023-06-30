@@ -6,12 +6,16 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore}
+import com.daml.network.environment.RetryProvider
+import com.daml.network.store.TxLogStore.TransactionTreeSource
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.TxLogIndexRecord
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
-import com.daml.network.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
+import com.daml.network.wallet.store.db.WalletTables.{
+  UserWalletAcsStoreRowData,
+  UserWalletTxLogStoreRowData,
+}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -30,18 +34,19 @@ class DbUserWalletStore(
     override val defaultAcsDomain: DomainAlias,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val connection: CNLedgerConnection,
+    override protected val transactionTreeSource: TransactionTreeSource,
     override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStore[
+) extends DbCNNodeAppStoreWithHistory[
       UserWalletStore.TxLogIndexRecord,
       UserWalletStore.TxLogEntry,
     ](
       storage = storage,
-      tableName = DbUserWalletStore.tableName,
+      acsTableName = DbUserWalletStore.acsTableName,
+      txLogTableName = DbUserWalletStore.txLogTableName,
       // TODO (#5544): change this to something better
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
@@ -89,10 +94,21 @@ class DbUserWalletStore(
       }
   }
 
-  // TODO (#6239): implement this
   override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = Right(DBIO.successful(())) // avoid blowing up until implemented
+  ): Either[String, DBIO[_]] = UserWalletTxLogStoreRowData
+    .fromIndexRecord(record)
+    .map {
+      case UserWalletTxLogStoreRowData(
+            eventId
+          ) =>
+        val safeEventId = lengthLimited(eventId)
+        sqlu"""
+              insert into user_wallet_txlog_store(store_id, event_id)
+              values ($storeId, $safeEventId)
+              on conflict do nothing
+            """
+    }
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 
@@ -165,19 +181,21 @@ class DbUserWalletStore(
     .take(maxNumInputs)
 
   override def listTransactions(
-      beginAfterEventId: Option[String],
+      beginAfterEventIdO: Option[String],
       limit: Int,
-  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]] = for {
-    domain <- domains.waitForDomainConnection(defaultAcsDomain)
-    entries <- beginAfterEventId.fold(
-      txLogReader.getTxLogByOffset(0, limit)
-    )(
-      txLogReader.getTxLogAfterEventId(domain, _, limit)
-    )
-  } yield entries
+  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]] = {
+    waitUntilAcsIngested {
+      for {
+        _ <- defaultAcsDomainIdF
+        eventIds <- multiDomainAcsStore.getTxLogEventIdsInReverseOrder(beginAfterEventIdO, limit)
+        entries <- Future.traverse(eventIds)(i => txLogReader.loadTxLogEntry(i))
+      } yield entries
+    }
+  }
 
 }
 
 object DbUserWalletStore {
-  val tableName: String = WalletTables.UserWalletAcsStore.baseTableRow.tableName
+  val acsTableName: String = WalletTables.UserWalletAcsStore.baseTableRow.tableName
+  val txLogTableName: String = WalletTables.UserWalletTxLogStore.baseTableRow.tableName
 }

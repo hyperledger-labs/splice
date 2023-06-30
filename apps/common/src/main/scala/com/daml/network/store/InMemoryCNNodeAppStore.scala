@@ -24,7 +24,7 @@ abstract class InMemoryCNNodeAppStore[
       retryProvider,
     )
 
-  override def txLog = multiDomainAcsStore
+  override def txLog: InMemoryMultiDomainAcsStore[TXI, TXE] = multiDomainAcsStore
 
   override lazy val domains: DomainStore =
     new InMemoryDomainStore(

@@ -7,12 +7,13 @@ import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.{Limit, LimitHelpers, MultiDomainAcsStore}
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
@@ -37,7 +38,7 @@ class DbScanStore(
     storage: DbStorage,
     override protected[this] val scanConfig: ScanAppBackendConfig,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val connection: CNLedgerConnection,
+    override protected val transactionTreeSource: TransactionTreeSource,
     override protected val retryProvider: RetryProvider,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -45,7 +46,8 @@ class DbScanStore(
     closeContext: CloseContext,
 ) extends DbCNNodeAppStoreWithHistory[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry](
       storage,
-      DbScanStore.tableName,
+      DbScanStore.acsTableName,
+      DbScanStore.txLogTableName,
       // TODO (#5544): change this to something better
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
@@ -110,7 +112,7 @@ class DbScanStore(
       for {
         row <- storage
           .querySingle(
-            (selectFromAcsTable(DbScanStore.tableName) ++
+            (selectFromAcsTable(DbScanStore.acsTableName) ++
               sql"""
               where store_id = $storeId
                 and template_id = ${CoinRules.TEMPLATE_ID}
@@ -132,7 +134,7 @@ class DbScanStore(
     for {
       row <- storage
         .querySingle(
-          (selectFromAcsTable(DbScanStore.tableName) ++
+          (selectFromAcsTable(DbScanStore.acsTableName) ++
             sql"""
                 where store_id = $storeId
                   and template_id = ${CoinRulesV1Test.TEMPLATE_ID}
@@ -155,7 +157,7 @@ class DbScanStore(
       for {
         row <- storage
           .querySingle(
-            (selectFromAcsTable(DbScanStore.tableName) ++
+            (selectFromAcsTable(DbScanStore.acsTableName) ++
               sql"""
                   where store_id = $storeId
                     and template_id = ${ValidatorTraffic.TEMPLATE_ID}
@@ -207,7 +209,7 @@ class DbScanStore(
       for {
         rows <- storage
           .query(
-            (selectFromAcsTable(DbScanStore.tableName) ++
+            (selectFromAcsTable(DbScanStore.acsTableName) ++
               sql"""
                   where store_id = $storeId
                     and template_id = ${ImportCrate.TEMPLATE_ID}
@@ -233,7 +235,7 @@ class DbScanStore(
       (for {
         row <- storage
           .querySingle(
-            (selectFromAcsTable(DbScanStore.tableName) ++
+            (selectFromAcsTable(DbScanStore.acsTableName) ++
               sql"""
                   where store_id = $storeId
                     and template_id = ${FeaturedAppRight.TEMPLATE_ID}
@@ -248,7 +250,8 @@ class DbScanStore(
 
 object DbScanStore {
 
-  val tableName = "scan_acs_store"
+  val acsTableName = "scan_acs_store"
+  val txLogTableName = "scan_txlog_store"
 
   @unused
   def txLogIndexRecordDbType(record: ScanTxLogParser.TxLogIndexRecord): String3 = {

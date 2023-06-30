@@ -36,7 +36,8 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 
 class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     storage: DbStorage,
-    tableName: String,
+    acsTableName: String,
+    txLogTableName: String,
     storeDescriptor: io.circe.Json,
     resolveDomainId: TraceContext => Future[DomainId], // no support for multi-domain yet
     override protected val loggerFactory: NamedLoggerFactory,
@@ -105,7 +106,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   ): Future[Option[ContractWithState[TCid, T]]] = waitUntilAcsIngested {
     storage
       .querySingle( // index: acs_store_template_sid_cid
-        (selectFromAcsTable(tableName) ++
+        (selectFromAcsTable(acsTableName) ++
           sql"""
           where store_id = $storeId
             and contract_id = ${lengthLimited(id.contractId)}
@@ -121,7 +122,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   ): Future[Option[ContractState]] = waitUntilAcsIngested {
     storage
       .querySingle( // index: acs_store_template_sid_cid
-        (selectFromAcsTable(tableName) ++
+        (selectFromAcsTable(acsTableName) ++
           sql"""
             where store_id = $storeId
               and contract_id = ${lengthLimited(id.contractId)}
@@ -142,7 +143,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     val templateId = companionClass.typeId(companion)
     for {
       result <- storage.query( // index: acs_store_template_sid_tid_en
-        (selectFromAcsTable(tableName) ++
+        (selectFromAcsTable(acsTableName) ++
           sql"""
           where store_id = $storeId
             and template_id = $templateId
@@ -180,7 +181,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       _ <- waitUntilAcsIngested()
       result <- storage
         .query( // index: acs_store_template_sid_tid_ce
-          (selectFromAcsTable(tableName) ++
+          (selectFromAcsTable(acsTableName) ++
             sql"""
           where store_id = $storeId
             and template_id = $templateId
@@ -248,7 +249,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             val offsetPromise = offsetChangedAfterStreamingQuery.get()
             storage
               .query( // index: acs_store_template_sid_tid_en
-                (selectFromAcsTable(tableName) ++
+                (selectFromAcsTable(acsTableName) ++
                   sql"""
                     where store_id = $storeId
                       and template_id = $templateId
@@ -449,7 +450,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                   }
                 case (_, Delete(contractId)) =>
                   sqlu"""
-                         delete from #$tableName
+                         delete from #$acsTableName
                          where contract_id = $contractId
                         """.map(_ => ())
               } ++ txEntries.map(txe =>
@@ -501,21 +502,48 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       ContractState.Assigned(domainId)
     }
 
-  override def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit ec: ExecutionContext) = ???
-
   override def getLatestTxLogIndex(query: TXI => Boolean)(implicit ec: ExecutionContext) = ???
-
-  override def getTxLogIndicesAfterEventId(
-      domainId: DomainId,
-      beginAfterEventId: String,
-      limit: Int,
-  )(implicit ec: ExecutionContext) = ???
 
   override def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit ec: ExecutionContext) = ???
 
   override def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
       ec: ExecutionContext
   ): Future[A] = ???
+
+  /* Returns the event ids of the first `limit` TxLog entries that were inserted after the entry
+     with the given event id, in reverse insertion order (newest first). */
+  def getTxLogEventIdsInReverseOrder(
+      beginAfterEventIdO: Option[String],
+      limit: Int,
+  )(implicit lc: TraceContext): Future[Seq[String]] = {
+    for {
+      eventIds <- storage
+        .query(
+          beginAfterEventIdO.fold(
+            sql"""
+                select event_id
+                from #${txLogTableName}
+                where store_id = $storeId
+                order by entry_number desc
+                limit $limit
+              """.as[String]
+          )(beginAfterEventId => sql"""
+                select event_id
+                from #${txLogTableName}
+                where store_id = $storeId
+                and entry_number < (
+                    select entry_number
+                    from #${txLogTableName}
+                    where store_id = $storeId
+                    and event_id = ${lengthLimited(beginAfterEventId)}
+                )
+                order by entry_number desc
+                limit $limit
+              """.as[String]),
+          "getTxLogEventIdsInReverseOrder",
+        )
+    } yield eventIds
+  }
 
   override def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot] =
     // TODO(#6073): implement snapshot reading for the DB store

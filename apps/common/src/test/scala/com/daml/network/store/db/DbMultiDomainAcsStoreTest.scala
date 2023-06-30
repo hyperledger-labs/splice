@@ -105,6 +105,7 @@ class DbMultiDomainAcsStoreTest
       new DbMultiDomainAcsStore(
         storage,
         "acs_store_template",
+        "txlog_store_template",
         storeDescriptor(id),
         _ => Future.successful(DomainId.tryFromString("domain1::domain")),
         loggerFactory,

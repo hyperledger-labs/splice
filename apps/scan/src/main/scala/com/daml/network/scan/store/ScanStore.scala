@@ -15,6 +15,7 @@ import com.daml.network.store.{
 import MultiDomainAcsStore.{ContractWithState, ReadyContract}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.DbScanStore
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{CoinConfigSchedule, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -154,19 +155,21 @@ object ScanStore {
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
-  ): ScanStore =
+  ): ScanStore = {
+    val treeSource = TransactionTreeSource.LedgerConnection(svcParty, connection)
     storage match {
       case _: MemoryStorage =>
         new InMemoryScanStore(
           svcParty = svcParty,
           scanConfig,
           loggerFactory,
-          connection,
+          treeSource,
           retryProvider,
         )
       case db: DbStorage =>
-        new DbScanStore(svcParty, db, scanConfig, loggerFactory, connection, retryProvider)
+        new DbScanStore(svcParty, db, scanConfig, loggerFactory, treeSource, retryProvider)
     }
+  }
 
   def contractFilter(
       svcParty: PartyId,

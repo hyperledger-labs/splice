@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{Contract, HasHealth}
+import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.DomainAlias
@@ -35,8 +35,13 @@ class UserWalletManager(
     retryProvider: RetryProvider,
     scanConnection: ScanConnection,
     override val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
-    extends AutoCloseable
+)(implicit
+    ec: ExecutionContext,
+    mat: Materializer,
+    tracer: Tracer,
+    templateJsonDecoder: TemplateJsonDecoder,
+    close: CloseContext,
+) extends AutoCloseable
     with NamedLogging
     with HasHealth {
 

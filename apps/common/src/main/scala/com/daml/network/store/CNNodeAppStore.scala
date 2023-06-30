@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.digitalasset.canton.logging.NamedLogging
 
 import scala.concurrent.ExecutionContext
@@ -41,13 +41,12 @@ trait CNNodeAppStoreWithHistory[
     TXI <: TxLogStore.IndexRecord,
     TXE <: TxLogStore.Entry[TXI],
 ] extends CNNodeAppStore[TXI, TXE] {
-  protected def connection: CNLedgerConnection
+  protected def transactionTreeSource: TransactionTreeSource
 
   protected final val txLogReader: TxLogStore.Reader[TXI, TXE] =
     new TxLogStore.Reader[TXI, TXE](
       txLog,
-      transactionTreeSource = TxLogStore.TransactionTreeSource
-        .LedgerConnection(acsContractFilter.ingestionFilter.primaryParty, connection),
+      transactionTreeSource = transactionTreeSource,
       loggerFactory,
     )
 }

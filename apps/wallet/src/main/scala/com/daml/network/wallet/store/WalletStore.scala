@@ -27,7 +27,7 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDom
   /** The key identifying the parties considered by this store. */
   def walletKey: WalletStore.Key
 
-  // TODO (#5164): Remove this override so that multiDomainAcsStore is just the generic MultiDomainAcsStore
+  // TODO (#6227): Remove this override so that multiDomainAcsStore is just the generic MultiDomainAcsStore
   def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
     TxLogStore.IndexRecord,
     TxLogStore.Entry[TxLogStore.IndexRecord],
@@ -39,7 +39,7 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDom
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] = for {
     domainId <- defaultAcsDomainIdF
-    // TODO (#5164): Replace with a wallet-specific lookup
+    // TODO (#6227): Replace with a wallet-specific lookup
     install <- multiDomainAcsStore.findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(
       domainId,
       (co: Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]) =>
@@ -53,7 +53,7 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDom
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] = for {
     domainId <- defaultAcsDomainIdF
-    // TODO (#5164): Replace with a wallet-specific lookup
+    // TODO (#6227): Replace with a wallet-specific lookup
     install <- multiDomainAcsStore.findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(
       domainId,
       (co: Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]) =>
@@ -65,7 +65,7 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDom
       tc: TraceContext
   ): Future[Option[Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]] =
     defaultAcsDomainIdF.flatMap(
-      // TODO (#5164): Replace with a wallet-specific lookup
+      // TODO (#6227): Replace with a wallet-specific lookup
       multiDomainAcsStore.findContractOnDomain(coinCodegen.FeaturedAppRight.COMPANION)(
         _,
         (co: Contract[FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]) =>

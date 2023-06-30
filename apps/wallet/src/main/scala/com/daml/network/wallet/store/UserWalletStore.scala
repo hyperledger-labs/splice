@@ -18,7 +18,8 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.{CNNodeAppStoreWithHistory, ConfiguredDefaultDomain, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
-import com.daml.network.util.{CNNodeUtil, Contract}
+import com.daml.network.store.TxLogStore.TransactionTreeSource
+import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.{
   AppPaymentRequest,
   Subscription,
@@ -27,9 +28,11 @@ import com.daml.network.wallet.store.UserWalletStore.{
   SubscriptionRequest,
   SubscriptionState,
 }
+import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -401,19 +404,31 @@ object UserWalletStore {
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
-      ec: ExecutionContext
-  ): UserWalletStore =
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      close: CloseContext,
+  ): UserWalletStore = {
+    val treeSource = TransactionTreeSource.LedgerConnection(key.endUserParty, connection)
     storage match {
       case _: MemoryStorage =>
         new InMemoryUserWalletStore(
           key,
           globalDomain,
           loggerFactory,
-          connection,
+          treeSource,
           retryProvider,
         )
-      case _: DbStorage => throw new RuntimeException("Not implemented")
+      case dbStorage: DbStorage =>
+        new DbUserWalletStore(
+          key,
+          globalDomain,
+          dbStorage,
+          loggerFactory,
+          treeSource,
+          retryProvider,
+        )
     }
+  }
 
   case class Key(
       /** The party-id of the SVC issuing CC managed by this end-user wallet. */

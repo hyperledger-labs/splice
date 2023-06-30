@@ -7,11 +7,12 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.MultiDomainAcsStore.{ContractWithState, ReadyContract}
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.{InMemoryCNNodeAppStore, MultiDomainAcsStore, TxLogStore}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -26,7 +27,7 @@ class InMemoryScanStore(
     override val svcParty: PartyId,
     override protected[this] val scanConfig: ScanAppBackendConfig,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val connection: CNLedgerConnection,
+    override protected val transactionTreeSource: TransactionTreeSource,
     override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext

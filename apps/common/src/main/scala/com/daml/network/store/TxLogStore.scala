@@ -3,10 +3,10 @@ package com.daml.network.store
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.environment.CNLedgerConnection
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
@@ -30,23 +30,12 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
 
   def txLogParser: Parser[TXI, TXE]
 
-  def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]]
-
   /** Gets the latest entry that satisfies a given query.
     * Throws [[Status.NOT_FOUND]] if no such entry exists.
     */
   def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
       ec: ExecutionContext
   ): Future[TXI]
-
-  /** List all events that come after the given event id up to the set limit.
-    * Excludes the event with the given id.
-    */
-  def getTxLogIndicesAfterEventId(domainId: DomainId, beginAfterEventId: String, limit: Int)(
-      implicit ec: ExecutionContext
-  ): Future[Seq[TXI]]
 
   /** List all events that satisfy a given filter. Currently assumes the filter is selective enough for
     * the returned list to not be too long, i.e. does not support limiting the size of the response or pagination.
@@ -129,16 +118,36 @@ object TxLogStore {
       override def getTransactionTreeByEventId(eventId: String): Future[TransactionTree] =
         connection.tryGetTransactionTreeByEventId(parties = Seq(party), id = eventId)
     }
-    case class StaticForTesting(allTransactionTrees: Seq[TransactionTree])
+
+    case class ForTesting(initialTransactionTrees: Seq[TransactionTree] = Seq.empty)
         extends TransactionTreeSource {
+      @volatile
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      private var transactionTrees: Seq[TransactionTree] = initialTransactionTrees
+
+      def addTree(tree: TransactionTree): Unit = blocking {
+        synchronized {
+          transactionTrees = tree +: transactionTrees
+        }
+      }
+
       override def getTransactionTreeByEventId(eventId: String): Future[TransactionTree] =
-        allTransactionTrees
+        transactionTrees
           .find(_.getEventsById.containsKey(eventId))
           .fold(
             Future.failed[TransactionTree](
               new RuntimeException(s"No transaction with event id $eventId")
             )
           )(tx => Future.successful(tx))
+    }
+
+    case object Unused extends TransactionTreeSource {
+      override def getTransactionTreeByEventId(eventId: String): Future[TransactionTree] =
+        Future.failed(
+          new RuntimeException(
+            "This class should only be used for tests where you never read TxLog entries"
+          )
+        )
     }
   }
 
@@ -152,46 +161,30 @@ object TxLogStore {
       override val loggerFactory: NamedLoggerFactory,
   ) extends NamedLogging {
 
-    def getTxLogByOffset(offset: Int, limit: Int)(implicit
-        ec: ExecutionContext,
-        tc: TraceContext,
-    ): Future[Seq[TXE]] = for {
-      indices <- txLogStore.getTxLogIndicesByOffset(offset, limit)
-      entries <- Future.traverse(indices)(i => loadTxLogEntry(i))
-    } yield entries
-
     def getLatestTxLogEntry(
         query: (TXI) => Boolean = (_: TXI) => true
     )(implicit ec: ExecutionContext, tc: TraceContext): Future[TXE] = for {
       index <- txLogStore.getLatestTxLogIndex(query)
-      entry <- loadTxLogEntry(index)
+      entry <- loadTxLogEntry(index.eventId)
     } yield entry
 
-    def getTxLogAfterEventId(domain: DomainId, beginAfterEventId: String, limit: Int)(implicit
-        ec: ExecutionContext,
-        tc: TraceContext,
-    ): Future[Seq[TXE]] = for {
-      indices <- txLogStore.getTxLogIndicesAfterEventId(domain, beginAfterEventId, limit)
-      entries <- Future.traverse(indices)(i => loadTxLogEntry(i))
-    } yield entries
-
-    private def loadTxLogEntry(entryIndex: TXI)(implicit
+    def loadTxLogEntry(eventId: String)(implicit
         ec: ExecutionContext,
         tc: TraceContext,
     ): Future[TXE] = for {
       // Load original transaction tree from the ledger
       // TODO(#2455) handle the case when the transaction has been pruned from the ledger
-      tx <- transactionTreeSource.getTransactionTreeByEventId(entryIndex.eventId)
+      tx <- transactionTreeSource.getTransactionTreeByEventId(eventId)
 
       // Extract application-specific data from the tree
       entries = txLogStore.txLogParser.parse(tx, logger)
 
       // Find original TxLog entry
       entry = entries
-        .find(_.indexRecord.eventId == entryIndex.eventId)
+        .find(_.indexRecord.eventId == eventId)
         .getOrElse(
           sys.error(
-            s"Parser did not return any entry for event ${entryIndex.eventId}. "
+            s"Parser did not return any entry for event ${eventId}. "
               + "The parser did return an entry for the same event previously. "
               + "Either the parser doesn't always return the same entry for a given input tree event, "
               + "or the transaction tree was loaded using different reader parties than those used during ingestion."

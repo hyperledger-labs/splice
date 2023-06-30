@@ -5,14 +5,14 @@ import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{DisclosedContracts, HasHealth}
+import com.daml.network.util.{DisclosedContracts, HasHealth, TemplateJsonDecoder}
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.lifecycle.FlagCloseable
+import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -36,8 +36,13 @@ class UserWalletService(
     override protected[this] val retryProvider: RetryProvider,
     loggerFactory0: NamedLoggerFactory,
     scanConnection: ScanConnection,
-)(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
-    extends RetryProvider.Has
+)(implicit
+    ec: ExecutionContext,
+    mat: Materializer,
+    tracer: Tracer,
+    templateJsonDecoder: TemplateJsonDecoder,
+    close: CloseContext,
+) extends RetryProvider.Has
     with FlagCloseable
     with NamedLogging
     with HasHealth {

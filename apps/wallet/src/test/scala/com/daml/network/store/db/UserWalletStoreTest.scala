@@ -16,11 +16,12 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubscCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.wallet.store.UserWalletStore
+import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.StoreTest
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.{AppPaymentRequest, SubscriptionRequest}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -32,6 +33,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.google.protobuf
+import org.scalatest.{Assertion, Succeeded}
 
 import scala.concurrent.Future
 
@@ -545,6 +547,96 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       }
 
     }
+
+    "listTransactions" should {
+
+      // This helper is similar to the one in WalletTxLogTestUtil
+      type CheckTxHistoryFn = PartialFunction[UserWalletTxLogParser.TxLogEntry, Assertion]
+      def checkTxHistory(
+          store: UserWalletStore,
+          expected: Seq[CheckTxHistoryFn],
+          previousEventId: Option[String] = None,
+      ): Unit = {
+
+        val actual = store.listTransactions(previousEventId, limit = 100000).futureValue
+        actual should have length expected.size.toLong
+
+        actual
+          .zip(expected)
+          .zipWithIndex
+          .foreach { case ((entry, pf), i) =>
+            clue(s"Entry at position $i") {
+              inside(entry)(pf)
+            }
+          }
+
+        clue("Paginated result should be equal to non-paginated result") {
+          val paginatedResult = Iterator
+            .unfold[Seq[UserWalletTxLogParser.TxLogEntry], Option[String]](previousEventId)(
+              beginAfterId => {
+                val entries = store.listTransactions(beginAfterId, limit = 2).futureValue
+                if (entries.isEmpty)
+                  None
+                else
+                  Some(entries -> Some(entries.last.indexRecord.eventId))
+              }
+            )
+            .toSeq
+            .flatten
+
+          paginatedResult should contain theSameElementsInOrderAs actual
+        }
+      }
+
+      "return entries in correct order" in {
+
+        val treeSource = TransactionTreeSource.ForTesting()
+        def mkMint(amount: Double)(offset: String) = {
+          val result = mintTransaction(user1, amount, 1, 1)(offset)
+          treeSource.addTree(result)
+          result
+        }
+
+        for {
+          store <- mkStore(user1, treeSource)
+          _ <- dummyDomain.ingest(mkMint(1.0))(store.multiDomainAcsStore)
+          _ <- dummyDomain.ingest(mkMint(2.0))(store.multiDomainAcsStore)
+          _ <- dummyDomain.ingest(mkMint(3.0))(store.multiDomainAcsStore)
+          _ <- dummyDomain.ingest(mkMint(4.0))(store.multiDomainAcsStore)
+          _ <- dummyDomain.ingest(mkMint(5.0))(store.multiDomainAcsStore)
+        } yield {
+          eventually() {
+            checkTxHistory(
+              store,
+              // Note: transactions are returned in reverse chronological order
+              Seq(
+                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                  logEntry.amount shouldBe 5.0
+                },
+                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                  logEntry.amount shouldBe 4.0
+                },
+                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                  logEntry.amount shouldBe 3.0
+                },
+                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                  logEntry.amount shouldBe 2.0
+                },
+                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                  logEntry.amount shouldBe 1.0
+                },
+              ),
+            )
+            Succeeded
+          }
+        }
+      }
+    }
   }
 
   private lazy val provider1 = providerParty(1)
@@ -913,7 +1005,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  protected def mkStore(endUserParty: PartyId): Future[UserWalletStore]
+  // Note: The TransactionTreeSource is only used to read TxLog entries. For most tests it is never used.
+  protected def mkStore(
+      endUserParty: PartyId,
+      transactionTreeSource: TransactionTreeSource = TransactionTreeSource.Unused,
+  ): Future[UserWalletStore]
 
   lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
@@ -921,13 +1017,15 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 }
 
 class InMemoryUserWalletStoreTest extends UserWalletStoreTest {
-  override protected def mkStore(endUserParty: PartyId): Future[InMemoryUserWalletStore] = {
+  override protected def mkStore(
+      endUserParty: PartyId,
+      transactionTreeSource: TransactionTreeSource,
+  ): Future[InMemoryUserWalletStore] = {
     val store = new InMemoryUserWalletStore(
       key = storeKey(endUserParty),
       defaultAcsDomain = domainAlias,
       loggerFactory = loggerFactory,
-      // The ledger connection is only used for reading full TxLog entries
-      connection = null,
+      transactionTreeSource = transactionTreeSource,
       retryProvider = RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
     )
     for {
@@ -948,7 +1046,10 @@ class DbUserWalletStoreTest
     with AcsJdbcTypes
     with AcsTables {
 
-  override protected def mkStore(endUserParty: PartyId): Future[DbUserWalletStore] = {
+  override protected def mkStore(
+      endUserParty: PartyId,
+      transactionTreeSource: TransactionTreeSource,
+  ): Future[DbUserWalletStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         Seq(
@@ -964,8 +1065,7 @@ class DbUserWalletStoreTest
       defaultAcsDomain = domainAlias,
       storage = storage,
       loggerFactory = loggerFactory,
-      // The ledger connection is only used for reading full TxLog entries
-      connection = null,
+      transactionTreeSource = transactionTreeSource,
       retryProvider = RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
     )
     for {

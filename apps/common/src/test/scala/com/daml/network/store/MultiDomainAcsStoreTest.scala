@@ -2,16 +2,15 @@ package com.daml.network.store
 
 import akka.actor.ActorSystem
 import cats.syntax.foldable.*
-import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, TransactionTree}
+import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.codegen.java.cn.scripts.testwallet.TestDeliveryOffer
 import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.{DeliveryOffer, DeliveryOfferView}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.ledger.api.{TransferEvent, TransactionTreeUpdate}
+import com.daml.network.environment.ledger.api.TransferEvent
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
-import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.topology.DomainId
@@ -586,82 +585,6 @@ abstract class MultiDomainAcsStoreTest[
             ContractState.Assigned(d1),
           ),
         )
-      }
-    }
-
-    "return tx log entries in correct order" in {
-      implicit val store = mkStore()
-      val tx1Offset = "011"
-      val tx2Offset = "012"
-      val tx3Offset = "013"
-      val tx4Offset = "014"
-
-      val (validatorRewardCouponsForAcs, validatorRewardCouponsForTxs) =
-        Seq(0, 1, 2, 3).map(i => mkValidatorRewardCoupon(i)).splitAt(2)
-      val filteredAppRewardCoupons =
-        Seq(0, 1, 3).map(i => appRewardCoupon(i + 100, mkPartyId(s"provider-$i")))
-      val appRewardCouponsToArchive = Seq(2, 3).map(i => appRewardCoupon(i, providerParty(i)))
-
-      val tx1: TransactionTree = mkTx(
-        tx1Offset,
-        Seq(
-          filteredAppRewardCoupons.map(toCreatedEvent),
-          appRewardCouponsToArchive.map(toArchivedEvent),
-          validatorRewardCouponsForAcs.map(toCreatedEvent),
-        ).flatten,
-      )
-      val tx2: TransactionTree = mkTx(
-        tx2Offset,
-        Seq(mkValidatorRewardCoupon(100))
-          .map(toCreatedEvent)
-          .appendedAll(filteredAppRewardCoupons.map(toArchivedEvent)),
-      )
-      val tx3: TransactionTree = mkCreateTx(tx3Offset, validatorRewardCouponsForTxs)
-      val tx4: TransactionTree = mkCreateTx(tx4Offset, Seq(mkValidatorRewardCoupon(5)))
-
-      val reader = new TxLogStore.Reader[TestTxLogIndexRecord, TestTxLogEntry](
-        txLogStore = store,
-        transactionTreeSource = TransactionTreeSource.StaticForTesting(Seq(tx1, tx2, tx3, tx4)),
-        loggerFactory,
-      )
-      val initialEventIdD1 = tx2.getRootEventIds.asScala.headOption.value
-      val initialEventIdD2 = tx3.getRootEventIds.asScala.headOption.value
-      for {
-        _ <- acs()
-        _ <- store.ingestionSink.ingestUpdate(d1, TransactionTreeUpdate(tx1))
-        _ <- store.ingestionSink.ingestUpdate(d1, TransactionTreeUpdate(tx2))
-        _ <- store.ingestionSink.ingestUpdate(d2, TransactionTreeUpdate(tx3))
-        indices <- store.getTxLogIndicesByOffset(0, 1000)
-        entries <- reader.getTxLogByOffset(0, 1000)
-        indices2 <- store.getTxLogIndicesByOffset(2, 3)
-        entries2 <- reader.getTxLogByOffset(2, 3)
-
-        d1Indices <- store.getTxLogIndicesAfterEventId(d1, initialEventIdD1, 10)
-        d2Indices <- store.getTxLogIndicesAfterEventId(d2, initialEventIdD2, 10)
-      } yield {
-        // The test tx log creates one entry for each create event.
-        // The test transactions only contain root nodes, the tx log should preserve their order.
-        def createEvents(tx: TransactionTree): Seq[CreatedEvent] =
-          tx.getRootEventIds.asScala.toList
-            .collect(i =>
-              tx.getEventsById.get(i) match {
-                case c: CreatedEvent => c
-              }
-            )
-        val expectedEventsInTxLog = Seq(tx1, tx2, tx3).flatMap(createEvents(_)).reverse
-        val expectedEventIds = expectedEventsInTxLog.map(_.getEventId)
-
-        indices.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds
-        entries.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds
-
-        indices2.map(_.eventId) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 5)
-        entries2.map(_.payload) should contain theSameElementsInOrderAs expectedEventIds.slice(2, 5)
-
-        d1Indices.map(_.eventId) should contain theSameElementsInOrderAs Seq(tx1)
-          .flatMap(createEvents(_))
-          .map(_.getEventId)
-          .reverse
-        d2Indices.map(_.eventId) shouldBe empty
       }
     }
 

@@ -13,6 +13,7 @@ import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.StoreTest
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{CNNodeUtil, Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -266,7 +267,7 @@ class InMemoryScanStoreTest extends ScanStoreTest {
         domains = new ScanDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       ),
       loggerFactory,
-      connection = null,
+      transactionTreeSource = TransactionTreeSource.Unused,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
     )
     for {
@@ -308,7 +309,7 @@ class DbScanStoreTest
         domains = new ScanDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       ),
       loggerFactory,
-      connection = null,
+      transactionTreeSource = TransactionTreeSource.Unused,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
     )(parallelExecutionContext, implicitly, implicitly)
     for {

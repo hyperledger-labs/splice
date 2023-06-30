@@ -3,8 +3,9 @@ package com.daml.network.wallet.store.memory
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.InMemoryCNNodeAppStore
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.digitalasset.canton.DomainAlias
@@ -18,7 +19,7 @@ class InMemoryUserWalletStore(
     override val key: UserWalletStore.Key,
     override val defaultAcsDomain: DomainAlias,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val connection: CNLedgerConnection,
+    override protected val transactionTreeSource: TransactionTreeSource,
     override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
@@ -100,10 +101,11 @@ class InMemoryUserWalletStore(
   )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]] =
     for {
       domain <- domains.waitForDomainConnection(defaultAcsDomain)
-      entries <- beginAfterEventId.fold(
-        txLogReader.getTxLogByOffset(0, limit)
+      indices = beginAfterEventId.fold(
+        txLog.getTxLogIndicesByOffset(0, limit)
       )(
-        txLogReader.getTxLogAfterEventId(domain, _, limit)
+        txLog.getTxLogIndicesAfterEventId(domain, _, limit)
       )
+      entries <- Future.traverse(indices)(i => txLogReader.loadTxLogEntry(i.eventId))
     } yield entries
 }

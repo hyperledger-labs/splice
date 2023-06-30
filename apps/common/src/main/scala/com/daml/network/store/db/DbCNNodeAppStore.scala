@@ -17,7 +17,8 @@ abstract class DbCNNodeAppStore[
     TXE <: TxLogStore.Entry[TXI],
 ](
     storage: DbStorage,
-    tableName: String,
+    acsTableName: String,
+    txLogTableName: String,
     storeDescriptor: io.circe.Json,
 )(implicit
     protected val ec: ExecutionContext,
@@ -31,7 +32,8 @@ abstract class DbCNNodeAppStore[
   override val multiDomainAcsStore: DbMultiDomainAcsStore[TXI, TXE] =
     new DbMultiDomainAcsStore(
       storage,
-      tableName,
+      acsTableName,
+      txLogTableName,
       storeDescriptor,
       tc => defaultAcsDomainIdF(tc),
       loggerFactory,
@@ -42,6 +44,7 @@ abstract class DbCNNodeAppStore[
       (evt, tc) => ingestionTxLogInsert(evt)(tc),
     )
 
+  // TODO(M3-83): set this to multiDomainAcsStore once all db stores support reading from the db txlog
   override def txLog: TxLogStore[TXI, TXE] = new InMemoryMultiDomainAcsStore(
     loggerFactory,
     acsContractFilter,
@@ -78,6 +81,7 @@ abstract class DbCNNodeAppStoreWithoutHistory(
 ) extends DbCNNodeAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]](
       storage,
       tableName,
+      "THIS_STORE_DOES_NOT_HAVE_A_TXLOG",
       storeDescriptor,
     ) { this: ConfiguredDefaultDomain =>
 
@@ -92,7 +96,8 @@ abstract class DbCNNodeAppStoreWithHistory[
     TXE <: TxLogStore.Entry[TXI],
 ](
     storage: DbStorage,
-    tableName: String,
+    acsTableName: String,
+    txLogTableName: String,
     storeDescriptor: io.circe.Json,
 )(implicit
     ec: ExecutionContext,
@@ -100,7 +105,8 @@ abstract class DbCNNodeAppStoreWithHistory[
     closeContext: CloseContext,
 ) extends DbCNNodeAppStore[TXI, TXE](
       storage,
-      tableName,
+      acsTableName,
+      txLogTableName,
       storeDescriptor,
     )
     with CNNodeAppStoreWithHistory[TXI, TXE] { this: ConfiguredDefaultDomain => }

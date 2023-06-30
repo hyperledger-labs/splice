@@ -429,26 +429,20 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   /** TX log APIs
     */
 
-  override def getTxLogIndicesByOffset(offset: Int, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]] =
-    Future.successful(stateVar.txLog.slice(offset, offset + limit).map(_.payload))
+  def getTxLogIndicesByOffset(offset: Int, limit: Int): Seq[TXI] =
+    stateVar.txLog.slice(offset, offset + limit).map(_.payload)
 
-  override def getTxLogIndicesAfterEventId(
+  def getTxLogIndicesAfterEventId(
       domainId: DomainId,
       beginAfterEventId: String,
       limit: Int,
-  )(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]] =
-    Future.successful(
-      stateVar.txLog.view
-        .filter(_.domain == domainId)
-        .map(_.payload)
-        .dropWhile(_.eventId != beginAfterEventId)
-        .slice(1, 1 + limit)
-        .toSeq
-    )
+  ): Seq[TXI] =
+    stateVar.txLog.view
+      .filter(_.domain == domainId)
+      .map(_.payload)
+      .dropWhile(_.eventId != beginAfterEventId)
+      .slice(1, 1 + limit)
+      .toSeq
 
   override def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
       ec: ExecutionContext
