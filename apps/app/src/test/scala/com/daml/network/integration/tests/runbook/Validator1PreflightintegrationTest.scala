@@ -254,7 +254,7 @@ class Validator1PreflightIntegrationTest
 
     // Generate new random CNS names to avoid conflicts between multiple preflight check runs
     val entryId = (new scala.util.Random).nextInt().toHexString
-    val cnsName = s"alice_${entryId}.cns"
+    val cnsName = s"alice_${entryId}.unverified.cns"
 
     withFrontEnd("alice-validator1") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
