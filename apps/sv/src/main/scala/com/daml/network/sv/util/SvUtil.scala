@@ -40,7 +40,7 @@ object SvUtil {
   )
 
   val defaultSvcDomainNumber = 0L;
-  private val defaultInitialTrafficGrant = 100_000L
+  private val defaultInitialTrafficGrant = 1000_000L
 
   private def defaultSvcGlobalDomainConfig = new GlobalDomainConfig(
     // domains
