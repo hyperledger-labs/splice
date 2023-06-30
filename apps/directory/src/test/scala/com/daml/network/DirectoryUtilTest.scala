@@ -32,6 +32,7 @@ class DirectoryUtilTest extends BaseTest with BaseTestWordSpec {
           ("restricted special characters", "aliceentry~$!@%^&*()+.unverified.cns"),
           ("dots before the required suffix", "alice.entry.unverified.cns"),
           ("incorrect suffix", "alice.cns"),
+          ("uppercase characters", "alice_Entry.unverified.cns"),
           ("too many characters", "my_very_l0ng_cns_nam3_with_over_40_characters.unverified.cns"),
         )
 
