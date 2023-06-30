@@ -42,6 +42,7 @@ in pkgs.mkShell {
     openapi-generator-cli
     openjdk11
     pigz
+    popeye
     postgresql_11
     pre-commit
     procps
