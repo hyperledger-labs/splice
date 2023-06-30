@@ -144,50 +144,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "ZHVtbXlAY2xpZW50cw=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-directory-ledger-api-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-directory-ledger-api-auth",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "ledger-api-user": "ZHVtbXlAY2xpZW50cw=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-scan-ledger-api-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-scan-ledger-api-auth",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "private": "TUVFQ0FRQXdFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNFSnpBbEFnRUJCQ0JzRnVGYTdFdW1rZGc0ZGNmL3Z4SVhnQWplMlVMVnorcVRLUDNzL3RIcUt3PT0=",
           "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFMWViK0prSDJRRlJDWmVkTy9QNWNxNWQyK3lmZHdQK2pFKzl3M2NUNkJxZkh4Q2QvUHlBMG1tV01lUG92U2htZjk3SGxVYWpGdU4wNWtaZ3h2amNQUXc9PQ=="
         }
@@ -244,28 +200,6 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv1-validator-ledger-api-auth",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "ledger-api-user": "ZHVtbXlAY2xpZW50cw=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-svc-ledger-api-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-svc-ledger-api-auth",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

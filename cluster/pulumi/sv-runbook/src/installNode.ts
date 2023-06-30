@@ -16,14 +16,11 @@ import {
   createSvAppSecrets,
   createSvValidatorSecrets,
   createSvDirectoryUiSecrets,
-  directoryUserParticipantSecret,
   imagePullSecret,
   imagePullSecretByNamespaceName,
-  scanUserParticipantSecret,
   sv1UserParticipantSecret,
   sv1UserValidatorParticipantSecret,
   svKeySecret,
-  svcUserParticipantSecret,
 } from './secrets';
 import { CLUSTER_BASENAME, TARGET_CLUSTER, REPO_ROOT, SV_NAME } from './utils';
 
@@ -98,9 +95,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       loopback,
       sv1UserParticipantSecret(svNamespace, auth0Cfg),
       sv1UserValidatorParticipantSecret(svNamespace, auth0Cfg),
-      scanUserParticipantSecret(svNamespace),
-      directoryUserParticipantSecret(svNamespace),
-      svcUserParticipantSecret(svNamespace),
       svKeySecret(svNamespace, SV_PUBLIC_KEY, SV_PRIVATE_KEY),
     ])
   );

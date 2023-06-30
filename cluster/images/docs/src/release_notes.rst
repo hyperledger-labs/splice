@@ -8,7 +8,7 @@ Release Notes
 
 * Deployment
     * Ensured that both the `cn-cometbft` and `cn-postgres` charts support the `db.volumeSize` and `db.volumeStorageClass` values for configuring persistent storage.
-
+    * The three secrets, `cn-app-scan-ledger-api-auth`, `cn-app-directory-ledger-api-auth`, `cn-app-svc-ledger-api-auth` that were required before with dummy values, are no longer required.
 
 2023-07-02
 ----------
@@ -40,6 +40,11 @@ Release Notes
 * The environment variable ``CANTON_PARTICIPANT_USERS`` defining the admin users to be allocated as part of participant
   bootstrapping is now a simple JSON array of strings, where each element is the name of another environment variable
   storing the name of the user to be allocated.
+
+* Frontend updates:
+
+  * Coin configuration in Scan UI now shows real data from the backend.
+  * Domain Fees leaderboard in Scan UI now shows real data from the backend.
 
 2023-06-25
 ----------

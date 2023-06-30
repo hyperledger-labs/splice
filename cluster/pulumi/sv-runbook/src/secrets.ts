@@ -146,19 +146,6 @@ export async function createSvAppSecrets(
   };
 }
 
-// TODO(#4374): get rid of the dummy secrets
-export function scanUserParticipantSecret(ns: ExactNamespace): k8s.core.v1.Secret {
-  return participantSecret(ns, 'scan', 'dummy');
-}
-
-export function directoryUserParticipantSecret(ns: ExactNamespace): k8s.core.v1.Secret {
-  return participantSecret(ns, 'directory', 'dummy');
-}
-
-export function svcUserParticipantSecret(ns: ExactNamespace): k8s.core.v1.Secret {
-  return participantSecret(ns, 'svc', 'dummy');
-}
-
 export function svKeySecret(
   ns: ExactNamespace,
   publicKey: string,

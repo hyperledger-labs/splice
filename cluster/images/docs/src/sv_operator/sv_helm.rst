@@ -302,14 +302,6 @@ The following two kubernetes secrets will instruct the participant to create ser
     kubectl create --namespace sv secret generic cn-app-sv1-ledger-api-auth \
         "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients"
 
-For technical reasons, please also create the following dummy secrets (a requirement that will be removed in the near future):
-
-.. code-block:: bash
-
-    kubectl create --namespace sv secret generic cn-app-scan-ledger-api-auth "--from-literal=ledger-api-user=dummy"
-    kubectl create --namespace sv secret generic cn-app-directory-ledger-api-auth "--from-literal=ledger-api-user=dummy"
-    kubectl create --namespace sv secret generic cn-app-svc-ledger-api-auth "--from-literal=ledger-api-user=dummy"
-
 The SV app is configured with a secret as follows:
 
 .. code-block:: bash
