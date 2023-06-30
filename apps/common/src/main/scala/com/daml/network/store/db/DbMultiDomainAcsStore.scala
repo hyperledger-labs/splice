@@ -3,7 +3,7 @@ package com.daml.network.store.db
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import cats.implicits.*
-import com.daml.ledger.javaapi.data.{CreatedEvent, Template}
+import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
@@ -517,7 +517,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       ec: ExecutionContext
   ): Future[A] = ???
 
-  override def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
+  override def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot] =
     // TODO(#6073): implement snapshot reading for the DB store
     ???
 }

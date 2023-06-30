@@ -3,7 +3,13 @@ package com.daml.network.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  ExercisedEvent,
+  Template,
+  TransactionTree,
+  Identifier,
+}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.*
@@ -525,24 +531,30 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   override def close(): Unit = ()
 
-  override def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] = Future {
-    val state = stateVar
-    state.offset match {
-      case None =>
-        throw Status.NOT_FOUND
-          .withDescription("ACS has not yet been fully ingested.")
-          .asRuntimeException()
-      case Some(offset) =>
-        JsonAcsSnapshot(
-          offset,
-          state.createEvents.values
-            .collect(
-              Function.unlift(ev => contractFilter.decodeMatchingContract(ev))
-            )
-            .toSeq,
-        )
+  override def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot] =
+    Future {
+      val state = stateVar
+      state.offset match {
+        case None =>
+          throw Status.NOT_FOUND
+            .withDescription("ACS has not yet been fully ingested.")
+            .asRuntimeException()
+        case Some(offset) =>
+          JsonAcsSnapshot(
+            offset,
+            state.createEvents.values
+              .collect(
+                Function.unlift(ev => {
+                  if (ignoredContracts.contains(ev.getTemplateId))
+                    None
+                  else
+                    contractFilter.decodeMatchingContract(ev)
+                })
+              )
+              .toSeq,
+          )
+      }
     }
-  }
 }
 
 object InMemoryMultiDomainAcsStore {

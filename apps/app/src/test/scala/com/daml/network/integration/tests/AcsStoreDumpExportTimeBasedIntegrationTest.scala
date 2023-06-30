@@ -31,7 +31,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
   implicit val templateJsonDecoder: TemplateJsonDecoder =
     new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-  protected def createTestContracts()(implicit env: FixtureParam): Set[String] = {
+  protected def createTestContracts()(implicit env: FixtureParam): (Set[String], Set[String]) = {
 
     // TODO(#6193): also create an `ImportCrate` contract as a test contract, so it's easy to create a test-dump with a Coin, LockedCoin, and ImportCrate
 
@@ -66,18 +66,42 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
       )
       .map(co => co.id.contractId)
 
-    aliceUnlockedIds
-      .appendedAll(aliceLockedIds)
-      .appendedAll(Seq(id2.contractId, id3.contractId))
-      .toSet
+    // Locking creates app and validator rewards for the user itself
+    val aliceAppRewards = aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+      .filterJava(cc.coin.AppRewardCoupon.COMPANION)(
+        aliceUserParty
+      )
+    aliceAppRewards should not be empty
+    val aliceValidatorRewards = aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+      .filterJava(cc.coin.ValidatorRewardCoupon.COMPANION)(
+        aliceUserParty
+      )
+    aliceValidatorRewards should not be empty
+
+    (
+      aliceUnlockedIds
+        .appendedAll(aliceLockedIds)
+        .appendedAll(Seq(id2.contractId, id3.contractId))
+        .toSet,
+      aliceAppRewards
+        .map(_.id.contractId)
+        .appendedAll(
+          aliceValidatorRewards.map(_.id.contractId)
+        )
+        .toSet,
+    )
 
   }
 
   protected def checkDump(
-      expectedContractIds: Set[String],
+      testContractIds: (Set[String], Set[String]),
       dump: http.GetAcsStoreDumpResponse,
   ): Assertion = {
+    val (expectedContractIds, ignoredContractIds) = testContractIds
     val contracts = dump.contracts
+
+    // check that the ignored contracts are not present in the dump
+    forAll(dump.contracts)(co => ignoredContractIds should not contain (co.contractId))
 
     // check that the coins we tapped are present in the dump
     val coinContracts = contracts.collect(

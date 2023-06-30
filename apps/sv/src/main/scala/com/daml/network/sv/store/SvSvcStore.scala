@@ -2,6 +2,7 @@ package com.daml.network.sv.store
 
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data as javab
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as v1testcc
@@ -23,15 +24,18 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
+  ConfiguredDefaultDomain,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
   PageLimit,
-  ConfiguredDefaultDomain,
   TxLogStore,
 }
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.{JsonAcsSnapshot, QueryResult, ReadyContract}
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
+import com.daml.network.sv.store.SvSvcStore.{
+  DuplicateValidatorTrafficContracts,
+  ignoredContractsForAcsDump,
+}
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
@@ -748,6 +752,9 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
         }
       )
       .map(dict => dict.values.toSeq)
+
+  def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
+    multiDomainAcsStore.getJsonAcsSnapshot(ignoredContractsForAcsDump)
 }
 
 object SvSvcStore {
@@ -768,6 +775,16 @@ object SvSvcStore {
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
+
+  val ignoredContractsForAcsDump: Set[Identifier] = Set(
+    // Note: these three kinds of contracts are not included in an ACS dump due to the ExpireUnclaimedRewards trigger
+    // being disabled, which leads to a too high growth of the ACS export per hour.
+    cc.coin.AppRewardCoupon.COMPANION.TEMPLATE_ID,
+    cc.coin.ValidatorRewardCoupon.COMPANION.TEMPLATE_ID,
+    cc.round.ClosedMiningRound.COMPANION.TEMPLATE_ID,
+    // TODO(#6313): remove this ignore once we don't have left-over confirmations anymore
+    cn.svcrules.Confirmation.COMPANION.TEMPLATE_ID,
+  )
 
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(

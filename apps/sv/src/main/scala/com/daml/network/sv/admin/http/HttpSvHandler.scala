@@ -427,7 +427,7 @@ class HttpSvHandler(
         logger.debug(s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription}")
         for {
           // TODO(#6073): this doesn't work for larger ACS as the client will timeout -- we can change its semantics to start a dump process and return a handle to the operation that can be checked for completion
-          snapshot <- svcStore.multiDomainAcsStore.getJsonAcsSnapshot()
+          snapshot <- svcStore.getJsonAcsSnapshot()
           response <- Future {
             blocking {
               import io.circe.syntax.*
@@ -479,7 +479,7 @@ class HttpSvHandler(
     v0.SvResource.GetAcsStoreDumpResponse
   ] = {
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      svcStore.multiDomainAcsStore
+      svcStore
         .getJsonAcsSnapshot()
         .map(snapshot =>
           v0.SvResource.GetAcsStoreDumpResponse.OK(
