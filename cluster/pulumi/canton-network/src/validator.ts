@@ -25,7 +25,7 @@ export async function installValidator(
   withDomainFees = false,
   isDevNet: boolean,
   postgresPassword: pulumi.Input<string>,
-  validatorWalletUser?: string
+  validatorWalletUser: string
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 

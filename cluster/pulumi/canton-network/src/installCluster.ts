@@ -245,7 +245,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     validator1Onboarding,
     withDomainFees,
     isDevNet,
-    validatorPostgresPassword.result
+    validatorPostgresPassword.result,
+    'auth0|63e3d75ff4114d87a2c1e4f5'
   );
 
   const splitwellPostgresPassword = generatePassword('splitwell');

@@ -4560,7 +4560,8 @@
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "topup": {},
-        "validatorPartyHint": "validator1_validator_service_user"
+        "validatorPartyHint": "validator1_validator_service_user",
+        "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       }
     },
     "name": "helm-validator1-validator-validator1",
