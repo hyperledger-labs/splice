@@ -207,20 +207,31 @@ uses our redistributable Helm charts to install a Canton Network
 test environment inside a cluster already configured with the
 infrastructure script.
 
-1. Change to the repository root and ensure docker images are built
-   and pushed to the Docker repository. (`make docker-push`)
+1. Start from a clean slate: `make -C $REPO_ROOT clean`
+   - Note that this step internally calls `sbt bundle` to build the most recent version of our apps.
+     later steps don't call `sbt bundle` automatically, as it takes too long.
+1. Ensure docker images are built and pushed to the Docker repository: `make -C $REPO_ROOT docker-push -j`
+   - Note: helm charts built locally reference the docker images using just your username.
+     Make sure to `make docker-push`, whenever you want to propagate local changes.
 1. Start with a working cluster and change to its deployment directory.
-1. Delete the existing cluster resources: `cncluster obliterate_state`.
+1. Acquire the cluster lock `cncluster lock`.
+1. Delete the existing cluster resources managed by pulumi: `cncluster reset`.
+   This should typically not be required as the cluster is reset upon unlocking it.
 1. Apply the Pulumi cluster configuration: `cncluster apply`.
-1. Use `kubectl get pods -A` to observe creation of the four new SV App nodes.
+   - Use `kubectl get pods -A` to observe creation of the four new SV App nodes.
+   - You can also use the graphical `k9s` tool for this purpose, see its [docs here](https://k9scli.io/).
+   - Some tips for handling deployment failures:
+     - *Secrets not containing the right values*: decode the secret using something like
+       `kubectl get secret -n sv-1 cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps -o 'jsonpath={.data.json-credentials}' | base64 -d`
+       or use `k9s` to navigate to the secrets overview using `:secrets` and press `x` on the secret of interest.
+     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network cancel`
+     - See also the section on [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
 1. The Pulumi and Helm charts may now be edited and `cncluster apply`
    once again used to apply only the changes to the cluster.
-1. `cncluster pdown` Will remove from the cluster, the portions
-   of the configuration managed by Pulumi.
+   - Set `export PULUMI_RETRY=1` to deal with the false-negatives on
+     [Pulumi deployment failures](https://github.com/DACH-NY/canton-network-node/issues/5881)
+1. Release the cluster lock `cncluster unlock`, which also resets the cluster.
 
-Note: Since we are experiencing a significant amount of false-negatives on Pulumi deployment,
-the `cncluster` script can now optionally retry all pulumi commands. To enable that,
-set an environment variable `PULUMI_RETRY` to 1.
 
 ### Manual Google Cloud Configuration
 
