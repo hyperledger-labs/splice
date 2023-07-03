@@ -1,0 +1,18 @@
+{
+    "name": "TestNet-Preview Nightly Re-deployment",
+    "description": "Nightly Re-deployment of TestNet-Preview",
+    "attribution-actor": "system",
+    "parameters" : {
+      "branch" : "main",
+      "run-job": "deploy-testnet-preview"
+    },
+    "timetable" : {
+      "per-hour" : 1,
+      "hours-of-day": [
+        6
+      ],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}

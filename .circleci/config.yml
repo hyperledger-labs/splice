@@ -2412,8 +2412,7 @@ workflows:
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
-        # TODO(#6032) Remove this if we don't remove the whole cluster before.
-        # <<: *main-branch-only
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
@@ -2426,8 +2425,7 @@ workflows:
           - datadog
           - slack-context
     - deploy_cluster:
-        # TODO(#6032) Remove this if we don't remove the whole cluster before.
-        # <<: *main-branch-only
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
@@ -2440,8 +2438,7 @@ workflows:
     - preflight_check:
         cluster: "testnet-preview"
         <<: *non_devnet_preflight_params
-        # TODO(#6032) Remove this if we don't remove the whole cluster before.
-        # <<: *main-branch-only
+        <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
@@ -2505,16 +2502,14 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          # TODO(#6032) Remove this if we don't remove the whole cluster before.
-          # <<: *main-branch-only
+          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "deploy_testnet_preview"
       - preflight_check:
-          # TODO(#6032) Remove this if we don't remove the whole cluster before.
-          # <<: *main-branch-only
+          <<: *main-branch-only
           cluster: "testnet-preview"
           <<: *non_devnet_preflight_params
           context:
