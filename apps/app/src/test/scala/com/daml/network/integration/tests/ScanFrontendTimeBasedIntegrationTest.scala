@@ -4,15 +4,17 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{ConfigScheduleUtil, FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.util.CNNodeUtil
 
 import scala.jdk.CollectionConverters.*
+import java.time.{Duration, Instant}
 
 class ScanFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
     with FrontendLoginUtil
+    with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
 
@@ -141,8 +143,55 @@ class ScanFrontendTimeBasedIntegrationTest
               })
           },
         )
+      }
 
-      // TODO(#6307) -- schedule a change to coinconfig and check UI results
+      val newHoldingFee = 0.1
+
+      clue("schedule a config change, and advance time for it to take effect") {
+        val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+
+        val ledgerNow = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+        val javaTomorrow = Instant.now().plusSeconds(86400) // one day later in seconds
+
+        // Create two configs: the first scheduled one tick from now, so we can test changes to the coin config display itself
+        // The second is scheduled one day past real-time, so we can test the "Next update at..." display, since the TimeBased tests start at
+        // the beginning of the epoch, 1970, and thus wouldn't show up in the browser (which checks for future values relative to local time)
+        val configSchedule =
+          createConfigSchedule(
+            currentConfigSchedule,
+            (
+              defaultTickDuration.asJava,
+              mkUpdatedCoinConfig(
+                currentConfigSchedule,
+                tickDuration = defaultTickDuration,
+                holdingFee = newHoldingFee,
+              ),
+            ),
+            (
+              Duration.between(ledgerNow.toInstant, javaTomorrow),
+              mkUpdatedCoinConfig(
+                currentConfigSchedule,
+                tickDuration = defaultTickDuration,
+                holdingFee = newHoldingFee,
+              ),
+            ),
+          )
+        setConfigSchedule(configSchedule)
+        advanceRoundsByOneTick
+        advanceRoundsByOneTick
+      }
+
+      clue("check new config change in the UI") {
+        withFrontEnd("scan-ui") { implicit webDriver =>
+          find(id("holding-fee")).value.text should matchText(
+            s"${newHoldingFee} CC/Round"
+          )
+
+          // depending on timing, we might dip below 23 hours, 59 mins, 30 seconds which results in this string from date-fns
+          find(id("next-config-update")).value.text should (equal("1 day") or equal(
+            "about 24 hours"
+          ))
+        }
       }
     }
   }

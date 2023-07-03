@@ -60,7 +60,7 @@ const NextConfigUpdate: React.FC = () => {
   return (
     <Stack spacing={2}>
       <Typography variant="h3">Next Configuration Update</Typography>
-      <Typography variant="body1">
+      <Typography variant="body1" id="next-config-update">
         {configurationUpdate ? (
           formatDistanceToNow(configurationUpdate, { includeSeconds: true })
         ) : (
