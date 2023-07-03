@@ -627,21 +627,6 @@ function subcmd_create() {
 subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank state. Clears all data.'
 
 function _cluster_reset() {
-    _info "Deleting all stateful sets..."
-    kubectl delete StatefulSet --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
-
-    _info "Deleting all deployments..."
-    kubectl delete Deployment --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
-
-    _info "Deleting all pods..."
-    kubectl delete Pods --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
-
-    _info "Deleting all services..."
-    kubectl delete Service --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
-
-    _info "Deleting all persistent volume claims..."
-    kubectl delete PersistentVolumeClaim --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
-
     _info "Uninstalling Pulumi canton-network-gateway stack"
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
@@ -667,33 +652,6 @@ function subcmd_reset() {
 
     _cluster_reset "$@"
 }
-
-###
-
-subcommand_whitelist[obliterate_state]='Delete ALL CANTON NETWORK RESOURCES from the cluster.'
-
-function subcmd_obliterate_state() {
-    _production_gate
-    _prompt_to_confirm
-    _cluster_must_exist
-
-    _info "Deleting all Canton Network Namespaces..."
-    kubectl delete Namespace -l cnjClusterName="${GCP_CLUSTER_NAME}"
-
-    _info "Full delete... deleting default namespace deployments..."
-    kubectl delete Deployment -l cnjClusterName="${GCP_CLUSTER_NAME}"
-
-    _info "Full delete... deleting default namespace services..."
-    kubectl delete Service -l cnjClusterName="${GCP_CLUSTER_NAME}"
-
-    # Delete the external service manually, since it does not have
-    # the CNJ prefix cluster name label.
-    kubectl delete Service external --ignore-not-found=true
-
-    _info "Cluster state obliterated"
-}
-
-###
 
 subcommand_whitelist[ci_apply]='Run only by CircleCI'
 
