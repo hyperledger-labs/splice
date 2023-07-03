@@ -69,8 +69,8 @@ of which are accessible only through VPN:
 | ScratchNetB     | http://scratchb.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
 | ScratchNetC     | http://scratchc.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
 | ScratchNetD     | http://scratchd.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
-| ScratchNetF     | http://scratchd.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
-| ScratchNetG     | http://scratchd.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
+| ScratchNetF     | http://scratchf.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
+| ScratchNetG     | http://scratchg.network.canton.global     | Ad hoc, manual                   | Cluster Configuration Development      |
 | TestNet Preview | http://test-preview.network.canton.global | Ad hoc, through CI               | Longer Running Tests with devnet=false |
 
 The automatic deployments are configured as
