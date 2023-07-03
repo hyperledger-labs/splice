@@ -14,8 +14,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
 
-import java.nio.file.Files
-
 /** Runs through runbook but does so while spinning up a local SVC. */
 class LocalRunbookIntegrationTest
     extends CNNodeIntegrationTest
@@ -46,24 +44,6 @@ class LocalRunbookIntegrationTest
   System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
 
   private def setupAndStartCanton() = {
-    // We merge the bootstrap we need for the SVC & the domain
-    // with the bootstrap for the validator so we
-    // don't need to start two Canton instances.
-    val bootstrapFile: File = Files.createTempFile("canton-bootstrap", "scala")
-    val validatorBootstrapContent: String =
-      (validatorPath / "validator-participant.sc").contentAsString
-    bootstrapFile.overwrite("""
-      |println("Creating sv1 user")
-      |sv_participant.ledger_api.users.create(
-      |  id = "sv1",
-      |  actAs = Set.empty,
-      |  readAs = Set.empty,
-      |  primaryParty = None,
-      |  participantAdmin = true,
-      |)
-      |""".stripMargin)
-    bootstrapFile.append(validatorBootstrapContent)
-
     // Note: the Canton process started here uses ports that do not collide with ports 5xxx used
     // by the persistent Canton instance started by `./start-canton.sh`:
     // - The local SVC node uses ports 9xxx (hardcoded in config files)
@@ -84,7 +64,7 @@ class LocalRunbookIntegrationTest
         "-C",
         "canton.participants-x.validatorParticipant.admin-api.port=7002",
         "--bootstrap",
-        bootstrapFile.toString,
+        (validatorPath / "validator-participant.sc").toString,
       ),
       "local-runbook",
     )

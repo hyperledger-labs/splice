@@ -828,28 +828,24 @@ The tls certificate is configured in the infrastructure pulumi chart
 Note that these manual changes update an existing cluster, but you should make sure to update the pulumi chart consistently
 for those changes to also persist for future cluster deployments.
 
-## Participant User Configuration
+## Participant Admin User Configuration
 
-The participant admin users need to be allocated as part of the bootstrap file
-of a participant for bootstrapping. The configuration for those users
-is specified through a `CANTON_PARTICIPANT_USERS` environment
-variable. That variable specifies an array of strings in JSON format,
-where each string is the name of another environment variable that stores the name
-of the user to be allocated. Going through environment variables allows us to pick up k8s secrets.
-The users will be allocated in the given order.
+The participant admin user needs to be allocated during participant initialization.
+Its desired user name is specified through the `CANTON_PARTICIPANT_ADMIN_USER_NAME` environment variable.
+When using the `cn-participant` helm chart,
+you can supply an environment variable source for obtaining the admin user name from a k8s secret,
+via the `participantAdminUserNameFrom` value on the helm chart.
 
-Note that you typically don't need to allocate parties manually at all,
-only (admin) users. Party allocation is handled by CN apps themselves
-and happens during app initialization.
-
-Using a typical SV participant as an example, here is how an admin user for the SV app is allocated.
+Here is how the admin user name of a typical SV participant is configured.
 Using this user, the SV app later takes care of allocating the SV party, the SV validator user and,
 if the SV is the SVC founder, also the SVC party.
 
-```json
-[
-  'CN_APP_SV_LEDGER_API_AUTH_USER_NAME'
-]
+```yaml
+participantAdminUserNameFrom:
+  secretKeyRef:
+    key: ledger-api-user
+    name: cn-app-sv1-ledger-api-auth
+    optional: false
 ```
 
 ## Token configuration

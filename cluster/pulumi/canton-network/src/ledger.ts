@@ -49,8 +49,7 @@ export function installParticipant(
   name: string,
   postgresDb: pulumi.Output<string>,
   extraDomains: Domain[],
-  participantUserEnvVars: string[],
-  extraEnvVars: k8s.types.input.core.v1.EnvVar[],
+  participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
   postgresPassword: pulumi.Input<string>,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource {
@@ -63,8 +62,7 @@ export function installParticipant(
       postgresPassword,
       postgresSchema: xns.logicalName + '_participant',
       extraDomains: JSON.stringify(extraDomains),
-      participantUsers: JSON.stringify(participantUserEnvVars),
-      extraEnvVars,
+      participantAdminUserNameFrom,
     },
     dependsOn
   );

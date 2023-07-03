@@ -1,19 +1,10 @@
 import cats.syntax.functor._
 import com.digitalasset.canton.console.ParticipantReferenceCommon
 import com.digitalasset.canton.console.commands.ParticipantHealthAdministrationCommon
-import com.digitalasset.canton.admin.api.client.data.User
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.syntax._
-import scala.util.Try
-
-def getCnAppLedgerApiAuthUserNameFromEnv(app: String) = {
-  val envVar = s"CN_APP_${app}_LEDGER_API_AUTH_USER_NAME"
-  sys.env
-    .get(envVar)
-    .getOrElse(sys.error(s"Environment variable ${envVar} does not exist"))
-}
 
 case class DomainDef(
     alias: String,
@@ -31,22 +22,6 @@ def connectDomain(
 
   logger.info(s"Executing self ping to verify connection to ${domain.alias} domain...")
   pHealth.ping(p.id)
-}
-
-def ensureParticipantUser(
-    p: ParticipantReferenceCommon,
-    userName: String,
-    createUser: => User,
-): User = {
-  // TODO(#4176) refactor to avoid logging `NOT_FOUND/USER_NOT_FOUND` error
-  val user = Try(p.ledger_api.users.get(userName)).toOption.getOrElse({
-    logger.info(s"User missing, creating now: ${userName}")
-    createUser
-  })
-
-  logger.info(s"User ${userName} is ${user}")
-
-  user
 }
 
 // Reference to a value from an environment. This is mainly used
@@ -135,19 +110,3 @@ def resolvePartyRef(
         .primaryParty
         .getOrElse(sys.error(s"User $otherId has no primary party"))
   }
-
-// Creates a user that is used as the initial participant admin user: it has admin rights, and no actAs/readAs rights.
-def createParticipantAdminUser(p: ParticipantReferenceCommon, userId: String) = {
-  ensureParticipantUser(
-    p,
-    userId, {
-      p.ledger_api.users.create(
-        id = userId,
-        primaryParty = None,
-        actAs = Set.empty,
-        readAs = Set.empty,
-        participantAdmin = true,
-      )
-    },
-  )
-}

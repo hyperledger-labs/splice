@@ -1,6 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   auth0UserNameEnvVar,
+  auth0UserNameEnvVarSource,
   installAuth0Secret,
   installAuth0UISecret,
   exactNamespace,
@@ -37,8 +38,7 @@ export async function installSplitwell(
     'participant',
     postgresDb,
     [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
-    ['CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
-    [auth0UserNameEnvVar('splitwell_validator', 'validator')],
+    auth0UserNameEnvVarSource('validator'),
     postgresPassword,
     [domain]
   );

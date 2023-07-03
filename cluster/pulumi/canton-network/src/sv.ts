@@ -2,7 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { Output } from '@pulumi/pulumi';
 import {
-  auth0UserNameEnvVar,
+  auth0UserNameEnvVarSource,
   installAuth0Secret,
   installAuth0UISecret,
   ChartValues,
@@ -195,8 +195,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     'participant',
     postgresDb,
     [],
-    ['CN_APP_SV_LEDGER_API_AUTH_USER_NAME'],
-    [auth0UserNameEnvVar('sv')],
+    auth0UserNameEnvVarSource('sv'),
     config.postgresPassword
   );
   const cometbft = installCometBftNode(xns, config.nodename, config.onboardingName);

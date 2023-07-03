@@ -26,8 +26,8 @@ spec:
           value: {{ .Values.postgres }}
         - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
           value: {{ .Values.postgresSchema }}
-        - name: CANTON_PARTICIPANT_USERS
-          value: {{ .Values.participantUsers | toJson }}
+        - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
+          valueFrom: {{ .Values.participantAdminUserNameFrom | toYaml | nindent 12 }}
         - name: CANTON_PARTICIPANT_EXTRA_DOMAINS
           value: {{ .Values.extraDomains | toJson }}
         - name: AUTH_JWKS_URL
@@ -39,7 +39,6 @@ spec:
            secretKeyRef:
               name: "{{ .Release.Name }}-secrets"
               key: cantonParticipantPostgresPassword
-        {{ .Values.extraEnvVars | toYaml | nindent 8 }}
         {{- with .Values.globalDomain }}
         {{- if .alias }}
         - name: GLOBAL_DOMAIN_ALIAS

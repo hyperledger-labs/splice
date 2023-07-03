@@ -1089,20 +1089,14 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
         "extraDomains": "[{\"alias\":\"splitwell\",\"url\":\"http://domain.splitwell:5008\"}]",
-        "extraEnvVars": [
-          {
-            "name": "CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-validator-ledger-api-auth",
-                "optional": false
-              }
-            }
-          }
-        ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[\"CN_APP_SPLITWELL_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"]",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "cn-app-validator-ledger-api-auth",
+            "optional": false
+          }
+        },
         "postgres": "postgres.splitwell.svc.cluster.local",
         "postgresSchema": "splitwell_participant",
         "resources": {
@@ -1672,20 +1666,14 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
         "extraDomains": "[]",
-        "extraEnvVars": [
-          {
-            "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-sv-ledger-api-auth",
-                "optional": false
-              }
-            }
-          }
-        ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"]",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "cn-app-sv-ledger-api-auth",
+            "optional": false
+          }
+        },
         "postgres": "postgres.sv-1.svc.cluster.local",
         "postgresSchema": "sv-1_participant",
         "resources": {
@@ -2417,20 +2405,14 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
         "extraDomains": "[]",
-        "extraEnvVars": [
-          {
-            "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-sv-ledger-api-auth",
-                "optional": false
-              }
-            }
-          }
-        ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"]",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "cn-app-sv-ledger-api-auth",
+            "optional": false
+          }
+        },
         "postgres": "postgres.sv-2.svc.cluster.local",
         "postgresSchema": "sv-2_participant",
         "resources": {
@@ -3140,20 +3122,14 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
         "extraDomains": "[]",
-        "extraEnvVars": [
-          {
-            "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-sv-ledger-api-auth",
-                "optional": false
-              }
-            }
-          }
-        ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"]",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "cn-app-sv-ledger-api-auth",
+            "optional": false
+          }
+        },
         "postgres": "postgres.sv-3.svc.cluster.local",
         "postgresSchema": "sv-3_participant",
         "resources": {
@@ -3788,20 +3764,14 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
         "extraDomains": "[]",
-        "extraEnvVars": [
-          {
-            "name": "CN_APP_SV_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-sv-ledger-api-auth",
-                "optional": false
-              }
-            }
-          }
-        ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[\"CN_APP_SV_LEDGER_API_AUTH_USER_NAME\"]",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "cn-app-sv-ledger-api-auth",
+            "optional": false
+          }
+        },
         "postgres": "postgres.sv-4.svc.cluster.local",
         "postgresSchema": "sv-4_participant",
         "resources": {
@@ -4286,20 +4256,14 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
         "extraDomains": "[{\"alias\":\"splitwell\",\"url\":\"http://domain.splitwell:5008\"}]",
-        "extraEnvVars": [
-          {
-            "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
-            "valueFrom": {
-              "secretKeyRef": {
-                "key": "ledger-api-user",
-                "name": "cn-app-validator-ledger-api-auth",
-                "optional": false
-              }
-            }
-          }
-        ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "participantUsers": "[\"CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME\"]",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "cn-app-validator-ledger-api-auth",
+            "optional": false
+          }
+        },
         "postgres": "postgres.validator1.svc.cluster.local",
         "postgresSchema": "validator1_participant",
         "resources": {

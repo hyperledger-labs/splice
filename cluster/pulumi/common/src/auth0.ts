@@ -348,15 +348,20 @@ export function auth0UserNameEnvVar(
   if (!secretName) {
     secretName = name;
   }
-
   return {
     name: `CN_APP_${name.toUpperCase()}_LEDGER_API_AUTH_USER_NAME`,
-    valueFrom: {
-      secretKeyRef: {
-        key: 'ledger-api-user',
-        name: `cn-app-${secretName.toLowerCase().replaceAll('_', '-')}-ledger-api-auth`,
-        optional: false,
-      },
+    valueFrom: auth0UserNameEnvVarSource(secretName),
+  };
+}
+
+export function auth0UserNameEnvVarSource(
+  secretName: string
+): k8s.types.input.core.v1.EnvVarSource {
+  return {
+    secretKeyRef: {
+      key: 'ledger-api-user',
+      name: `cn-app-${secretName.toLowerCase().replaceAll('_', '-')}-ledger-api-auth`,
+      optional: false,
     },
   };
 }

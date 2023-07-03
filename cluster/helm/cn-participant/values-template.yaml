@@ -17,12 +17,9 @@ auth:
   targetAudience: "https://canton.network.global"
 
 extraDomains: '[]'
-extraEnvVars:
-- name: CN_APP_SV1_LEDGER_API_AUTH_USER_NAME
-  valueFrom:
-    secretKeyRef:
-      key: ledger-api-user
-      name: cn-app-sv1-ledger-api-auth
-      optional: false
 
-participantUsers: '["CN_APP_SV1_LEDGER_API_AUTH_USER_NAME"]'
+participantAdminUserNameFrom:
+  secretKeyRef:
+    key: ledger-api-user
+    name: cn-app-sv1-ledger-api-auth
+    optional: false

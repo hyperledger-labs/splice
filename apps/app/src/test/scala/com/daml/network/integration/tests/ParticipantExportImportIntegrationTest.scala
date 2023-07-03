@@ -151,14 +151,6 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       |println(sv_participant.keys.secret.list())
       |println("Initializing participant with uid ${participantDump.id.toString}")
       $participantInitializationCommand
-      |println("Creating sv1 user")
-      |sv_participant.ledger_api.users.create(
-      |  id = "${sv1LocalBackend.config.ledgerApiUser}",
-      |  actAs = Set.empty,
-      |  readAs = Set.empty,
-      |  primaryParty = None,
-      |  participantAdmin = true,
-      |)
       |""".stripMargin
 
     val bootstrapFile: File = Files.createTempFile("canton-bootstrap", ".sc")
@@ -171,6 +163,10 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       (svDomainPath / "canton.conf").toString,
       "-C",
       "canton.participants-x.sv_participant.init.auto-init=false", // avoid creating new identity
+      "-C",
+      // adjust sv user id to account for the suffixing done by ensureNovelDamlNames
+      "canton.participants-x.sv_participant.ledger-api.user-management-service." +
+        s"additional-admin-user-id=${sv1LocalBackend.config.ledgerApiUser}",
       "--bootstrap",
       bootstrapFile.toString,
     )
