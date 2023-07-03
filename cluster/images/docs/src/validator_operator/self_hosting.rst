@@ -74,12 +74,20 @@ you extracted Canton next to the Canton network tarball. If you placed it somewh
 
 Next, open a second terminal and navigate to the extracted bundle's root directory.
 In order to become a validator, you need the sponsorship of a current supervalidator.
-In this feature preview, you can obtain such a sponsorship without interacting with a supervalidator operator.
-Use the following shell command to get sponsored by supervalidator 1 and obtain an onboarding secret from it (saved to `validator-onboarding.conf`):
 
-.. parsed-literal::
+Your supervalidator will provide you with a configuration file
+containing the required secret to authorize yourself towards their
+SV. This file should be saved under ``validator-onboarding.conf``.
 
-   curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+.. admonition:: DevNet-only
+
+  On DevNet, you can obtain the configuration file automatically by
+  sending a request to a super validator which will provide you with a
+  secret:
+
+  .. parsed-literal::
+
+     curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 You can now start a console with the CN apps. Use the following command, making sure that the `validator-onboarding.conf` matches the file you created in the previous step.
 
@@ -96,17 +104,23 @@ Now, onboard a new user called "alice" via the validator app: ::
 
 You are now registered as a validator on the Canton network. You've also configured a user that can transact through a wallet. Congratulations!
 
-Tapping some Canton Coin from the Dev Faucet
---------------------------------------------
+Interacting with the Wallet
+---------------------------
 
 To use the wallet, you interact with the wallet setup in the previous section using a specific party user. In our example, ``aliceWallet`` has been
 configured to interact with the validator app using the previously created user ``alice``.
 
-Using Alice’s wallet, you can create free coins like so: ::
+Obtaining Canton Coin
+---------------------
 
-  @ val coinId = aliceWallet.tap(100.0)
+Obtaining Canton Coin requires that an existing holder of Canton Coin,
+e.g., a super validator transfers you some of their holdings. In the following steps, we assume that you have some Canton Coin available.
 
-Creating free coins will only be possible in temporary test- and devnets.
+.. admonition:: DevNet-only
+
+  On DevNet, you can also acquire Canton Coins yourself by tapping a faucet to create coins: ::
+
+    @ val coinId = aliceWallet.tap(100.0)
 
 Listing your Canton Coins
 -------------------------
@@ -260,7 +274,7 @@ On Windows or Mac you can omit the ``--add-host=host.docker.internal:host-gatewa
 
   docker run -d --name nginx_cn_frontends -p 3000:3000 -v $(pwd)/examples/nginx/conf:/etc/nginx/conf.d -v $(pwd)/web-uis:/usr/share/nginx/html nginx
 
-The Wallet UI is now accessible at http://wallet.localhost:3000, where you can login as alice and see the coins you tapped earlier in this tutorial.
+The Wallet UI is now accessible at http://wallet.localhost:3000, where you can login as alice and see your coin holdings.
 
 The Directory UI should be accessible at http://directory.localhost:3000.
 

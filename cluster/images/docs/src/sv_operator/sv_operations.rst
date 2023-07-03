@@ -20,10 +20,7 @@ and copy the last generated `onboarding secret`.
   :width: 600
   :alt: Generate an onboarding secret in the SV UI.
 
-Now you can follow the self-hosted :ref:`validator instructions to spin up another validator <self_hosted_validator>`. Instead of running the curl command on
-the endpoint `/devnet/onboard/validator/prepare`, use the onboarding secret you copied above.
-
-Finally, you need to paste the onboarding secret in the template file for validator onboarding and specify the URL of
+Using the secret, you can now create ``validator-onboarding-conf`` by replacing it in the template below and specifying the URL of
 your SV there, as it will be the onboarding sponsor of the new validator (e.g. *https://sv.sv.svc.your_domain.com/api/v0/sv/*):
 
 ::
@@ -38,3 +35,5 @@ your SV there, as it will be the onboarding sponsor of the new validator (e.g. *
         }
       }
     }
+
+Using that configuration file, you can now follow the self-hosted :ref:`validator instructions to spin up another validator <self_hosted_validator>`.

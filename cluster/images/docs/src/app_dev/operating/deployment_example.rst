@@ -50,11 +50,15 @@ configuration.
 
 The release bundle already contains a configuration file with that section added.
 
-Request a validator onboarding secret...
+As when setting up a self-hosted validator, you need a super validator to provide you with a configuration file to onboard your validator. Save that as ``validator-onboarding.conf``
 
-.. parsed-literal::
+.. admonition:: DevNet-only
 
-   curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+  On DevNet you can obtain an onboarding secret yourself:
+
+  .. parsed-literal::
+
+     curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 ...and then start the splitwell validator with this configuration file and the onboarding config you just obtained:
 
@@ -134,11 +138,17 @@ Once the console opened, connect it to the domain you started earlier ::
   @ splitwellParticipant.domains.connect("splitwell", "http://localhost:5108")
 
 With the participant being connected to both the global domain and the
-splitwell domain, you can now start the validator again. First, request a new onboarding secret:
+splitwell domain, you can now start the validator again.
 
-.. parsed-literal::
+Save the configuration you got from your sponsoring SV under ``validator-onboarding.conf``.
 
-   curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+.. admonition:: DevNet-only
+
+  On DevNet, you can obtain a new onboarding secret yourself:
+
+  .. parsed-literal::
+
+     curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 Next start up the validator:
 
