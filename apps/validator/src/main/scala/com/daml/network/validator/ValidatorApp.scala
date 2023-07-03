@@ -32,13 +32,18 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
+import com.daml.network.http.v0.validatorPublic.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{HasHealth, UploadablePackage}
-import com.daml.network.validator.admin.http.{HttpValidatorAdminHandler, HttpValidatorHandler}
+import com.daml.network.validator.admin.http.{
+  HttpValidatorAdminHandler,
+  HttpValidatorHandler,
+  HttpValidatorPublicHandler,
+}
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{
   AppInstance,
@@ -465,6 +470,12 @@ class ValidatorApp(
         retryProvider,
       )
 
+      publicHandler = new HttpValidatorPublicHandler(
+        automation.store,
+        config.ledgerApiUser,
+        loggerFactory,
+      )
+
       routes = cors(
         CorsSettings(ac).withAllowedMethods(
           List(
@@ -517,6 +528,10 @@ class ValidatorApp(
                         provide(())
                       }
                     ),
+                ),
+                ValidatorPublicResource.routes(
+                  publicHandler,
+                  _ => provide(()),
                 ),
                 CommonAdminResource.routes(commonAdminHandler, _ => provide(())),
               )

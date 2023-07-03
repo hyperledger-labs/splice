@@ -11,8 +11,8 @@ paths:
     $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1livez"
   /validator-user:
     get:
-      tags: [validator]
-      x-jvm-package: validator
+      tags: [validatorPublic]
+      x-jvm-package: validatorPublic
       operationId: "getValidatorUserInfo"
       responses:
         "200":

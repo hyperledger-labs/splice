@@ -8,6 +8,7 @@ import com.daml.network.util.ParticipantIdentitiesDump
 import com.daml.network.validator.admin.api.client.commands.{
   HttpValidatorAdminAppClient,
   HttpValidatorAppClient,
+  HttpValidatorPublicAppClient,
   UserInfo,
 }
 import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
@@ -29,7 +30,7 @@ abstract class ValidatorAppReference(
   def getValidatorUserInfo(): UserInfo = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAppClient.GetValidatorUserInfo
+        HttpValidatorPublicAppClient.GetValidatorUserInfo
       )
     }
   }

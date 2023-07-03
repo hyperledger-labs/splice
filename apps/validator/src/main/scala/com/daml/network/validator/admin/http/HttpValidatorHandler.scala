@@ -28,7 +28,6 @@ class HttpValidatorHandler(
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
-  private val store = storeWithIngestion.store
 
   def register(
       respond: v0.ValidatorResource.RegisterResponse.type
@@ -36,20 +35,6 @@ class HttpValidatorHandler(
     withNewTrace(workflowId) { implicit traceContext => span =>
       span.setAttribute("name", ledgerApiUser)
       onboard(ledgerApiUser).map(p => definitions.RegistrationResponse(p))
-    }
-
-  def getValidatorUserInfo(
-      respond: v0.ValidatorResource.GetValidatorUserInfoResponse.type
-  )()(
-      ledgerApiUser: String
-  ): Future[v0.ValidatorResource.GetValidatorUserInfoResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      Future.successful(
-        definitions.GetValidatorUserInfoResponse(
-          store.key.validatorParty.filterString,
-          validatorUserName,
-        )
-      )
     }
 
   private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {

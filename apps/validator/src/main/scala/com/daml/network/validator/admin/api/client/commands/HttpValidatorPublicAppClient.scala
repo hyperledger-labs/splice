@@ -4,17 +4,22 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.http.v0.validator as http
+import com.daml.network.http.v0.validatorPublic as http
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object HttpValidatorAppClient {
+final case class UserInfo(
+    primaryParty: PartyId,
+    userName: String,
+)
+
+object HttpValidatorPublicAppClient {
 
   abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = http.ValidatorClient
+    override type Client = http.ValidatorPublicClient
 
     def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
@@ -22,24 +27,25 @@ object HttpValidatorAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.ValidatorClient.httpClient(
+      http.ValidatorPublicClient.httpClient(
         HttpClientBuilder().buildClient,
         host,
       )
   }
 
-  case object Register extends BaseCommand[http.RegisterResponse, PartyId] {
+  case object GetValidatorUserInfo
+      extends BaseCommand[http.GetValidatorUserInfoResponse, UserInfo] {
 
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.RegisterResponse] =
-      client.register(headers = headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorUserInfoResponse] =
+      client.getValidatorUserInfo(headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.RegisterResponse.OK(response) =>
-      Codec.decode(Codec.Party)(response.partyId)
+    ) = { case http.GetValidatorUserInfoResponse.OK(response) =>
+      Codec.decode(Codec.Party)(response.partyId).map(pid => UserInfo(pid, response.userName))
     }
   }
 }
