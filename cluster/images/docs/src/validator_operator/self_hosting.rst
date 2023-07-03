@@ -77,7 +77,7 @@ In order to become a validator, you need the sponsorship of a current supervalid
 
 Your supervalidator will provide you with a configuration file
 containing the required secret to authorize yourself towards their
-SV. This file should be saved under ``validator-onboarding.conf``.
+SV. This file should be saved under ``validator-onboarding.conf`` in the directory you are currently in.
 
 .. admonition:: DevNet-only
 
@@ -366,11 +366,15 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
 9. Now start the validator again:
 
-    a. generate the validator-onboarding.conf against your new Auth0 tenant:
+    a. Create the ``validator-onboarding.conf`` file in the current directory based on what your SV sent you.
 
-    .. parsed-literal::
+       .. admonition:: DevNet-only
 
-        curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+         On DevNet, you can obtain the configuration file automatically using the following command:
+
+         .. parsed-literal::
+
+             curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
     b. start Canton Network:
 

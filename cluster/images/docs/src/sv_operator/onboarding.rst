@@ -48,18 +48,6 @@ Assuming that you have extended the ``examples/sv/sv-participant.conf`` to match
 Like for hosting a validator, you also need to enable the GCP DA Canton DevNet VPN.
 If you can view this documentation, you already enabled the VPN successfully.
 
-.. _validator-secret:
-
-Validator Onboarding
---------------------
-
-An SV node includes a validator node, so just like when
-:ref:`deploying a validator node <self_hosted_validator>`, you need to obtain a secret from your sponsoring SV:
-
-.. parsed-literal::
-
-   curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/v0/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/sv/validator-onboarding-nosecret.conf > validator-onboarding.conf
-
 
 .. _cometbft-identity:
 
@@ -159,7 +147,7 @@ To start the SV app, run the following command:
 
 .. parsed-literal::
 
-    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/sv/sv.conf --config examples/sv/sv-onboarding.conf --config validator-onboarding.conf --bootstrap examples/sv/sv.sc
+    NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/sv/sv.conf --config examples/sv/sv-onboarding.conf --bootstrap examples/sv/sv.sc
 
 Once the SV app has started and you can access the CN console, you can confirm that your SV node is fully operational by querying its debug endpoint: ::
 

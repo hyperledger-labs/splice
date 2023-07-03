@@ -36,4 +36,6 @@ your SV there, as it will be the onboarding sponsor of the new validator (e.g. *
       }
     }
 
-Using that configuration file, you can now follow the self-hosted :ref:`validator instructions to spin up another validator <self_hosted_validator>`.
+Save that configuration file as ``validator-conboarding.conf`` in the
+root of the extracted release and follow the self-hosted
+:ref:`validator instructions to spin up another validator <self_hosted_validator>`.
