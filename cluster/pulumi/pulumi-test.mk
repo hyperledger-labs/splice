@@ -16,7 +16,10 @@ $(dir)/lint:
 
 .PHONY: $(dir)/test-config
 $(dir)/test-config: $(dir)/test.json $(dir)/expected.json
-	cd $(@D) && diff -u expected.json test.json
+	diff -u $(@D)/expected.json $(@D)/test.json; \
+	EXIT=$$?; \
+	cp $(@D)/test.json $(@D)/expected.json; \
+	exit $$EXIT
 
 .PHONY: $(dir)/update-expected
 $(dir)/update-expected: $(dir)/test.json
