@@ -43,15 +43,9 @@ MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for infor
 FAILED_PRECONDITION/DAML_INTERPRETATION_ERROR.+'Contract is not locked' was not met
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
 
-# TODO(#5383) Consider not ignoring this
-Failed to send: sending accepted txs to members.*TopologyRequestProcessor
-
 # TODO(#528) Remove this again
 proposed serial .* doesn't immediately follow the existing serial
 TopologyManagerWriteServiceX/Authorize.*INTERNAL.*ApiRequestLogger
-
-# TODO(#5670) Remove this once we understand its source, and the underlying problem is fixed
-Broken or malicious domain topology manager is sending transactions during epsilon changes
 
 # TODO(#5705): remove once serial mismatches are no longer logged as WARN and a follow-up ERROR
 Topology evaluation failed with Txs failed.*Serial mismatch
