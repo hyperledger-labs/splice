@@ -53,7 +53,7 @@ spec:
         {{ else -}}
         # Onboarding without specifying a secret only works in devnet
         - name: CN_APP_DEVNET
-          value: 1
+          value: "1"
         {{ end -}}
         {{ else -}}
         # Validator has either already been onboarded or
