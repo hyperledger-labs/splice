@@ -10,7 +10,7 @@ import { installDocs } from './docs';
 import { installClusterIngress } from './ingress';
 import { installSplitwell } from './splitwell';
 import { installSvNode, SvOnboarding } from './sv';
-import { installValidator } from './validator';
+import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
 
@@ -238,7 +238,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   }
 
   const validatorPostgresPassword = generatePassword('validator1-password');
-  const validator = await installValidator(
+  const validator = await installValidator1(
     auth0Client,
     sv1,
     'validator1',

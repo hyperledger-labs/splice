@@ -17,7 +17,7 @@ import {
   validatorOnboardingSecretName,
 } from './sv';
 
-export async function installValidator(
+export async function installValidator1(
   auth0Client: Auth0Client,
   svc: pulumi.Resource,
   name: string,
