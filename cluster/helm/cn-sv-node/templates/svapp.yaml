@@ -30,6 +30,9 @@ spec:
             {{- if eq .Values.onboardingType "found-collective" }}
             - name: CN_APP_SV_IS_DEV_NET
               value: {{ .Values.isDevNet | quote }}
+            - name: ADDITIONAL_CONFIG_GLOBAL_LOCK_TIMEOUT
+              value: |
+                canton.sv-apps.sv.onboarding.global-lock-timeout=240s
             {{- end }}
             - name: CN_APP_SV_PARTICIPANT_ADDRESS
               value: {{ .Values.participantAddress | default "participant" | quote }}
