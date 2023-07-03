@@ -71,6 +71,8 @@ commands:
         - nix-{{ checksum "/tmp/nix-cache-key" }}
     - run:
        name: Setup Nix
+       # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+       no_output_timeout: "20m"
        command: |
          set -euo pipefail
          echo 'source ~/.nix-profile/etc/profile.d/nix.sh' >> "$BASH_ENV"
@@ -1229,12 +1231,14 @@ jobs:
       - record_job_start_time
       - setup_nix
       - run_bash_command_in_nix:
+          cmd_name: Checkout testnet-next commit
+          cmd: git checkout testnet-next
+      - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
           cluster: << parameters.cluster >>
-          cmd: |
-            git checkout testnet-next
-
-            make cluster/build
+          cmd: make cluster/build
       - run_bash_command_in_nix:
           cmd_name: Deploy Pulumi/Helm configuration to cluster.
           cluster: << parameters.cluster >>
