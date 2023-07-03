@@ -39,4 +39,9 @@ class LeaderBasedAutomationService(
   registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svTaskContext))
   registerTrigger(new GarbageCollectCoinPriceVotesTrigger(triggerContext, svTaskContext))
+
+  registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
+  if (config.automation.enableUnclaimedRewardExpiration) {
+    registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
+  }
 }

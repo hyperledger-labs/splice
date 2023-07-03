@@ -42,10 +42,6 @@ class SvSvcAutomationService(
     registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
   }
   registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
-  if (config.automation.enableUnclaimedRewardExpiration) {
-    registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svcStore, connection))
-  }
-  registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svcStore, connection))
 
   // Register optional BFT triggers
   cometBft.foreach { node =>
