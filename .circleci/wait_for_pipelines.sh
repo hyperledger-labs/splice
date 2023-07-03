@@ -3,21 +3,13 @@ set -eou pipefail
 PIPELINE_NUMBER="$1"
 WORKFLOW_NAMES="$2"
 
-fetch() {
-    url=$1
-    target=$2
-    # Retry in case of network flakiness
-    curl -sSL \
-        --retry 60 \
-        --retry-max-time 120 \
-        --fail -X GET -u "$CIRCLECI_TOKEN:" -H "Content-Type: application/json" -o "${target}" "${url}"
-}
-
 pipeline_workflows_complete() {
   pipeline_id=$1
-  if fetch "https://circleci.com/api/v2/pipeline/$pipeline_id/workflow" "/tmp/workflows.json"
+  if fetch_pages "https://circleci.com/api/v2/pipeline/$pipeline_id/workflow" "/tmp/workflows.json"
   then
+    echo "workflows for pipeline $pipeline_id:"
     cat /tmp/workflows.json
+    echo ""
     # https://circleci.com/docs/api/v2/index.html#operation/listWorkflowsByPipelineId
     # Valid statuses are "success" "running" "not_run" "failed" "error" "failing" "on_hold" "canceled" "unauthorized"
     # We want to wait until it has fully completed
@@ -57,23 +49,61 @@ wait_for_pipeline_to_complete() {
     done
 }
 
-fetch "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=main" "/tmp/pipelines.json"
-# The results are paginated but we are interested in handling conflicts with more or less concurrent jobs so we can reasonably assume that relevant jobs are
-# wtihin the first page and not fetch later responses.
-# TODO(#6161): remove this assumption
-PREVIOUS_JOBS=$(jq -c < /tmp/pipelines.json ".items | map(select(.number < $PIPELINE_NUMBER)) | .[]")
-while IFS= read -r JOB; do
-    PIPELINE_NUMBER=$(jq <<< "$JOB" -r '.number')
-    PIPELINE_ID=$(jq <<< "$JOB" -r '.id')
-    echo "Checking pipeline $PIPELINE_NUMBER ($PIPELINE_ID) ..."
-    fetch "https://circleci.com/api/v2/pipeline/$PIPELINE_ID/workflow" "/tmp/workflows.json"
-    while IFS= read -r WORKFLOW; do
-        WORKFLOW_NAME=$(jq -r <<< "$WORKFLOW" '.name')
-        if [[ " ${WORKFLOW_NAMES} " == *" ${WORKFLOW_NAME} "* ]]; then
-            echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
-            wait_for_pipeline_to_complete "$PIPELINE_ID"
-        else
-            echo "Ignoring workflow $WORKFLOW_NAME"
-        fi
-    done <<< "$(jq -c < /tmp/workflows.json ".items | .[]")"
-done <<< "$PREVIOUS_JOBS"
+get_url() {
+    local url=$1
+    # Retry in case of network flakiness
+    curl -sSL \
+        --retry 60 \
+        --retry-max-time 120 \
+        --fail -X GET -u "$CIRCLECI_TOKEN:" -H "Content-Type: application/json" "${url}"
+}
+
+write_pages() {
+    local url=$1
+    local output_file=$2
+    local response
+    local next_page_token
+    response=$(get_url "$url")
+    next_page_token=$(jq -r '.next_page_token' <<< "$response")
+    while IFS= read -r page; do
+        echo "$page" >> "$output_file"
+    done <<< "$response"
+
+    if [ "$next_page_token" != "null" ]; then
+        next_page_url="${url}?page-token=${next_page_token}"
+        write_pages "$next_page_url" "$output_file"
+    fi
+}
+
+fetch_pages() {
+    local url=$1
+    local output_file=$2
+    rm -f "$output_file" >/dev/null 2>&1
+    write_pages "$url" "$output_file"
+}
+
+tmp_pipelines_file="/tmp/pipelines.json"
+tmp_workflows_file="/tmp/workflows.json"
+fetch_pages "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=main" "$tmp_pipelines_file"
+
+PREVIOUS_JOBS=$(jq -c < $tmp_pipelines_file ".items | map(select(.number < $PIPELINE_NUMBER)) | .[] | { number: .number, id: .id}")
+if [ "${#PREVIOUS_JOBS}" -gt 0 ]; then
+    while IFS= read -r JOB; do
+        PIPELINE_NUMBER=$(jq <<< "$JOB" -r '.number')
+        PIPELINE_ID=$(jq <<< "$JOB" -r '.id')
+        echo "Checking pipeline $PIPELINE_NUMBER ($PIPELINE_ID) ..."
+        fetch_pages "https://circleci.com/api/v2/pipeline/$PIPELINE_ID/workflow" "$tmp_workflows_file"
+        while IFS= read -r WORKFLOW; do
+            WORKFLOW_NAME=$(jq -r <<< "$WORKFLOW" '.name')
+            if [[ " ${WORKFLOW_NAMES} " == *" ${WORKFLOW_NAME} "* ]]; then
+                echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
+                wait_for_pipeline_to_complete "$PIPELINE_ID"
+            else
+                echo "Ignoring workflow $WORKFLOW_NAME"
+            fi
+        done <<< "$(jq -c < "$tmp_workflows_file" ".items | .[]")"
+    done <<< "$PREVIOUS_JOBS"
+else
+    echo "No previous jobs found for pipeline $PIPELINE_NUMBER, failing!"
+    exit 1
+fi
