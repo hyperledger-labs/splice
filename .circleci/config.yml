@@ -273,15 +273,12 @@ commands:
       - run_bash_command_in_nix:
           cmd_name: Reap << parameters.cluster >> if lock older than 6 hours
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
             export KUBECONFIG=$PWD/.kubecfg
 
             cncluster activate
-            export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
-            export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
-            export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
             cncluster show
             if ! cncluster ci_assert_fresh_lock; then
               lockholder=$(cncluster lockholder)
@@ -1163,13 +1160,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply SV-runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
             cncluster activate
-            export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
-            export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
-            export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -1203,13 +1197,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
             cncluster activate
-            export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
-            export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
-            export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
             cncluster ci_apply
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
@@ -1242,14 +1233,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Deploy Pulumi/Helm configuration to cluster.
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID  --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
             cncluster activate
-
-            export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
-            export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
-            export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
             cncluster ci_apply
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
@@ -1326,7 +1313,7 @@ jobs:
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -p
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh
-          additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
           extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
           extra_parameters: -DAUTH0_TENANT=dev
           timeout: "15m"
@@ -1422,13 +1409,10 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Reset Cluster and Free Lock (if on scratch*)
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep SV_TEST_AUTH0_DOMAIN --keep SV_TEST_AUTH0_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep SV_TEST_AUTH0_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
             cncluster activate
-            export AUTH0_DOMAIN=$SV_TEST_AUTH0_DOMAIN
-            export AUTH0_CLIENT_ID=$SV_TEST_AUTH0_CLIENT_ID
-            export AUTH0_CLIENT_SECRET=$SV_TEST_AUTH0_CLIENT_SECRET
             cncluster ci_reset_unlock
       - collect_test_timings_and_send_to_datadog
 
@@ -1444,7 +1428,7 @@ jobs:
       - restore_sbt_cache
       - execute_sbt_command:
           cmd: "\"tools/run\""
-          additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET"
       - save_sbt_cache
       - save_compiled_classes
 
