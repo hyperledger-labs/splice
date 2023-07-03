@@ -84,6 +84,14 @@ spec:
         {{ end }}
         - name: CN_APP_VALIDATOR_GLOBAL_DOMAIN_URL
           value: {{ .Values.globalDomainUrl | quote }}
+        {{- range $ii, $domain := .Values.extraDomains }}
+        - name: ADDITIONAL_CONFIG_EXTRA_DOMAIN_{{ $ii }}
+          value: |
+            canton.validator-apps.validator_backend.domains.extra.{{ $ii }} = {
+              alias = {{ $domain.alias | quote }}
+              url = {{ $domain.url | quote }}
+            }
+        {{- end }}
         - name: ADDITIONAL_CONFIG_FOUNDING_SV
           value: canton.validator-apps.validator_backend.founding-sv-client.admin-api.url = "{{ .Values.foundingSvApiUrl }}"
         {{- if (.Values.topup).enabled }}

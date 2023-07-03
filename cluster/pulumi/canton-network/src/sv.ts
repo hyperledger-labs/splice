@@ -194,7 +194,6 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     xns,
     'participant',
     postgresDb,
-    [],
     auth0UserNameEnvVarSource('sv'),
     config.postgresPassword
   );

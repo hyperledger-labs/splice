@@ -48,7 +48,6 @@ export function installParticipant(
   xns: ExactNamespace,
   name: string,
   postgresDb: pulumi.Output<string>,
-  extraDomains: Domain[],
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
   postgresPassword: pulumi.Input<string>,
   dependsOn: pulumi.Resource[] = []
@@ -61,13 +60,8 @@ export function installParticipant(
       postgres: postgresDb,
       postgresPassword,
       postgresSchema: xns.logicalName + '_participant',
-      extraDomains: JSON.stringify(extraDomains),
       participantAdminUserNameFrom,
     },
     dependsOn
   );
 }
-
-type Domain = { alias: StringOrEnv; url: StringOrEnv };
-
-type StringOrEnv = string | { env: string };

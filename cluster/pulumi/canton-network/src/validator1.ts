@@ -35,7 +35,6 @@ export async function installValidator1(
     xns,
     'participant',
     postgresDb,
-    [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     auth0UserNameEnvVarSource('validator'),
     postgresPassword
   );
@@ -68,6 +67,7 @@ export async function installValidator1(
         'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar',
       ],
       globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
+      extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
       validatorWalletUser,
       foundingSvApiUrl: 'http://sv-app.sv-1:5014',
       svSponsorAddress: 'http://sv-app.sv-1:5014',

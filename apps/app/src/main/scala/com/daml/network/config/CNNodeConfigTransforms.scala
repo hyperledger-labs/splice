@@ -329,6 +329,8 @@ object CNNodeConfigTransforms {
     updateAllValidatorConfigs_(
       _.focus(_.domains.global.url)
         .modify(bumpUrl(_))
+        .focus(_.domains.extra)
+        .modify(_.map(d => d.copy(url = bumpUrl(d.url))))
     )
   }
 

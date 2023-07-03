@@ -49,6 +49,7 @@ import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorSt
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.HttpWalletHandler
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -118,6 +119,7 @@ class ValidatorApp(
             withParticipantAdminConnection { participantAdminConnection =>
               for {
                 _ <- ensureGlobalDomainRegistered(participantAdminConnection)
+                _ <- ensureExtraDomainsRegistered(participantAdminConnection)
                 _ <- connection.ensureUserPrimaryPartyIsAllocated(
                   config.ledgerApiUser,
                   config.validatorPartyHint
@@ -295,10 +297,27 @@ class ValidatorApp(
 
   private def ensureGlobalDomainRegistered(
       participantAdminConnection: ParticipantAdminConnection
+  ): Future[Unit] = ensureDomainRegistered(
+    config.domains.global.alias,
+    config.domains.global.url,
+    participantAdminConnection,
+  )
+
+  private def ensureExtraDomainsRegistered(
+      participantAdminConnection: ParticipantAdminConnection
+  ): Future[Unit] =
+    config.domains.extra.traverse_(domain =>
+      ensureDomainRegistered(domain.alias, domain.url, participantAdminConnection)
+    )
+
+  private def ensureDomainRegistered(
+      alias: DomainAlias,
+      url: String,
+      participantAdminConnection: ParticipantAdminConnection,
   ): Future[Unit] = {
     val domainConfig = DomainConnectionConfig(
-      config.domains.global.alias,
-      SequencerConnections.single(GrpcSequencerConnection.tryCreate(config.domains.global.url)),
+      alias,
+      SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)),
     )
     participantAdminConnection.ensureDomainRegistered(domainConfig)
   }

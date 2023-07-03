@@ -16,8 +16,6 @@ auth:
   jwksUrl: "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
   targetAudience: "https://canton.network.global"
 
-extraDomains: '[]'
-
 participantAdminUserNameFrom:
   secretKeyRef:
     key: ledger-api-user

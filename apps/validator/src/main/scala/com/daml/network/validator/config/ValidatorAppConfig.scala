@@ -61,7 +61,16 @@ case class ValidatorGlobalDomainConfig(
     buyExtraTraffic: BuyExtraTrafficConfig = BuyExtraTrafficConfig(),
 )
 
-case class ValidatorDomainConfig(global: ValidatorGlobalDomainConfig)
+// Validators are responsible for establishing connections to domains and so need more information than just a `DomainConfig`
+case class ValidatorExtraDomainConfig(
+    alias: DomainAlias,
+    url: String,
+)
+
+case class ValidatorDomainConfig(
+    global: ValidatorGlobalDomainConfig,
+    extra: Seq[ValidatorExtraDomainConfig] = Seq(),
+)
 
 case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),

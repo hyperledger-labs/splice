@@ -9,6 +9,5 @@
 {{ $_ := required ".Values.postgresPassword is required." .Values.postgresPassword }}
 {{ $_ := required ".Values.postgresSchema is required." .Values.postgresSchema }}
 {{ $_ := required ".Values.participantAdminUserNameFrom is required." .Values.participantAdminUserNameFrom }}
-{{ $_ := required ".Values.extraDomains is required." .Values.extraDomains }}
 {{ $_ := required ".Values.auth.jwksUrl is required." .Values.auth.jwksUrl }}
 {{ $_ := required ".Values.auth.targetAudience is required." .Values.auth.targetAudience }}

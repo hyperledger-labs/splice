@@ -48,17 +48,6 @@ Seq(
   ("splitwellUpgrade", splitwellUpgradeSequencer, splitwellUpgradeMediator),
 ).foreach((bootstrapOtherDomain _).tupled)
 
-println("Connecting splitwell, alice & bob participant to splitwell domain...")
-Seq(aliceParticipant, bobParticipant, splitwellParticipant).foreach(
-  _.domains.connect_local(splitwellSequencer, alias = Some(DomainAlias.tryCreate("splitwell")))
-)
-// We only connect splitwell by default since we want to simulate users connecting gradually to the domain.
-println("Connecting splitwell to upgraded domain...")
-splitwellParticipant.domains.connect_local(
-  splitwellUpgradeSequencer,
-  alias = Some(DomainAlias.tryCreate("splitwellUpgrade")),
-)
-
 // These user allocations are only there
 // for local testing. Our tests allocate their own users.
 println(s"Allocating users for local testing...")

@@ -37,7 +37,6 @@ export async function installSplitwell(
     xns,
     'participant',
     postgresDb,
-    [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     auth0UserNameEnvVarSource('validator'),
     postgresPassword,
     [domain]
@@ -84,6 +83,7 @@ export async function installSplitwell(
         { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },
       ],
       globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
+      extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
       additionalConfig: [
         ...fixedTokenConfig,
         'canton.validator-apps.validator_backend.app-instances.splitwise = {',

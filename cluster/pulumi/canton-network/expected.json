@@ -1088,7 +1088,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
-        "extraDomains": "[{\"alias\":\"splitwell\",\"url\":\"http://domain.splitwell:5008\"}]",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
@@ -1346,6 +1345,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
+        "extraDomains": [
+          {
+            "alias": "splitwell",
+            "url": "http://domain.splitwell:5008"
+          }
+        ],
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
@@ -1665,7 +1670,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
-        "extraDomains": "[]",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
@@ -2404,7 +2408,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
-        "extraDomains": "[]",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
@@ -3121,7 +3124,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
-        "extraDomains": "[]",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
@@ -3763,7 +3765,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
-        "extraDomains": "[]",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
@@ -4255,7 +4256,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "enableHealthProbes": true,
-        "extraDomains": "[{\"alias\":\"splitwell\",\"url\":\"http://domain.splitwell:5008\"}]",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
@@ -4500,6 +4500,12 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAdminAuth": true,
+        "extraDomains": [
+          {
+            "alias": "splitwell",
+            "url": "http://domain.splitwell:5008"
+          }
+        ],
         "fixedTokens": false,
         "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",

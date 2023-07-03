@@ -486,6 +486,8 @@ object CNNodeConfig {
       deriveReader[BuyExtraTrafficConfig]
     implicit val validatorGlobalDomainConfigReader: ConfigReader[ValidatorGlobalDomainConfig] =
       deriveReader[ValidatorGlobalDomainConfig]
+    implicit val validatorExtraDomainConfigReader: ConfigReader[ValidatorExtraDomainConfig] =
+      deriveReader[ValidatorExtraDomainConfig]
     implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =
       deriveReader[ValidatorDomainConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
@@ -663,6 +665,8 @@ object CNNodeConfig {
       deriveWriter[BuyExtraTrafficConfig]
     implicit val validatorGlobalDomainConfigWriter: ConfigWriter[ValidatorGlobalDomainConfig] =
       deriveWriter[ValidatorGlobalDomainConfig]
+    implicit val validatorExtraDomainConfigWriter: ConfigWriter[ValidatorExtraDomainConfig] =
+      deriveWriter[ValidatorExtraDomainConfig]
     implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
       deriveWriter[ValidatorDomainConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =

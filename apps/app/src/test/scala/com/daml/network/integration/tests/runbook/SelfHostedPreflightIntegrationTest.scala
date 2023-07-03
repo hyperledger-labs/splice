@@ -14,7 +14,6 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
-import monocle.macros.syntax.lens.*
 
 import scala.util.Using
 
@@ -53,9 +52,6 @@ class SelfHostedPreflightIntegrationTest
       // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
-      // Disable autostart, because our apps require the participant to be connected to a domain
-      // when the app starts. The apps are started manually in `validator-participant.sc` below.
-      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
       // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
 
@@ -70,8 +66,6 @@ class SelfHostedPreflightIntegrationTest
       "canton.participants-x.validatorParticipant.ledger-api.port=6001",
       "-C",
       "canton.participants-x.validatorParticipant.admin-api.port=6002",
-      "--bootstrap",
-      (validatorPath / "validator-participant.sc").toString,
     )
     checkFrontendsNetworkAppsAddress(sys.env("NETWORK_APPS_ADDRESS"))
 

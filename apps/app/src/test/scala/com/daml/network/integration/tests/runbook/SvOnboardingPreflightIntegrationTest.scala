@@ -12,7 +12,6 @@ import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardin
 import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
-import monocle.macros.syntax.lens.*
 
 import scala.util.Using
 
@@ -47,9 +46,6 @@ class SvOnboardingPreflightIntegrationTest
       // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
-      // Disable autostart, because our apps require the participant to be connected to a domain
-      // when the app starts. The apps are started manually in `sv-participant.sc` below.
-      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
       // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
 
@@ -75,8 +71,6 @@ class SvOnboardingPreflightIntegrationTest
           "canton.participants-x.svParticipant.ledger-api.port=6001",
           "-C",
           "canton.participants-x.svParticipant.admin-api.port=6002",
-          "--bootstrap",
-          (svPath / "sv-participant.sc").toString,
         )
         Using.resource(startCanton(cantonArgs, "self-hosted-sv")) { _ =>
           runScript(svPath / "sv.sc")(env.environment)

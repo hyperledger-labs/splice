@@ -13,7 +13,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
 
-import java.nio.file.Files
 import scala.util.Using
 
 /** Preflight test that spins up a new validator following our runbook.
@@ -58,9 +57,6 @@ class SelfHostedSplitwellPreflightIntegrationTest
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(2000)(conf)
       )
-      // Disable autostart, because our apps require the participant to be connected to a domain
-      // when the app starts. The apps are started manually in `validator-participant.sc` below.
-      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
       // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
       // Replace the path to the splitwell dar file.
@@ -69,27 +65,6 @@ class SelfHostedSplitwellPreflightIntegrationTest
   "run through runbook with self-hosted splitwell" in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
-    val bootstrapFile: File = Files.createTempFile("validator-and-splitwell-bootstrap", ".sc")
-
-    val validatorBootstrapContent: String =
-      (validatorPath / "validator-participant.sc").contentAsString
-    val splitwellBootstrapContent: String =
-      (splitwellPath / "splitwell-participant.sc").contentAsString
-
-    val content =
-      s"""
-         | def validatorBootstrap() = {
-         | $validatorBootstrapContent
-         | }
-         | def splitwellBootstrap() = {
-         | $splitwellBootstrapContent
-         | }
-         | validatorBootstrap()
-         | splitwellBootstrap()
-    """.stripMargin
-
-    bootstrapFile.overwrite(content)
-
     val cantonArgs = Seq(
       "-c",
       (validatorPath / "validator-participant.conf").toString,
@@ -103,8 +78,6 @@ class SelfHostedSplitwellPreflightIntegrationTest
       "canton.participants-x.splitwellParticipant.ledger-api.port=7101",
       "-C",
       "canton.participants-x.splitwellParticipant.admin-api.port=7102",
-      "--bootstrap",
-      bootstrapFile.toString,
     )
 
     Using.resource(startCanton(cantonArgs, "self-hosted-splitwell")) { _ =>
