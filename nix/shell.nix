@@ -72,7 +72,6 @@ in pkgs.mkShell {
   DAML_PROTOBUFS = "${pkgs.daml_pbs}";
   CANTON = "${pkgs.canton}";
   SDK_VERSION = "${pkgs.daml_pbs.sdk_version}";
-  # If you update the CometBFT version here make sure to also update the CircleCI image version
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
 }
