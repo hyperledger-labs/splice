@@ -52,17 +52,21 @@ class ParticipantInitializer(
             }
         } yield result
       case None =>
-        retryProvider.ensureThatB(
-          "participant is initialized",
-          isInitialized(),
-          // There doesn't seem to be a way to tell the participant to init with
-          // a freshly generated identity, except by changing its config.
-          sys.error(
-            "Can't initialize participant without a participant bootstrap dump." +
-              " Should the participant be configured to auto-init?"
-          ),
-          logger,
-        )
+        retryProvider
+          .waitUntil(
+            "participant is initialized",
+            isInitialized().map(_ => ()),
+            logger,
+          )
+          .recoverWith(ex => {
+            // There doesn't seem to be a way to tell the participant to init with
+            // a freshly generated identity, except by changing its config.
+            logger.error(
+              s"Participant failed to initialize: ${ex.getMessage()}." +
+                " Should the participant be configured to auto-init?"
+            )
+            Future.failed(ex)
+          })
     }
 
   private def isInitialized(): Future[Boolean] = participantAdminConnection.getStatus().map {
