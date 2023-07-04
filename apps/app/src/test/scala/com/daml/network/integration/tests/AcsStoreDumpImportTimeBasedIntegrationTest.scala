@@ -1,11 +1,11 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.config.{CNNodeConfigTransforms, GcpBucketConfig}
 import com.daml.network.config.CNNodeConfigTransforms.{
   updateAllAutomationConfigs,
   updateAllSvAppConfigs_,
 }
+import com.daml.network.config.{CNNodeConfigTransforms, GcpBucketConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -23,7 +23,7 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
     extends CNNodeIntegrationTest
     with WalletTestUtil {
 
-  def bootstrapDumpConfig: T
+  def bootstrapDumpConfig(name: String): T
 
   // We use fixed dumps to test data continuity.
   // We expect to add new dumps and a corresponding test from test-net releases that fail staging
@@ -67,7 +67,7 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
               case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
                 Some(
                   foundCollective.copy(
-                    bootstrappingDump = Some(bootstrapDumpConfig)
+                    bootstrappingDump = Some(bootstrapDumpConfig(config.name.value))
                   )
                 )
               case other => other
@@ -120,19 +120,20 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
 
 final class FileAcsStoreDumpImportTimeBasedIntegrationTest
     extends AcsStoreDumpImportTimeBasedIntegrationTest[SvBootstrapDumpConfig.File] {
-  override def bootstrapDumpConfig = SvBootstrapDumpConfig.File(bootstrappingDumpFilename)
+
+  override def bootstrapDumpConfig(name: String) =
+    SvBootstrapDumpConfig.File(bootstrappingDumpFilename)
 }
 
 final class GcpAcsStoreDumpImportTimeBasedIntegrationTest
     extends AcsStoreDumpImportTimeBasedIntegrationTest[SvBootstrapDumpConfig.Gcp] {
-  private val bucketPath = Paths.get("acs/import-test/dummy.json")
-  override def bootstrapDumpConfig =
-    SvBootstrapDumpConfig.Gcp(GcpBucketConfig.inferForTesting, bucketPath)
 
-  override def beforeAll() = {
-    super.beforeAll()
+  private def bucketPath(name: String) = Paths.get(s"acs/import-test/dummy_${name}.json")
+  override def bootstrapDumpConfig(name: String) = {
     val gcpBucket = new GcpBucket(GcpBucketConfig.inferForTesting, loggerFactory)
     val fileContent = better.files.File(bootstrappingDumpFilename).contentAsString
-    gcpBucket.dumpStringToBucket(fileContent, bucketPath)
+    gcpBucket.dumpStringToBucket(fileContent, bucketPath(name))
+    SvBootstrapDumpConfig.Gcp(GcpBucketConfig.inferForTesting, bucketPath(name))
   }
+
 }
