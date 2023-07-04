@@ -13,7 +13,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { BackupConfig, installGcpBucketSecret } from './backup';
+import { BackupConfig, GcpBucket, installGcpBucketSecret } from './backup';
 import { installCometBftNode } from './cometbft';
 import { domainFeesConfig } from './domainFeesCfg';
 import { installGlobalDomain, installParticipant } from './ledger';
@@ -87,6 +87,11 @@ export function installValidatorOnboardingSecret(
   );
 }
 
+export type BootstrappingDumpConfig = {
+  path: string;
+  bucket: GcpBucket;
+};
+
 export type SvConfig = {
   auth0Client: Auth0Client;
   nodename: string;
@@ -101,6 +106,7 @@ export type SvConfig = {
   expectedValidatorOnboardings: ValidatorOnboarding[];
   isDevNet: boolean;
   backupConfig?: BackupConfig;
+  bootstrappingDumpConfig?: BootstrappingDumpConfig;
   withDomainNode: boolean;
 };
 
@@ -194,6 +200,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
     acsStoreDump: config.backupConfig,
+    bootstrappingDump: config.bootstrappingDumpConfig,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

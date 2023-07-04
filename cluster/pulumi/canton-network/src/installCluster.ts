@@ -8,7 +8,7 @@ import { BackupConfig, installGcpBucket, GcpBucketConfig } from './backup';
 import { installDocs } from './docs';
 import { installClusterIngress } from './ingress';
 import { installSplitwell } from './splitwell';
-import { installSvNode, SvOnboarding } from './sv';
+import { BootstrappingDumpConfig, installSvNode, SvOnboarding } from './sv';
 import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
@@ -31,6 +31,8 @@ if (withDomainFees && !doubleSv) {
   );
   exit(1);
 }
+
+const bootstrappingDumpPath = process.env.SV_BOOSTRAPPING_DUMP_PATH;
 
 const SV2_KEY = {
   publicKey:
@@ -143,9 +145,18 @@ const backupBucketConfig: GcpBucketConfig = {
   bucketName: 'da-cn-data-dumps',
 };
 
-const backupConfig: BackupConfig | undefined = isDevNet
-  ? undefined
-  : { backupInterval: '10m', bucket: installGcpBucket(backupBucketConfig) };
+let backupConfig: BackupConfig | undefined;
+let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
+
+if (!isDevNet || bootstrappingDumpPath) {
+  const backupBucket = installGcpBucket(backupBucketConfig);
+  if (!isDevNet) {
+    backupConfig = { backupInterval: '10m', bucket: backupBucket };
+  }
+  if (bootstrappingDumpPath) {
+    bootstrappingDumpConfig = { path: bootstrappingDumpPath, bucket: backupBucket };
+  }
+}
 
 function generatePassword(name: string): random.RandomPassword {
   return new random.RandomPassword(name, {
@@ -171,6 +182,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     expectedValidatorOnboardings: [splitwellOnboarding, validator1Onboarding],
     isDevNet,
     backupConfig: backupConfig,
+    bootstrappingDumpConfig: bootstrappingDumpConfig,
     withDomainNode: true,
   });
 

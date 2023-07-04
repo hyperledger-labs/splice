@@ -33,6 +33,27 @@ spec:
             - name: ADDITIONAL_CONFIG_GLOBAL_LOCK_TIMEOUT
               value: |
                 canton.sv-apps.sv.onboarding.global-lock-timeout=240s
+            {{- with .Values.bootstrappingDump -}}
+            - name: ADDITIONAL_CONFIG_BOOTSTRAPPING_DUMP
+              value: |
+                canton.sv-apps.sv.onboarding.bootstrapping-dump {
+                  type = gcp
+                  bucket {
+                    project-id = {{ .bucket.config.projectId }}
+                    bucket-name = {{ .bucket.config.bucketName }}
+                    credentials {
+                      type = service-account
+                      json-credentials = ${CN_APP_SV_BOOTSTRAPPING_DUMP_SERVICE_ACCOUNT_CREDENTIALS}
+                    }
+                  }
+                  path = {{ .path | quote }}
+                }
+            - name: CN_APP_SV_BOOTSTRAPPING_DUMP_SERVICE_ACCOUNT_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  key: "json-credentials"
+                  name: {{ .bucket.secretName }}
+            {{- end }}
             {{- end }}
             - name: CN_APP_SV_PARTICIPANT_ADDRESS
               value: {{ .Values.participantAddress | default "participant" | quote }}
