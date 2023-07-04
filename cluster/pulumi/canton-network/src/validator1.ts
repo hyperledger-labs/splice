@@ -59,7 +59,7 @@ export async function installValidator1(
     // TODO(#6247) Enable auth here once Validator1PreflightIntegrationTest
     // supports this.
     disableAdminAuth: isDevNet,
-    backupConfig,
+    backupConfig: backupConfig ? { config: backupConfig } : undefined,
     extraDependsOn,
     auth0AppName: 'validator1',
   });

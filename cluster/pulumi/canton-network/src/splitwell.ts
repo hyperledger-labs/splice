@@ -73,7 +73,7 @@ export async function installSplitwell(
       '}',
     ].join('\n'),
     onboarding,
-    backupConfig,
+    backupConfig: backupConfig ? { config: backupConfig } : undefined,
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     auth0AppName: 'splitwell_validator',
   });

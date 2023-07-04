@@ -154,6 +154,7 @@ spec:
                 }
             {{- end }}
             {{- $clusterBaseName := .Values.cluster.basename -}}
+            {{- $namespace := .Release.Namespace -}}
             {{- with .Values.acsStoreDump }}
             - name: ADDITIONAL_CONFIG_CN_APP_SV_ACS_STORE_DUMP
               value: |
@@ -167,7 +168,7 @@ spec:
                       json-credentials = ${CN_APP_SV_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
                     }
                   }
-                  prefix = {{ $clusterBaseName }}
+                  prefix = "{{ $clusterBaseName }}/{{ $namespace }}"
                 }
             - name: CN_APP_SV_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
               valueFrom:

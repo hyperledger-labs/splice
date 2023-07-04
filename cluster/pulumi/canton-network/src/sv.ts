@@ -122,6 +122,10 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
+  const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
+    ? installGcpBucketSecret(xns, config.backupConfig.bucket)
+    : undefined;
+
   const dependsOn: pulumi.Resource[] = auth0BackendSecrets
     .concat(auth0UISecrets)
     .concat(
@@ -139,7 +143,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
         installValidatorOnboardingSecret(xns, onboarding)
       )
     )
-    .concat(config.backupConfig ? [installGcpBucketSecret(xns, config.backupConfig.bucket)] : []);
+    .concat(backupConfigSecret ? [backupConfigSecret] : []);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres', config.postgresPassword);
 
@@ -234,6 +238,13 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     validatorWalletUser: config.validatorWalletUser,
     participant,
     auth0AppName: config.auth0ValidatorAppName,
+    backupConfig:
+      config.backupConfig && backupConfigSecret
+        ? {
+            config: config.backupConfig,
+            secret: backupConfigSecret,
+          }
+        : undefined,
   });
 
   installCNHelmChart(

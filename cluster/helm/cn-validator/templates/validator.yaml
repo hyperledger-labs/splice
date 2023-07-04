@@ -105,6 +105,7 @@ spec:
           value: "false"
         {{- end }}
         {{- $clusterBaseName := .Values.cluster.basename -}}
+        {{- $namespace := .Release.Namespace -}}
         {{- with .Values.participantIdentitiesBackup }}
         - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_BACKUP
           value: |
@@ -118,7 +119,7 @@ spec:
                   json-credentials = ${CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
                 }
               }
-              prefix = {{ $clusterBaseName }}
+              prefix = "{{ $clusterBaseName }}/{{ $namespace }}"
               backup-interval = {{ .backupInterval }}
             }
         - name: CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS

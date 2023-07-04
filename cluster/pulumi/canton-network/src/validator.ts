@@ -16,6 +16,12 @@ export type ExtraDomain = {
   url: string;
 };
 
+export type ValidatorBackupConfig = {
+  // If not set the secret will be created.
+  secret?: pulumi.Resource;
+  config: BackupConfig;
+};
+
 export type ValidatorConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
@@ -24,7 +30,7 @@ export type ValidatorConfig = {
   withDomainFees: boolean;
   validatorWalletUser?: string;
   participant: pulumi.Resource;
-  backupConfig?: BackupConfig;
+  backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: pulumi.Resource[];
   appDars?: string[];
   validatorPartyHint?: string;
@@ -47,7 +53,11 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       config.onboarding ? [installValidatorOnboardingSecret(config.xns, config.onboarding)] : []
     )
     .concat(
-      config.backupConfig ? [installGcpBucketSecret(config.xns, config.backupConfig.bucket)] : []
+      config.backupConfig
+        ? config.backupConfig.secret
+          ? [config.backupConfig.secret]
+          : [installGcpBucketSecret(config.xns, config.backupConfig.config.bucket)]
+        : []
     )
     .concat(config.extraDependsOn || []);
 
@@ -81,7 +91,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
           }
         : {},
       disableAdminAuth: config.disableAdminAuth,
-      participantIdentitiesBackup: config.backupConfig,
+      participantIdentitiesBackup: config.backupConfig?.config,
       additionalConfig: config.additionalConfig,
     },
     dependsOn

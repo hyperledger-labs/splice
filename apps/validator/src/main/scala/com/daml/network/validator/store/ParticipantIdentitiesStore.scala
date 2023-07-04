@@ -6,7 +6,7 @@ import com.daml.network.environment.{BuildInfo, CNLedgerConnection, ParticipantA
 import com.daml.network.util.{BackupDump, ParticipantIdentitiesDump}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
@@ -75,7 +75,7 @@ class ParticipantIdentitiesStore(
         // Deliberately not using better files here
         // because it turns this into an absolute path which
         // then makes all the logging stuff below very confusing.
-        val filename = ParticipantIdentitiesStore.dumpFilename(dump.id, now)
+        val filename = ParticipantIdentitiesStore.dumpFilename(now)
         // TODO(#6073): compress output file
         val fileDesc =
           s"participant identities dump containing ${dump.keys.size} keys and ${dump.users.size} users to ${dumpConfig.locationDescription} at path: $filename"
@@ -94,10 +94,9 @@ class ParticipantIdentitiesStore(
 }
 
 object ParticipantIdentitiesStore {
-  def dumpFilename(id: ParticipantId, now: Instant) =
+  def dumpFilename(now: Instant) =
     Paths.get(
       BuildInfo.compiledVersion,
-      id.toProtoPrimitive,
-      s"participant_identities_${id}_${now}.json",
+      s"participant_identities_${now}.json",
     )
 }

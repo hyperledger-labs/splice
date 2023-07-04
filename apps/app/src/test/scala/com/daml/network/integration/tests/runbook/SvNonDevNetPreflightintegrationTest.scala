@@ -31,6 +31,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   protected def svNumber: Int
   protected val svName = s"sv$svNumber"
   protected val svUrlPrefix = s"sv-$svNumber"
+  protected val svNamespace = svUrlPrefix
 
   protected def svClient(implicit env: CNNodeTestConsoleEnvironment) = svcl(svName)
   protected def svValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc(
@@ -128,8 +129,8 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
     svClient.cometBftNodeStatus().catchingUp shouldBe false
   }
 
-  "Check that there is a recent participant identity backup on GCP" in { implicit env =>
-    testRecentParticipantIdentitiesDump(svValidatorClient)
+  "Check that there is a recent participant identity backup on GCP" in { _ =>
+    testRecentParticipantIdentitiesDump(svNamespace)
   }
 
   private def checkRoundWithinTickDuration(round: Instant, factor: Double)(implicit

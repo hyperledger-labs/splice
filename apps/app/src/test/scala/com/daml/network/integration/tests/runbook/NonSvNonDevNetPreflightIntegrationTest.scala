@@ -42,13 +42,12 @@ final class NonSvNonDevNetPreflightIntegrationTestBase
     }
   }
 
-  "Check that there is a recent participant identity backup on GCP for validator1" in {
-    implicit env =>
-      testRecentParticipantIdentitiesDump(validator1Client)
+  "Check that there is a recent participant identity backup on GCP for validator1" in { _ =>
+    testRecentParticipantIdentitiesDump("validator1")
   }
 
   "Check that there is a recent participant identity backup on GCP for splitwell validator" in {
-    implicit env =>
-      testRecentParticipantIdentitiesDump(splitwellValidatorClient)
+    _ =>
+      testRecentParticipantIdentitiesDump("splitwell")
   }
 }

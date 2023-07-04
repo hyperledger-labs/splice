@@ -435,14 +435,12 @@ class HttpSvHandler(
 
               // determine target file
               val now = clock.now.toInstant
-              val svcFingerprint = show"${svcStore.key.svcParty}".filter('.'.!=)
               // Deliberately not using better files here
               // because it turns this into an absolute path which
               // then makes all the logging stuff below very confusing.
               val filename = Paths.get(
                 BuildInfo.compiledVersion,
-                svStoreWithIngestion.store.key.svParty.uid.id.toProtoPrimitive,
-                s"${svcFingerprint}_off-${snapshot.offset}_size-${snapshot.contracts.size}_${now}.json",
+                s"svc_acs_dump_${now}.json",
               )
               // TODO(#6073): compress output file
               val httpSnapshot = definitions.GetAcsStoreDumpResponse(
