@@ -22,6 +22,7 @@ import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.svAdmin.SvAdminResource
+import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
@@ -91,6 +92,24 @@ class SvApp(
     .filter(_.enabled)
 
   override def packages = super.packages ++ Seq("dar/svc-governance-0.1.0.dar")
+
+  override def preInitializeBeforeLedgerConnection(): Future[Unit] = {
+    val participantAdminConnection = new ParticipantAdminConnection(
+      config.participantClient.adminApi,
+      loggerFactory,
+      retryProvider,
+      clock,
+    )
+    val participantInitializer = new ParticipantInitializer(
+      config.participantBootstrappingDump,
+      loggerFactory,
+      retryProvider,
+      participantAdminConnection,
+    )
+    participantInitializer
+      .ensureInitializedWithExpectedId()
+      .andThen(_ => participantAdminConnection.close())
+  }
 
   override def initializeNode(ledgerClient: CNLedgerClient): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(

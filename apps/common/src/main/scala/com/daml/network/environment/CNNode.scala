@@ -43,11 +43,12 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     */
   protected def requiredTemplates: Set[Identifier] = Set.empty
 
-  // Code that is run after the user has been allocated but before
+  // Code that is run after a ledger connection becomes available but before
   // waiting for the primary party. This can be used for things like
   // domain connections and allocation of the primary party.
   @nowarn("cat=unused")
-  protected def preInitialize(connection: CNLedgerConnection): Future[Unit] = Future.unit
+  protected def preInitializeAfterLedgerConnection(connection: CNLedgerConnection): Future[Unit] =
+    Future.unit
 
   def initialize(
       ledgerClient: CNLedgerClient,
@@ -57,10 +58,10 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   override protected def initializeNode(
       ledgerClient: CNLedgerClient
   ): Future[State] = for {
-    _ <- Future.successful(())
+    _ <- preInitializeBeforeLedgerConnection()
     _ = logger.info(s"Acquiring ledger connection")
     initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
-    _ <- preInitialize(initConnection)
+    _ <- preInitializeAfterLedgerConnection(initConnection)
     serviceParty <-
       retryProvider.getValueWithRetries[PartyId](
         s"primary party of service user $serviceUser",

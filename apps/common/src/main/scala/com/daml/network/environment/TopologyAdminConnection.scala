@@ -609,6 +609,9 @@ class TopologyAdminConnection(
     ).map(_.map(r => TopologyResult(r.context, r.item)))
   }
 
+  def initId(participantId: ParticipantId)(implicit traceContext: TraceContext): Future[Unit] = {
+    runCmd(TopologyAdminCommandsX.Init.InitId(participantId.uid.toProtoPrimitive))
+  }
 }
 
 object TopologyAdminConnection {

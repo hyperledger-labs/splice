@@ -112,7 +112,7 @@ class ValidatorApp(
   // Note that for the validator of an SV app, the user will be created by the SV app with a
   // primary party set to the SV app already so this is a noop.
   // For regular validators, this allocates a new user.
-  override def preInitialize(connection: CNLedgerConnection) =
+  override def preInitializeAfterLedgerConnection(connection: CNLedgerConnection) =
     for {
       // TODO(#5803) Consider removing this once Canton stops falling apart.
       // Wait for the sponsoring SV which also ensures the domain is initialized.

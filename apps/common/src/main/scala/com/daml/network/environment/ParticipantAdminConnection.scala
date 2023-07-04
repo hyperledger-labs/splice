@@ -7,6 +7,7 @@ import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
+  StatusAdminCommands,
   VaultAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
@@ -29,6 +30,7 @@ import io.grpc.Status
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
+import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -52,6 +54,12 @@ class ParticipantAdminConnection(
   ): Future[Seq[ListConnectedDomainsResult]] = {
     runCmd(ParticipantAdminCommands.DomainConnectivity.ListConnectedDomains())
   }
+
+  private val participantStatusCommand =
+    new StatusAdminCommands.GetStatus(ParticipantStatus.fromProtoV0)
+
+  def getStatus()(implicit traceContext: TraceContext): Future[NodeStatus[ParticipantStatus]] =
+    runCmd(participantStatusCommand)
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
@@ -325,5 +333,11 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[ByteString] = {
     runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest))
+  }
+
+  def importKeyPair(keyPair: Array[Byte], name: Option[String])(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name))
   }
 }

@@ -40,9 +40,7 @@ class ParticipantIdentitiesStore(
             )
           )
       )
-      bootstrapTxs <- participantAdminConnection
-        .getIdentityBootstrapTransactions(id.uid)
-        .map(txs => txs.map(tx => tx.toByteArray))
+      bootstrapTxs <- participantAdminConnection.getIdentityBootstrapTransactions(id.uid)
       users <- connection
         .listUsers()
         .map(users =>

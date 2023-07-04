@@ -217,12 +217,17 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     )
   }
 
+  // Code that is run before a ledger connection becomes available.
+  // This can be used for helping the participant initialize.
+  protected def preInitializeBeforeLedgerConnection(): Future[Unit] = Future.unit
+
   protected def initializeNode(
       ledgerClient: CNLedgerClient
   ): Future[State]
 
   logger.info(s"Starting initialization")
-  private val ledgerClientF = createLedgerClient()
+  private val preInitialize1F = preInitializeBeforeLedgerConnection()
+  private val ledgerClientF = preInitialize1F.flatMap { _ => createLedgerClient() }
   private val initializeF = ledgerClientF.flatMap { client =>
     val initConnection = client.connection(this.getClass.getSimpleName, loggerFactory)
     waitForUser(initConnection).flatMap(_ => initializeNode(client))
