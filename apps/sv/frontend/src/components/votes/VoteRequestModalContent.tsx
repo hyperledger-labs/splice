@@ -19,6 +19,7 @@ import {
   TableRow,
   Typography,
   TableHead,
+  Link,
 } from '@mui/material';
 
 import { ContractId, Party } from '@daml/types';
@@ -136,9 +137,12 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({ voteRequestC
                     <Typography variant="h6">Reason Url</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="h6" id="vote-request-modal-reason-url">
+                    <Link
+                      href={voteRequestQuery.data.payload.reason.url}
+                      id="vote-request-modal-reason-url"
+                    >
                       {voteRequestQuery.data.payload.reason.url}
-                    </Typography>
+                    </Link>
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -221,7 +225,9 @@ const VoteRow: React.FC<VoteRowProps> = ({ svName, sv, reasonBody, reasonUrl }) 
       <PartyId partyId={sv} className="sv-party" />
     </TableCell>
     <TableCell className="vote-reason-body">{reasonBody}</TableCell>
-    <TableCell className="url">{reasonUrl}</TableCell>
+    <TableCell className="url">
+      <Link href={reasonUrl}>{reasonUrl}</Link>
+    </TableCell>
   </TableRow>
 );
 

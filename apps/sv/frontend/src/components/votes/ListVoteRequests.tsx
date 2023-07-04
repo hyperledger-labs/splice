@@ -22,6 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 import Container from '@mui/material/Container';
+import Link from '@mui/material/Link';
 
 import { ActionRequiringConfirmation, SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId } from '@daml/types';
@@ -233,7 +234,7 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
                       <span style={{ fontWeight: 'bold' }}>Description:</span> {description}
                     </TableCell>
                     <TableCell>
-                      <span style={{ fontWeight: 'bold' }}>URL:</span> {url}
+                      <span style={{ fontWeight: 'bold' }}>URL:</span> <Link href={url}>{url}</Link>
                     </TableCell>
                   </TableBody>
                 </Table>
