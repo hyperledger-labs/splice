@@ -31,7 +31,7 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
   const handleAddComponent = () => {
     const newComponent = baseComponent;
     newComponent._1 = date + ':00Z';
-    // TODO(M3-56): we should use a correct mui date picker which includes directly right format!
+    // TODO(#6100): we should use a correct mui date picker which includes directly right format!
     if (!components.map(e => e._1).includes(newComponent._1) && /^\d{4}-/.test(newComponent._1)) {
       setComponents(prevComponents => [...prevComponents, newComponent]);
     }
