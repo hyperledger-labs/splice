@@ -43,23 +43,12 @@ MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for infor
 FAILED_PRECONDITION/DAML_INTERPRETATION_ERROR.+'Contract is not locked' was not met
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
 
-# TODO(#528) Remove this again
-proposed serial .* doesn't immediately follow the existing serial
-TopologyManagerWriteServiceX/Authorize.*INTERNAL.*ApiRequestLogger
-
 # TODO(#5705): remove once serial mismatches are no longer logged as WARN and a follow-up ERROR
 Topology evaluation failed with Txs failed.*Serial mismatch
 domain outbox flusher The domain.*failed the following topology transactions
 
 # TODO(#5706): investigate and remove once fixed
 MEDIATOR_INVALID_MESSAGE.*Received a mediator response.*with an unknown request id.*Discarding response
-
-# TODO(#5753) Remove once the issue is fixed in Canton
-ACS_COMMITMENT_MISMATCH.*The local commitment does not match the remote commitment
-ACS_MISMATCH_NO_SHARED_CONTRACTS.*Received a commitment where we have no shared contract with the sender
-
-# TODO(#5763) Remove this once this is fixed in Canton
-LOCAL_VERDICT_MALFORMED_(REQUEST|PAYLOAD).*Received a request.*with a view that is not correctly authorized
 
 # TODO(#6106): Remove this when we can
 Failed to handle Mediator events
