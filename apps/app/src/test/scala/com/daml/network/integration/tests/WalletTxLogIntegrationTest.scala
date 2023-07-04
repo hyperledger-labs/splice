@@ -618,7 +618,7 @@ class WalletTxLogIntegrationTest
       )
 
       // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
-      val paymentCid = clue("Alice's automation triggers the second payment") {
+      val payment = clue("Alice's automation triggers the second payment") {
         eventually() {
           inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
             sub.subscription.payload should equal(
@@ -627,7 +627,7 @@ class WalletTxLogIntegrationTest
             inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
               state.payload.subscription shouldBe sub.subscription.contractId
               state.payload.payData should equal(request.subscriptionRequest.payload.payData)
-              state.contractId
+              state
             }
           }
         }
@@ -640,7 +640,7 @@ class WalletTxLogIntegrationTest
           charlieUserId,
           charlieUserParty,
           aliceUserParty,
-          paymentCid,
+          payment,
         ),
       )(
         "Charlie's balance reflects the collected payment",

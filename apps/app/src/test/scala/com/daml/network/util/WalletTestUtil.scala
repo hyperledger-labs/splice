@@ -341,19 +341,19 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId: String,
       userParty: PartyId,
       senderParty: PartyId,
-      payment: subsCodegen.SubscriptionPayment.ContractId,
+      payment: Contract[subsCodegen.SubscriptionPayment.ContractId, subsCodegen.SubscriptionPayment],
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val now = env.environment.clock.now
-    val tc = sv1ScanBackend.getTransferContextWithInstances(now)
+    val tc = sv1ScanBackend.getTransferContextWithInstances(now, Some(payment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
     val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty, senderParty),
       readAs = Seq(),
-      update = payment.exerciseSubscriptionPayment_Collect(
+      update = payment.contractId.exerciseSubscriptionPayment_Collect(
         appTc
       ),
       domainId = Some(disclosure.assignedDomain),
