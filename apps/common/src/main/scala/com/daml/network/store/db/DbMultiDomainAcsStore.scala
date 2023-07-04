@@ -368,7 +368,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       }
     }
 
-    // TODO (#5623) : update txlog tables too
     override def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
