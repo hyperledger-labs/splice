@@ -90,7 +90,7 @@ class AuthTokenManagerTest extends AsyncWordSpec with BaseTest {
     val retryMe = new AtomicReference[Option[CantonTimestamp => Unit]](None)
     when(clockMock.scheduleAt(any[CantonTimestamp => Unit], any[CantonTimestamp]))
       .thenAnswer[CantonTimestamp => Unit, CantonTimestamp] { case (action, _) =>
-        println(s"schedule at called, ${retryMe.get()}")
+        logger.debug(s"schedule at called, ${retryMe.get()}")
         retryMe.getAndUpdate(_ => Some(action)) shouldBe empty
         FutureUnlessShutdown.unit
       }
@@ -159,7 +159,7 @@ class AuthTokenManagerTest extends AsyncWordSpec with BaseTest {
     }
 
     def succeed(token: AuthToken): Unit = {
-      println(s"returning success from obtain token: $token")
+      logger.debug(s"returning success from obtain token: $token")
       nextResult.get().success(Some(token))
     }
 
