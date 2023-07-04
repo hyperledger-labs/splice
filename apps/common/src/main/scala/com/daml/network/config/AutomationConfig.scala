@@ -22,4 +22,7 @@ case class AutomationConfig(
     /** Only intended for testing. Disables the generation of SV rewards.
       */
     enableSvRewards: Boolean = true,
+    /** Only intended for testing. Disables the expiration of Coin.
+      */
+    enableExpireCoin: Boolean = false,
 ) {}

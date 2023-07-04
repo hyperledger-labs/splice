@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.round.*
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -11,9 +10,8 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import monocle.macros.syntax.lens.*
 
-import java.time.{Duration as JavaDuration, Instant}
+import java.time.{Instant, Duration as JavaDuration}
 import scala.concurrent.duration.*
 
 class SvTimeBasedIntegrationTestBase
@@ -29,13 +27,6 @@ class SvTimeBasedIntegrationTestBase
       .withManualStart
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
       .withoutAutomaticRewardsCollectionAndCoinMerging
-      .addConfigTransforms((_, config) => {
-        // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.
-        // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.enableUnclaimedRewardExpiration).replace(true)
-        )(config)
-      })
 
   protected def readyToAdvanceAt(rounds: OpenMiningRoundsTriplet): Instant = {
     Ordering[Instant].max(

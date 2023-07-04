@@ -13,7 +13,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import monocle.macros.syntax.lens.*
 
 import java.time.Duration
 import java.util.UUID
@@ -34,13 +33,6 @@ class WalletTimeBasedIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
-      .addConfigTransform((_, config) => {
-        // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.
-        // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.enableUnclaimedRewardExpiration).replace(true)
-        )(config)
-      })
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)

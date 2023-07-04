@@ -10,7 +10,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.{ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
-import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
 class SvcTimeBasedIntegrationTest
@@ -29,13 +28,6 @@ class SvcTimeBasedIntegrationTest
       )
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
       .withoutAutomaticRewardsCollectionAndCoinMerging
-      .addConfigTransforms((_, config) => {
-        // TODO(M3-63) Currently, auto-expiration of unclaimed rewards is disabled by default, and enabled only where needed.
-        // In the cluster it currently cannot be enabled due to lack of resiliency to unavailable validators
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.focus(_.enableUnclaimedRewardExpiration).replace(true)
-        )(config)
-      })
 
   "coin rules cache should be invalidated when the coin rules change" in { implicit env =>
     val (_, _) = onboardAliceAndBob()

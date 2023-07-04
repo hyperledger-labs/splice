@@ -31,7 +31,11 @@ class LeaderBasedAutomationService(
   registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExecuteVoteRequestActionTrigger(triggerContext, svTaskContext))
   registerTrigger(new ArchiveDuplicateValidatorTrafficTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExpiredCoinTrigger(triggerContext, svTaskContext))
+
+  if (config.automation.enableExpireCoin) {
+    registerTrigger(new ExpiredCoinTrigger(triggerContext, svTaskContext))
+  }
+
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
