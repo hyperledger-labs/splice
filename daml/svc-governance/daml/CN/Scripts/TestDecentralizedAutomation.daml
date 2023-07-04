@@ -9,7 +9,8 @@ import qualified DA.Set as Set
 import Daml.Script
 import DA.Time
 
-import CC.API.V1.Round
+import CC.API.V1.Round (Round(..))
+import CC.Round
 import CC.Coin
 
 import CN.SvcRules
@@ -81,8 +82,10 @@ testLeaderElection = do
   runNextIssuanceD app 1.1
   runNextIssuanceD app 1.2
 
+  openRounds <- map snd <$> query @OpenMiningRound app.svc
+
   -- wow! stuff works :D
-  return ()
+  trace openRounds $ return ()
 
 
 testUnclaimedRewardsMerging : Script ()
@@ -138,7 +141,7 @@ testRequiredNumOfConfirmationInDevNet = do
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
           newMemberParty = svX
           newMemberName = "svX"
-          nextMiningRound = (Round 3)
+          joinedAsOfRound = (Round 3)
           domainId
   confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
     submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
@@ -163,7 +166,7 @@ testRequiredNumOfConfirmationInDevNet = do
 
 testConfirmationExpiry : Script ()
 testConfirmationExpiry = do
-  (app, svc, (sv1, _, _, _)) <- initCollective False
+  (app, svc, (sv1, _, _, _)) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1, and sv1 is the leader
 
   -- a new sv prepares his participant
@@ -180,7 +183,7 @@ testConfirmationExpiry = do
       svcAction = SRARC_AddMember $ SvcRules_AddMember with
         newMemberParty = svX
         newMemberName = "svX"
-        nextMiningRound = (Round 3)
+        joinedAsOfRound = (Round 3)
         domainId
 
   -- leader tries to expire the confirmation, but it's too early

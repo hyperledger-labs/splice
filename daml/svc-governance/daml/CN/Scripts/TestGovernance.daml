@@ -23,7 +23,7 @@ import CN.Scripts.SvcTestUtils
 -- | Tests vote request machinery on featured app right granting and revoking.
 testVoteRequest : Script ()
 testVoteRequest = do
-  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
@@ -115,7 +115,7 @@ testVoteRequest = do
 -- | Test SvcRules configuration changes.
 testSvcRulesConfigChange : Script ()
 testSvcRulesConfigChange = do
-  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
 
   [(_, svcRules)] <- query @SvcRules svc
 
@@ -134,7 +134,7 @@ testSvcRulesConfigChange = do
 -- | Test membership removal and GC of CoinPriceVotes
 testRemoveMember : Script ()
 testRemoveMember = do
-  (app, svc, (sv1, sv2, sv3, sv4)) <- initCollective False
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
 
   -- check that the leader is currently sv1
   [(_, svcRules)] <- query @SvcRules svc

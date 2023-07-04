@@ -17,8 +17,7 @@ testImportCrates = do
 
   -- create a fresh SVC party with its coinRules and user party
   newApp <- genericSetupApp "new"
-  (newCoinRulesCid, _) <- getCoinRules newApp
-  (newOpenRoundCid, newOpenRound) <- getLatestActiveOpenRound newApp
+  (newOpenRoundCid, _) <- getLatestActiveOpenRound newApp
 
   newAlice <- allocateParty "newAlice"
   newAliceXyz <- allocateParty "newAlice::xyz"
@@ -39,29 +38,25 @@ testImportCrates = do
   -- exact match is checked
   submitMultiMustFail [newAliceXyz] [newApp.svc] $ exerciseCmd pkg1 ImportCrate_Receive with
     receiver = newAliceXyz
-    openRound = newOpenRoundCid
-    coinRules = newCoinRulesCid
+    openRoundCid = newOpenRoundCid
 
   submitMulti [newAlice] [newApp.svc] $ exerciseCmd pkg1 ImportCrate_Receive with
     receiver = newAlice
-    openRound = newOpenRoundCid
-    coinRules = newCoinRulesCid
+    openRoundCid = newOpenRoundCid
 
   -- this import crate can be received as only the prefix is checked
   submitMulti [newAliceXyz] [newApp.svc] $ exerciseCmd pkg2 ImportCrate_Receive with
     receiver = newAliceXyz
-    openRound = newOpenRoundCid
-    coinRules = newCoinRulesCid
+    openRoundCid = newOpenRoundCid
 
   -- check import crate and coins of the newApp.svc
   pkgs <- query @ImportCrate newApp.svc
   pkgs === []
 
   -- need to adjust the round of the newAmount, it changes between the initial tap and the reminting
-  let newAmount = coin1.amount with createdAt = newOpenRound.round
-  let newCoin1 = Coin with svc = newApp.svc; owner = newAlice; amount = newAmount
-  let newCoin2 = Coin with svc = newApp.svc; owner = newAliceXyz; amount = newAmount
+  let newCoin1 = Coin with svc = newApp.svc; owner = newAlice; amount = coin1.amount
+  let newCoin2 = Coin with svc = newApp.svc; owner = newAliceXyz; amount = coin1.amount
   newCoins <- query @Coin newApp.svc
-  map snd newCoins === [newCoin2, newCoin1]
+  map snd newCoins === [newCoin1, newCoin2]
 
   pure ()

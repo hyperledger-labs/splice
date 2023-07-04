@@ -1,39 +1,57 @@
 package com.daml.network.store
 
 import com.daml.ledger.javaapi.data
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref
 import com.daml.network.codegen.java.cc
 import com.daml.network.http.v0.definitions as http
+import com.daml.network.util.Contract.Companion
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
 
 object AcsStoreDump {
 
-  def extractImportCommandsFromJsonDump(svcParty: PartyId, productionMode: Boolean)(
+  private def fromJsonIgnoringPackageId[TCid <: ContractId[T], T <: DamlRecord[?]](
+      companion: Companion.Template[TCid, T]
+  )(contract: http.Contract)(implicit
+      decoder: TemplateJsonDecoder
+  ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
+    val fixedPackageId = Ref.PackageId.assertFromString(companion.TEMPLATE_ID.getPackageId)
+    // fixup templateId
+    val templateId = Ref.Identifier.assertFromString(contract.templateId)
+    val fixedTemplateId = Ref.Identifier(
+      fixedPackageId,
+      templateId.qualifiedName,
+    )
+    val fixedContract = contract.copy(templateId = fixedTemplateId.toString())
+    Contract.fromJson(companion)(fixedContract)
+  }
+
+  def extractOpenMiningRounds(
+      contracts: Seq[http.Contract]
+  )(implicit templateDecoder: TemplateJsonDecoder): Seq[cc.round.OpenMiningRound] =
+    contracts.collect(
+      Function.unlift(co =>
+        fromJsonIgnoringPackageId(cc.round.OpenMiningRound.COMPANION)(co).toOption.map(_.payload)
+      )
+    )
+
+  def extractImportCommands(svcParty: PartyId, productionMode: Boolean)(
       contracts: Seq[http.Contract]
   )(implicit templateDecoder: TemplateJsonDecoder): Seq[data.Command] = {
-    val ccPackageId = Ref.PackageId.assertFromString(cc.coin.Coin.TEMPLATE_ID.getPackageId)
 
     def extractCoin(co: http.Contract): Seq[cc.coin.Coin] = {
-      // fixup templateId
-      val templateId = Ref.Identifier.assertFromString(co.templateId)
-      val fixedTemplateId = Ref.Identifier(
-        ccPackageId,
-        templateId.qualifiedName,
-      )
-      val fixedContract = co.copy(templateId = fixedTemplateId.toString())
       // attempt to decode as a: Coin
-      Contract
-        .fromJson(cc.coin.Coin.COMPANION)(fixedContract)
+      fromJsonIgnoringPackageId(cc.coin.Coin.COMPANION)(co)
         .map(_.payload)
         // LockedCoin
-        .orElse(Contract.fromJson(cc.coin.LockedCoin.COMPANION)(fixedContract).map(_.payload.coin))
+        .orElse(fromJsonIgnoringPackageId(cc.coin.LockedCoin.COMPANION)(co).map(_.payload.coin))
         // ImportCrate, as not all of them might have been imported
         .orElse(
-          Contract
-            .fromJson(cc.coinimport.ImportCrate.COMPANION)(fixedContract)
+          fromJsonIgnoringPackageId(cc.coinimport.ImportCrate.COMPANION)(co)
             .map(_.payload.payload)
         )
         .toSeq

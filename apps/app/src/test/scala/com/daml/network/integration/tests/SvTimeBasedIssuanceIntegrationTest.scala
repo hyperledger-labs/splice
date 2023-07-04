@@ -44,57 +44,20 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
         svcParty,
       ) should have size 1
 
-      // Only Sv1 get svc reward from round 0 as Sv2, Sv3 and Sv4 only joined in round 3
-      inside(
-        svs.head.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(svs.head.getSvcInfo().svParty)
-      ) { case Seq(newCoin) =>
-        newCoin.data.svc shouldBe svcParty.toProtoPrimitive
-        newCoin.data.owner shouldBe svs.head.getSvcInfo().svParty.toProtoPrimitive
-        newCoin.data.amount.initialAmount shouldBe coinsToIssueToSvc
-          .setScale(10, RoundingMode.HALF_UP)
-      }
-
-      Seq(sv2Backend, sv3Backend, sv4Backend).map { sv =>
-        val coins = sv.participantClient.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(sv.getSvcInfo().svParty)
-        coins shouldBe empty
-      }
-    }
-
-    // three ticks - rounds 1-3 close.
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
-    eventually() {
-      getSortedIssuingRounds(
-        sv1Backend.participantClientWithAdminToken,
-        svcParty,
-      ) should have size 3
-
-      val eachSvGetInRound3 =
+      // All of SV1 to SV4 join as of round 0 and get a reward
+      val eachSvGetInRound0 =
         coinsToIssueToSvc
           .divide(BigDecimal(svs.size).bigDecimal, RoundingMode.HALF_UP)
           .setScale(10, RoundingMode.HALF_UP)
 
-      // All Svs get reward from round 3
-      inside(
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(svs.head.getSvcInfo().svParty)
-      ) { case Seq(_, _, _, newCoin) =>
-        newCoin.data.svc shouldBe svcParty.toProtoPrimitive
-        newCoin.data.owner shouldBe sv1Backend.getSvcInfo().svParty.toProtoPrimitive
-        newCoin.data.amount.initialAmount shouldBe eachSvGetInRound3
-      }
-
-      Seq(sv2Backend, sv3Backend, sv4Backend).map { sv =>
+      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map { sv =>
         inside(
           sv.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(cc.coin.Coin.COMPANION)(sv.getSvcInfo().svParty)
         ) { case Seq(newCoin) =>
           newCoin.data.svc shouldBe svcParty.toProtoPrimitive
           newCoin.data.owner shouldBe sv.getSvcInfo().svParty.toProtoPrimitive
-          newCoin.data.amount.initialAmount shouldBe eachSvGetInRound3
+          newCoin.data.amount.initialAmount shouldBe eachSvGetInRound0
         }
       }
     }
@@ -107,8 +70,8 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
       sv4Backend.stop()
     }
     actAndCheck(
-      "Advancing by 15 rounds",
-      (1 to 14).foreach(_ => advanceRoundsByOneTick),
+      "Advancing by 12 rounds",
+      (1 to 11).foreach(_ => advanceRoundsByOneTick),
     )(
       "SV4 has 11 unclaimed rewards contracts",
       _ => {

@@ -28,13 +28,13 @@ import CN.Util.ExpiringContract
 
 
 initMainNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
-initMainNetCollective = initCollective False
+initMainNetCollective = initCollective None False
 
 initDevNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
-initDevNetCollective = initCollective True
+initDevNetCollective = initCollective None True
 
-initCollective : Bool -> Script (CCApp, Party, (Party, Party, Party, Party))
-initCollective isDevNet = do
+initCollective : Optional [OpenMiningRound] -> Bool -> Script (CCApp, Party, (Party, Party, Party, Party))
+initCollective initialOpenRounds isDevNet = do
   -- allocate users for the four founding members
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
@@ -65,7 +65,7 @@ initCollective isDevNet = do
         globalDomain = initialGlobalDomainConfig
   let coinConfig = defaultCoinConfig
 
-  -- have mallory bootstrap the collective
+  -- have sv1 bootstrap the collective
   submit svc $ createAndExerciseCmd
     SvcBootstrap with
       svc
@@ -86,6 +86,7 @@ initCollective isDevNet = do
       config
       initialTrafficState = Map.empty
       enabledChoices = API.enableAllChoices
+      initialOpenRounds
       isDevNet
     SvcBootstrap_Bootstrap
 
@@ -102,11 +103,11 @@ initCollective isDevNet = do
     submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid $ SvcRules_OnboardValidator with
       sponsor = sv1
       validator = svParty
-    (_, latestOpenRound) <- getLatestOpenRound app
+    (_, earliestOpenRound) <- head <$> getOpenRoundsSorted app
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
       newMemberParty = svParty
       newMemberName = svName
-      nextMiningRound = Round (latestOpenRound.round.number + 1)
+      joinedAsOfRound = earliestOpenRound.round
       domainId = coinConfig.globalDomain.activeDomain
 
   pure (app, svc, (sv1, sv2, sv3, sv4))

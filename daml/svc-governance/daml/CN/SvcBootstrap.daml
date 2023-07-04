@@ -1,5 +1,7 @@
 module CN.SvcBootstrap where
 
+import DA.Foldable (forA_)
+import DA.List (sortOn)
 import qualified DA.Map as Map
 
 import CC.Coin
@@ -7,8 +9,10 @@ import CC.CoinConfig
 import CC.GlobalDomain (initialValidatorTraffic)
 import CC.Schedule
 import qualified CC.API.V1.Coin as API
-import CC.API.V1.Round
+import qualified CC.API.V1.Round as API
+import CC.Round
 
+import CN.Util.Assert
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
 import CN.SvcRules
@@ -22,6 +26,7 @@ template SvcBootstrap with
     coinConfig : CoinConfig USD
     coinPrice : Decimal
     config : SvcRulesConfig
+    initialOpenRounds : Optional [OpenMiningRound]
     initialTrafficState: Map.Map Text TrafficState
     enabledChoices : API.EnabledChoices
     isDevNet : Bool
@@ -32,10 +37,41 @@ template SvcBootstrap with
     choice SvcBootstrap_Bootstrap : ()
       controller svc
       do
+        -- create coin-rules and the initial price vote of the founding member
+        coinRulesCid <- create CoinRules with
+          svc
+          configSchedule = Schedule with
+            initialValue = coinConfig
+            futureValues = []
+          enabledChoices
+          isDevNet
+          lock = False
+        -- bootstrap rounds if necessary
+        earliestOpenRound <- case initialOpenRounds of
+          None -> do
+            exercise coinRulesCid CoinRules_Bootstrap_Rounds with
+              coinPrice
+            pure (API.Round 0)
+          Some openRoundsUnsorted -> do
+            let openRounds = sortOn (.round) openRoundsUnsorted
+            require "There are exactly three open rounds" (length openRounds == 3)
+            let [earliest, middle, latest] = openRounds
+            require "Middle is one after earliest" (middle.round.number == earliest.round.number + 1)
+            require "Latest is one after middle" (latest.round.number == middle.round.number + 1)
+            forA_ openRounds $ \openRound ->
+              create openRound with svc = svc  -- replace SVC party as it might have changed
+            pure earliest.round
+        -- create initial coin price vote of founder
+        now <- getTime
+        _ <- create CoinPriceVote with
+          svc
+          sv = founderParty
+          coinPrice = Some coinPrice
+          lastUpdatedAt = now
         -- create the SVC rules with the founding member as the sole member
         let founderInfo = MemberInfo with
               name = founderName
-              joinedAsOfRound = Round 0
+              joinedAsOfRound = earliestOpenRound
               domainNodes = founderDomainNodes
         _ <- create SvcRules with
           svc
@@ -46,25 +82,6 @@ template SvcBootstrap with
           initialTrafficState
           isDevNet
           lock = False
-
-        -- create coin-rules and the initial price vote of the founding member
-        coinRulesCid <- create CoinRules with
-          svc
-          configSchedule = Schedule with
-            initialValue = coinConfig
-            futureValues = []
-          enabledChoices
-          isDevNet
-          lock = False
-        exercise coinRulesCid CoinRules_Bootstrap_Rounds with
-          coinPrice
-        now <- getTime
-        _ <- create CoinPriceVote with
-          svc
-          sv = founderParty
-          coinPrice = Some coinPrice
-          lastUpdatedAt = now
-
         -- create initial ValidatorTraffic for the founding member based on configured initial traffic grant
         let domainId = coinConfig.globalDomain.activeDomain
         let trafficAmount = config.initialTrafficGrant

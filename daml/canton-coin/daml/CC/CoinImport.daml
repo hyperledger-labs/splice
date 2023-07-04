@@ -5,6 +5,7 @@ import CC.Coin
 import CC.Round
 
 import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
 
 import CN.Util.Assert
 
@@ -23,15 +24,19 @@ template ImportCrate with
     choice ImportCrate_Receive : API.CoinCreateSummary (ContractId Coin)
       with
         receiver : Party
-        coinRules : ContractId CoinRules
-        openRound : ContractId OpenMiningRound
+        openRoundCid : ContractId OpenMiningRound
       controller receiver
       do
         if exactMatch
           then require "Receiver party matches receiver name" (partyToText receiver == receiverName)
           else require "Receiver name is a prefix of the receiver party" (receiverName `T.isPrefixOf` partyToText receiver)
-        exercise coinRules CoinRules_Mint with
-          receiver
-          amount = payload.amount.initialAmount
-          openRound
-
+        openRound <- exercise (toInterfaceContractId @API.OpenMiningRound openRoundCid) (API.OpenMiningRound_Fetch receiver)
+        coinCid <- create Coin with
+          svc = svc
+          owner = receiver
+          amount = payload.amount
+        return API.CoinCreateSummary with
+                  coin = coinCid
+                  -- NOTE: this price is not the price at which the original coin was created.
+                  -- We can't restore that as we don't know it, and we accept this imprecision.
+                  coinPrice = openRound.coinPrice

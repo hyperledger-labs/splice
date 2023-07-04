@@ -5,7 +5,7 @@ import akka.stream.Materializer
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.definitions as http
@@ -49,6 +49,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
@@ -318,63 +319,77 @@ class FoundingNodeInitializer(
           requiredDars,
           noLock,
         )
-        _ <- importAcsSnapshot()
+        optOpenMiningRounds <- importAcsSnapshot()
         _ <- retryProvider.retryForAutomation(
           "bootstrapping SVC",
-          bootstrapSvc(),
+          bootstrapSvc(optOpenMiningRounds),
           logger,
         )
       } yield ()
     }
 
-    private def importAcsSnapshot(): Future[Unit] = foundingConfig.bootstrappingDump match {
-      case None => Future.unit
-      case Some(config) =>
-        for {
-          cmds <- Future {
-            blocking {
-              val jsonString = config match {
-                case SvBootstrapDumpConfig.File(file) =>
-                  logger.info(s"Parsing contracts in ACS store dump: ${file.toAbsolutePath}")
-                  better.files.File(file).contentAsString
-                case SvBootstrapDumpConfig.Gcp(bucketConfig, path) =>
-                  val bucket = new GcpBucket(bucketConfig, loggerFactory)
-                  bucket.readStringFromBucket(path)
+    private def importAcsSnapshot(): Future[Option[Seq[cc.round.OpenMiningRound]]] =
+      foundingConfig.bootstrappingDump match {
+        case None => Future.successful(None)
+        case Some(config) =>
+          for {
+            jsonDump <- Future {
+              blocking {
+                val jsonString = config match {
+                  case SvBootstrapDumpConfig.File(file) =>
+                    logger.info(s"Parsing contracts in ACS store dump: ${file.toAbsolutePath}")
+                    better.files.File(file).contentAsString
+                  case SvBootstrapDumpConfig.Gcp(bucketConfig, path) =>
+                    val bucket = new GcpBucket(bucketConfig, loggerFactory)
+                    bucket.readStringFromBucket(path)
+                }
+                io.circe.parser
+                  .decode[http.GetAcsStoreDumpResponse](jsonString)
+                  .fold(
+                    err =>
+                      throw new IllegalArgumentException(
+                        s"Failed to parse ${config.description}: $err"
+                      ),
+                    result => result,
+                  )
               }
-              val jsonDump = io.circe.parser
-                .decode[http.GetAcsStoreDumpResponse](jsonString)
-                .fold(
-                  err =>
-                    throw new IllegalArgumentException(
-                      s"Failed to parse ${config.description}: $err"
-                    ),
-                  result => result,
-                )
-              AcsStoreDump.extractImportCommandsFromJsonDump(svcParty, productionMode = false)(
-                jsonDump.contracts.toSeq
-              )
             }
-          }
-          _ = logger.debug(
-            show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
-          )
-          _ <-
-            // TODO(#6073): consider command dedup (or another protection from failed/partial imports), and limiting the batch size
-            svcStoreWithIngestion.connection
-              .submitCommandsNoDedup(
-                actAs = Seq(svcParty),
-                readAs = Seq.empty,
-                commands = cmds,
-                domainId = domainId,
-              )
+            cmds = AcsStoreDump.extractImportCommands(svcParty, productionMode = false)(
+              jsonDump.contracts.toSeq
+            )
+            _ = logger.debug(
+              show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
+            )
+            _ <-
+              // TODO(#6073): consider command dedup (or another protection from failed/partial imports), and limiting the batch size
+              svcStoreWithIngestion.connection
+                .submitCommandsNoDedup(
+                  actAs = Seq(svcParty),
+                  readAs = Seq.empty,
+                  commands = cmds,
+                  domainId = domainId,
+                )
 
-        } yield logger.info(
-          s"Completed importing ACS store dump by submitting ${cmds.size} commands in one transaction."
-        )
-    }
+          } yield {
+            import com.daml.network.util.PrettyInstances.*
+
+            val openMiningRounds = AcsStoreDump.extractOpenMiningRounds(jsonDump.contracts)
+            if (!(openMiningRounds.size == 3))
+              logger.error(
+                show"Expected 3 open mining rounds, but found ${openMiningRounds.size} open mining rounds: ${openMiningRounds
+                    .map(_.toValue)}"
+              )
+            logger.info(
+              s"Completed importing ACS store dump by submitting ${cmds.size} commands in one transaction."
+            )
+            Some(openMiningRounds)
+          }
+      }
 
     // Create SvcRules and CoinRules and open the first mining round
-    private def bootstrapSvc(): Future[Unit] = {
+    private def bootstrapSvc(
+        optOpenMiningRounds: Option[Seq[cc.round.OpenMiningRound]]
+    ): Future[Unit] = {
       for {
         coinRules <- svcStore.lookupCoinRules()
         participantId <- participantAdminConnection.getParticipantId()
@@ -429,6 +444,7 @@ class FoundingNodeInitializer(
                       ),
                       foundingConfig.initialCoinPrice.bigDecimal,
                       svcRulesConfig,
+                      optOpenMiningRounds.map(_.asJava).toJava,
                       trafficStateForAllMembers
                         .map(m =>
                           m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(

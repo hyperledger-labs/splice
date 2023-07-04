@@ -597,7 +597,9 @@ object MultiDomainAcsStore {
     }
   }
 
-  sealed abstract class ContractState extends PrettyPrinting with Product with Serializable
+  sealed abstract class ContractState extends PrettyPrinting with Product with Serializable {
+    def isAssigned: Boolean
+  }
 
   object ContractState {
     case class Assigned(
@@ -605,10 +607,12 @@ object MultiDomainAcsStore {
     ) extends ContractState {
       override def pretty: Pretty[this.type] =
         prettyOfClass(param("domain", _.domain))
+      override val isAssigned = true
     }
 
     case object InFlight extends ContractState {
       override def pretty: Pretty[this.type] = prettyOfObject[InFlight.type]
+      override val isAssigned = false
     }
   }
 

@@ -18,6 +18,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -110,8 +111,17 @@ class UserWalletService(
     def receive(): Future[Done] = for {
       domainId <- store.defaultAcsDomainIdF
       crates <- scanConnection.listImportCrates(userPartyId)
-      coinRules <- scanConnection.getCoinRules()
-      openRound <- scanConnection.getLatestOpenMiningRound()
+      (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()
+      // We're explicitly not checking for the round to be open, as we only need it to supply the CoinPrice for scan.
+      openRound = openRounds
+        .collectFirst { case co if co.state.isAssigned => co }
+        .getOrElse(
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              show"There is at least one open round in $openRounds that is assigned to a domain."
+            )
+            .asRuntimeException()
+        )
       _ = logger.debug(show"Attempting to receive ${crates.size} crates for $userPartyId")
       _ <- Future.sequence(crates.map(crate => {
         logger.debug(show"Attempting to receive $crate")
@@ -121,14 +131,13 @@ class UserWalletService(
           commands = crate.contract.contractId
             .exerciseImportCrate_Receive(
               userPartyId.toProtoPrimitive,
-              coinRules.contract.contractId,
               openRound.contract.contractId,
             )
             .commands()
             .asScala
             .toSeq,
           domainId,
-          disclosedContracts = DisclosedContracts(crate, coinRules, openRound),
+          disclosedContracts = DisclosedContracts(crate, openRound),
         )
       }))
     } yield {
@@ -152,7 +161,7 @@ class UserWalletService(
           scala.util.Success(Done)
         case scala.util.Failure(ex) =>
           logger.error(
-            s"Unexpected exception when receiving crates for $userPartyId, as we are shutting down",
+            s"Unexpected exception when receiving crates for $userPartyId",
             ex,
           )
           scala.util.Failure(ex)

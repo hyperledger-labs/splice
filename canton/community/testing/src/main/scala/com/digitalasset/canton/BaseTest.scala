@@ -11,7 +11,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger}
+import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.time.PositiveSeconds
@@ -38,6 +38,7 @@ import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.scalacheck.CheckerAsserting
 import org.slf4j.bridge.SLF4JBridgeHandler
+import org.slf4j.event.Level
 import org.typelevel.discipline.Laws
 
 import scala.annotation.nowarn
@@ -144,6 +145,14 @@ trait BaseTest
         throw ex
     }
   }
+
+  /** Suppressed failed clue messages to make our log-checker happy when using clues within an eventually. */
+  def suppressFailedClues[T](loggerFactory: SuppressingLogger)(expr: => T): T =
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
+      expr,
+      logEntries =>
+        forAll(logEntries)(logEntry => logEntry.message should startWith("Failed: clue")),
+    )
 
   /** Allows for returning an `EitherT[Future, _, Assertion]` instead of `Future[Assertion]` in asynchronous
     * test suites.

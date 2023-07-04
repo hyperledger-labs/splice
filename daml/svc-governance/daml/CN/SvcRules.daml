@@ -265,7 +265,7 @@ template SvcRules with
       with
         newMemberParty : Party
         newMemberName : Text
-        nextMiningRound : Round
+        joinedAsOfRound : Round
         domainId: Text
       controller svc
       do
@@ -275,7 +275,7 @@ template SvcRules with
           require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
         let info = MemberInfo with
               name = newMemberName
-              joinedAsOfRound = nextMiningRound
+              joinedAsOfRound = joinedAsOfRound
               domainNodes = noDomainNodes
         let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
         now <- getTime
@@ -326,8 +326,9 @@ template SvcRules with
           lock
 
     -- Called by SV candidates to add themselves to the SvcRules once they are confirmed and ready.
-    -- We use the passed rounds for reliably determining the next round, which will be
-    -- the first round in which the new SV will receive rewards.
+    -- We use the passed rounds for reliably determining the earliest open round, which will be
+    -- the first round in which the new SV will receive rewards. We make the SV receive rewards
+    -- early so they can start to pay domain fees early.
     nonconsuming choice SvcRules_AddConfirmedMember : ContractId SvcRules
       with
         sv : Party
@@ -359,7 +360,7 @@ template SvcRules with
         exercise self SvcRules_AddMember with
           newMemberParty = sv
           newMemberName = svOnboardingConfirmed.svName
-          nextMiningRound = Round (latestRound.round.number + 1)
+          joinedAsOfRound = earliestRound.round
           domainId = coinConfig.globalDomain.activeDomain
 
 

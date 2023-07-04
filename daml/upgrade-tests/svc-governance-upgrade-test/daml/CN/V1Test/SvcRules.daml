@@ -93,7 +93,7 @@ template ConfirmationV1Test with
 template SvcRulesV1Test with
     svc : Party        -- ^ The collective party representing this collective
     epoch : Int        -- ^ The number of leaders that have already been elected.
-    nextMiningRound : Round
+    joinedAsOfRound : Round
     members : Map.Map Party MemberInfo
     leader : Party
     config : SvcRulesConfig
@@ -123,12 +123,12 @@ template SvcRulesV1Test with
         require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
         let info = MemberInfo with
               name = newMemberName
-              joinedAsOfRound = nextMiningRound
+              joinedAsOfRound = joinedAsOfRound
               domainNodes = Map.empty
         create SvcRulesV1Test with
           svc
           epoch
-          nextMiningRound
+          joinedAsOfRound
           leader
           members = Map.insert newMemberParty info members
           config
@@ -143,7 +143,7 @@ template SvcRulesV1Test with
         create SvcRulesV1Test with
           svc
           epoch
-          nextMiningRound
+          joinedAsOfRound
           leader
           -- NOTE: this immediate deletion also slashes that members share of the current round's issuance
           members = Map.delete member members
@@ -206,7 +206,7 @@ template SvcRulesV1Test with
         create SvcRulesV1Test with
           svc
           epoch = epoch + 1
-          nextMiningRound
+          joinedAsOfRound
           members
           leader = newLeader
           config

@@ -2,6 +2,7 @@ package com.daml.network.history
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, DamlOptional, ExercisedEvent, Value}
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
@@ -68,6 +69,26 @@ object Mint extends ExerciseNodeCompanion {
     v1.coin.CoinCreateSummary.valueDecoder(cid =>
       new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
+  override def resToValue(res: Res) = res.toValue(_.toValue)
+}
+
+object ImportCrate_Receive extends ExerciseNodeCompanion {
+  override type Tpl = cc.coinimport.ImportCrate
+  override type Arg = cc.coinimport.ImportCrate_Receive
+  override type Res = v1.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
+
+  override val templateOrInterface = Left(cc.coinimport.ImportCrate.COMPANION)
+  override val choice = cc.coinimport.ImportCrate.CHOICE_ImportCrate_Receive
+
+  override val argDecoder = cc.coinimport.ImportCrate_Receive.valueDecoder()
+
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder =
+    v1.coin.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
+    )
+
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
 

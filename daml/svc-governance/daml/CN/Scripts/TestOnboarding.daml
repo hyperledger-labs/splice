@@ -2,12 +2,13 @@ module CN.Scripts.TestOnboarding where
 
 import DA.Assert
 import DA.Foldable (forA_)
+import DA.List (sort)
 import DA.Optional (fromSome)
 import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
 
-import CC.API.V1.Round
+import CC.API.V1.Round as API (Round(..))
 import CC.ValidatorLicense
 
 import CN.CometBft
@@ -16,9 +17,12 @@ import CN.SVC.GlobalDomain
 import CN.SvOnboarding
 
 import CC.Scripts.Util
+import CC.Scripts.Parameters
 import CN.Scripts.SvcTestUtils
 import CC.GlobalDomain (ValidatorTraffic, initialValidatorTraffic)
-import CC.Coin (CoinRules)
+import CC.Coin (CoinRules, Coin)
+import CC.Round
+import CC.Schedule
 
 
 testOnboardValidator : Script ()
@@ -107,8 +111,11 @@ testSvOnboarding = do
   -- once svX becomes able to read as svc (e.g., after party migration to svX's participant)...
   [(svcRulesCid, _)] <- query @SvcRules svc
 
+  -- run one issuance so we svX joins in a round after round 0
+  runNextIssuance app
+
   -- it gets the open mining rounds, so that it can set it's own `joinedAsOfRound` in a cheat-resistant way
-  [(earliestRoundCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
+  [(earliestRoundCid, earliestRound), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
 
   [(coinRulesCid, _)] <- query @CoinRules svc
 
@@ -138,7 +145,11 @@ testSvOnboarding = do
     coinRulesCid
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
-  assert (svX `elem` Map.keys svcRules.members)
+  case Map.lookup svX svcRules.members of
+    None -> fail "svX is not a member of the SVC"
+    Some info ->
+      -- the new member joined in the earliest open round
+      info.joinedAsOfRound === earliestRound.round
 
   -- now that svX is a member it can set its CometBFT config to become a CometBFT  validator
   -- TODO(M3-59): add negative tests for limits enforced on config values (manual testing showed they work)
@@ -303,5 +314,67 @@ testSvMemberOverwriteInDevNet = do
 
   -- overwriting existing member successfuly
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" (Round 3) domainId
+
+  pure ()
+
+testTapAfterRestoringOpenRounds : Script ()
+testTapAfterRestoringOpenRounds = do
+  now <- getTime
+  -- copied from `CoinRules_BootstrapRounds`: not a perfect approximation for importing rounds but good enough
+  let Some svc = partyFromText "svc"
+  let configUsd = getValueAsOf now defaultCoinConfigSchedule
+  let tickDuration = configUsd.tickDuration
+  let opensAt0 = now
+  let opensAt1 = now
+  let opensAt2 = addRelTime now tickDuration
+
+  let targetClosesAt0 = addRelTime now tickDuration
+  let targetClosesAt1 = addRelTime targetClosesAt0 tickDuration
+  let targetClosesAt2 = addRelTime targetClosesAt1 tickDuration
+
+  -- We accept that round 0 will only be open for one tickDuration in contrast to all other ones.
+  -- Its SVC rewards are compensation for the extra effort of bootstrapping.
+  let issuingFor0 = days 0
+  let issuingFor1 = issuingFor0 + tickDuration
+  let issuingFor2 = issuingFor1 + tickDuration
+
+  let issuanceConfig0 = getValueAsOf issuingFor0 configUsd.issuanceCurve
+  let issuanceConfig1 = getValueAsOf issuingFor1 configUsd.issuanceCurve
+  let issuanceConfig2 = getValueAsOf issuingFor2 configUsd.issuanceCurve
+
+  let transferConfigUsd = configUsd.transferConfig
+  let coinPrice = 2.0
+
+  let initialOpenRounds =
+        [ OpenMiningRound with
+            -- rounds shifted by 10 to check that the new numbers get picked up
+            svc; round = API.Round 10; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
+        , OpenMiningRound with
+            svc; round = API.Round 12; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+        -- moved after Round 12 on purpose to see that init works with sorting rounds
+        , OpenMiningRound with
+            svc; round = API.Round 11; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
+        ]
+
+
+  (app, _, _) <- initCollective (Some initialOpenRounds) True
+  -- all members are onboarded in the earliest open round, which is required as
+  -- they all were members of that round when the data export happened
+  -- NOTE: members that join later after a data import will though miss some SvRewards. We're OK with this.
+  [(_, svcRules)] <- query @SvcRules app.svc
+  sort (map (.joinedAsOfRound) $ Map.values (svcRules.members)) ===
+    replicate 4 (API.Round 10)
+
+
+  (alice, _) <- setupSelfHostedUser app "alice"
+
+  -- the user setup taps 1.0 coin, which gets tapped at the most recent open round, which is round 11
+  [(_, coin)] <- query @Coin alice.primaryParty
+  (coin.amount.createdAt, coin.amount.initialAmount) === (API.Round 11, 1.0)
+
+  -- next issuance runs successfully and creates IssuingRound 10
+  runNextIssuanceD app 3.0
+  [(_, issuingRound)] <- query @IssuingMiningRound app.svc
+  issuingRound.round === API.Round 10
 
   pure ()
