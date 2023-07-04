@@ -4,7 +4,7 @@ const auth0Account = 'canton-network-dev.us';
 
 export const auth0Cfg: Auth0Config = {
   appToClientId: {
-    validator: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
+    validator1: 'cf0cZaTagQUN59C1HBL2udiIBdFh2CWq',
     splitwell: 'ekPlYxilradhEnpWdS80WfW63z1nHvKy',
     splitwell_validator: 'hqpZ6TP0wGyG2yYwhH6NLpuo0MpJMQZW',
     'sv-1': 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn',

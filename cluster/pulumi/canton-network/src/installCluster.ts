@@ -184,6 +184,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     backupConfig: backupConfig,
     bootstrappingDumpConfig: bootstrappingDumpConfig,
     withDomainNode: true,
+    auth0ValidatorAppName: 'sv1_validator',
   });
 
   const sv2PostgresPassword = generatePassword(`sv-2-postgres-passwd`);
@@ -202,6 +203,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     isDevNet,
     backupConfig: backupConfig,
     withDomainNode: isDevNet,
+    auth0ValidatorAppName: 'sv2_validator',
   });
   if (!doubleSv) {
     const sv3PostgresPassword = generatePassword(`sv-3-postgres-passwd`);
@@ -220,6 +222,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       isDevNet,
       backupConfig: backupConfig,
       withDomainNode: isDevNet,
+      auth0ValidatorAppName: 'sv3_validator',
     });
 
     const sv4PostgresPassword = generatePassword(`sv-4-postgres-passwd`);
@@ -238,6 +241,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       isDevNet,
       backupConfig: backupConfig,
       withDomainNode: isDevNet,
+      auth0ValidatorAppName: 'sv4_validator',
     });
   }
 

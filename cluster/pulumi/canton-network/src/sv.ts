@@ -15,8 +15,8 @@ import type { Auth0Client } from 'cn-pulumi-common';
 import * as postgres from './postgres';
 import { BackupConfig, GcpBucket, installGcpBucketSecret } from './backup';
 import { installCometBftNode } from './cometbft';
-import { domainFeesConfig } from './domainFeesCfg';
 import { installGlobalDomain, installParticipant } from './ledger';
+import { installValidatorApp } from './validator';
 
 // btoa is only available in DOM so inline the definition here.
 const btoa = (s: string) => Buffer.from(s).toString('base64');
@@ -108,6 +108,7 @@ export type SvConfig = {
   backupConfig?: BackupConfig;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   withDomainNode: boolean;
+  auth0ValidatorAppName: string;
 };
 
 export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> {
@@ -115,13 +116,10 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
 
   const auth0BackendSecrets: pulumi.Resource[] = [
     await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
-    await installAuth0Secret(config.auth0Client, xns, 'validator', 'validator'),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
     await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
-    await installAuth0UISecret(config.auth0Client, xns, 'wallet', 'wallet'),
-    await installAuth0UISecret(config.auth0Client, xns, 'directory', 'directory'),
   ];
 
   const dependsOn: pulumi.Resource[] = auth0BackendSecrets
@@ -229,27 +227,14 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     }
   }
 
-  installCNHelmChart(
+  installValidatorApp({
+    auth0Client: config.auth0Client,
+    withDomainFees: config.withDomainFees,
     xns,
-    'validator-' + xns.logicalName,
-    'cn-validator',
-    {
-      additionalUsers: [],
-      appDars: [],
-      validatorWalletUser: config.validatorWalletUser,
-      globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
-      foundingSvApiUrl: 'http://sv-app.sv-1:5014',
-      topup: config.withDomainFees
-        ? {
-            enabled: true,
-            targetThroughput: domainFeesConfig.targetThroughput,
-            minTopupInterval: domainFeesConfig.minTopupInterval,
-          }
-        : {},
-      participantIdentitiesBackup: config.backupConfig,
-    },
-    [svApp]
-  );
+    validatorWalletUser: config.validatorWalletUser,
+    participant,
+    auth0AppName: config.auth0ValidatorAppName,
+  });
 
   installCNHelmChart(
     xns,

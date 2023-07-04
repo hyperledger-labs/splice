@@ -84,14 +84,14 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-id": "7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov",
           "client-secret": "***",
-          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "ledger-api-user": "7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov@clients",
           "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
-    "name": "auth0-secret-sv-1-validator",
+    "name": "auth0-secret-sv-1-sv1_validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -132,14 +132,14 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-id": "5N2kwYLOqrHtnnikBqw8A7foa01kui7h",
           "client-secret": "***",
-          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "ledger-api-user": "5N2kwYLOqrHtnnikBqw8A7foa01kui7h@clients",
           "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
-    "name": "auth0-secret-sv-2-validator",
+    "name": "auth0-secret-sv-2-sv2_validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -180,14 +180,14 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-id": "V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh",
           "client-secret": "***",
-          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "ledger-api-user": "V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh@clients",
           "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
-    "name": "auth0-secret-sv-3-validator",
+    "name": "auth0-secret-sv-3-sv3_validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -228,14 +228,14 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+          "client-id": "FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL",
           "client-secret": "***",
-          "ledger-api-user": "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq@clients",
+          "ledger-api-user": "FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL@clients",
           "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
-    "name": "auth0-secret-sv-4-validator",
+    "name": "auth0-secret-sv-4-sv4_validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -259,7 +259,7 @@
         }
       }
     },
-    "name": "auth0-secret-validator1-validator",
+    "name": "auth0-secret-validator1-validator1",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -303,7 +303,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-splitwell-splitwell",
+    "name": "auth0-ui-secret-splitwell-wallet",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1275,7 +1275,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-validator/",
       "compat": "true",
-      "name": "splitwell",
+      "name": "validator-splitwell",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1296,6 +1296,7 @@
             "value": "auth0|63e12e0415ad881ffe914e61"
           }
         ],
+        "appDars": [],
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -1362,7 +1363,6 @@
             "optional": false
           }
         },
-        "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -1376,7 +1376,7 @@
         "topup": {}
       }
     },
-    "name": "helm-splitwell-splitwell",
+    "name": "helm-splitwell-validator-splitwell",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4517,8 +4517,6 @@
             "optional": false
           }
         },
-        "participantAddress": "participant",
-        "postgres": "postgres.validator1.svc.cluster.local",
         "resources": {
           "limits": {
             "memory": "8Gi"
