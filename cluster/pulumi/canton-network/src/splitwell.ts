@@ -11,6 +11,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
+import { BackupConfig, installGcpBucketSecret } from './backup';
 import { domainFeesConfig } from './domainFeesCfg';
 import { installDomain, installParticipant } from './ledger';
 import {
@@ -25,7 +26,8 @@ export async function installSplitwell(
   providerWalletUser: string,
   onboarding: ValidatorOnboarding,
   withDomainFees = false,
-  postgresPassword: pulumi.Input<string>
+  postgresPassword: pulumi.Input<string>,
+  backupConfig?: BackupConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell');
 
@@ -60,7 +62,7 @@ export async function installSplitwell(
     await installAuth0UISecret(auth0Client, xns, 'wallet', 'splitwell'),
     await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
     installValidatorOnboardingSecret(xns, onboarding),
-  ];
+  ].concat(backupConfig ? [installGcpBucketSecret(xns, backupConfig.bucket)] : []);
 
   const fixedTokenConfig = fixedTokens()
     ? [
@@ -108,6 +110,7 @@ export async function installSplitwell(
             minTopupInterval: domainFeesConfig.minTopupInterval,
           }
         : {},
+      participantIdentitiesBackup: backupConfig,
     },
     dependsOn
   );

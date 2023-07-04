@@ -6,12 +6,13 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
   CNNodeIntegrationTestWithSharedEnvironment,
 }
-
+import com.daml.network.util.ParticipantIdentitiesTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 // Integration test for everything that is not part of an SV node.
 final class NonSvNonDevNetPreflightIntegrationTestBase
-    extends CNNodeIntegrationTestWithSharedEnvironment {
+    extends CNNodeIntegrationTestWithSharedEnvironment
+    with ParticipantIdentitiesTestUtil {
 
   // For now treating this as a non-SV app since it is really run directly as the SVC
   // rather than as SV-1. It just happens to be in SV-1's namespace.
@@ -39,5 +40,15 @@ final class NonSvNonDevNetPreflightIntegrationTestBase
       )(_.httpReady shouldBe true)
       splitwellClient.health.status.isActive shouldBe Some(true)
     }
+  }
+
+  "Check that there is a recent participant identity backup on GCP for validator1" in {
+    implicit env =>
+      testRecentParticipantIdentitiesDump(validator1Client)
+  }
+
+  "Check that there is a recent participant identity backup on GCP for splitwell validator" in {
+    implicit env =>
+      testRecentParticipantIdentitiesDump(splitwellValidatorClient)
   }
 }

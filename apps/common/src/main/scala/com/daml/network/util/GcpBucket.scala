@@ -3,10 +3,11 @@ package com.daml.network.util
 import com.daml.network.config.GcpBucketConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.cloud.storage.{BlobId, BlobInfo, Storage, StorageOptions}
+import com.google.cloud.storage.{Blob, BlobId, BlobInfo, Storage, StorageOptions}
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
+import scala.jdk.CollectionConverters.*
 
 class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLoggerFactory)
     extends NamedLogging {
@@ -34,6 +35,22 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     val blobInfo = BlobInfo.newBuilder(blobId).build()
     storage.create(blobInfo, data)
     logger.info(s"Bytes dumped to GCP bucket: gs://${config.bucketName}/$fileName")
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
+  def list(startOffset: String, endOffset: String): Seq[Blob] = {
+    val blobs = Seq.newBuilder[Blob]
+    var page = storage.list(
+      config.bucketName,
+      Storage.BlobListOption.startOffset(startOffset),
+      Storage.BlobListOption.endOffset(endOffset),
+    )
+    blobs ++= page.getValues().asScala
+    while (page.hasNextPage) {
+      page = page.getNextPage
+      blobs ++= page.getValues().asScala
+    }
+    blobs.result()
   }
 
   private def readBytesFromBucket(fileName: String): Array[Byte] = {

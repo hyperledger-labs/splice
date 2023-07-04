@@ -9,6 +9,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
+import { BackupConfig, installGcpBucketSecret } from './backup';
 import { domainFeesConfig } from './domainFeesCfg';
 import { installParticipant } from './ledger';
 import {
@@ -25,7 +26,8 @@ export async function installValidator1(
   withDomainFees = false,
   isDevNet: boolean,
   postgresPassword: pulumi.Input<string>,
-  validatorWalletUser: string
+  validatorWalletUser: string,
+  backupConfig?: BackupConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
@@ -43,7 +45,7 @@ export async function installValidator1(
     await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
-  const dependsOn = [
+  const dependsOn: pulumi.Resource[] = [
     svc,
     xns.ns,
     participant,
@@ -51,7 +53,7 @@ export async function installValidator1(
     await installAuth0UISecret(auth0Client, xns, 'wallet', 'wallet'),
     await installAuth0UISecret(auth0Client, xns, 'directory', 'directory'),
     installValidatorOnboardingSecret(xns, onboarding),
-  ];
+  ].concat(backupConfig ? [installGcpBucketSecret(xns, backupConfig.bucket)] : []);
 
   return installCNHelmChart(
     xns,
@@ -88,6 +90,7 @@ export async function installValidator1(
       // TODO(#6247) Enable auth here once Validator1PreflightIntegrationTest
       // supports this.
       disableAdminAuth: isDevNet,
+      participantIdentitiesBackup: backupConfig,
     },
     dependsOn
   );

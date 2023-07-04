@@ -7,7 +7,7 @@ import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.CoinConfigSchedule
+import com.daml.network.util.{CoinConfigSchedule, ParticipantIdentitiesTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 
 import java.time.{Duration, Instant}
@@ -19,6 +19,7 @@ import java.nio.file.Paths
 abstract class SvNonDevNetPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with SvUiIntegrationTestUtil
+    with ParticipantIdentitiesTestUtil
     with FrontendLoginUtil {
 
   override def environmentDefinition
@@ -125,6 +126,10 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
 
   "Check health status of sv cometBft node" in { implicit env =>
     svClient.cometBftNodeStatus().catchingUp shouldBe false
+  }
+
+  "Check that there is a recent participant identity backup on GCP" in { implicit env =>
+    testRecentParticipantIdentitiesDump(svValidatorClient)
   }
 
   private def checkRoundWithinTickDuration(round: Instant, factor: Double)(implicit

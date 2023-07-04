@@ -139,20 +139,20 @@ spec:
                 canton.sv-apps.sv.acs-store-dump = {
                   type = gcp
                   bucket {
-                    project-id = {{ .projectId }}
-                    bucket-name = {{ .bucketName }}
+                    project-id = {{ .bucket.config.projectId }}
+                    bucket-name = {{ .bucket.config.bucketName }}
                     credentials {
                       type = service-account
-                      json-credentials = ${CN_APP_SV_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                      json-credentials = ${CN_APP_SV_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
                     }
                   }
                   prefix = {{ $clusterBaseName }}
                 }
-            - name: CN_APP_SV_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+            - name: CN_APP_SV_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
               valueFrom:
                 secretKeyRef:
                   key: "json-credentials"
-                  name: {{ .secretName }}
+                  name: {{ .bucket.secretName }}
             {{- end }}
           ports:
             - name: sv-api

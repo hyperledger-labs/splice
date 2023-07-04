@@ -1,6 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { Output } from '@pulumi/pulumi';
 import {
   auth0UserNameEnvVarSource,
   installAuth0Secret,
@@ -14,6 +13,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
+import { BackupConfig, installGcpBucketSecret } from './backup';
 import { installCometBftNode } from './cometbft';
 import { domainFeesConfig } from './domainFeesCfg';
 import { installGlobalDomain, installParticipant } from './ledger';
@@ -87,39 +87,6 @@ export function installValidatorOnboardingSecret(
   );
 }
 
-export const gcpBucketSecretName = 'cn-app-sv-gcp-bucket';
-
-export function installGcpBucketSecret(
-  xns: ExactNamespace,
-  config: GcpBucketConfig
-): Output<k8s.core.v1.Secret> {
-  return config.jsonCredentials.apply(
-    credential =>
-      new k8s.core.v1.Secret(
-        `cn-app-${xns.logicalName}-gcp-bucket`,
-        {
-          metadata: {
-            name: gcpBucketSecretName,
-            namespace: xns.logicalName,
-          },
-          type: 'Opaque',
-          data: {
-            'json-credentials': credential,
-          },
-        },
-        {
-          dependsOn: [xns.ns],
-        }
-      )
-  );
-}
-
-export type GcpBucketConfig = {
-  projectId: string;
-  bucketName: string;
-  jsonCredentials: Output<string>;
-};
-
 export type SvConfig = {
   auth0Client: Auth0Client;
   nodename: string;
@@ -133,14 +100,14 @@ export type SvConfig = {
   postgresPassword: pulumi.Input<string>;
   expectedValidatorOnboardings: ValidatorOnboarding[];
   isDevNet: boolean;
-  acsStoreDump?: GcpBucketConfig;
+  backupConfig?: BackupConfig;
   withDomainNode: boolean;
 };
 
 export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> {
   const xns = exactNamespace(config.nodename);
 
-  const auth0BackendSecrets: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = [
+  const auth0BackendSecrets: pulumi.Resource[] = [
     await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
     await installAuth0Secret(config.auth0Client, xns, 'validator', 'validator'),
   ];
@@ -151,7 +118,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     await installAuth0UISecret(config.auth0Client, xns, 'directory', 'directory'),
   ];
 
-  const dependsOn: (pulumi.Resource | pulumi.Output<pulumi.Resource>)[] = auth0BackendSecrets
+  const dependsOn: pulumi.Resource[] = auth0BackendSecrets
     .concat(auth0UISecrets)
     .concat(
       config.onboarding.type == 'join-with-key'
@@ -168,7 +135,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
         installValidatorOnboardingSecret(xns, onboarding)
       )
     )
-    .concat(config.acsStoreDump ? [installGcpBucketSecret(xns, config.acsStoreDump)] : []);
+    .concat(config.backupConfig ? [installGcpBucketSecret(xns, config.backupConfig.bucket)] : []);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres', config.postgresPassword);
 
@@ -226,13 +193,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     })),
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
-    acsStoreDump: config.acsStoreDump
-      ? {
-          projectId: config.acsStoreDump.projectId,
-          bucketName: config.acsStoreDump.bucketName,
-          secretName: gcpBucketSecretName,
-        }
-      : undefined,
+    acsStoreDump: config.backupConfig,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -278,6 +239,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
             minTopupInterval: domainFeesConfig.minTopupInterval,
           }
         : {},
+      participantIdentitiesBackup: config.backupConfig,
     },
     [svApp]
   );

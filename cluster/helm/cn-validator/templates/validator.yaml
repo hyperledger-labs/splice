@@ -104,6 +104,29 @@ spec:
         - name: CN_APP_VALIDATOR_ENABLE_ADMIN_AUTH
           value: "false"
         {{- end }}
+        {{- $clusterBaseName := .Values.cluster.basename -}}
+        {{- with .Values.participantIdentitiesBackup }}
+        - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_BACKUP
+          value: |
+            canton.validator-apps.validator_backend.participant-identities-backup = {
+              type = gcp
+              bucket {
+                project-id = {{ .bucket.config.projectId }}
+                bucket-name = {{ .bucket.config.bucketName }}
+                credentials {
+                  type = service-account
+                  json-credentials = ${CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                }
+              }
+              prefix = {{ $clusterBaseName }}
+              backup-interval = {{ .backupInterval }}
+            }
+        - name: CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              key: "json-credentials"
+              name: {{ .bucket.secretName }}
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http

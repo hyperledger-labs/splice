@@ -265,7 +265,7 @@ authenticated properly against GCE.
 
 Operations against GCE clusters are complicated by the fact that there
 is more than one cluster, and the clusters have different connection
-paramaters. To accommodate this, there is a directory under
+parameters. To accommodate this, there is a directory under
 [`cluster/deployment`](/cluster/deployment) for each cluster that
 contains the connection configuration specific to that
 cluster. Operations against that cluster must be invoked from within

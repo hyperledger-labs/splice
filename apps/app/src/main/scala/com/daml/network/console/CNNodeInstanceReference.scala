@@ -184,6 +184,12 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
     ).getOrElse(false)
   }
 
+  @Help.Summary("Get the version of the node")
+  def version: HttpAdminAppClient.VersionInfo =
+    consoleEnvironment.run {
+      httpCommand(HttpAdminAppClient.GetVersion())
+    }
+
   // Override topology to avoid using grpc status check
   private lazy val topology_ =
     new TopologyAdministrationGroup(

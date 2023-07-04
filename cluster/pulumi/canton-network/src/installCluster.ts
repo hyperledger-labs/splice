@@ -1,11 +1,10 @@
-import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
-import { Key } from '@pulumi/gcp/serviceaccount';
 import { Auth0Client } from 'cn-pulumi-common';
 import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
 import { exit } from 'process';
 
+import { BackupConfig, installGcpBucket, GcpBucketConfig } from './backup';
 import { installDocs } from './docs';
 import { installClusterIngress } from './ingress';
 import { installSplitwell } from './splitwell';
@@ -139,18 +138,14 @@ const validator1Onboarding = {
   expiresIn: '1h',
 };
 
-function configureGcpBucketKey(): Key {
-  const serviceAccountName = `projects/da-cn-devnet/serviceAccounts/da-cn-data-exports@da-cn-devnet.iam.gserviceaccount.com`;
+const backupBucketConfig: GcpBucketConfig = {
+  projectId: 'da-cn-devnet',
+  bucketName: 'da-cn-data-dumps',
+};
 
-  // Note, creating a new key can fail with a precondition error on an attempt
-  // to create keys beyond the tenth.
-  const key = new gcp.serviceaccount.Key(`gcp-bucket-${process.env.GCP_CLUSTER_BASENAME}`, {
-    serviceAccountId: serviceAccountName,
-    publicKeyType: 'TYPE_X509_PEM_FILE',
-  });
-
-  return key;
-}
+const backupConfig: BackupConfig | undefined = isDevNet
+  ? undefined
+  : { backupInterval: '10m', bucket: installGcpBucket(backupBucketConfig) };
 
 function generatePassword(name: string): random.RandomPassword {
   return new random.RandomPassword(name, {
@@ -175,13 +170,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     postgresPassword: sv1PostgresPassword.result,
     expectedValidatorOnboardings: [splitwellOnboarding, validator1Onboarding],
     isDevNet,
-    acsStoreDump: isDevNet
-      ? undefined
-      : {
-          projectId: 'da-cn-devnet',
-          bucketName: 'da-cn-data-dumps',
-          jsonCredentials: configureGcpBucketKey().privateKey,
-        },
+    backupConfig: backupConfig,
     withDomainNode: true,
   });
 
@@ -199,6 +188,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     postgresPassword: sv2PostgresPassword.result,
     expectedValidatorOnboardings: [],
     isDevNet,
+    backupConfig: backupConfig,
     withDomainNode: isDevNet,
   });
   if (!doubleSv) {
@@ -216,6 +206,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       postgresPassword: sv3PostgresPassword.result,
       expectedValidatorOnboardings: [],
       isDevNet,
+      backupConfig: backupConfig,
       withDomainNode: isDevNet,
     });
 
@@ -233,6 +224,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       postgresPassword: sv4PostgresPassword.result,
       expectedValidatorOnboardings: [],
       isDevNet,
+      backupConfig: backupConfig,
       withDomainNode: isDevNet,
     });
   }
@@ -246,7 +238,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     withDomainFees,
     isDevNet,
     validatorPostgresPassword.result,
-    'auth0|63e3d75ff4114d87a2c1e4f5'
+    'auth0|63e3d75ff4114d87a2c1e4f5',
+    backupConfig
   );
 
   const splitwellPostgresPassword = generatePassword('splitwell');
@@ -256,7 +249,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding,
     withDomainFees,
-    splitwellPostgresPassword.result
+    splitwellPostgresPassword.result,
+    backupConfig
   );
 
   const docs = installDocs();
