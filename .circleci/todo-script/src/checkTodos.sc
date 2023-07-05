@@ -245,8 +245,7 @@ val tags: List[RegexCategory] = List(
 
 val allRegexps: List[RegexCategory] = tags ++ List(Issue, Milestone)
 
-val todoPatterns = Seq("TODO", "FIXME")
-val todoPatternRegexpStr = todoPatterns.map(str => s"($str)").mkString("|")
+val identifierRegex = "(TODO)(.*?)\\((.+?)\\)".r
 
 val todoStyleExcludePrefixes =
   Seq("canton/", "project/CantonDependencies.scala", "experiments/", "README.md")
@@ -273,12 +272,11 @@ def matchTODOWithBuckets(line: String, bucketsForLine: String): List[(Bucket, St
 }
 
 def processScalaStyleTodo(line: String): List[(Bucket, String)] = {
-  val identifierRegex = ("(" + todoPatternRegexpStr + """)(.*?)\((.+?)\)""").r
   val excluded = todoStyleExcludePrefixes.exists(line.startsWith) ||
     todoStyleExcludeSuffixes.exists(suffix => line.takeWhile(c => c != ':').endsWith(suffix))
   if (excluded)
     List(ExcludedBucket -> line)
-  else if (line.contains("FIXME"))
+  else if (line.toUpperCase.contains("FIXME"))
     List(FixmeBucket -> line)
   else {
     identifierRegex.findFirstMatchIn(line) match {
@@ -308,9 +306,17 @@ def writeToFile(content: String, filename: String): Unit = {
   }
 }
 
-def grepForPattern(pattern: String): Seq[String] =
-  Seq("git", "grep", "-I", pattern)
+def grepForPattern(pattern: String, caseInsensitive: Boolean = false): Seq[String] =
+  Seq(
+    Seq("git", "grep", "-I"),
+    (if (caseInsensitive) Seq("-i") else Seq.empty),
+    Seq(pattern),
+  ).flatten
 
+val grepCommands = Seq(grepForPattern("TODO"), grepForPattern("FIXME", caseInsensitive = true))
+val grepLines = grepCommands.flatMap({ command =>
+  command.lineStream_!(ErrorCollector)
+})
 object ErrorCollector extends ProcessLogger {
   private val allErrors = ListBuffer[String]()
   def errors() = allErrors.mkString("\n\n")
@@ -322,11 +328,6 @@ object ErrorCollector extends ProcessLogger {
   override def err(s: => String): Unit = allErrors += s
   override def buffer[T](f: => T) = f
 }
-
-val grepCommands = todoPatterns.map(grepForPattern)
-val grepLines = grepCommands.flatMap({ command =>
-  command.lineStream_!(ErrorCollector)
-})
 
 if (ErrorCollector.anyError())
   throw new RuntimeException("grep or awk failed with errors:\n\n" + ErrorCollector.errors())
