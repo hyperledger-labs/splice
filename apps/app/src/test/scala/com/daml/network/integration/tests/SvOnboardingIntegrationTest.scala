@@ -180,7 +180,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       )
     }
     clue("try to reuse the same secret for a second onboarding, which should succeed") {
-      eventually() {
+      eventuallySucceeds() {
         sv.onboardValidator(candidate, secret)
       }
     }
