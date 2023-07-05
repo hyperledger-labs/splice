@@ -47,6 +47,10 @@ spec:
           value: "{{ .url }}"
         {{- end }}
         {{- end }}
+        {{- if .Values.disableAutoInit }}
+        - name: CANTON_PARTICIPANT_AUTO_INIT
+          value: "false"
+        {{- end }}
         ports:
         - containerPort: 5002
           name: lg-adm-api

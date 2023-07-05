@@ -4,7 +4,12 @@ import { Auth0Client } from 'cn-pulumi-common';
 import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
 import { exit } from 'process';
 
-import { BackupConfig, installGcpBucket, GcpBucketConfig } from './backup';
+import {
+  BackupConfig,
+  installGcpBucket,
+  GcpBucketConfig,
+  ParticipantBootstrapDumpConfig,
+} from './backup';
 import { installDocs } from './docs';
 import { installClusterIngress } from './ingress';
 import { installSplitwell } from './splitwell';
@@ -32,7 +37,19 @@ if (withDomainFees && !doubleSv) {
   exit(1);
 }
 
+// TODO(#6427) Align this to the spec for participant identity bootstrapping below.
 const bootstrappingDumpPath = process.env.SV_BOOSTRAPPING_DUMP_PATH;
+
+type ParticipantBootstrapCliConfig = {
+  cluster: string;
+  version: string;
+  date: string;
+};
+
+const participantIdentityBootstrappingConfig: ParticipantBootstrapCliConfig = process.env
+  .PARTICIPANT_IDENTITY_BOOTSTRAPPING
+  ? JSON.parse(process.env.PARTICIPANT_IDENTITY_BOOTSTRAPPING)
+  : undefined;
 
 const SV2_KEY = {
   publicKey:
@@ -147,8 +164,9 @@ const backupBucketConfig: GcpBucketConfig = {
 
 let backupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
+let participantIdentityBootstrapConfig: ParticipantBootstrapDumpConfig | undefined;
 
-if (!isDevNet || bootstrappingDumpPath) {
+if (!isDevNet || bootstrappingDumpPath || participantIdentityBootstrappingConfig) {
   const backupBucket = installGcpBucket(backupBucketConfig);
   if (!isDevNet) {
     backupConfig = { backupInterval: '10m', bucket: backupBucket };
@@ -156,6 +174,18 @@ if (!isDevNet || bootstrappingDumpPath) {
   if (bootstrappingDumpPath) {
     bootstrappingDumpConfig = { path: bootstrappingDumpPath, bucket: backupBucket };
   }
+  const end = new Date(Date.parse(participantIdentityBootstrappingConfig.date));
+  // We search within an interval of 1 hour. Given that we usually backups every 10min, this gives us
+  // more than enough of a threshold to make sure each node has one backup in that interval
+  // while also having sufficiently few backups that the bucket query is fast.
+  const start = new Date(end.valueOf() - 60 * 60 * 1000);
+  participantIdentityBootstrapConfig = {
+    bucket: backupBucket,
+    cluster: participantIdentityBootstrappingConfig.cluster,
+    version: participantIdentityBootstrappingConfig.version,
+    start,
+    end,
+  };
 }
 
 function generatePassword(name: string): random.RandomPassword {
@@ -185,6 +215,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     bootstrappingDumpConfig: bootstrappingDumpConfig,
     withDomainNode: true,
     auth0ValidatorAppName: 'sv1_validator',
+    participantBootstrapDump: participantIdentityBootstrapConfig,
   });
 
   const sv2PostgresPassword = generatePassword(`sv-2-postgres-passwd`);
@@ -204,6 +235,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     backupConfig: backupConfig,
     withDomainNode: isDevNet,
     auth0ValidatorAppName: 'sv2_validator',
+    participantBootstrapDump: participantIdentityBootstrapConfig,
   });
   if (!doubleSv) {
     const sv3PostgresPassword = generatePassword(`sv-3-postgres-passwd`);
@@ -223,6 +255,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       backupConfig: backupConfig,
       withDomainNode: isDevNet,
       auth0ValidatorAppName: 'sv3_validator',
+      participantBootstrapDump: participantIdentityBootstrapConfig,
     });
 
     const sv4PostgresPassword = generatePassword(`sv-4-postgres-passwd`);
@@ -242,6 +275,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       backupConfig: backupConfig,
       withDomainNode: isDevNet,
       auth0ValidatorAppName: 'sv4_validator',
+      participantBootstrapDump: participantIdentityBootstrapConfig,
     });
   }
 
@@ -255,7 +289,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     isDevNet,
     validatorPostgresPassword.result,
     'auth0|63e3d75ff4114d87a2c1e4f5',
-    backupConfig
+    backupConfig,
+    participantIdentityBootstrapConfig
   );
 
   const splitwellPostgresPassword = generatePassword('splitwell');
@@ -266,7 +301,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     splitwellOnboarding,
     withDomainFees,
     splitwellPostgresPassword.result,
-    backupConfig
+    backupConfig,
+    participantIdentityBootstrapConfig
   );
 
   const docs = installDocs();

@@ -8,7 +8,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { BackupConfig } from './backup';
+import { BackupConfig, ParticipantBootstrapDumpConfig } from './backup';
 import { installParticipant } from './ledger';
 import { ValidatorOnboarding } from './sv';
 import { installValidatorApp } from './validator';
@@ -22,7 +22,8 @@ export async function installValidator1(
   isDevNet: boolean,
   postgresPassword: pulumi.Input<string>,
   validatorWalletUser: string,
-  backupConfig?: BackupConfig
+  backupConfig?: BackupConfig,
+  participantBootstrapDump?: ParticipantBootstrapDumpConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
@@ -62,5 +63,6 @@ export async function installValidator1(
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     extraDependsOn,
     auth0AppName: 'validator1',
+    participantBootstrapDump,
   });
 }

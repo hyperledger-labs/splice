@@ -128,6 +128,14 @@ spec:
               key: "json-credentials"
               name: {{ .bucket.secretName }}
         {{- end }}
+        {{- with .Values.participantBootstrappingDump }}
+        - name: ADDITIONAL_CONFIG_CN_APP_SV_PARTICIPANT_BOOTSTRAPPING_DUMP
+          value: |
+            canton.validator-apps.validator_backend.participant-bootstrapping-dump {
+              type = file
+              file = /etc/participant-bootstrapping-dump/content
+            }
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http
@@ -148,9 +156,21 @@ spec:
           periodSeconds: 20
           failureThreshold: 5
           timeoutSeconds: 10
+        {{- with .Values.participantBootstrappingDump }}
+        volumeMounts:
+          - name: participant-bootstrapping-dump-volume
+            mountPath: /etc/participant-bootstrapping-dump
+            readOnly: true
+        {{- end }}
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
+      {{- with .Values.participantBootstrappingDump }}
+      volumes:
+        - name: participant-bootstrapping-dump-volume
+          secret:
+            secretName: {{ .secretName }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

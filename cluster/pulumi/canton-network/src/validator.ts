@@ -3,7 +3,13 @@ import * as pulumi from '@pulumi/pulumi';
 import { installAuth0Secret, installAuth0UISecret, installCNHelmChart } from 'cn-pulumi-common';
 import type { Auth0Client, ExactNamespace } from 'cn-pulumi-common';
 
-import { BackupConfig, installGcpBucketSecret } from './backup';
+import {
+  BackupConfig,
+  ParticipantBootstrapDumpConfig,
+  fetchAndInstallParticipantBootstrapDump,
+  installGcpBucketSecret,
+  participantBootstrapDumpSecretName,
+} from './backup';
 import { domainFeesConfig } from './domainFeesCfg';
 import {
   ValidatorOnboarding,
@@ -39,9 +45,15 @@ export type ValidatorConfig = {
   svSponsorAddress?: string;
   additionalConfig?: string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
+  participantBootstrapDump?: ParticipantBootstrapDumpConfig;
 };
 
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
+  const participantBootstrapDumpSecret: pulumi.Resource | undefined =
+    config.participantBootstrapDump
+      ? fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
+      : undefined;
+
   const dependsOn: pulumi.Resource[] = [
     config.xns.ns,
     config.participant,
@@ -59,7 +71,8 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
           : [installGcpBucketSecret(config.xns, config.backupConfig.config.bucket)]
         : []
     )
-    .concat(config.extraDependsOn || []);
+    .concat(config.extraDependsOn || [])
+    .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
   return installCNHelmChart(
     config.xns,
@@ -93,6 +106,9 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       disableAdminAuth: config.disableAdminAuth,
       participantIdentitiesBackup: config.backupConfig?.config,
       additionalConfig: config.additionalConfig,
+      participantBootstrappingDump: config.participantBootstrapDump
+        ? { secretName: participantBootstrapDumpSecretName }
+        : undefined,
     },
     dependsOn
   );

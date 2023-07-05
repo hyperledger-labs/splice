@@ -9,7 +9,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { BackupConfig } from './backup';
+import { BackupConfig, ParticipantBootstrapDumpConfig } from './backup';
 import { installDomain, installParticipant } from './ledger';
 import { ValidatorOnboarding } from './sv';
 import { installValidatorApp } from './validator';
@@ -21,7 +21,8 @@ export async function installSplitwell(
   onboarding: ValidatorOnboarding,
   withDomainFees = false,
   postgresPassword: pulumi.Input<string>,
-  backupConfig?: BackupConfig
+  backupConfig?: BackupConfig,
+  participantBootstrapDump?: ParticipantBootstrapDumpConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell');
 
@@ -35,6 +36,7 @@ export async function installSplitwell(
     postgresDb,
     auth0UserNameEnvVarSource('validator'),
     postgresPassword,
+    false,
     [domain]
   );
 
@@ -76,5 +78,6 @@ export async function installSplitwell(
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     auth0AppName: 'splitwell_validator',
+    participantBootstrapDump,
   });
 }

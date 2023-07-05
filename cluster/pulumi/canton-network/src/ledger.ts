@@ -50,6 +50,7 @@ export function installParticipant(
   postgresDb: pulumi.Output<string>,
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
   postgresPassword: pulumi.Input<string>,
+  disableAutoInit = false,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource {
   return installCNHelmChart(
@@ -61,6 +62,7 @@ export function installParticipant(
       postgresPassword,
       postgresSchema: xns.logicalName + '_participant',
       participantAdminUserNameFrom,
+      disableAutoInit,
     },
     dependsOn
   );

@@ -13,7 +13,14 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { BackupConfig, GcpBucket, installGcpBucketSecret } from './backup';
+import {
+  BackupConfig,
+  GcpBucket,
+  ParticipantBootstrapDumpConfig,
+  fetchAndInstallParticipantBootstrapDump,
+  installGcpBucketSecret,
+  participantBootstrapDumpSecretName,
+} from './backup';
 import { installCometBftNode } from './cometbft';
 import { installGlobalDomain, installParticipant } from './ledger';
 import { installValidatorApp } from './validator';
@@ -109,6 +116,7 @@ export type SvConfig = {
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   withDomainNode: boolean;
   auth0ValidatorAppName: string;
+  participantBootstrapDump?: ParticipantBootstrapDumpConfig;
 };
 
 export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> {
@@ -125,6 +133,11 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
   const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
     ? installGcpBucketSecret(xns, config.backupConfig.bucket)
     : undefined;
+
+  const participantBootstrapDumpSecret: pulumi.Resource | undefined =
+    config.participantBootstrapDump
+      ? fetchAndInstallParticipantBootstrapDump(xns, config.participantBootstrapDump)
+      : undefined;
 
   const dependsOn: pulumi.Resource[] = auth0BackendSecrets
     .concat(auth0UISecrets)
@@ -143,7 +156,8 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
         installValidatorOnboardingSecret(xns, onboarding)
       )
     )
-    .concat(backupConfigSecret ? [backupConfigSecret] : []);
+    .concat(backupConfigSecret ? [backupConfigSecret] : [])
+    .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres', config.postgresPassword);
 
@@ -170,7 +184,9 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     'participant',
     postgresDb,
     auth0UserNameEnvVarSource('sv'),
-    config.postgresPassword
+    config.postgresPassword,
+    // If we have a dump, we disable auto init.
+    !!config.participantBootstrapDump
   );
   const cometbft = installCometBftNode(xns, config.nodename, config.onboardingName);
 
@@ -203,6 +219,9 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     approvedSvIdentities: config.approvedSvIdentities,
     acsStoreDump: config.backupConfig,
     bootstrappingDump: config.bootstrappingDumpConfig,
+    participantBootstrappingDump: config.participantBootstrapDump
+      ? { secretName: participantBootstrapDumpSecretName }
+      : undefined,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

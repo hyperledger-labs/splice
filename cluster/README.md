@@ -1113,7 +1113,7 @@ account](https://console.cloud.google.com/iam-admin/serviceaccounts/details/1106
 To download exports for local inspection either use the web UI or
 `gsutil cp`.
 
-### Bootstrapping from a Cluster Data Dump
+### Bootstrapping from a Cluster ACS Data Dump
 
 To bootstrap a fresh cluter from a cluster data dump, set ``SV_BOOSTRAPPING_DUMP_PATH`` to a path within the GCP bucket, e.g.,
 
@@ -1122,6 +1122,15 @@ export SV_BOOSTRAPPING_DUMP_PATH=test-preview/0.1.1-snapshot.20230703.3186.0.v6d
 ```
 
 This will configure SV 1 to read this snapshot and create the corresponding contracts based on the dump.
+
+### Bootstrapping from a Cluster Participant Identity Dump
+
+To bootstrap a fresh cluter from a cluster participant identity data dump, set ``process.env.PARTICIPANT_IDENTITY_BOOTSTRAPPING`` to a JSON object specifying
+the cluster, the version and the date the backup is from. The most recent backup before the specified date will be used to bootstrap from.
+
+```
+export PARTICIPANT_IDENTITY_BOOTSTRAPPING='{"cluster": "test", "version": "0.1.1-snapshot.20230704.3191.0.v7fa089f1", "date": "2023-07-04T19:40:00.000Z"}'
+```
 
 ## Appendix: Kubernetes and Other Deployment Resources
 
