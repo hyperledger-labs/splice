@@ -1213,7 +1213,7 @@ jobs:
             fi
             if [[ -n "<< pipeline.parameters.bootstrapping_config >>" ]]; then
               export BOOTSTRAPPING_CONFIG="<< pipeline.parameters.bootstrapping_config >>"
-              if [[ -z "${RESTORE_CLUSTER:-}" ]];
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
                 echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
                 exit 1
               fi
@@ -1257,7 +1257,7 @@ jobs:
             export RESTORE_CLUSTER=1
             if [[ -n "<< pipeline.parameters.bootstrapping_config >>" ]]; then
               export BOOTSTRAPPING_CONFIG="<< pipeline.parameters.bootstrapping_config >>"
-              if [[ -z "${RESTORE_CLUSTER:-}" ]];
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
                 echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
                 exit 1
               fi
