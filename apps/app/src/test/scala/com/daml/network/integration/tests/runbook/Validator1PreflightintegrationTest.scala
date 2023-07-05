@@ -337,7 +337,7 @@ class Validator1PreflightIntegrationTest
         click on "onboard-button"
 
       // TODO(#5855) consider using the default timeUntilSuccess once user onboarding doesn't require acquiring a global lock
-      eventually(timeUntilSuccess = 1.minute) {
+      eventually(timeUntilSuccess = 80.seconds) {
         findAll(className("party-id")) should have size 1
       }
       copyPartyId()
