@@ -28,6 +28,11 @@ parameters:
   mark-for-testnet:
     type: boolean
     default: false
+  # Overwrite the bootstrapping config for a cluster. If not set,
+  # the cluster will be bootstrapped from the preceeding version of the cluster.
+  bootstrapping_config:
+    type: string
+    default: ""
 
 notify-fail: &notify-fail
   context: slack-context
@@ -1184,6 +1189,9 @@ jobs:
       cluster:
         type: enum
         enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+      restore_cluster:
+        type: boolean
+        default: false
     steps:
       - checkout
       - record_job_start_time
@@ -1200,6 +1208,16 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n "<< pipeline.parameters.bootstrapping_config >>" ]]; then
+              export BOOTSTRAPPING_CONFIG="<< pipeline.parameters.bootstrapping_config >>"
+              if [[ -z "${RESTORE_CLUSTER:-}" ]];
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
             cncluster activate
             cncluster ci_apply
       - notify-cluster-fail:
@@ -1236,6 +1254,14 @@ jobs:
           additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
           gce_authenticate: true
           cmd: |
+            export RESTORE_CLUSTER=1
+            if [[ -n "<< pipeline.parameters.bootstrapping_config >>" ]]; then
+              export BOOTSTRAPPING_CONFIG="<< pipeline.parameters.bootstrapping_config >>"
+              if [[ -z "${RESTORE_CLUSTER:-}" ]];
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
             cncluster activate
             cncluster ci_apply
       - notify-cluster-fail:
@@ -2415,6 +2441,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "testnet-preview"
+        restore_cluster: true
         requires:
            - deployment_test
            - docker_images_push

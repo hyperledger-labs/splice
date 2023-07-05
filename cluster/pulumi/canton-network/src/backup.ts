@@ -5,6 +5,7 @@ import { Bucket, File, Storage } from '@google-cloud/storage';
 import { Key } from '@pulumi/gcp/serviceaccount';
 import { Output } from '@pulumi/pulumi';
 import { ExactNamespace } from 'cn-pulumi-common';
+import { exit } from 'process';
 
 export type GcpBucketConfig = {
   projectId: string;
@@ -79,6 +80,10 @@ async function getLatestObject(
   endOffset: string
 ): Promise<File> {
   const [objects] = await bucket.getFiles({ startOffset, endOffset });
+  if (objects.length === 0) {
+    console.error(`No files between ${startOffset} and ${endOffset}`);
+    exit(1);
+  }
   return objects.reduce((prev, cur) => (cur.name > prev.name ? cur : prev));
 }
 
@@ -92,8 +97,6 @@ async function getLatestObjectInDateRange(
   // JS timestamps are miliseconds but Daml timestamps are microseconds so we just add 3 zeroes.
   const startOffset = `${prefix}${start.toISOString().slice(0, -1)}000Z${suffix}`;
   const endOffset = `${prefix}${end.toISOString().slice(0, -1)}000Z${suffix}`;
-  console.error(startOffset);
-  console.error(endOffset);
   return getLatestObject(bucket, startOffset, endOffset);
 }
 

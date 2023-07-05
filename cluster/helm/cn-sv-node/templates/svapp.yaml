@@ -33,7 +33,7 @@ spec:
             - name: ADDITIONAL_CONFIG_GLOBAL_LOCK_TIMEOUT
               value: |
                 canton.sv-apps.sv.onboarding.global-lock-timeout=240s
-            {{- with .Values.acsBootstrappingDump -}}
+            {{- with .Values.acsBootstrappingDump }}
             - name: ADDITIONAL_CONFIG_BOOTSTRAPPING_DUMP
               value: |
                 canton.sv-apps.sv.onboarding.bootstrapping-dump {
