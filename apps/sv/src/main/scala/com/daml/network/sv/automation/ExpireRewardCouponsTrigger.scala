@@ -2,20 +2,17 @@ package com.daml.network.sv.automation
 
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
-  TriggerContext,
   TaskOutcome,
   TaskSuccess,
+  TriggerContext,
 }
 import com.daml.network.codegen.java.cc.coin.{CoinRules, CoinRules_ClaimExpiredRewards}
-import com.daml.network.codegen.java.cc.coin.{ValidatorRewardCoupon, AppRewardCoupon}
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.sv.store.ExpiredRewardCouponsBatch
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
-
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -40,40 +37,13 @@ class ExpireRewardCouponsTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-
-      // lookup coupons in the ACS to check if they were archived
-      validatorCouponsExist <- Future
-        .sequence(
-          expiredRewardsTask.validatorCoupons
-            .fold(Seq())((acc, group) => acc ++ group)
-            .map(validatorCoupon =>
-              store.multiDomainAcsStore
-                .lookupContractByIdOnDomain(ValidatorRewardCoupon.COMPANION)(
-                  domainId,
-                  validatorCoupon,
-                )
-                .map(_.isDefined)
-            )
-        )
-        .map(_.exists(found => found))
-      appCouponsExist <- Future
-        .sequence(
-          expiredRewardsTask.appCoupons
-            .fold(Seq())((acc, group) => acc ++ group)
-            .map(appCoupon =>
-              store.multiDomainAcsStore
-                .lookupContractByIdOnDomain(AppRewardCoupon.COMPANION)(
-                  domainId,
-                  appCoupon,
-                )
-                .map(_.isDefined)
-            )
-        )
-        .map(_.exists(found => found))
-
-      isStale <- Future.successful(!validatorCouponsExist && !appCouponsExist)
-    } yield isStale
+      allValidatorCouponsExist <- store.multiDomainAcsStore.allKnownAndNotArchived(
+        expiredRewardsTask.validatorCoupons
+      )
+      allAppCouponsExist <- store.multiDomainAcsStore.allKnownAndNotArchived(
+        expiredRewardsTask.appCoupons
+      )
+    } yield !(allValidatorCouponsExist && allAppCouponsExist)
   }
 
   override def completeTaskAsFollower(
@@ -111,27 +81,23 @@ class ExpireRewardCouponsTrigger(
   ): Future[Int] = {
     for {
       domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-      validatorRewardCmds = expiredRewardsTask.validatorCoupons.map(group =>
-        svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
-          coinRules.contractId,
-          new CoinRules_ClaimExpiredRewards(
-            expiredRewardsTask.closedRound.contractId,
-            group.asJava,
-            Seq.empty.asJava,
-          ),
-        )
+      validatorRewardCmd = svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
+        coinRules.contractId,
+        new CoinRules_ClaimExpiredRewards(
+          expiredRewardsTask.closedRound.contractId,
+          expiredRewardsTask.validatorCoupons.asJava,
+          Seq.empty.asJava,
+        ),
       )
-      appRewardCmds = expiredRewardsTask.appCoupons.map(group =>
-        svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
-          coinRules.contractId,
-          new CoinRules_ClaimExpiredRewards(
-            expiredRewardsTask.closedRound.contractId,
-            Seq.empty.asJava,
-            group.asJava,
-          ),
-        )
+      appRewardCmd = svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
+        coinRules.contractId,
+        new CoinRules_ClaimExpiredRewards(
+          expiredRewardsTask.closedRound.contractId,
+          Seq.empty.asJava,
+          expiredRewardsTask.appCoupons.asJava,
+        ),
       )
-      cmds = validatorRewardCmds ++ appRewardCmds
+      cmds = Seq(validatorRewardCmd, appRewardCmd)
       _ <- Future.sequence(
         cmds.map(cmd =>
           svTaskContext.connection

@@ -37,20 +37,19 @@ class MergeUnclaimedRewardsTrigger(
   ): Future[Seq[Seq[Contract[
     UnclaimedReward.ContractId,
     UnclaimedReward,
-  ]]]] = {
-    val threshold: Long =
-      10 // TODO(M3-46): make this the actual threshold read from the svcRules config
-    // Fetch up to two times the threshold of contracts for increased merging throughput.
-    store
-      .listUnclaimedRewards(threshold * 2)
-      .map(unclaimedRewards =>
+  ]]]] =
+    for {
+      svcRules <- store.getSvcRules()
+      threshold = svcRules.payload.config.numUnclaimedRewardsThreshold
+      unclaimedRewards <- store.listUnclaimedRewards(threshold * 2)
+    } yield
+      (
         if (unclaimedRewards.length > threshold) {
           Seq(unclaimedRewards)
         } else {
           Seq()
         }
       )
-  }
 
   protected def isStaleTask(
       unclaimedRewards: Seq[Contract[
@@ -59,24 +58,10 @@ class MergeUnclaimedRewardsTrigger(
       ]]
   )(implicit tc: TraceContext): Future[Boolean] =
     for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-
-      // lookup rewards in the ACS to check if they were archived
-      unclaimedRewardsExist <- Future
-        .sequence(
-          unclaimedRewards.map(unclaimedReward =>
-            store.multiDomainAcsStore
-              .lookupContractByIdOnDomain(UnclaimedReward.COMPANION)(
-                domainId,
-                unclaimedReward.contractId,
-              )
-              .map(_.isDefined)
-          )
-        )
-        .map(_.exists(found => found))
-
-      isStale <- Future.successful(!unclaimedRewardsExist)
-    } yield isStale
+      unclaimedRewardsExist <- store.multiDomainAcsStore.allKnownAndNotArchived(
+        unclaimedRewards.map(_.contractId)
+      )
+    } yield !unclaimedRewardsExist
 
   override def completeTaskAsFollower(
       unclaimedRewards: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]

@@ -283,6 +283,11 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       st.lookupContractState(id)
     }
 
+  def allKnownAndNotArchived(ids: Seq[ContractId[?]])(implicit
+      traceContext: TraceContext
+  ): Future[Boolean] =
+    Future.sequence(ids.map(lookupContractStateById)).map(_.forall(_.isDefined))
+
   /** Find a contract that satisfies a predicate.
     *
     * Caution: this function traverses all contracts!

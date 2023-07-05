@@ -282,20 +282,25 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = {
     lookupOldestClosedMiningRound()
-      .flatMap(_ match {
+      .flatMap {
         case Some(closedRound) =>
           for {
-            appRewards <- listAppRewardCouponsGroupedByCounterparty(
+            appRewardGroups <- listAppRewardCouponsGroupedByCounterparty(
               closedRound.payload.round.number,
               totalCouponsLimit = totalCouponsLimit,
             )
-            validatorRewards <- listValidatorRewardCouponsGroupedByCounterparty(
+            validatorRewardGroups <- listValidatorRewardCouponsGroupedByCounterparty(
               closedRound.payload.round.number,
               totalCouponsLimit = totalCouponsLimit,
             )
-          } yield Seq(ExpiredRewardCouponsBatch(closedRound, validatorRewards, appRewards))
+          } yield appRewardGroups.map(group =>
+            ExpiredRewardCouponsBatch(closedRound, Seq.empty, group)
+          ) ++
+            validatorRewardGroups.map(group =>
+              ExpiredRewardCouponsBatch(closedRound, group, Seq.empty)
+            )
         case None => Future(Seq())
-      })
+      }
   }
 
   def lookupOldestClosedMiningRound()(implicit tc: TraceContext): Future[
@@ -898,8 +903,8 @@ object SvSvcStore {
 
 case class ExpiredRewardCouponsBatch(
     closedRound: Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound],
-    validatorCoupons: Seq[Seq[cc.coin.ValidatorRewardCoupon.ContractId]],
-    appCoupons: Seq[Seq[cc.coin.AppRewardCoupon.ContractId]],
+    validatorCoupons: Seq[cc.coin.ValidatorRewardCoupon.ContractId],
+    appCoupons: Seq[cc.coin.AppRewardCoupon.ContractId],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(
