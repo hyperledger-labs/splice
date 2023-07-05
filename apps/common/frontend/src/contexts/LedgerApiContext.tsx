@@ -25,6 +25,11 @@ import {
 } from 'common-protobuf/com/daml/ledger/api/v1/transaction_filter_pb';
 import { TransactionTree } from 'common-protobuf/com/daml/ledger/api/v1/transaction_pb';
 import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
+import { StateServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v2/state_service_grpc_web_pb';
+import {
+  GetConnectedDomainsRequest,
+  GetConnectedDomainsResponse,
+} from 'common-protobuf/com/daml/ledger/api/v2/state_service_pb';
 import grpcWeb from 'grpc-web';
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -49,6 +54,7 @@ export class LedgerApiClient {
   activeContractsServiceClient: ActiveContractsServicePromiseClient;
   commandServiceClient: CommandServicePromiseClient;
   userManagementServiceClient: UserManagementServicePromiseClient;
+  stateServiceClient: StateServicePromiseClient;
   userId: string;
   metaData: grpcWeb.Metadata;
 
@@ -56,12 +62,14 @@ export class LedgerApiClient {
     activeContractsServiceClient: ActiveContractsServicePromiseClient,
     commandServiceClient: CommandServicePromiseClient,
     userManagementServiceClient: UserManagementServicePromiseClient,
+    stateServiceClient: StateServicePromiseClient,
     userId: string,
     token: string | undefined
   ) {
     this.activeContractsServiceClient = activeContractsServiceClient;
     this.commandServiceClient = commandServiceClient;
     this.userManagementServiceClient = userManagementServiceClient;
+    this.stateServiceClient = stateServiceClient;
     this.userId = userId;
     this.metaData = token !== undefined ? { Authorization: 'Bearer ' + token } : {};
   }
@@ -245,6 +253,12 @@ export class LedgerApiClient {
     );
     return user.getUser()!.getPrimaryParty();
   }
+
+  async getConnectedDomains(party: string): Promise<GetConnectedDomainsResponse.ConnectedDomain[]> {
+    const request = new GetConnectedDomainsRequest().setParty(party);
+    const response = await this.stateServiceClient.getConnectedDomains(request, this.metaData);
+    return response.getConnectedDomainsList();
+  }
 }
 
 export interface LedgerApiClientProps {
@@ -257,6 +271,7 @@ export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
     activeContractsServiceClient: ActiveContractsServicePromiseClient,
     commandServiceClient: CommandServicePromiseClient,
     userManagementServiceClient: UserManagementServicePromiseClient,
+    stateServiceCilent: StateServicePromiseClient,
     userId: string,
     token: string
   ): T;
@@ -276,10 +291,12 @@ export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
     const activeContractsClient = new ActiveContractsServicePromiseClient(url);
     const commandServiceClient = new CommandServicePromiseClient(url);
     const userManagementClient = new UserManagementServicePromiseClient(url);
+    const stateServiceClient = new StateServicePromiseClient(url);
     const apiClient = new c(
       activeContractsClient,
       commandServiceClient,
       userManagementClient,
+      stateServiceClient,
       userId,
       userAccessToken
     );

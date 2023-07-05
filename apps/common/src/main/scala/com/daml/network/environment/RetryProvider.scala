@@ -549,6 +549,12 @@ object RetryProvider {
                       case _ => false
                     }
                     ||
+                    // This can happen if the party allocation has not yet been propagated to the new domain.
+                    statusCode == Status.Code.INVALID_ARGUMENT &&
+                    raw"No participant of the party .* has confirmation permission on both domains at respective timestamps".r
+                      .findFirstMatchIn(description)
+                      .isDefined
+                    ||
                     // CANCELLED can also be a deliberate cancellation from the client
                     // so we only retry if we observe RST_STREAM which we sometimes see
                     // around Canton restarts.

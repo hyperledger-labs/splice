@@ -1,6 +1,5 @@
-import { usePrimaryParty, useStateSnapshotServiceClient } from 'common-frontend';
+import { usePrimaryParty } from 'common-frontend';
 import { useGetSvcPartyId } from 'common-frontend/scan-api';
-import { GetConnectedDomainsRequest } from 'common-protobuf/com/daml/ledger/api/v2/state_service_pb';
 import {
   ListSplitwellInstallsRequest,
   SplitwellContext,
@@ -36,7 +35,6 @@ function collectFirst<A, B>(xs: A[], f: (elt: A) => B | undefined): B | undefine
 const Home: React.FC = () => {
   const splitwellClient = useSplitwellClient();
   const ledgerApiClient = useSplitwellLedgerApiClient();
-  const stateSnapshotServiceClient = useStateSnapshotServiceClient();
   const { data: svc = undefined } = useGetSvcPartyId();
 
   const [provider, setProvider] = useState<string | undefined>();
@@ -71,17 +69,16 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     const queryConnectedDomains = async (partyId: string) => {
-      const req = new GetConnectedDomainsRequest().setParty(partyId);
       console.debug('Querying for connected domains');
-      const domains = await stateSnapshotServiceClient.getConnectedDomains(req);
-      const domainIds = domains.getConnectedDomainsList().map(domain => domain.getDomainId());
+      const domains = await ledgerApiClient.getConnectedDomains(partyId);
+      const domainIds = domains.map(domain => domain.getDomainId());
       setConnectedDomainIds(domainIds);
       console.debug(`Connected domains: ${domainIds}`);
     };
     if (primaryPartyId) {
       queryConnectedDomains(primaryPartyId);
     }
-  }, [stateSnapshotServiceClient, primaryPartyId]);
+  }, [ledgerApiClient, primaryPartyId]);
 
   useEffect(() => {
     const queryInstall = async (
@@ -175,7 +172,6 @@ const Home: React.FC = () => {
     splitwellClient,
     splitwellDomainIds,
     connectedDomainIds,
-    stateSnapshotServiceClient,
   ]);
 
   const pickPreferredInstallDomain = useCallback(() => {

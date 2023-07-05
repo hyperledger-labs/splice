@@ -1,12 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import {
-  DirectoryClientProvider,
-  AuthProvider,
-  UserProvider,
-  StateSnapshotServiceClientProvider,
-  theme,
-} from 'common-frontend';
+import { DirectoryClientProvider, AuthProvider, UserProvider, theme } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import { RpcError, StatusCode } from 'grpc-web';
 import React from 'react';
@@ -60,9 +54,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
             <DirectoryClientProvider url={config.services.directory.url}>
               <ScanClientProvider url={config.services.scan.url}>
                 <SplitwellLedgerApiClientProvider url={config.services.ledgerApi.url}>
-                  <StateSnapshotServiceClientProvider url={config.services.ledgerApi.url}>
-                    {children}
-                  </StateSnapshotServiceClientProvider>
+                  {children}
                 </SplitwellLedgerApiClientProvider>
               </ScanClientProvider>
             </DirectoryClientProvider>
