@@ -4,7 +4,13 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{ConfigScheduleUtil, FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{
+  ConfigScheduleUtil,
+  FrontendLoginUtil,
+  TimeTestUtil,
+  WalletTestUtil,
+  DomainFeesTestUtil,
+}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.util.CNNodeUtil
 
@@ -16,7 +22,8 @@ class ScanFrontendTimeBasedIntegrationTest
     with FrontendLoginUtil
     with ConfigScheduleUtil
     with WalletTestUtil
-    with TimeTestUtil {
+    with TimeTestUtil
+    with DomainFeesTestUtil {
 
   val coinPrice = 2
   override def environmentDefinition
@@ -28,14 +35,11 @@ class ScanFrontendTimeBasedIntegrationTest
 
   def compareLeaderboardTable(
       resultRowClassName: String,
-      expected: Seq[(String, String)],
+      expected: Seq[Seq[String]],
   )(implicit webDriver: WebDriverType) = {
     findAll(className(resultRowClassName)).toSeq.map(row => {
       val children = row.findAllChildElements(tagName("td"))
-      children.map(c => c.text).toList match {
-        case List(a, b) => (a, b)
-        case _ => fail("Expected a list of 2 elements")
-      }
+      children.map(c => c.text).toList
     }) shouldBe expected
   }
 
@@ -88,7 +92,7 @@ class ScanFrontendTimeBasedIntegrationTest
         clue("Compare app leaderboard values") {
           compareLeaderboardTable(
             "app-leaderboard-row",
-            Seq((aliceValidatorWalletParty, "41.5 CC")),
+            Seq(Seq(aliceValidatorWalletParty, "41.5 CC")),
           )
         }
 
@@ -105,7 +109,7 @@ class ScanFrontendTimeBasedIntegrationTest
         clue("Compare validator leaderboard values") {
           compareLeaderboardTable(
             "validator-leaderboard-row",
-            Seq((aliceValidatorWalletParty, "0.083 CC")),
+            Seq(Seq(aliceValidatorWalletParty, "0.083 CC")),
           )
         }
       }
@@ -191,6 +195,72 @@ class ScanFrontendTimeBasedIntegrationTest
           find(id("next-config-update")).value.text should (equal("1 day") or equal(
             "about 24 hours"
           ))
+        }
+      }
+    }
+
+    "See expected domain fees leaderboard" in { implicit env =>
+      waitForWalletUser(aliceValidatorWalletClient)
+      waitForWalletUser(bobValidatorWalletClient)
+      val aliceValidatorWalletParty = aliceValidatorWalletClient.userStatus().party
+      val bobValidatorWalletParty = bobValidatorWalletClient.userStatus().party
+      val firstRound = sv1ScanBackend
+        .getLatestOpenMiningRound(env.environment.clock.now)
+        .contract
+        .payload
+        .round
+        .number
+      actAndCheck(
+        "Buy some traffic in rounds 1&2, and advance enough rounds for round 2 to close", {
+          aliceValidatorWalletClient.tap(100.0)
+          bobValidatorWalletClient.tap(100.0)
+          val trafficAmount = 1_000_000L
+          buyExtraTraffic(
+            aliceValidatorBackend,
+            aliceValidatorWalletClient.list().coins,
+            trafficAmount,
+            env.environment.clock.now,
+          )
+          advanceRoundsByOneTick
+          buyExtraTraffic(
+            aliceValidatorBackend,
+            aliceValidatorWalletClient.list().coins,
+            trafficAmount,
+            env.environment.clock.now,
+          )
+          buyExtraTraffic(
+            bobValidatorBackend,
+            bobValidatorWalletClient.list().coins,
+            trafficAmount,
+            env.environment.clock.now,
+          )
+          (0 to 4).foreach(_ => advanceRoundsByOneTick)
+        },
+      )(
+        "Wait for round to close in scan",
+        _ => sv1ScanBackend.getRoundOfLatestData()._1 shouldBe (firstRound + 1),
+      )
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to Scan UI main page",
+          go to "http://localhost:3006/domain-fees-leaderboard",
+        )(
+          "See both entries in the leaderboard",
+          _ => {
+            findAll(className("domain-fees-leaderboard-row")).toSeq should have length 2
+          },
+        )
+
+        clue("Compare domain fees leaderboard values") {
+
+          compareLeaderboardTable(
+            "domain-fees-leaderboard-row",
+            Seq(
+              Seq(aliceValidatorWalletParty, "2", "2000000", "1 CC", (firstRound + 1).toString),
+              Seq(bobValidatorWalletParty, "1", "1000000", "0.5 CC", (firstRound + 1).toString),
+            ),
+          )
         }
       }
     }

@@ -64,7 +64,7 @@ const ValidatorRow: React.FC<{
   const { name, numPurchases, totalTrafficPurchased, totalCcSpent, lastPurchasedInRound } =
     validator;
   return (
-    <TableRow>
+    <TableRow className="domain-fees-leaderboard-row">
       <TableCell>{name}</TableCell>
       <TableCell align="right">{numPurchases}</TableCell>
       <TableCell align="right">{totalTrafficPurchased}</TableCell>
