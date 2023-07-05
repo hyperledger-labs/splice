@@ -16,9 +16,9 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.codegen.java.cn.wallet.install.{
+  CoinOperationOutcome,
   coinoperation,
   coinoperationoutcome,
-  CoinOperationOutcome,
 }
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
@@ -38,6 +38,7 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
   TracedLogger,
 }
+import com.digitalasset.canton.protocol.messages.LocalReject
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -557,7 +558,7 @@ class HttpWalletHandler(
         )
       } yield result,
       logger,
-      HttpWalletHandler.InactiveContractRetryable(_),
+      HttpWalletHandler.TapRetryable(_),
     )
   }
 
@@ -763,7 +764,7 @@ class HttpWalletHandler(
 }
 
 object HttpWalletHandler {
-  case class InactiveContractRetryable(operationName: String) extends ExceptionRetryable {
+  case class TapRetryable(operationName: String) extends ExceptionRetryable {
     override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
         tc: TraceContext
     ): ErrorKind = outcome match {
@@ -772,10 +773,22 @@ object HttpWalletHandler {
           s"The operation $operationName failed with a ${InactiveContracts.id} error $ex."
         )
         TransientErrorKind
+      case Failure(ex: io.grpc.StatusRuntimeException) if isLockedContract(ex) =>
+        logger.info(
+          s"The operation $operationName failed with a ${LocalReject.ConsistencyRejections.LockedContracts.id} error $ex."
+        )
+        TransientErrorKind
       // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
       case Failure(ex: io.grpc.StatusRuntimeException) if isNonspecificInvalidArgument(ex) =>
         logger.info(
           s"The operation $operationName failed with a nonspecifc INVALID_ARGUMENT error $ex."
+        )
+        TransientErrorKind
+      case Failure(ex: io.grpc.StatusRuntimeException)
+          if (ex.getStatus.getCode == Status.Code.FAILED_PRECONDITION && ex.getStatus.getDescription
+            .contains("The requirement 'Contract is not locked' was not met.")) =>
+        logger.info(
+          s"The operation $operationName failed due to the svcRules lock $ex."
         )
         TransientErrorKind
       case Failure(ex: io.grpc.StatusRuntimeException)
@@ -796,6 +809,14 @@ object HttpWalletHandler {
     ex.getStatus.getCode == Status.Code.NOT_FOUND &&
     ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
       case ErrorInfoDetail(InactiveContracts.id, _) => true
+      case _ => false
+    }
+  }
+
+  private def isLockedContract(ex: io.grpc.StatusRuntimeException): Boolean = {
+    ex.getStatus.getCode == Status.Code.ABORTED &&
+    ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
+      case ErrorInfoDetail(LocalReject.ConsistencyRejections.LockedContracts.id, _) => true
       case _ => false
     }
   }
