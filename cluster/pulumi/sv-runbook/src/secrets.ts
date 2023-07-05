@@ -119,7 +119,7 @@ type AppAndUiSecrets = {
   uiSecret: k8s.core.v1.Secret;
 };
 
-export async function createSvValidatorSecrets(
+export async function svValidatorSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client
 ): Promise<AppAndUiSecrets> {
@@ -129,14 +129,14 @@ export async function createSvValidatorSecrets(
   };
 }
 
-export function createSvDirectoryUiSecrets(
+export function svDirectoryUiSecret(
   ns: ExactNamespace,
   auth0Client: Auth0Client
 ): k8s.core.v1.Secret {
   return uiSecret(auth0Client, ns, 'directory', directoryClientId);
 }
 
-export async function createSvAppSecrets(
+export async function svAppSecrets(
   ns: ExactNamespace,
   auth0Client: Auth0Client
 ): Promise<AppAndUiSecrets> {

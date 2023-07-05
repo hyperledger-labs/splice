@@ -14,9 +14,9 @@ import { installCometBftNode } from './cometbft';
 import { installCNSVHelmChart, installCNSVHelmChartByNamespaceName } from './helm';
 import { installLoopback } from './loopback';
 import {
-  createSvAppSecrets,
-  createSvValidatorSecrets,
-  createSvDirectoryUiSecrets,
+  svAppSecrets,
+  svValidatorSecrets,
+  svDirectoryUiSecret,
   imagePullSecret,
   imagePullSecretByNamespaceName,
   sv1UserParticipantSecret,
@@ -138,7 +138,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     ...fixedTokensValue,
   };
 
-  const svAppSecrets = await createSvAppSecrets(svNamespace, auth0Client);
+  const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
+    svNamespace,
+    auth0Client
+  );
 
   const sv = installCNSVHelmChart(
     svNamespace,
@@ -147,7 +150,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
     localCharts,
     version,
-    svImagePullDeps.concat([participant]).concat([svAppSecrets.appSecret, svAppSecrets.uiSecret])
+    svImagePullDeps.concat([participant]).concat([svAppSecret, svAppUISecret])
   );
 
   installCNSVHelmChart(
@@ -157,7 +160,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     fixedTokens() ? fixedTokensValue : {},
     localCharts,
     version,
-    svImagePullDeps.concat([sv, participant]).concat(svAppSecrets.appSecret)
+    svImagePullDeps.concat([sv, participant]).concat(svAppSecret)
   );
 
   const validatorValues = loadYamlFromFile(
@@ -188,8 +191,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     validatorValuesWithMaybeDomainFees['topup']['enabled'] = false;
   }
 
-  const svValidatorSecrets = await createSvValidatorSecrets(svNamespace, auth0Client);
-  const svDirectoryUiSecrets = createSvDirectoryUiSecrets(svNamespace, auth0Client);
+  const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } =
+    await svValidatorSecrets(svNamespace, auth0Client);
 
   const validator = installCNSVHelmChart(
     svNamespace,
@@ -200,8 +203,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     version,
     svImagePullDeps
       .concat([sv, participant])
-      .concat([svValidatorSecrets.appSecret, svValidatorSecrets.uiSecret])
-      .concat([svDirectoryUiSecrets])
+      .concat([svValidatorAppSecret, svValidatorUISecret])
+      .concat([svDirectoryUiSecret(svNamespace, auth0Client)])
   );
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
