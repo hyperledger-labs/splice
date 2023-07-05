@@ -18,7 +18,7 @@ spec:
         app: {{ .Release.Name }}-mediator
     spec:
       containers:
-      - name: {{ .Release.Name }}
+      - name: {{ .Release.Name }}-mediator
         image: "{{ .Values.imageRepo }}/canton-mediator:{{ .Values.cluster.imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
