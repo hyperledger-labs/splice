@@ -1,7 +1,11 @@
 package com.daml.network.util
 
+import com.daml.ledger.javaapi
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.{
+  ValidatorTraffic,
+  ValidatorTrafficCreationIntent,
+}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyExtraTraffic
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_BuyExtraTraffic
 import com.daml.network.codegen.java.cn.wallet.install.{CoinOperation, WalletAppInstall}
@@ -15,6 +19,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.CoinPosition
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.DomainId
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -23,24 +28,60 @@ import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 trait DomainFeesTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences =>
 
-  def getValidatorTraffic(
-      validatorApp: ValidatorAppBackendReference
-  )(implicit env: CNNodeTestConsoleEnvironment): ValidatorTraffic.Contract = {
-    val validatorParty = validatorApp.getValidatorPartyId()
-    inside(
-      sv1ValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(ValidatorTraffic.COMPANION)(
-          validatorParty,
-          _.data.validator == validatorParty.toProtoPrimitive,
-        )
-    ) { case Seq(traffic) => traffic }
+  private def listValidatorContracts[
+      TC <: javaapi.data.codegen.Contract[TCid, T],
+      TCid <: javaapi.data.codegen.ContractId[T],
+      T <: javaapi.data.Template,
+  ](
+      templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T]
+  )(
+      validatorApp: ValidatorAppBackendReference,
+      filterPredicate: TC => Boolean = (_: TC) => true,
+  ): Seq[TC] = {
+    validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
+      .filterJava(templateCompanion)(
+        validatorApp.getValidatorPartyId(),
+        predicate = filterPredicate,
+      )
+  }
+
+  private def getOrCreateIntentOrTrafficCid(
+      validatorApp: ValidatorAppBackendReference,
+      ts: CantonTimestamp,
+  )(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): daTypes.Either[ValidatorTrafficCreationIntent.ContractId, ValidatorTraffic.ContractId] = {
+    inside(listValidatorContracts(ValidatorTrafficCreationIntent.COMPANION)(validatorApp)) {
+      case Seq(intent) => new daTypes.either.Left(intent.id)
+      case Seq() =>
+        inside(listValidatorContracts(ValidatorTraffic.COMPANION)(validatorApp)) {
+          case Seq(traffic) => new daTypes.either.Right(traffic.id)
+          case Seq() =>
+            val validatorParty = validatorApp.getValidatorPartyId()
+            val domainId =
+              DomainId.tryFromString(sv1ScanBackend.getCoinConfigAsOf(ts).globalDomain.activeDomain)
+            val intentCreationCmd = ValidatorTrafficCreationIntent.create(
+              validatorApp.getValidatorPartyId().toProtoPrimitive,
+              domainId.toProtoPrimitive,
+            )
+            val intentCid =
+              validatorApp.participantClientWithAdminToken.ledger_api_extensions.commands
+                .submitWithResult(
+                  userId = validatorApp.config.ledgerApiUser,
+                  actAs = Seq(validatorParty),
+                  readAs = Seq(validatorParty),
+                  update = intentCreationCmd,
+                  domainId = Some(domainId),
+                )
+                .contractId
+            new daTypes.either.Left(
+              new ValidatorTrafficCreationIntent.ContractId(intentCid.contractId)
+            )
+        }
+    }
   }
 
   /** Buy extra traffic for a given validator with the provided coins.
-    *
-    * Currently assumes that a previous ValidatorTraffic contract already exists.
-    * For SVs, this will always be true because they are granted some traffic at
-    * the time of founding or joining the SVC.
     */
   def buyExtraTraffic(
       validatorApp: ValidatorAppBackendReference,
@@ -50,7 +91,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
     val validatorParty = validatorApp.getValidatorPartyId()
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
-    val prevTraffic = getValidatorTraffic(validatorApp)
+    val intentOrTrafficCid = getOrCreateIntentOrTrafficCid(validatorApp, ts)
     val walletInstall = inside(
       validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(WalletAppInstall.COMPANION)(
@@ -78,7 +119,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       List[CoinOperation](
         new CO_BuyExtraTraffic(
           trafficAmount,
-          new daTypes.either.Right(prevTraffic.id),
+          intentOrTrafficCid,
           new RelTime(1),
         )
       ).asJava,

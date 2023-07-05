@@ -36,11 +36,11 @@ class WalletTxLogWithDomainFeesIntegrationTest
       val (_, totalCostCc) = computeDomainFees(trafficAmount, now)
 
       actAndCheck(
-        "Purchase extra traffic", {
+        "Purchase extra traffic for SV1", {
           buyExtraTraffic(sv1ValidatorBackend, Seq(), trafficAmount, now)
         },
       )(
-        "Check that an extra traffic purchase is registered in the transaction history",
+        "Check that an extra traffic purchase is registered in the SV1's tx history",
         _ => {
           checkTxHistory(
             sv1WalletClient,
@@ -70,6 +70,43 @@ class WalletTxLogWithDomainFeesIntegrationTest
           )
         },
       )
+
+      actAndCheck(
+        "Purchase extra traffic for aliceValidator", {
+          buyExtraTraffic(aliceValidatorBackend, Seq(), trafficAmount, now)
+        },
+      )(
+        "Check that an extra traffic purchase is registered in aliceValidator's tx history",
+        _ => {
+          checkTxHistory(
+            aliceValidatorWalletClient,
+            Seq[CheckTxHistoryFn](
+              { case logEntry: walletLogEntry.Transfer =>
+                // Payment of domain fees by validator to SVC
+                logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.ExtraTrafficPurchase
+                inside(logEntry.sender) { case (sender, amount) =>
+                  sender shouldBe aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive
+                  // amount actually paid will be more than totalCostCc due to fees
+                  amount should beWithin(-totalCostCc - smallAmount, -totalCostCc)
+                }
+                inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+                  receiver shouldBe svcParty.toProtoPrimitive
+                  // domain fees paid is immediately burnt by SVC
+                  amount shouldBe 0
+                }
+              },
+              { case logEntry: walletLogEntry.BalanceChange =>
+                logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
+                logEntry.receiver shouldBe aliceValidatorBackend
+                  .getValidatorPartyId()
+                  .toProtoPrimitive
+                logEntry.amount should beWithin(totalCostCc, totalCostCc + smallAmount)
+              },
+            ),
+          )
+        },
+      )
+
     }
   }
 
