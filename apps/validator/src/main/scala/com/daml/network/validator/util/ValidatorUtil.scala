@@ -206,11 +206,6 @@ private[validator] object ValidatorUtil {
         // this command could fail with PERMISSION_DENIED errors (#4425).
         additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
-      _ <- storeWithIngestion.connection.revokeUserRights(
-        validatorUserName,
-        Seq(endUserParty),
-        Seq(endUserParty),
-      )
     } yield {
       logger.debug(s"User $endUserParty offboarded")
       ()

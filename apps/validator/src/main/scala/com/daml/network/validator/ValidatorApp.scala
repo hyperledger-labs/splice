@@ -393,6 +393,7 @@ class ValidatorApp(
           ledgerClient,
           config.domains.global.alias,
           store,
+          config.ledgerApiUser,
           config.automation,
           clock,
           config.treasury,

@@ -40,7 +40,7 @@ class ValidatorAutomationService(
       retryProvider,
     ) {
   registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
-  registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager))
+  registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
   registerTrigger(
     new TopupValidatorTrafficBalanceTrigger(
       triggerContext,

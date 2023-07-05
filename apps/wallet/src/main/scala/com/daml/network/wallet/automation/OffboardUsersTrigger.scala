@@ -6,6 +6,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -16,6 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class OffboardUsersTrigger(
     override protected val context: TriggerContext,
     walletManager: UserWalletManager,
+    connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -35,9 +37,17 @@ class OffboardUsersTrigger(
   override protected def completeTask(task: OffboardUsersTrigger.UserToOffboard)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    Future {
-      walletManager.offboardUser(task.username)
-    }.map(_ => TaskSuccess(s"offboarded user ${task.username} from wallet"))
+    for {
+      _ <- Future {
+        walletManager.offboardUser(task.username)
+      }
+      party <- connection.getPrimaryParty(task.username)
+      _ <- connection.revokeUserRights(
+        walletManager.validatorUser,
+        Seq(party),
+        Seq(party),
+      )
+    } yield TaskSuccess(s"offboarded user ${task.username} from wallet")
   }
 
   override protected def isStaleTask(task: OffboardUsersTrigger.UserToOffboard)(implicit

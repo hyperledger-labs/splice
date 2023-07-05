@@ -28,6 +28,7 @@ class UserWalletManager(
     ledgerClient: CNLedgerClient,
     val globalDomain: DomainAlias,
     val store: WalletStore,
+    val validatorUser: String,
     automationConfig: AutomationConfig,
     clock: Clock,
     treasuryConfig: TreasuryConfig,
