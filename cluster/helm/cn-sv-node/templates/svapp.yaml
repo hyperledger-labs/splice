@@ -33,7 +33,7 @@ spec:
             - name: ADDITIONAL_CONFIG_GLOBAL_LOCK_TIMEOUT
               value: |
                 canton.sv-apps.sv.onboarding.global-lock-timeout=240s
-            {{- with .Values.bootstrappingDump -}}
+            {{- with .Values.acsBootstrappingDump -}}
             - name: ADDITIONAL_CONFIG_BOOTSTRAPPING_DUMP
               value: |
                 canton.sv-apps.sv.onboarding.bootstrapping-dump {
@@ -181,7 +181,7 @@ spec:
               value: |
                 canton.sv-apps.sv.participant-bootstrapping-dump {
                   type = file
-                  file = /etc/participant-bootstrapping-dump/content
+                  file = /participant-bootstrapping-dump/content
                 }
             {{- end }}
           ports:
@@ -207,7 +207,7 @@ spec:
           {{- with .Values.participantBootstrappingDump }}
           volumeMounts:
             - name: participant-bootstrapping-dump-volume
-              mountPath: /etc/participant-bootstrapping-dump
+              mountPath: /participant-bootstrapping-dump
               readOnly: true
           {{- end }}
           {{- with .Values.resources }}

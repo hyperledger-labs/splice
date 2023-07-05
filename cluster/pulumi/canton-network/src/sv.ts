@@ -15,9 +15,9 @@ import type { Auth0Client } from 'cn-pulumi-common';
 import * as postgres from './postgres';
 import {
   BackupConfig,
-  GcpBucket,
-  ParticipantBootstrapDumpConfig,
+  BootstrappingDumpConfig,
   fetchAndInstallParticipantBootstrapDump,
+  getLatestSvcAcsDumpFile,
   installGcpBucketSecret,
   participantBootstrapDumpSecretName,
 } from './backup';
@@ -94,11 +94,6 @@ export function installValidatorOnboardingSecret(
   );
 }
 
-export type BootstrappingDumpConfig = {
-  path: string;
-  bucket: GcpBucket;
-};
-
 export type SvConfig = {
   auth0Client: Auth0Client;
   nodename: string;
@@ -116,8 +111,14 @@ export type SvConfig = {
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   withDomainNode: boolean;
   auth0ValidatorAppName: string;
-  participantBootstrapDump?: ParticipantBootstrapDumpConfig;
 };
+
+function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
+  return getLatestSvcAcsDumpFile(xns, config).apply(file => ({
+    path: file.name,
+    bucket: config.bucket,
+  }));
+}
 
 export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> {
   const xns = exactNamespace(config.nodename);
@@ -134,10 +135,9 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     ? installGcpBucketSecret(xns, config.backupConfig.bucket)
     : undefined;
 
-  const participantBootstrapDumpSecret: pulumi.Resource | undefined =
-    config.participantBootstrapDump
-      ? fetchAndInstallParticipantBootstrapDump(xns, config.participantBootstrapDump)
-      : undefined;
+  const participantBootstrapDumpSecret: pulumi.Resource | undefined = config.bootstrappingDumpConfig
+    ? fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
+    : undefined;
 
   const dependsOn: pulumi.Resource[] = auth0BackendSecrets
     .concat(auth0UISecrets)
@@ -186,7 +186,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     auth0UserNameEnvVarSource('sv'),
     config.postgresPassword,
     // If we have a dump, we disable auto init.
-    !!config.participantBootstrapDump
+    !!config.bootstrappingDumpConfig
   );
   const cometbft = installCometBftNode(xns, config.nodename, config.onboardingName);
 
@@ -218,8 +218,11 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
     acsStoreDump: config.backupConfig,
-    bootstrappingDump: config.bootstrappingDumpConfig,
-    participantBootstrappingDump: config.participantBootstrapDump
+    acsBootstrappingDump:
+      config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
+        ? getAcsBootstrappingDump(xns, config.bootstrappingDumpConfig)
+        : undefined,
+    participantBootstrappingDump: config.bootstrappingDumpConfig
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
   } as ChartValues;

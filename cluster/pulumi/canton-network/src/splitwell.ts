@@ -9,7 +9,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { BackupConfig, ParticipantBootstrapDumpConfig } from './backup';
+import { BackupConfig, BootstrappingDumpConfig } from './backup';
 import { installDomain, installParticipant } from './ledger';
 import { ValidatorOnboarding } from './sv';
 import { installValidatorApp } from './validator';
@@ -22,7 +22,7 @@ export async function installSplitwell(
   withDomainFees = false,
   postgresPassword: pulumi.Input<string>,
   backupConfig?: BackupConfig,
-  participantBootstrapDump?: ParticipantBootstrapDumpConfig
+  participantBootstrapDump?: BootstrappingDumpConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell');
 
@@ -36,7 +36,8 @@ export async function installSplitwell(
     postgresDb,
     auth0UserNameEnvVarSource('validator'),
     postgresPassword,
-    false,
+    // We disable auto-init if we have a dump to bootstrap from.
+    !!participantBootstrapDump,
     [domain]
   );
 

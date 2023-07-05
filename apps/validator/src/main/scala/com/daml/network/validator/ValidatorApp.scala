@@ -21,11 +21,7 @@ import com.daml.network.auth.{
 }
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.config.{
-  NetworkAppClientConfig,
-  ParticipantBootstrapDumpConfig,
-  SharedCNNodeAppParameters,
-}
+import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.{
   CNLedgerClient,
   CNLedgerConnection,
@@ -43,7 +39,7 @@ import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.util.{GcpBucket, HasHealth, ParticipantIdentitiesDump, UploadablePackage}
+import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.{
   HttpValidatorAdminHandler,
   HttpValidatorHandler,
@@ -77,7 +73,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
-import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -128,24 +124,6 @@ class ValidatorApp(
   // For regular validators, this allocates a new user.
   override def preInitializeAfterLedgerConnection(connection: CNLedgerConnection) =
     for {
-      // TODO(#6405) Drop this again once we use the dump for real™
-      _ <- config.participantBootstrappingDump.traverse { conf =>
-        for {
-          content <- conf match {
-            case ParticipantBootstrapDumpConfig.File(path) =>
-              import better.files.File
-              Future { blocking { File(path).contentAsString } }
-            case ParticipantBootstrapDumpConfig.Gcp(bucketConfig, path) =>
-              import java.nio.file.Paths
-              val bucket = new GcpBucket(bucketConfig, loggerFactory)
-              Future { blocking { bucket.readStringFromBucket(Paths.get(path)) } }
-          }
-        } yield {
-          ParticipantIdentitiesDump.fromJsonString(content).left.foreach { error =>
-            sys.error(s"Failed to decode participant identity dump: $error")
-          }
-        }
-      }
       // TODO(#5803) Consider removing this once Canton stops falling apart.
       // Wait for the sponsoring SV which also ensures the domain is initialized.
       _ <- config.onboarding.traverse_(waitUntilSponsorIsActive(_))

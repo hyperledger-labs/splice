@@ -8,7 +8,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { BackupConfig, ParticipantBootstrapDumpConfig } from './backup';
+import { BackupConfig, BootstrappingDumpConfig } from './backup';
 import { installParticipant } from './ledger';
 import { ValidatorOnboarding } from './sv';
 import { installValidatorApp } from './validator';
@@ -23,7 +23,7 @@ export async function installValidator1(
   postgresPassword: pulumi.Input<string>,
   validatorWalletUser: string,
   backupConfig?: BackupConfig,
-  participantBootstrapDump?: ParticipantBootstrapDumpConfig
+  participantBootstrapDump?: BootstrappingDumpConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
@@ -34,7 +34,9 @@ export async function installValidator1(
     'participant',
     postgresDb,
     auth0UserNameEnvVarSource('validator'),
-    postgresPassword
+    postgresPassword,
+    // We disable auto-init if we have a dump to bootstrap from.
+    !!participantBootstrapDump
   );
 
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [

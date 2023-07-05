@@ -5,7 +5,7 @@ import type { Auth0Client, ExactNamespace } from 'cn-pulumi-common';
 
 import {
   BackupConfig,
-  ParticipantBootstrapDumpConfig,
+  BootstrappingDumpConfig,
   fetchAndInstallParticipantBootstrapDump,
   installGcpBucketSecret,
   participantBootstrapDumpSecretName,
@@ -45,7 +45,7 @@ export type ValidatorConfig = {
   svSponsorAddress?: string;
   additionalConfig?: string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
-  participantBootstrapDump?: ParticipantBootstrapDumpConfig;
+  participantBootstrapDump?: BootstrappingDumpConfig;
 };
 
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {

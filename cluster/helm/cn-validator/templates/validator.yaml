@@ -133,7 +133,7 @@ spec:
           value: |
             canton.validator-apps.validator_backend.participant-bootstrapping-dump {
               type = file
-              file = /etc/participant-bootstrapping-dump/content
+              file = /participant-bootstrapping-dump/content
             }
         {{- end }}
         ports:
@@ -159,7 +159,7 @@ spec:
         {{- with .Values.participantBootstrappingDump }}
         volumeMounts:
           - name: participant-bootstrapping-dump-volume
-            mountPath: /etc/participant-bootstrapping-dump
+            mountPath: /participant-bootstrapping-dump
             readOnly: true
         {{- end }}
         {{- with .Values.resources }}
