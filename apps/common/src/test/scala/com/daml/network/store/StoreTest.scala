@@ -13,7 +13,7 @@ import com.daml.ledger.javaapi.data.{
   Unit as damlUnit,
 }
 import com.google.protobuf
-import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
+import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as coinCodegen}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   InFlightTransferOutEvent,
@@ -54,11 +54,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       round: Int,
       provider: PartyId,
       featured: Boolean = false,
-  ): Contract[directoryCodegen.AppRewardCoupon.ContractId, directoryCodegen.AppRewardCoupon] =
+  ): Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon] =
     Contract(
-      identifier = directoryCodegen.AppRewardCoupon.TEMPLATE_ID,
-      contractId = new directoryCodegen.AppRewardCoupon.ContractId(s"de#$round"),
-      payload = new directoryCodegen.AppRewardCoupon(
+      identifier = coinCodegen.AppRewardCoupon.TEMPLATE_ID,
+      contractId = new coinCodegen.AppRewardCoupon.ContractId(s"de#$round"),
+      payload = new coinCodegen.AppRewardCoupon(
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
         featured,
@@ -77,13 +77,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       round: Int,
       user: PartyId,
   ): Contract[
-    directoryCodegen.ValidatorRewardCoupon.ContractId,
-    directoryCodegen.ValidatorRewardCoupon,
+    coinCodegen.ValidatorRewardCoupon.ContractId,
+    coinCodegen.ValidatorRewardCoupon,
   ] =
     Contract(
-      identifier = directoryCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
-      contractId = new directoryCodegen.ValidatorRewardCoupon.ContractId(s"der#$round"),
-      payload = new directoryCodegen.ValidatorRewardCoupon(
+      identifier = coinCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
+      contractId = new coinCodegen.ValidatorRewardCoupon.ContractId(s"der#$round"),
+      payload = new coinCodegen.ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         user.toProtoPrimitive,
         BigDecimal(1.0).bigDecimal,
@@ -131,6 +131,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       childEventIds = Seq.empty.asJava,
     )
   }
+
+  protected def toActiveContract[TCid <: ContractId[T], T](
+      domain: DomainId,
+      contract: Contract[TCid, T],
+  ): ActiveContract =
+    ActiveContract(domain, toCreatedEvent(contract))
 
   protected def exercisedEvent[TCid <: ContractId[T], T](
       contractId: String,

@@ -355,10 +355,17 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         s"ACS was already ingested for store $storeId",
       )
       for {
-
-        // TODO(#5481): Insert ACS data here, in the same SQL transaction as updating the offset.
-        //  Don't insert TxLog data, the TxLog starts after the initial ACS ingestion.
-        _ <- storage.update(updateOffset(offset), "ingestAcs.updateOffset")
+        // TODO(#5858): Get initial txLogEntries from txLogParser.parseAcs()
+        txLogEntries <- Future.successful(Seq.empty)
+        // TODO(#5643): batch inserts
+        workTodo = WorkTodo(
+          VectorMap.from(
+            acs
+              .filter(contract => contractFilter.contains(contract.createdEvent))
+              .map(contract => contract.createdEvent.getContractId -> Insert(contract.createdEvent))
+          )
+        )
+        _ <- ingestWork(offset, workTodo, txLogEntries)
       } yield {
         finishedAcsIngestion.success(())
         notifyStreamsOfNewOffset()

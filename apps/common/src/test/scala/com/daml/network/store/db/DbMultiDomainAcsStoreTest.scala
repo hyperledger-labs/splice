@@ -4,7 +4,7 @@ import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.StoreTest.TestTxLogStoreParser
 import com.daml.network.store.db.AcsTables.*
@@ -36,9 +36,11 @@ class DbMultiDomainAcsStoreTest
       implicit val store = mkStore()
       val coupons = (1 to 3).map(n => appRewardCoupon(n, svcParty))
       val seenCoupons =
-        new AtomicReference(Seq.empty[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]])
+        new AtomicReference(
+          Seq.empty[Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]]
+        )
       val done = store
-        .streamReadyContracts(AppRewardCoupon.COMPANION, pageSize = PageLimit(1))
+        .streamReadyContracts(coinCodegen.AppRewardCoupon.COMPANION, pageSize = PageLimit(1))
         .take(3)
         .runForeach(coupon => seenCoupons.updateAndGet(x => x.appended(coupon.contract)))
       for {
@@ -69,14 +71,33 @@ class DbMultiDomainAcsStoreTest
       } yield {
         eventually() {
           store1
-            .listContracts(AppRewardCoupon.COMPANION)
+            .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
             .futureValue
             .map(_.contract) should be(Seq(coupon))
           store2
-            .listContracts(AppRewardCoupon.COMPANION)
+            .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
             .futureValue
             .map(_.contract) should be(Seq(coupon))
         }
+      }
+    }
+
+    "ingest the initial acs" in {
+      implicit val store = mkStore()
+      val couponsAcs =
+        (1 to 3)
+          .map(n => appRewardCoupon(n, svcParty))
+          .map(c => toActiveContract(dummyDomain, c))
+      for {
+        _ <- store.ingestionSink.initialize()
+        _ <- store.ingestionSink.ingestAcs("0", couponsAcs, Seq.empty)
+        _ <- store.waitUntilAcsIngested()
+      } yield {
+        store
+          .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
+          .futureValue
+          // Note: the ACS is not ordered
+          .map(_.contract.payload.round.number) should contain theSameElementsAs (1L to 3L)
       }
     }
 
@@ -96,7 +117,7 @@ class DbMultiDomainAcsStoreTest
     val contractFilter = MultiDomainAcsStore
       .SimpleContractFilter(
         PartyId.tryFromProtoPrimitive("aaaa::bbbb"),
-        Map(MultiDomainAcsStore.mkFilter(AppRewardCoupon.COMPANION)(_ => true)),
+        Map(MultiDomainAcsStore.mkFilter(coinCodegen.AppRewardCoupon.COMPANION)(_ => true)),
         Map.empty,
       )
 
@@ -124,7 +145,7 @@ class DbMultiDomainAcsStoreTest
       evt: CreatedEvent,
   ): DBIO[Unit] = {
     val contract = Contract
-      .fromCreatedEvent(AppRewardCoupon.COMPANION)(evt)
+      .fromCreatedEvent(coinCodegen.AppRewardCoupon.COMPANION)(evt)
       .valueOrFail("Failed to parse contract.")
     val contractId = new ContractId[Any](evt.getContractId)
     val row = AcsStoreRowTemplate(
