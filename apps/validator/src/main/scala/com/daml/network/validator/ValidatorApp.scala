@@ -39,6 +39,7 @@ import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
 import com.daml.network.http.v0.validatorPublic.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
@@ -112,6 +113,15 @@ class ValidatorApp(
     withSvConnection(
       config.foundingSvClient.adminApi
     )(svConnection => f(svConnection.withGlobalLock(_, _)))
+
+  override def preInitializeBeforeLedgerConnection(): Future[Unit] =
+    ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+      config.participantClient,
+      config.participantBootstrappingDump,
+      loggerFactory,
+      retryProvider,
+      clock,
+    )
 
   // Note that for the validator of an SV app, the user will be created by the SV app with a
   // primary party set to the SV app already so this is a noop.

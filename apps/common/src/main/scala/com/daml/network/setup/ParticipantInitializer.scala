@@ -6,9 +6,10 @@ package com.daml.network.setup
 import cats.implicits.*
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.{NamedLogging, NamedLoggerFactory}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.config.ParticipantBootstrapDumpConfig
+import com.daml.network.config.{CNParticipantClientConfig, ParticipantBootstrapDumpConfig}
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.util.ParticipantIdentitiesDump
 import io.grpc.Status
@@ -17,6 +18,37 @@ import java.nio.file.Path
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Methods required by the SvApp and ValidatorApp to initialize their participant with existing identities */
+
+object ParticipantInitializer {
+  def ensureParticipantInitializedWithExpectedId(
+      participantClientConfig: CNParticipantClientConfig,
+      dumpConfig: Option[ParticipantBootstrapDumpConfig],
+      loggerFactory: NamedLoggerFactory,
+      retryProvider: RetryProvider,
+      clock: Clock,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      tc: TraceContext,
+  ): Future[Unit] = {
+
+    val participantAdminConnection = new ParticipantAdminConnection(
+      participantClientConfig.adminApi,
+      loggerFactory,
+      retryProvider,
+      clock,
+    )
+    val participantInitializer = new ParticipantInitializer(
+      dumpConfig,
+      loggerFactory,
+      retryProvider,
+      participantAdminConnection,
+    )
+    participantInitializer
+      .ensureInitializedWithExpectedId()
+      .andThen(_ => participantAdminConnection.close())
+  }
+}
+
 class ParticipantInitializer(
     dumpConfig: Option[ParticipantBootstrapDumpConfig],
     override protected val loggerFactory: NamedLoggerFactory,
@@ -25,7 +57,6 @@ class ParticipantInitializer(
 )(implicit
     ec: ExecutionContextExecutor,
     tc: TraceContext,
-//     tracer: Tracer,
 ) extends NamedLogging {
 
   def ensureInitializedWithExpectedId(): Future[Unit] =
@@ -55,18 +86,24 @@ class ParticipantInitializer(
         retryProvider
           .waitUntil(
             "participant is initialized",
-            isInitialized().map(_ => ()),
+            isInitialized()
+              .flatMap(if (_) {
+                Future.unit
+              } else {
+                // There doesn't seem to be a way to tell the participant to init with
+                // a freshly generated identity, except by changing its config.
+                Future.failed(
+                  Status.FAILED_PRECONDITION
+                    .withDescription(
+                      "Participant is still initializing. " +
+                        "Is the participant configured to auto-init? " +
+                        "(You didn't specify a participant bootstrapping config.)"
+                    )
+                    .asRuntimeException()
+                )
+              }),
             logger,
           )
-          .recoverWith(ex => {
-            // There doesn't seem to be a way to tell the participant to init with
-            // a freshly generated identity, except by changing its config.
-            logger.error(
-              s"Participant failed to initialize: ${ex.getMessage()}." +
-                " Should the participant be configured to auto-init?"
-            )
-            Future.failed(ex)
-          })
     }
 
   private def isInitialized(): Future[Boolean] = participantAdminConnection.getStatus().map {

@@ -48,8 +48,8 @@ all network indices must be odd numbers.
   - See `validator.conf`, `validator-participant.conf`, `sv.conf`, `sv-participant.conf`
 - `7`: Local runbook integration test, self-hosted validator
   - See `LocalRunbookIntegrationTest.scala`
-- `9`: Local runbook integration test, SVC node
-  - See `LocalRunbookIntegrationTest.scala`
+- `9`: Local runbook integration test and participant identities dump test, `sv1Local`, `aliceValidatorLocal`
+  - See `LocalRunbookIntegrationTest.scala`, `local-sv-node`, `local-validator-node`
 - `15`: Simulated time
   - See `simple-topology.conf` with ports bumped by 10k, `simple-topology-canton-simtime.conf`
 - `25`: Toxi-proxy ports

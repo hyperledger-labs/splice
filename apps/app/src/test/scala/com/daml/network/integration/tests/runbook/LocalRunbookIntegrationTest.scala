@@ -28,8 +28,8 @@ class LocalRunbookIntegrationTest
 
   val svParticipantPath: File = svNodePath / "canton-participant"
   val svDomainPath: File = svNodePath / "canton-domain"
-  val svAppsPath: File = svNodePath / "sv-apps"
-  val scanAppPath: File = svNodePath / "scan-apps"
+  val svAppPath: File = svNodePath / "sv-app"
+  val scanAppPath: File = svNodePath / "scan-app"
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
     ("ParticipantLedgerApi", 7001),
@@ -86,7 +86,7 @@ class LocalRunbookIntegrationTest
         // Config file template for onboarding self-hosted validator (original version from the runbook)
         validatorPath / "validator-onboarding-nosecret.conf",
         // Config files for SVC-hosted apps (modified copies of deployed configs)
-        svAppsPath / "app.conf",
+        svAppPath / "app.conf",
         scanAppPath / "app.conf",
       )
       .clearConfigTransforms()

@@ -93,23 +93,14 @@ class SvApp(
 
   override def packages = super.packages ++ Seq("dar/svc-governance-0.1.0.dar")
 
-  override def preInitializeBeforeLedgerConnection(): Future[Unit] = {
-    val participantAdminConnection = new ParticipantAdminConnection(
-      config.participantClient.adminApi,
+  override def preInitializeBeforeLedgerConnection(): Future[Unit] =
+    ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+      config.participantClient,
+      config.participantBootstrappingDump,
       loggerFactory,
       retryProvider,
       clock,
     )
-    val participantInitializer = new ParticipantInitializer(
-      config.participantBootstrappingDump,
-      loggerFactory,
-      retryProvider,
-      participantAdminConnection,
-    )
-    participantInitializer
-      .ensureInitializedWithExpectedId()
-      .andThen(_ => participantAdminConnection.close())
-  }
 
   override def initializeNode(ledgerClient: CNLedgerClient): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(

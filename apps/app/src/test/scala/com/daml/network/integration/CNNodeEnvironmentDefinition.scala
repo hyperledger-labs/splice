@@ -81,8 +81,8 @@ case class CNNodeEnvironmentDefinition(
       })
       validators.local.foreach(validator => {
         if (
-          !validator.name.startsWith("sv") && !extraIgnoredValidatorPrefixes
-            .exists(validator.name.startsWith)
+          !validator.name.startsWith("sv") && !validator.name
+            .endsWith("Local") && !extraIgnoredValidatorPrefixes.exists(validator.name.startsWith)
         ) {
           CNNodeEnvironmentDefinition.withAllocatedValidatorUser(validator)
         }

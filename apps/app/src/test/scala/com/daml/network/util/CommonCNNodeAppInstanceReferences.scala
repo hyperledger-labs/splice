@@ -44,6 +44,11 @@ trait CommonCNNodeAppInstanceReferences {
     "sv1Scan"
   )
 
+  def sv1ScanLocalBackend(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference =
+    scanb(
+      "sv1ScanLocal"
+    )
+
   def sv2ScanBackend(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference = scanb(
     "sv2Scan"
   )
@@ -62,6 +67,12 @@ trait CommonCNNodeAppInstanceReferences {
       env: CNNodeTestConsoleEnvironment
   ): ValidatorAppBackendReference = v(
     "aliceValidator"
+  )
+
+  def aliceValidatorLocalBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
+    "aliceValidatorLocal"
   )
 
   def aliceValidatorClient(implicit

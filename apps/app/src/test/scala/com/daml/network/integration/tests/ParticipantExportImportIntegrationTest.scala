@@ -23,12 +23,18 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
 
   val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
   val svNodePath: File = testResourcesPath / "local-sv-node"
+  val validatorNodePath: File = testResourcesPath / "local-validator-node"
 
   val svParticipantPath: File = svNodePath / "canton-participant"
   val svDomainPath: File = svNodePath / "canton-domain"
-  val svAppsPath: File = svNodePath / "sv-apps"
+  val svAppPath: File = svNodePath / "sv-app"
+  val scanAppPath: File = svNodePath / "scan-app"
 
-  lazy val dumpFile: File = Files.createTempFile("participant-dump", ".json")
+  val validatorParticipantPath: File = validatorNodePath / "canton-participant"
+  val validatorAppPath: File = validatorNodePath / "validator-app"
+
+  lazy val svDumpFile: File = Files.createTempFile("sv-participant-dump", ".json")
+  lazy val validatorDumpFile: File = Files.createTempFile("validator-participant-dump", ".json")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
@@ -38,19 +44,29 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
         // Config that runs against long-running Canton; sv1 defined here
         testResourcesPath / "simple-topology.conf",
         // Config that runs against Canton started from this test; sv1-local defined here
-        svAppsPath / "app.conf",
+        svAppPath / "app.conf",
+        scanAppPath / "app.conf",
+        validatorAppPath / "app.conf",
       )
       .clearConfigTransforms()
       .addConfigTransforms(
         (_, config) => CNNodeConfigTransforms.ensureNovelDamlNames()(config),
         (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
-        (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
-        (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
         (_, config) =>
           CNNodeConfigTransforms.updateAllSvAppConfigs { case (name, c) =>
             if (name == "sv1Local") {
               c.copy(participantBootstrappingDump =
-                Some(ParticipantBootstrapDumpConfig.File(dumpFile.path))
+                Some(ParticipantBootstrapDumpConfig.File(svDumpFile.path))
+              )
+            } else {
+              c
+            }
+          }(config),
+        (_, config) =>
+          CNNodeConfigTransforms.updateAllValidatorConfigs { case (name, c) =>
+            if (name == "aliceValidatorLocal") {
+              c.copy(participantBootstrappingDump =
+                Some(ParticipantBootstrapDumpConfig.File(validatorDumpFile.path))
               )
             } else {
               c
@@ -61,49 +77,70 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       .withManualStart
   }
 
-  "We can export a Canton participant identity and import it in a new participant" in {
-    implicit env =>
-      startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
-      val svcInfoBefore = sv1Backend.getSvcInfo()
+  "We can export and import Canton participant identities dumps" in { implicit env =>
+    startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend, aliceValidatorBackend)
 
-      val participantDump = clue("Getting participant identities dump") {
-        sv1ValidatorBackend.dumpParticipantIdentities()
+    val svcInfoBefore = sv1Backend.getSvcInfo()
+    val validatorPartyBefore = aliceValidatorBackend.getValidatorPartyId()
+
+    val svParticipantDump = clue("Getting participant identities dump from SV1") {
+      sv1ValidatorBackend.dumpParticipantIdentities()
+    }
+    clue("Checking exported users list") {
+      val sv1Party = svcInfoBefore.svParty
+      svParticipantDump.users should contain(
+        ParticipantIdentitiesDump.ParticipantUser(sv1Backend.config.ledgerApiUser, Some(sv1Party))
+      )
+      svParticipantDump.users should contain(
+        ParticipantIdentitiesDump.ParticipantUser(
+          sv1ValidatorBackend.config.ledgerApiUser,
+          Some(sv1Party),
+        )
+      )
+      svParticipantDump.users should contain(
+        ParticipantIdentitiesDump.ParticipantUser(
+          sv1ValidatorBackend.config.validatorWalletUser.value,
+          Some(sv1Party),
+        )
+      )
+    }
+    val validatorParticipantDump =
+      clue("Getting participant identities dump from Alice's validator") {
+        aliceValidatorBackend.dumpParticipantIdentities()
       }
-      clue("Checking exported users list") {
-        val sv1Party = svcInfoBefore.svParty
-        participantDump.users should contain(
-          ParticipantIdentitiesDump.ParticipantUser(sv1Backend.config.ledgerApiUser, Some(sv1Party))
+    clue("Checking exported users list") {
+      validatorParticipantDump.users should contain(
+        ParticipantIdentitiesDump.ParticipantUser(
+          aliceValidatorBackend.config.ledgerApiUser,
+          Some(validatorPartyBefore),
         )
-        participantDump.users should contain(
-          ParticipantIdentitiesDump.ParticipantUser(
-            sv1ValidatorBackend.config.ledgerApiUser,
-            Some(sv1Party),
-          )
-        )
-        participantDump.users should contain(
-          ParticipantIdentitiesDump.ParticipantUser(
-            sv1ValidatorBackend.config.validatorWalletUser.value,
-            Some(sv1Party),
-          )
-        )
-      }
-
-      dumpFile.overwrite(participantDump.toJson.spaces2)
-
+      )
+    }
+    clue("Writing dumps to file") {
+      svDumpFile.overwrite(svParticipantDump.toJson.spaces2)
+      validatorDumpFile.overwrite(validatorParticipantDump.toJson.spaces2)
+    }
+    clue("Stopping nodes before reset") {
+      aliceValidatorBackend.stop()
       sv1ValidatorBackend.stop()
       sv1ScanBackend.stop()
       sv1Backend.stop()
+    }
 
-      Using.resource(startStandaloneCanton()(env)) { _ =>
-        sv1LocalBackend.startSync()
-
+    Using.resource(startStandaloneCanton()(env)) { _ =>
+      clue("Starting nodes after reset") {
+        startAllSync(sv1LocalBackend, sv1ScanLocalBackend, aliceValidatorLocalBackend)
+      }
+      clue("Checking that SV identities were transferred correctly") {
         val svcInfoAfter = sv1LocalBackend.getSvcInfo()
-
         svcInfoAfter.svParty shouldBe svcInfoBefore.svParty
         svcInfoAfter.svcParty shouldBe svcInfoBefore.svcParty
-
-      // TODO(#6073) also spin up a new validator app and compare the exported participant identity
       }
+      clue("Checking that validator identities were transferred correctly") {
+        val aliceValidatorPartyAfter = aliceValidatorLocalBackend.getValidatorPartyId()
+        aliceValidatorPartyAfter shouldBe validatorPartyBefore
+      }
+    }
   }
 
   private def startStandaloneCanton()(implicit env: CNNodeTestConsoleEnvironment) = {
@@ -112,12 +149,20 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
       (svParticipantPath / "canton.conf").toString,
       "-c",
       (svDomainPath / "canton.conf").toString,
+      "-c",
+      (validatorParticipantPath / "canton.conf").toString,
+      // avoid creating new identities
       "-C",
-      "canton.participants-x.sv_participant.init.auto-init=false", // avoid creating new identity
+      "canton.participants-x.sv_participant.init.auto-init=false",
       "-C",
-      // adjust sv user id to account for the suffixing done by ensureNovelDamlNames
+      "canton.participants-x.validator_participant.init.auto-init=false",
+      // adjust user ids to account for the suffixing done by ensureNovelDamlNames
+      "-C",
       "canton.participants-x.sv_participant.ledger-api.user-management-service." +
         s"additional-admin-user-id=${sv1LocalBackend.config.ledgerApiUser}",
+      "-C",
+      "canton.participants-x.validator_participant.ledger-api.user-management-service." +
+        s"additional-admin-user-id=${aliceValidatorLocalBackend.config.ledgerApiUser}",
     )
     startCanton(cantonArgs, "participant-export-import")
   }
@@ -137,11 +182,19 @@ class ParticipantExportImportIntegrationTest extends CNNodeIntegrationTest with 
           c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
         }
       ),
-      CNNodeConfigTransforms.updateAllValidatorConfigs_(c => {
-        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+      CNNodeConfigTransforms.updateAllValidatorConfigs((name, c) => {
+        if (name.endsWith("Local")) {
+          c
+        } else {
+          c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
+        }
       }),
-      CNNodeConfigTransforms.updateAllScanAppConfigs_(c => {
-        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
+      CNNodeConfigTransforms.updateAllScanAppConfigs((name, c) => {
+        if (name.endsWith("Local")) {
+          c
+        } else {
+          c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
+        }
       }),
     )
     transforms.foldLeft(config)((c, tf) => tf(c))
