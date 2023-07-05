@@ -382,7 +382,17 @@ class WalletTimeBasedIntegrationTest
 
     "generate app rewards correctly" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      grantFeaturedAppRight(aliceValidatorWalletClient)
+
+      actAndCheck(
+        "Grant featuredAppRight on Alice's wallet",
+        grantFeaturedAppRight(aliceValidatorWalletClient),
+      )(
+        "Check that Alice's wallet is granted",
+        _ => {
+          aliceValidatorClient.getValidatorUserInfo().featured shouldBe true
+        },
+      )
+
       aliceWalletClient.tap(20.0)
 
       eventually() {

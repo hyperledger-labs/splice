@@ -6,14 +6,15 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class HttpValidatorPublicHandler(
     store: ValidatorStore,
     validatorUserName: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    tracer: Tracer
+    ec: ExecutionContext,
+    tracer: Tracer,
 ) extends v0.ValidatorPublicHandler[Unit]
     with Spanning
     with NamedLogging {
@@ -24,12 +25,13 @@ class HttpValidatorPublicHandler(
   )()(
       fake: Unit
   ): Future[v0.ValidatorPublicResource.GetValidatorUserInfoResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      Future.successful(
-        definitions.GetValidatorUserInfoResponse(
-          store.key.validatorParty.filterString,
-          validatorUserName,
-        )
+    withNewTrace(workflowId) { implicit tc => _ =>
+      for {
+        featuredAppRight <- store.lookupValidatorFeaturedAppRight()
+      } yield definitions.GetValidatorUserInfoResponse(
+        store.key.validatorParty.filterString,
+        validatorUserName,
+        featuredAppRight.isDefined,
       )
     }
 }

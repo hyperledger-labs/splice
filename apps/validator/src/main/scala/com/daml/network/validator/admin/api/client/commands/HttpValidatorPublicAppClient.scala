@@ -14,6 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 final case class UserInfo(
     primaryParty: PartyId,
     userName: String,
+    featured: Boolean,
 )
 
 object HttpValidatorPublicAppClient {
@@ -45,7 +46,9 @@ object HttpValidatorPublicAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.GetValidatorUserInfoResponse.OK(response) =>
-      Codec.decode(Codec.Party)(response.partyId).map(pid => UserInfo(pid, response.userName))
+      Codec
+        .decode(Codec.Party)(response.partyId)
+        .map(pid => UserInfo(pid, response.userName, response.featured))
     }
   }
 }

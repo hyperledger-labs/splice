@@ -135,11 +135,14 @@ components:
       required:
         - party_id
         - user_name
+        - featured
       properties:
         party_id:
           type: string
         user_name:
           type: string
+        featured:
+          type: boolean
 
     ListUsersResponse:
       type: object
