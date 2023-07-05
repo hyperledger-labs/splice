@@ -539,7 +539,7 @@
         "topup": {
           "enabled": false,
           "minTopupInterval": "1m",
-          "targetThroughput": 10000
+          "targetThroughput": 33300
         },
         "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
       }
