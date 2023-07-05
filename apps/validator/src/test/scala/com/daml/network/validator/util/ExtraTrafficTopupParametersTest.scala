@@ -33,13 +33,11 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
   private def mkExtraTrafficTopupParameters(
       minTopupInterval: NonNegativeFiniteDuration = defaultMinTopupInterval,
       triggerPollingInterval: NonNegativeFiniteDuration = defaultTriggerPollingInterval,
-      baseRate: BigDecimal = defaultBaseRate,
-      baseRateBurstWindow: NonNegativeFiniteDuration = defaultBaseRateBurstWindow,
       minTopupAmount: Long = defaultMinTopupAmount,
       targetRate: BigDecimal = defaultTargetRate,
   ) = {
     ExtraTrafficTopupParameters(
-      domainFeesConfig(baseRate, baseRateBurstWindow, minTopupAmount),
+      domainFeesConfig(defaultBaseRate, defaultBaseRateBurstWindow, minTopupAmount),
       BuyExtraTrafficConfig(NonNegativeNumeric.tryCreate(targetRate), minTopupInterval),
       triggerPollingInterval,
     )
@@ -49,12 +47,11 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
       topupParameters: ExtraTrafficTopupParameters,
       minTopupInterval: NonNegativeFiniteDuration,
       triggerPollingInterval: NonNegativeFiniteDuration = defaultTriggerPollingInterval,
-      baseRate: BigDecimal = defaultBaseRate,
       targetRate: BigDecimal = defaultTargetRate,
       minTopupAmount: Long = defaultMinTopupAmount,
   ) = {
     topupParameters.topupAmount should be >= minTopupAmount
-    topupParameters.topupAmount should be >= ((targetRate - baseRate) / 1e3 * topupParameters.minTopupInterval.duration.toMillis)
+    topupParameters.topupAmount should be >= (targetRate / 1e3 * topupParameters.minTopupInterval.duration.toMillis)
       .setScale(0, RoundingMode.CEILING)
       .toLong
     topupParameters.minTopupInterval.duration.toMillis >= triggerPollingInterval.duration.toMillis
@@ -78,25 +75,16 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
       }
     }
 
-    "target rate is less than or equal to the base rate" should {
+    "target rate of zero" should {
       "not require any top-up at all" in {
-        val topupParams1 = mkExtraTrafficTopupParameters(
-          baseRate = BigDecimal(1_000),
-          targetRate = BigDecimal(500),
-        )
+        val topupParams1 = mkExtraTrafficTopupParameters(targetRate = 0)
         topupParams1.topupAmount shouldBe 0
-        val topupParams2 = mkExtraTrafficTopupParameters(
-          baseRate = BigDecimal(1_000),
-          targetRate = BigDecimal(1_000),
-        )
-        topupParams2.topupAmount shouldBe 0
       }
     }
 
     "min top-up amount is relatively low" should {
       "provide enough extra traffic to last till next top-up" in {
         val minTopupAmount = 4_000_000L
-        val baseRate = BigDecimal(1_000)
         val targetRate = BigDecimal(10_000)
         val triggerPollingInterval = NonNegativeFiniteDuration.ofMinutes(2)
 
@@ -107,7 +95,6 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
         // next top-up will happen after 4 polling intervals = 8 mins
         val topupParams1 = mkExtraTrafficTopupParameters(
           minTopupAmount = minTopupAmount,
-          baseRate = baseRate,
           targetRate = targetRate,
           triggerPollingInterval = triggerPollingInterval,
           minTopupInterval = NonNegativeFiniteDuration.ofMinutes(7),
@@ -116,20 +103,18 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
         // here too, next top-up will occur after 4 polling intervals = 8 mins
         val topupParams2 = mkExtraTrafficTopupParameters(
           minTopupAmount = minTopupAmount,
-          baseRate = baseRate,
           targetRate = targetRate,
           triggerPollingInterval = triggerPollingInterval,
           minTopupInterval = NonNegativeFiniteDuration.ofMinutes(8),
         )
         val topupIntervalSecs = NonNegativeFiniteDuration.ofMinutes(8).duration.toSeconds
         // Note that by min top-up amount being "relatively low", we mean
-        // minTopupAmount <= (targetRate - baseRate) * topupInterval
-        //                   = (10_000 - 1_000) * 8 * 60 = 4.32MB
-        topupParams1.topupAmount shouldBe (targetRate - baseRate) * topupIntervalSecs
+        // minTopupAmount <= targetRate * topupInterval
+        //                   = 10_000 * 8 * 60 = 4.8MB
+        topupParams1.topupAmount shouldBe targetRate * topupIntervalSecs
         topupParams1.minTopupInterval.duration.toSeconds shouldBe topupIntervalSecs
         checkTopupParameters(
           topupParams1,
-          baseRate = baseRate,
           targetRate = targetRate,
           minTopupAmount = minTopupAmount,
           minTopupInterval = NonNegativeFiniteDuration.ofMinutes(8),
@@ -141,30 +126,27 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
 
     "min top-up amount is relatively high" should {
       "adjust top-up interval to deliver configured target rate" in {
-        // Set minTopupAmount in this case to be > 4.32MB
+        // Set minTopupAmount in this case to be > 4.8MB
         val minTopupAmount = 5_000_000L
-        val baseRate = BigDecimal(1_000)
         val targetRate = BigDecimal(10_000)
         val minTopupInterval = NonNegativeFiniteDuration.ofMinutes(7)
         val triggerPollingInterval = NonNegativeFiniteDuration.ofMinutes(2)
 
         val topupParams = mkExtraTrafficTopupParameters(
           minTopupAmount = minTopupAmount,
-          baseRate = baseRate,
           targetRate = targetRate,
           triggerPollingInterval = triggerPollingInterval,
           minTopupInterval = minTopupInterval,
         )
         // topupInterval in this case would be derived from the minTopupAmount as
-        // minTopupAmount / (targetRate - baseRate) ~= 9.3 mins
+        // minTopupAmount / targetRate ~= 8.3 mins
         // the actual topupInterval would then be this value rounded up to the nearest
         // multiple of the polling interval = 10 mins
         val topupIntervalSecs = NonNegativeFiniteDuration.ofMinutes(10).duration.toSeconds
-        topupParams.topupAmount shouldBe (targetRate - baseRate) * topupIntervalSecs
+        topupParams.topupAmount shouldBe targetRate * topupIntervalSecs
         topupParams.minTopupInterval.duration.toSeconds shouldBe topupIntervalSecs
         checkTopupParameters(
           topupParams,
-          baseRate = baseRate,
           targetRate = targetRate,
           minTopupAmount = minTopupAmount,
           minTopupInterval = minTopupInterval,

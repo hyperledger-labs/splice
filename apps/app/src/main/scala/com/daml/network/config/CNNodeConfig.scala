@@ -485,7 +485,21 @@ object CNNodeConfig {
     implicit val buyExtraTrafficConfigReader: ConfigReader[BuyExtraTrafficConfig] =
       deriveReader[BuyExtraTrafficConfig]
     implicit val validatorGlobalDomainConfigReader: ConfigReader[ValidatorGlobalDomainConfig] =
-      deriveReader[ValidatorGlobalDomainConfig]
+      deriveReader[ValidatorGlobalDomainConfig].emap(config => {
+        val trafficPurchasedOnEachTopup =
+          config.buyExtraTraffic.targetThroughput.value * config.buyExtraTraffic.minTopupInterval.duration.toSeconds
+        val trafficReservedForTopups = config.trafficReservedForTopups.value
+        Either.cond(
+          // config is valid if either the validator is not configured to do top-ups
+          // or the reserved traffic is less than the traffic purchased per top-up
+          trafficPurchasedOnEachTopup == 0 || trafficReservedForTopups < trafficPurchasedOnEachTopup,
+          config,
+          ConfigValidationFailed(
+            s"The target-throughput times the min-topup-interval in the buy-extra-traffic config (currently: $trafficPurchasedOnEachTopup) " +
+              s"must be greater than the traffic-reserved-for-topups (currently: $trafficReservedForTopups)"
+          ),
+        )
+      })
     implicit val validatorExtraDomainConfigReader: ConfigReader[ValidatorExtraDomainConfig] =
       deriveReader[ValidatorExtraDomainConfig]
     implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =

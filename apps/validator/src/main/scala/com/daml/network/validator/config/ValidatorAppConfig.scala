@@ -37,8 +37,8 @@ final case class BuyExtraTrafficConfig(
     /** target throughput in bytes per second
       *
       * The top-up trigger uses this to determine how much extra traffic to purchase each time.
-      * Values smaller than the SVC-determined base rate imply that no extra traffic will be
-      * purchased automatically and the throughput will be limited to the base rate.
+      * A value of zero implies that no extra traffic will be purchased automatically and
+      * the throughput will be limited to the base rate.
       */
     targetThroughput: NonNegativeNumeric[BigDecimal] =
       NonNegativeNumeric.tryCreate(BigDecimal(0)), // in bytes per second
@@ -50,7 +50,7 @@ final case class BuyExtraTrafficConfig(
       * polling interval of the top-up trigger.
       *
       * Note that the actual interval between top-ups might be larger due to the SVC requiring
-      * a minimal top-up amount larger than `(targetThroughput - freeBaseThroughput) * minTopupInterval`.
+      * a minimal top-up amount larger than `targetThroughput * minTopupInterval`.
       */
     minTopupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
 )
@@ -59,6 +59,13 @@ case class ValidatorGlobalDomainConfig(
     alias: DomainAlias,
     url: String,
     buyExtraTraffic: BuyExtraTrafficConfig = BuyExtraTrafficConfig(),
+
+    /** amount of extra traffic reserved for transactions required to do traffic topups
+      *
+      * Note that this will be ignored if the validator is not configured to do topups
+      * i.e. the target throughput is set to zero (its default value).
+      */
+    trafficReservedForTopups: NonNegativeNumeric[Long] = NonNegativeNumeric.tryCreate(100_000L),
 )
 
 // Validators are responsible for establishing connections to domains and so need more information than just a `DomainConfig`

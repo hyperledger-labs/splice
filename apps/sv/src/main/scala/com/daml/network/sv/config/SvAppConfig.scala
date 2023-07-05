@@ -13,6 +13,7 @@ import com.daml.network.config.{
 }
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
@@ -91,6 +92,13 @@ object SvOnboardingConfig {
 final case class SvGlobalDomainConfig(
     alias: DomainAlias,
     url: String,
+
+    /** amount of extra traffic reserved for transactions required to do traffic topups
+      *
+      * Note that this value MUST be smaller or euqal to the value provided in SV's validator config; and ideally it SHOULD be equal to it.
+      * Also an SV's validator must always be configured to do top-ups
+      */
+    trafficReservedForTopups: NonNegativeNumeric[Long] = NonNegativeNumeric.tryCreate(100_000L),
 )
 
 final case class SvDomainConfig(

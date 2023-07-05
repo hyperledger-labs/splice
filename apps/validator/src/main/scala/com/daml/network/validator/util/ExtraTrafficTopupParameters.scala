@@ -26,9 +26,8 @@ object ExtraTrafficTopupParameters {
       validatorConfig: BuyExtraTrafficConfig,
       topupTriggerPollingInterval: NonNegativeFiniteDuration,
   ): ExtraTrafficTopupParameters = {
-    val baseRateBytesPerSecond = globalConfig.baseRateTrafficLimits.rate
     val targetRateBytesPerSecond = validatorConfig.targetThroughput.value
-    if (targetRateBytesPerSecond <= baseRateBytesPerSecond) {
+    if (targetRateBytesPerSecond <= 0L) {
       // the topup interval in this case is irrelevant
       ExtraTrafficTopupParameters(0L, NonNegativeFiniteDuration.ofSeconds(0))
     } else {
@@ -36,7 +35,6 @@ object ExtraTrafficTopupParameters {
       val minTopupInterval =
         maximumOfDuration(validatorConfig.minTopupInterval, topupTriggerPollingInterval)
       val expectedTopupParameters = roundUpIntervalAndCalculateAmount(
-        baseRateBytesPerSecond,
         targetRateBytesPerSecond,
         minTopupInterval,
         topupTriggerPollingInterval,
@@ -50,10 +48,9 @@ object ExtraTrafficTopupParameters {
         val topupIntervalMillis = (
           BigDecimal(
             globalConfig.minTopupAmount
-          ) / (targetRateBytesPerSecond - baseRateBytesPerSecond) * 1e3
+          ) / targetRateBytesPerSecond * 1e3
         ).setScale(0, RoundingMode.CEILING).toLong
         roundUpIntervalAndCalculateAmount(
-          baseRateBytesPerSecond,
           targetRateBytesPerSecond,
           NonNegativeFiniteDuration.ofMillis(topupIntervalMillis),
           topupTriggerPollingInterval,
@@ -69,7 +66,6 @@ object ExtraTrafficTopupParameters {
     if (duration1.duration >= duration2.duration) duration1 else duration2
 
   private def roundUpIntervalAndCalculateAmount(
-      baseRateBytesPerSecond: BigDecimal,
       targetRateBytesPerSecond: BigDecimal,
       topupInterval: NonNegativeFiniteDuration,
       topupTriggerPollingInterval: NonNegativeFiniteDuration,
@@ -82,7 +78,7 @@ object ExtraTrafficTopupParameters {
     val nextTopupAfterMillis = multiple * pollingIntervalMillis
     // calculate topupAmount as the amount of traffic needed to deliver target rate till next top-up
     val topupAmountBytes =
-      ((targetRateBytesPerSecond - baseRateBytesPerSecond) / 1e3 * nextTopupAfterMillis)
+      (targetRateBytesPerSecond / 1e3 * nextTopupAfterMillis)
         .setScale(0, RoundingMode.CEILING)
         .toLong
     ExtraTrafficTopupParameters(
