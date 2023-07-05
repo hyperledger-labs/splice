@@ -253,6 +253,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ParticipantUser"
+        version:
+          type: string
 
     ParticipantKey:
       type: object

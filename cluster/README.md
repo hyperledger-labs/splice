@@ -1116,10 +1116,10 @@ To download exports for local inspection either use the web UI or
 ### Bootstrapping from a Cluster Data Dump
 
 To bootstrap a fresh cluter from an ACS and participant identity data dump, set ``process.env.BOOTSTRAPPING_CONFIG`` to a JSON object specifying
-the cluster, the version and the date the backup is from. The most recent backup before the specified date will be used to bootstrap from.
+the cluster and the date the backup is from. The most recent backup before the specified date will be used to bootstrap from.
 
 ```
-export BOOTSTRAPPING_CONFIG='{"cluster": "test-preview", "version": "0.1.1-snapshot.20230704.3202.0.vcc9b7cbe", "date": "2023-07-05T12:00:00.000Z"}'
+export BOOTSTRAPPING_CONFIG='{"cluster": "test-preview", "date": "2023-07-05T12:00:00.000Z"}'
 ```
 
 ## Appendix: Kubernetes and Other Deployment Resources

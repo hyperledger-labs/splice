@@ -905,3 +905,5 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+        version:
+          type: string

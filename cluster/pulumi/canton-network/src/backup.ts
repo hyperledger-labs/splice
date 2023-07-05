@@ -100,17 +100,20 @@ async function getLatestObjectInDateRange(
   return getLatestObject(bucket, startOffset, endOffset);
 }
 
+const bucketPath = (cluster: string, xns: ExactNamespace): string => {
+  return `${cluster}/${xns.logicalName}`;
+};
+
 async function getLatestParticipantIdentityDump(
   bucket: Bucket,
   xns: ExactNamespace,
   cluster: string,
-  version: string,
   start: Date,
   end: Date
 ): Promise<string> {
   const latestObject = await getLatestObjectInDateRange(
     bucket,
-    `${cluster}/${xns.logicalName}/${version}/participant_identities_`,
+    `${bucketPath(cluster, xns)}/participant_identities_`,
     '.json',
     start,
     end
@@ -126,7 +129,7 @@ export function getLatestSvcAcsDumpFile(
     const bucket = getGcpBucket(config.bucket.config, credentials);
     const file = await getLatestObjectInDateRange(
       bucket,
-      `${config.cluster}/${xns.logicalName}/${config.version}/svc_acs_dump_`,
+      `${bucketPath(config.cluster, xns)}/svc_acs_dump_`,
       '.json',
       config.start,
       config.end
@@ -157,7 +160,6 @@ export const participantBootstrapDumpSecretName = 'cn-app-participant-bootstrap-
 export type BootstrappingDumpConfig = {
   bucket: GcpBucket;
   cluster: string;
-  version: string;
   start: Date;
   end: Date;
 };
@@ -172,7 +174,6 @@ export function fetchAndInstallParticipantBootstrapDump(
       bucket,
       xns,
       config.cluster,
-      config.version,
       config.start,
       config.end
     );

@@ -44,7 +44,7 @@ abstract class ParticipantIdentitiesBackupIntegrationTestBase[T <: BackupDumpCon
     "produce a participant identities dump in the background" in { implicit env =>
       initSvcWithSv1Only()
       val logLineRegex =
-        "Wrote participant identities dump.*at path: (.*)/(.*\\.json)".r
+        "Wrote participant identities dump.*at path: (.*\\.json)".r
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
         aliceValidatorBackend.startSync(),
@@ -53,8 +53,8 @@ abstract class ParticipantIdentitiesBackupIntegrationTestBase[T <: BackupDumpCon
             1,
             logEntries,
           )(logEntry => {
-            inside(logEntry.message) { case logLineRegex(subDir, filename) =>
-              val dump = readDump(Paths.get(subDir, filename).toString)
+            inside(logEntry.message) { case logLineRegex(filename) =>
+              val dump = readDump(filename.toString)
               val jsonDump = ParticipantIdentitiesDump
                 .fromJsonString(dump)
                 .fold(

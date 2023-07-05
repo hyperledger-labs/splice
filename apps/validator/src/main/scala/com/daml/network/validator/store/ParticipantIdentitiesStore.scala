@@ -51,7 +51,13 @@ class ParticipantIdentitiesStore(
             )
           )
         )
-    } yield ParticipantIdentitiesDump(id, keys, bootstrapTxs, users)
+    } yield ParticipantIdentitiesDump(
+      id,
+      keys,
+      bootstrapTxs,
+      users,
+      Some(BuildInfo.compiledVersion),
+    )
 
   /** Write a dump of the participant identities to the configured backup location.
     *
@@ -96,7 +102,6 @@ class ParticipantIdentitiesStore(
 object ParticipantIdentitiesStore {
   def dumpFilename(now: Instant) =
     Paths.get(
-      BuildInfo.compiledVersion,
-      s"participant_identities_${now}.json",
+      s"participant_identities_${now}.json"
     )
 }

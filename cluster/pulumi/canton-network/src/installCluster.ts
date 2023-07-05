@@ -34,7 +34,6 @@ if (withDomainFees && !doubleSv) {
 
 type BootstrapCliConfig = {
   cluster: string;
-  version: string;
   date: string;
 };
 
@@ -170,7 +169,6 @@ if (!isDevNet || bootstrappingConfig) {
     bootstrappingDumpConfig = {
       bucket: backupBucket,
       cluster: bootstrappingConfig.cluster,
-      version: bootstrappingConfig.version,
       start,
       end,
     };

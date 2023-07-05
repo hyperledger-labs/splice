@@ -17,6 +17,7 @@ final case class ParticipantIdentitiesDump(
     keys: Seq[ParticipantIdentitiesDump.ParticipantKey],
     bootstrapTxs: Seq[GenericSignedTopologyTransactionX],
     users: Seq[ParticipantIdentitiesDump.ParticipantUser],
+    version: Option[String],
 ) {
   def toHttp: http.ParticipantIdentitiesDump = {
     http.ParticipantIdentitiesDump(
@@ -28,6 +29,7 @@ final case class ParticipantIdentitiesDump(
       users
         .map(user => http.ParticipantUser(user.id, user.primaryParty.map(_.toProtoPrimitive)))
         .toVector,
+      version,
     )
   }
   def toJson: Json = {
@@ -51,6 +53,7 @@ object ParticipantIdentitiesDump {
         users = response.users.toSeq.map(user =>
           ParticipantUser(user.id, user.primaryParty.map(PartyId.tryFromProtoPrimitive(_)))
         ),
+        version = response.version,
       )
     ).toEither.left.map(_.getMessage())
   }

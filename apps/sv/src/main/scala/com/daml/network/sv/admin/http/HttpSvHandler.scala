@@ -439,13 +439,13 @@ class HttpSvHandler(
               // because it turns this into an absolute path which
               // then makes all the logging stuff below very confusing.
               val filename = Paths.get(
-                BuildInfo.compiledVersion,
-                s"svc_acs_dump_${now}.json",
+                s"svc_acs_dump_${now}.json"
               )
               // TODO(#6073): compress output file
               val httpSnapshot = definitions.GetAcsStoreDumpResponse(
                 offset = snapshot.offset,
                 contracts = snapshot.contracts.map(_.toJson).toVector,
+                version = Some(BuildInfo.compiledVersion),
               )
               val fileDesc =
                 s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $filename"

@@ -672,9 +672,8 @@ function subcmd_ci_apply() {
     # However, we allow overwriting it to account for cases where the previous cluster is broken in some way.
     if [ -n "${RESTORE_CLUSTER:-}" ] && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
         CLUSTER="$GCP_CLUSTER_BASENAME"
-        PREVIOUS_VERSION="$(curl -sSLf --retry 60 --retry-max-time 120 "https://$CLUSTER.network.canton.global/version")"
         NOW="$(date +"%Y-%m-%dT%H:%M:%S.000Z")"
-        export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"version\": \"$PREVIOUS_VERSION\", \"date\": \"$NOW\"}"
+        export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"date\": \"$NOW\"}"
     fi
 
     _cluster_show
