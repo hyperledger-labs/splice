@@ -57,7 +57,7 @@ class DbMultiDomainAcsStoreTest
       }
     }
 
-    "allow creating same contract id in different stores" in {
+    "allow creating & deleting same contract id in different stores" in {
       val store1 = mkStore(id = 1)
       val store2 = mkStore(id = 2)
       val coupon = appRewardCoupon(1, svcParty)
@@ -68,12 +68,25 @@ class DbMultiDomainAcsStoreTest
         _ <- store2.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty)
         _ <- dummyDomain.create(coupon)(store1)
         _ <- dummyDomain.create(coupon)(store2)
-      } yield {
-        eventually() {
+        _ = eventually() {
           store1
             .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
             .futureValue
             .map(_.contract) should be(Seq(coupon))
+          store2
+            .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
+            .futureValue
+            .map(_.contract) should be(Seq(coupon))
+        }
+        _ <- dummyDomain.archive(coupon)(store1)
+      } yield {
+        eventually() {
+          // deleted from store1
+          store1
+            .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
+            .futureValue
+            .map(_.contract) should have size 0
+          // but not from store2
           store2
             .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
             .futureValue

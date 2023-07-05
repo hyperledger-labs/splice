@@ -16,7 +16,6 @@ import com.daml.network.environment.ledger.api.*
 import com.daml.network.util.{Contract, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -554,11 +553,6 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 object InMemoryMultiDomainAcsStore {
 
   import MultiDomainAcsStore.{ContractState, TransferId}
-
-  private case class ContractLocation(
-      contractId: ContractId[_],
-      domain: DomainId,
-  )
 
   private case class ContractStateEvent(
       contractId: ContractId[_],
@@ -1250,96 +1244,5 @@ object InMemoryMultiDomainAcsStore {
   private object TransferInEventSummary {
     case object AddedTransferIn extends TransferInEventSummary
     case class RemovedTransferOut(removedTombstone: Boolean) extends TransferInEventSummary
-  }
-
-  private case class IngestionSummary[TXE <: TxLogStore.Entry[_]](
-      txId: Option[String],
-      offset: Option[String],
-      newAcsSize: Int,
-      ingestedCreatedEvents: Seq[CreatedEvent],
-      numFilteredCreatedEvents: Int,
-      ingestedArchivedEvents: Seq[ExercisedEvent],
-      numFilteredArchivedEvents: Int,
-      addedContractLocations: Seq[ContractLocation],
-      removedContractLocations: Seq[ContractLocation],
-      addedTransferInEvents: Seq[(ContractId[_], TransferId)],
-      numFilteredTransferInEvents: Int,
-      removedTransferInEvents: Seq[(ContractId[_], TransferId)],
-      addedTransferOutEvents: Seq[(ContractId[_], TransferId)],
-      numFilteredTransferOutEvents: Int,
-      removedTransferOutEvents: Seq[(ContractId[_], TransferId)],
-      addedArchivedTombstones: Seq[ContractId[_]],
-      removedArchivedTombstones: Seq[ContractId[_]],
-      ingestedTxLogEntries: Seq[TXE],
-  ) extends PrettyPrinting {
-    import com.daml.network.util.PrettyInstances
-    import com.daml.network.util.PrettyInstances.*
-
-    @SuppressWarnings(Array("org.wartremover.warts.Product"))
-    implicit val txLogPretty: Pretty[TXE] = adHocPrettyInstance
-
-    implicit def prettyContractLocation: Pretty[ContractLocation] =
-      prettyNode("ContractLocation", param("cid", _.contractId), param("domain", _.domain))
-
-    implicit def prettyTransferId: Pretty[TransferId] =
-      prettyNode(
-        "TransferId",
-        param("source", _.source),
-        param[TransferId, String]("id", _.id)(PrettyInstances.prettyString),
-      )
-
-    override def pretty: Pretty[this.type] = {
-
-      def paramIfNonZero[T](name: String, getValue: T => Int) =
-        param(name, getValue(_), (x: T) => getValue(x) != 0)
-
-      prettyNode(
-        "", // intentionally left empty, as that worked better in the log messages above
-        paramIfDefined("txId", _.txId.map(_.unquoted)),
-        paramIfDefined("offset", _.offset.map(_.unquoted)),
-        param("newAcsSize", _.newAcsSize),
-        paramIfNonEmpty("ingestedCreatedEvents", _.ingestedCreatedEvents),
-        paramIfNonZero("numFilteredCreatedEvents", _.numFilteredCreatedEvents),
-        paramIfNonEmpty("ingestedArchivedEvents", _.ingestedArchivedEvents),
-        paramIfNonZero("numFilteredArchivedEvents", _.numFilteredArchivedEvents),
-        paramIfNonEmpty("addedContractLocations", _.addedContractLocations),
-        paramIfNonEmpty("removedContractLocations", _.removedContractLocations),
-        paramIfNonEmpty("addedTransferInEvents", _.addedTransferInEvents),
-        paramIfNonZero("numFilteredTransferInEvents", _.numFilteredTransferInEvents),
-        paramIfNonEmpty("removedTransferInEvents", _.removedTransferInEvents),
-        paramIfNonEmpty("addedTransferOutEvents", _.addedTransferOutEvents),
-        paramIfNonZero("numFilteredTransferOutEvents", _.numFilteredTransferOutEvents),
-        paramIfNonEmpty("removedTransferOutEvents", _.removedTransferOutEvents),
-        paramIfNonEmpty("addedArchivedTombstones", _.addedArchivedTombstones),
-        paramIfNonEmpty("removedArchivedTombstones", _.removedArchivedTombstones),
-        paramIfNonEmpty(
-          "ingestedTxLogEntries",
-          _.ingestedTxLogEntries,
-        ),
-      )
-    }
-  }
-
-  private object IngestionSummary {
-    def empty[TXE <: TxLogStore.Entry[_]]: IngestionSummary[TXE] = IngestionSummary(
-      txId = None,
-      offset = None,
-      newAcsSize = 0,
-      ingestedCreatedEvents = Seq.empty,
-      numFilteredCreatedEvents = 0,
-      ingestedArchivedEvents = Seq.empty,
-      numFilteredArchivedEvents = 0,
-      addedContractLocations = Seq.empty,
-      removedContractLocations = Seq.empty,
-      addedTransferInEvents = Seq.empty,
-      numFilteredTransferInEvents = 0,
-      removedTransferInEvents = Seq.empty,
-      addedTransferOutEvents = Seq.empty,
-      numFilteredTransferOutEvents = 0,
-      removedTransferOutEvents = Seq.empty,
-      addedArchivedTombstones = Seq.empty,
-      removedArchivedTombstones = Seq.empty,
-      ingestedTxLogEntries = Seq.empty,
-    )
   }
 }

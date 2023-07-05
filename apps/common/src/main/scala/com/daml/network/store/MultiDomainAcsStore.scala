@@ -258,6 +258,9 @@ object MultiDomainAcsStore {
     /** Whether the scope might contain an event of the given interface. */
     def mightContain[I, Id, View](interfaceCompanion: JavaInterfaceCompanion[I, Id, View]): Boolean
 
+    /** Whether the scope might contain an event of the given template OR interface. */
+    def mightContain(identifier: Identifier): Boolean
+
     def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[_]](
         interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
     )(ev: CreatedEvent): Option[Contract[Id, View]]
@@ -296,6 +299,10 @@ object MultiDomainAcsStore {
         interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
     ): Boolean =
       interfaceFilters.contains(interfaceCompanion.TEMPLATE_ID)
+
+    override def mightContain(identifier: Identifier): Boolean = {
+      templateFilters.contains(identifier) || interfaceFilters.contains(identifier)
+    }
 
     override def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[?]](
         interfaceCompanion: JavaInterfaceCompanion[I, Id, View]

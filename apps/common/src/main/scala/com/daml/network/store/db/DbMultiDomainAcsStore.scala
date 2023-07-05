@@ -3,7 +3,7 @@ package com.daml.network.store.db
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import cats.implicits.*
-import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
@@ -26,7 +26,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.annotation.unused
 import scala.collection.immutable.VectorMap
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -74,6 +74,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     finishedAcsIngestion.future.flatMap(_ => f)
   def waitUntilAcsIngested(): Future[Unit] =
     finishedAcsIngestion.future
+
+  private val acsSize = new AtomicInteger(0)
 
   def lastIngestedOffset(
       storage: DbStorage,
@@ -310,7 +312,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
            """.asUpdate,
             "initialize.1",
           )
-        descriptorResult <- storage
+        (newStoreId, lastIngestedOffset) <- storage
           .querySingle(
             sql"""
              select id, last_ingested_offset
@@ -319,17 +321,32 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
              """.as[(Int, Option[String])].headOption,
             "initialize.2",
           )
-          .value
+          .getOrRaise(
+            new RuntimeException(s"No row for $storeDescriptor found, which was just inserted!")
+          )
+        alreadyIngestedAcs = lastIngestedOffset.isDefined
+        acsSizeInDb <-
+          if (alreadyIngestedAcs) {
+            storage
+              .querySingle(
+                sql"""
+                   select count(*)
+                   from #$acsTableName
+                   where store_id = $newStoreId
+                 """.as[Int].headOption,
+                "initialize.getAcsCount",
+              )
+              .getOrElse(0)
+          } else {
+            Future.successful(0)
+          }
       } yield {
-        val (newStoreId, lastIngestedOffset) = descriptorResult.getOrElse(
-          throw new RuntimeException(s"No row for $storeDescriptor found")
-        )
-
         storeIdA.set(Some(newStoreId))
         logger.info(s"Store $storeDescriptor initialized with storeId $storeId")
 
-        if (lastIngestedOffset.isDefined) {
+        if (alreadyIngestedAcs) {
           finishedAcsIngestion.success(())
+          acsSize.set(acsSizeInDb)
         }
 
         lastIngestedOffset
@@ -358,16 +375,23 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         // TODO(#5858): Get initial txLogEntries from txLogParser.parseAcs()
         txLogEntries <- Future.successful(Seq.empty)
         // TODO(#5643): batch inserts
+        toInsert = acs
+          .filter(contract => contractFilter.contains(contract.createdEvent))
+          .map(contract => contract.createdEvent.getContractId -> Insert(contract.createdEvent))
         workTodo = WorkTodo(
-          VectorMap.from(
-            acs
-              .filter(contract => contractFilter.contains(contract.createdEvent))
-              .map(contract => contract.createdEvent.getContractId -> Insert(contract.createdEvent))
-          )
+          None,
+          offset,
+          VectorMap.from(toInsert),
+          numFilteredCreatedEvents = acs.size - toInsert.size,
         )
-        _ <- ingestWork(offset, workTodo, txLogEntries)
+        _ <- ingestWork(workTodo, txLogEntries)
       } yield {
+        val summary =
+          WorkDone(None, offset, acs.map(_.createdEvent), Seq.empty, 0)
+            .toSummary(workTodo, Seq.empty)
+        logger.debug(show"Ingested complete ACS at offset $offset: $summary")
         finishedAcsIngestion.success(())
+        acsSize.set(acs.size)
         notifyStreamsOfNewOffset()
         logger.info(
           s"Store $storeId ingested the ACS and switched to ingesting updates at $offset"
@@ -379,9 +403,12 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         traceContext: TraceContext
     ): Future[Unit] = {
       for {
-        (offset, todo, txEntries) <- getIngestionWork(transfer)
-        _ <- ingestWork(offset, todo, txEntries)
+        (todo, txEntries) <- getIngestionWork(transfer)
+        workDone <- ingestWork(todo, txEntries)
       } yield {
+        val summary = workDone.toSummary(todo, txEntries)
+        acsSize.set(summary.newAcsSize)
+        logger.debug(show"Ingested transaction $summary")
         notifyStreamsOfNewOffset()
       }
     }
@@ -393,32 +420,36 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
     private def getIngestionWork(
         transfer: TreeUpdate
-    )(implicit tc: TraceContext): Future[(String, WorkTodo, Seq[TXE])] = {
+    )(implicit tc: TraceContext): Future[(WorkTodo, Seq[TXE])] = {
       transfer match {
         case TransferUpdate(_) =>
           // TODO (#5314): support transfers
           Future.failed(new UnsupportedOperationException("Transfers are unsupported."))
         case TransactionTreeUpdate(tree) =>
           Future {
-            val workTodo = Trees.foldTree(tree, WorkTodo(VectorMap.empty))(
+            val workTodo = Trees.foldTree(
+              tree,
+              WorkTodo(
+                Some(tree.getTransactionId),
+                tree.getOffset,
+                VectorMap.empty,
+                numFilteredCreatedEvents = 0,
+              ),
+            )(
               onCreate = (st, ev, _) => {
                 if (contractFilter.contains(ev)) {
-                  WorkTodo(st.todo + (ev.getContractId -> Insert(ev)))
+                  st.copy(todo = st.todo + (ev.getContractId -> Insert(ev)))
                 } else {
-                  st
+                  st.copy(numFilteredCreatedEvents = st.numFilteredCreatedEvents + 1)
                 }
               },
               onExercise = (st, ev, _) => {
-                if (ev.isConsuming) {
+                if (ev.isConsuming && contractFilter.mightContain(ev.getTemplateId)) {
                   // optimization: a delete on a contract cancels-out with the corresponding insert
                   if (st.todo.contains(ev.getContractId)) {
-                    WorkTodo(st.todo - ev.getContractId)
+                    st.copy(todo = st.todo - ev.getContractId)
                   } else {
-                    WorkTodo(
-                      st.todo + (ev.getContractId -> Delete(
-                        new ContractId[Any](ev.getContractId)
-                      ))
-                    )
+                    st.copy(todo = st.todo + (ev.getContractId -> Delete(ev)))
                   }
                 } else {
                   st
@@ -426,7 +457,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
               },
             )
             (
-              tree.getOffset,
               workTodo,
               txLogParser.parse(tree, logger),
             )
@@ -434,53 +464,117 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       }
     }
 
-    private def ingestWork(offset: String, workTodo: WorkTodo, txEntries: Seq[TXE])(implicit
+    private def ingestWork(workTodo: WorkTodo, txEntries: Seq[TXE])(implicit
         tc: TraceContext
-    ): Future[Unit] = {
+    ): Future[WorkDone] = {
       storage
         .queryAndUpdate(
           DBIO
             .sequence(
               // TODO (#5643): batch inserts
-              // TODO (#5645): implement a summary of changes
               workTodo.todo.toVector.map {
-                case (_, Insert(evt)) =>
+                case (_, insert @ Insert(evt)) =>
                   ingestAcsInsert(evt, tc) match {
                     case Left(err) =>
                       val errMsg =
-                        s"Item at offset $offset with contract id ${evt.getContractId} cannot be ingested: $err"
+                        s"Item at offset ${workTodo.offset} with contract id ${evt.getContractId} cannot be ingested: $err"
                       logger.error(errMsg)
                       throw new IllegalArgumentException(errMsg)
                     case Right(action) =>
-                      action.map(_ => ())
+                      action.map(_ => Some(insert))
                   }
-                case (_, Delete(contractId)) =>
+                case (_, delete @ Delete(exerciseEvent)) =>
+                  val contractId = exerciseEvent.getContractId
                   sqlu"""
                          delete from #$acsTableName
-                         where contract_id = $contractId
-                        """.map(_ => ())
+                         where store_id = $storeId
+                           and contract_id = ${lengthLimited(contractId)}
+                        """.map {
+                    case 1 =>
+                      Some(delete)
+                    case _ =>
+                      // there was actually no contract with that id. This can happen because:
+                      // `contractFilter.mightContain` in `getIngestionWork` can return true for a template,
+                      // but that might still satisfy some other filter, so the contract was never inserted
+                      Option.empty[OperationToDo]
+                  }
               } ++ txEntries.map(txe =>
                 ingestTxLogInsert(txe.indexRecord, tc) match {
                   case Left(err) =>
                     val errMsg =
-                      s"Tx at offset $offset with event id ${txe.indexRecord.eventId} cannot be ingested: $err"
+                      s"Tx at offset ${workTodo.offset} with event id ${txe.indexRecord.eventId} cannot be ingested: $err"
                     logger.error(errMsg)
                     throw new IllegalArgumentException(errMsg)
                   case Right(action) =>
-                    action.map(_ => ())
+                    action.map(_ => Option.empty[OperationToDo])
                 }
-              ) :+ updateOffset(offset)
+              ) :+ updateOffset(workTodo.offset).map(_ => Option.empty[OperationToDo])
             )
             .transactionally
-            .map(_ => ()),
+            .map { operationsDone =>
+              val (deletes, inserts) = operationsDone.flatten.partitionMap {
+                case Delete(evt) => Left(evt)
+                case Insert(evt) => Right(evt)
+              }
+              WorkDone(
+                workTodo.txId,
+                workTodo.offset,
+                inserts,
+                deletes,
+                workTodo.numFilteredCreatedEvents,
+              )
+            },
           "ingest tree",
         )
     }
 
     sealed trait OperationToDo
     case class Insert(evt: CreatedEvent) extends OperationToDo
-    case class Delete(id: ContractId[Any]) extends OperationToDo
-    case class WorkTodo(todo: VectorMap[String, OperationToDo])
+    case class Delete(evt: ExercisedEvent) extends OperationToDo
+    case class WorkTodo(
+        txId: Option[String],
+        offset: String,
+        todo: VectorMap[String, OperationToDo],
+        numFilteredCreatedEvents: Int,
+    )
+
+    case class WorkDone(
+        txId: Option[String],
+        offset: String,
+        inserts: Seq[CreatedEvent],
+        deletes: Seq[ExercisedEvent],
+        numFilteredCreatedEvents: Int,
+    ) {
+      def toSummary(workTodo: WorkTodo, txEntries: Seq[TXE]): IngestionSummary[TXE] = {
+        val numDeletesWanted = workTodo.todo.count {
+          case (_, _: Delete) => true
+          case _ => false
+        }
+        val numDeletesDone = deletes.size
+        IngestionSummary(
+          txId = txId,
+          offset = Some(offset),
+          newAcsSize = acsSize.get() + inserts.size - numDeletesDone,
+          ingestedCreatedEvents = inserts,
+          numFilteredCreatedEvents = numFilteredCreatedEvents,
+          ingestedArchivedEvents = deletes,
+          ingestedTxLogEntries = txEntries,
+          numFilteredArchivedEvents = numDeletesWanted - numDeletesDone,
+          // These are only applicable to the in-memory version:
+          addedArchivedTombstones = Seq.empty,
+          removedArchivedTombstones = Seq.empty,
+          // TODO (#5314): all these below are multi-domain
+          addedContractLocations = Seq.empty,
+          removedContractLocations = Seq.empty,
+          addedTransferInEvents = Seq.empty,
+          numFilteredTransferInEvents = 0,
+          removedTransferInEvents = Seq.empty,
+          addedTransferOutEvents = Seq.empty,
+          numFilteredTransferOutEvents = 0,
+          removedTransferOutEvents = Seq.empty,
+        )
+      }
+    }
   }
 
   override def close(): Unit = ()
