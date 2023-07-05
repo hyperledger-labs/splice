@@ -46,6 +46,7 @@ class SvOnboardingPreflightIntegrationTest
       // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
+      .withManualStart
 
   "run through sv onboarding runbook" in { implicit env =>
     // TODO(M3-53) Consider running this test more than once per deployment once we can offboard SVs

@@ -102,6 +102,7 @@ class LocalRunbookIntegrationTest
         (_, conf) => localValidatorFoundingSvUrl(conf),
         (_, conf) => localScanUrl(conf),
       )
+      .withManualStart
       .withThisSetup(env => {
         setupAndStartCanton()
         env.fullSvcApps.local.foreach(_.start())

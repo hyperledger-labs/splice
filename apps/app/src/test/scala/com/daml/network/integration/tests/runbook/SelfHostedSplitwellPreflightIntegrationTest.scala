@@ -61,6 +61,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
       // Replace the path to the splitwell dar file.
       .addConfigTransforms((_, conf) => replaceDarFilePath(conf))
+      .withManualStart
 
   "run through runbook with self-hosted splitwell" in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup

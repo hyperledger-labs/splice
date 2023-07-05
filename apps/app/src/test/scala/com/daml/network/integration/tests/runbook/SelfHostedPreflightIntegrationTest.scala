@@ -54,6 +54,7 @@ class SelfHostedPreflightIntegrationTest
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
       // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
+      .withManualStart
 
   "run through runbook with self-hosted validator" in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
