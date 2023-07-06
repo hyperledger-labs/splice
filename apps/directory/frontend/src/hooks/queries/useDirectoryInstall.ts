@@ -28,6 +28,20 @@ const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall> | null
         return null;
       }
     },
+    refetchInterval: (data, query) => {
+      if (data !== null && data !== undefined) {
+        // Install contracts are not not expected to change. Once a contract is found, stop refetching.
+        console.debug('useDirectoryInstall: contract found, stopping');
+        return false;
+      } else if (query.state.status === 'error') {
+        //
+        console.debug('useDirectoryInstall: query error, stopping');
+        return false;
+      } else {
+        console.debug('useDirectoryInstall: no data, refetching');
+        return 500;
+      }
+    },
     enabled: !!ledgerApi && !!primaryPartyId && !!providerPartyId, // wait for dependencies to be defined
   });
 };

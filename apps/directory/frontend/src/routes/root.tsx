@@ -1,4 +1,4 @@
-import { ErrorBoundary, Loading, PartyId, useUserState } from 'common-frontend';
+import { ErrorBoundary, ErrorDisplay, Loading, PartyId, useUserState } from 'common-frontend';
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 
@@ -11,13 +11,13 @@ import {
   useProviderParty,
   useRequestDirectoryInstall,
 } from '../hooks';
+import { isDarFileMissingError } from '../utils/errors';
 
 const Root: React.FC = () => {
   const { logout } = useUserState();
   const primaryPartyQuery = usePrimaryParty();
   const primaryPartyId = primaryPartyQuery.data;
-  const { data: directoryInstallContract, isLoading: isDirectoryInstallContractLoading } =
-    useDirectoryInstall();
+  const directoryInstall = useDirectoryInstall();
   const { data: providerPartyId } = useProviderParty();
 
   const ledgerApiClient = useLedgerApiClient();
@@ -26,12 +26,12 @@ const Root: React.FC = () => {
   useEffect(() => {
     if (
       requestDirectoryInstall.isIdle &&
-      !isDirectoryInstallContractLoading &&
+      directoryInstall.isSuccess &&
       primaryPartyId &&
       providerPartyId &&
       ledgerApiClient
     ) {
-      if (directoryInstallContract) {
+      if (directoryInstall.data) {
         console.debug('DirectoryInstall found');
       } else {
         console.debug('DirectoryInstall not found, creating DirectoryInstallRequest');
@@ -39,16 +39,43 @@ const Root: React.FC = () => {
       }
     }
   }, [
-    directoryInstallContract,
-    isDirectoryInstallContractLoading,
+    directoryInstall.isSuccess,
+    directoryInstall.data,
     ledgerApiClient,
     primaryPartyId,
     providerPartyId,
     requestDirectoryInstall,
   ]);
 
-  if (primaryPartyQuery.isLoading) {
-    return <Loading />;
+  let content;
+  if (isDarFileMissingError(directoryInstall.error)) {
+    const missingTemplates = directoryInstall.error.warnings.unknownTemplateIds.join(', ');
+    content = (
+      <ErrorDisplay
+        message="A required template was not found on the participant"
+        userAction="Make sure the application operator has uploaded all relevant DAR files."
+        details={`Missing templates: ${missingTemplates}`}
+        retryFn={() => directoryInstall.refetch()}
+      />
+    );
+  } else if (directoryInstall.error !== null) {
+    content = (
+      <ErrorDisplay
+        message="Problem loading directory install contract"
+        userAction="Please try again later. If the problem persists, contact the application operator."
+      />
+    );
+  } else if (primaryPartyQuery.error !== null) {
+    content = (
+      <ErrorDisplay
+        message="Problem loading primary party"
+        userAction="Please try again later. If the problem persists, contact the application operator."
+      />
+    );
+  } else if (directoryInstall.isLoading || primaryPartyQuery.isLoading) {
+    content = <Loading />;
+  } else {
+    content = <Outlet />;
   }
 
   return (
@@ -78,7 +105,7 @@ const Root: React.FC = () => {
           </Toolbar>
         </Box>
         {/* no need to show the app if it won't be usable. Creating DirectoryInstall should be fast. */}
-        {directoryInstallContract ? <Outlet /> : <Loading />}
+        {content}
       </Box>
     </ErrorBoundary>
   );

@@ -124,7 +124,7 @@ class WalletFrontendIntegrationTest
             _ => {
               val ccText = find(id("wallet-balance-cc")).value.text.trim
               val usdText = find(id("wallet-balance-usd")).value.text.trim
-              val errorMessage = find(className("error-display-text")).value.text.trim
+              val errorMessage = find(className("error-display-message")).value.text.trim
 
               ccText should not be "..."
               usdText should not be "..."
