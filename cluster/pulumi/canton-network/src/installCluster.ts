@@ -116,6 +116,12 @@ const additionalDevNetApprovedSvIdentities = [
     publicKey:
       'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESxcNzqTXgL+ocVESayKc4nddN6taa/uFI9ca7GGIJs1Ns3yKFDDu6UCDKH+qlXA0+CcmyW6ytvZ9WPVeD7JsMw==',
   },
+  // Ben Minton (DA support)
+  {
+    name: 'dasc-test-sv-01',
+    publicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU/AYexo+CmqZxcNEnKgaNoJmdqhHP2nElBymaE4HREPQ0VgObBRNNMlgU/WfUUKElmn2u2D/b/wNtKKrtTA99A==',
+  },
 ];
 
 const approvedSvIdentities = nonDevNetApprovedSvIdentities
