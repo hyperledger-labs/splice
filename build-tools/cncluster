@@ -174,7 +174,7 @@ function _uses_pulumi_stack() {
 
     pulumi_project=$1
 
-    _pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+    RETRY_PULUMI="" _pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
             stack init 2> /dev/null || true
 }
