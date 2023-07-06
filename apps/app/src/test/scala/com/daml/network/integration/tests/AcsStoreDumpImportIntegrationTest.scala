@@ -17,9 +17,10 @@ import com.daml.network.util.{GcpBucket, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.nio.file.Paths
+import java.time.Instant
 
 // Separate from the export as we need a different config for SV1
-abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpConfig]
+abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
     extends CNNodeIntegrationTest
     with WalletTestUtil {
 
@@ -32,10 +33,7 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
   // NOTE: use the following steps to produce such a dump
   //  1. Run the DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest to produce a dump file
   //  2. Open the produced json file in `apps/app/src/test/resources/dumps/test-outputs/<your-build-prefix>`
-  //  3. Reformat it using 'jq' or IntelliJ and replace
-  //     a. all package-ids with 'deadbeef'
-  //     b. the year timestamps of all timestmpas ('1970') with ('1800') so that the imported OpenMiningRounds
-  //        are definitely in the past, even when using simtime.
+  //  3. Reformat it using 'jq' or IntelliJ and replace all package-ids with 'deadbeef'
 
   final protected val bootstrappingDumpFilename =
     AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpDir.resolve(
@@ -45,8 +43,7 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      // Using SimTime to get control over rounds not advancing.
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
@@ -54,7 +51,7 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
       .addConfigTransforms((_, config) =>
         updateAllAutomationConfigs(config =>
           config.copy(
-            // Need to disable these triggers so we can use checkWallet
+            // Need to disable these triggers so we can comfortably use checkWallet
             enableAutomaticRewardsCollectionAndCoinMerging = false,
             enableSvRewards = false,
           )
@@ -79,19 +76,20 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
 
   "sv1" should {
     "load the initial ACS dump" in { implicit env =>
-      clue("Check that the open-mining rounds advanced by one ticket have been restored") {
-        val openMiningRounds = sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(cc.round.OpenMiningRound.COMPANION)(
-            svcParty
-          )
-        inside(openMiningRounds.map(_.data.round.number).sorted) { roundNumbers =>
-          // We can't check for exact equality as the simtime clock is shared with other simtime tests in
-          // CI, and thus might be farther than unix epoch zero, which in turn triggers the AdvanceOpenMiningRounds
-          // trigger. The test is still reasonably useful, as the initial round would be round 0 in a freshly
-          // initialized consortium.
-          // TODO(#6408): use control over what trigger are running to improve the precision of this test
-          val minRound: Long = roundNumbers.min
-          minRound should (be >= 1L)
+      clue("Check that the open-mining rounds advanced by one tick have been restored") {
+        // in an eventually because we rely on round change automation triggering once
+        // (this seems to happen already before the actual test starts, but why not play it safe)
+        eventually() {
+          val openMiningRounds = sv1Backend.participantClient.ledger_api_extensions.acs
+            .filterJava(cc.round.OpenMiningRound.COMPANION)(
+              svcParty
+            )
+          // we expect to have imported 1,2,3, and that a round change happens shortly after importing
+          openMiningRounds.map(_.data.round.number).sorted shouldBe Seq(2L, 3L, 4L)
+          // we expect that our testing dump is from quite some time ago
+          openMiningRounds.filter(
+            _.data.targetClosesAt.isBefore(Instant.now())
+          ) should have length 2
         }
       }
 
@@ -107,7 +105,9 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
         sv1ScanBackend.listImportCrates(dora) should have size (0)
       }
 
-      // Alice had a normal and a locked coin, which are not getting merged as we don't advance time
+      // Note that coin merging and SV rewards are disabled for this test!
+
+      // Alice had a normal and a locked coin
       checkWallet(alice, aliceWalletClient, Seq((10.0, 10), (99.0, 100.0)))
       checkWallet(bob, bobWalletClient, Seq((20.0, 20.0)))
       // Charlie has a coin and an import crate
@@ -119,15 +119,15 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
 
 }
 
-final class FileAcsStoreDumpImportTimeBasedIntegrationTest
-    extends AcsStoreDumpImportTimeBasedIntegrationTest[SvBootstrapDumpConfig.File] {
+final class FileAcsStoreDumpImportIntegrationTest
+    extends AcsStoreDumpImportIntegrationTest[SvBootstrapDumpConfig.File] {
 
   override def bootstrapDumpConfig(name: String) =
     SvBootstrapDumpConfig.File(bootstrappingDumpFilename)
 }
 
-final class GcpAcsStoreDumpImportTimeBasedIntegrationTest
-    extends AcsStoreDumpImportTimeBasedIntegrationTest[SvBootstrapDumpConfig.Gcp] {
+final class GcpAcsStoreDumpImportIntegrationTest
+    extends AcsStoreDumpImportIntegrationTest[SvBootstrapDumpConfig.Gcp] {
 
   private def bucketPath(name: String) = Paths.get(s"acs/import-test/dummy_${name}.json")
   override def bootstrapDumpConfig(name: String) = {
