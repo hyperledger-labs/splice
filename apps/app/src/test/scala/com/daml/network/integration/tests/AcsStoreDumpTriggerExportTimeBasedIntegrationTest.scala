@@ -13,7 +13,7 @@ import java.nio.file.Paths
 abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: BackupDumpConfig]
     extends AcsStoreDumpExportTimeBasedIntegrationTestBase {
 
-  protected def acsStoreDumpConfig: T
+  protected def acsStoreDumpConfig(testContext: String): T
 
   protected def readDump(filename: String): String
 
@@ -22,16 +22,16 @@ abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: Backup
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
-      .addConfigTransformsToFront(
+      .addConfigTransforms(
         CNNodeConfigTransforms.onlySv1,
         (_, conf) =>
           CNNodeConfigTransforms.updateAllSvAppConfigs_(c =>
-            c.copy(acsStoreDump = Some(acsStoreDumpConfig))
+            c.copy(acsStoreDump = Some(acsStoreDumpConfig(conf.name.value)))
           )(conf),
       )
 
   "sv1" should {
-    "produce an ACS store dump via triggering the writing to a file" in { implicit env =>
+    "produce an ACS store dump via triggering through the http endpoint" in { implicit env =>
       val expectedContractIds = createTestContracts()
 
       eventually() {
@@ -54,12 +54,13 @@ abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: Backup
 
 final class DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest
     extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[BackupDumpConfig.Directory] {
-  override def acsStoreDumpConfig = BackupDumpConfig.Directory(Paths.get("dumps/testing"), None)
+  private val dumpDirectory = Paths.get("dumps/testing")
+  override def acsStoreDumpConfig(testContext: String) =
+    BackupDumpConfig.Directory(dumpDirectory, None)
 
   override def readDump(filename: String) = {
     import better.files.File
-    val dumpDir = File(acsStoreDumpConfig.directory)
-    val dumpFile = dumpDir / filename
+    val dumpFile = File(dumpDirectory) / filename
     dumpFile.contentAsString
   }
 
@@ -67,8 +68,13 @@ final class DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest
 
 final class GcpBucketAcsStoreDumpTriggerExportTimeBasedIntegrationTest
     extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[BackupDumpConfig.Gcp] {
-  override def acsStoreDumpConfig =
-    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None, None)
-  val bucket = new GcpBucket(acsStoreDumpConfig.bucket, loggerFactory)
-  override def readDump(filename: String) = bucket.readStringFromBucket(Paths.get(filename))
+  val bucketConfig = GcpBucketConfig.inferForTesting
+
+  override def acsStoreDumpConfig(testContext: String) =
+    BackupDumpConfig.Gcp(bucketConfig, prefix = Some(testContext), None)
+
+  override def readDump(filename: String) = {
+    val bucket = new GcpBucket(bucketConfig, loggerFactory)
+    bucket.readStringFromBucket(Paths.get(filename))
+  }
 }
