@@ -376,6 +376,7 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
+- Optionally, you might want to modify the `postgresPassword` entry setting it to a secure value. If you do that, remember to change it in ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml`` too.
 
 An SV node includes a validator app so you also need to configure
 that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
@@ -414,7 +415,7 @@ reaches a stable state prior to moving on to the next step.
 .. code-block:: bash
 
     helm repo update
-    helm install postgres canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} --wait
+    helm install postgres canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml --wait
     helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
     helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml --wait
     helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml --wait

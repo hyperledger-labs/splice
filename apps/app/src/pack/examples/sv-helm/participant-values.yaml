@@ -1,4 +1,5 @@
 postgres: postgres
+postgresPassword: "secret"
 postgresSchema: sv_participant
 globalDomain:
   alias: global
