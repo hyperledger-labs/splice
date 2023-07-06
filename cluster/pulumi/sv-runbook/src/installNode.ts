@@ -22,6 +22,7 @@ import {
   sv1UserParticipantSecret,
   sv1UserValidatorParticipantSecret,
   svKeySecret,
+  participantBootstrapDumpSecret,
 } from './secrets';
 import { CLUSTER_BASENAME, TARGET_CLUSTER, REPO_ROOT, SV_NAME } from './utils';
 
@@ -29,6 +30,8 @@ const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
+
+const participantIdentityFile = process.env.PARTICIPANT_IDENTITY_FILE;
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const version = process.env.CHARTS_VERSION;
@@ -65,6 +68,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     special: true,
   }).result;
 
+  const participantIdentitySecret = participantIdentityFile
+    ? await participantBootstrapDumpSecret(svNamespace, participantIdentityFile)
+    : undefined;
+
   const postgres = installCNSVHelmChart(
     svNamespace,
     'postgres',
@@ -91,6 +98,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       targetAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
     postgresPassword: password,
+    disableAutoInit: !!participantIdentitySecret,
   };
 
   const participant = installCNSVHelmChart(
@@ -125,6 +133,9 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       ...svValues.auth,
       audience: auth0Cfg.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
     },
+    participantBootstrappingDump: participantIdentitySecret
+      ? participantIdentitySecret.metadata.name.apply(n => ({ secretName: n }))
+      : undefined,
   };
 
   const fixedTokensValue: ChartValues = {
@@ -150,7 +161,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
     localCharts,
     version,
-    svImagePullDeps.concat([participant]).concat([svAppSecret, svAppUISecret])
+    svImagePullDeps
+      .concat([participant])
+      .concat([svAppSecret, svAppUISecret])
+      .concat(participantIdentitySecret ? [participantIdentitySecret] : [])
   );
 
   installCNSVHelmChart(

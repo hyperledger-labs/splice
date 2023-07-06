@@ -10,6 +10,7 @@ Release Notes
     * Ensured that both the `cn-cometbft` and `cn-postgres` charts support the `db.volumeSize` and `db.volumeStorageClass` values for configuring persistent storage.
     * The three secrets, `cn-app-scan-ledger-api-auth`, `cn-app-directory-ledger-api-auth`, `cn-app-svc-ledger-api-auth` that were required before with dummy values, are no longer required.
     * The `cn-postgres` and `cn-participant`charts now require a non-empty `postgresPassword` value to be set. The value templates includes a default value that you can modify to something more secure.
+    * The SV Helm runbook has been extended with a section that explains :ref:`how to restore from a participant identities backup <participant-identities-restore>`.
 
 2023-07-02
 ----------

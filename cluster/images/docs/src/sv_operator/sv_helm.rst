@@ -346,11 +346,13 @@ To setup the wallet and SV UI, create the following two secrets.
 Installing the Software
 -----------------------
 
-Install the Helm charts needed to start an SV node connected to the cluster.
-To make these commands work, you will need to meet a few
-preconditions. The first is that there needs to be an environment
-variable defined to refer to the version of the Helm charts necessary
-to connect to this environment:
+Configuring the Helm Charts
++++++++++++++++++++++++++++
+
+To install the Helm charts needed to start an SV node connected to the
+cluster, you will need to meet a few preconditions. The first is that
+there needs to be an environment variable defined to refer to the
+version of the Helm charts necessary to connect to this environment:
 
 Note that because of the lack data retention from release to release
 in either `DevNet` or `TestNet`, every release should be installed
@@ -407,6 +409,34 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
+
+.. _participant-identities-restore:
+
+Restoring from an existing Particiant Identities Backup
++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+If you are restoring from an existing :ref:`participant identities backup <participant-identities-backup>`, you need to create another secret containing that dump. Here
+we are assuming you've stored the dump in a file called ``participant-identities-dump.json`` in the current directory.
+
+.. code-block:: bash
+
+    kubectl create --namespace sv secret generic participant-identities-dump \
+        "--from-file=content=participant-identities-dump.json"
+
+You also need to configure the participant to not initialize automatically by uncommenting the following section in your ``participant-values.yaml``.
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
+    :start-after: PARTICIPANT_BOOTSTRAP_START
+    :end-before: PARTICIPANT_BOOTSTRAP_END
+
+Lastly, you need to configure the SV app to bootstrap the participant from the content of your secret by uncommenting the following section in your ``sv-values.yaml``.
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
+    :start-after: PARTICIPANT_BOOTSTRAP_START
+    :end-before: PARTICIPANT_BOOTSTRAP_END
+
+Installing the Helm Charts
+++++++++++++++++++++++++++
 
 With these files in place, you can execute the following helm commands
 in sequence. It's generally a good idea to wait until each deployment
@@ -627,6 +657,8 @@ Note that as of now, each instance of the Scan app backend aggregates only Canto
 This will be changed in future updates, where the Scan app will guarantee correctness against all data since network start.
 At that point, data in different instances of the Scan app (hosted by different Super Validators) will always be consistent.
 This allows the public to inspect multiple Scan UIs and compare their data, so that they do not need to trust a single Super Validator.
+
+.. _participant-identities-backup:
 
 Transitioning Across Network Resets
 -----------------------------------

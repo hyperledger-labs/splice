@@ -392,6 +392,7 @@
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
         },
+        "disableAutoInit": false,
         "enableHealthProbes": true,
         "globalDomain": {
           "alias": "global",
