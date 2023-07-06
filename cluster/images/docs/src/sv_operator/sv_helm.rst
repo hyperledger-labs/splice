@@ -410,7 +410,7 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-.. _participant-identities-restore:
+.. _sv-participant-identities-restore:
 
 Restoring from an existing Particiant Identities Backup
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++

@@ -509,15 +509,24 @@ Once you obtained the token, obtaining the data can be done as follows:
 If your are following this runbook, you can replace ``YOUR_VALIDATOR_API_URL`` with ``http://localhost:5003``.
 If you are following the :ref:`Kubernetes-based SV runbook <sv-helm>`, you can replace it with ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator``.
 
-Please store the resulting ``participant-dump.json`` in a safe location.
+Please store the resulting ``participant-identities-dump.json`` in a safe location.
 We recommend performing a fresh participant identities dump (on your "old" network validator) just before re-initializing your participant and validator on a freshly reset ("new") network.
 To account for cases where this is not possible, we additionally recommend setting up periodical backups of your validator's participant identities data.
 
 .. TODO(#6290): Cover the config for periodic backup to GCP buckets or a directory as well
 
+.. _validator-participant-identities-restore:
+
 Initialize With Existing Identities Data
 ++++++++++++++++++++++++++++++++++++++++
 
-Detailed instructions will be added soon.
+To restore from an existing ``participant-identities-dump.json`` file,
+you need to pass an additional configuration file to your participant
+and your validator and specify the path to this file through the ``PARTICIPANT_IDENTITIES_DUMP`` environment variable:
 
-.. TODO(#6219): Add instructions once we have actually implemented this and know it works
+Assuming you saved the file in the current directory, the commands look as follows:
+
+.. parsed-literal::
+
+    DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../|canton_subdir|/bin/canton --config examples/validator/validator-participant.conf --config examples/validator/validator-participant-bootstrapping.conf
+    PARTICIPANT_IDENTITIES_DUMP=participant-identities-dump.json NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc --config examples/validator/validator-bootstrapping.conf
