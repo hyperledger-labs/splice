@@ -253,7 +253,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     }
   }
 
-  installValidatorApp({
+  await installValidatorApp({
     auth0Client: config.auth0Client,
     withDomainFees: config.withDomainFees,
     xns,

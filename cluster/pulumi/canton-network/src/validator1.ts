@@ -45,7 +45,7 @@ export async function installValidator1(
 
   const extraDependsOn: pulumi.Resource[] = [svc];
 
-  return installValidatorApp({
+  return await installValidatorApp({
     auth0Client,
     withDomainFees,
     validatorWalletUser,

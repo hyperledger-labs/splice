@@ -57,7 +57,7 @@ export async function installSplitwell(
     await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
   ];
 
-  return installValidatorApp({
+  return await installValidatorApp({
     auth0Client,
     xns,
     withDomainFees,
