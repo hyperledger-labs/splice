@@ -104,17 +104,6 @@ export function sv1UserParticipantSecret(
   return participantSecret(ns, 'sv1', requireAuth0ClientId(auth0Cfg.appToClientId, 'sv'));
 }
 
-export function sv1UserValidatorParticipantSecret(
-  ns: ExactNamespace,
-  auth0Cfg: Auth0Config
-): k8s.core.v1.Secret {
-  return participantSecret(
-    ns,
-    'sv1-validator',
-    requireAuth0ClientId(auth0Cfg.appToClientId, 'validator')
-  );
-}
-
 type AppAndUiSecrets = {
   appSecret: k8s.core.v1.Secret;
   uiSecret: k8s.core.v1.Secret;

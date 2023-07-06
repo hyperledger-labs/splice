@@ -189,28 +189,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "ledger-api-user": "dXhlUUdJQkt1ZU5EbXVnVnMxUmxNV0VVWmhacXlMeXJAY2xpZW50cw=="
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "cn-app-sv1-validator-ledger-api-auth",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv1-validator-ledger-api-auth",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoicUdLRWRQL0V5T2d1dVBJc0JYQ0E5cURZeEN3OUp0UTljVEJzcm9RY0FiU0dEcXZ6NDJTY0lPOEw4ZzJXMEFPbndZdG9Lc1cweDhHSTQxeGdLcjRlbWc9PSJ9fQ==",
           "priv_validator_key.json": "ewogICJhZGRyZXNzIjogIjA2NDdFNEZGMjc5MDhCOEI4NzRDMjY0NzUzNkFDOTg2QzlFQTBCQUIiLAogICJwdWJfa2V5IjogewogICAgInR5cGUiOiAidGVuZGVybWludC9QdWJLZXlFZDI1NTE5IiwKICAgICJ2YWx1ZSI6ICIzVEhIQnc0amVjQ0dPZWgxVWRiU0hmSDU0QlZqRmpxS2hySm5yWEFPZ2xNPSIKICB9LAogICJwcml2X2tleSI6IHsKICAgICJ0eXBlIjogInRlbmRlcm1pbnQvUHJpdktleUVkMjU1MTkiLAogICAgInZhbHVlIjogIjhmWkRzVkxyYTFWRTgvMjhrYUltaXdrV1BqVWdUZUF0SmN6VHh2cDVIQ25kTWNjSERpTjV3SVk1NkhWUjF0SWQ4Zm5nRldNV09vcUdzbWV0Y0E2Q1V3PT0iCiAgfQp9"
         }

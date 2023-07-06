@@ -20,7 +20,6 @@ import {
   imagePullSecret,
   imagePullSecretByNamespaceName,
   sv1UserParticipantSecret,
-  sv1UserValidatorParticipantSecret,
   svKeySecret,
   participantBootstrapDumpSecret,
 } from './secrets';
@@ -112,7 +111,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       postgres,
       loopback,
       sv1UserParticipantSecret(svNamespace, auth0Cfg),
-      sv1UserValidatorParticipantSecret(svNamespace, auth0Cfg),
       svKeySecret(svNamespace, SV_PUBLIC_KEY, SV_PRIVATE_KEY),
     ])
   );

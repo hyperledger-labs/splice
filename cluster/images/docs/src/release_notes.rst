@@ -12,6 +12,7 @@ Release Notes
     * The `cn-postgres` and `cn-participant`charts now require a non-empty `postgresPassword` value to be set. The value templates includes a default value that you can modify to something more secure.
     * The SV Helm runbook has been extended with a section that explains :ref:`how to restore from a participant identities backup <sv-participant-identities-restore>`.
     * The instructions for self hosted validators have been extended with a section that explains :ref:`how to restore from a participant identities backup <validator-participant-identities-restore>`.
+    * The secret ``cn-app-sv1-validator-ledger-api-auth`` is no longer required.
 
 2023-07-02
 ----------

@@ -296,9 +296,6 @@ The following two kubernetes secrets will instruct the participant to create ser
 
 .. code-block:: bash
 
-    kubectl create --namespace sv secret generic cn-app-sv1-validator-ledger-api-auth \
-        "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients"
-
     kubectl create --namespace sv secret generic cn-app-sv1-ledger-api-auth \
         "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients"
 
