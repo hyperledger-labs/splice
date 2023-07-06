@@ -1,0 +1,320 @@
+{
+  "id" : "PAR::sv1Participant::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
+  "keys" : [
+    {
+      "keyPair" : "Cq8DCqwDCr8BCkQxMjIwOTUyZDY4YzZkMWQ5Yzg0NjhmNGIxZTNkN2U1Mzk5NzFlM2JhYzYxZWUxZmE2MWIyNDg1YzMxOWJjYjczODBjNRABGnMIq6yoqAUSawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISIMCbLB8htBhVSNdl/0lnBoHujF2w6tZRH/cEKkZyQ+U7GAMQARirrKioBSADIAES5wEKRDEyMjA5NTJkNjhjNmQxZDljODQ2OGY0YjFlM2Q3ZTUzOTk3MWUzYmFjNjFlZTFmYTYxYjI0ODVjMzE5YmNiNzM4MGM1EAEamgEIq6yoqAUSkQEKhAEKOHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVkMjU1MTlQcml2YXRlS2V5EkYSIE6wKf7qvd60dFGDNKX6TXn0C8/PqnHNrOvlKyUiKlhIGiISIMCbLB8htBhVSNdl/0lnBoHujF2w6tZRH/cEKkZyQ+U7GAIQARirrKioBSADIAE=",
+      "name" : "sv1Participant-namespace"
+    },
+    {
+      "keyPair" : "Cq8DCqwDCr8BCkQxMjIwY2U2NjY3MjVjNTAyZGFkYmVhNjFlOTliZmU5MDVkOGVhZDcyM2Y4M2Q1NzQyYzIyZTQyMjA3ZDhlMTdmMWQ5ZRABGnMIwMqotwISawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISIPorWFQkXR8PdX/s+iGwIJiURL47L3yvgr9nTAy8lai2GAMQARjAyqi3AiADIAES5wEKRDEyMjBjZTY2NjcyNWM1MDJkYWRiZWE2MWU5OWJmZTkwNWQ4ZWFkNzIzZjgzZDU3NDJjMjJlNDIyMDdkOGUxN2YxZDllEAEamgEIwMqotwISkQEKhAEKOHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVkMjU1MTlQcml2YXRlS2V5EkYSIO/Iz2N2UXfl6EW9BcIFgbE3XTSPzcmk9FyYD19D4/NIGiISIPorWFQkXR8PdX/s+iGwIJiURL47L3yvgr9nTAy8lai2GAIQARjAyqi3AiADIAE=",
+      "name" : "sv1Participant-signing"
+    },
+    {
+      "keyPair" : "CpUFEpIFCrMCCkQxMjIwNGRmNzI2NWMxMjNmOTc5Yzg5NjBjMWQwNWU1NzY1NzQxNTUxZTA1NTE1OGU5YTA5NGFiOWQyODZlNDkzN2U5NBABGuYBCMHqx+gHEt0BCtABCj10eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FY2llc0FlYWRIa2RmUHVibGljS2V5EowBEkQKBAgCEAMSOhI4CjB0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5BZXNHY21LZXkSAhAQGAEYARohAKZNbQj24snxRVqCoefzd9V96lVvDKrh/5qruX5NYfIHIiEAnzQJLnIyHISFiosEhovBmAV2e5a6HzrhUlO3P+cV8C0YAxABGMHqx+gHIAEgARLZAgpEMTIyMDRkZjcyNjVjMTIzZjk3OWM4OTYwYzFkMDVlNTc2NTc0MTU1MWUwNTUxNThlOWEwOTRhYjlkMjg2ZTQ5MzdlOTQQARqMAgjB6sfoBxKDAgr2AQo+dHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuRWNpZXNBZWFkSGtkZlByaXZhdGVLZXkSsQESjAESRAoECAIQAxI6EjgKMHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkFlc0djbUtleRICEBAYARgBGiEApk1tCPbiyfFFWoKh5/N31X3qVW8MquH/mqu5fk1h8gciIQCfNAkucjIchIWKiwSGi8GYBXZ7lrofOuFSU7c/5xXwLRogBJwTYvfihVRC0iykQWgp+k+EK4XMQ26/bWo3jlITS+IYAhABGMHqx+gHIAEgAQ==",
+      "name" : "sv1Participant-encryption"
+    }
+  ],
+  "bootstrapTxs" : [
+    "CqcDCpcCCpICEAEajQIKigIKRDEyMjA5NTJkNjhjNmQxZDljODQ2OGY0YjFlM2Q3ZTUzOTk3MWUzYmFjNjFlZTFmYTYxYjI0ODVjMzE5YmNiNzM4MGM1Er8BCkQxMjIwOTUyZDY4YzZkMWQ5Yzg0NjhmNGIxZTNkN2U1Mzk5NzFlM2JhYzYxZWUxZmE2MWIyNDg1YzMxOWJjYjczODBjNRABGnMIq6yoqAUSawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISIMCbLB8htBhVSNdl/0lnBoHujF2w6tZRH/cEKkZyQ+U7GAMQARirrKioBSADIAEYARACEooBCAESQEX85hYv2i6GlQGgGVdx+5SxV7kiLoDNVSZRYQH/XALRl48+5AzShSmxPydAlGN3b6imTkQYpwCE7erx44WwUwsaRDEyMjA5NTJkNjhjNmQxZDljODQ2OGY0YjFlM2Q3ZTUzOTk3MWUzYmFjNjFlZTFmYTYxYjI0ODVjMzE5YmNiNzM4MGM1EAI=",
+    "CvYFCuYECuEEEAEa3AQi2QQKWVBBUjo6c3YxUGFydGljaXBhbnQ6OjEyMjA5NTJkNjhjNmQxZDljODQ2OGY0YjFlM2Q3ZTUzOTk3MWUzYmFjNjFlZTFmYTYxYjI0ODVjMzE5YmNiNzM4MGM1EsIBCr8BCkQxMjIwY2U2NjY3MjVjNTAyZGFkYmVhNjFlOTliZmU5MDVkOGVhZDcyM2Y4M2Q1NzQyYzIyZTQyMjA3ZDhlMTdmMWQ5ZRABGnMIwMqotwISawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISIPorWFQkXR8PdX/s+iGwIJiURL47L3yvgr9nTAy8lai2GAMQARjAyqi3AiADIAEStgISswIKRDEyMjA0ZGY3MjY1YzEyM2Y5NzljODk2MGMxZDA1ZTU3NjU3NDE1NTFlMDU1MTU4ZTlhMDk0YWI5ZDI4NmU0OTM3ZTk0EAEa5gEIwerH6AcS3QEK0AEKPXR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVjaWVzQWVhZEhrZGZQdWJsaWNLZXkSjAESRAoECAIQAxI6EjgKMHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkFlc0djbUtleRICEBAYARgBGiEApk1tCPbiyfFFWoKh5/N31X3qVW8MquH/mqu5fk1h8gciIQCfNAkucjIchIWKiwSGi8GYBXZ7lrofOuFSU7c/5xXwLRgDEAEYwerH6AcgASABEAISigEIARJAZZDkqYG9GQH2oJDiB7lTMSJ2j0lJfslbEltiigkDwNfwMR1pA7FmTc0dptgukCxEJMBB4bkvPZNlbPrE+j4zDxpEMTIyMDk1MmQ2OGM2ZDFkOWM4NDY4ZjRiMWUzZDdlNTM5OTcxZTNiYWM2MWVlMWZhNjFiMjQ4NWMzMTliY2I3MzgwYzUQAg=="
+  ],
+  "users" : [
+    {
+      "id" : "participant_admin",
+      "primaryParty" : null
+    },
+    {
+      "id" : "sv1",
+      "primaryParty" : null
+    },
+    {
+      "id" : "sv1-32f14a28",
+      "primaryParty" : "canton-foundation-1-32f14a28::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-36feb6e6",
+      "primaryParty" : "canton-foundation-1-36feb6e6::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-37f587ab",
+      "primaryParty" : "canton-foundation-1-37f587ab::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-48c31a48",
+      "primaryParty" : "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-5540fd3",
+      "primaryParty" : "canton-foundation-1-5540fd3::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-615b7778",
+      "primaryParty" : "canton-foundation-1-615b7778::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-6c800c4",
+      "primaryParty" : "canton-foundation-1-6c800c4::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-7304fdfe",
+      "primaryParty" : "canton-foundation-1-7304fdfe::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-7fe47ecd",
+      "primaryParty" : "canton-foundation-1-7fe47ecd::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-88a539c2",
+      "primaryParty" : "canton-foundation-1-88a539c2::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-8bc25a9b",
+      "primaryParty" : "canton-foundation-1-8bc25a9b::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-9caf1719",
+      "primaryParty" : "canton-foundation-1-9caf1719::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-a224f814",
+      "primaryParty" : "canton-foundation-1-a224f814::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-ac45ea98",
+      "primaryParty" : "canton-foundation-1-ac45ea98::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-aea9680",
+      "primaryParty" : "canton-foundation-1-aea9680::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-b168fa74",
+      "primaryParty" : "canton-foundation-1-b168fa74::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-b849aac0",
+      "primaryParty" : "canton-foundation-1-b849aac0::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-c13b02b8",
+      "primaryParty" : "canton-foundation-1-c13b02b8::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-c5e94347",
+      "primaryParty" : "canton-foundation-1-c5e94347::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-d7817205",
+      "primaryParty" : "canton-foundation-1-d7817205::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-ea8beaf1",
+      "primaryParty" : "canton-foundation-1-ea8beaf1::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-ee2907b1",
+      "primaryParty" : "canton-foundation-1-ee2907b1::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-f71886d",
+      "primaryParty" : "canton-foundation-1-f71886d::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1-feb1d66d",
+      "primaryParty" : "canton-foundation-1-feb1d66d::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-32f14a28",
+      "primaryParty" : "canton-foundation-1-32f14a28::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-36feb6e6",
+      "primaryParty" : "canton-foundation-1-36feb6e6::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-37f587ab",
+      "primaryParty" : "canton-foundation-1-37f587ab::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-48c31a48",
+      "primaryParty" : "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-5540fd3",
+      "primaryParty" : "canton-foundation-1-5540fd3::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-615b7778",
+      "primaryParty" : "canton-foundation-1-615b7778::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-6c800c4",
+      "primaryParty" : "canton-foundation-1-6c800c4::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-7304fdfe",
+      "primaryParty" : "canton-foundation-1-7304fdfe::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-7fe47ecd",
+      "primaryParty" : "canton-foundation-1-7fe47ecd::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-88a539c2",
+      "primaryParty" : "canton-foundation-1-88a539c2::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-8bc25a9b",
+      "primaryParty" : "canton-foundation-1-8bc25a9b::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-9caf1719",
+      "primaryParty" : "canton-foundation-1-9caf1719::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-a224f814",
+      "primaryParty" : "canton-foundation-1-a224f814::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-ac45ea98",
+      "primaryParty" : "canton-foundation-1-ac45ea98::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-aea9680",
+      "primaryParty" : "canton-foundation-1-aea9680::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-b168fa74",
+      "primaryParty" : "canton-foundation-1-b168fa74::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-b849aac0",
+      "primaryParty" : "canton-foundation-1-b849aac0::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-c13b02b8",
+      "primaryParty" : "canton-foundation-1-c13b02b8::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-c5e94347",
+      "primaryParty" : "canton-foundation-1-c5e94347::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-d7817205",
+      "primaryParty" : "canton-foundation-1-d7817205::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-ea8beaf1",
+      "primaryParty" : "canton-foundation-1-ea8beaf1::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-ee2907b1",
+      "primaryParty" : "canton-foundation-1-ee2907b1::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-f71886d",
+      "primaryParty" : "canton-foundation-1-f71886d::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_user-feb1d66d",
+      "primaryParty" : "canton-foundation-1-feb1d66d::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-32f14a28",
+      "primaryParty" : "canton-foundation-1-32f14a28::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-36feb6e6",
+      "primaryParty" : "canton-foundation-1-36feb6e6::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-37f587ab",
+      "primaryParty" : "canton-foundation-1-37f587ab::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-48c31a48",
+      "primaryParty" : "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-5540fd3",
+      "primaryParty" : "canton-foundation-1-5540fd3::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-615b7778",
+      "primaryParty" : "canton-foundation-1-615b7778::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-6c800c4",
+      "primaryParty" : "canton-foundation-1-6c800c4::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-7304fdfe",
+      "primaryParty" : "canton-foundation-1-7304fdfe::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-7fe47ecd",
+      "primaryParty" : "canton-foundation-1-7fe47ecd::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-88a539c2",
+      "primaryParty" : "canton-foundation-1-88a539c2::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-8bc25a9b",
+      "primaryParty" : "canton-foundation-1-8bc25a9b::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-9caf1719",
+      "primaryParty" : "canton-foundation-1-9caf1719::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-a224f814",
+      "primaryParty" : "canton-foundation-1-a224f814::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-ac45ea98",
+      "primaryParty" : "canton-foundation-1-ac45ea98::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-aea9680",
+      "primaryParty" : "canton-foundation-1-aea9680::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-b168fa74",
+      "primaryParty" : "canton-foundation-1-b168fa74::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-b849aac0",
+      "primaryParty" : "canton-foundation-1-b849aac0::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-c13b02b8",
+      "primaryParty" : "canton-foundation-1-c13b02b8::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-c5e94347",
+      "primaryParty" : "canton-foundation-1-c5e94347::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-d7817205",
+      "primaryParty" : "canton-foundation-1-d7817205::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-ea8beaf1",
+      "primaryParty" : "canton-foundation-1-ea8beaf1::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-ee2907b1",
+      "primaryParty" : "canton-foundation-1-ee2907b1::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-f71886d",
+      "primaryParty" : "canton-foundation-1-f71886d::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    },
+    {
+      "id" : "sv1_validator_wallet_user-feb1d66d",
+      "primaryParty" : "canton-foundation-1-feb1d66d::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5"
+    }
+  ],
+  "version" : "0.1.1-martinflorian-dirty"
+}

@@ -8,7 +8,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
+  CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.store.AcsStoreDump
@@ -27,7 +27,7 @@ import org.scalatest.Assertion
 import java.time.Duration
 
 abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
-    extends CNNodeIntegrationTest
+    extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
     with DirectoryTestUtil {
@@ -54,7 +54,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
       })
 
   protected def createTestContracts()(implicit env: FixtureParam): (Set[String], Set[String]) = {
-    clue(" Advance by one round, so we can check that we properly restore open mining rounds") {
+    clue("Advance by one round, so we can check that we properly restore open mining rounds") {
       advanceRoundsByOneTick
       val openMiningRounds = sv1Backend.participantClient.ledger_api_extensions.acs
         .filterJava(cc.round.OpenMiningRound.COMPANION)(

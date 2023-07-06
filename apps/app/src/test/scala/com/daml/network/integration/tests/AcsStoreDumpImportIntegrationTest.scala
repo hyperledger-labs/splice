@@ -30,10 +30,11 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
   // We expect to add new dumps and a corresponding test from test-net releases that fail staging
   // and required adaption of the dump import code.
   //
-  // NOTE: use the following steps to produce such a dump
-  //  1. Run the DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest to produce a dump file
-  //  2. Open the produced json file in `apps/app/src/test/resources/dumps/test-outputs/<your-build-prefix>`
-  //  3. Reformat it using 'jq' or IntelliJ and replace all package-ids with 'deadbeef'
+  // NOTE: use the following steps to produce required dumps
+  //  1. Run the CombinedDumpDirectoryExportTimeBasedIntegrationTest to produce 3 dump files:
+  //     one of the acs, and one of the participants of sv1 and alice
+  //  2. Copy the produced json files from `apps/app/src/test/resources/dumps/test-outputs/`
+  //  3. Only for the ACS dump: Reformat it using 'jq' or IntelliJ and replace all package-ids with 'deadbeef'
 
   final protected val bootstrappingDumpFilename =
     AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpDir.resolve(

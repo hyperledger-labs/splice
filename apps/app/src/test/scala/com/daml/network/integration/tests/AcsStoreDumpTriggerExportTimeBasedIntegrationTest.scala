@@ -44,25 +44,9 @@ abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: Backup
       }
     }
   }
-
 }
 
-final class DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest
-    extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[BackupDumpConfig.Directory] {
-  override def acsStoreDumpConfig(testContext: String) =
-    BackupDumpConfig.Directory(
-      AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir,
-      None,
-    )
-
-  override def readDump(filename: String) = {
-    import better.files.File
-    val dumpFile =
-      File(AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir) / filename
-    dumpFile.contentAsString
-  }
-
-}
+// triggering of dump to directory is tested in CombinedDumpDirectoryExportTimeBasedIntegrationTest
 
 final class GcpBucketAcsStoreDumpTriggerExportTimeBasedIntegrationTest
     extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[BackupDumpConfig.Gcp] {

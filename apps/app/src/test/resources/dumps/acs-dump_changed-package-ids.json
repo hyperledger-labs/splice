@@ -1,9 +1,9 @@
 {
-  "offset": "00000000000000023c",
+  "offset": "0000000000000002d1",
   "contracts": [
     {
       "template_id": "deadbeef001:CC.Coin:CoinRules",
-      "contract_id": "005142849ac5c25d17697c7454c55a3b1e15435db427017430800062c99159c96eca01122058e6904bd23652a57d075919fcfc64d51fe90b44f5e16341c856f43d31e5ea22",
+      "contract_id": "0043ff2de06d3ceb68356a203310cc7ba2cadd26d4f57d38a56d8adb8160154b40ca0112206f914867ca8d1cfe727d075ec267aeed854cb5d78248890621ff5486800b908c",
       "payload": {
         "enabledChoices": {
           "enable_ValidatorRewardCoupon_ArchiveAsValidator": true,
@@ -116,12 +116,12 @@
               "requiredDomains": {
                 "map": [
                   [
-                    "global-domain::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+                    "global-domain::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
                     {}
                   ]
                 ]
               },
-              "activeDomain": "global-domain::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+              "activeDomain": "global-domain::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
               "fees": {
                 "baseRateTrafficLimits": {
                   "rate": "3333.0",
@@ -142,18 +142,18 @@
         },
         "lock": false,
         "isDevNet": true,
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946"
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f"
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122054e791e74fac3c61310f8e17a1ff06d13795360915a7b63aefe4461095f96ea9"
+        "driverMetadata": "0a260a2408011220d1533ebcc112572c74aae43a226e5abcf61f5f8c7c42ec223cba718cd6517abc"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Round:OpenMiningRound",
-      "contract_id": "00a091e9394f151ddf33b27c0faba792685c11048d86431d24156bc4ac45149164ca011220b6b9cc523e4dd66afa4d151894449f047d54a8de48ea7e3aaec88819ba54b143",
+      "contract_id": "0035b0753af92c1b97ec0a29097820c9de1a40fe9ab3e41025c364cd91970ff0dbca011220b1ab923f0faafcf4ae07c9a32964efe6911cf499d79e5f0b314cd653b1a3e17e",
       "payload": {
         "issuingFor": {
           "microseconds": "150000000"
@@ -166,7 +166,7 @@
           "featuredAppRewardCap": "100.0",
           "validatorRewardCap": "0.2"
         },
-        "opensAt": "1970-01-01T00:32:00Z",
+        "opensAt": "1970-01-01T00:34:40Z",
         "transferConfigUsd": {
           "holdingFee": {
             "rate": "0.0000048225"
@@ -198,26 +198,26 @@
           },
           "maxNumOutputs": "100"
         },
-        "targetClosesAt": "1970-01-01T00:37:00Z",
+        "targetClosesAt": "1970-01-01T00:39:40Z",
         "coinPrice": "1.0",
         "tickDuration": {
           "microseconds": "150000000"
         },
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "round": {
           "number": "1"
         }
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112203addad2105bfbea4e002aea64c97914405698066ab9c9f4466f078f5b27e167a"
+        "driverMetadata": "0a260a2408011220ae2ca2f48988d298c808bd1d437999c46f65dad591700689f56edc469347a030"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Round:OpenMiningRound",
-      "contract_id": "006c0e56c4d8d18c528926e50616226df84d5cfefcd6c716b303ecd765cab66413ca0112201a10b0256b8710dc2ca2e7ef036a8a50bbc857cd5016c6ebf11542d254fbb6ab",
+      "contract_id": "00f0c3ce2451e700fad808b63f23b572c776913c5d09c974b13a32c8c468a2b546ca011220ae66e419da7d0c81ef653dcc2c17a0a91cbe8164951e78a0ed5e5201770d0f06",
       "payload": {
         "issuingFor": {
           "microseconds": "300000000"
@@ -230,7 +230,7 @@
           "featuredAppRewardCap": "100.0",
           "validatorRewardCap": "0.2"
         },
-        "opensAt": "1970-01-01T00:34:30Z",
+        "opensAt": "1970-01-01T00:37:10Z",
         "transferConfigUsd": {
           "holdingFee": {
             "rate": "0.0000048225"
@@ -262,46 +262,46 @@
           },
           "maxNumOutputs": "100"
         },
-        "targetClosesAt": "1970-01-01T00:39:30Z",
+        "targetClosesAt": "1970-01-01T00:42:10Z",
         "coinPrice": "1.0",
         "tickDuration": {
           "microseconds": "150000000"
         },
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "round": {
           "number": "2"
         }
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220aec0b2313a85767f4105ed16e056949d4a572b67f507f71123d22f6c14398d41"
+        "driverMetadata": "0a260a24080112203e1d8320bb283326be0b2069ae818f620b0738676e601054ba6fe071c322bf9c"
       },
       "create_arguments_blob": ""
     },
     {
-      "template_id": "deadbeef002:CN.SVC.CoinPrice:CoinPriceVote",
-      "contract_id": "009e766f8c12d734fefdcb466d39628ee52135620790497919b878e17a4f98a4f1ca01122035e5f74671188a13a9f293e0e898256636ad999b4737d28be15280ca4edccf63",
+      "template_id": "deadbeef001:CN.SVC.CoinPrice:CoinPriceVote",
+      "contract_id": "000b1c9d016c3d3b5f286b0838e89a3611493dc03efb2e98861d7a67dc5b8c6dbcca0112207ba79225db75936f938e1a7125d081133b691943ab796e98b6eb85b4ac5d817d",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "sv": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "sv": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
         "coinPrice": "1.0",
-        "lastUpdatedAt": "1970-01-01T00:32:00Z"
+        "lastUpdatedAt": "1970-01-01T00:34:40Z"
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220904f959750083a5b8f0841242203c4ce8d7995b198d05a5b1c8782f7677888a8"
+        "driverMetadata": "0a260a24080112207f88f53b2df45349577285f9fddb2314d257e03eb33f4f7325357d73de991619"
       },
       "create_arguments_blob": ""
     },
     {
-      "template_id": "deadbeef002:CN.SvcRules:SvcRules",
-      "contract_id": "0090c8c55022ab26a54c568c361435f9a4ef9843277fc8f6243143bad0c3ab7c8cca011220a1d7f6fdd14a05324eda6b8e1afc2f26dd9561091910775a0ffbaa5d78a46fdf",
+      "template_id": "deadbeef001:CN.SvcRules:SvcRules",
+      "contract_id": "0063b81754952504caa1b972d869ba343bc304ec9b1c76347cd08b6ff76204b959ca0112202613001c5ea9ea74170c6f4d0c4bc4e2a15352710d25220c1995026c3d51a395",
       "payload": {
         "epoch": "0",
         "initialTrafficState": [],
-        "leader": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
+        "leader": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
         "isDevNet": true,
         "lock": false,
         "config": {
@@ -348,7 +348,7 @@
         },
         "members": [
           [
-            "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
+            "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
             {
               "name": "Canton-Foundation-1",
               "joinedAsOfRound": {
@@ -358,98 +358,98 @@
             }
           ]
         ],
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946"
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f"
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122054d5e3f2944b9af33329c1c3236e4e936914424bca0040d593c3bb27e86fc96f"
+        "driverMetadata": "0a260a240801122079c6c92670b547e07fe3c08c1f717161d47de8bbd14ec641f9a887137222bfc6"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.GlobalDomain:ValidatorTraffic",
-      "contract_id": "005903039176936f34fa4d3123feb19dd387141f5f1d7d25b921ef5f65c8b64476ca011220ec7e0b14712f35c9abe7e098b6c796d78e1ba5f2100bbed9fc226fa7d6beed3d",
+      "contract_id": "00b46878321d3cdeffc7e939476caba16eec6d1914d7414f3b01daa06c8f292c79ca0112203747a649d20a7e9412f393136a90ef338e0c12beaa7630fd1129518a4e77a387",
       "payload": {
         "usdSpent": "0.0",
         "ccSpent": "0.0",
         "lastPurchasedAt": "0001-01-01T00:00:00Z",
         "numPurchases": "0",
-        "validator": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
-        "domainId": "global-domain::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "validator": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
+        "domainId": "global-domain::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "totalPurchased": "1000000"
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220ea722ba3d162c21653f93739af4f79c1aa1e486d4efa999eb8f179e65bbd5efc"
+        "driverMetadata": "0a260a2408011220f2ea923de331a4e1b6b017fb1b4cf0625ae228e6d13375f8f654d3de3560305d"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
-      "contract_id": "00285c7d2b9c243e4cb7bdad6cc0ef01f67101be39624920cc0eae974510aa17a1ca011220160ff7ef479d00da71e5fde436f8aa04cf4d12e852ec5ef73fc5bd2659ae7871",
+      "contract_id": "00d81abf04729774367fa2a3e08d106b23315beec268951c6cb23e29bb77a2396fca01122015b6150cedf4c7aaf2d72354a2deceaec70fb914ea187893b6a7899199234ed8",
       "payload": {
-        "validator": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
-        "sponsor": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946"
+        "validator": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
+        "sponsor": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f"
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112209056a985d4c51c1f2e98848090d654845ee1f8699946314fd4367abfafdf2cb1"
+        "driverMetadata": "0a260a24080112206b35a2484df6004ff0f6096c26e66d80d7a52107c4bca3f763ab49c058d2f896"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
-      "contract_id": "00cc79f931a0395bbc28fa782a556bf15438d8cbe1bb695d16257801680203353fca01122071c6dc157f9f3b2581a415ce64f215d32ad9fca4279914a63a63f9d64d313bdc",
+      "contract_id": "00ca2f1fbf16dc06a5a03453d5a1e1fe5cfb793308f719799bf3033267385260aeca011220cd79460430b7b80cd0c5e6e129fba53fbae5f38e0e5398f6b4990ea4f80bcefb",
       "payload": {
-        "validator": "alice__validator__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f",
-        "sponsor": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946"
+        "validator": "bob__validator__user-48c31a48::122064c7b1460105f0c373cc2bcd453e6ff7cd52e9024ff08c29060b14e86745c71f",
+        "sponsor": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f"
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122069b2c3c28def23cf77763321433d83dff9f45c793dd24491867a4e677452ee8b"
+        "driverMetadata": "0a260a24080112201a173c91ad893a71c16a669868251968856e434e2bffac0c796ca15a85c5be25"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
-      "contract_id": "008ebfc0ec2bd45d2e13a7f952631023b9f05efb6b51bdffb21d51e7d2ba9f72baca0112206c50d45c39143e5d5624fafa6e4b38445c4769b1969ecefefb7de60f96603038",
+      "contract_id": "0031f194720f2b2d29c85138784fa6aa67557d3fb6afddf81ef9343c787b853093ca01122085541dff62e0dc0402da7431136793213507fde0b3b5194998441f3e6da7161a",
       "payload": {
-        "validator": "bob__validator__user-e2de4f1a::1220eee02b34dc39bf5d63b563c67ff15818f1db96711312dfc3190bb4c682b8c2d5",
-        "sponsor": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946"
+        "validator": "splitwell__validator__user-48c31a48::1220d908eac25dfac082d55e7ea1bf223b00466e7b88f0510be6a3850d423396fb67",
+        "sponsor": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f"
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220bb897b7deb5f1b9b130baf99a2a1dcdf64db5c178ce2078bae76106b247c1237"
+        "driverMetadata": "0a260a240801122006ad8c0633bfca589e998bef3224f4cf7e604c26be6a7973dd152fbf85f242a8"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
-      "contract_id": "00e1ce408a76684208f79ab6f3f85529cbfd201ca27a324978bf4f9cf2ce1e6c15ca011220e68c2c8a989b443d229f7b15f25936d5446bbb396439d263035edf1e74a8714a",
+      "contract_id": "00c395252d81c2d26986abadabf4c0fd60ab83d9fbdb609a87b7eb074f9e23c952ca011220aa2ad08af87e62c731654f47c3625776bed3b01a1fb3f96ccc85a4c7795a1653",
       "payload": {
-        "validator": "splitwell__validator__user-e2de4f1a::12208b0715569f16f0e83412c593be194be87c4b6fd6541b1a6aeb648e85873cc1d0",
-        "sponsor": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946"
+        "validator": "alice__validator__user-48c31a48::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
+        "sponsor": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f"
       },
       "metadata": {
-        "createdAt": "1920000000",
+        "createdAt": "2080000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112207aad6f4b5a19fd3b0f8ec8ff514071586bb26c6ad55a784c18756258372a7062"
+        "driverMetadata": "0a260a240801122016f8381c78069f3fc677ea4fcfa76aa72e8b23ce8c504d35f784cd13eb35615a"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Round:OpenMiningRound",
-      "contract_id": "00262d2a2a83725ec35488eec9b29d4dedf9c96a76e0f910028eb191422ff8fa0fca011220ebf8b9f5ee6d11036f0aaa2ac6aa846494544407d8352950eeda6b27dafc402a",
+      "contract_id": "00510874da3344dea9f270df6c501dabf02e80bdfcbe45cfd4abee84327e2a8e98ca011220f1373eeacfefc625cdb4fa57b416cff89568d8fb33029851234f2c1e07afc62d",
       "payload": {
         "issuingFor": {
           "microseconds": "450000000"
@@ -462,7 +462,7 @@
           "featuredAppRewardCap": "100.0",
           "validatorRewardCap": "0.2"
         },
-        "opensAt": "1970-01-01T00:37:10Z",
+        "opensAt": "1970-01-01T00:39:50Z",
         "transferConfigUsd": {
           "holdingFee": {
             "rate": "0.0000048225"
@@ -494,64 +494,64 @@
           },
           "maxNumOutputs": "100"
         },
-        "targetClosesAt": "1970-01-01T00:42:10Z",
+        "targetClosesAt": "1970-01-01T00:44:50Z",
         "coinPrice": "1.0",
         "tickDuration": {
           "microseconds": "150000000"
         },
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "round": {
           "number": "3"
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112201397a8ea6f6ae2636a6cacc66a683abb2c2e7767c66f96fca02ad5d27891ab60"
+        "driverMetadata": "0a260a240801122064df6e2ced9cced8ebe3afebc13aea5ad48f51991eff67c2fbe1b4f8bed182e5"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Coin:UnclaimedReward",
-      "contract_id": "00e7bd2c644cc313269292d3cee0767f065121cb67ac6a0b53a798ab0467a26b73ca01122026255a0da63cc81ba726ffb3a5d58f14715657fb4ce4adb36d6d38afb2feaed2",
+      "contract_id": "009a2dbab8acc1abd2918c1dcc6564ab1b25e1564821073adb72a02c9381125519ca0112205ead75ea088036eac3dba8be1b9da442a47a8694a52de29ae3cb10809615fca1",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "amount": "123668.1887366819"
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122003d2a221a6ef8e6895c49170c2b118426319852c900fc788e5ff721784dcf900"
+        "driverMetadata": "0a260a24080112200184de4560d6b71c57776236a8c8a805aaa3defdf41c73c98fd41d8384fd52f3"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Round:IssuingMiningRound",
-      "contract_id": "009f327152aefa975267d12c24f77c25812f8c58d0ce3993e8501676a2b0e24bafca011220d27c9a53d00f08f4d49cad0bef4b895e2a602d61a4180e41317ee78443c8e001",
+      "contract_id": "00f5ff48b69c4251a289f3ed334c4ff62e2f477979d39a0cb2093a51f3e44ec782ca011220b67e577802ffe555058439174d032f3f2270855551005d242f985f87f06f9f8e",
       "payload": {
         "issuancePerFeaturedAppRewardCoupon": "100.0",
-        "opensAt": "1970-01-01T00:37:10Z",
-        "targetClosesAt": "1970-01-01T00:42:10Z",
+        "opensAt": "1970-01-01T00:39:50Z",
+        "targetClosesAt": "1970-01-01T00:44:50Z",
         "issuancePerUnfeaturedAppRewardCoupon": "0.6",
         "issuancePerValidatorRewardCoupon": "0.2",
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "round": {
           "number": "0"
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112205dbccb27f5bddc086d63d44f07ad02ae896f427dc2e947c2afc48107c10e768f"
+        "driverMetadata": "0a260a240801122064619cc70cb74c50264f04f942c8a0586cab08bdc184459010baaedeabfef2fe"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "00ed8e83e0d5056e25385df723602792b21846b70d61c785e0509cfcaf63210dcaca01122047901f569ed2811cc359263fb9e738402b4b68898c6df2a48238d9c0b64b877d",
+      "contract_id": "00500dc24dc6e4cd4a06d73ef11aae9f1ce863df0a3fb42cd89c533a35c9adebc4ca011220e82ea2d9cc5606ec75f16fa5bcc0eb267acda4c1a4e85eddad58a05a1090ecc9",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "owner": "canton-foundation-1-e2de4f1a::12200ed33fed20e07b4d70b8bdca4f8fded091100f69033621f7f02d1d6c1ad22b36",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "owner": "canton-foundation-1-48c31a48::1220952d68c6d1d9c8468f4b1e3d7e539971e3bac61ee1fa61b2485c319bcb7380c5",
         "amount": {
           "initialAmount": "66590.5631659056",
           "createdAt": {
@@ -563,19 +563,19 @@
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122091bd183f33f76792a30f8d1e751c5da117c4c52524134a359c896c22cbeab227"
+        "driverMetadata": "0a260a24080112200ecaa6c6b1af67f1af8a62035be87001c0a9707eeb3b4ea6c4d029147c311801"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Coin:LockedCoin",
-      "contract_id": "0097f9a65443de69302a0bec711b73f382b53cd25fd2eca72527cd8c27356f8263ca011220cc328fc680661d5b72ea36b43b906a823ad9c0aca182226fc6a6b88fcd873bde",
+      "contract_id": "00314106a2a5d4e07496bebfbaa1b57c88d820551246b51a0f0565225500faefe9ca0112203115c27d7ac8c3ec7818ef708d681b7fe8026f5631545d32a7d2a05fa626ba82",
       "payload": {
         "coin": {
-          "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-          "owner": "alice__wallet__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f",
+          "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+          "owner": "alice__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
           "amount": {
             "initialAmount": "10.0",
             "createdAt": {
@@ -588,60 +588,60 @@
         },
         "lock": {
           "holders": [],
-          "expiresAt": "1970-01-11T00:34:40Z"
+          "expiresAt": "1970-01-11T00:37:20Z"
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112204436b17b5d614fb43bdc1fea4741c297d38667e8a360b1f66ac4103450dce40b"
+        "driverMetadata": "0a260a24080112209f1f1d6c7d324933cdcef2ba289f3be664fef297a276e481b8c164fa02ecf21c"
       },
       "create_arguments_blob": ""
     },
     {
-      "template_id": "deadbeef003:CN.Directory:DirectoryInstall",
-      "contract_id": "00fee267ca04c6c9214b035649ba6c6260740b41a7983740ae214ffcc804e8af96ca011220de68b97c705471d7e0d58fd50fcc3043dfe107d930517cab2946df486965b07b",
+      "template_id": "deadbeef001:CN.Directory:DirectoryInstall",
+      "contract_id": "007338218812c6b86a0bd1cd6d9817a1d95341470b9dd32d5427160c0657def323ca011220a208e451f5c00b13a389b4e6b526609a924c196f38ca907c0548438ce1673f19",
       "payload": {
-        "provider": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "provider": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "entryLifetime": {
           "microseconds": "7776000000000"
         },
         "entryFee": "1.0",
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "renewalDuration": {
           "microseconds": "86400000000"
         },
-        "user": "alice__wallet__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f"
+        "user": "alice__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220ee51b8806669cac228bf2de11b056db67bcb6ced11eaa55c82bf5960b903194c"
+        "driverMetadata": "0a260a24080112204ba39e59b7d4e0b650cfbbb1685bd478b279356433102964af21af95d0ba5888"
       },
       "create_arguments_blob": ""
     },
     {
-      "template_id": "deadbeef003:CN.Directory:DirectoryEntryContext",
-      "contract_id": "0030e5243e3e13f915cbae39ddc2304cd31080ade0a2d197b5cd46fb1fa3ab43b7ca0112207d936cac299bc4c1204553d8eba6628f75abaf51ed96770f00477f473c76f53b",
+      "template_id": "deadbeef001:CN.Directory:DirectoryEntryContext",
+      "contract_id": "00307046150117ff84d3cd62c41bc95a7d9564362b8c4a89cb016f124c191bdc67ca011220685980f2bb1b800fabcb5cc33e01851f191e554279bf594f2ad248eace566d29",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "provider": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "user": "alice__wallet__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "provider": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "user": "alice__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
         "name": "alice.unverified.cns"
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220273711c151f7895f6105c5ca47ba4089ff4cf8c7907f8f2174259e642fdf900e"
+        "driverMetadata": "0a260a24080112206a7d12882923aa2c6487b4538dcc8ea6221fa13343cc2cd51bdb3287001c450a"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "00b78b8654e4eb2a4c9afc7b6cd38662d831536d4f901ff21b42867e344a93f2c7ca011220f650d68f990228d412fdaf66ef8c14f1c00954a9c879972572df1169ba3d0055",
+      "contract_id": "00a1a0d3cbd5e374d0326288a74c0cab79ea56de4b12e5c767dc3124ba82ac43aaca0112207b4a177fb82111551b2ff964926cec0a5085bce7bd7af00124eb2d6353701ea8",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "owner": "alice__wallet__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "owner": "alice__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
         "amount": {
           "initialAmount": "103.835",
           "createdAt": {
@@ -653,23 +653,23 @@
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122037858042c0eaf11235a50c61700a6c9c6fb158b7c55488c3836de21778ccdf10"
+        "driverMetadata": "0a260a24080112208fb818184772e7a8b77afd953b57622990cb86ade9f7887e7824a49faec4366d"
       },
       "create_arguments_blob": ""
     },
     {
-      "template_id": "6ef83c565f71beec7854bf890612004c0f523eb98602c283ed85f6672662734e:CN.Wallet.Subscriptions:SubscriptionIdleState",
-      "contract_id": "00e61c31a9bd7cc93d7c4e4c473443a9f562f1ed3befa9cbdaed2284d632d23e1eca0112209e5b8cab1f84443c47da6f052f4e3fcfc48a9c57214a9d0cbd59c33d41fc46c8",
+      "template_id": "deadbeef001:CN.Wallet.Subscriptions:SubscriptionIdleState",
+      "contract_id": "00fefa2ee8b452ba6b38063cc801201b0086048e0b8c624d3325c9030a0d0e84f8ca011220b5b4a9084aeb4444313fc335ef945ca3bd7b78f9f164fa49c8f2e5277d3df39c",
       "payload": {
-        "subscription": "008cb5248036dfcc804e0e0fbba3e439280a79f45f823f5291f46788720ab6245aca01122086c59f990680e16092215ee20bf0be04a1847f23a584fef7a5e8a827b7d94b57",
+        "subscription": "00c0fce151345865c4fa7c330c96643ea4aca5a1315f577b500b64eba342fb4093ca011220d4ddeb6ec1fcc082ddc50ff784eb7004860a0caa3546c959f78882c7c18e7db3",
         "subscriptionData": {
-          "provider": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-          "context": "0030e5243e3e13f915cbae39ddc2304cd31080ade0a2d197b5cd46fb1fa3ab43b7ca0112207d936cac299bc4c1204553d8eba6628f75abaf51ed96770f00477f473c76f53b",
-          "receiver": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-          "sender": "alice__wallet__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f",
-          "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946"
+          "provider": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+          "context": "00307046150117ff84d3cd62c41bc95a7d9564362b8c4a89cb016f124c191bdc67ca011220685980f2bb1b800fabcb5cc33e01851f191e554279bf594f2ad248eace566d29",
+          "receiver": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+          "sender": "alice__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
+          "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f"
         },
         "payData": {
           "paymentAmount": {
@@ -683,21 +683,21 @@
             "microseconds": "86400000000"
           }
         },
-        "nextPaymentDueAt": "1970-04-01T00:34:40Z"
+        "nextPaymentDueAt": "1970-04-01T00:37:20Z"
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220cbfa7ed9382805f79b92efafdc58047729c95e9105d37e0affc9f79dfdfd087f"
+        "driverMetadata": "0a260a2408011220edf22be3b4cfc848411b905f5e06c268bad29102514f3f6e09eb4679facc4b8c"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "00dcd4a4779f20eccc642710336cfc7da89cc123067da9397218a783f8db22dc86ca011220c06c8e459e2bb994b7a7eb3a50587e9c75b08e80c9b40328915fa4a0c0d2536f",
+      "contract_id": "008ce5db3587a0a94d2c1dca635e2ba2e930f64ab9cd54f1f77874ae0507d23bb4ca011220b67205907330abdc5c3fda58861fa03d30cbd859e48eb055ce35d2effb0e5d81",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "owner": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "owner": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "amount": {
           "initialAmount": "1.0",
           "createdAt": {
@@ -709,34 +709,34 @@
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112203e59c697a60844cc752832bef2d7ecf5c04db461b1768b8e78a186aa27cffffe"
+        "driverMetadata": "0a260a2408011220f15c808033f3431b6c8c0e9f80a86c7cc6ecb474c83d39138e3a36bdd9d6472f"
       },
       "create_arguments_blob": ""
     },
     {
-      "template_id": "deadbeef003:CN.Directory:DirectoryEntry",
-      "contract_id": "0045846b2acfcb64a6eb5868c8cec054eb26aefd1121481a65d54aeebf8cbe1069ca01122028ca7b1d22a4601f6d99de22aa3042b817d3abf716c03a6cb43385e0d86cc287",
+      "template_id": "deadbeef001:CN.Directory:DirectoryEntry",
+      "contract_id": "00108cde4efa3cebd7a30e61cf3f52a11b550a03897f7c623c83da20e0ff49adc2ca011220638afc76491974cad0090a3ec2772c04fcce7818514caafdc4163addfdf8754d",
       "payload": {
-        "user": "alice__wallet__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f",
-        "provider": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "user": "alice__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
+        "provider": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "name": "alice.unverified.cns",
-        "expiresAt": "1970-04-01T00:34:40Z"
+        "expiresAt": "1970-04-01T00:37:20Z"
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220249ac10fe3ced5155c45668e209ca9d9329a71097947b8e310ec0c99df66dc8b"
+        "driverMetadata": "0a260a24080112203ea75cf31f48118386c75f3887ccda51ae198c70da047469d67aaa175e40c471"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "001f13233753fa47de654094c9dc6f7a8131b8c469d6aadae87db51e7cb82ea848ca0112206ee3c41c1e1f4563108d2bcf45bb61c1aba3b4a8aba31f71f301ebef37e5ef13",
+      "contract_id": "009e38a9fbce0327c94c15bb236224a829b33a55550cff032d3b0add996f882518ca0112202f067d46b4c2482841ba2af21ee1621c71cd46efb5348b1425f84046a2b8d5c0",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "owner": "bob__wallet__user-e2de4f1a::1220eee02b34dc39bf5d63b563c67ff15818f1db96711312dfc3190bb4c682b8c2d5",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "owner": "bob__wallet__user-48c31a48__tc0_002eunverified_002ecns::122064c7b1460105f0c373cc2bcd453e6ff7cd52e9024ff08c29060b14e86745c71f",
         "amount": {
           "initialAmount": "20.0",
           "createdAt": {
@@ -748,18 +748,18 @@
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112208673aab61c86f51bcbdce7313aa7645e8ca35ef9a467b083ee82d037668d35e6"
+        "driverMetadata": "0a260a2408011220aadd445e8d6f71e2f52569c32eb580c88e78fc1ddd4c770febc6d7faab8fa544"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "00be808977222f582f70ae1d1e2179e981bd6be770af376c531169f9c272f0cb70ca01122066cb09eb88b3113f2a4378b8ae63bf43b70118ae76bfc0d98a7c8d12f20ef952",
+      "contract_id": "00808edd9db875e338df3d291427e2211dedf468c4fdebc51b7db5c4e30c11e52cca01122091954bf05d16dc4cfbc2bbfe52dbcc0845aa017cf59f097e40c1b5972fae0e36",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-        "owner": "charlie__wallet__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+        "owner": "charlie__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
         "amount": {
           "initialAmount": "30.0",
           "createdAt": {
@@ -771,22 +771,22 @@
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220761998cb94f42b4af87a132111d3b33da5649af28d024111c04ddb7c28857d7a"
+        "driverMetadata": "0a260a2408011220ea742f341e2eac8af0bb599919261bf79a1af70b6e584c614a6a62fb0cb8d080"
       },
       "create_arguments_blob": ""
     },
     {
       "template_id": "deadbeef001:CC.CoinImport:ImportCrate",
-      "contract_id": "0007be0f9cc072400733c7a1e6c523215cc13cf6426bd7894357d2dd784a5fe218ca01122007501defb48a9d2b4aeff193fd1c48f2e0f15e4dd871735e40bd0f4689b8a06e",
+      "contract_id": "009a5738c824fa4b82d04a14073c446bf0a360e4a5538ad4a3d68cc4a183d6cd78ca011220c81d70bd3782f6a40521c4fc9391f28623f91d5f1331695a1526ac21150f4508",
       "payload": {
-        "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
+        "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
         "receiverName": "charlie__wallet__user",
         "exactMatch": false,
         "payload": {
-          "svc": "svc-e2de4f1a-e2de4f1a::1220667eb89219bf5ff3f1afb71cac1bfb4529607b686b010674d8d79c0e4fc66946",
-          "owner": "charlie__wallet__user-e2de4f1a::122094df73248606622426cc4859ed3038ebf9c26aa608d69d3f77a68c21ae42b93f",
+          "svc": "svc-48c31a48-48c31a48::1220b71b739f83ead68dbf48c4f0ef56779e5021953bcc4f9ff044c6c4baf7635f3f",
+          "owner": "charlie__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
           "amount": {
             "initialAmount": "30.0",
             "createdAt": {
@@ -799,12 +799,12 @@
         }
       },
       "metadata": {
-        "createdAt": "2080000000",
+        "createdAt": "2240000000",
         "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220ec171df6b9a03702b1e0058a85a4bb3bbf510c584f2f6545c59e424103129edc"
+        "driverMetadata": "0a260a240801122066c33f0f871690d5fe722a5e0af0605bf1812d7b96537d3c38876b4c1c2836b6"
       },
       "create_arguments_blob": ""
     }
   ],
-  "version": "0.1.1-simon-dirty"
+  "version": "0.1.1-martinflorian-dirty"
 }
