@@ -487,7 +487,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
 object StoreTest {
   case class TestTxLogIndexRecord(
-      offset: String,
+      optOffset: Option[String],
       eventId: String,
   ) extends TxLogStore.IndexRecord
 
@@ -497,12 +497,17 @@ object StoreTest {
   ) extends TxLogStore.Entry[TestTxLogIndexRecord]
 
   object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
+    def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(implicit
+        tc: TraceContext
+    ): Seq[(DomainId, TestTxLogEntry)] = Seq.empty
+
     override def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TestTxLogEntry] = {
       Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(
         onCreate = (res, event, _) => {
           res :+
             TestTxLogEntry(
-              indexRecord = TestTxLogIndexRecord(offset = tx.getOffset, eventId = event.getEventId),
+              indexRecord =
+                TestTxLogIndexRecord(optOffset = Some(tx.getOffset), eventId = event.getEventId),
               payload = event.getEventId,
             )
         },

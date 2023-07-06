@@ -99,6 +99,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
           acs,
           transferOuts,
           offset,
+          txLogParser,
           contractFilter.contains,
         )
       ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
@@ -695,14 +696,26 @@ object InMemoryMultiDomainAcsStore {
         evs: Seq[ActiveContract],
         transferOuts: Seq[InFlightTransferOutEvent],
         acsOffset: String,
+        txLogParser: TxLogStore.Parser[TXI, TXE],
         p: CreatedEvent => Boolean,
+    )(implicit
+        tc: TraceContext
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
       val (stAcs, summaryAcs) = ingestActiveContracts(evs, p)
       val (stInFlight, summaryTransferOut) = stAcs.ingestTransferOuts(transferOuts, summaryAcs, p)
       val (stFinal, offsetsToRemove) = stInFlight.removeOffsetSignalsBefore(acsOffset)
+      val parsedTxLogEntries = txLogParser.parseAcs(evs, transferOuts)
       (
-        stFinal.copy(offset = Some(acsOffset), offsetChanged = Promise()),
+        stFinal.copy(
+          offset = Some(acsOffset),
+          offsetChanged = Promise(),
+          txLog = parsedTxLogEntries.reverse
+            .map({ case (domain, entry) =>
+              IndexRecordWithDomain(domain, entry.indexRecord)
+            })
+            .to(collection.immutable.Queue),
+        ),
         (
           summaryTransferOut.copy(
             newAcsSize = stFinal.createEvents.size

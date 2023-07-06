@@ -379,7 +379,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         s"ACS was already ingested for store $storeId",
       )
       for {
-        // TODO(#5858): Get initial txLogEntries from txLogParser.parseAcs()
+        // TODO(#6547): Get initial txLogEntries from txLogParser.parseAcs()
         txLogEntries <- Future.successful(Seq.empty)
         // TODO(#5643): batch inserts
         toInsert = acs

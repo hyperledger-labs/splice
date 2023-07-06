@@ -53,6 +53,9 @@ import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
+import com.daml.network.environment.ledger.api.ActiveContract
+import com.daml.network.environment.ledger.api.InFlightTransferOutEvent
+import com.digitalasset.canton.topology.DomainId
 
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
@@ -536,6 +539,11 @@ class UserWalletTxLogParser(
     roots.foldMap(parseTree(tree, _))
   }
 
+  // The wallet TxLog does not currently parse from ACS
+  override def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(implicit
+      tc: TraceContext
+  ): Seq[(DomainId, TxLogEntry)] = Seq.empty
+
   override def tryParse(tx: TransactionTree)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
@@ -558,7 +566,9 @@ object UserWalletTxLogParser {
   final case class TxLogIndexRecord(
       offset: String,
       eventId: String,
-  ) extends TxLogStore.IndexRecord
+  ) extends TxLogStore.IndexRecord {
+    override def optOffset = Some(offset)
+  }
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {
     def toResponseItem: httpDef.ListTransactionsResponseItem

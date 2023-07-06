@@ -202,6 +202,19 @@ object ImportCrate {
   }
 }
 
+object LockedCoinCreate {
+  type TCid = coinCodegen.LockedCoin.ContractId
+  type T = coinCodegen.LockedCoin
+  type ContractType = Contract[TCid, T]
+  val companion = coinCodegen.LockedCoin.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    Contract.fromCreatedEvent(companion)(event)
+  }
+}
+
 object CoinExpire extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.Coin
   override type Arg = coinCodegen.Coin_Expire

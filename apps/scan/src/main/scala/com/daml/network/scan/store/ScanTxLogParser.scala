@@ -5,7 +5,6 @@ import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
 import com.daml.network.codegen.java.cc.api.v1.coin.{CoinCreateSummary, CoinExpireSummary}
 import com.daml.network.codegen.java.cc.coinimport
-import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Codec, ExerciseNode}
@@ -19,6 +18,10 @@ import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
+import com.daml.network.environment.ledger.api.ActiveContract
+import com.daml.network.environment.ledger.api.InFlightTransferOutEvent
+import com.digitalasset.canton.topology.DomainId
+import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
@@ -89,6 +92,28 @@ class ScanTxLogParser(
     roots.foldMap(parseTree(tree, _))
   }
 
+  // TODO(#4906): handle in-flight contracts when we tackle global domain migration
+  override def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(implicit
+      tc: TraceContext
+  ): Seq[(DomainId, ScanTxLogParser.TxLogEntry)] = acs.collect(ac =>
+    ac.createdEvent match {
+      case CoinCreate(c) =>
+        (ac.domainId, entryFromCoinContract(ac.createdEvent.getEventId, c))
+      case LockedCoinCreate(lc) =>
+        (ac.domainId, entryFromLockedCoinContract(ac.createdEvent.getEventId, lc))
+    }
+  )
+
+  def entryFromCoinContract(
+      eventId: String,
+      coin: CoinCreate.ContractType,
+  ): TxLogEntry = entryFromCoin(None, eventId, coin.payload.amount)
+
+  def entryFromLockedCoinContract(
+      eventId: String,
+      lc: LockedCoinCreate.ContractType,
+  ): TxLogEntry = entryFromCoin(None, eventId, lc.payload.coin.amount)
+
   override def tryParse(tx: TransactionTree)(implicit
       tc: TraceContext
   ): Seq[ScanTxLogParser.TxLogEntry] = {
@@ -113,23 +138,24 @@ object ScanTxLogParser {
   sealed trait TxLogIndexRecord extends TxLogStore.IndexRecord
 
   object TxLogIndexRecord {
+
     final case class ErrorIndexRecord(
         offset: String,
         eventId: String,
-    ) extends TxLogIndexRecord
+    ) extends TxLogIndexRecord { override def optOffset = Some(offset) }
 
     final case class OpenMiningRoundIndexRecord(
         offset: String,
         eventId: String,
         round: Long,
-    ) extends TxLogIndexRecord
+    ) extends TxLogIndexRecord { override def optOffset = Some(offset) }
 
     final case class ClosedMiningRoundIndexRecord(
         offset: String,
         eventId: String,
         round: Long,
         effectiveAt: Instant,
-    ) extends TxLogIndexRecord
+    ) extends TxLogIndexRecord { override def optOffset = Some(offset) }
 
     sealed trait RewardIndexRecord extends TxLogIndexRecord {
       def party: PartyId
@@ -143,7 +169,7 @@ object ScanTxLogParser {
         round: Long,
         party: PartyId,
         amount: BigDecimal,
-    ) extends RewardIndexRecord
+    ) extends RewardIndexRecord { override def optOffset = Some(offset) }
 
     final case class ValidatorRewardIndexRecord(
         offset: String,
@@ -151,7 +177,7 @@ object ScanTxLogParser {
         round: Long,
         party: PartyId,
         amount: BigDecimal,
-    ) extends RewardIndexRecord
+    ) extends RewardIndexRecord { override def optOffset = Some(offset) }
 
     final case class ExtraTrafficPurchaseIndexRecord(
         offset: String,
@@ -160,10 +186,10 @@ object ScanTxLogParser {
         validator: PartyId,
         trafficPurchased: Long,
         ccSpent: BigDecimal,
-    ) extends TxLogIndexRecord
+    ) extends TxLogIndexRecord { override def optOffset = Some(offset) }
 
     final case class BalanceChangeIndexRecord(
-        offset: String,
+        optOffset: Option[String],
         eventId: String,
         round: Long,
         changeToInitialAmountAsOfRoundZero: BigDecimal,
@@ -226,7 +252,7 @@ object ScanTxLogParser {
         immutable.Queue(
           TxLogEntry.EmptyTxLogEntry(
             indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
-              offset = tx.getOffset(),
+              optOffset = Some(tx.getOffset()),
               eventId = event.getEventId(),
               round = coin.amount.createdAt.number,
               changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
@@ -258,14 +284,10 @@ object ScanTxLogParser {
 
       State(
         immutable.Queue(
-          TxLogEntry.EmptyTxLogEntry(
-            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
-              offset = tx.getOffset(),
-              eventId = event.getEventId(),
-              round = coin.amount.createdAt.number,
-              changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
-              changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
-            )
+          ScanTxLogParser.entryFromCoin(
+            Some(tx.getOffset()),
+            event.getEventId(),
+            coin.amount,
           )
         )
       )
@@ -326,7 +348,7 @@ object ScanTxLogParser {
         immutable.Queue(
           TxLogEntry.EmptyTxLogEntry(
             indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
-              offset = tx.getOffset(),
+              optOffset = Some(tx.getOffset()),
               eventId = rootEventId.getOrElse(event.getEventId()),
               round = round.number,
               changeToInitialAmountAsOfRoundZero =
@@ -352,7 +374,7 @@ object ScanTxLogParser {
         immutable.Queue(
           TxLogEntry.EmptyTxLogEntry(
             indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
-              offset = tx.getOffset(),
+              optOffset = Some(tx.getOffset()),
               eventId = event.getEventId(),
               round = cxsum.round.number,
               changeToInitialAmountAsOfRoundZero = cxsum.changeToInitialAmountAsOfRoundZero,
@@ -452,9 +474,25 @@ object ScanTxLogParser {
       )
     }
 
-    private def amountAsOfRoundZero(amount: ExpiringAmount) =
-      amount.initialAmount + amount.ratePerRound.rate * BigDecimal(amount.createdAt.number)
-
   }
+
+  private def entryFromCoin(
+      optOffset: Option[String],
+      eventId: String,
+      amount: ExpiringAmount,
+  ): TxLogEntry = {
+    TxLogEntry.EmptyTxLogEntry(
+      indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
+        optOffset = optOffset,
+        eventId = eventId,
+        round = amount.createdAt.number,
+        changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(amount),
+        changeToHoldingFeesRate = amount.ratePerRound.rate,
+      )
+    )
+  }
+
+  private def amountAsOfRoundZero(amount: ExpiringAmount) =
+    amount.initialAmount + amount.ratePerRound.rate * BigDecimal(amount.createdAt.number)
 
 }

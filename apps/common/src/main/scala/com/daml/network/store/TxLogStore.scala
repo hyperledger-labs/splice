@@ -9,6 +9,9 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import com.daml.network.environment.ledger.api.ActiveContract
+import com.daml.network.environment.ledger.api.InFlightTransferOutEvent
+import com.digitalasset.canton.topology.DomainId
 
 /** Stores historical information that can be used to construct application-specific historical events,
   * such as a user notification or an item from a bank statement.
@@ -66,12 +69,17 @@ object TxLogStore {
 
   /** Identifies the transaction tree event that an tx log entry is associated with */
   trait EntryEvent {
-    def offset: String
+    def optOffset: Option[String]
     def eventId: String
   }
 
   /** Extracts tx log entries from transaction tree events */
   trait Parser[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
+
+    /** Extract application-specific TxLog entries from the acs, before starting to ingest transactions */
+    def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(implicit
+        tc: TraceContext
+    ): Seq[(DomainId, TXE)]
 
     /** Extract application-specific TxLog entries from the given daml transaction */
     def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE]
@@ -102,6 +110,9 @@ object TxLogStore {
   object Parser {
     final case class Empty[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]]()
         extends Parser[TXI, TXE] {
+      override def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(
+          implicit tc: TraceContext
+      ): Seq[(DomainId, TXE)] = Seq.empty
       override def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE] = Seq.empty
       override def error(offset: String, eventId: String): Option[TXE] = None
     }
@@ -192,4 +203,5 @@ object TxLogStore {
         )
     } yield entry
   }
+
 }
