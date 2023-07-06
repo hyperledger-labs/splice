@@ -82,7 +82,6 @@ class ParticipantIdentitiesStore(
         // because it turns this into an absolute path which
         // then makes all the logging stuff below very confusing.
         val filename = ParticipantIdentitiesStore.dumpFilename(now)
-        // TODO(#6073): compress output file
         val fileDesc =
           s"participant identities dump containing ${dump.keys.size} keys and ${dump.users.size} users to ${dumpConfig.locationDescription} at path: $filename"
         logger.debug(s"Attempting to write $fileDesc")

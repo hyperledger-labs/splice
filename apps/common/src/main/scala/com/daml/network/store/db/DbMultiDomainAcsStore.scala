@@ -653,6 +653,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   }
 
   override def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot] =
-    // TODO(#6073): implement snapshot reading for the DB store
+    // TODO(#6400): implement snapshot reading for the DB store
     ???
 }

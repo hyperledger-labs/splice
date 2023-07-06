@@ -426,7 +426,7 @@ class HttpSvHandler(
       case Some(acsDumpConfig: BackupDumpConfig) =>
         logger.debug(s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription}")
         for {
-          // TODO(#6073): this doesn't work for larger ACS as the client will timeout -- we can change its semantics to start a dump process and return a handle to the operation that can be checked for completion
+          // Note: we expect the snapshots to be small enough to be delivered within the request timeout.
           snapshot <- svcStore.getJsonAcsSnapshot()
           response <- Future {
             blocking {
@@ -441,7 +441,6 @@ class HttpSvHandler(
               val filename = Paths.get(
                 s"svc_acs_dump_${now}.json"
               )
-              // TODO(#6073): compress output file
               val httpSnapshot = definitions.GetAcsStoreDumpResponse(
                 offset = snapshot.offset,
                 contracts = snapshot.contracts.map(_.toJson).toVector,

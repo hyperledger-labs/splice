@@ -31,15 +31,16 @@ abstract class AcsStoreDumpImportTimeBasedIntegrationTest[T <: SvBootstrapDumpCo
   //
   // NOTE: use the following steps to produce such a dump
   //  1. Run the DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest to produce a dump file
-  //  2. Open the produced json file in `dumps/testing/<your-build-prefix>`
+  //  2. Open the produced json file in `apps/app/src/test/resources/dumps/test-outputs/<your-build-prefix>`
   //  3. Reformat it using 'jq' or IntelliJ and replace
   //     a. all package-ids with 'deadbeef'
   //     b. the year timestamps of all timestmpas ('1970') with ('1800') so that the imported OpenMiningRounds
   //        are definitely in the past, even when using simtime.
 
-  // TODO(#6073): move to test/resources and remove the `./dumps` directory and its .gitignore once we dump to a Google Cloud Storage bucket
-  protected val bootstrappingDumpFilename =
-    Paths.get("dumps/static_test_data/test-dump_changed-package-ids.json")
+  final protected val bootstrappingDumpFilename =
+    AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpDir.resolve(
+      "acs-dump_changed-package-ids.json"
+    )
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

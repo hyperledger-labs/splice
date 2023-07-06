@@ -72,13 +72,13 @@ object AcsStoreDump {
           svcParty.toProtoPrimitive,
           receiverName,
           productionMode,
-          coin, // TODO(#6073): consider embedding the contract-id as well for easier traceability
+          coin, // TODO(#6503): embed the contract id here for idempotent imports
         ).create().commands().asScala.toSeq
       }
     } yield cmd
   }
 
-  // TODO(#6073): get rid of this party name suffix hackery once we only support the fixed mode
+  // TODO(#6278): get rid of this party name suffix hackery once we only support the fixed mode
   def dropPartyNameSuffix(partyStr: String): String =
     "-[a-z0-9_]+::.*$".r.replaceFirstIn(partyStr, "")
 

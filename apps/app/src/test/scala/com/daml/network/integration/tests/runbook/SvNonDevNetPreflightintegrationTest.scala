@@ -152,7 +152,7 @@ final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightInt
 
   override protected def svNumber = 1
 
-  // TODO(#6073) Replace this by only checking that a recent snapshot exists
+  // TODO(#6228) once the SvApp does its own backup: replace this by only checking that a recent snapshot exists
   // instead of triggering one.
   "trigger ACS snapshot and check that it can be downloaded and decoded" in { implicit env =>
     val result = sv1Client.triggerAcsDump()

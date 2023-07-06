@@ -75,8 +75,12 @@ abstract class ParticipantIdentitiesBackupIntegrationTestBase[T <: BackupDumpCon
 
 final class DirectoryParticipantIdentitiesBackupIntegrationTest
     extends ParticipantIdentitiesBackupIntegrationTestBase[BackupDumpConfig.Directory] {
+
   override def backupDumpConfig =
-    BackupDumpConfig.Directory(Paths.get("dumps/testing"), backupInterval)
+    BackupDumpConfig.Directory(
+      AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir,
+      backupInterval,
+    )
 
   override def readDump(filename: String) = {
     import better.files.File

@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.{CNNodeConfigTransforms, BackupDumpConfig, GcpBucketConfig}
+import com.daml.network.config.{BackupDumpConfig, CNNodeConfigTransforms, GcpBucketConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.GcpBucket
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 
 abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: BackupDumpConfig]
     extends AcsStoreDumpExportTimeBasedIntegrationTestBase {
@@ -54,13 +54,16 @@ abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: Backup
 
 final class DirectoryAcsStoreDumpTriggerExportTimeBasedIntegrationTest
     extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[BackupDumpConfig.Directory] {
-  private val dumpDirectory = Paths.get("dumps/testing")
   override def acsStoreDumpConfig(testContext: String) =
-    BackupDumpConfig.Directory(dumpDirectory, None)
+    BackupDumpConfig.Directory(
+      AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir,
+      None,
+    )
 
   override def readDump(filename: String) = {
     import better.files.File
-    val dumpFile = File(dumpDirectory) / filename
+    val dumpFile =
+      File(AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir) / filename
     dumpFile.contentAsString
   }
 
@@ -77,4 +80,11 @@ final class GcpBucketAcsStoreDumpTriggerExportTimeBasedIntegrationTest
     val bucket = new GcpBucket(bucketConfig, loggerFactory)
     bucket.readStringFromBucket(Paths.get(filename))
   }
+}
+
+object AcsStoreDumpTriggerExportTimeBasedIntegrationTest {
+  val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
+
+  // Not using temp-files so test-generated outputs are easy to inspect.
+  val testDumpOutputDir: Path = testDumpDir.resolve("test-outputs")
 }

@@ -361,7 +361,7 @@ class FoundingNodeInitializer(
               show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
             )
             _ <-
-              // TODO(#6073): consider command dedup (or another protection from failed/partial imports), and limiting the batch size
+              // TODO(#6503): consider command dedup (or another protection from failed/partial imports), and limiting the batch size
               svcStoreWithIngestion.connection
                 .submitCommandsNoDedup(
                   actAs = Seq(svcParty),

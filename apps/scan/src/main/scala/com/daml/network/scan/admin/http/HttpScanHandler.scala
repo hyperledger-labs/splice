@@ -486,13 +486,12 @@ class HttpScanHandler(
       }
     }
 
-  // TODO(#6073): make the process for importing crates on the validator app robust to large lists of crates, if required
   override def listImportCrates(respond: v0.ScanResource.ListImportCratesResponse.type)(
       party: String
   )(extracted: Unit): Future[v0.ScanResource.ListImportCratesResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       {
-        // TODO(#6073): only do that in test-mode
+        // TODO(#6278): do not drop the suffix here
         val receiverName = AcsStoreDump.dropPartyNameSuffix(party)
         for {
           crates <- store.listImportCrates(receiverName)
@@ -502,7 +501,6 @@ class HttpScanHandler(
               MaybeCachedContractWithState(
                 Some(crate.contract.toJson),
                 crate.state match {
-                  // TODO(#6073): figure out whether there's a better way to do this conversion
                   case ContractState.InFlight => None
                   case ContractState.Assigned(domainId) => Some(domainId.toProtoPrimitive)
                 },
