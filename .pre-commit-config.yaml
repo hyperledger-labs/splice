@@ -43,12 +43,6 @@ repos:
         entry: "make cluster/pulumi/canton-network/test"
         files: '^cluster/pulumi/canton-network/.*[.]ts$'
         pass_filenames: false
-      - id: pulumi_cn_gw
-        name: check pulumi canton-network-gateway config
-        language: system
-        entry: "make cluster/pulumi/canton-network-gateway/test"
-        files: '^cluster/pulumi/canton-network-gateway/.*[.]ts$'
-        pass_filenames: false
       - id: pulumi_sv
         name: check pulumi sv-runbook config
         language: system

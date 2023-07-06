@@ -821,6 +821,24 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-istio-fwd/",
+      "compat": "true",
+      "name": "fwd-all",
+      "namespace": "cn-namespace",
+      "values": {
+        "cluster": {
+          "basename": "mock"
+        }
+      }
+    },
+    "name": "fwd-all",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-full/",
       "compat": "true",
       "name": "cluster-ingress",

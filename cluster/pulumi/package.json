@@ -34,7 +34,6 @@
     "workspaces": [
         "common",
         "canton-network",
-        "canton-network-gateway",
         "infra",
         "sv-runbook"
     ]

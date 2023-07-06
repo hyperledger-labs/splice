@@ -6,6 +6,7 @@ import { exit } from 'process';
 
 import { BackupConfig, installGcpBucket, GcpBucketConfig, BootstrappingDumpConfig } from './backup';
 import { installDocs } from './docs';
+import { configureForwardAll } from './gateway';
 import { installClusterIngress } from './ingress';
 import { installSplitwell } from './splitwell';
 import { installSvNode, SvOnboarding } from './sv';
@@ -184,6 +185,10 @@ function generatePassword(name: string): random.RandomPassword {
 }
 
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
+  configureForwardAll(
+    infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>
+  );
+
   const sv1PostgresPassword = generatePassword(`sv-1-postgres-passwd`);
   const sv1 = await installSvNode({
     auth0Client,

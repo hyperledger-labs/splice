@@ -96,22 +96,6 @@ function _needs_auth0_sv_management_api_creds() {
     fi
 }
 
-function _cluster_install_network_gateway() {
-    # TODO(#4560): Use an empty passphrase until we manage secrets
-    local -x PULUMI_CONFIG_PASSPHRASE=''
-
-    _info "Creating a pulumi stack if it does not yet exist"
-
-    _uses_pulumi_stack canton-network-gateway
-
-    _info "Installing canton-network-gateway stack"
-
-    # Spin up the canton-network-gateway pulumi stack
-    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" \
-           --cwd "${REPO_ROOT}/cluster/pulumi/canton-network-gateway" \
-           up -y --skip-preview
-}
-
 function _cluster_apply() {
     IMAGE_TAG=$1
 
@@ -129,8 +113,6 @@ function _cluster_apply() {
     else
         args+=(-c "FIXED_TOKENS=0")
     fi
-
-    _cluster_install_network_gateway
 
     _info "Applying Pulumi Stack"
 
@@ -630,9 +612,8 @@ function _cluster_reset() {
     _info "Uninstalling Pulumi canton-network-gateway stack"
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
-    _uses_pulumi_stack canton-network-gateway
-    subcmd_pulumi canton-network-gateway refresh --yes --skip-preview
-    subcmd_pulumi canton-network-gateway down --yes --skip-preview
+    # TODO(#6473): Remove this line when we have the change from #6439 deployed to all clusters.
+    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" down --skip-preview
 
     _info "Uninstalling Pulumi canton-network stack"
     _uses_pulumi_stack canton-network
@@ -1052,7 +1033,6 @@ function subcmd_apply() {
             fi
         fi
 
-        _cluster_install_network_gateway
         subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
     fi
 }
