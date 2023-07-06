@@ -1122,7 +1122,7 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "1",
+            "cpu": "4",
             "memory": "32Gi"
           }
         }
@@ -1705,7 +1705,7 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "1",
+            "cpu": "4",
             "memory": "32Gi"
           }
         }
@@ -2448,7 +2448,7 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "1",
+            "cpu": "4",
             "memory": "32Gi"
           }
         }
@@ -3169,7 +3169,7 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "1",
+            "cpu": "4",
             "memory": "32Gi"
           }
         }
@@ -3815,7 +3815,7 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "1",
+            "cpu": "4",
             "memory": "32Gi"
           }
         }
@@ -4311,7 +4311,7 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "1",
+            "cpu": "4",
             "memory": "32Gi"
           }
         }

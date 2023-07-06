@@ -13,6 +13,7 @@ Release Notes
     * The SV Helm runbook has been extended with a section that explains :ref:`how to restore from a participant identities backup <sv-participant-identities-restore>`.
     * The instructions for self hosted validators have been extended with a section that explains :ref:`how to restore from a participant identities backup <validator-participant-identities-restore>`.
     * The secret ``cn-app-sv1-validator-ledger-api-auth`` is no longer required.
+    * The participant now requests 4 CPUs to improve behavior under load.
 
 2023-07-02
 ----------
