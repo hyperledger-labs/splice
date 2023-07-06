@@ -63,7 +63,7 @@ class DirectoryApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      providerPartyId: PartyId,
+      svParty: PartyId,
   ): Future[DirectoryApp.State] =
     for {
       initConnection <- Future.successful(
@@ -78,7 +78,7 @@ class DirectoryApp(
         loggerFactory,
       )
       store = DirectoryStore(
-        providerParty = providerPartyId,
+        providerParty = svcParty,
         svcParty = svcParty,
         storage,
         config.domains,

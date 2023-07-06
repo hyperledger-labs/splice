@@ -76,6 +76,11 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         .flat(Set(aliceUserParty), completeAfter = 1, beginOffset = offsetBefore)
     }
 
+    "use svc as provider party" in { implicit env =>
+      val svc = sv1Backend.getSvcInfo().svcParty
+      directoryBackend.getProviderPartyId() shouldBe svc
+    }
+
     "ensure unique install despite racing install requests w/ and w/o archivals" in {
       implicit env =>
         // NOTE: this test also serves to check that the stale-contract detection logic in the OnCreateTrigger works properly
