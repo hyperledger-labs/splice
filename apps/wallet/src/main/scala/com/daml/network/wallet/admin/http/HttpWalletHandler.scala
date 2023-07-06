@@ -4,8 +4,8 @@ import akka.stream.Materializer
 import cats.implicits.showInterpolator
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
-import com.daml.ledger.javaapi.data.{Template, Unit as DUnit}
-import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen.{ContractId, Update}
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
@@ -280,11 +280,13 @@ class HttpWalletHandler(
         coinRules <- scanConnection.getCoinRules()
         result <- exerciseWalletAction((installCid, _) =>
           Future.successful(
-            installCid.exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(
-              coinRules.contract.contractId
-            )
+            installCid
+              .exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(
+                coinRules.contract.contractId
+              )
+              .map(_.exerciseResult)
           )
-        )(user, _.exerciseResult, dislosedContracts = DisclosedContracts(coinRules))
+        )(user, dislosedContracts = DisclosedContracts(coinRules))
       } yield d0.SelfGrantFeaturedAppRightResponse(Codec.encodeContractId(result))
     }
 
@@ -298,13 +300,16 @@ class HttpWalletHandler(
             contractId
           )
         Future.successful(
-          installCid.exerciseWalletAppInstall_TransferOffer_Accept(
-            requestCid
-          )
+          installCid
+            .exerciseWalletAppInstall_TransferOffer_Accept(requestCid)
+            .map { cid =>
+              d0.AcceptTransferOfferResponse(
+                Codec.encodeContractId(cid.exerciseResult)
+              ): r0.AcceptTransferOfferResponse
+            }
         )
       })(
-        user,
-        cid => d0.AcceptTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult)),
+        user
       )
     }
 
@@ -312,19 +317,20 @@ class HttpWalletHandler(
       contractId: String
   )(user: String): Future[r0.RejectTransferOfferResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      exerciseWalletAction[r0.RejectTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
+      exerciseWalletAction[r0.RejectTransferOfferResponse]((installCid, _) => {
         val requestCid =
           Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
             contractId
           )
         Future.successful(
-          installCid.exerciseWalletAppInstall_TransferOffer_Reject(
-            requestCid
-          )
+          installCid
+            .exerciseWalletAppInstall_TransferOffer_Reject(
+              requestCid
+            )
+            .map(_ => r0.RejectTransferOfferResponseOK)
         )
       })(
-        user,
-        _ => r0.RejectTransferOfferResponseOK,
+        user
       )
     }
 
@@ -332,19 +338,20 @@ class HttpWalletHandler(
       contractId: String
   )(user: String): Future[r0.WithdrawTransferOfferResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      exerciseWalletAction[r0.WithdrawTransferOfferResponse, Exercised[DUnit]]((installCid, _) => {
+      exerciseWalletAction[r0.WithdrawTransferOfferResponse]((installCid, _) => {
         val requestCid =
           Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
             contractId
           )
         Future.successful(
-          installCid.exerciseWalletAppInstall_TransferOffer_Withdraw(
-            requestCid
-          )
+          installCid
+            .exerciseWalletAppInstall_TransferOffer_Withdraw(
+              requestCid
+            )
+            .map(_ => r0.WithdrawTransferOfferResponseOK)
         )
       })(
-        user,
-        _ => r0.WithdrawTransferOfferResponseOK,
+        user
       )
     }
 
@@ -380,11 +387,11 @@ class HttpWalletHandler(
           contractId
         )
         Future.successful(
-          installCid.exerciseWalletAppInstall_AppPaymentRequest_Reject(
-            requestCid
-          )
+          installCid
+            .exerciseWalletAppInstall_AppPaymentRequest_Reject(requestCid)
+            .map(_ => r0.RejectAppPaymentRequestResponseOK)
         )
-      })(user, _ => r0.RejectAppPaymentRequestResponseOK)
+      })(user)
     }
 
   override def getSubscriptionRequest(respond: r0.GetSubscriptionRequestResponse.type)(
@@ -437,11 +444,13 @@ class HttpWalletHandler(
             contractId
           )
         Future.successful(
-          installCid.exerciseWalletAppInstall_SubscriptionIdleState_CancelSubscription(
-            requestCid
-          )
+          installCid
+            .exerciseWalletAppInstall_SubscriptionIdleState_CancelSubscription(
+              requestCid
+            )
+            .map(_ => r0.CancelSubscriptionRequestResponseOK)
         )
-      })(user, _ => r0.CancelSubscriptionRequestResponseOK)
+      })(user)
     }
 
   override def rejectSubscriptionRequest(
@@ -453,11 +462,11 @@ class HttpWalletHandler(
           contractId
         )
         Future.successful(
-          installCid.exerciseWalletAppInstall_SubscriptionRequest_Reject(
-            requestCid
-          )
+          installCid
+            .exerciseWalletAppInstall_SubscriptionRequest_Reject(requestCid)
+            .map(_ => r0.RejectSubscriptionRequestResponseOK)
         )
-      })(user, _ => r0.RejectSubscriptionRequestResponseOK)
+      })(user)
     }
 
   override def getBalance(respond: r0.GetBalanceResponse.type)()(
@@ -508,19 +517,21 @@ class HttpWalletHandler(
         val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
         val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
         Future.successful(
-          installCid.exerciseWalletAppInstall_CreateTransferOffer(
-            receiver.toProtoPrimitive,
-            new PaymentAmount(amount, Currency.CC),
-            request.description,
-            expiresAt.toInstant,
-          )
+          installCid
+            .exerciseWalletAppInstall_CreateTransferOffer(
+              receiver.toProtoPrimitive,
+              new PaymentAmount(amount, Currency.CC),
+              request.description,
+              expiresAt.toInstant,
+            )
+            .map { cid =>
+              r0.CreateTransferOfferResponse.OK(
+                d0.CreateTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult))
+              )
+            }
         )
       })(
         user,
-        cid =>
-          r0.CreateTransferOfferResponse.OK(
-            d0.CreateTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult))
-          ),
         dedup = Some(
           (
             CNLedgerConnection.CommandId(
@@ -601,11 +612,11 @@ class HttpWalletHandler(
           case Some(cid) =>
             exerciseWalletAction((installCid, _) => {
               Future.successful(
-                installCid.exerciseWalletAppInstall_FeaturedAppRights_Cancel(
-                  cid.contractId
-                )
+                installCid
+                  .exerciseWalletAppInstall_FeaturedAppRights_Cancel(cid.contractId)
+                  .map(_ => r0.CancelFeaturedAppRightsResponseOK)
               )
-            })(user, _ => r0.CancelFeaturedAppRightsResponseOK)
+            })(user)
         }
       } yield result
     }
@@ -714,14 +725,13 @@ class HttpWalletHandler(
     *
     * Note: curried syntax helps with type inference
     */
-  private def exerciseWalletAction[Response, ChoiceResult](
+  private def exerciseWalletAction[Response](
       getUpdate: (
           installCodegen.WalletAppInstall.ContractId,
           UserWalletStore,
-      ) => Future[Update[ChoiceResult]]
+      ) => Future[Update[Response]]
   )(
       user: String,
-      getResponse: ChoiceResult => Response,
       dedup: Option[(CommandId, DedupConfig)] = None,
       dislosedContracts: DisclosedContracts = DisclosedContracts(),
   )(implicit tc: TraceContext): Future[Response] = {
@@ -757,9 +767,7 @@ class HttpWalletHandler(
             )
       }
 
-    } yield {
-      getResponse(result)
-    }
+    } yield result
   }
 }
 
