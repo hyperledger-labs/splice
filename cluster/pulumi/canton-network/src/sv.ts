@@ -267,6 +267,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
             secret: backupConfigSecret,
           }
         : undefined,
+    extraDependsOn: [svApp],
   });
 
   installCNHelmChart(
