@@ -55,7 +55,7 @@ class SvRewardTrigger(
   private def collectSvReward(
       svReward: SvRewardContract,
       openMiningRound: Contract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound],
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+  ): Future[TaskOutcome] = {
     for {
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()

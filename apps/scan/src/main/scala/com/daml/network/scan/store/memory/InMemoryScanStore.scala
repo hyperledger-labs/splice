@@ -13,7 +13,7 @@ import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.MultiDomainAcsStore.{ContractWithState, ReadyContract}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.{InMemoryCNNodeAppStore, MultiDomainAcsStore, TxLogStore}
+import com.daml.network.store.{InMemoryCNNodeAppStore, HardLimit, TxLogStore}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -36,12 +36,11 @@ class InMemoryScanStore(
 
   override def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[MultiDomainAcsStore.ReadyContract[CoinRules.ContractId, CoinRules]]] =
+  ): Future[Option[ReadyContract[CoinRules.ContractId, CoinRules]]] =
     for {
-      domain <- defaultAcsDomainIdF
-      contractO <- multiDomainAcsStore
-        .findContractOnDomain(cc.coin.CoinRules.COMPANION)(domain, (_: Any) => true)
-    } yield contractO.map(ReadyContract(_, domain))
+      contracts <- multiDomainAcsStore
+        .listReadyContracts(cc.coin.CoinRules.COMPANION, HardLimit(1))
+    } yield contracts.headOption
 
   override def lookupCoinRulesV1Test()(implicit
       tc: TraceContext

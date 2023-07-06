@@ -1,10 +1,12 @@
 package com.daml.network.sv.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore
+import MultiDomainAcsStore.{ContractCompanion, ReadyContract}
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.{SvStore, SvSvStore}
@@ -12,6 +14,7 @@ import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import slick.dbio.DBIO
@@ -65,6 +68,14 @@ class DbSvSvStore(
   )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[
     Option[Contract[ApprovedSvIdentity.ContractId, ApprovedSvIdentity]]
   ]] = ???
+
+  protected[this] override def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
+      excludedDomain: DomainId,
+      c: C,
+  )(implicit
+      tc: TraceContext,
+      companion: ContractCompanion[C, I, P],
+  ): Future[Seq[ReadyContract[I, P]]] = ???
 }
 
 object DbSvSvStore {

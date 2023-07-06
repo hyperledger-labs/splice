@@ -3,7 +3,9 @@ package com.daml.network.sv.store
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.Identifier
+import javab.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as v1testcc
 import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive, UnclaimedReward}
@@ -31,7 +33,12 @@ import com.daml.network.store.{
   PageLimit,
   TxLogStore,
 }
-import com.daml.network.store.MultiDomainAcsStore.{JsonAcsSnapshot, QueryResult, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.{
+  ContractCompanion,
+  JsonAcsSnapshot,
+  QueryResult,
+  ReadyContract,
+}
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvSvcStore.{
   DuplicateValidatorTrafficContracts,
@@ -66,24 +73,19 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   ]
 
   def lookupSvcRulesWithOffset(
-  )(implicit tc: TraceContext): Future[
+  ): Future[
     QueryResult[Option[
       ReadyContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
     ]]
   ] = for {
-    domain <- defaultAcsDomainIdF
-    c <- multiDomainAcsStore
-      .findContractOnDomainWithOffset(cn.svcrules.SvcRules.COMPANION)(domain, (_: Any) => true)
-  } yield c.map(_.map(ReadyContract(_, domain)))
+    c <- multiDomainAcsStore.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)()
+  } yield c.map(_ flatMap (_.toReadyContract))
 
-  def lookupSvcRules()(implicit
-      tc: TraceContext
-  ): Future[Option[ReadyContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
+  def lookupSvcRules()
+      : Future[Option[ReadyContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     lookupSvcRulesWithOffset().map(_.value)
 
   def getSvcRules(
-  )(implicit
-      tc: TraceContext
   ): Future[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
     lookupSvcRules().map(
       _.map(_.contract).getOrElse(
@@ -93,19 +95,17 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       )
     )
 
-  def svIsLeader()(implicit tc: TraceContext): Future[Boolean] =
+  def svIsLeader(): Future[Boolean] =
     getSvcRules().map(_.payload.leader == key.svParty.toProtoPrimitive)
 
-  def lookupCoinRulesWithOffset(
-  )(implicit tc: TraceContext): Future[
+  private[this] def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[
-      Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
+      ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
     ]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore
-        .findContractOnDomainWithOffset(cc.coin.CoinRules.COMPANION)(_, (_: Any) => true)
-    )
+  ] = for {
+    result <- multiDomainAcsStore
+      .findContractWithOffset(cc.coin.CoinRules.COMPANION)((_: Any) => true)
+  } yield result map (_ flatMap (_.toReadyContract))
 
   def lookupCoinRulesV1TestWithOffset(
   )(implicit tc: TraceContext): Future[
@@ -121,16 +121,13 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
         )
     )
 
-  def lookupCoinRules()(implicit
-      tc: TraceContext
-  ): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
+  def lookupCoinRules()
+      : Future[Option[ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     lookupCoinRulesWithOffset().map(_.value)
 
-  def getCoinRules()(implicit
-      tc: TraceContext
-  ): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
+  def getCoinRules(): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
     lookupCoinRules().map(
-      _.getOrElse(
+      _.map(_.contract).getOrElse(
         throw new StatusRuntimeException(
           Status.NOT_FOUND.withDescription("No active CoinRules contract")
         )
@@ -781,6 +778,46 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
 
   def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
     multiDomainAcsStore.getJsonAcsSnapshot(ignoredContractsForAcsDump)
+
+  protected[this] def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
+      excludedDomain: DomainId,
+      c: C,
+  )(implicit
+      tc: TraceContext,
+      companion: ContractCompanion[C, I, P],
+  ): Future[Seq[ReadyContract[I, P]]]
+
+  private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Seq[ReadyContract[?, ?]]] = {
+    import com.daml.network.codegen.java.cn.svcrules as svcr
+    def c[C, I <: ContractId[?], P](c: C)(implicit companion: ContractCompanion[C, I, P]) =
+      listReadyContractsNotOnDomain(targetDomain, c)
+
+    for {
+      coinRulesO <- lookupCoinRules()
+      otherContracts <- Future sequence Seq(
+        c(svcr.Vote.COMPANION),
+        c(svcr.VoteRequest.COMPANION),
+        c(svcr.Confirmation.COMPANION),
+        c(svcr.SvReward.COMPANION),
+        c(svcr.ElectionRequest.COMPANION),
+        c(so.SvOnboardingRequest.COMPANION),
+        c(so.SvOnboardingConfirmed.COMPANION),
+      )
+    } yield (otherContracts.view.flatten ++ coinRulesO
+      .filterNot(_.domain == targetDomain)
+      .toList).toSeq
+  }
+
+  final def listSvcRulesTransferFollowers()(implicit
+      tc: TraceContext
+  ): Future[Seq[FollowTask[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules, ?, ?]]] = {
+    lookupSvcRules().flatMap(_.map { svcRules =>
+      listLaggingSvcRulesFollowers(svcRules.domain)
+        .map(_ map (FollowTask(svcRules, _)))
+    }.getOrElse(Future successful Seq.empty))
+  }
 }
 
 object SvSvcStore {

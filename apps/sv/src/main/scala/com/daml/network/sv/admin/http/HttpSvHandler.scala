@@ -863,7 +863,7 @@ class HttpSvHandler(
       candidateParty: PartyId,
       secret: String,
       validatorOnboarding: Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding],
-  )(implicit tc: TraceContext): Future[Unit] =
+  ): Future[Unit] =
     for {
       svcRules <- svcStore.getSvcRules()
       cmds = (

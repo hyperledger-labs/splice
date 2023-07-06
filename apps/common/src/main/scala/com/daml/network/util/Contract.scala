@@ -47,11 +47,12 @@ import scala.util.Try
   */
 final case class Contract[TCid, T](
     identifier: Identifier,
-    contractId: TCid & ContractId[_],
-    payload: T & DamlRecord[_],
+    override val contractId: TCid & ContractId[_],
+    override val payload: T & DamlRecord[_],
     metadata: ContractMetadata,
     createArgumentsBlob: protobuf.Any,
-) extends PrettyPrinting {
+) extends PrettyPrinting
+    with Contract.Has[TCid, T] {
 
   def toProtoV0: v0.Contract = v0.Contract(
     templateId = Some(scalaValue.Identifier.fromJavaProto(identifier.toProto)),
@@ -104,12 +105,21 @@ final case class Contract[TCid, T](
       param("contractMetadata", _.metadata),
     )
   }
+
+  @deprecated("no need to call `.contract`, guaranteed to return receiver", since = "20230621")
+  override def contract: this.type = this
 }
 
 object Contract {
   object Companion {
     type Template[TCid, Data] = ContractCompanion[_ <: CodegenContract[TCid, Data], TCid, Data]
     type Interface[ICid, Marker, View] = InterfaceCompanion[Marker, ICid, View]
+  }
+
+  trait Has[TCid, T] {
+    def contract: Contract[TCid, T]
+    def contractId: TCid & ContractId[?] = contract.contractId
+    def payload: T & DamlRecord[?] = contract.payload
   }
 
   def javaValueToLfValue(v: Value)(implicit elc: ErrorLoggingContext): lf.Value =

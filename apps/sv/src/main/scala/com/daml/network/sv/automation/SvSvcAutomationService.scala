@@ -1,7 +1,11 @@
 package com.daml.network.sv.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{CNNodeAppAutomationService, TransferInTrigger}
+import com.daml.network.automation.{
+  CNNodeAppAutomationService,
+  TransferFollowTrigger,
+  TransferInTrigger,
+}
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -11,7 +15,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class SvSvcAutomationService(
     clock: Clock,
@@ -84,4 +88,29 @@ class SvSvcAutomationService(
 
   registerTrigger(new SvcRulesTransferTrigger(triggerContext, svcStore, connection))
   registerTrigger(new TransferInTrigger(triggerContext, svcStore, connection, store.key.svcParty))
+
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      svcStore,
+      connection,
+      store.key.svcParty,
+      implicit tc => svcStore.listSvcRulesTransferFollowers(),
+    )
+  )
+
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      svStore,
+      connection,
+      store.key.svParty,
+      implicit tc =>
+        svcStore
+          .lookupSvcRules()
+          .flatMap(
+            _.map(svStore.listSvcRulesTransferFollowers(_)).getOrElse(Future successful Seq.empty)
+          ),
+    )
+  )
 }

@@ -1,16 +1,18 @@
 package com.daml.network.sv.store
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   ConfiguredDefaultDomain,
   MultiDomainAcsStore,
   PageLimit,
 }
+import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult, ReadyContract}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.memory.InMemorySvSvStore
@@ -18,6 +20,7 @@ import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -97,6 +100,25 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomai
       )
       .map(_.headOption)
   )
+
+  protected[this] def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
+      excludedDomain: DomainId,
+      c: C,
+  )(implicit
+      tc: TraceContext,
+      companion: ContractCompanion[C, I, P],
+  ): Future[Seq[ReadyContract[I, P]]]
+
+  private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Seq[ReadyContract[?, ?]]] =
+    listReadyContractsNotOnDomain(targetDomain, so.ApprovedSvIdentity.COMPANION)
+
+  final def listSvcRulesTransferFollowers[SrCid, Sr](svcRules: ReadyContract[SrCid, Sr])(implicit
+      tc: TraceContext
+  ): Future[Seq[FollowTask[SrCid, Sr, ?, ?]]] =
+    listLaggingSvcRulesFollowers(svcRules.domain)
+      .map(_ map (FollowTask(svcRules, _)))
 
   def key: SvStore.Key
 }

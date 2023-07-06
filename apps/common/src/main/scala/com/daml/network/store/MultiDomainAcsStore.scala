@@ -563,7 +563,8 @@ object MultiDomainAcsStore {
   final case class ReadyContract[TCid, T](
       contract: Contract[TCid, T],
       domain: DomainId,
-  ) extends PrettyPrinting {
+  ) extends PrettyPrinting
+      with Contract.Has[TCid, T] {
     override def pretty = prettyOfClass[ReadyContract[TCid, T]](
       param("contract", _.contract),
       param("domain", _.domain),
@@ -573,7 +574,7 @@ object MultiDomainAcsStore {
   final case class ContractWithState[TCid, T](
       contract: Contract[TCid, T],
       state: ContractState,
-  ) {
+  ) extends Contract.Has[TCid, T] {
     def toReadyContract: Option[ReadyContract[TCid, T]] =
       state match {
         case ContractState.Assigned(domain) => Some(ReadyContract(contract, domain))
