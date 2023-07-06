@@ -18,7 +18,6 @@ fi
 
 ##
 
-SOURCE_IMAGE_TAG=$(get-snapshot-version)
 GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
 CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 
@@ -667,8 +666,11 @@ function subcmd_ci_apply() {
     _info "Resetting cluster for CI deployment."
     _cluster_reset
 
-    _info "Applying CI deployment."
-    _cluster_apply "${SOURCE_IMAGE_TAG}"
+    source_image_tag=$(get-snapshot-version)
+
+    _info "Applying CI deployment: ${source_image_tag}"
+
+    _cluster_apply "${source_image_tag}"
 }
 
 ###
@@ -941,13 +943,43 @@ function subcmd__autocomplete() {
 subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the current cluster"
 
 function subcmd_pulumi() {
-    _production_gate
 
     pulumi_project="${1-}"
     pulumi_cmd="${2-}"
+    shift 2
+
     if [ -z "${pulumi_cmd}" ] || [ -z "${pulumi_project}" ]; then
         _error "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
     fi
+
+    if [ ! -d "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" ]; then
+        _error "Unknown Pulumi project: ${pulumi_project}"
+    fi
+
+    # Only mutating operations need a production gate. Developer
+    # inspection of clusters should be permissable even in production
+    # like clusters.
+    case "${pulumi_cmd}" in
+        new|up|destroy|down|cancel|refresh|config)
+            _production_gate
+            ;;
+        *)
+            ;;
+    esac
+
+    args=(--cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}")
+
+    case "${pulumi_cmd}" in
+        whoami|org)
+            ;;
+
+        *)
+            args+=(--stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}")
+            ;;
+    esac
+
+    # TODO(#4560): Use an empty passphrase until we manage secrets
+    local -x PULUMI_CONFIG_PASSPHRASE=''
 
     function run_pulumi() {
         if [[ -n "${GCP_CLUSTER_PROD_LIKE:-}" || "$pulumi_project" == "infra" ]]
@@ -958,14 +990,8 @@ function subcmd_pulumi() {
         fi
     }
 
-    shift 2
 
-    # TODO(#4560): Use an empty passphrase until we manage secrets
-    local -x PULUMI_CONFIG_PASSPHRASE=''
-
-    run_pulumi --stack "${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
-           --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
-            "$pulumi_cmd" "$@"
+    run_pulumi "${args[@]}" "$pulumi_cmd" "$@"
 }
 
 ###
@@ -998,7 +1024,7 @@ function subcmd_apply() {
 
     if [ -n "${1-}" ]; then
         IMAGE_TAG=$1
-        _warning "Overriding image tag: ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
+        _warning "Overriding image tag: ${IMAGE_TAG} (was: ${VERSION_NUMBER})"
     fi
 
     args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
