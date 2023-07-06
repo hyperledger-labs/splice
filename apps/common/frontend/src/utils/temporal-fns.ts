@@ -1,19 +1,48 @@
+import { Temporal } from '@js-temporal/polyfill';
 import BigNumber from 'bignumber.js';
 
+function prettyPrintInterval(
+  seconds: number = 0,
+  minutes: number = 0,
+  hours: number = 0,
+  days: number = 0,
+  months: number = 0,
+  years: number = 0
+) {
+  const timeUnits = [
+    { unit: 'year', value: years },
+    { unit: 'month', value: months },
+    { unit: 'day', value: days },
+    { unit: 'hour', value: hours },
+    { unit: 'minute', value: minutes },
+    { unit: 'second', value: seconds },
+  ];
+
+  const formatDuration = (unit: string, value: number) =>
+    `${value} ${unit}${value === 1 ? '' : 's'}`;
+
+  const durations = timeUnits
+    .filter(({ value }) => value > 0)
+    .map(({ unit, value }) => formatDuration(unit, value));
+
+  return durations.join(', ');
+}
+
+export function durationToInterval(duration: string): string {
+  const { years, months, days, hours, minutes, seconds } = Temporal.Duration.from(duration);
+
+  return prettyPrintInterval(seconds, minutes, hours, days, months, years);
+}
+
 export const microsecondsToInterval: (microseconds: string) => string = (microseconds: string) => {
-  const seconds = new BigNumber(microseconds).div(1000000).toNumber();
+  const second = new BigNumber(microseconds).div(1000000).toNumber();
 
-  const d = Math.floor(seconds / (24 * 3600));
-  const h = Math.floor((seconds % (3600 * 24)) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor((seconds % 3600) % 60);
+  const days = Math.floor(second / (24 * 3600));
+  const hours = Math.floor((second % (3600 * 24)) / 3600);
+  const minutes = Math.floor((second % 3600) / 60);
+  const seconds = Math.floor((second % 3600) % 60);
 
-  const days =
-    d > 0 ? d + (d === 1 ? ' day' : ' days') + (h > 0 || m > 0 || s > 0 ? ', ' : '') : '';
-  const hours = h > 0 ? h + (h === 1 ? ' hr' : ' hrs') + (m > 0 || s > 0 ? ', ' : '') : '';
-  const mins = m > 0 ? m + (m === 1 ? ' min' : ' mins') + (s > 0 ? ', ' : '') : '';
-  const secs = s > 0 ? s + (s === 1 ? ' sec' : ' secs') : '';
-  return days + hours + mins + secs;
+  return prettyPrintInterval(seconds, minutes, hours, days);
 };
 
 export const microsecondsToSeconds = (microseconds: string): BigNumber =>

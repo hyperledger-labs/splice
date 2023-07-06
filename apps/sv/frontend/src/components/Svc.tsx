@@ -1,5 +1,12 @@
 import { UseQueryResult } from '@tanstack/react-query';
-import { ErrorDisplay, Loading, PartyId, SvClientProvider, TitledTable } from 'common-frontend';
+import {
+  durationToInterval,
+  ErrorDisplay,
+  Loading,
+  PartyId,
+  SvClientProvider,
+  TitledTable,
+} from 'common-frontend';
 import React from 'react';
 import JSONPretty from 'react-json-pretty';
 import 'react-json-pretty/themes/monikai.css';
@@ -151,6 +158,7 @@ const StatusDisplay: React.FC<{ status: UseQueryResult<NodeStatus> }> = ({ statu
   }
 
   const success = data.success!;
+
   return (
     <Table>
       <TableBody>
@@ -160,7 +168,7 @@ const StatusDisplay: React.FC<{ status: UseQueryResult<NodeStatus> }> = ({ statu
         </TableRow>
         <TableRow>
           <TableCell>uptime</TableCell>
-          <TableCell className="uptime-value">{success.uptime}</TableCell>
+          <TableCell className="uptime-value">{durationToInterval(success.uptime)}</TableCell>
         </TableRow>
       </TableBody>
     </Table>
