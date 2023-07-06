@@ -299,7 +299,7 @@ class RetryProvider(
     RetryConfig(
       // TODO(#5855) Reset this back to 35 once
       // we got rid of locking.
-      maxRetries = 100,
+      maxRetries = 150,
       initialDelay = 200.millis,
       maxDelay = 5.seconds,
       resetRetriesAfter = None,
