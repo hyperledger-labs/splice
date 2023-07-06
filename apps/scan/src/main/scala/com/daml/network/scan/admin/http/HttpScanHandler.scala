@@ -174,7 +174,7 @@ class HttpScanHandler(
                 | None =>
               Some(coinRules.contract.toJson)
           },
-          domainId = Some(coinRules.domain.toProtoPrimitive),
+          domainId = coinRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
         )
         definitions.GetCoinRulesResponse(
           coinRulesUpdate = response
@@ -213,7 +213,7 @@ class HttpScanHandler(
                 | None =>
               Some(coinRules.contract.toJson)
           },
-          domainId = Some(coinRules.domain.toProtoPrimitive),
+          domainId = coinRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
         )
         definitions.GetCoinRulesResponse(
           coinRulesUpdate = response

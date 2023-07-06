@@ -32,7 +32,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       globalUpgradeDomain
     ) withClue "find the global-upgrade domain ID"
 
-    val updatedCoinRulesCid = clue("change coinconfig to migrate domains") {
+    clue("change coinconfig to migrate domains") {
       inside(sv1ScanBackend.getCoinRules()) {
         case ContractWithState(firstCoinRules, Assigned(global1)) =>
           val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
@@ -62,7 +62,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           eventually() {
             inside(sv1ScanBackend.getCoinRules()) { case ContractWithState(secondCoinRules, _) =>
               secondCoinRules.contractId should not be firstCoinRules.contractId
-              secondCoinRules.contractId
             }
           }
       }
@@ -85,11 +84,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
 
     clue("see whether coinrules follows svcrules") {
       eventually() {
-        val cid: LfContractId = updatedCoinRulesCid
-        sv1ValidatorBackend.participantClient.transfer.lookup_contract_domain(cid) shouldBe Map(
-          cid -> globalUpgradeDomain
-        )
-        // will HTTP 500 while in-flight
         sv1ScanBackend.getCoinRules().state shouldBe Assigned(globalUpgradeId)
       }
     }

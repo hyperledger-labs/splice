@@ -11,7 +11,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
-import com.daml.network.store.MultiDomainAcsStore.{ContractWithState, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.ContractWithState
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.{InMemoryCNNodeAppStore, HardLimit, TxLogStore}
 import com.daml.network.util.Contract
@@ -36,20 +36,19 @@ class InMemoryScanStore(
 
   override def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[ReadyContract[CoinRules.ContractId, CoinRules]]] =
+  ): Future[Option[ContractWithState[CoinRules.ContractId, CoinRules]]] =
     for {
       contracts <- multiDomainAcsStore
-        .listReadyContracts(cc.coin.CoinRules.COMPANION, HardLimit(1))
+        .listContracts(cc.coin.CoinRules.COMPANION, HardLimit(1))
     } yield contracts.headOption
 
   override def lookupCoinRulesV1Test()(implicit
       tc: TraceContext
-  ): Future[Option[ReadyContract[CoinRulesV1Test.ContractId, CoinRulesV1Test]]] =
+  ): Future[Option[ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test]]] =
     for {
-      domain <- defaultAcsDomainIdF
-      contractO <- multiDomainAcsStore
-        .findContractOnDomain(CoinRulesV1Test.COMPANION)(domain, (_: Any) => true)
-    } yield contractO.map(ReadyContract(_, domain))
+      contracts <- multiDomainAcsStore
+        .listContracts(CoinRulesV1Test.COMPANION, HardLimit(1))
+    } yield contracts.headOption
 
   override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext

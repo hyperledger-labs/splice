@@ -13,6 +13,7 @@ import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.{Limit, LimitHelpers, MultiDomainAcsStore}
+import MultiDomainAcsStore.ContractWithState
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
@@ -107,7 +108,7 @@ class DbScanStore(
 
   override def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[MultiDomainAcsStore.ReadyContract[CoinRules.ContractId, CoinRules]]] =
+  ): Future[Option[ContractWithState[CoinRules.ContractId, CoinRules]]] =
     waitUntilAcsIngested {
       for {
         row <- storage
@@ -125,11 +126,11 @@ class DbScanStore(
         contractWithState <- row.traverse(
           multiDomainAcsStore.contractWithStateFromRow(CoinRules.COMPANION)(_)
         )
-      } yield contractWithState.flatMap(_.toReadyContract)
+      } yield contractWithState
     }
 
   override def lookupCoinRulesV1Test()(implicit tc: TraceContext): Future[
-    Option[MultiDomainAcsStore.ReadyContract[CoinRulesV1Test.ContractId, CoinRulesV1Test]]
+    Option[ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test]]
   ] = waitUntilAcsIngested {
     for {
       row <- storage
@@ -147,7 +148,7 @@ class DbScanStore(
       contractWithState <- row.traverse(
         multiDomainAcsStore.contractWithStateFromRow(CoinRulesV1Test.COMPANION)(_)
       )
-    } yield contractWithState.flatMap(_.toReadyContract)
+    } yield contractWithState
   }
 
   override def lookupValidatorTraffic(validatorParty: PartyId)(implicit

@@ -12,7 +12,7 @@ import com.daml.network.store.{
   ConfiguredDefaultDomain,
   MultiDomainAcsStore,
 }
-import MultiDomainAcsStore.{ContractWithState, ReadyContract}
+import MultiDomainAcsStore.ContractWithState
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.store.TxLogStore.TransactionTreeSource
@@ -50,10 +50,12 @@ trait ScanStore
 
   def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
+  ): Future[Option[ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
 
   def lookupCoinRulesV1Test()(implicit tc: TraceContext): Future[
-    Option[ReadyContract[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]]
+    Option[
+      ContractWithState[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]
+    ]
   ]
 
   def getTotalCoinBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
