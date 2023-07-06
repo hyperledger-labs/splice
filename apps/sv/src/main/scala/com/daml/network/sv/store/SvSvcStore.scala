@@ -21,6 +21,7 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
@@ -853,7 +854,8 @@ object SvSvcStore {
       ) ++
         (if (appConfig.enableCoinRulesUpgrade)
            Map(mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))
-         else Map.empty),
+         else Map.empty) ++
+        DirectoryStore.directoryTemplateFilters(svcParty),
     )
   }
 

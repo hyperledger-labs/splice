@@ -148,31 +148,34 @@ object DirectoryStore {
   }
 
   /** Contract filter of a directory app store for a specific provider. */
-  def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter = {
+  def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter =
+    MultiDomainAcsStore.SimpleContractFilter(
+      providerPartyId,
+      directoryTemplateFilters(providerPartyId),
+    )
+
+  def directoryTemplateFilters(providerPartyId: PartyId) = {
     import MultiDomainAcsStore.mkFilter
     val provider: String = providerPartyId.toProtoPrimitive
 
-    MultiDomainAcsStore.SimpleContractFilter(
-      providerPartyId,
-      Map(
-        mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.provider == provider),
-        mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co =>
-          co.payload.provider == provider
-        ),
-        mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
-          co.payload.subscriptionData.provider == provider
-        ),
-        mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
-          co.payload.subscriptionData.provider == provider
-        ),
-        mkFilter(subsCodegen.SubscriptionIdleState.COMPANION)(co =>
-          co.payload.subscriptionData.provider == provider
-        ),
-        mkFilter(directoryCodegen.DirectoryInstallRequest.COMPANION)(co =>
-          co.payload.provider == provider
-        ),
-        mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.provider == provider),
+    Map(
+      mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.provider == provider),
+      mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co =>
+        co.payload.provider == provider
       ),
+      mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
+        co.payload.subscriptionData.provider == provider
+      ),
+      mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
+        co.payload.subscriptionData.provider == provider
+      ),
+      mkFilter(subsCodegen.SubscriptionIdleState.COMPANION)(co =>
+        co.payload.subscriptionData.provider == provider
+      ),
+      mkFilter(directoryCodegen.DirectoryInstallRequest.COMPANION)(co =>
+        co.payload.provider == provider
+      ),
+      mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.provider == provider),
     )
   }
 

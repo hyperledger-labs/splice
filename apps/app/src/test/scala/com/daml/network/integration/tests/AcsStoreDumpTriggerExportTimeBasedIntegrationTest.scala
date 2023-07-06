@@ -3,7 +3,6 @@ package com.daml.network.integration.tests
 import com.daml.network.config.{BackupDumpConfig, CNNodeConfigTransforms, GcpBucketConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.GcpBucket
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -19,15 +18,11 @@ abstract class AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[T <: Backup
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      // start only sv1 but not sv2-4
-      .addConfigTransforms(
-        CNNodeConfigTransforms.onlySv1,
-        (_, conf) =>
-          CNNodeConfigTransforms.updateAllSvAppConfigs_(c =>
-            c.copy(acsStoreDump = Some(acsStoreDumpConfig(conf.name.value)))
-          )(conf),
+    simpleTopologyWithSimtimeTuned
+      .addConfigTransforms((_, conf) =>
+        CNNodeConfigTransforms.updateAllSvAppConfigs_(c =>
+          c.copy(acsStoreDump = Some(acsStoreDumpConfig(conf.name.value)))
+        )(conf)
       )
 
   "sv1" should {

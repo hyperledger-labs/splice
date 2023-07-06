@@ -107,8 +107,8 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
 
       // Note that coin merging and SV rewards are disabled for this test!
 
-      // Alice had a normal and a locked coin
-      checkWallet(alice, aliceWalletClient, Seq((10.0, 10), (99.0, 100.0)))
+      // Alice had a locked coin and a normal coin that was initially 100 but got larger due to tapping 5.0 for setting up the directory entry
+      checkWallet(alice, aliceWalletClient, Seq((10.0, 10), (103.0, 104.0)))
       checkWallet(bob, bobWalletClient, Seq((20.0, 20.0)))
       // Charlie has a coin and an import crate
       checkWallet(charlie, charlieWalletClient, Seq((30.0, 30.0), (30.0, 30.0)))

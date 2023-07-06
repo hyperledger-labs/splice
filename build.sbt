@@ -371,6 +371,7 @@ lazy val `apps-sv` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `directory-daml`,
+      `apps-directory`, // Required for the SvSvcStore to also store all CNS entries and related contracts
       `validator-lifecycle-daml`,
       `svc-governance-daml`,
       `svc-governance-v1test-daml`,
