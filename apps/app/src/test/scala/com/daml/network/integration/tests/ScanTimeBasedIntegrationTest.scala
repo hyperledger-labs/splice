@@ -248,4 +248,56 @@ class ScanTimeBasedIntegrationTest
       },
     )
   }
+
+  "get total coin balance" in { implicit env =>
+    val (_, _) = onboardAliceAndBob()
+
+    def roundNum() =
+      sv1ScanBackend.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
+    roundNum() shouldBe 1
+
+    val tapRound1Amount = BigDecimal(500.0)
+    clue("Tap in round 1") {
+      aliceWalletClient.tap(tapRound1Amount)
+    }
+
+    advanceRoundsByOneTick
+
+    roundNum() shouldBe 2
+
+    val tapRound2Amount = BigDecimal(500.0)
+    clue("Tap in round 2") {
+      bobWalletClient.tap(tapRound2Amount)
+    }
+
+    actAndCheck(
+      "advance to close round 2",
+      (0 to 4).foreach(_ => advanceRoundsByOneTick),
+    )(
+      "check round 2 is closed",
+      _ => {
+        sv1ScanBackend.getRoundOfLatestData()._1 shouldBe 2
+      },
+    )
+
+    // advance to close round 2
+    (0 to 4).foreach(_ => advanceRoundsByOneTick)
+
+    clue("Get total balances for round 0, 1 and 2") {
+      val holdingFee = BigDecimal(CNNodeUtil.defaultHoldingFee.rate)
+      val total0 = sv1ScanBackend.getTotalCoinBalance(0)
+      val total1 = sv1ScanBackend.getTotalCoinBalance(1)
+      val total2 = sv1ScanBackend.getTotalCoinBalance(2)
+
+      val holdingFeeAfterOneRound = 1 * holdingFee
+      val holdingFeeAfterTwoRounds = 2 * holdingFee
+
+      total0 shouldBe 0.0
+      total1 shouldBe (tapRound1Amount - holdingFeeAfterOneRound)
+      total2 shouldBe (
+        tapRound1Amount - holdingFeeAfterTwoRounds +
+          tapRound2Amount - holdingFeeAfterOneRound
+      )
+    }
+  }
 }

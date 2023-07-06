@@ -57,6 +57,7 @@ template Coin
          requireCoinExpiredForAllOpenRounds roundCid this
          return API.CoinExpireSummary with
            owner = owner
+           round = amount.createdAt
            changeToInitialAmountAsOfRoundZero = - getValueAsOfRound0 amount
            changeToHoldingFeesRate = - (amount.ratePerRound.rate)
 
@@ -111,6 +112,7 @@ template LockedCoin
          requireCoinExpiredForAllOpenRounds roundCid coin
          return API.CoinExpireSummary with
            owner = coin.owner
+           round = coin.amount.createdAt
            changeToInitialAmountAsOfRoundZero = -(getValueAsOfRound0 coin.amount)
            changeToHoldingFeesRate = - (coin.amount.ratePerRound.rate)
 

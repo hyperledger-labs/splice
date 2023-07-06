@@ -392,6 +392,24 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           )
         ),
       )
+
+    def exercise[TCid <: ContractId[T], T](
+        contract: Contract[TCid, T],
+        interfaceId: Option[Identifier],
+        choiceName: String,
+        choiceArgument: damlValue,
+        exerciseResult: damlValue,
+        offset: String = nextOffset,
+    )(implicit store: MultiDomainAcsStore) =
+      store.ingestionSink.ingestUpdate(
+        domain,
+        TransactionTreeUpdate(
+          mkTx(
+            offset,
+            Seq(mkExercise(contract, interfaceId, choiceName, choiceArgument, exerciseResult)),
+          )
+        ),
+      )
   }
 
   private def nextTransactionId(): String = java.util.UUID.randomUUID().toString.replace("-", "")
@@ -443,6 +461,27 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       updateId = "",
       offset = new LedgerOffset.Absolute(offset),
       event = event,
+    )
+
+  protected def mkExercise[TCid <: ContractId[T], T](
+      contract: Contract[TCid, T],
+      interfaceId: Option[Identifier],
+      choiceName: String,
+      choiceArgument: damlValue,
+      exerciseResult: damlValue,
+  ): TreeEvent =
+    new ExercisedEvent(
+      eventId = "dummyEventId",
+      contractId = contract.contractId.contractId,
+      templateId = contract.identifier,
+      interfaceId = interfaceId.toJava,
+      witnessParties = Seq.empty.asJava,
+      consuming = false,
+      choice = choiceName,
+      choiceArgument = choiceArgument,
+      exerciseResult = exerciseResult,
+      actingParties = Seq.empty.asJava,
+      childEventIds = Seq.empty.asJava,
     )
 }
 

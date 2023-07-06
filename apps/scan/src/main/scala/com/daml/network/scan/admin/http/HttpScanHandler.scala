@@ -271,14 +271,13 @@ class HttpScanHandler(
 
   def getTotalCoinBalance(
       response: v0.ScanResource.GetTotalCoinBalanceResponse.type
-  )()(extracted: Unit): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =
+  )(asOfEndOfRound: Long)(extracted: Unit): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       for {
-        (totalCoins, totalLockedCoins) <- store.getTotalCoinBalance()
+        total <- store.getTotalCoinBalance(asOfEndOfRound)
       } yield {
         definitions.GetTotalCoinBalanceResponse(
-          Codec.encode(totalCoins),
-          Codec.encode(totalLockedCoins),
+          Codec.encode(total)
         )
       }
     }

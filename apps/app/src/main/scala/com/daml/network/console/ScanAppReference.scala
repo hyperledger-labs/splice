@@ -134,9 +134,9 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary("Get the total balance of Canton Coin in the network")
-  def getTotalCoinBalance(): HttpScanAppClient.TotalBalances =
+  def getTotalCoinBalance(asOfEndOfRound: Long): BigDecimal =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetTotalCoinBalance)
+      httpCommand(HttpScanAppClient.GetTotalCoinBalance(asOfEndOfRound))
     }
 
   @Help.Summary("Get the Canton Coin config parameters for a given round")

@@ -35,6 +35,9 @@ class WalletTxLogIntegrationTest
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging
+      .addConfigTransformToFront(
+        CNNodeConfigTransforms.onlySv1
+      )
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // Some tests use the splitwell app to generate multi-party payments
@@ -1235,7 +1238,7 @@ class WalletTxLogIntegrationTest
         .map(_.indexRecord.eventId)
 
       val coinAmount = BigDecimal(42)
-
+      // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
       val coin = loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
           createCoin(
@@ -1246,11 +1249,17 @@ class WalletTxLogIntegrationTest
           )
         },
         logs =>
-          inside(logs) { case Seq(log) =>
-            log.errorMessage should include("Unexpected coin create event")
+          inside(logs) {
+            case logLines if logLines.nonEmpty =>
+              logLines.foreach(_.errorMessage should include("Unexpected coin create event"))
+              logLines
+                .filter(_.errorMessage contains ("RuntimeException"))
+                .foreach(_.errorMessage should include("Unexpected coin create event"))
+              logLines should have size (env.scans.local.size.toLong + 1) // + 1 for UserWalletTxLog
           },
       )
 
+      // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
           archiveCoin(
@@ -1261,10 +1270,13 @@ class WalletTxLogIntegrationTest
           )
         },
         logs =>
-          inside(logs) { case Seq(log) =>
-            log.errorMessage should include(
-              "Unexpected coin archive event"
-            )
+          inside(logs) {
+            case logLines if logLines.nonEmpty =>
+              logLines.foreach(_.errorMessage should include("Unexpected coin archive event"))
+              logLines
+                .filter(_.errorMessage contains ("RuntimeException"))
+                .foreach(_.errorMessage should include("Unexpected coin archive event"))
+              logLines should have size (env.scans.local.size.toLong + 1) // + 1 for UserWalletTxLog
           },
       )
 

@@ -126,6 +126,13 @@ paths:
       tags: [scan]
       x-jvm-package: scan
       operationId: "getTotalCoinBalance"
+      parameters:
+        - in: query
+          name: asOfEndOfRound
+          required: true
+          schema:
+            type: integer
+            format: int64
       responses:
         "200":
           description: ok
@@ -410,11 +417,9 @@ components:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
     GetTotalCoinBalanceResponse:
       type: object
-      required: ["total_unlocked_balance", "total_locked_balance"]
+      required: ["total_balance"]
       properties:
-        total_unlocked_balance:
-          type: string
-        total_locked_balance:
+        total_balance:
           type: string
     GetCoinConfigForRoundResponse:
       type: object

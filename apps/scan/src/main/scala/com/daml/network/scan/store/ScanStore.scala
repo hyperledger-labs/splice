@@ -56,7 +56,7 @@ trait ScanStore
     Option[ReadyContract[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]]
   ]
 
-  def getTotalCoinBalance()(implicit tc: TraceContext): Future[(BigDecimal, BigDecimal)]
+  def getTotalCoinBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
 
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
   def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]

@@ -3,10 +3,11 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.CNParticipantClientReference
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
-
 import java.time.Instant
+import org.slf4j.event.Level
 
 class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
@@ -48,6 +49,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
+      val nrOfScanBackends = 1
       clue("Starting SVC app and SV1 app") {
         startAllSync(sv1ScanBackend, sv1Backend)
       }
@@ -87,14 +89,14 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         )
       }
 
-      createCoinOwnBySvc(svcParticipant, 1.0)
+      createCoinOwnBySvc(svcParticipant, 1.0, nrOfScanBackends)
 
       clue("start onboarding new SV and SVC party setup on new SV's dedicated participant") {
         // SV4 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
         startAllSync(sv4ValidatorBackend, sv4Backend)
       }
 
-      createCoinOwnBySvc(svcParticipant, 2.0)
+      createCoinOwnBySvc(svcParticipant, 2.0, nrOfScanBackends)
 
       val globalDomainId = inside(sv4Participant.domains.list_connected()) { case Seq(domain) =>
         domain.domainId
@@ -184,13 +186,25 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
   private def createCoinOwnBySvc(
       participant: CNParticipantClientReference,
       amount: Double,
-  )(implicit env: CNNodeTestConsoleEnvironment) =
-    participant.ledger_api_extensions.commands.submitWithResult(
-      sv1Backend.config.ledgerApiUser,
-      actAs = Seq(svcParty),
-      readAs = Seq.empty,
-      update = coin(amount, svcParty).create,
+      nrOfScanBackends: Int,
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+      {
+        participant.ledger_api_extensions.commands.submitWithResult(
+          sv1Backend.config.ledgerApiUser,
+          actAs = Seq(svcParty),
+          readAs = Seq.empty,
+          update = coin(amount, svcParty).create,
+        )
+      },
+      logs =>
+        inside(logs) { case logLines =>
+          logLines.foreach(_.errorMessage should include("Unexpected coin create event"))
+          logLines should have size (nrOfScanBackends.toLong)
+        },
     )
+  }
 
   private def coin(amount: Double, party: PartyId) = new cc.coin.Coin(
     party.toProtoPrimitive,

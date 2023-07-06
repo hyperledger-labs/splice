@@ -51,32 +51,29 @@ class InMemoryScanStore(
         .findContractOnDomain(CoinRulesV1Test.COMPANION)(domain, (_: Any) => true)
     } yield contractO.map(ReadyContract(_, domain))
 
-  override def getTotalCoinBalance()(implicit
+  override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext
-  ): Future[(BigDecimal, BigDecimal)] = {
+  ): Future[BigDecimal] = {
     for {
-      // TODO(#2930): This is a very naive preliminary implementation that will be completely replaced soon
-      domainId <- defaultAcsDomainIdF
-      coins <- multiDomainAcsStore.listContractsOnDomain(
-        coinCodegen.Coin.COMPANION,
-        domainId,
-      )
-      totalCoins = coins.foldLeft(BigDecimal(0.0))((b, coin) =>
-        b + coin.payload.amount.initialAmount
-      )
-      lockedCoins <- multiDomainAcsStore.listContractsOnDomain(
-        coinCodegen.LockedCoin.COMPANION,
-        domainId,
-      )
-      totalLockedCoins = lockedCoins.foldLeft(BigDecimal(0.0))((b, lockedCoin) =>
-        b + lockedCoin.payload.coin.amount.initialAmount
-      )
-    } yield {
-      (
-        totalCoins,
-        totalLockedCoins,
-      )
-    }
+      totalCoinBalance <- txLog
+        .getTxLogIndicesByFilter(_ match {
+          case balanceChange: ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord =>
+            balanceChange.round <= asOfEndOfRound
+          case _ => false
+        })
+        .map(txLogEntries =>
+          txLogEntries.foldLeft(BigDecimal.valueOf(0.0))((sum, entry) =>
+            entry match {
+              case e: ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord =>
+                sum + e.changeToInitialAmountAsOfRoundZero - e.changeToHoldingFeesRate * (asOfEndOfRound + 1)
+              case _ =>
+                throw Status.INTERNAL
+                  .withDescription("Unexpected log entry type")
+                  .asRuntimeException()
+            }
+          )
+        )
+    } yield totalCoinBalance
   }
 
   override def getCoinConfigForRound(

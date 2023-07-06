@@ -3,6 +3,9 @@ package com.daml.network.scan.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
+import com.daml.network.codegen.java.cc.api.v1.coin.{CoinCreateSummary, CoinExpireSummary}
+import com.daml.network.codegen.java.cc.coinimport
+import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Codec, ExerciseNode}
@@ -36,18 +39,41 @@ class ScanTxLogParser(
         exercised match {
           case Transfer(node) =>
             State.fromTransfer(tree, root, node)
+          case Mint(node) =>
+            State.fromCoinCreateSummary(tree, exercised, node.result.value)
+          case ImportCrate_Receive(_) =>
+            State.empty
           case CoinRules_BuyExtraTraffic(node) =>
             State.fromBuyExtraTraffic(tree, exercised, node)
+          case CoinExpire(node) =>
+            State.fromCoinExpireSummary(tree, exercised, node.result.value)
+          case LockedCoinExpireCoin(node) =>
+            State.fromCoinExpireSummary(tree, exercised, node.result.value)
+          case LockedCoinUnlock(_) =>
+            State.empty
+          case CoinArchive(_) =>
+            // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
+            logger.error(
+              s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
+            )
+            State.empty
           case _ => parseTrees(tree, exercised.getChildEventIds.asScala.toList)
         }
 
       case created: CreatedEvent =>
         created match {
+          case ImportCrate(crate) =>
+            State.fromImportCrate(tree, root, crate.payload)
           case OpenMiningRoundCreate(round) =>
             State.fromOpenMiningRoundCreate(tree, root, round)
-          case ClosedMiningRoundCreate(round) => {
+          case ClosedMiningRoundCreate(round) =>
             State.fromClosedMiningRoundCreate(tree, root, round)
-          }
+          case CoinCreate(coin) =>
+            // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
+            logger.error(
+              s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
+            )
+            State.empty
           case _ => State.empty
         }
 
@@ -135,6 +161,15 @@ object ScanTxLogParser {
         trafficPurchased: Long,
         ccSpent: BigDecimal,
     ) extends TxLogIndexRecord
+
+    final case class BalanceChangeIndexRecord(
+        offset: String,
+        eventId: String,
+        round: Long,
+        changeToInitialAmountAsOfRoundZero: BigDecimal,
+        changeToHoldingFeesRate: BigDecimal,
+    ) extends TxLogIndexRecord
+
   }
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}
@@ -176,8 +211,64 @@ object ScanTxLogParser {
 
     implicit val stateMonoid: Monoid[State] = new Monoid[State] {
       override val empty = State(immutable.Queue.empty)
+
       override def combine(a: State, b: State) =
         a.appended(b)
+    }
+
+    def fromImportCrate(
+        tx: TransactionTree,
+        event: TreeEvent,
+        crate: coinimport.ImportCrate,
+    ): State = {
+      val coin = crate.payload
+      State(
+        immutable.Queue(
+          TxLogEntry.EmptyTxLogEntry(
+            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
+              offset = tx.getOffset(),
+              eventId = event.getEventId(),
+              round = coin.amount.createdAt.number,
+              changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
+              changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
+            )
+          )
+        )
+      )
+    }
+
+    def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+        tx: TransactionTree,
+        event: TreeEvent,
+        ccsum: CoinCreateSummary[T],
+    ): State = {
+      val coinCid = ccsum.coin.contractId
+      val coin = tx.getEventsById.asScala
+        .collectFirst {
+          case (_, c: CreatedEvent) if c.getContractId == coinCid => {
+            CoinCreate.unapply(c).map(_.payload)
+          }
+        }
+        .flatten
+        .getOrElse {
+          throw new RuntimeException(
+            s"The coin contract $coinCid referenced by CoinCreateSummary was not found in transaction ${tx.getTransactionId}"
+          )
+        }
+
+      State(
+        immutable.Queue(
+          TxLogEntry.EmptyTxLogEntry(
+            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
+              offset = tx.getOffset(),
+              eventId = event.getEventId(),
+              round = coin.amount.createdAt.number,
+              changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
+              changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
+            )
+          )
+        )
+      )
     }
 
     def fromTransfer(
@@ -231,7 +322,45 @@ object ScanTxLogParser {
           State.empty
         }
 
-      State.empty.appended(appRewardEntry).appended(validatorRewardEntry)
+      val balanceChangeEntry = State(
+        immutable.Queue(
+          TxLogEntry.EmptyTxLogEntry(
+            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
+              offset = tx.getOffset(),
+              eventId = rootEventId.getOrElse(event.getEventId()),
+              round = round.number,
+              changeToInitialAmountAsOfRoundZero =
+                node.result.value.summary.changeToInitialAmountAsOfRoundZero,
+              changeToHoldingFeesRate = node.result.value.summary.changeToHoldingFeesRate,
+            )
+          )
+        )
+      )
+
+      State.empty
+        .appended(appRewardEntry)
+        .appended(validatorRewardEntry)
+        .appended(balanceChangeEntry)
+    }
+
+    def fromCoinExpireSummary(
+        tx: TransactionTree,
+        event: TreeEvent,
+        cxsum: CoinExpireSummary,
+    ): State = {
+      State(
+        immutable.Queue(
+          TxLogEntry.EmptyTxLogEntry(
+            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
+              offset = tx.getOffset(),
+              eventId = event.getEventId(),
+              round = cxsum.round.number,
+              changeToInitialAmountAsOfRoundZero = cxsum.changeToInitialAmountAsOfRoundZero,
+              changeToHoldingFeesRate = cxsum.changeToHoldingFeesRate,
+            )
+          )
+        )
+      )
     }
 
     def fromBuyExtraTraffic(
@@ -323,5 +452,9 @@ object ScanTxLogParser {
       )
     }
 
+    private def amountAsOfRoundZero(amount: ExpiringAmount) =
+      amount.initialAmount + amount.ratePerRound.rate * BigDecimal(amount.createdAt.number)
+
   }
+
 }

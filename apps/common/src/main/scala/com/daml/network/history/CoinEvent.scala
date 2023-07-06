@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, DamlOptional, ExercisedEvent,
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coinimport
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
@@ -180,6 +181,19 @@ object CoinCreate {
   type T = coinCodegen.Coin
   type ContractType = Contract[TCid, T]
   val companion = coinCodegen.Coin.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    Contract.fromCreatedEvent(companion)(event)
+  }
+}
+
+object ImportCrate {
+  type TCid = coinimport.ImportCrate.ContractId
+  type T = coinimport.ImportCrate
+  type ContractType = Contract[TCid, T]
+  val companion = coinimport.ImportCrate.COMPANION
 
   def unapply(
       event: CreatedEvent

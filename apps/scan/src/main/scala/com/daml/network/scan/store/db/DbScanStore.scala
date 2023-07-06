@@ -171,7 +171,9 @@ class DbScanStore(
       } yield row.map(contractFromRow(ValidatorTraffic.COMPANION)(_))
     }
 
-  override def getTotalCoinBalance()(implicit tc: TraceContext): Future[(BigDecimal, BigDecimal)] =
+  override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] =
     ??? // TODO (#6194): this requires scan_txlog_store
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
@@ -262,6 +264,7 @@ object DbScanStore {
       case _: ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord => "are"
       case _: ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord => "vre"
       case _: ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord => "etp"
+      case _: ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord => "bc"
     }
     String3.tryCreate(s)
   }

@@ -269,31 +269,18 @@ object HttpScanAppClient {
     }
   }
 
-  final case class TotalBalances(
-      totalUnlocked: BigDecimal,
-      totalLocked: BigDecimal,
-  )
-
-  case object GetTotalCoinBalance
-      extends BaseCommand[http.GetTotalCoinBalanceResponse, TotalBalances] {
+  case class GetTotalCoinBalance(asOfEndOfRound: Long)
+      extends BaseCommand[http.GetTotalCoinBalanceResponse, BigDecimal] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTotalCoinBalanceResponse] =
-      client.getTotalCoinBalance(headers)
+      client.getTotalCoinBalance(asOfEndOfRound, headers)
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetTotalCoinBalanceResponse.OK(response) =>
-        for {
-          unlocked <- Codec.decode(Codec.BigDecimal)(response.totalUnlockedBalance)
-          locked <- Codec.decode(Codec.BigDecimal)(response.totalLockedBalance)
-        } yield {
-          TotalBalances(
-            totalUnlocked = unlocked,
-            totalLocked = locked,
-          )
-        }
+        Codec.decode(Codec.BigDecimal)(response.totalBalance)
     }
   }
 

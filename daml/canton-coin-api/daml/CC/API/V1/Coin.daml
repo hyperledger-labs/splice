@@ -186,6 +186,7 @@ data CoinCreateSummary coinCointractId = CoinCreateSummary with
 
 data CoinExpireSummary = CoinExpireSummary with
     owner : Party
+    round: Round -- ^ Round for which this expiry was registered.
     changeToInitialAmountAsOfRoundZero : Decimal
     -- The change to the total balance introduced by a coin expiry, normalized to round zero, i.e., 
     -- a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
