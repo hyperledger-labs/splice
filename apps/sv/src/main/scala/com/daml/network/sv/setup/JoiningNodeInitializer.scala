@@ -15,6 +15,7 @@ import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.resource.Storage
@@ -49,6 +50,7 @@ class JoiningNodeInitializer(
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
+    closeContext: CloseContext,
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,

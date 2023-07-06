@@ -26,6 +26,7 @@ import com.daml.network.util.{GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
@@ -70,6 +71,7 @@ class FoundingNodeInitializer(
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
+    closeContext: CloseContext,
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,

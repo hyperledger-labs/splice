@@ -237,3 +237,33 @@ create table scan_txlog_store
 
 create index scan_txlog_store_sid_irt_r_en
     on scan_txlog_store (store_id, index_record_type, round, entry_number desc);
+
+-- SV store
+------------------
+
+create table sv_acs_store
+(
+    like acs_store_template including all,
+
+    -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
+    foreign key (store_id) references store_descriptors (id),
+
+    -- index columns
+    ----------------
+
+    -- candidate_secret in ValidatorOnboarding or secret in UsedSecret
+    onboarding_secret text,
+
+    -- candidate_name in ApprovedSvIdentity
+    sv_candidate_name text
+);
+
+-- lookup validator onboarding or used secret by secret
+create index sv_acs_store_sid_tid_vocs
+    on sv_acs_store (store_id, template_id, onboarding_secret)
+    where onboarding_secret is not null;
+
+-- lookup approved sv identity by candidate name
+create index sv_acs_store_sid_tid_asicn
+    on sv_acs_store (store_id, template_id, sv_candidate_name)
+    where sv_candidate_name is not null;
