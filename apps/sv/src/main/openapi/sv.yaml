@@ -862,22 +862,28 @@ components:
       required:
         - reason
         - trace_id
+        - exclusive
       properties:
         reason:
           type: string
         trace_id:
           type: string
+        exclusive:
+          type: boolean
 
     ReleaseGlobalLockRequest:
       type: object
       required:
         - reason
         - trace_id
+        - exclusive
       properties:
         reason:
           type: string
         trace_id:
           type: string
+        exclusive:
+          type: boolean
 
     TriggerAcsDumpResponse:
       type: object

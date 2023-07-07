@@ -1,6 +1,7 @@
 package com.daml.network.sv.util
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -11,17 +12,27 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{blocking, ExecutionContext, Future}
 
 // TODO(#5855) remove this class and file
+
+// This is roughly an RW lock where multiple R operations can
+// acquire the lock concurrently but a W operation
+// cannot acquire the operation concurrently with other W or R operations.
+// Our operations don't correspond to reads/writes so we instead use "shared"/"exclusive"
 private[sv] class ExpiringLock(
     expirationDuration: NonNegativeFiniteDuration,
     logger: TracedLogger,
 )(implicit ec: ExecutionContext) {
-  private val lockRef: AtomicReference[LockState] = new AtomicReference[LockState](Unlocked)
+  import ExpiringLock.*
 
-  def tryAcquire(reason: String, traceId: String)(implicit
+  private val lockRef: AtomicReference[LockState] =
+    new AtomicReference[LockState](LockState.Unlocked)
+
+  def lockType(exclusive: Boolean) = if (exclusive) "exclusive" else "shared"
+
+  def tryAcquire(reason: String, traceId: String, exclusive: Boolean)(implicit
       traceContext: TraceContext
   ): Future[Unit] = Future {
-    logger.debug(s"Trying to acquire lock for $reason ($traceId)")
-    val success = tryAcquire()
+    logger.debug(s"Trying to acquire ${lockType(exclusive)} lock for $reason ($traceId)")
+    val success = tryAcquire(exclusive)
     if (success) {
       logger.debug(s"Acquired lock ($traceId)")
     } else {
@@ -30,57 +41,115 @@ private[sv] class ExpiringLock(
     }
   }
 
-  def release(reason: String, traceId: String)(implicit traceContext: TraceContext): Future[Unit] =
+  def release(reason: String, traceId: String, exclusive: Boolean)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
     Future {
-      release()
-      logger.debug(s"Released lock for $reason ($traceId)")
+      release(exclusive)
+      logger.debug(s"Released ${lockType(exclusive)} lock for $reason ($traceId)")
     }
 
   def withGlobalLock[T](
-      reason: String
+      reason: String,
+      exclusive: Boolean,
   )(f: => Future[T])(implicit traceContext: TraceContext): Future[T] = {
     val traceId = UUID.randomUUID.toString
-    tryAcquire(reason, traceId).flatMap { _ =>
-      f.transformWith(r => release(reason, traceId).transform(rr => rr.flatMap(_ => r)))
+    tryAcquire(reason, traceId, exclusive).flatMap { _ =>
+      f.transformWith(r => release(reason, traceId, exclusive).transform(rr => rr.flatMap(_ => r)))
     }
   }
 
-  private def tryAcquire()(implicit traceContext: TraceContext): Boolean = {
+  private def tryAcquire(exclusive: Boolean)(implicit traceContext: TraceContext): Boolean = {
+    import LockState.{LockedState, Locked, Unlocked}
     blocking {
-      // we probably don't need this but we also never want to have to debug this code again
       synchronized {
         val oldLockState = lockRef.get
-        val newLockState = LockState(locked = true, Instant.now().plus(expirationDuration.asJava))
-        if (oldLockState == Unlocked) {
-          lockRef.compareAndSet(oldLockState, newLockState)
-        } else if (
-          oldLockState.expiresAt
-            .isBefore(Instant.now()) && lockRef.compareAndSet(oldLockState, newLockState)
-        ) {
-          logger.warn(
-            s"Acquired expired lock held since ${oldLockState.expiresAt.minus(expirationDuration.asJava)}, assuming that lock holder has died."
-          )
-          true
-        } else false
+        val expiresAt = Instant.now().plus(expirationDuration.asJava)
+        oldLockState match {
+          case Unlocked =>
+            lockRef.set(
+              Locked(
+                expiresAt,
+                if (exclusive) LockedState.Exclusive else LockedState.Shared(PositiveInt.one),
+              )
+            )
+            true
+          case Locked(oldExpiresAt, state) =>
+            val isExpired = oldExpiresAt.isBefore(Instant.now())
+            state match {
+              case LockedState.Shared(count) if !exclusive =>
+                // No reason to worry about expiry here since there can be multiple shared lock holders
+                // without issues.
+                lockRef.set(Locked(expiresAt, LockedState.Shared(count + PositiveInt.one)))
+                true
+              case _ if exclusive && isExpired =>
+                logger.warn(
+                  s"Acquired expired lock held since ${oldExpiresAt.minus(expirationDuration.asJava)}, assuming that lock holder has died."
+                )
+                lockRef.set(Locked(expiresAt, LockedState.Exclusive))
+                true
+              case LockedState.Exclusive if isExpired =>
+                logger.warn(
+                  s"Acquired expired lock held since ${oldExpiresAt.minus(expirationDuration.asJava)}, assuming that lock holder has died."
+                )
+                lockRef.set(Locked(expiresAt, LockedState.Shared(PositiveInt.one)))
+                true
+              case _ =>
+                false
+            }
+        }
       }
     }
   }
 
-  private def release()(implicit traceContext: TraceContext): Unit = {
+  private def release(exclusive: Boolean)(implicit traceContext: TraceContext): Unit = {
+    import LockState.{LockedState, Locked, Unlocked}
     blocking {
-      // we probably don't need this we but also never want to have to debug this code
       synchronized {
-        val oldLockState = lockRef.getAndSet(Unlocked)
-        if (oldLockState == Unlocked) {
-          logger.error("Released an already unlocked lock")
-        } else if (oldLockState.expiresAt.isBefore(Instant.now())) {
-          logger.warn(
-            s"Released an expired lock held since ${oldLockState.expiresAt.minus(expirationDuration.asJava)}."
-          )
+        val oldLockState = lockRef.get
+        oldLockState match {
+          case Unlocked =>
+            logger.error("Released an already unlocked lock")
+          case Locked(expiresAt, state) =>
+            state match {
+              case LockedState.Exclusive =>
+                if (exclusive) {
+                  lockRef.set(Unlocked)
+                } else {
+                  logger.error(
+                    "Trying to release a shared lock but lock is locked as exclusive, likely the shared lock expired"
+                  )
+                }
+              case LockedState.Shared(count) =>
+                if (!exclusive) {
+                  val newCount = PositiveInt.create(count.value - 1)
+                  lockRef.set(
+                    newCount.fold(_ => Unlocked, c => Locked(expiresAt, LockedState.Shared(c)))
+                  )
+                } else {
+                  logger.error(
+                    "Trying to release an exclusive lock but lock is locked as shared, likely the exclusive lock expired"
+                  )
+                }
+            }
         }
       }
     }
   }
 }
-private case class LockState(locked: Boolean, expiresAt: Instant);
-private object Unlocked extends LockState(locked = false, Instant.MIN)
+
+private object ExpiringLock {
+  sealed abstract class LockState extends Product with Serializable
+
+  object LockState {
+    final case object Unlocked extends LockState
+    final case class Locked(expiresAt: Instant, state: LockedState) extends LockState
+
+    sealed abstract class LockedState
+
+    object LockedState {
+      final case object Exclusive extends LockedState
+      final case class Shared(count: PositiveInt) extends LockedState
+    }
+  }
+}

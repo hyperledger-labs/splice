@@ -80,7 +80,8 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
             .flatMap(svParticipantId =>
               globalLock
                 .withGlobalLock(
-                  s"Updating traffic limit for validator ${validatorTraffic_.validator}"
+                  s"Updating traffic limit for validator ${validatorTraffic_.validator}",
+                  exclusive = false,
                 )(
                   participantAdminConnection
                     .ensureTrafficControlState(

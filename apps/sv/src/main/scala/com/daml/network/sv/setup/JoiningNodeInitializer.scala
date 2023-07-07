@@ -92,6 +92,7 @@ class JoiningNodeInitializer(
       svParty <- withSvConnection(config.foundingSvClient.adminApi)(
         _.withGlobalLock(
           "Domain connection of SV and allocation of SV party",
+          exclusive = false,
           () => {
             for {
               _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
@@ -100,7 +101,7 @@ class JoiningNodeInitializer(
                 initConnection,
                 config,
                 participantAdminConnection,
-                { case (_, f) => f() },
+                { case (_, _, f) => f() },
               )
             } yield svParty
           },
@@ -162,15 +163,22 @@ class JoiningNodeInitializer(
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
           _ <- svConnection.withGlobalLock(
-            "Onboarding of sequencer and mediator",
+            "Onboarding of sequencer",
+            exclusive = false,
+            () =>
+              localDomainNode.onboardLocalSequencerIfRequired(
+                config.domains.global.alias,
+                globalDomain,
+                participantAdminConnection,
+                svConnection,
+              ),
+          )
+          _ <- svConnection.withGlobalLock(
+            "Onboarding of mediator",
+            // Mediator onboarding is the only (known) operation that requires locking at the moment.
+            exclusive = true,
             () =>
               for {
-                _ <- localDomainNode.onboardLocalSequencerIfRequired(
-                  config.domains.global.alias,
-                  globalDomain,
-                  participantAdminConnection,
-                  svConnection,
-                )
                 _ <- localDomainNode.onboardLocalMediatorIfRequired(
                   globalDomain,
                   participantAdminConnection,
@@ -322,7 +330,7 @@ class JoiningNodeInitializer(
                 _ <- withSvConnection(svClient.adminApi)(connection =>
                   participantAdminConnection.uploadDarFiles(
                     requiredDars,
-                    connection.withGlobalLock(_, _),
+                    connection.withGlobalLock(_, _, _),
                   )
                 )
                 _ <- requestOnboarding(

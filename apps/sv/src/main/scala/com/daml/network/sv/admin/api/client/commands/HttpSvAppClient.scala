@@ -334,14 +334,14 @@ object HttpSvAppClient {
     ) = _ => Right(())
   }
 
-  case class AcquireGlobalLock(reason: String, traceId: String)
+  case class AcquireGlobalLock(reason: String, traceId: String, exclusive: Boolean)
       extends BaseCommand[http.AcquireGlobalLockResponse, Unit] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.AcquireGlobalLockResponse] =
       client.acquireGlobalLock(
-        definitions.AcquireGlobalLockRequest(reason, traceId),
+        definitions.AcquireGlobalLockRequest(reason, traceId, exclusive),
         headers = headers,
       )
 
@@ -350,14 +350,14 @@ object HttpSvAppClient {
     }
   }
 
-  case class ReleaseGlobalLock(reason: String, traceId: String)
+  case class ReleaseGlobalLock(reason: String, traceId: String, exclusive: Boolean)
       extends BaseCommand[http.ReleaseGlobalLockResponse, Unit] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.ReleaseGlobalLockResponse] =
       client.releaseGlobalLock(
-        definitions.ReleaseGlobalLockRequest(reason, traceId),
+        definitions.ReleaseGlobalLockRequest(reason, traceId, exclusive),
         headers = headers,
       )
 

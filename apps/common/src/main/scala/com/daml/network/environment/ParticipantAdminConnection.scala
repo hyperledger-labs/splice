@@ -204,13 +204,14 @@ class ParticipantAdminConnection(
 
   def uploadDarFiles(
       pkgs: Seq[UploadablePackage],
-      withLock: (String, () => Future[Unit]) => Future[Unit],
+      withLock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
     withLock(
       "DAR upload",
+      false,
       () =>
         pkgs.foldLeft(Future.unit)((previous, dar) =>
           previous.flatMap(_ => uploadDarFile(dar, f => f()))

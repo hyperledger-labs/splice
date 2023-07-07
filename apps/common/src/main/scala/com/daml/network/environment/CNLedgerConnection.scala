@@ -356,7 +356,7 @@ class CNLedgerConnection(
       userId: String,
       hint: String,
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, () => Future[Unit]) => Future[Unit],
+      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PartyId] =
     retryProvider.ensureThatO(
       s"User $userId has primary party",
@@ -373,7 +373,7 @@ class CNLedgerConnection(
       hint: String,
       namespaceO: Option[Namespace],
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, () => Future[Unit]) => Future[Unit],
+      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext) =
     for {
       participantId <- participantAdminConnection.getParticipantId()
@@ -386,6 +386,7 @@ class CNLedgerConnection(
       )
       _ <- lock(
         s"Ensure that party $partyId is allocated",
+        false,
         () =>
           for {
             _ <- participantAdminConnection
@@ -431,7 +432,7 @@ class CNLedgerConnection(
       user: String,
       userRights: Seq[User.Right],
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, () => Future[Unit]) => Future[Unit],
+      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PartyId] =
     for {
       party <- ensurePartyAllocated(
@@ -528,7 +529,7 @@ class CNLedgerConnection(
       username: String,
       userRights: Seq[User.Right] = Seq.empty,
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, () => Future[Unit]) => Future[Unit],
+      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PartyId] = {
     for {
       existingPartyId <- getOptionalPrimaryParty(username).recover {

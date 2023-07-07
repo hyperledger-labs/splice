@@ -78,7 +78,7 @@ class FoundingNodeInitializer(
 ) extends NamedLogging {
 
   @nowarn("cat=unused")
-  private def noLock[T](reason: String, f: () => Future[T]): Future[T] = f()
+  private def noLock[T](reason: String, exclusive: Boolean, f: () => Future[T]): Future[T] = f()
 
   def bootstrapCollective(): Future[
     (

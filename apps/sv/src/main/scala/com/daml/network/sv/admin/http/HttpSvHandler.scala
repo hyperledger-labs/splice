@@ -86,14 +86,18 @@ class HttpSvHandler(
         )
     }
 
-  private def withAcquiredGlobalLock[T](reason: String, f: => Future[T]): Future[T] = {
+  private def withAcquiredGlobalLock[T](
+      reason: String,
+      exclusive: Boolean,
+      f: => Future[T],
+  ): Future[T] = {
     val traceId = UUID.randomUUID
     acquireGlobalLock(v0.SvResource.AcquireGlobalLockResponse)(
-      definitions.AcquireGlobalLockRequest(reason, traceId.toString)
+      definitions.AcquireGlobalLockRequest(reason, traceId.toString, exclusive)
     )(()).flatMap { _ =>
       f.andThen(_ =>
         releaseGlobalLock(v0.SvResource.ReleaseGlobalLockResponse)(
-          definitions.ReleaseGlobalLockRequest(reason, traceId.toString)
+          definitions.ReleaseGlobalLockRequest(reason, traceId.toString, exclusive)
         )(())
       )
     }
@@ -107,7 +111,7 @@ class HttpSvHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       withGlobalLock { globalLock =>
         globalLock
-          .tryAcquire(body.reason, body.traceId)
+          .tryAcquire(body.reason, body.traceId, body.exclusive)
           .map(_ => v0.SvResource.AcquireGlobalLockResponseOK)
       }
     }
@@ -120,7 +124,7 @@ class HttpSvHandler(
     withNewTrace(workflowId) { implicit traceContext => _ =>
       withGlobalLock { globalLock =>
         globalLock
-          .release(body.reason, body.traceId)
+          .release(body.reason, body.traceId, body.exclusive)
           .map(_ => v0.SvResource.ReleaseGlobalLockResponseOK)
       }
     }
@@ -540,7 +544,8 @@ class HttpSvHandler(
       // We need both locks here to prevent topology transactions and Daml transactions.
       // This is the only place that calls svcRulesLock.lock() so there is no chance of a deadlock.
       acsBytes <- withAcquiredGlobalLock(
-        s"Authorizing SVC party to participant $participantId", {
+        s"Authorizing SVC party to participant $participantId",
+        exclusive = false, {
           for {
             _ <- svcRulesLock.lock()
             _ = logger.info(
@@ -669,7 +674,7 @@ class HttpSvHandler(
         dummyHint,
         None,
         participantAdminConnection,
-        { case (_, f) =>
+        { case (_, _, f) =>
           f()
         }, // Don't lock here, the candidate SV locks around the whole sequencer onboarding.
       )

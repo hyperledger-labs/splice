@@ -101,14 +101,14 @@ class ValidatorApp(
     with BasicDirectives {
 
   @nowarn("cat=unused")
-  private def noLock[T](reason: String, f: () => Future[T]): Future[T] = f()
+  private def noLock[T](reason: String, exclusive: Boolean, f: () => Future[T]): Future[T] = f()
 
   private def noLock_(f: () => Future[Unit]): Future[Unit] = f()
 
-  def withGlobalLock[A, B](f: ((String, () => Future[A]) => Future[A]) => Future[B]) =
+  def withGlobalLock[A, B](f: ((String, Boolean, () => Future[A]) => Future[A]) => Future[B]) =
     withSvConnection(
       config.foundingSvClient.adminApi
-    )(svConnection => f(svConnection.withGlobalLock(_, _)))
+    )(svConnection => f(svConnection.withGlobalLock(_, _, _)))
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] =
     ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
@@ -129,7 +129,8 @@ class ValidatorApp(
       _ <- config.onboarding.traverse_(waitUntilSponsorIsActive(_))
       _ <- withGlobalLock[Unit, Unit](lock =>
         lock(
-          "Domain connection and primary party allocation of validatior",
+          "Domain connection and primary party allocation of validator",
+          false,
           () =>
             withParticipantAdminConnection { participantAdminConnection =>
               for {
@@ -193,6 +194,7 @@ class ValidatorApp(
       party <- withGlobalLock[PartyId, PartyId](lock =>
         lock(
           s"Allocate party for user ${instance.serviceUser}",
+          false,
           () =>
             for {
               _ <- instance.dars.traverse_(dar =>

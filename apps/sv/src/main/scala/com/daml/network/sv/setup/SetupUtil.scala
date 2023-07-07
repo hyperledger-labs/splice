@@ -13,7 +13,7 @@ private[setup] object SetupUtil {
       connection: CNLedgerConnection,
       config: SvAppBackendConfig,
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, () => Future[Unit]) => Future[Unit],
+      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PartyId] = {
     val partyHint = config.svPartyHint.getOrElse(
       config.onboarding

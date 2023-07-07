@@ -107,25 +107,25 @@ final class SvConnection private (
       HttpSvAppClient.GetSvcInfo,
     )
 
-  def acquireGlobalLock(reason: String, traceId: String): Future[Unit] =
+  def acquireGlobalLock(reason: String, traceId: String, exclusive: Boolean): Future[Unit] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.AcquireGlobalLock(reason, traceId),
+      HttpSvAppClient.AcquireGlobalLock(reason, traceId, exclusive),
     )
 
-  def releaseGlobalLock(reason: String, traceId: String): Future[Unit] =
+  def releaseGlobalLock(reason: String, traceId: String, exclusive: Boolean): Future[Unit] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.ReleaseGlobalLock(reason, traceId),
+      HttpSvAppClient.ReleaseGlobalLock(reason, traceId, exclusive),
     )
 
-  def withGlobalLock[T](reason: String, f: () => Future[T]): Future[T] = {
+  def withGlobalLock[T](reason: String, exclusive: Boolean, f: () => Future[T]): Future[T] = {
     val traceId = UUID.randomUUID.toString
     logger.debug(s"Trying to perform operation under lock: $reason ($traceId)")
     retryProvider
       .retryForAutomation(
         "Acquire global lock",
-        acquireGlobalLock(reason, traceId),
+        acquireGlobalLock(reason, traceId, exclusive),
         logger,
       )
       .flatMap(_ =>
@@ -133,7 +133,7 @@ final class SvConnection private (
           retryProvider
             .retryForAutomation(
               "Release global lock",
-              releaseGlobalLock(reason, traceId),
+              releaseGlobalLock(reason, traceId, exclusive),
               logger,
             )
             .transform {

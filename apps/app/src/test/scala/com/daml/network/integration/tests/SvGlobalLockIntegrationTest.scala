@@ -37,30 +37,63 @@ class SvGlobalLockIntegrationTest
   val dummyReason = "reason"
   val dummyTraceId = "traceid"
 
-  "global lock locks" in { implicit env =>
-    sv1Backend.startSync();
+  "global lock locks exclusive" in { implicit env =>
+    sv1Backend.startSync()
 
-    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, true)
 
     assertThrowsAndLogsCommandFailures(
-      sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId),
+      sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, true),
       _.errorMessage should include("Lock is not free"),
     )
-    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId)
-    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId)
-    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId, true)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, true)
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId, true)
   }
 
   "global lock can be expired" in { implicit env =>
-    sv1Backend.startSync();
+    sv1Backend.startSync()
 
-    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, true)
     Threading.sleep(globalLockTimeout.asJava.toMillis)
 
     loggerFactory.assertLogs(
-      sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId),
+      sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, true),
       _.warningMessage should include("Acquired expired lock held since"),
     )
-    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId)
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId, true)
+  }
+
+  "shared lock can be acquired multiple times" in { implicit env =>
+    sv1Backend.startSync()
+
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, false)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, false)
+
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId, false)
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId, false)
+  }
+  "shared lock cannot be acquired exclusively" in { implicit env =>
+    sv1Backend.startSync()
+
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, false)
+    assertThrowsAndLogsCommandFailures(
+      sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, true),
+      _.errorMessage should include("Lock is not free"),
+    )
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId, false)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, true)
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId, true)
+  }
+  "exclusive lock cannot be acquired shared" in { implicit env =>
+    sv1Backend.startSync()
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, true)
+    assertThrowsAndLogsCommandFailures(
+      sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, false),
+      _.errorMessage should include("Lock is not free"),
+    )
+    sv1Backend.releaseGlobalLock(dummyReason, dummyTraceId, true)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, false)
+    sv1Backend.acquireGlobalLock(dummyReason, dummyTraceId, false)
   }
 }
