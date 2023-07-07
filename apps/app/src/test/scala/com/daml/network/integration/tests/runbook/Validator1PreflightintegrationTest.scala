@@ -144,7 +144,7 @@ class Validator1PreflightIntegrationTest
         inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
           val transaction = readTransactionFromRow(tx)
           transaction.action should matchText("Received")
-          val partyR = s"$alicePartyId\nvia\nvalidator1_validator_service_user::.*".r
+          val partyR = s"$alicePartyId validator1_validator_service_user::.*".r
           val description = transaction.partyDescription.getOrElse(fail("There should be a party."))
           description should fullyMatch regex partyR
           transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
