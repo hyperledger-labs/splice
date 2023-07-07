@@ -1,22 +1,22 @@
 {
-  "id" : "PAR::aliceParticipant::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c",
+  "id" : "PAR::aliceParticipant::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
   "keys" : [
     {
-      "keyPair" : "Cq8DCqwDCr8BCkQxMjIwYjk3OTE4ZjYyODMzNTAxYWM1OTFiOTE4NDQwNjk2NTQyYzY5Yzc2YzFiOTg5NmIzMWJjMzdiNWZjMjI2ZDU0YxABGnMIt9vpnAcSawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISINqAnG+uzHsLIAWnxH9xu8kU/IFlekj+OfrBxJKCYFw6GAMQARi32+mcByADIAES5wEKRDEyMjBiOTc5MThmNjI4MzM1MDFhYzU5MWI5MTg0NDA2OTY1NDJjNjljNzZjMWI5ODk2YjMxYmMzN2I1ZmMyMjZkNTRjEAEamgEIt9vpnAcSkQEKhAEKOHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVkMjU1MTlQcml2YXRlS2V5EkYSIC6TlMBZbTHuaCQjdQoE4GvOvhJ65TQnSDeNllAuFCVyGiISINqAnG+uzHsLIAWnxH9xu8kU/IFlekj+OfrBxJKCYFw6GAIQARi32+mcByADIAE=",
+      "keyPair" : "Cq8DCqwDCr8BCkQxMjIwNjhjM2EwMWIzYmYzMTM3ZjRhNzdiYTgzYmQ1ZWI4N2E3YzNlOWY3ZWE3OTNiMTk2MzljMDg2YTY1NWE1NjlmMRABGnMIrqaPzwISawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISIF5alrkQ7580t0p+D0hfj9wX0MMt/0Oip8C6KMSDALZJGAMQARiupo/PAiADIAES5wEKRDEyMjA2OGMzYTAxYjNiZjMxMzdmNGE3N2JhODNiZDVlYjg3YTdjM2U5ZjdlYTc5M2IxOTYzOWMwODZhNjU1YTU2OWYxEAEamgEIrqaPzwISkQEKhAEKOHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVkMjU1MTlQcml2YXRlS2V5EkYSIAlDIvmZp9szFWx4JzwTDZmz6QWiKAfu4wBpTAqxfXI6GiISIF5alrkQ7580t0p+D0hfj9wX0MMt/0Oip8C6KMSDALZJGAIQARiupo/PAiADIAE=",
       "name" : "aliceParticipant-namespace"
     },
     {
-      "keyPair" : "Cq8DCqwDCr8BCkQxMjIwYTdjNWY1YzBhYWQ0YWVhMDhkNjZhMzIyZjIzYWY0NDlhM2QxOTU1YmEzMmYxZTFhNDVhZThiOGU5NzQyMWY5MRABGnMI3IWPzAYSawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISINUGr6z73+8np7dDFth/ster9TmoTRAs+gIQzyXTqudLGAMQARjchY/MBiADIAES5wEKRDEyMjBhN2M1ZjVjMGFhZDRhZWEwOGQ2NmEzMjJmMjNhZjQ0OWEzZDE5NTViYTMyZjFlMWE0NWFlOGI4ZTk3NDIxZjkxEAEamgEI3IWPzAYSkQEKhAEKOHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVkMjU1MTlQcml2YXRlS2V5EkYSID62U7Ud8ZMYAXvroBzPE++xrDvarHY59iA8EWYlnfScGiISINUGr6z73+8np7dDFth/ster9TmoTRAs+gIQzyXTqudLGAIQARjchY/MBiADIAE=",
+      "keyPair" : "Cq8DCqwDCr8BCkQxMjIwNDM2NGU4Y2RiNWEzMjMyZDU4NjJjYTQ2M2RmMzI3ZTRiYjg2MWUzM2YxYWY5MzZjZTUyYWViMDM1ZGY2YjViZhABGnMIjPuhhQESawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISIDefn1jSAq/nc7dfTjce2AiEbIPvIaUKf0Fg9Y3GdRmdGAMQARiM+6GFASADIAES5wEKRDEyMjA0MzY0ZThjZGI1YTMyMzJkNTg2MmNhNDYzZGYzMjdlNGJiODYxZTMzZjFhZjkzNmNlNTJhZWIwMzVkZjZiNWJmEAEamgEIjPuhhQESkQEKhAEKOHR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVkMjU1MTlQcml2YXRlS2V5EkYSINHPM7pLkPdFRaQcC+tMNdylcWa0Dxrj+CNDwwZQ++HoGiISIDefn1jSAq/nc7dfTjce2AiEbIPvIaUKf0Fg9Y3GdRmdGAIQARiM+6GFASADIAE=",
       "name" : "aliceParticipant-signing"
     },
     {
-      "keyPair" : "CpMFEpAFCrICCkQxMjIwYzljMDIzYWRiYzYyZWI0N2Q4OWNiZTIwNDg4ZWY3NzZlZDRjZTJmMmQ2MTgxYzQ2YzIxOGZjYWZkMTU4ZDM4ZRABGuUBCPmV174CEtwBCs8BCj10eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FY2llc0FlYWRIa2RmUHVibGljS2V5EosBEkQKBAgCEAMSOhI4CjB0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5BZXNHY21LZXkSAhAQGAEYARohAMkkMy8j/zCIe4sp61E2mtZZMbpCByjOCYsTySBbaBP+IiBt/cTqN3WuY9UwEEMCNRQSk3+3f5KOMcNZF2HF3Hn1yhgDEAEY+ZXXvgIgASABEtgCCkQxMjIwYzljMDIzYWRiYzYyZWI0N2Q4OWNiZTIwNDg4ZWY3NzZlZDRjZTJmMmQ2MTgxYzQ2YzIxOGZjYWZkMTU4ZDM4ZRABGosCCPmV174CEoICCvUBCj50eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FY2llc0FlYWRIa2RmUHJpdmF0ZUtleRKwARKLARJECgQIAhADEjoSOAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EgIQEBgBGAEaIQDJJDMvI/8wiHuLKetRNprWWTG6QgcozgmLE8kgW2gT/iIgbf3E6jd1rmPVMBBDAjUUEpN/t3+SjjHDWRdhxdx59coaIFCCsyIliyf+Ztxtm593RGpDrLve28uc2/bhFtCTwBCKGAIQARj5lde+AiABIAE=",
+      "keyPair" : "CpIFEo8FCrECCkQxMjIwMWNlOWYxMDJjYjRmYTIwY2NhOTg0MzhhNTdmYzBiMmQ1OGMzMWQxMDhkYjVkMjdmMjExNjAwYWMwNzE0YTBjNhABGuQBCLXQzoQGEtsBCs4BCj10eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FY2llc0FlYWRIa2RmUHVibGljS2V5EooBEkQKBAgCEAMSOhI4CjB0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5BZXNHY21LZXkSAhAQGAEYARohAKPnoNtSfixXCQUd/4GCuf1A0IEL+r1eNRAqKW6FvsHjIh9c9NqAxWG0zzR3DgGYA7vKmCkD73DHxEwMOp4G9PobGAMQARi10M6EBiABIAES2AIKRDEyMjAxY2U5ZjEwMmNiNGZhMjBjY2E5ODQzOGE1N2ZjMGIyZDU4YzMxZDEwOGRiNWQyN2YyMTE2MDBhYzA3MTRhMGM2EAEaiwIItdDOhAYSggIK9QEKPnR5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVjaWVzQWVhZEhrZGZQcml2YXRlS2V5ErABEooBEkQKBAgCEAMSOhI4CjB0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5BZXNHY21LZXkSAhAQGAEYARohAKPnoNtSfixXCQUd/4GCuf1A0IEL+r1eNRAqKW6FvsHjIh9c9NqAxWG0zzR3DgGYA7vKmCkD73DHxEwMOp4G9PobGiEA9kzOfgtMSMU7H37Pl7L50i4oAGe/00yg4SYK//exULoYAhABGLXQzoQGIAEgAQ==",
       "name" : "aliceParticipant-encryption"
     }
   ],
   "bootstrapTxs" : [
-    "CqcDCpcCCpICEAEajQIKigIKRDEyMjBiOTc5MThmNjI4MzM1MDFhYzU5MWI5MTg0NDA2OTY1NDJjNjljNzZjMWI5ODk2YjMxYmMzN2I1ZmMyMjZkNTRjEr8BCkQxMjIwYjk3OTE4ZjYyODMzNTAxYWM1OTFiOTE4NDQwNjk2NTQyYzY5Yzc2YzFiOTg5NmIzMWJjMzdiNWZjMjI2ZDU0YxABGnMIt9vpnAcSawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISINqAnG+uzHsLIAWnxH9xu8kU/IFlekj+OfrBxJKCYFw6GAMQARi32+mcByADIAEYARACEooBCAESQE9BN8Y7X2A9G71siUPw1pi8GpAa2qImLqubOKlDmR3RmsLZLNbG40/s+MN41gcPQFX8V5RRQ7mPzb9jDkTS8A0aRDEyMjBiOTc5MThmNjI4MzM1MDFhYzU5MWI5MTg0NDA2OTY1NDJjNjljNzZjMWI5ODk2YjMxYmMzN2I1ZmMyMjZkNTRjEAI=",
-    "CvcFCucECuIEEAEa3QQi2gQKW1BBUjo6YWxpY2VQYXJ0aWNpcGFudDo6MTIyMGI5NzkxOGY2MjgzMzUwMWFjNTkxYjkxODQ0MDY5NjU0MmM2OWM3NmMxYjk4OTZiMzFiYzM3YjVmYzIyNmQ1NGMSwgEKvwEKRDEyMjBhN2M1ZjVjMGFhZDRhZWEwOGQ2NmEzMjJmMjNhZjQ0OWEzZDE5NTViYTMyZjFlMWE0NWFlOGI4ZTk3NDIxZjkxEAEacwjchY/MBhJrCl8KN3R5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVkMjU1MTlQdWJsaWNLZXkSIhIg1QavrPvf7yent0MW2H+y16v1OahNECz6AhDPJdOq50sYAxABGNyFj8wGIAMgARK1AhKyAgpEMTIyMGM5YzAyM2FkYmM2MmViNDdkODljYmUyMDQ4OGVmNzc2ZWQ0Y2UyZjJkNjE4MWM0NmMyMThmY2FmZDE1OGQzOGUQARrlAQj5lde+AhLcAQrPAQo9dHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuRWNpZXNBZWFkSGtkZlB1YmxpY0tleRKLARJECgQIAhADEjoSOAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EgIQEBgBGAEaIQDJJDMvI/8wiHuLKetRNprWWTG6QgcozgmLE8kgW2gT/iIgbf3E6jd1rmPVMBBDAjUUEpN/t3+SjjHDWRdhxdx59coYAxABGPmV174CIAEgARACEooBCAESQAtqvMVscqVsEGJVcTDoStMQIjzmfQ16dRsD2cqBPO1r9XKOB/3klZ2kz9VK3WgEls4Hgal+0M8/jtPo9JP/5wQaRDEyMjBiOTc5MThmNjI4MzM1MDFhYzU5MWI5MTg0NDA2OTY1NDJjNjljNzZjMWI5ODk2YjMxYmMzN2I1ZmMyMjZkNTRjEAI="
+    "CqcDCpcCCpICEAEajQIKigIKRDEyMjA2OGMzYTAxYjNiZjMxMzdmNGE3N2JhODNiZDVlYjg3YTdjM2U5ZjdlYTc5M2IxOTYzOWMwODZhNjU1YTU2OWYxEr8BCkQxMjIwNjhjM2EwMWIzYmYzMTM3ZjRhNzdiYTgzYmQ1ZWI4N2E3YzNlOWY3ZWE3OTNiMTk2MzljMDg2YTY1NWE1NjlmMRABGnMIrqaPzwISawpfCjd0eXBlLmdvb2dsZWFwaXMuY29tL2dvb2dsZS5jcnlwdG8udGluay5FZDI1NTE5UHVibGljS2V5EiISIF5alrkQ7580t0p+D0hfj9wX0MMt/0Oip8C6KMSDALZJGAMQARiupo/PAiADIAEYARACEooBCAESQA1Rs1oEVU4XkRsiPolNfdpBeQIPJ+Ha9v9Pj7MZs6Usrra6AYULtGCvCLlgjHoXBkANy2Zl0DXE5FBQqbJzlAYaRDEyMjA2OGMzYTAxYjNiZjMxMzdmNGE3N2JhODNiZDVlYjg3YTdjM2U5ZjdlYTc5M2IxOTYzOWMwODZhNjU1YTU2OWYxEAI=",
+    "CvYFCuYECuEEEAEa3AQi2QQKW1BBUjo6YWxpY2VQYXJ0aWNpcGFudDo6MTIyMDY4YzNhMDFiM2JmMzEzN2Y0YTc3YmE4M2JkNWViODdhN2MzZTlmN2VhNzkzYjE5NjM5YzA4NmE2NTVhNTY5ZjESwgEKvwEKRDEyMjA0MzY0ZThjZGI1YTMyMzJkNTg2MmNhNDYzZGYzMjdlNGJiODYxZTMzZjFhZjkzNmNlNTJhZWIwMzVkZjZiNWJmEAEacwiM+6GFARJrCl8KN3R5cGUuZ29vZ2xlYXBpcy5jb20vZ29vZ2xlLmNyeXB0by50aW5rLkVkMjU1MTlQdWJsaWNLZXkSIhIgN5+fWNICr+dzt19ONx7YCIRsg+8hpQp/QWD1jcZ1GZ0YAxABGIz7oYUBIAMgARK0AhKxAgpEMTIyMDFjZTlmMTAyY2I0ZmEyMGNjYTk4NDM4YTU3ZmMwYjJkNThjMzFkMTA4ZGI1ZDI3ZjIxMTYwMGFjMDcxNGEwYzYQARrkAQi10M6EBhLbAQrOAQo9dHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuRWNpZXNBZWFkSGtkZlB1YmxpY0tleRKKARJECgQIAhADEjoSOAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EgIQEBgBGAEaIQCj56DbUn4sVwkFHf+Bgrn9QNCBC/q9XjUQKiluhb7B4yIfXPTagMVhtM80dw4BmAO7ypgpA+9wx8RMDDqeBvT6GxgDEAEYtdDOhAYgASABEAISigEIARJARDEQxOG+BjniQR2fcI7GCJLY0QeOFD+5lMSwdlbxt0SNshVTt8MECJYq0qvTRQBpyFxtdxCNqecEfZ4pagLyABpEMTIyMDY4YzNhMDFiM2JmMzEzN2Y0YTc3YmE4M2JkNWViODdhN2MzZTlmN2VhNzkzYjE5NjM5YzA4NmE2NTVhNTY5ZjEQAg=="
   ],
   "users" : [
     {
@@ -24,336 +24,20 @@
       "primaryParty" : null
     },
     {
-      "id" : "alice_validator_user-32f14a28",
-      "primaryParty" : "alice__validator__user-32f14a28::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
+      "id" : "alice_validator_user-55cef83",
+      "primaryParty" : "alice__validator__user-55cef83::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1"
     },
     {
-      "id" : "alice_validator_user-36feb6e6",
-      "primaryParty" : "alice__validator__user-36feb6e6::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
+      "id" : "alice_validator_wallet_user-55cef83",
+      "primaryParty" : "alice__validator__user-55cef83::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1"
     },
     {
-      "id" : "alice_validator_user-37f587ab",
-      "primaryParty" : "alice__validator__user-37f587ab::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
+      "id" : "alice_wallet_user-55cef83_tc0.unverified.cns",
+      "primaryParty" : "alice__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1"
     },
     {
-      "id" : "alice_validator_user-48c31a48",
-      "primaryParty" : "alice__validator__user-48c31a48::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-5540fd3",
-      "primaryParty" : "alice__validator__user-5540fd3::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-615b7778",
-      "primaryParty" : "alice__validator__user-615b7778::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-6c800c4",
-      "primaryParty" : "alice__validator__user-6c800c4::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-7304fdfe",
-      "primaryParty" : "alice__validator__user-7304fdfe::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-7fe47ecd",
-      "primaryParty" : "alice__validator__user-7fe47ecd::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-88a539c2",
-      "primaryParty" : "alice__validator__user-88a539c2::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-8bc25a9b",
-      "primaryParty" : "alice__validator__user-8bc25a9b::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-9caf1719",
-      "primaryParty" : "alice__validator__user-9caf1719::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-a224f814",
-      "primaryParty" : "alice__validator__user-a224f814::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-ac45ea98",
-      "primaryParty" : "alice__validator__user-ac45ea98::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-aea9680",
-      "primaryParty" : "alice__validator__user-aea9680::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-b168fa74",
-      "primaryParty" : "alice__validator__user-b168fa74::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-b849aac0",
-      "primaryParty" : "alice__validator__user-b849aac0::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-c13b02b8",
-      "primaryParty" : "alice__validator__user-c13b02b8::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-c5e94347",
-      "primaryParty" : "alice__validator__user-c5e94347::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-d7817205",
-      "primaryParty" : "alice__validator__user-d7817205::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-ea8beaf1",
-      "primaryParty" : "alice__validator__user-ea8beaf1::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-ee2907b1",
-      "primaryParty" : "alice__validator__user-ee2907b1::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-f71886d",
-      "primaryParty" : "alice__validator__user-f71886d::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_user-feb1d66d",
-      "primaryParty" : "alice__validator__user-feb1d66d::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-32f14a28",
-      "primaryParty" : "alice__validator__user-32f14a28::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-36feb6e6",
-      "primaryParty" : "alice__validator__user-36feb6e6::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-37f587ab",
-      "primaryParty" : "alice__validator__user-37f587ab::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-48c31a48",
-      "primaryParty" : "alice__validator__user-48c31a48::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-5540fd3",
-      "primaryParty" : "alice__validator__user-5540fd3::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-615b7778",
-      "primaryParty" : "alice__validator__user-615b7778::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-6c800c4",
-      "primaryParty" : "alice__validator__user-6c800c4::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-7304fdfe",
-      "primaryParty" : "alice__validator__user-7304fdfe::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-7fe47ecd",
-      "primaryParty" : "alice__validator__user-7fe47ecd::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-88a539c2",
-      "primaryParty" : "alice__validator__user-88a539c2::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-8bc25a9b",
-      "primaryParty" : "alice__validator__user-8bc25a9b::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-9caf1719",
-      "primaryParty" : "alice__validator__user-9caf1719::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-a224f814",
-      "primaryParty" : "alice__validator__user-a224f814::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-ac45ea98",
-      "primaryParty" : "alice__validator__user-ac45ea98::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-aea9680",
-      "primaryParty" : "alice__validator__user-aea9680::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-b168fa74",
-      "primaryParty" : "alice__validator__user-b168fa74::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-b849aac0",
-      "primaryParty" : "alice__validator__user-b849aac0::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-c13b02b8",
-      "primaryParty" : "alice__validator__user-c13b02b8::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-c5e94347",
-      "primaryParty" : "alice__validator__user-c5e94347::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-d7817205",
-      "primaryParty" : "alice__validator__user-d7817205::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-ea8beaf1",
-      "primaryParty" : "alice__validator__user-ea8beaf1::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-ee2907b1",
-      "primaryParty" : "alice__validator__user-ee2907b1::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-f71886d",
-      "primaryParty" : "alice__validator__user-f71886d::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_validator_wallet_user-feb1d66d",
-      "primaryParty" : "alice__validator__user-feb1d66d::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-32f14a28_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-32f14a28__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-36feb6e6_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-36feb6e6__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-37f587ab_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-37f587ab__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-48c31a48_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-5540fd3_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-5540fd3__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-615b7778",
-      "primaryParty" : "alice__wallet__user-615b7778::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-6c800c4_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-6c800c4__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-7fe47ecd_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-7fe47ecd__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-8bc25a9b_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-8bc25a9b__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-9caf1719_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-9caf1719__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-a224f814_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-a224f814__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-ac45ea98_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-ac45ea98__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-c13b02b8_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-c13b02b8__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-d7817205_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-d7817205__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-ea8beaf1",
-      "primaryParty" : "alice__wallet__user-ea8beaf1::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-ee2907b1_tc0.unverified.cns",
-      "primaryParty" : "alice__wallet__user-ee2907b1__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "alice_wallet_user-feb1d66d",
-      "primaryParty" : "alice__wallet__user-feb1d66d::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-32f14a28_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-32f14a28__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-36feb6e6_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-36feb6e6__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-37f587ab_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-37f587ab__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-48c31a48_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-48c31a48__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-5540fd3_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-5540fd3__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-615b7778",
-      "primaryParty" : "charlie__wallet__user-615b7778::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-6c800c4_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-6c800c4__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-7fe47ecd_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-7fe47ecd__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-8bc25a9b_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-8bc25a9b__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-9caf1719_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-9caf1719__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-a224f814_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-a224f814__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-ac45ea98_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-ac45ea98__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-c13b02b8_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-c13b02b8__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-d7817205_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-d7817205__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-ea8beaf1",
-      "primaryParty" : "charlie__wallet__user-ea8beaf1::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-ee2907b1_tc0.unverified.cns",
-      "primaryParty" : "charlie__wallet__user-ee2907b1__tc0_002eunverified_002ecns::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "charlie_wallet_user-feb1d66d",
-      "primaryParty" : "charlie__wallet__user-feb1d66d::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
-    },
-    {
-      "id" : "dora_xyz",
-      "primaryParty" : "dora__xyz::1220b97918f62833501ac591b918440696542c69c76c1b9896b31bc37b5fc226d54c"
+      "id" : "charlie_wallet_user-55cef83_tc0.unverified.cns",
+      "primaryParty" : "charlie__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1"
     },
     {
       "id" : "participant_admin",

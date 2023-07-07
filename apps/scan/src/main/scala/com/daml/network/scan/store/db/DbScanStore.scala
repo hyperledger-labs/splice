@@ -90,7 +90,7 @@ class DbScanStore(
         sqlu"""
               insert into scan_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
               contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
-              round, validator, amount, import_crate_receiver_name, featured_app_right_provider)
+              round, validator, amount, import_crate_receiver, featured_app_right_provider)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       $round, $validator, $amount, $safeImportCrateReceiverName, $featuredAppRightProvider)
@@ -205,7 +205,7 @@ class DbScanStore(
   ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] =
     ??? // TODO (#6194): this requires scan_txlog_store
 
-  override def listImportCrates(receiver: String)(implicit
+  override def listImportCrates(receiverParty: PartyId)(implicit
       tc: TraceContext
   ): Future[Seq[MultiDomainAcsStore.ContractWithState[ImportCrate.ContractId, ImportCrate]]] =
     waitUntilAcsIngested {
@@ -216,7 +216,7 @@ class DbScanStore(
               sql"""
                   where store_id = $storeId
                     and template_id = ${ImportCrate.TEMPLATE_ID}
-                    and import_crate_receiver_name = ${lengthLimited(receiver)}
+                    and import_crate_receiver = $receiverParty
                   limit ${sqlLimit(Limit.DefaultLimit)};
                  """).toActionBuilder.as[AcsStoreRowTemplate],
             "listImportCrates",

@@ -11,7 +11,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.store.AcsStoreDump
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.{
   Contract,
@@ -121,8 +120,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
         readAs = Seq.empty,
         update = new cc.coinimport.ImportCrate(
           svcParty.toProtoPrimitive,
-          AcsStoreDump.dropPartyNameSuffix(charlieUserParty.toProtoPrimitive),
-          false,
+          charlieUserParty.toProtoPrimitive,
           charlieCoin.data,
         ).create,
       )

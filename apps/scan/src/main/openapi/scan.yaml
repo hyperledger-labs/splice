@@ -330,7 +330,7 @@ paths:
       operationId: "listImportCrates"
       parameters:
         - in: query
-          name: party
+          name: receiver_party_id
           required: true
           schema:
             type: string

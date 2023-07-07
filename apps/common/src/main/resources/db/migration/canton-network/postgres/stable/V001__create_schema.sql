@@ -174,8 +174,8 @@ create table scan_acs_store
     -- amount of coins
     amount                      numeric,
 
-    -- the receiverName of an ImportCreate contract
-    import_crate_receiver_name  text,
+    -- the receiver of an ImportCrate contract
+    import_crate_receiver text,
 
     -- the provider partyid of a FeaturedAppRight contract
     featured_app_right_provider text
@@ -188,8 +188,8 @@ create index scan_acs_store_sid_tid_val
 
 -- list ImportCrates
 create index scan_acs_store_sid_tid_icrn
-    on scan_acs_store (store_id, template_id, import_crate_receiver_name)
-    where import_crate_receiver_name is not null;
+    on scan_acs_store (store_id, template_id, import_crate_receiver)
+    where import_crate_receiver is not null;
 
 -- lookup FeaturedAppRight
 create index scan_acs_store_sid_tid_farp

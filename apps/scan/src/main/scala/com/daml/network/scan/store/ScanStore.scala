@@ -132,7 +132,7 @@ trait ScanStore
         )
     )
 
-  def listImportCrates(receiver: String)(implicit
+  def listImportCrates(receiverParty: PartyId)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]]
 

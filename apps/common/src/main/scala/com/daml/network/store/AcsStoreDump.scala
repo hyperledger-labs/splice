@@ -39,7 +39,7 @@ object AcsStoreDump {
       )
     )
 
-  def extractImportCommands(svcParty: PartyId, productionMode: Boolean)(
+  def extractImportCommands(svcParty: PartyId)(
       contracts: Seq[http.Contract]
   )(implicit templateDecoder: TemplateJsonDecoder): Seq[data.Command] = {
 
@@ -60,26 +60,11 @@ object AcsStoreDump {
     for {
       httpCo <- contracts
       coin <- extractCoin(httpCo)
-      cmd <- {
-        val receiverName =
-          if (productionMode) coin.owner
-          else {
-            // Drop the party name suffix, as we don't migrate the parties to a fresh participant node
-            dropPartyNameSuffix(coin.owner)
-          }
-
-        new cc.coinimport.ImportCrate(
-          svcParty.toProtoPrimitive,
-          receiverName,
-          productionMode,
-          coin, // TODO(#6503): embed the contract id here for idempotent imports
-        ).create().commands().asScala.toSeq
-      }
+      cmd <- new cc.coinimport.ImportCrate(
+        svcParty.toProtoPrimitive,
+        coin.owner,
+        coin, // TODO(#6503): embed the contract id here for idempotent imports
+      ).create().commands().asScala.toSeq
     } yield cmd
   }
-
-  // TODO(#6278): get rid of this party name suffix hackery once we only support the fixed mode
-  def dropPartyNameSuffix(partyStr: String): String =
-    "-[a-z0-9_]+::.*$".r.replaceFirstIn(partyStr, "")
-
 }

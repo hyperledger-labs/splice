@@ -114,6 +114,12 @@ trait CommonCNNodeAppInstanceReferences {
     "sv1Validator"
   )
 
+  def sv1ValidatorLocalBackend(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): ValidatorAppBackendReference = v(
+    "sv1ValidatorLocal"
+  )
+
   def sv2ValidatorBackend(implicit
       env: CNNodeTestConsoleEnvironment
   ): ValidatorAppBackendReference = v(

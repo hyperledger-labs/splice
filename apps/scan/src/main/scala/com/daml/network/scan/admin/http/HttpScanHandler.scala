@@ -16,7 +16,6 @@ import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.store.AcsStoreDump
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{
   Codec,
@@ -486,14 +485,12 @@ class HttpScanHandler(
     }
 
   override def listImportCrates(respond: v0.ScanResource.ListImportCratesResponse.type)(
-      party: String
+      receiverPartyId: String
   )(extracted: Unit): Future[v0.ScanResource.ListImportCratesResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
       {
-        // TODO(#6278): do not drop the suffix here
-        val receiverName = AcsStoreDump.dropPartyNameSuffix(party)
         for {
-          crates <- store.listImportCrates(receiverName)
+          crates <- store.listImportCrates(PartyId.tryFromProtoPrimitive(receiverPartyId))
         } yield definitions.ListImportCratesResponse(
           crates
             .map(crate =>

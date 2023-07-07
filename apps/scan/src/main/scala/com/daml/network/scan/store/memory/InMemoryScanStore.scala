@@ -300,7 +300,7 @@ class InMemoryScanStore(
       )
     )
 
-  def listImportCrates(receiverName: String)(implicit
+  def listImportCrates(receiverParty: PartyId)(implicit
       tc: TraceContext
   ): Future[
     Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
@@ -308,7 +308,7 @@ class InMemoryScanStore(
     multiDomainAcsStore.filterContracts(
       cc.coinimport.ImportCrate.COMPANION,
       (co: Contract[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]) =>
-        co.payload.receiverName == receiverName,
+        co.payload.receiver == receiverParty.toProtoPrimitive,
     )
 
   override def findFeaturedAppRight(

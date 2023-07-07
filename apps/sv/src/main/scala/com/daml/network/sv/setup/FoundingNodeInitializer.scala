@@ -356,9 +356,7 @@ class FoundingNodeInitializer(
                   )
               }
             }
-            cmds = AcsStoreDump.extractImportCommands(svcParty, productionMode = false)(
-              jsonDump.contracts.toSeq
-            )
+            cmds = AcsStoreDump.extractImportCommands(svcParty)(jsonDump.contracts.toSeq)
             _ = logger.debug(
               show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
             )

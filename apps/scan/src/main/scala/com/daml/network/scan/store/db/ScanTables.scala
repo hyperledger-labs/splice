@@ -17,7 +17,7 @@ object ScanTables extends AcsTables {
       round: Option[Long],
       validator: Option[PartyId],
       amount: Option[BigDecimal],
-      importCrateReceiverName: Option[String],
+      importCrateReceiver: Option[String],
       featuredAppRightProvider: Option[PartyId],
   )
 
@@ -36,7 +36,7 @@ object ScanTables extends AcsTables {
               round = None,
               validator = None,
               amount = None,
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -48,7 +48,7 @@ object ScanTables extends AcsTables {
               round = None,
               validator = None,
               amount = None,
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -61,7 +61,7 @@ object ScanTables extends AcsTables {
               round = Some(contract.payload.round.number),
               validator = None,
               amount = None,
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -73,7 +73,7 @@ object ScanTables extends AcsTables {
               round = Some(contract.payload.round.number),
               validator = None,
               amount = None,
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -86,7 +86,7 @@ object ScanTables extends AcsTables {
               round = Some(contract.payload.round.number),
               validator = None,
               amount = None,
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -98,7 +98,7 @@ object ScanTables extends AcsTables {
               round = Some(contract.payload.round.number),
               validator = None,
               amount = None,
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -110,7 +110,7 @@ object ScanTables extends AcsTables {
               round = None,
               validator = None,
               amount = None,
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider =
                 Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
@@ -123,7 +123,7 @@ object ScanTables extends AcsTables {
               round = None,
               validator = None,
               amount = Some(contract.payload.amount.initialAmount),
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -136,7 +136,7 @@ object ScanTables extends AcsTables {
               round = None,
               validator = None,
               amount = Some(contract.payload.coin.amount.initialAmount),
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -148,7 +148,7 @@ object ScanTables extends AcsTables {
               round = None,
               validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
               amount = None,
-              importCrateReceiverName = None,
+              importCrateReceiver = None,
               featuredAppRightProvider = None,
             )
           }
@@ -160,7 +160,7 @@ object ScanTables extends AcsTables {
               round = None,
               validator = None,
               amount = None,
-              importCrateReceiverName = Some(contract.payload.receiverName),
+              importCrateReceiver = Some(contract.payload.receiver),
               featuredAppRightProvider = None,
             )
           }

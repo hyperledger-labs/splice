@@ -19,34 +19,28 @@ testImportCrates = do
   newApp <- genericSetupApp "new"
   (newOpenRoundCid, _) <- getLatestActiveOpenRound newApp
 
-  newAlice <- allocateParty "newAlice"
-  newAliceXyz <- allocateParty "newAlice::xyz"
+  alice <- allocateParty "alice"
+  wrongAlice <- allocateParty "wrongAlice"
 
-
-  pkg1 <- submit newApp.svc $ createCmd ImportCrate with
+  crate <- submit newApp.svc $ createCmd ImportCrate with
     svc = newApp.svc
-    receiverName = partyToText newAlice
-    exactMatch = True
+    receiver = alice
     payload = coin1
 
-  pkg2 <- submit newApp.svc $ createCmd ImportCrate with
-    svc = newApp.svc
-    receiverName = partyToText newAlice
-    exactMatch = False
-    payload = coin1
-
-  -- exact match is checked
-  submitMultiMustFail [newAliceXyz] [newApp.svc] $ exerciseCmd pkg1 ImportCrate_Receive with
-    receiver = newAliceXyz
+  submitMultiMustFail [wrongAlice] [newApp.svc] $ exerciseCmd crate ImportCrate_Receive with
+    receiver_ = wrongAlice
     openRoundCid = newOpenRoundCid
 
-  submitMulti [newAlice] [newApp.svc] $ exerciseCmd pkg1 ImportCrate_Receive with
-    receiver = newAlice
+  submitMultiMustFail [alice] [newApp.svc] $ exerciseCmd crate ImportCrate_Receive with
+    receiver_ = wrongAlice
     openRoundCid = newOpenRoundCid
 
-  -- this import crate can be received as only the prefix is checked
-  submitMulti [newAliceXyz] [newApp.svc] $ exerciseCmd pkg2 ImportCrate_Receive with
-    receiver = newAliceXyz
+  submitMultiMustFail [wrongAlice] [newApp.svc] $ exerciseCmd crate ImportCrate_Receive with
+    receiver_ = alice
+    openRoundCid = newOpenRoundCid
+
+  submitMulti [alice] [newApp.svc] $ exerciseCmd crate ImportCrate_Receive with
+    receiver_ = alice
     openRoundCid = newOpenRoundCid
 
   -- check import crate and coins of the newApp.svc
@@ -54,9 +48,8 @@ testImportCrates = do
   pkgs === []
 
   -- need to adjust the round of the newAmount, it changes between the initial tap and the reminting
-  let newCoin1 = Coin with svc = newApp.svc; owner = newAlice; amount = coin1.amount
-  let newCoin2 = Coin with svc = newApp.svc; owner = newAliceXyz; amount = coin1.amount
+  let newCoin = Coin with svc = newApp.svc; owner = alice; amount = coin1.amount
   newCoins <- query @Coin newApp.svc
-  map snd newCoins === [newCoin1, newCoin2]
+  map snd newCoins === [newCoin]
 
   pure ()
