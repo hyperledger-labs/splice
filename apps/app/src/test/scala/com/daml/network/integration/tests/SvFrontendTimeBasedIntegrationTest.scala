@@ -28,10 +28,10 @@ class SvFrontendTimeBasedIntegrationTest
     queryResult should not be empty
     inside(queryResult) {
       case Some(queryRow) => {
-        queryRow.childElement(className("general-svc-key-name")).text should matchText(
-          key
-        )
-        queryRow.childElement(className("general-svc-value-name")).text should matchText(value)
+        queryRow.childElement(className("general-svc-key-name")).text should matchText(key)
+        seleniumText(
+          queryRow.childElement(className("general-svc-value-name"))
+        ) should matchText(value)
       }
     }
   }
@@ -44,7 +44,9 @@ class SvFrontendTimeBasedIntegrationTest
         queryRow.childElement(className("general-svc-key-name")).text should matchText(
           key
         )
-        queryRow.childElement(className("general-svc-value-name")).text shouldNot matchText(value)
+        seleniumText(
+          queryRow.childElement(className("general-svc-value-name"))
+        ) shouldNot matchText(value)
       }
     }
   }

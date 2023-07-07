@@ -39,6 +39,7 @@ trait SplitwellFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   def createGroup(groupName: String)(implicit webDriver: WebDriverType) = {
+    waitForQuery(id("group-id-field"))
     click on "group-id-field"
     textField("group-id-field").value = groupName
     click on "create-group-button"

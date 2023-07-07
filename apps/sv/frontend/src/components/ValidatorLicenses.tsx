@@ -75,7 +75,7 @@ const LicenseRow: React.FC<LicenseRowProps> = ({ validator, sponsor, createdAt, 
         <DateDisplay datetime={createdAt.toISOString()} />
       </TableCell>
       <TableCell>
-        {<PartyId partyId={validator} className="validator-licenses-validator" />}
+        <PartyId partyId={validator} className="validator-licenses-validator" />
       </TableCell>
       <TableCell>
         <Stack direction="row" spacing={1}>

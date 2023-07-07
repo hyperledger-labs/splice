@@ -89,17 +89,17 @@ trait FrontendLoginUtil { self: FrontendTestCommon =>
               if (onboardThroughWalletUI) {
                 find(id("onboard-button")).value.text should not be empty
               } else {
-                find(id("logged-in-user")).value.text should not be empty
+                seleniumText(find(id("logged-in-user"))) should not be empty
               },
           )
         }
         val userPartyId = if (onboardThroughWalletUI) {
           actAndCheck("onboard user", click on "onboard-button")(
             "user is onboarded",
-            _ => find(id("logged-in-user")).value.text,
+            _ => seleniumText(find(id("logged-in-user"))),
           )._2
         } else {
-          find(id("logged-in-user")).value.text
+          seleniumText(find(id("logged-in-user")))
         }
 
         afterLoginChecks(user, PartyId.tryFromProtoPrimitive(userPartyId), webDriver)

@@ -212,7 +212,7 @@ class WalletFrontendIntegrationTest
         )(
           "Alice sees her directory entry name",
           _ => {
-            find(id("logged-in-user")).value.text should matchText(entryName)
+            seleniumText(find(id("logged-in-user"))) should matchText(entryName)
           },
         )
 
@@ -223,7 +223,7 @@ class WalletFrontendIntegrationTest
         )(
           "The name is still there",
           _ => {
-            find(id("logged-in-user")).value.text should matchText(entryName)
+            seleniumText(find(id("logged-in-user"))) should matchText(entryName)
           },
         )
       }

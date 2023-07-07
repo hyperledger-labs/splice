@@ -99,8 +99,11 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
 }) => {
   return (
     <TableRow className="subscription-row">
-      <TableCell variant="party" className="sub-receiver">
-        <DirectoryEntry partyId={subscription.subscription.payload.receiver} />
+      <TableCell variant="party">
+        <DirectoryEntry
+          className="sub-receiver"
+          partyId={subscription.subscription.payload.receiver}
+        />
       </TableCell>
       <TableCell variant="party">
         <Service
@@ -135,7 +138,7 @@ const Service: React.FC<{ provider: Party; description: string }> = ({ provider,
       <Typography variant="h6" className="sub-description">
         {description}
       </Typography>
-      <DirectoryEntry partyId={provider} variant="caption" classNames="sub-provider" />
+      <DirectoryEntry partyId={provider} variant="caption" className="sub-provider" />
     </Stack>
   );
 };

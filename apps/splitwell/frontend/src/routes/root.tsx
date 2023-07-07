@@ -26,7 +26,7 @@ const Root: React.FC = () => {
             <Typography variant="h6" sx={{ flexGrow: 1 }} id="app-title">
               CN Splitwell
               {primaryPartyId && (
-                <div id="logged-in-user">
+                <div id="logged-in-user" data-selenium-text={primaryPartyId}>
                   <DirectoryEntryComponent partyId={primaryPartyId} />
                 </div>
               )}

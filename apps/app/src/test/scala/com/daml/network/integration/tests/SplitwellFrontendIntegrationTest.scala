@@ -110,14 +110,15 @@ class SplitwellFrontendIntegrationTest
         eventually() {
           inside(findAll(className("balances-table-row")).toSeq) {
             case Seq(r1, r2) => // Need to sync here on the actual values (size not enough)
-              r1.childElement(className("balances-table-receiver")).text should matchText(
-                aliceParty
-              )
-              r1.childElement(className("balances-table-amount")).text shouldBe "-400.0000000000"
-              r2.childElement(className("balances-table-receiver")).text should matchText(
-                charlieParty
-              )
-              r2.childElement(className("balances-table-amount")).text shouldBe "-111.0000000000"
+              matchRow(
+                Seq("party-id", "balances-table-amount"),
+                Seq(aliceParty, "-400.0000000000"),
+              )(r1)
+
+              matchRow(
+                Seq("party-id", "balances-table-amount"),
+                Seq(charlieParty, "-111.0000000000"),
+              )(r2)
           }
         }
         click on className("settle-my-debts-link")
@@ -130,29 +131,42 @@ class SplitwellFrontendIntegrationTest
         // And then back to splitwell, where he is already logged in
         eventually() {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row1, row2) =>
-            row1.childElement(className("balances-table-receiver")).text should matchText(
-              aliceParty
-            )
-            row1.childElement(className("balances-table-amount")).text shouldBe "0.0000000000"
-            row2.childElement(className("balances-table-receiver")).text should matchText(
-              charlieParty
-            )
-            row2.childElement(className("balances-table-amount")).text shouldBe "0.0000000000"
+            matchRow(
+              Seq("party-id", "balances-table-amount"),
+              Seq(aliceParty, "0.0000000000"),
+            )(row1)
+
+            matchRow(
+              Seq("party-id", "balances-table-amount"),
+              Seq(charlieParty, "0.0000000000"),
+            )(row2)
           }
           val rows = findAll(className("balance-updates-list-item")).toSeq
           rows should have size 4
           // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
-          forExactly(1, rows)(
-            _.text should matchText(s"${bobParty} sent 111.0000000000 CC to ${charlieParty}")
+          forExactly(1, rows)(row =>
+            matchRow(
+              Seq("sender", "description", "receiver"),
+              Seq(bobParty, "sent 111.0000000000 CC to", charlieParty),
+            )(row)
           )
-          forExactly(1, rows)(
-            _.text should matchText(s"${bobParty} sent 400.0000000000 CC to ${aliceParty}")
+          forExactly(1, rows)(row =>
+            matchRow(
+              Seq("sender", "description", "receiver"),
+              Seq(bobParty, "sent 400.0000000000 CC to", aliceParty),
+            )(row)
           )
-          forExactly(1, rows)(
-            _.text should matchText(s"${charlieParty} paid 333.0000000000 CC for Digestivs")
+          forExactly(1, rows)(row =>
+            matchRow(
+              Seq("sender", "description"),
+              Seq(charlieParty, "paid 333.0000000000 CC for Digestivs"),
+            )(row)
           )
-          forExactly(1, rows)(
-            _.text should matchText(s"${aliceParty} paid 1200.0000000000 CC for Team lunch")
+          forExactly(1, rows)(row =>
+            matchRow(
+              Seq("sender", "description"),
+              Seq(aliceParty, "paid 1200.0000000000 CC for Team lunch"),
+            )(row)
           )
         }
       }
@@ -211,13 +225,22 @@ class SplitwellFrontendIntegrationTest
         // And then back to splitwell, where he is already logged in
         eventually(scaled(5 seconds)) {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
-            row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
-            row.childElement(className("balances-table-amount")).text.toDouble shouldBe 0.0
+            matchRow(
+              Seq("directory-entry", "balances-table-amount"),
+              Seq(aliceCns, "0.0000000000"),
+            )(row)
           }
           inside(findAll(className("balance-updates-list-item")).toSeq.sortBy(_.text)) {
             case Seq(row1, row2) =>
-              row1.text should matchText(s"${aliceCns} paid 1000.0000000000 CC for Team lunch")
-              row2.text should matchText(s"${bobCns} sent 500.0000000000 CC to ${aliceCns}")
+              matchRow(
+                Seq("directory-entry", "description"),
+                Seq(aliceCns, "paid 1000.0000000000 CC for Team lunch"),
+              )(row1)
+
+              matchRow(
+                Seq("sender", "description", "receiver"),
+                Seq(bobCns, "sent 500.0000000000 CC to", aliceCns),
+              )(row2)
           }
         }
       }

@@ -35,12 +35,9 @@ class ScanFrontendTimeBasedIntegrationTest
 
   def compareLeaderboardTable(
       resultRowClassName: String,
-      expected: Seq[Seq[String]],
+      expected: Seq[String],
   )(implicit webDriver: WebDriverType) = {
-    findAll(className(resultRowClassName)).toSeq.map(row => {
-      val children = row.findAllChildElements(tagName("td"))
-      children.map(c => c.text).toList
-    }) shouldBe expected
+    findAll(className(resultRowClassName)).toSeq.map(seleniumText) shouldBe expected
   }
 
   "A scan UI" should {
@@ -92,7 +89,7 @@ class ScanFrontendTimeBasedIntegrationTest
         clue("Compare app leaderboard values") {
           compareLeaderboardTable(
             "app-leaderboard-row",
-            Seq(Seq(aliceValidatorWalletParty, "41.5 CC")),
+            Seq(s"${aliceValidatorWalletParty} 41.5 CC"),
           )
         }
 
@@ -109,7 +106,7 @@ class ScanFrontendTimeBasedIntegrationTest
         clue("Compare validator leaderboard values") {
           compareLeaderboardTable(
             "validator-leaderboard-row",
-            Seq(Seq(aliceValidatorWalletParty, "0.083 CC")),
+            Seq(s"${aliceValidatorWalletParty} 0.083 CC"),
           )
         }
       }
@@ -257,8 +254,8 @@ class ScanFrontendTimeBasedIntegrationTest
           compareLeaderboardTable(
             "domain-fees-leaderboard-row",
             Seq(
-              Seq(aliceValidatorWalletParty, "2", "2000000", "1 CC", (firstRound + 1).toString),
-              Seq(bobValidatorWalletParty, "1", "1000000", "0.5 CC", (firstRound + 1).toString),
+              s"${aliceValidatorWalletParty} 2 2000000 1 CC ${(firstRound + 1).toString}",
+              s"${bobValidatorWalletParty} 1 1000000 0.5 CC ${(firstRound + 1).toString}",
             ),
           )
         }

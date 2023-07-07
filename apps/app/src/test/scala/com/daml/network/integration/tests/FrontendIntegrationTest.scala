@@ -297,6 +297,31 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     textField.childElement(className("MuiInputBase-input")).underlying
   )
 
+  protected def seleniumText(elementOpt: Option[Element]): String =
+    elementOpt
+      .map(el => el.attribute("data-selenium-text").getOrElse(el.text))
+      .getOrElse("")
+
+  protected def seleniumText(element: Element): String = seleniumText(Some(element))
+
+  protected def matchRow(
+      dataClassNames: Seq[String],
+      expectedValues: Seq[String],
+  )(row: Element): Unit = {
+    if (dataClassNames.length !== expectedValues.length) {
+      fail("className list must match length of expected value list")
+    } else {
+      dataClassNames
+        .map(name => seleniumText(row.childElement(className(name))))
+        .zip(expectedValues)
+        .foreach({
+          case (dataText, expectedValue) => {
+            dataText should matchText(expectedValue)
+          }
+        })
+    }
+  }
+
   // We override eventually to also retry on StaleElementReferenceException
   // because that’s very common in frontend tests and having
   // each call site try to catch that seems unlikely to be reliable.

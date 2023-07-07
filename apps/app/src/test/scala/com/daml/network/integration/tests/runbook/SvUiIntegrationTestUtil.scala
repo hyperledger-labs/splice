@@ -34,8 +34,8 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
           svInfo.foreach(si =>
             inside(findAll(className("general-svc-value-name")).toSeq.take(2)) {
               case Seq(svUser, svPartyId) =>
-                svUser.text should matchText(si.svUser)
-                svPartyId.text should matchText(si.svParty.toProtoPrimitive)
+                seleniumText(svUser) should matchText(si.svUser)
+                seleniumText(svPartyId) should matchText(si.svParty.toProtoPrimitive)
             }
           )
         },
@@ -60,9 +60,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
                 .map(row =>
                   (PartyId
                     .tryFromProtoPrimitive(
-                      row
-                        .childElement(className("sv-party"))
-                        .text
+                      seleniumText(row.childElement(className("sv-party")))
                     ) -> row.childElement(className("coin-price")).text)
                 )
                 .toMap

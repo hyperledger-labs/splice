@@ -222,23 +222,26 @@ class Validator1PreflightIntegrationTest
       // And then back to splitwell, where he is already logged in
       eventually() {
         inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
-          row.childElement(className("balances-table-receiver")).text should matchText(
-            aliceUserPartyId
-          )
+          seleniumText(
+            row.childElement(className("balances-table-receiver"))
+          ) should matchText(aliceUserPartyId)
+
           row.childElement(className("balances-table-amount")).text.toDouble shouldBe 0.0
         }
         val rows = findAll(className("balance-updates-list-item")).toSeq
         rows should have size 2
         // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
-        forExactly(1, rows)(
-          _.text should matchText(
-            s"${aliceUserPartyId} paid 100.0000000000 CC for Team lunch"
-          )
+        forExactly(1, rows)(row =>
+          matchRow(
+            Seq("sender", "description"),
+            Seq(aliceUserPartyId, "paid 100.0000000000 CC for Team lunch"),
+          )(row)
         )
-        forExactly(1, rows)(
-          _.text should matchText(
-            s"${bobUserPartyId} sent 50.0000000000 CC to ${aliceUserPartyId}"
-          )
+        forExactly(1, rows)(row =>
+          matchRow(
+            Seq("sender", "description", "receiver"),
+            Seq(bobUserPartyId, "sent 50.0000000000 CC to", aliceUserPartyId),
+          )(row)
         )
       }
     }
@@ -347,7 +350,7 @@ class Validator1PreflightIntegrationTest
   private def copyPartyId()(implicit webDriver: WebDriverType): String = {
     clue(s"Copying party ID") {
       find(className("party-id")).fold(throw new Error("Party ID display expected, but not found"))(
-        elm => elm.text
+        elm => seleniumText(elm)
       )
     }
   }

@@ -94,9 +94,9 @@ class WalletTransfersFrontendIntegrationTest
             offerCards should have size (1)
 
             inside(offerCards) { case Seq(offerCard) =>
-              offerCard.childElement(className("transfer-offer-sender")).text should matchText(
-                expectedCns(aliceUserParty, aliceDirectoryName)
-              )
+              seleniumText(
+                offerCard.childElement(className("transfer-offer-sender"))
+              ) should matchText(expectedCns(aliceUserParty, aliceDirectoryName))
 
               offerCard.childElement(className("transfer-offer-cc-amount")).text should matchText(
                 s"+ $transferAmount CC"
@@ -161,9 +161,9 @@ class WalletTransfersFrontendIntegrationTest
           offerCards should have size (1)
 
           inside(offerCards) { case Seq(offerCard) =>
-            offerCard.childElement(className("transfer-offer-sender")).text should matchText(
-              bobDirectoryDisplay
-            )
+            seleniumText(
+              offerCard.childElement(className("transfer-offer-sender"))
+            ) should matchText(bobDirectoryDisplay)
 
             offerCard.childElement(className("transfer-offer-expiry")).text should matchText(
               s"Expires $expectedExpiry"

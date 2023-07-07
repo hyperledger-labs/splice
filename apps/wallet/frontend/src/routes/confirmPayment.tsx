@@ -153,11 +153,11 @@ const SingleRecipientInfo: React.FC<SingleRecipientInfoProps> = ({
         partyId={receiver}
         variant="h5"
         fontWeight="bold"
-        classNames="payment-receiver"
+        className="payment-receiver"
       />
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2">via</Typography>{' '}
-        <DirectoryEntry partyId={provider} variant="body2" classNames="payment-provider" />
+        <DirectoryEntry partyId={provider} variant="body2" className="payment-provider" />
       </Stack>
     </Stack>
   );
@@ -184,7 +184,7 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
       </Typography>
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2">via</Typography>{' '}
-        <DirectoryEntry partyId={provider} variant="body2" classNames="payment-provider" />
+        <DirectoryEntry partyId={provider} variant="body2" className="payment-provider" />
       </Stack>
       <Table>
         <TableBody>
@@ -193,7 +193,7 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
             return (
               <TableRow key={receiver} id={`${receiver}-payment-row`}>
                 <TableCell variant="party">
-                  <DirectoryEntry partyId={receiver} variant="h6" classNames="receiver-entry" />
+                  <DirectoryEntry partyId={receiver} variant="h6" className="receiver-entry" />
                 </TableCell>
                 <TableCell>
                   <Typography variant="h6" className="receiver-amount">

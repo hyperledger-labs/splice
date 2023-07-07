@@ -90,15 +90,20 @@ class SvFrontendIntegrationTest
           _ => {
             val valueCells = findAll(className("general-svc-value-name")).toSeq
             valueCells should have length 9
-            forExactly(1, valueCells)(
-              _.text should matchText(sv1Backend.config.ledgerApiUser)
+            forExactly(1, valueCells)(cell =>
+              seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
             )
-            forExactly(3, valueCells)(
-              _.text should matchText(sv1Backend.getSvcInfo().svParty.toProtoPrimitive)
+            forExactly(3, valueCells)(cell =>
+              seleniumText(cell) should matchText(
+                sv1Backend.getSvcInfo().svParty.toProtoPrimitive
+              )
             )
           },
         )
-        actAndCheck("Click on domain status tab", click on "information-tab-canton-domain-status")(
+        actAndCheck(
+          "Click on domain status tab",
+          click on "information-tab-canton-domain-status",
+        )(
           "Observe sequencer and mediator as active",
           _ => {
             val activeCells = findAll(className("active-value")).toSeq
@@ -156,9 +161,11 @@ class SvFrontendIntegrationTest
               row
             }
             val sponsor =
-              row.childElement(className("validator-licenses-sponsor")).text
+              seleniumText(row.childElement(className("validator-licenses-sponsor")))
+
             val validator =
-              row.childElement(className("validator-licenses-validator")).text
+              seleniumText(row.childElement(className("validator-licenses-validator")))
+
             sponsor shouldBe sv1Backend.getSvcInfo().svParty.toProtoPrimitive
             validator shouldBe newValidatorParty.toProtoPrimitive
           },
@@ -393,7 +400,9 @@ class SvFrontendIntegrationTest
               element.text should matchText("SRARC_RemoveMember")
             }
             inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
-              element.text should matchText(sv1Backend.getSvcInfo().svParty.toProtoPrimitive)
+              seleniumText(element) should matchText(
+                sv1Backend.getSvcInfo().svParty.toProtoPrimitive
+              )
             }
             inside(find(id("vote-request-modal-reason-body"))) { case Some(element) =>
               element.text should matchText(requestReasonBody)
@@ -772,7 +781,7 @@ class SvFrontendIntegrationTest
       coinPrice: String,
   ) = {
     forExactly(1, rows) { row =>
-      row.childElement(className("sv-party")).text shouldBe svParty.toProtoPrimitive
+      seleniumText(row.childElement(className("sv-party"))) shouldBe svParty.toProtoPrimitive
       row.childElement(className("coin-price")).text shouldBe coinPrice
     }
   }

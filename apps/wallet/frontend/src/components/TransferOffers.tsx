@@ -114,7 +114,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
             <DirectoryEntry
               partyId={offer.senderId}
               variant="h5"
-              classNames={'transfer-offer-sender'}
+              className={'transfer-offer-sender'}
             />
           </Stack>
         </Stack>

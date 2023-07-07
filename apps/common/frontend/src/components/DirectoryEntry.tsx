@@ -16,7 +16,7 @@ interface Entry {
 type DirectoryEntryProps = PartyIdProps & TypographyProps;
 
 const DirectoryEntry: React.FC<DirectoryEntryProps> = props => {
-  const { partyId, classNames, noCopy: _, ...typographyProps } = props;
+  const { partyId, className, noCopy: _, ...typographyProps } = props;
   const directoryClient = useDirectoryClient();
 
   const [entry, setParty] = useState<Entry | undefined>(undefined); // undefined state represents the directory lookup still being pending
@@ -38,10 +38,11 @@ const DirectoryEntry: React.FC<DirectoryEntryProps> = props => {
     return (
       <div
         style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}
-        className={classNames}
+        className={`directory-entry ${className}`}
+        data-selenium-text={`${entry.entry.name} (${partyId})`}
       >
         <Tooltip title="Directory Entry" style={{ marginRight: '4px' }}>
-          <div className="dir-entry" style={{ display: 'flex', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
             <Typography {...typographyProps}>{entry.entry.name}</Typography>
           </div>
         </Tooltip>

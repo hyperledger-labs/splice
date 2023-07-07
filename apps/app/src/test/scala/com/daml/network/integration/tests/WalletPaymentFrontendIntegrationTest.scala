@@ -492,7 +492,9 @@ class WalletPaymentFrontendIntegrationTest
       s"Send ${expectedSendAmount._1} ${expectedSendAmount._2} to"
     )
 
-    element.childElement(className("payment-receiver")).text should matchText(expectedReceiver)
+    seleniumText(element.childElement(className("payment-receiver"))) should matchText(
+      expectedReceiver
+    )
   }
 
   private def matchMultipleRecipientPaymentInfo(element: Element)(
@@ -514,7 +516,7 @@ class WalletPaymentFrontendIntegrationTest
     expectedReceivers.foreach {
       case (partyId, expectedReceiver, expectedAmount, expectedConvertedAmount) =>
         val row = element.childElement(id(s"${partyId.toProtoPrimitive}-payment-row"))
-        row.childElement(className("receiver-entry")).text should matchText(
+        seleniumText(row.childElement(className("receiver-entry"))) should matchText(
           expectedCns(partyId, expectedReceiver)
         )
         row.childElement(className("receiver-amount")).text should matchText(expectedAmount)
@@ -537,7 +539,9 @@ class WalletPaymentFrontendIntegrationTest
       tolerance,
     )
 
-    element.childElement(className("payment-provider")).text should matchText(expectedProvider)
+    seleniumText(element.childElement(className("payment-provider"))) should matchText(
+      expectedProvider
+    )
 
     // TODO (#3492): test with fee
     element.childElement(className("payment-total-cc")).text should matchTextMixedWithNumbers(
@@ -573,7 +577,7 @@ class WalletPaymentFrontendIntegrationTest
         coinPrice,
         "Sent",
         "App Payment Accepted",
-        Some(s"Automation via ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
+        Some(s"Automation ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
         expectedLockedAmount,
       )
 
@@ -581,7 +585,7 @@ class WalletPaymentFrontendIntegrationTest
         coinPrice,
         "Sent",
         "App Payment Collected",
-        Some(s"${expectedCns(receiverPartyId, expectedEntryName)} via $provider"),
+        Some(s"${expectedCns(receiverPartyId, expectedEntryName)} $provider"),
         balanceChangeForSender,
       )
     }

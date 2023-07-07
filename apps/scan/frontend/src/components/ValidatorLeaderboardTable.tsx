@@ -1,6 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, ErrorDisplay, Loading, TitledTable } from 'common-frontend';
+import { AmountDisplay, ErrorDisplay, Loading, PartyId, TitledTable } from 'common-frontend';
 import { useGetTopValidatorsByValidatorRewards } from 'common-frontend/scan-api';
 
 import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
@@ -51,8 +51,13 @@ const ValidatorRow: React.FC<{
   totalRewards: BigNumber;
 }> = ({ name, totalRewards }) => {
   return (
-    <TableRow className="validator-leaderboard-row">
-      <TableCell>{name}</TableCell>
+    <TableRow
+      className="validator-leaderboard-row"
+      data-selenium-text={`${name} ${totalRewards} CC`}
+    >
+      <TableCell>
+        <PartyId partyId={name} />
+      </TableCell>
       <TableCell align="right">
         <AmountDisplay amount={totalRewards} currency="CC" />
       </TableCell>

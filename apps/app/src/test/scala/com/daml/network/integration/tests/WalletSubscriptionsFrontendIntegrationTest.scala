@@ -207,11 +207,10 @@ class WalletSubscriptionsFrontendIntegrationTest
       expectedDescription: String,
   ) = {
     val receiver = subscriptionRow.childElement(className("sub-receiver"))
-    // Selenium doesn't see hidden content (and party ids are very long, so are usually hidden)
-    receiver.underlying.getAttribute("textContent") shouldBe expectedReceiver.replaceAll("\\s+", "")
+    seleniumText(receiver) shouldBe expectedReceiver
 
     val provider = subscriptionRow.childElement(className("sub-provider"))
-    provider.underlying.getAttribute("textContent") shouldBe expectedProvider.replaceAll("\\s+", "")
+    seleniumText(provider) shouldBe expectedProvider
 
     subscriptionRow.childElement(className("sub-description")).text should matchText(
       expectedDescription

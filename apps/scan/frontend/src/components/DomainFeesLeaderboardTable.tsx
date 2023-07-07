@@ -64,7 +64,10 @@ const ValidatorRow: React.FC<{
   const { name, numPurchases, totalTrafficPurchased, totalCcSpent, lastPurchasedInRound } =
     validator;
   return (
-    <TableRow className="domain-fees-leaderboard-row">
+    <TableRow
+      className="domain-fees-leaderboard-row"
+      data-selenium-text={`${name} ${numPurchases} ${totalTrafficPurchased} ${totalCcSpent} CC ${lastPurchasedInRound}`}
+    >
       <TableCell>{name}</TableCell>
       <TableCell align="right">{numPurchases}</TableCell>
       <TableCell align="right">{totalTrafficPurchased}</TableCell>

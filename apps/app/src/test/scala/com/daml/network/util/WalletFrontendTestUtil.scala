@@ -58,7 +58,12 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
     FrontendTransaction(
       action = transactionRow.childElement(className("tx-action")).text,
       subtype = transactionRow.childElement(className("tx-subtype")).text.replaceAll("[()]", ""),
-      partyDescription = transactionRow.findChildElement(className("tx-party")).map(_.text),
+      partyDescription = for {
+        senderOrReceiver <- transactionRow
+          .findChildElement(className("sender-or-receiver"))
+          .map(seleniumText)
+        providerId <- transactionRow.findChildElement(className("provider-id")).map(seleniumText)
+      } yield s"${senderOrReceiver} ${providerId}",
       ccAmount = parseAmountText(
         transactionRow
           .childElement(className("tx-amount-cc"))

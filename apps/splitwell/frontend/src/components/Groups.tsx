@@ -137,8 +137,8 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, i
           <TableBody>
             {Array.from(balances).map(([party, balance]) => (
               <TableRow key={party} className="balances-table-row">
-                <TableCell className="balances-table-receiver">
-                  <DirectoryEntryComponent partyId={party} />
+                <TableCell>
+                  <DirectoryEntryComponent className="balances-table-receiver" partyId={party} />
                 </TableCell>
                 <TableCell className="balances-table-amount">{balance}</TableCell>
               </TableRow>
@@ -328,16 +328,21 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
       const value = update.payload.update.value;
       return (
         <ListItem className="balance-updates-list-item">
-          <DirectoryEntryComponent partyId={value.payer} /> paid {value.amount} {'CC for '}
-          {value.description}
+          <DirectoryEntryComponent className="sender" partyId={value.payer} />
+          <span className="description">
+            paid {value.amount} {'CC for '} {value.description}
+          </span>
         </ListItem>
       );
     } else if (update.payload.update.tag === 'Transfer') {
       const value = update.payload.update.value;
       return (
         <ListItem className="balance-updates-list-item">
-          <DirectoryEntryComponent partyId={value.sender} /> sent {value.amount} {'CC to '}
-          <DirectoryEntryComponent partyId={value.receiver} />
+          <DirectoryEntryComponent className="sender" partyId={value.sender} />
+          <span className="description">
+            sent {value.amount} {'CC to '}
+          </span>
+          <DirectoryEntryComponent className="receiver" partyId={value.receiver} />
         </ListItem>
       );
     } else {

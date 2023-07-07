@@ -90,7 +90,7 @@ class WalletFrontendTimeBasedIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
         eventually() {
-          val loggedInUser = find(id("logged-in-user")).value.text.trim
+          val loggedInUser = seleniumText(find(id("logged-in-user")))
           loggedInUser shouldBe entryName
         }
       }
@@ -104,7 +104,7 @@ class WalletFrontendTimeBasedIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
         eventually() {
-          val loggedInUser = find(id("logged-in-user")).value.text.trim
+          val loggedInUser = seleniumText(find(id("logged-in-user")))
           loggedInUser shouldBe alicePartyId.toProtoPrimitive
         }
       }

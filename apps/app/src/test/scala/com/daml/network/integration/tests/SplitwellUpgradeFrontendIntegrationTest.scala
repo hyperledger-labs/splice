@@ -99,10 +99,9 @@ class SplitwellUpgradeFrontendIntegrationTest
 
       def checkSoleBalance(amount: String)(implicit wd: WebDriverType) = eventually() {
         inside(findAll(className("balances-table-row")).toSeq) { case Seq(r1) =>
-          r1.childElement(className("balances-table-receiver")).text should matchText(
-            alice.toProtoPrimitive
+          matchRow(Seq("party-id", "balances-table-amount"), Seq(alice.toProtoPrimitive, amount))(
+            r1
           )
-          r1.childElement(className("balances-table-amount")).text shouldBe amount
         }
       }
 

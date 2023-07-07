@@ -114,7 +114,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               coinPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "App Payment Accepted",
-              expectedPartyDescription = Some(s"Automation via $aliceValidatorParty"),
+              expectedPartyDescription = Some(s"Automation $aliceValidatorParty"),
               expectedAmountCC = BigDecimal("-1.31415"),
             )
             matchTransaction(sent)(
@@ -122,7 +122,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAction = "Sent",
               expectedSubtype = "P2P Payment Completed",
               expectedPartyDescription = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} via $aliceValidatorParty"
+                s"${expectedCns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
               ),
               expectedAmountCC = BigDecimal("-1.18"),
             )
@@ -131,7 +131,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAction = "Received",
               expectedSubtype = "P2P Payment Completed",
               expectedPartyDescription = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} via $aliceValidatorParty"
+                s"${expectedCns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
               ),
               expectedAmountCC = BigDecimal("1.07"),
             )
@@ -141,14 +141,14 @@ class WalletTransactionHistoryFrontendIntegrationTest
               coinPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "Subscription Initial Payment Collected",
-              expectedPartyDescription = Some(s"$directoryExpectedCns via $directoryExpectedCns"),
+              expectedPartyDescription = Some(s"$directoryExpectedCns $directoryExpectedCns"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
             matchTransaction(lockForDirectory)(
               coinPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "Subscription Initial Payment Accepted",
-              expectedPartyDescription = Some(s"Automation via $aliceValidatorParty"),
+              expectedPartyDescription = Some(s"Automation $aliceValidatorParty"),
               expectedAmountCC = BigDecimal("-0.5"), // 1 USD
             )
             matchTransaction(balanceChange)(

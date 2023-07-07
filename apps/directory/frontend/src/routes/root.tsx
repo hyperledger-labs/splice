@@ -94,9 +94,7 @@ const Root: React.FC = () => {
             </Typography>
             {primaryPartyId && (
               // Using a DirectoryEntry here seems a bit circular
-              <div id="logged-in-user">
-                <PartyId partyId={primaryPartyId} />
-              </div>
+              <PartyId partyId={primaryPartyId} id="logged-in-user" />
             )}
 
             <Button color="inherit" onClick={logout} id="logout-button">

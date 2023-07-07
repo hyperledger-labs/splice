@@ -39,6 +39,7 @@ function getInfoTable(title: string, rows: { key: string; value: string; isParty
             <TableCell
               align="left"
               className="general-svc-value-name"
+              data-selenium-text={row.value}
               style={{ wordBreak: row.isParty ? 'normal' : 'break-all' }}
             >
               {row.isParty ? <PartyId partyId={row.value} /> : row.value}

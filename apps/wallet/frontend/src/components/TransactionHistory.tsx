@@ -280,13 +280,37 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
 
   let senderOrReceiver;
   if (transaction.receivers.length === 0) {
-    senderOrReceiver = <Typography variant="body1">Automation</Typography>;
+    senderOrReceiver = (
+      <Typography className="sender-or-receiver" data-selenium-text="Automation" variant="body1">
+        Automation
+      </Typography>
+    );
   } else if (transaction.senderId !== primaryPartyId) {
-    senderOrReceiver = <DirectoryEntry partyId={transaction.senderId} variant="body1" />;
+    senderOrReceiver = (
+      <DirectoryEntry
+        className="sender-or-receiver"
+        partyId={transaction.senderId}
+        variant="body1"
+      />
+    );
   } else if (transaction.receivers.length === 1) {
-    senderOrReceiver = <DirectoryEntry partyId={transaction.receivers[0].party} variant="body1" />;
+    senderOrReceiver = (
+      <DirectoryEntry
+        className="sender-or-receiver"
+        partyId={transaction.receivers[0].party}
+        variant="body1"
+      />
+    );
   } else {
-    senderOrReceiver = <Typography variant="body1">Multiple Recipients</Typography>;
+    senderOrReceiver = (
+      <Typography
+        className="sender-or-receiver"
+        data-selenium-text="Multiple Recipients"
+        variant="body1"
+      >
+        Multiple Recipients
+      </Typography>
+    );
   }
 
   return (
@@ -294,7 +318,11 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
       {senderOrReceiver}
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="caption">via </Typography>
-        <DirectoryEntry partyId={transaction.providerId} variant="caption" />
+        <DirectoryEntry
+          className="provider-id"
+          partyId={transaction.providerId}
+          variant="caption"
+        />
       </Stack>
     </Stack>
   );

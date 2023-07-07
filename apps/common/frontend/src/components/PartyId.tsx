@@ -1,40 +1,51 @@
+import React from 'react';
+
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { Typography, TypographyProps } from '@mui/material';
+import { InputBase, styled } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
 
 export type PartyIdProps = {
   partyId: string;
   noCopy?: boolean;
-  classNames?: string;
-} & TypographyProps;
-const PartyId: React.FC<PartyIdProps> = props => {
-  const { partyId, classNames, noCopy, ...typographyProps } = props;
-  const handleClick = () => navigator.clipboard.writeText(partyId);
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center' }}>
-      <Tooltip title={'Party ID: ' + partyId}>
-        <div
-          style={{
-            display: 'inline-flex',
-            maxWidth: '400px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            fontWeight: 'lighter',
-          }}
-          className={`party-id ${classNames}`}
-        >
-          <Typography {...typographyProps}>{partyId}</Typography>
-        </div>
-      </Tooltip>
-      {!noCopy && (
-        <IconButton onClick={handleClick}>
-          <ContentCopyIcon fontSize={'small'} />
-        </IconButton>
-      )}
-    </div>
-  );
+  className?: string;
+  id?: string;
 };
+
+const PartyId: React.FC<PartyIdProps> = ({ className, id, partyId, noCopy }) => (
+  <div
+    id={id}
+    className={`party-id ${className}`}
+    data-selenium-text={partyId}
+    style={{ display: 'flex', alignItems: 'center' }}
+  >
+    <PartyStyled
+      disabled
+      readOnly
+      value={partyId}
+      endAdornment={
+        !noCopy && (
+          <IconButton onClick={() => navigator.clipboard.writeText(partyId)}>
+            <ContentCopyIcon fontSize={'small'} />
+          </IconButton>
+        )
+      }
+    />
+  </div>
+);
+
+const PartyStyled = styled(InputBase)(({ theme }) => ({
+  '& > .MuiInputBase-input.Mui-disabled': {
+    color: theme.palette.colors.neutral[80],
+    WebkitTextFillColor: theme.palette.colors.neutral[80],
+    backgroundColor: theme.palette.colors.neutral[15],
+    borderRadius: '5px',
+    padding: theme.spacing(1),
+    paddingRight: theme.spacing(0.5),
+    textOverflow: 'ellipsis',
+  },
+  padding: 0,
+  margin: 0,
+  width: '100%',
+}));
 
 export default PartyId;

@@ -51,7 +51,9 @@ class WalletAuth0FrontendIntegrationTest
             )(
               "The user is automatically logged in",
               _ =>
-                find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
+                seleniumText(find(id("logged-in-user"))) should matchText(
+                  userPartyId.toProtoPrimitive
+                ),
             )
             actAndCheck(
               "The user logs out", {

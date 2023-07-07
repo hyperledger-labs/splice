@@ -143,7 +143,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
             if (isInitial)
               "Subscription Initial Payment Collected"
             else "Subscription Payment Collected",
-          expectedPartyDescription = Some(s"$directoryExpectedCns via $directoryExpectedCns"),
+          expectedPartyDescription = Some(s"$directoryExpectedCns $directoryExpectedCns"),
           expectedAmountCC = BigDecimal(0), // 0 USD
         )
         matchTransaction(lockForDirectory)(
@@ -154,7 +154,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
               "Subscription Initial Payment Accepted"
             else "Subscription Payment Accepted",
           expectedPartyDescription =
-            Some(s"Automation via ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
+            Some(s"Automation ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
           expectedAmountCC = BigDecimal("-0.5"), // 1 USD
         )
       }
