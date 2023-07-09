@@ -23,13 +23,12 @@ class SvNodePreflightSvIntegrationTest
       this.getClass.getSimpleName()
     )
 
-  "The SV UI of the node is working as expected" in { env =>
+  "The SV UI of the node is working as expected" in { _ =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
     val svUsername = s"admin@sv.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
-    val votedSvParties = env.svs.remote.map(_.getSvcInfo().svParty)
     withFrontEnd("sv") { implicit webDriver =>
-      testSvUi(svUiUrl, svUsername, svPassword, None, votedSvParties)
+      testSvUi(svUiUrl, svUsername, svPassword, None, Seq())
     }
   }
 

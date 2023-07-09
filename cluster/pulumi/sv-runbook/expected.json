@@ -253,108 +253,11 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "gateway",
-      "compat": "true",
-      "name": "istio-egressgateway",
-      "namespace": "sv",
-      "repositoryOpts": {
-        "repo": "https://istio-release.storage.googleapis.com/charts"
-      },
-      "values": {
-        "service": {
-          "ports": [
-            {
-              "name": "status-port",
-              "port": 15021,
-              "protocol": "TCP",
-              "targetPort": 15021
-            },
-            {
-              "name": "http2",
-              "port": 80,
-              "protocol": "TCP",
-              "targetPort": 80
-            },
-            {
-              "name": "https",
-              "port": 443,
-              "protocol": "TCP",
-              "targetPort": 443
-            },
-            {
-              "name": "grpc-domain",
-              "port": 5008,
-              "protocol": "TCP",
-              "targetPort": 5008
-            },
-            {
-              "name": "cometbft-1",
-              "port": 26656,
-              "protocol": "TCP",
-              "targetPort": 26656
-            },
-            {
-              "name": "cometbft-2",
-              "port": 26666,
-              "protocol": "TCP",
-              "targetPort": 26666
-            },
-            {
-              "name": "cometbft-3",
-              "port": 26676,
-              "protocol": "TCP",
-              "targetPort": 26676
-            },
-            {
-              "name": "cometbft-4",
-              "port": 26686,
-              "protocol": "TCP",
-              "targetPort": 26686
-            },
-            {
-              "name": "cometbft-sv",
-              "port": 26696,
-              "protocol": "TCP",
-              "targetPort": 26696
-            }
-          ],
-          "type": "ClusterIP"
-        }
-      }
-    },
-    "name": "istio-egressgateway",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "enableServerSideApply": "true"
     },
     "name": "k8s",
     "provider": "",
     "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
-      "compat": "true",
-      "name": "loopback",
-      "namespace": "sv",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "svrun"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
-      }
-    },
-    "name": "loopback",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,

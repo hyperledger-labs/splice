@@ -57,7 +57,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     'istio-injection': 'enabled',
   });
 
-  const loopback = installLoopback(svNamespace, CLUSTER_BASENAME, localCharts, version);
+  const loopback =
+    TARGET_CLUSTER === CLUSTER_BASENAME
+      ? installLoopback(svNamespace, CLUSTER_BASENAME, localCharts, version)
+      : null;
 
   const svImagePullDeps = localCharts ? [] : imagePullSecret(svNamespace);
 
@@ -107,12 +110,13 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     participantValuesWithSpecifiedAud,
     localCharts,
     version,
-    svImagePullDeps.concat([
-      postgres,
-      loopback,
-      sv1UserParticipantSecret(svNamespace, auth0Cfg),
-      svKeySecret(svNamespace, SV_PUBLIC_KEY, SV_PRIVATE_KEY),
-    ])
+    svImagePullDeps
+      .concat([
+        postgres,
+        sv1UserParticipantSecret(svNamespace, auth0Cfg),
+        svKeySecret(svNamespace, SV_PUBLIC_KEY, SV_PRIVATE_KEY),
+      ])
+      .concat(loopback !== null ? loopback : [])
   );
 
   const svValues = loadYamlFromFile(
