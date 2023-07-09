@@ -51,7 +51,7 @@ export type ValidatorConfig = {
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     config.participantBootstrapDump
-      ? fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
+      ? await fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
       : undefined;
 
   const dependsOn: pulumi.Resource[] = [

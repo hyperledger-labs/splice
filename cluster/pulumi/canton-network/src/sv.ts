@@ -113,11 +113,12 @@ export type SvConfig = {
   auth0ValidatorAppName: string;
 };
 
-function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
-  return getLatestSvcAcsDumpFile(xns, config).apply(file => ({
+async function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
+  const file = await getLatestSvcAcsDumpFile(xns, config);
+  return {
     path: file.name,
     bucket: config.bucket,
-  }));
+  };
 }
 
 export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> {
@@ -136,7 +137,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     : undefined;
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined = config.bootstrappingDumpConfig
-    ? fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
+    ? await fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
     : undefined;
 
   const dependsOn: pulumi.Resource[] = auth0BackendSecrets

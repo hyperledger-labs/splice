@@ -1,11 +1,9 @@
-import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
-import * as pulumi from '@pulumi/pulumi';
 import { Bucket, File, Storage } from '@google-cloud/storage';
-import { Key } from '@pulumi/gcp/serviceaccount';
-import { Output } from '@pulumi/pulumi';
-import { ExactNamespace } from 'cn-pulumi-common';
+import { ExactNamespace, config } from 'cn-pulumi-common';
 import { exit } from 'process';
+
+const DATA_EXPORT_BUCKET_SA_KEY_JSON = config.require('DATA_EXPORT_BUCKET_SA_KEY_JSON');
 
 export type GcpBucketConfig = {
   projectId: string;
@@ -15,24 +13,14 @@ export type GcpBucketConfig = {
 export type GcpBucket = {
   config: GcpBucketConfig;
   secretName: string;
-  jsonCredentials: Output<string>;
+  jsonCredentials: string;
 };
 
 export function installGcpBucket(config: GcpBucketConfig): GcpBucket {
-  const projectId = config.projectId;
-  const serviceAccountName = `projects/${projectId}/serviceAccounts/da-cn-data-exports@${projectId}.iam.gserviceaccount.com`;
-
-  // Note, creating a new key can fail with a precondition error on an attempt
-  // to create keys beyond the tenth.
-  const key: Key = new gcp.serviceaccount.Key(`gcp-bucket-${process.env.GCP_CLUSTER_BASENAME}`, {
-    serviceAccountId: serviceAccountName,
-    publicKeyType: 'TYPE_X509_PEM_FILE',
-  });
-
   return {
     config: config,
     secretName: `cn-gcp-bucket-${config.projectId}-${config.bucketName}`,
-    jsonCredentials: key.privateKey,
+    jsonCredentials: DATA_EXPORT_BUCKET_SA_KEY_JSON,
   };
 }
 
@@ -52,7 +40,7 @@ export function installGcpBucketSecret(xns: ExactNamespace, bucket: GcpBucket): 
       },
       type: 'Opaque',
       data: {
-        'json-credentials': bucket.jsonCredentials,
+        'json-credentials': Buffer.from(bucket.jsonCredentials, 'utf-8').toString('base64'),
       },
     },
     {
@@ -124,24 +112,21 @@ async function getLatestParticipantIdentityDump(
 export function getLatestSvcAcsDumpFile(
   xns: ExactNamespace,
   config: BootstrappingDumpConfig
-): pulumi.Output<File> {
-  return config.bucket.jsonCredentials.apply(async credentials => {
-    const bucket = getGcpBucket(config.bucket.config, credentials);
-    const file = await getLatestObjectInDateRange(
-      bucket,
-      `${bucketPath(config.cluster, xns)}/svc_acs_dump_`,
-      '.json',
-      config.start,
-      config.end
-    );
-    return file;
-  });
+): Promise<File> {
+  const bucket = getGcpBucket(config.bucket.config, config.bucket.jsonCredentials);
+  return getLatestObjectInDateRange(
+    bucket,
+    `${bucketPath(config.cluster, xns)}/svc_acs_dump_`,
+    '.json',
+    config.start,
+    config.end
+  );
 }
 
 export function installParticipantIdentitySecret(
   xns: ExactNamespace,
   secretName: string,
-  content: Output<string>
+  content: string
 ): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(`cn-app-${xns.logicalName}-${secretName}`, {
     metadata: {
@@ -150,7 +135,7 @@ export function installParticipantIdentitySecret(
     },
     type: 'Opaque',
     data: {
-      content: content.apply(content => Buffer.from(content, 'ascii').toString('base64')),
+      content: Buffer.from(content, 'ascii').toString('base64'),
     },
   });
 }
@@ -164,20 +149,17 @@ export type BootstrappingDumpConfig = {
   end: Date;
 };
 
-export function fetchAndInstallParticipantBootstrapDump(
+export async function fetchAndInstallParticipantBootstrapDump(
   xns: ExactNamespace,
   config: BootstrappingDumpConfig
-): k8s.core.v1.Secret {
-  const dumpContent = config.bucket.jsonCredentials.apply(async credentials => {
-    const bucket = getGcpBucket(config.bucket.config, credentials);
-    const content = await getLatestParticipantIdentityDump(
-      bucket,
-      xns,
-      config.cluster,
-      config.start,
-      config.end
-    );
-    return content;
-  });
-  return installParticipantIdentitySecret(xns, participantBootstrapDumpSecretName, dumpContent);
+): Promise<k8s.core.v1.Secret> {
+  const bucket = getGcpBucket(config.bucket.config, config.bucket.jsonCredentials);
+  const content = await getLatestParticipantIdentityDump(
+    bucket,
+    xns,
+    config.cluster,
+    config.start,
+    config.end
+  );
+  return installParticipantIdentitySecret(xns, participantBootstrapDumpSecretName, content);
 }

@@ -115,6 +115,8 @@ function _cluster_apply() {
 
     _info "Applying Pulumi Stack"
 
+    subcmd_install_data_export_bucket_key
+    _get_data_export_bucket_secret | subcmd_pulumi canton-network config set DATA_EXPORT_BUCKET_SA_KEY_JSON
     subcmd_pulumi canton-network up --yes --skip-preview --show-sames "${args[@]}"
 }
 
@@ -447,64 +449,114 @@ function subcmd_set_machine_type() {
 
 ###
 
-subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
-
-function _get_dns01_secret() {
-    gcloud secrets versions access 1 --secret="${DNS01_SA_KEY_SECRET}"
+function _get_gcloud_secret() {
+  local -r secret_name="$1"
+  gcloud secrets versions access 1 --secret="$secret_name"
 }
 
+function _get_dns01_secret() {
+    _get_gcloud_secret "${DNS01_SA_KEY_SECRET}"
+}
+
+function _get_data_export_bucket_secret() {
+    _get_gcloud_secret "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}"
+}
+
+function _get_service_account_key_id() {
+    local -r secret_name="$1"
+    _get_gcloud_secret "$secret_name" | jq -r '.private_key_id'
+}
+
+subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
+
 function subcmd_get_dns01_key_id() {
-    _get_dns01_secret | jq -r '.private_key_id'
+    _get_service_account_key_id "${DNS01_SA_KEY_SECRET}"
+}
+
+subcommand_whitelist[get_data_export_bucket_key_id]='Get the gcloud service account key id used for dns challenges.'
+
+function subcmd_get_data_export_bucket_key_id() {
+    _get_service_account_key_id "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}"
 }
 
 ###
 
-subcommand_whitelist[install_dns01_key]='Allocate an DNS SA Key for the project and store it in a secret.'
+function _install_service_account_key() {
+    local -r secret_name="$1"
+    local -r iam_account="$2"
 
-function subcmd_install_dns01_key() {
-    _prompt_to_confirm --no-lock
-
-    SECRET=$(gcloud secrets list --filter "name:${DNS01_SA_KEY_SECRET}" --format 'value(name)')
+    SECRET=$(gcloud secrets list --filter "name:$secret_name" --format 'value(name)')
 
     if [ -z "${SECRET}" ]; then
         _info "Allocating service account key and storing as secret."
         gcloud iam service-accounts keys create /tmp/key.json \
-               --iam-account "${DNS01_SA_IAM_ACCOUNT}"
+               --iam-account "$iam_account"
 
-        gcloud secrets create "${DNS01_SA_KEY_SECRET}" --data-file=/tmp/key.json
+        gcloud secrets create "$secret_name" --data-file=/tmp/key.json
 
         rm /tmp/key.json
     else
-        SA_KEY_ID=$(subcmd_get_dns01_key_id)
+        SA_KEY_ID=$(_get_service_account_key_id "$secret_name")
 
-        _info "DNS Service Account key secret already exists: ${SA_KEY_ID}"
+        _info "Service Account key secret already exists: ${SA_KEY_ID}"
     fi
 }
+
+subcommand_whitelist[install_dns01_key]='Allocate a DNS SA Key for the project and store it in a secret.'
+
+function subcmd_install_dns01_key() {
+    _prompt_to_confirm --no-lock
+
+    _install_service_account_key "${DNS01_SA_KEY_SECRET}" "${DNS01_SA_IAM_ACCOUNT}"
+}
+
+subcommand_whitelist[install_data_export_bucket_key]='Allocate a data export key for the project and store it in a secret.'
+
+function subcmd_install_data_export_bucket_key() {
+    _prompt_to_confirm --no-lock
+
+    _install_service_account_key "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}" "${DATA_EXPORT_BUCKET_SA_IAM_ACCOUNT}"
+}
 ###
+
+function _uninstall_service_account_key() {
+    local -r secret_name="$1"
+    local -r iam_account="$2"
+
+    SECRET=$(gcloud secrets list --filter "name:$secret_name" --format 'value(name)')
+
+    if [ -z "${SECRET}" ]; then
+        _warning "No service account key secret to delete."
+    else
+        SA_KEY_ID=$(_get_service_account_key_id "$secret_name")
+
+        _info "Deleting SA Key: ${SA_KEY_ID}"
+
+        gcloud iam service-accounts keys delete \
+               --iam-account "$iam_account" \
+               --quiet \
+               "${SA_KEY_ID}" || true
+
+        gcloud secrets delete --quiet "$secret_name"
+
+        _info "Service account key deleted."
+    fi
+}
 
 subcommand_whitelist[uninstall_dns01_key]='Delete the DNS SA Key for the project and the corresponding secret'
 
 function subcmd_uninstall_dns01_key() {
     _prompt_to_confirm --no-lock
 
-    SECRET=$(gcloud secrets list --filter "name:${DNS01_SA_KEY_SECRET}" --format 'value(name)')
+    _uninstall_service_account_key "${DNS01_SA_KEY_SECRET}" "${DNS01_SA_IAM_ACCOUNT}"
+}
 
-    if [ -z "${SECRET}" ]; then
-        _warning "No service account key secret to delete."
-    else
-        SA_KEY_ID=$(subcmd_get_dns01_key_id)
+subcommand_whitelist[uninstall_data_export_bucket_key]='Delete the data export key for the project and the corresponding secret'
 
-        _info "Deleting SA Key: ${SA_KEY_ID}"
+function subcmd_uninstall_data_export_bucket_key() {
+    _prompt_to_confirm --no-lock
 
-        gcloud iam service-accounts keys delete \
-               --iam-account "${DNS01_SA_IAM_ACCOUNT}" \
-               --quiet \
-               "${SA_KEY_ID}" || true
-
-        gcloud secrets delete --quiet "${DNS01_SA_KEY_SECRET}"
-
-        _info "Service account key deleted."
-    fi
+    _uninstall_service_account_key "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}" "${DATA_EXPORT_BUCKET_SA_IAM_ACCOUNT}"
 }
 
 ###
@@ -518,7 +570,7 @@ function subcmd_infra_up() {
 
     _uses_pulumi_stack infra
 
-    _get_dns01_secret | subcmd_pulumi infra config set DNA01_SA_KEY_JSON
+    _get_dns01_secret | subcmd_pulumi infra config set DNS01_SA_KEY_JSON
     subcmd_pulumi infra config set CLUSTER_BASENAME "${GCP_CLUSTER_BASENAME}"
 
     subcmd_pulumi infra up --yes --skip-preview
@@ -1039,6 +1091,9 @@ function subcmd_apply() {
     else
         args+=(-c "FIXED_TOKENS=0")
     fi
+
+    subcmd_install_data_export_bucket_key
+    _get_data_export_bucket_secret | subcmd_pulumi canton-network config set DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     if [ -n "${preview:-}" ]; then
         _info "Previewing apply."
