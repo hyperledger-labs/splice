@@ -15,6 +15,11 @@ Release Notes
     * The secrets ``cn-app-sv1-validator-ledger-api-auth`` and ``cn-app-sv1-ledger-api-auth`` are no longer required.
     * The participant now requests 4 CPUs to improve behavior under load.
 
+* Frontend updates:
+
+  * Total coin balance in Scan UI now shows real data from the backend, and also reflects data from network inception and not only from the point the specific backend was created.
+    Note that this holds only for total coin balance for now, not for all data in the Scan UI.
+
 2023-07-02
 ----------
 

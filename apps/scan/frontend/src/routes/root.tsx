@@ -7,6 +7,7 @@ import { Grid, Tab, Tabs, Typography, Box } from '@mui/material';
 import AmountSummary from '../components/AmountSummary';
 import Header from '../components/Header';
 import NetworkInfo from '../components/NetworkInfo';
+import TotalCoinBalance from '../components/TotalCoinBalance';
 
 const Root: React.FC = () => {
   const navLinks = [
@@ -20,7 +21,6 @@ const Root: React.FC = () => {
   const currentPath = useLocation().pathname;
   const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];
 
-  const totalCoinBalance = BigNumber(1234567.324567523); // mock data
   const totalRewardsIssued = BigNumber(1234567.324567523); // mock data
 
   return (
@@ -36,7 +36,7 @@ const Root: React.FC = () => {
       </Grid>
 
       <Grid item xs={12} lg={6}>
-        <AmountSummary title="Total Coin Balance" amount={totalCoinBalance} />
+        <TotalCoinBalance />
       </Grid>
 
       <Grid item xs={12} lg={6}>

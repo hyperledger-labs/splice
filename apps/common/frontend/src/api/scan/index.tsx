@@ -7,6 +7,7 @@ import useGetTopValidatorsByPurchasedTraffic from './useGetTopValidatorsByPurcha
 import useGetTopValidatorsByValidatorRewards from './useGetTopValidatorsByValidatorRewards';
 import useLookupFeaturedAppRight from './useLookupFeaturedAppRight';
 import useTopAppProviders from './useTopAppProviders';
+import useTotalCoinBalance from './useTotalCoinBalance';
 
 export {
   ScanClientProvider,
@@ -18,4 +19,5 @@ export {
   useGetTopValidatorsByPurchasedTraffic,
   useLookupFeaturedAppRight,
   useTopAppProviders,
+  useTotalCoinBalance,
 };

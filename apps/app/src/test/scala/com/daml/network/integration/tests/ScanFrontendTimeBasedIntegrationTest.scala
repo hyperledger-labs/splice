@@ -261,5 +261,47 @@ class ScanFrontendTimeBasedIntegrationTest
         }
       }
     }
+
+    "See expected total coin balance" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val firstRound = sv1ScanBackend
+        .getLatestOpenMiningRound(env.environment.clock.now)
+        .contract
+        .payload
+        .round
+        .number
+
+      advanceRoundsByOneTick
+      aliceWalletClient.tap(100.0)
+
+      actAndCheck(
+        "Advance rounds",
+        (0 to 4).foreach(_ => advanceRoundsByOneTick),
+      )(
+        "Wait for round to close in scan",
+        _ => sv1ScanBackend.getRoundOfLatestData()._1 shouldBe (firstRound + 1),
+      )
+      // We do not check the backend computation here, nor do we want to rely on the exact coin balance created in other tests,
+      // so here we simply test that:
+      // The total balance increased as a result of our tap by the tap amount minus some amount to account for holding fees
+      // The frontend shows the balance from the backend
+      sv1ScanBackend.getTotalCoinBalance(firstRound + 1) should
+        (be > (sv1ScanBackend.getTotalCoinBalance(firstRound) + 99.0))
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to Scan UI main page",
+          go to "http://localhost:3006",
+        )(
+          "See valid total coin balance",
+          _ => {
+            screenshot()
+            seleniumText(find(id("total-coin-balance-cc"))) should matchText(
+              s"${sv1ScanBackend.getTotalCoinBalance(firstRound + 1)} CC"
+            )
+          },
+        )
+      }
+    }
   }
 }
