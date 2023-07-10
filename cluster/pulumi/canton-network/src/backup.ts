@@ -52,7 +52,7 @@ export function installGcpBucketSecret(xns: ExactNamespace, bucket: GcpBucket): 
 function getGcpBucket(bucketConfig: GcpBucketConfig, credentials: string): Bucket {
   const storage: Storage = new Storage({
     projectId: bucketConfig.projectId,
-    credentials: JSON.parse(Buffer.from(credentials, 'base64').toString('ascii')),
+    credentials: JSON.parse(credentials),
   });
   return storage.bucket(bucketConfig.bucketName);
 }
