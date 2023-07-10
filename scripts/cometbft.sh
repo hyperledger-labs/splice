@@ -3,7 +3,6 @@
 set -eou pipefail
 
 DOCKER_COMETBFT_CONTAINER_NAME="cometbft-for-cn-node"
-REPO_ROOT=$( git rev-parse --show-toplevel )
 DOCKER_COMEBFT_NETWORK_NAME="cometbft-for-cn-node"
 
 function create_docker_network() {
@@ -34,8 +33,7 @@ function docker_start() {
   docker cp "${cometbft_config_path}/sv${container_sv_index}/config" "$current_container_name:/cometbft/"
   docker cp "${cometbft_config_path}/sv${container_sv_index}/data" "$current_container_name:/cometbft/"
   docker start "$current_container_name"
-  mkdir -p "$REPO_ROOT/log"
-  docker logs -f "$current_container_name" > "$REPO_ROOT/log/$current_container_name.log" &
+  docker logs -f "$current_container_name" > "$LOGS_PATH/$current_container_name.log" &
 }
 
 function docker_stop() {

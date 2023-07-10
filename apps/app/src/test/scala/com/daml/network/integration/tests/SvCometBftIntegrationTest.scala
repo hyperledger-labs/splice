@@ -18,7 +18,7 @@ import scala.concurrent.duration.*
 
 class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
 
-  registerPlugin(new CometBftNetworkPlugin(NamedLoggerFactory.root))
+  registerPlugin(new CometBftNetworkPlugin("sv_cometbft_integration_test", NamedLoggerFactory.root))
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

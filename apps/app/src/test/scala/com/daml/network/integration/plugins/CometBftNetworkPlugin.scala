@@ -19,7 +19,8 @@ import scala.collection.concurrent.TrieMap
   * The CometBFT container belonging to SV1  is always started as it's the founder member in the genesis.json file
   */
 class CometBftNetworkPlugin(
-    protected val loggerFactory: NamedLoggerFactory
+    identifier: String,
+    protected val loggerFactory: NamedLoggerFactory,
 ) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] {
 
   private val runningContainers = new TrieMap[CometBftConnectionConfig, CometBftContainer]()
@@ -44,7 +45,7 @@ class CometBftNetworkPlugin(
   }
 
   def startNewCometBftContainer(id: String, network: Network): CometBftConnectionConfig = {
-    val container = new CometBftContainer(CometBftContainer.SvNetwork(id))
+    val container = new CometBftContainer(identifier, CometBftContainer.SvNetwork(id))
     container.initialize(network.some)
     logger.info(
       s"Started new CometBft container on IP ${container.getIp} and port ${container.getPort}"
