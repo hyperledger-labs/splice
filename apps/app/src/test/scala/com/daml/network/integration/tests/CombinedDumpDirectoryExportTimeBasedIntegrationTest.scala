@@ -5,7 +5,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.ParticipantIdentitiesDump
 
 final class CombinedDumpDirectoryExportTimeBasedIntegrationTest
-    extends AcsStoreDumpTriggerExportTimeBasedIntegrationTestBase[BackupDumpConfig.Directory] {
+    extends AcsStoreDumpExportTimeBasedIntegrationTestBase[BackupDumpConfig.Directory] {
   override def acsStoreDumpConfig(testContext: String) =
     BackupDumpConfig.Directory(
       AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir,
