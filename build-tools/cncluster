@@ -181,6 +181,50 @@ function _uses_pulumi_stack() {
             stack init 2> /dev/null || true
 }
 
+function _retry_until_value() {
+    local -r cmd="${1-}"
+    local -r msg="${2-}"
+    local -r expected="${3-}"
+    local -r is_regex="${4-}"
+
+    if [ -z "$cmd" ] || [ -z "$expected" ]; then
+        _error "Missing command or expected value in _retry_until_value"
+        exit 1
+    fi
+
+    local -i -r max_retries=$((12*30)) # with 5 second sleep, this is roughly 30 minutes
+    local -i num_retries=0
+
+    _log "Running command with retry (until $expected): $cmd"
+
+    function is_expected() {
+        local -r found="${1-}"
+        if [ -z "$is_regex" ]; then
+            if [ "$found" == "$expected" ]; then
+                true
+            else
+                _log "Waiting for $msg (found: \"$found\", expecting: \"$expected\")"
+                false
+            fi
+        else
+            if [[ "$found" =~ $expected ]]; then
+                true
+            else
+                _log "Waiting for $msg (found: \"$found\", expecting regex: \"$expected\")"
+                false
+            fi
+        fi
+    }
+
+    until found=$($cmd 2>&1 || true) && (is_expected "$found"); do
+        ((num_retries++)) && ((num_retries>max_retries)) && echo "Too many attempts, exiting" && exit 1
+        sleep 5
+    done
+
+    ret=$found
+}
+
+
 ### Cluster management
 
 
@@ -946,13 +990,50 @@ function subcmd_pods() {
 
 ###
 
+subcommand_whitelist[wait_version]="Wait for the cluster's version endpoint to return a specific version"
+
+function subcmd_wait_version() {
+    _cluster_show
+
+    expected="${1-}"
+
+    if [ -z "$expected" ]; then
+        _error "Missing expected version"
+        exit 1
+    fi
+
+    _retry_until_value "curl -sL http://${GCP_CLUSTER_BASENAME}.network.canton.global/version" "expected version" "$expected"
+
+    _log "Done. Cluster is now reporting version: $expected"
+}
+
+###
+
 subcommand_whitelist[wait]='Wait for the cluster to reach a fully ready state'
 
 function subcmd_wait() {
     _cluster_show
 
-    _log "Waiting for all pods to become ready"
-    kubectl wait --for=condition=Ready --all pod --timeout=5m --all-namespaces
+    namespace="${1-}"
+    app="${2-}"
+
+    if [ -z "$namespace" ]; then
+        _log "Waiting for all pods to become ready"
+        kubectl wait --for=condition=Ready --all pod --timeout=5m --all-namespaces
+    else
+        _retry_until_value "kubectl get ns $namespace -o jsonpath='{.status.phase}'" "namespace $namespace to be active" "'Active'"
+        if [ -z "$app" ]; then
+            _log "Namespace $namespace ready, waiting for all pods"
+            kubectl wait --for=condition=Ready --all pod --timeout=5m --namespace "$namespace"
+        else
+            _log "Namespace $namespace ready, waiting for $app"
+            _retry_until_value "kubectl get pods --selector=app=$app -n $namespace -o name" "pod for app $app" ^"pod" 1
+            pod=$ret
+            _log "Pod $pod found, waiting for ready state"
+            kubectl wait --for=condition=Ready --timeout=5m --namespace "$namespace" "$pod"
+            _log "Pod $pod ready"
+        fi
+    fi
 }
 
 ###
