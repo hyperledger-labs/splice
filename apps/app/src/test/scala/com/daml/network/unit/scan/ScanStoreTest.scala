@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
+  coinimport as coinimportCodegen,
   fees as feesCodegen,
   round as roundCodegen,
   schedule as scheduleCodegen,
@@ -151,6 +152,39 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext {
         }
       }
     }
+
+    "return correct total coin balance for the import crates" in {
+      val coinRound1Amount = 77.0
+      val coinRound2Amount = 88.0
+      val round1 = 1L
+      val round2 = 2L
+
+      def importCrateForRound(store: ScanStore, amount: BigDecimal, round: Long) =
+        dummyDomain.create(
+          mkImportCrateContract(svcParty, user1, mkCoin(user1, amount, round, holdingFee))
+        )(
+          store.multiDomainAcsStore
+        )
+
+      for {
+        store <- mkStore(user1)
+        _ <- importCrateForRound(store, coinRound1Amount, round1)
+        _ <- importCrateForRound(store, coinRound2Amount, round2)
+      } yield {
+        eventually() {
+          store
+            .getTotalCoinBalance(round1)
+            .futureValue shouldBe (coinRound1Amount - round1 * holdingFee)
+          val changeToRound1AsOfRound0 = holdingFee * round1
+          val changeToRound2AsOfRound0 = holdingFee * round2
+          val holdingFeesEndRound2 = holdingFee * round2 + 1
+          store.getTotalCoinBalance(round2).futureValue shouldBe (
+            coinRound1Amount + changeToRound1AsOfRound0 - holdingFeesEndRound2 +
+              coinRound2Amount + changeToRound2AsOfRound0 - holdingFeesEndRound2
+          )
+        }
+      }
+    }
   }
 
   private val user1 = userParty(1)
@@ -227,6 +261,45 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext {
       payload = template,
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  private def mkCoin(
+      owner: PartyId,
+      amount: BigDecimal,
+      createdAt: Long,
+      ratePerRound: BigDecimal,
+  ) = {
+    new coinCodegen.Coin(
+      svcParty.toProtoPrimitive,
+      owner.toProtoPrimitive,
+      new feesCodegen.ExpiringAmount(
+        amount.bigDecimal,
+        new ccApiCodegen.round.Round(createdAt),
+        new feesCodegen.RatePerRound(ratePerRound.bigDecimal),
+      ),
+    )
+  }
+
+  private def mkImportCrateContract(svc: PartyId, receiver: PartyId, coin: coinCodegen.Coin) = {
+    val templateId = coinimportCodegen.ImportCrate.TEMPLATE_ID
+    val template = mkImportCrate(svc, receiver, coin)
+    Contract(
+      identifier = templateId,
+      contractId = new coinimportCodegen.ImportCrate.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  private def mkImportCrate(svc: PartyId, receiver: PartyId, coin: coinCodegen.Coin) = {
+    new coinimportCodegen.ImportCrate(
+      svc.toProtoPrimitive,
+      receiver.toProtoPrimitive,
+      new coinimportCodegen.importpayload.IP_Coin(
+        coin
+      ),
     )
   }
 
