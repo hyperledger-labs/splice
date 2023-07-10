@@ -19,6 +19,12 @@ if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
+const approveSvRunbook =
+  process.env.APPROVE_SV_RUNBOOK !== undefined && process.env.APPROVE_SV_RUNBOOK !== '';
+if (approveSvRunbook) {
+  console.error('Approving SV used in SV runbook');
+}
+
 const doubleSv = (process.env.DOUBLE_SV !== undefined && process.env.DOUBLE_SV !== '') || !isDevNet;
 if (doubleSv) {
   console.error('Launching with a double SV');
@@ -99,16 +105,19 @@ const sv34ApprovedSvIdentities = [
   },
 ];
 
+const svRunbookApprovedSvIdentities = [
+  {
+    name: 'DA-Helm-Test-Node',
+    publicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==',
+  },
+];
+
 const additionalDevNetApprovedSvIdentities = [
   {
     name: 'DA-Test-Node',
     publicKey:
       'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA==',
-  },
-  {
-    name: 'DA-Helm-Test-Node',
-    publicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==',
   },
   // Jean Safar (CX)
   {
@@ -125,6 +134,7 @@ const additionalDevNetApprovedSvIdentities = [
 ];
 
 const approvedSvIdentities = nonDevNetApprovedSvIdentities
+  .concat(isDevNet || approveSvRunbook ? svRunbookApprovedSvIdentities : [])
   .concat(isDevNet ? additionalDevNetApprovedSvIdentities : [])
   .concat(doubleSv ? [] : sv34ApprovedSvIdentities);
 
