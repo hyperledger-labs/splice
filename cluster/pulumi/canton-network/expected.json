@@ -1976,7 +1976,17 @@
             "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
-        ]
+        ],
+        "resources": {
+          "limits": {
+            "cpu": 4,
+            "memory": "4Gi"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "1Gi"
+          }
+        }
       }
     },
     "name": "helm-sv-1-sv-1-cometbft",
@@ -2715,7 +2725,17 @@
             "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
-        ]
+        ],
+        "resources": {
+          "limits": {
+            "cpu": 4,
+            "memory": "4Gi"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "1Gi"
+          }
+        }
       }
     },
     "name": "helm-sv-2-sv-2-cometbft",
@@ -3361,7 +3381,17 @@
             "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
-        ]
+        ],
+        "resources": {
+          "limits": {
+            "cpu": 4,
+            "memory": "4Gi"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "1Gi"
+          }
+        }
       }
     },
     "name": "helm-sv-3-sv-3-cometbft",
@@ -4007,7 +4037,17 @@
             "externalAddress": "cometbft-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           }
-        ]
+        ],
+        "resources": {
+          "limits": {
+            "cpu": 4,
+            "memory": "4Gi"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "1Gi"
+          }
+        }
       }
     },
     "name": "helm-sv-4-sv-4-cometbft",
