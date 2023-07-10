@@ -103,7 +103,7 @@ const Root: React.FC = () => {
           </Toolbar>
         </Box>
         {/* no need to show the app if it won't be usable. Creating DirectoryInstall should be fast. */}
-        {content}
+        {directoryInstall.data ? content : <Loading />}
       </Box>
     </ErrorBoundary>
   );
