@@ -630,7 +630,19 @@ commands:
             # The tests run command wants to invoke the test runner for each test. That doesn't work for us.
             # However, what we do instead is we just print the tests it wants to run into a file and pass
             # that content then to sbt ...
-            cat << parameters.test_names_file >> | circleci tests run --command "xargs ./.circleci/grab-tests.sh" $extraargs --split-by=timings --test-selector=classname --time-default=5m
+            n=0
+            MAX_RETRY=5
+            until [ $n -gt $MAX_RETRY ]; do
+              cat << parameters.test_names_file >> | circleci tests run --command "xargs ./.circleci/grab-tests.sh" $extraargs --split-by=timings --test-selector=classname --time-default=5m && break
+              n=$[$n+1]
+              sleep 10
+            done
+
+            if [ $n -gt $MAX_RETRY ]; then
+              echo "Exceeded maximum retries, no more attempts" >&2
+              exit 1
+            fi
+
 
             # if we are re-running but don't have anything todo, then the file won't be there and we can halt
             if [ -e tests-to-run.txt ]; then
