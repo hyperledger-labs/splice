@@ -855,7 +855,7 @@ if the SV is the SVC founder, also the SVC party.
 participantAdminUserNameFrom:
   secretKeyRef:
     key: ledger-api-user
-    name: cn-app-sv1-ledger-api-auth
+    name: cn-app-sv-ledger-api-auth
     optional: false
 ```
 

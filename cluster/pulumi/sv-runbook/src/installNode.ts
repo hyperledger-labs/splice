@@ -19,7 +19,6 @@ import {
   svDirectoryUiSecret,
   imagePullSecret,
   imagePullSecretByNamespaceName,
-  sv1UserParticipantSecret,
   svKeySecret,
   participantBootstrapDumpSecret,
 } from './secrets';
@@ -103,6 +102,11 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     disableAutoInit: !!participantIdentitySecret,
   };
 
+  const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
+    svNamespace,
+    auth0Client
+  );
+
   const participant = installCNSVHelmChart(
     svNamespace,
     'participant',
@@ -111,11 +115,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     localCharts,
     version,
     svImagePullDeps
-      .concat([
-        postgres,
-        sv1UserParticipantSecret(svNamespace, auth0Cfg),
-        svKeySecret(svNamespace, SV_PUBLIC_KEY, SV_PRIVATE_KEY),
-      ])
+      .concat([postgres, svAppSecret, svKeySecret(svNamespace, SV_PUBLIC_KEY, SV_PRIVATE_KEY)])
       .concat(loopback !== null ? loopback : [])
   );
 
@@ -150,11 +150,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     ...svValuesWithSpecifiedAud,
     ...fixedTokensValue,
   };
-
-  const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
-    svNamespace,
-    auth0Client
-  );
 
   const sv = installCNSVHelmChart(
     svNamespace,

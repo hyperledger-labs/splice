@@ -292,14 +292,7 @@ Configuring Authentication on your SV Node
 We are now going to configure your SV node software based on the OIDC provider configuration values your exported to environment variables at the end of either :ref:`helm-sv-auth-requirements` or :ref:`helm-sv-auth0`.
 (Note that some authentication-related configuration steps are also included in :ref:`helm-sv-install`.)
 
-The following two kubernetes secrets will instruct the participant to create service users for your validator and SV apps:
-
-.. code-block:: bash
-
-    kubectl create --namespace sv secret generic cn-app-sv1-ledger-api-auth \
-        "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients"
-
-The SV app is configured with a secret as follows:
+The following kubernetes secret will instruct the participant to create a service user for your SV app:
 
 .. code-block:: bash
 
@@ -309,7 +302,6 @@ The SV app is configured with a secret as follows:
         "--from-literal=client-id=${SV_CLIENT_ID}" \
         "--from-literal=client-secret=${SV_CLIENT_SECRET}"
         "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}" # It is optional. uncomment it if you want to set audience for ledger API
-
 
 The validator app backend requires the following secret.
 

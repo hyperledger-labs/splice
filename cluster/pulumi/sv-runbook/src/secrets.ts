@@ -3,41 +3,15 @@ import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs/promises';
 import {
   Auth0Client,
-  Auth0Config,
   ExactNamespace,
   installAuth0Secret,
   installAuth0UiSecretWithClientId,
-  requireAuth0ClientId,
   requireEnv,
 } from 'cn-pulumi-common';
 
 const walletUIClientId = 'l9MS11POtbvPaVvgzns3Tdj9IDnosLwl';
 const svUIClientId = '8S8o4U6OYWWuw5vPCIpFQGzzWM2IpHkx';
 const directoryClientId = 'iwZgud30aDMMUYpZc5caSnjNATWwITzp';
-
-function participantSecret(
-  ns: ExactNamespace,
-  appName: string,
-  appAuth0ClientId: string
-): k8s.core.v1.Secret {
-  const secretName = 'cn-app-' + appName + '-ledger-api-auth';
-  return new k8s.core.v1.Secret(
-    secretName,
-    {
-      metadata: {
-        name: secretName,
-        namespace: ns.logicalName,
-      },
-      type: 'Opaque',
-      data: {
-        'ledger-api-user': btoa(appAuth0ClientId + '@clients'),
-      },
-    },
-    {
-      dependsOn: [ns.ns],
-    }
-  );
-}
 
 function uiSecret(
   auth0Client: Auth0Client,
@@ -95,13 +69,6 @@ export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
 
 export function imagePullSecret(ns: ExactNamespace): pulumi.Resource[] {
   return imagePullSecretByNamespaceName(ns.logicalName);
-}
-
-export function sv1UserParticipantSecret(
-  ns: ExactNamespace,
-  auth0Cfg: Auth0Config
-): k8s.core.v1.Secret {
-  return participantSecret(ns, 'sv1', requireAuth0ClientId(auth0Cfg.appToClientId, 'sv'));
 }
 
 type AppAndUiSecrets = {
