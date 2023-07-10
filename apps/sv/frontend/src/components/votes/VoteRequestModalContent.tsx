@@ -5,21 +5,21 @@ import {
   PartyId,
   SvClientProvider,
 } from 'common-frontend';
-import React, { ReactElement, useCallback } from 'react';
+import React, { ReactElement, useCallback, useEffect } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';
 import ClearIcon from '@mui/icons-material/Clear';
 import {
   CardContent,
+  Link,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
+  TableHead,
   TableRow,
   Typography,
-  TableHead,
-  Link,
 } from '@mui/material';
 
 import { ContractId, Party } from '@daml/types';
@@ -35,11 +35,23 @@ import ActionView from './actions/views/ActionView';
 
 interface VoteRequestModalProps {
   voteRequestContractId?: ContractId<VoteRequest>;
+  handleClose: () => void;
 }
 
-const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({ voteRequestContractId }) => {
+const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
+  voteRequestContractId,
+  handleClose,
+}) => {
   const voteRequestQuery = useVoteRequest(voteRequestContractId);
+
   const votesQuery = useListVotes(voteRequestContractId ? [voteRequestContractId] : []);
+
+  // allVotes being empty means that the vote request has been executed, as the initiator of the request must vote on his proposition. Therefore, we can close the modal.
+  useEffect(() => {
+    if (votesQuery.data!.length === 0) {
+      handleClose();
+    }
+  }, [votesQuery, handleClose]);
 
   const svcInfosQuery = useSvcInfos();
   const svPartyId = svcInfosQuery.data?.svPartyId;

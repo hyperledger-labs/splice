@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.svcrules.VoteRequest
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -770,6 +771,126 @@ class SvFrontendIntegrationTest
             },
           )
         }
+
+    }
+
+    "close the modal if the last required voter accepts a vote request" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "sv1 operator can login and browse to the governance tab", {
+            go to s"http://localhost:$sv1Port/votes"
+            loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+          },
+        )(
+          "sv1 can see the create vote request button",
+          _ => {
+            find(id("create-voterequest-submit-button")) should not be empty
+          },
+        )
+
+        actAndCheck(
+          "sv1 operator can create a new vote request", {
+            val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+            dropDownAction.selectByValue("SRARC_RemoveMember")
+
+            val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
+            dropDownMember.selectByIndex(3)
+
+            click on "create-voterequest-submit-button"
+          },
+        )(
+          "sv1 can see the new vote request",
+          _ => {
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            inside(tbody) { case Some(tb) =>
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              (
+                rows.head.childElement(className("vote-row-action")).text,
+                rows.head.childElement(className("vote-row-requester")).text,
+              )
+            }
+          },
+        )
+
+        val (_, requestId) = actAndCheck(
+          "sv1 operator can see the vote request detail by clicking review button", {
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            inside(tbody) { case Some(tb) =>
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              val reviewButton = rows.head
+                .childElement(className("vote-row-review"))
+                .childElement(className("vote-row-review-button"))
+              reviewButton.text should matchText("REVIEW")
+              reviewButton.underlying.click()
+            }
+          },
+        )(
+          "sv1 can see the new vote request detail",
+          _ => {
+            val requestId =
+              inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                tb.text
+              }
+            requestId
+          },
+        )
+
+        actAndCheck(
+          "sv3 accepts the request",
+          sv3Backend.castVote(new VoteRequest.ContractId(requestId), true, "", ""),
+        )(
+          "the number of accept votes increased to 2",
+          _ => {
+            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
+              element.text should matchText("2")
+            }
+          },
+        )
+      }
+
+      withFrontEnd("sv2") { implicit webDriver =>
+        actAndCheck(
+          "sv2 operator login and browse to the governance tab", {
+            go to s"http://localhost:$sv2Port/votes"
+            loginOnCurrentPage(sv2Port, sv2Backend.config.ledgerApiUser)
+          },
+        )(
+          "sv2 sees the new vote request",
+          _ => {
+            val tbody = find(id("sv-voting-action-needed-table-body"))
+            inside(tbody) { case Some(tb) =>
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              val reviewButton = rows.head
+                .childElement(className("vote-row-review"))
+                .childElement(className("vote-row-review-button"))
+              reviewButton.text should matchText("REVIEW")
+              reviewButton.underlying.click()
+            }
+          },
+        )
+
+        actAndCheck(
+          "sv2 operator accepts the requests", {
+            click on "cast-vote-button"
+            click on "accept-vote-button"
+            click on "save-vote-button"
+          },
+        )(
+          "sv2's modal closes as the threshold of 3 was reached",
+          _ => {
+            find(id("accept-vote-button")) shouldBe empty
+          },
+        )
+
+        clue("The vote requests list is empty.") {
+          eventually() {
+            sv1Backend.listVoteRequests() shouldBe empty
+          }
+        }
+      }
 
     }
 

@@ -148,7 +148,10 @@ const ListVoteRequests: React.FC = () => {
                   </IconButton>
                 }
               />
-              <VoteRequestModalContent voteRequestContractId={voteRequestContractId} />
+              <VoteRequestModalContent
+                voteRequestContractId={voteRequestContractId}
+                handleClose={handleClose}
+              />
             </Card>
           </Container>
         </Box>
