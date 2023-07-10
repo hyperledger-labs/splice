@@ -56,6 +56,12 @@ Canton Network Documentation
 
    release_notes.rst
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Troubleshooting
+
+   troubleshooting.rst
+
 
 .. TODO(M3-17): add back indices and search functionality if required
 
