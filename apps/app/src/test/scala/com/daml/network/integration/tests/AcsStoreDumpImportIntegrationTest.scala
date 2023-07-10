@@ -4,11 +4,11 @@ import better.files.File
 import com.daml.network.codegen.java.cc
 import com.daml.network.config.CNNodeConfigTransforms.{
   updateAllAutomationConfigs,
-  updateAllSvAppConfigs_,
+  updateAllSvAppFoundCollectiveConfigs_,
 }
 import com.daml.network.config.GcpBucketConfig
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.sv.config.{SvBootstrapDumpConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.SvBootstrapDumpConfig
 import com.daml.network.util.{GcpBucket, WalletTestUtil}
 
 import java.nio.file.{Files, Paths}
@@ -58,20 +58,9 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
             )
           )(config),
         (_, config) =>
-          // Set the static dump path
-          updateAllSvAppConfigs_(c =>
-            c.copy(
-              onboarding = c.onboarding match {
-                case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
-                  Some(
-                    foundCollective.copy(
-                      bootstrappingDump = Some(bootstrapDumpConfig(config.name.value))
-                    )
-                  )
-                case other => other
-              }
-            )
-          )(config),
+          updateAllSvAppFoundCollectiveConfigs_ { c =>
+            c.copy(bootstrappingDump = Some(bootstrapDumpConfig(config.name.value)))
+          }(config),
       )
 
   "sv1" should {
@@ -157,12 +146,29 @@ final class FileAcsStoreDumpImportIntegrationTest
 final class GcpAcsStoreDumpImportIntegrationTest
     extends AcsStoreDumpImportIntegrationTest[SvBootstrapDumpConfig.Gcp] {
 
+  import scala.concurrent.blocking
+
+  var bucketInitialized: Boolean = false
+
+  // There are multiple founding SV apps in the test so the config
+  // transform can get run multiple times.  Rather than trying to be
+  // clever and selecting the right one by name, we just ensure that
+  // the upload is cached.
+  def initializeBucket(name: String) = blocking {
+    synchronized {
+      if (!bucketInitialized) {
+        val gcpBucket = new GcpBucket(GcpBucketConfig.inferForTesting, loggerFactory)
+        val fileContent = File(acsDumpFilename).contentAsString
+        val fixedFileContent = fixUserSuffixes(fileContent, name)
+        gcpBucket.dumpStringToBucket(fixedFileContent, bucketPath(name))
+        bucketInitialized = true
+      }
+    }
+  }
+
   private def bucketPath(name: String) = Paths.get(s"acs/import-test/dummy_${name}.json")
   override def bootstrapDumpConfig(name: String) = {
-    val gcpBucket = new GcpBucket(GcpBucketConfig.inferForTesting, loggerFactory)
-    val fileContent = File(acsDumpFilename).contentAsString
-    val fixedFileContent = fixUserSuffixes(fileContent, name)
-    gcpBucket.dumpStringToBucket(fixedFileContent, bucketPath(name))
+    initializeBucket(name)
     SvBootstrapDumpConfig.Gcp(GcpBucketConfig.inferForTesting, bucketPath(name))
   }
 }
