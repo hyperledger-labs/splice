@@ -510,7 +510,7 @@ function subcmd_install_dns01_key() {
     _install_service_account_key "${DNS01_SA_KEY_SECRET}" "${DNS01_SA_IAM_ACCOUNT}"
 }
 
-subcommand_whitelist[install_data_export_bucket_key]='Allocate a data export key for the project and store it in a secret.'
+subcommand_whitelist[install_data_export_bucket_key]='Allocate a data export SA key for the project and store it in a secret.'
 
 function subcmd_install_data_export_bucket_key() {
     _prompt_to_confirm --no-lock
@@ -551,7 +551,7 @@ function subcmd_uninstall_dns01_key() {
     _uninstall_service_account_key "${DNS01_SA_KEY_SECRET}" "${DNS01_SA_IAM_ACCOUNT}"
 }
 
-subcommand_whitelist[uninstall_data_export_bucket_key]='Delete the data export key for the project and the corresponding secret'
+subcommand_whitelist[uninstall_data_export_bucket_key]='Delete the data export SA key for the project and the corresponding secret'
 
 function subcmd_uninstall_data_export_bucket_key() {
     _prompt_to_confirm --no-lock
