@@ -174,10 +174,9 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
                 .getContractState(new ContractId(ev.getContractId))
               (parsedEv, state)
             }
-          }),
-      )
-        .filter { case (ev, _) => filter(ev) }
-        .toSeq
+          })
+          .filter { case (ev, _) => filter(ev) },
+      ).toSeq
         .map { case (contract, state) =>
           ContractWithState(contract, state)
         }

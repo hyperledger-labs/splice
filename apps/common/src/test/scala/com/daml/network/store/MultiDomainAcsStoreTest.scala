@@ -117,8 +117,8 @@ abstract class MultiDomainAcsStoreTest[
       _ shouldBe expected
     }
 
-  private def c(i: Int): C = appRewardCoupon(i, svcParty)
-  private def cFeatured(i: Int): C = appRewardCoupon(i, svcParty, true)
+  protected def c(i: Int): C = appRewardCoupon(i, svcParty)
+  protected def cFeatured(i: Int): C = appRewardCoupon(i, svcParty, true)
 
   def transferInProgress(
       i: Int
@@ -173,9 +173,9 @@ abstract class MultiDomainAcsStoreTest[
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
 
-  private val d1: DomainId = DomainId.tryFromString("domain1::domain")
-  private val d2: DomainId = DomainId.tryFromString("domain2::domain")
-  private val d3: DomainId = DomainId.tryFromString("domain3::domain")
+  protected val d1: DomainId = DomainId.tryFromString("domain1::domain")
+  protected val d2: DomainId = DomainId.tryFromString("domain2::domain")
+  protected val d3: DomainId = DomainId.tryFromString("domain3::domain")
 
   "InMemoryMultiDomainAcsStore" should {
     "ingestion initialization is idempotent" in {
