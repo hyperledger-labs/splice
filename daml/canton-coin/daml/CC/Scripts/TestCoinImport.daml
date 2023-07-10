@@ -5,6 +5,7 @@ import Daml.Script
 
 import CC.Coin
 import CC.CoinImport
+import CC.ValidatorLicense
 import CC.Scripts.Util
 
 testImportCrates: Script ()
@@ -22,34 +23,52 @@ testImportCrates = do
   alice <- allocateParty "alice"
   wrongAlice <- allocateParty "wrongAlice"
 
-  crate <- submit newApp.svc $ createCmd ImportCrate with
+  coinCrate <- submit newApp.svc $ createCmd ImportCrate with
     svc = newApp.svc
     receiver = alice
-    payload = coin1
+    payload = IP_Coin coin1
 
-  submitMultiMustFail [wrongAlice] [newApp.svc] $ exerciseCmd crate ImportCrate_Receive with
+  let license = ValidatorLicense with
+        svc = app.svc
+        validator = alice
+        sponsor = app.svc
+  licenseCrate <- submit newApp.svc $ createCmd ImportCrate with
+    svc = newApp.svc
+    receiver = alice
+    payload = IP_ValidatorLicense license
+
+  submitMultiMustFail [wrongAlice] [newApp.svc] $ exerciseCmd coinCrate ImportCrate_Receive with
     receiver_ = wrongAlice
     openRoundCid = newOpenRoundCid
 
-  submitMultiMustFail [alice] [newApp.svc] $ exerciseCmd crate ImportCrate_Receive with
+  submitMultiMustFail [alice] [newApp.svc] $ exerciseCmd coinCrate ImportCrate_Receive with
     receiver_ = wrongAlice
     openRoundCid = newOpenRoundCid
 
-  submitMultiMustFail [wrongAlice] [newApp.svc] $ exerciseCmd crate ImportCrate_Receive with
+  submitMultiMustFail [wrongAlice] [newApp.svc] $ exerciseCmd coinCrate ImportCrate_Receive with
     receiver_ = alice
     openRoundCid = newOpenRoundCid
 
-  submitMulti [alice] [newApp.svc] $ exerciseCmd crate ImportCrate_Receive with
+  submitMulti [alice] [newApp.svc] $ exerciseCmd coinCrate ImportCrate_Receive with
     receiver_ = alice
     openRoundCid = newOpenRoundCid
 
-  -- check import crate and coins of the newApp.svc
-  pkgs <- query @ImportCrate newApp.svc
-  pkgs === []
+  -- receive a validator license crate
+  submitMulti [alice] [newApp.svc] $ exerciseCmd licenseCrate ImportCrate_Receive with
+    receiver_ = alice
+    openRoundCid = newOpenRoundCid
 
-  -- need to adjust the round of the newAmount, it changes between the initial tap and the reminting
+  -- the new coin has been created
   let newCoin = Coin with svc = newApp.svc; owner = alice; amount = coin1.amount
   newCoins <- query @Coin newApp.svc
   map snd newCoins === [newCoin]
+
+  -- alice has exactly one validator license
+  [(_, actuaLicense)] <- query @ValidatorLicense alice
+  actuaLicense === license with svc = newApp.svc
+
+  -- there are no left-over import crates
+  pkgs <- query @ImportCrate newApp.svc
+  pkgs === []
 
   pure ()

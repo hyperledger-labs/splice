@@ -4,7 +4,8 @@ import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
 import com.daml.network.codegen.java.cc.api.v1.coin.{CoinCreateSummary, CoinExpireSummary}
-import com.daml.network.codegen.java.cc.coinimport
+import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.{Codec, ExerciseNode}
@@ -21,7 +22,6 @@ import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.environment.ledger.api.ActiveContract
 import com.daml.network.environment.ledger.api.InFlightTransferOutEvent
 import com.digitalasset.canton.topology.DomainId
-import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
@@ -65,8 +65,8 @@ class ScanTxLogParser(
 
       case created: CreatedEvent =>
         created match {
-          case ImportCrate(crate) =>
-            State.fromImportCrate(tree, root, crate.payload)
+          case CoinImportCrate(coin) =>
+            State.fromCoinImportCrate(tree, root, coin)
           case OpenMiningRoundCreate(round) =>
             State.fromOpenMiningRoundCreate(tree, root, round)
           case ClosedMiningRoundCreate(round) =>
@@ -242,12 +242,11 @@ object ScanTxLogParser {
         a.appended(b)
     }
 
-    def fromImportCrate(
+    def fromCoinImportCrate(
         tx: TransactionTree,
         event: TreeEvent,
-        crate: coinimport.ImportCrate,
-    ): State = {
-      val coin = crate.payload
+        coin: cc.coin.Coin,
+    ): State =
       State(
         immutable.Queue(
           TxLogEntry.EmptyTxLogEntry(
@@ -261,7 +260,6 @@ object ScanTxLogParser {
           )
         )
       )
-    }
 
     def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,

@@ -784,15 +784,18 @@
         "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
         "receiver": "charlie__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
         "payload": {
-          "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-          "owner": "charlie__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-          "amount": {
-            "initialAmount": "30.0",
-            "createdAt": {
-              "number": "2"
-            },
-            "ratePerRound": {
-              "rate": "0.0000048225"
+          "tag": "IP_Coin",
+          "value": {
+            "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
+            "owner": "charlie__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
+            "amount": {
+              "initialAmount": "30.0",
+              "createdAt": {
+                "number": "2"
+              },
+              "ratePerRound": {
+                "rate": "0.0000048225"
+              }
             }
           }
         }

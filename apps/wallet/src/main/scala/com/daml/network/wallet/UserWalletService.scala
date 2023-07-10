@@ -110,7 +110,8 @@ class UserWalletService(
 
     def receive(): Future[Done] = for {
       domainId <- store.defaultAcsDomainIdF
-      crates <- scanConnection.listImportCrates(userPartyId)
+      // Important: we need to query the open-round before we list crates, as the availability of an open round signals
+      // that all crates have been ingested in scan.
       (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()
       // We're explicitly not checking for the round to be open, as we only need it to supply the CoinPrice for scan.
       openRound = openRounds
@@ -122,6 +123,7 @@ class UserWalletService(
             )
             .asRuntimeException()
         )
+      crates <- scanConnection.listImportCrates(userPartyId)
       _ = logger.debug(show"Attempting to receive ${crates.size} crates for $userPartyId")
       _ <- Future.sequence(crates.map(crate => {
         logger.debug(show"Attempting to receive $crate")

@@ -43,28 +43,41 @@ object AcsStoreDump {
       contracts: Seq[http.Contract]
   )(implicit templateDecoder: TemplateJsonDecoder): Seq[data.Command] = {
 
-    def extractCoin(co: http.Contract): Seq[cc.coin.Coin] = {
+    def extractCoin(co: http.Contract): Seq[cc.coin.Coin] =
       // attempt to decode as a: Coin
       fromJsonIgnoringPackageId(cc.coin.Coin.COMPANION)(co)
         .map(_.payload)
         // LockedCoin
         .orElse(fromJsonIgnoringPackageId(cc.coin.LockedCoin.COMPANION)(co).map(_.payload.coin))
-        // ImportCrate, as not all of them might have been imported
-        .orElse(
-          fromJsonIgnoringPackageId(cc.coinimport.ImportCrate.COMPANION)(co)
-            .map(_.payload.payload)
-        )
         .toSeq
+
+    val coinCommands =
+      for {
+        httpCo <- contracts
+        coin <- extractCoin(httpCo)
+        cmd <- new cc.coinimport.ImportCrate(
+          svcParty.toProtoPrimitive,
+          coin.owner,
+          new cc.coinimport.importpayload.IP_Coin(
+            coin
+          ), // TODO(#6503): embed the contract id here for idempotent imports
+        ).create().commands().asScala.toSeq
+      } yield cmd
+
+    val extractImportCrateCommands: Seq[data.Command] = {
+      for {
+        httpCo <- contracts
+        crate <- fromJsonIgnoringPackageId(cc.coinimport.ImportCrate.COMPANION)(httpCo).toSeq
+        cmd <- {
+          new cc.coinimport.ImportCrate(
+            svcParty.toProtoPrimitive, // override the svc party to the current one
+            crate.payload.receiver, // keep as-is
+            crate.payload.payload, // keep as-is
+          ).create().commands().asScala.toSeq
+        }
+      } yield cmd
     }
 
-    for {
-      httpCo <- contracts
-      coin <- extractCoin(httpCo)
-      cmd <- new cc.coinimport.ImportCrate(
-        svcParty.toProtoPrimitive,
-        coin.owner,
-        coin, // TODO(#6503): embed the contract id here for idempotent imports
-      ).create().commands().asScala.toSeq
-    } yield cmd
+    extractImportCrateCommands ++ coinCommands
   }
 }

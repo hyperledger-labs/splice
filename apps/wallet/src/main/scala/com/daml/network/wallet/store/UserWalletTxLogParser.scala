@@ -31,7 +31,7 @@ import com.daml.network.history.{
   CoinCreate,
   CoinExpire,
   CoinRules_BuyExtraTraffic,
-  ImportCrate_Receive,
+  ImportCrate_ReceiveCoin,
   LockedCoinExpireCoin,
   LockedCoinOwnerExpireLock,
   LockedCoinUnlock,
@@ -432,7 +432,7 @@ class UserWalletTxLogParser(
               )
             )
 
-          case ImportCrate_Receive(node) =>
+          case ImportCrate_ReceiveCoin(node) =>
             now(
               State.fromCoinCreateSummary(
                 tree,

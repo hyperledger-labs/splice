@@ -121,7 +121,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
         update = new cc.coinimport.ImportCrate(
           svcParty.toProtoPrimitive,
           charlieUserParty.toProtoPrimitive,
-          charlieCoin.data,
+          new cc.coinimport.importpayload.IP_Coin(charlieCoin.data),
         ).create,
       )
       created.contractId.contractId
