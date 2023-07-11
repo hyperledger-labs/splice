@@ -2350,6 +2350,8 @@ workflows:
           - datadog
           - slack-context
         sync_with_cluster_version: false
+        requires:
+          - wait_for_previous_pipeline
     - preflight_sv_check:
         <<: *main-branch-only
         cluster: "staging"
@@ -2359,6 +2361,8 @@ workflows:
           - datadog
           - slack-context
         sync_with_cluster_version: false
+        requires:
+          - wait_for_previous_pipeline
 
   deploy_devnet:
     when:
