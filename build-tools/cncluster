@@ -893,7 +893,9 @@ function subcmd_preflight() {
     cd "${REPO_ROOT}" && scripts/start-postgres-for-preflight.sh
 
     set +e
-    subcmd_sbt_for_preflight "apps-app/testOnly *PreflightIntegrationTest"
+    subcmd_sbt_for_preflight printTests
+    non_dev_preflight_tests=$(awk '{print $1}' "$REPO_ROOT"/test-full-class-names-preflight.log | paste -s -d' ' -)
+    subcmd_sbt_for_preflight "apps-app/testOnly $non_dev_preflight_tests"
     local test_result=$?
     set -e
 
