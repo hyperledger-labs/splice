@@ -9,8 +9,8 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
+import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
+import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
@@ -166,7 +166,7 @@ class FoundingNodeInitializer(
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- retryProvider.ensureThatB(
         show"the SvcRules and CoinRules are bootstrapped",
-        isOnboarded(svcStore), {
+        svcStore.lookupSvcRules().map(_.isDefined), {
           new WithSvcStore(svcAutomation, globalDomain).foundCollective()
         },
         logger,
@@ -335,6 +335,18 @@ class FoundingNodeInitializer(
         case None => Future.successful(None)
         case Some(config) =>
           for {
+            existingCrates <- svcStore.multiDomainAcsStore.listReadyContracts(
+              cc.coinimport.ImportCrate.COMPANION,
+              PageLimit(10),
+            )
+            _ = if (existingCrates.nonEmpty) {
+              logger.error(
+                show"Aborting founding node initialization, as the following crates already exist (probably due to a earlier partial init of the founding node):\n$existingCrates"
+              )
+              throw new IllegalStateException(
+                "Cannot import the ACS snapshot, as there already was an earlier partial or different import."
+              )
+            }
             jsonDump <- Future {
               blocking {
                 val jsonString = config match {
@@ -361,7 +373,7 @@ class FoundingNodeInitializer(
               show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
             )
             _ <-
-              // TODO(#6503): consider command dedup (or another protection from failed/partial imports), and limiting the batch size
+              // Note: we assume that the Acs dump is small enough to be imported in a single transaction.
               svcStoreWithIngestion.connection
                 .submitCommandsNoDedup(
                   actAs = Seq(svcParty),
@@ -593,12 +605,6 @@ class FoundingNodeInitializer(
     storeKey.svcParty,
     retryProvider,
     loggerFactory,
-  )
-
-  private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
-    svcRules <- svcStore.lookupSvcRules()
-  } yield svcRules.exists(
-    _.contract.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
   )
 
 }

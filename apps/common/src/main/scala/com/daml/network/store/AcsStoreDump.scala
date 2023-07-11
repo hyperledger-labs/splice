@@ -60,7 +60,7 @@ object AcsStoreDump {
           coin.owner,
           new cc.coinimport.importpayload.IP_Coin(
             coin
-          ), // TODO(#6503): embed the contract id here for idempotent imports
+          ),
         ).create().commands().asScala.toSeq
       } yield cmd
 
