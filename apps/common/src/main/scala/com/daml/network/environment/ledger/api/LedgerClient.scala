@@ -22,7 +22,7 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, HasCommands}
 import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.util.DisclosedContracts
@@ -186,7 +186,7 @@ private[environment] class LedgerClient(
       deduplicationOffsetOrDuration: DedupConfig,
       actAs: Seq[String],
       readAs: Seq[String],
-      commands: Seq[Command],
+      commands: Seq[HasCommands],
       disclosedContracts: DisclosedContracts,
   ): CommandServiceOuterClass.SubmitAndWaitRequest = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
@@ -196,7 +196,9 @@ private[environment] class LedgerClient(
       .setApplicationId(applicationId)
       .addAllActAs(actAs.asJava)
       .addAllReadAs(readAs.asJava)
-      .addAllCommands(commands.map(_.toProtoCommand).asJava)
+      .addAllCommands {
+        HasCommands.toCommands(commands.asJava).asScala.map(_.toProtoCommand).asJava
+      }
       .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
     deduplicationOffsetOrDuration match {
       case DedupOffset(offset) =>
@@ -219,7 +221,7 @@ private[environment] class LedgerClient(
       deduplicationConfig: DedupConfig,
       actAs: Seq[String],
       readAs: Seq[String],
-      commands: Seq[Command],
+      commands: Seq[HasCommands],
       disclosedContracts: DisclosedContracts,
   )(implicit ec: ExecutionContext): Future[String] = {
     val request = submitAndWaitRequest(

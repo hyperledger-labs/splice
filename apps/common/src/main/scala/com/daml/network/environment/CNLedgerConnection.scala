@@ -17,7 +17,7 @@ import com.daml.ledger.javaapi.data.{
   User,
   Identifier as LapiIdentifier,
 }
-import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, Update}
+import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   DedupConfig,
@@ -135,7 +135,7 @@ class CNLedgerConnection(
   def submitCommandsNoDedup(
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
-      commands: Seq[Command],
+      commands: Seq[HasCommands],
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
   ): Future[Unit] = {

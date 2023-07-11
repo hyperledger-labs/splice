@@ -133,6 +133,7 @@ private[validator] object ValidatorUtil {
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
+    import com.daml.network.codegen.java.da.internal.template.Archive as CodegenArchive
     val store = storeWithIngestion.store
     val validatorParty = store.key.validatorParty
     for {
@@ -150,60 +151,41 @@ private[validator] object ValidatorUtil {
           Future.unit
         }
       _ <- retryProvider.retryForClientCalls(
-        "Remove install contract",
-        store
-          .lookupWalletInstallByNameWithOffset(endUserName)
-          .map(_.value)
-          .flatMap {
-            case None =>
-              logger.debug(s"No install contract found for user $endUserName, skipping")
-              Future.unit
-            case Some(c) =>
+        "Remove install contract and validator right",
+        Future
+          .sequence(
+            Seq(
+              store
+                .lookupWalletInstallByNameWithOffset(endUserName)
+                .map(_.value.map(_.contractId.exerciseArchive(new CodegenArchive())).orElse {
+                  logger.debug(s"No install contract found for user $endUserName, skipping")
+                  None
+                }),
+              store
+                .lookupValidatorRightByPartyWithOffset(endUserParty)
+                .map(_.value.map(_.contractId.exerciseArchive(new CodegenArchive())).orElse {
+                  logger.debug(s"No validator right found for user $endUserName, skipping")
+                  None
+                }),
+            )
+          )
+          .flatMap(_.collect { case Some(archive) => archive } match {
+            case Seq() => Future.unit
+            case archives =>
               storeWithIngestion.connection
-                .submitWithResultAndOffsetNoDedup(
-                  actAs = Seq(
-                    store.key.validatorParty,
-                    PartyId.tryFromProtoPrimitive(c.payload.endUserParty),
-                  ),
-                  readAs = Seq.empty,
-                  update = c.contractId.exerciseArchive(
-                    new com.daml.network.codegen.java.da.internal.template.Archive()
-                  ),
-                  domainId = domainId,
-                )
-          },
-        logger,
-        // once the validator's actAs and readAs rights have been revoked,
-        // this command could fail with PERMISSION_DENIED errors (#4425).
-        additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
-      )
-      _ <- retryProvider.retryForClientCalls(
-        "Remove validator right",
-        store
-          .lookupValidatorRightByPartyWithOffset(endUserParty)
-          .map(_.value)
-          .flatMap {
-            case None =>
-              logger.debug(s"No validator right found for user $endUserName, skipping")
-              Future.unit
-            case Some(c) =>
-              storeWithIngestion.connection
-                .submitWithResultAndOffsetNoDedup(
+                .submitCommandsNoDedup(
                   actAs = Seq(
                     store.key.validatorParty,
                     endUserParty,
                   ),
                   readAs = Seq.empty,
-                  update = c.contractId
-                    .exerciseArchive(
-                      new com.daml.network.codegen.java.da.internal.template.Archive()
-                    ),
+                  commands = archives,
                   domainId = domainId,
                 )
-          },
+          }),
         logger,
         // once the validator's actAs and readAs rights have been revoked,
-        // this command could fail with PERMISSION_DENIED errors (#4425).
+        // these commands could fail with PERMISSION_DENIED errors (#4425).
         additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
     } yield {
