@@ -1706,7 +1706,7 @@ workflows:
         name: "scala_test wall clock time"
         test_names_file: "test-full-class-names.log"
         start_canton_options: "-d -p external -w"
-        resource_class: "2xlarge"
+        resource_class: "xlarge"
         parallelism: 10
     - scala_test:
         <<: *notify-fail
@@ -1717,7 +1717,7 @@ workflows:
         name: "scala_test sim time"
         test_names_file: "test-full-class-names-sim-time.log"
         start_canton_options: "-d -p external -s"
-        resource_class: "2xlarge"
+        resource_class: "xlarge"
         parallelism: 4
     - scala_test:
         <<: *notify-fail
@@ -1754,7 +1754,7 @@ workflows:
         name: "scala_test domain fees wall clock time"
         test_names_file: "test-full-class-names-domain-fees.log"
         start_canton_options: "-d -p external -w -t"
-        resource_class: "2xlarge+"
+        resource_class: "xlarge"
         parallelism: 1
     - scala_test:
         <<: *notify-fail
@@ -1765,7 +1765,7 @@ workflows:
         name: "scala_test global upgrade sim time"
         test_names_file: "test-full-class-names-global-upgrade-sim-time.log"
         start_canton_options: "-d -p external -s -g"
-        resource_class: "2xlarge"
+        resource_class: "xlarge"
         parallelism: 1
     - bundle:
         <<: *notify-fail
