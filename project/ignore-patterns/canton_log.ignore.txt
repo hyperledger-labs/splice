@@ -55,4 +55,7 @@ Failed to handle Mediator events
 Synchronous event processing failed for event batch with sequencer counters.*
 .*java.lang.IllegalStateException: Unable to fetch domain parameters.*
 
+# Detailed API logging is extremely useful for debugging so we turn this on in our tests.
+Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
+
 # Make sure to have a trailing newline
