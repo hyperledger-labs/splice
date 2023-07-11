@@ -449,7 +449,7 @@ class InMemoryScanStoreTest extends ScanStoreTest {
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty)
+        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )

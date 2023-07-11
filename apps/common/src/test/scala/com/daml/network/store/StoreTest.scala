@@ -16,7 +16,7 @@ import com.google.protobuf
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as coinCodegen}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
-  InFlightTransferOutEvent,
+  IncompleteTransferEvent,
   TransactionTreeUpdate,
   Transfer,
   TransferEvent,
@@ -135,8 +135,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def toActiveContract[TCid <: ContractId[T], T](
       domain: DomainId,
       contract: Contract[TCid, T],
+      counter: Long,
   ): ActiveContract =
-    ActiveContract(domain, toCreatedEvent(contract))
+    ActiveContract(domain, toCreatedEvent(contract), counter)
 
   protected def exercisedEvent[TCid <: ContractId[T], T](
       contractId: String,
@@ -220,26 +221,45 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val effectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
-  protected def toInFlightTransferOutEvent[TCid <: ContractId[T], T](
+  protected def toIncompleteTransferOut[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],
       transferOutId: String,
-      source: DomainId = dummyDomain,
-      target: DomainId = dummyDomain,
-  ): InFlightTransferOutEvent = InFlightTransferOutEvent(
+      source: DomainId,
+      target: DomainId,
+      counter: Long,
+  ): IncompleteTransferEvent.Out = IncompleteTransferEvent.Out(
     toTransferOutEvent(
       contract.contractId,
       transferOutId,
       source,
       target,
+      counter,
     ),
     toCreatedEvent(contract),
+  )
+
+  protected def toIncompleteTransferIn[TCid <: ContractId[T], T](
+      contract: Contract[TCid, T],
+      transferOutId: String,
+      source: DomainId,
+      target: DomainId,
+      counter: Long,
+  ): IncompleteTransferEvent.In = IncompleteTransferEvent.In(
+    toTransferInEvent(
+      contract,
+      transferOutId,
+      source,
+      target,
+      counter,
+    )
   )
 
   protected def toTransferOutEvent(
       contractId: ContractId[_],
       transferOutId: String,
-      source: DomainId = dummyDomain,
-      target: DomainId = dummyDomain,
+      source: DomainId,
+      target: DomainId,
+      counter: Long,
   ): TransferEvent.Out =
     TransferEvent.Out(
       transferOutId = transferOutId,
@@ -247,19 +267,22 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId = contractId,
       source = source,
       target = target,
+      counter = counter,
     )
 
   protected def toTransferInEvent[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],
       transferOutId: String,
-      source: DomainId = dummyDomain,
-      target: DomainId = dummyDomain,
+      source: DomainId,
+      target: DomainId,
+      counter: Long,
   ): TransferEvent.In = TransferEvent.In(
     transferOutId = transferOutId,
     submitter = userParty(1),
     source = source,
     target = target,
     createdEvent = toCreatedEvent(contract),
+    counter = counter,
   )
 
   protected def mkValidatorRewardCoupon(i: Int) = validatorRewardCoupon(i, userParty(i))
@@ -278,20 +301,33 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent))
 
   protected def acs[TCid <: ContractId[T], T](
-      acs: Seq[(Contract[TCid, T], DomainId)] = Seq.empty,
-      transferOuts: Seq[(Contract[TCid, T], DomainId, DomainId, String)] = Seq.empty,
+      acs: Seq[(Contract[TCid, T], DomainId, Long)] = Seq.empty,
+      incompleteOut: Seq[(Contract[TCid, T], DomainId, DomainId, String, Long)] = Seq.empty,
+      incompleteIn: Seq[(Contract[TCid, T], DomainId, DomainId, String, Long)] = Seq.empty,
       acsOffset: String = nextOffset,
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.ingestionSink.initialize()
     _ <- store.ingestionSink.ingestAcs(
       acsOffset,
-      acs.map { case (contract, domain) => ActiveContract(domain, toCreatedEvent(contract)) },
-      transferOuts.map { case (c, sourceDomain, targetDomain, tfid) =>
-        toInFlightTransferOutEvent(
+      acs.map { case (contract, domain, counter) =>
+        ActiveContract(domain, toCreatedEvent(contract), counter)
+      },
+      incompleteOut.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
+        toIncompleteTransferOut(
           c,
           tfid,
           sourceDomain,
           targetDomain,
+          counter,
+        )
+      },
+      incompleteIn.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
+        toIncompleteTransferIn(
+          c,
+          tfid,
+          sourceDomain,
+          targetDomain,
+          counter,
         )
       },
     )
@@ -358,6 +394,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def transferOut[TCid <: ContractId[T], T](
         contractAndDomain: (Contract[TCid, T], DomainId),
         transferId: String,
+        counter: Long,
     )(implicit store: MultiDomainAcsStore) =
       store.ingestionSink.ingestUpdate(
         domain,
@@ -369,6 +406,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
               transferId,
               domain,
               contractAndDomain._2,
+              counter,
             ),
           )
         ),
@@ -377,6 +415,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def transferIn[TCid <: ContractId[T], T](
         contractAndDomain: (Contract[TCid, T], DomainId),
         transferId: String,
+        counter: Long,
     )(implicit store: MultiDomainAcsStore) =
       store.ingestionSink.ingestUpdate(
         domain,
@@ -388,6 +427,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
               transferId,
               contractAndDomain._2,
               domain,
+              counter,
             ),
           )
         ),
@@ -497,7 +537,11 @@ object StoreTest {
   ) extends TxLogStore.Entry[TestTxLogIndexRecord]
 
   object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
-    def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(implicit
+    def parseAcs(
+        acs: Seq[ActiveContract],
+        incompleteOut: Seq[IncompleteTransferEvent.Out],
+        incompleteIn: Seq[IncompleteTransferEvent.In],
+    )(implicit
         tc: TraceContext
     ): Seq[(DomainId, TestTxLogEntry)] = Seq.empty
 

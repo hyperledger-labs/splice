@@ -86,12 +86,14 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     override def ingestAcs(
         offset: String,
         acs: Seq[ActiveContract],
-        transferOuts: Seq[InFlightTransferOutEvent],
+        incompleteOut: Seq[IncompleteTransferEvent.Out],
+        incompleteIn: Seq[IncompleteTransferEvent.In],
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.ingestAcs(
           acs,
-          transferOuts,
+          incompleteOut,
+          incompleteIn,
           offset,
           txLogParser,
           contractFilter.contains,
@@ -687,7 +689,8 @@ object InMemoryMultiDomainAcsStore {
 
     def ingestAcs(
         evs: Seq[ActiveContract],
-        transferOuts: Seq[InFlightTransferOutEvent],
+        incompleteOut: Seq[IncompleteTransferEvent.Out],
+        incompleteIn: Seq[IncompleteTransferEvent.In],
         acsOffset: String,
         txLogParser: TxLogStore.Parser[TXI, TXE],
         p: CreatedEvent => Boolean,
@@ -696,9 +699,9 @@ object InMemoryMultiDomainAcsStore {
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
       val (stAcs, summaryAcs) = ingestActiveContracts(evs, p)
-      val (stInFlight, summaryTransferOut) = stAcs.ingestTransferOuts(transferOuts, summaryAcs, p)
+      val (stInFlight, summaryTransferOut) = stAcs.ingestTransferOuts(incompleteOut, summaryAcs, p)
       val (stFinal, offsetsToRemove) = stInFlight.removeOffsetSignalsBefore(acsOffset)
-      val parsedTxLogEntries = txLogParser.parseAcs(evs, transferOuts)
+      val parsedTxLogEntries = txLogParser.parseAcs(evs, incompleteOut, incompleteIn)
       (
         stFinal.copy(
           offset = Some(acsOffset),
@@ -865,7 +868,7 @@ object InMemoryMultiDomainAcsStore {
 
     // Used during bootstrapping to ingest in-flight transfer outs
     private def ingestTransferOuts(
-        evs: Seq[InFlightTransferOutEvent],
+        evs: Seq[IncompleteTransferEvent.Out],
         summary: IngestionSummary[TXE],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {

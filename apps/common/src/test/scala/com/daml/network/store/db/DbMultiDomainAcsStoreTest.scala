@@ -45,7 +45,7 @@ class DbMultiDomainAcsStoreTest
         .runForeach(coupon => seenCoupons.updateAndGet(x => x.appended(coupon.contract)))
       for {
         _ <- store.ingestionSink.initialize()
-        _ <- store.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty)
+        _ <- store.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty, Seq.empty)
         _ <- dummyDomain.create(coupons.head)
         _ = eventually()(seenCoupons.get() should be(Seq(coupons.head)))
         _ <- dummyDomain.create(coupons(1))
@@ -63,9 +63,9 @@ class DbMultiDomainAcsStoreTest
       val coupon = appRewardCoupon(1, svcParty)
       for {
         _ <- store1.ingestionSink.initialize()
-        _ <- store1.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty)
+        _ <- store1.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty, Seq.empty)
         _ <- store2.ingestionSink.initialize()
-        _ <- store2.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty)
+        _ <- store2.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty, Seq.empty)
         _ <- dummyDomain.create(coupon)(store1)
         _ <- dummyDomain.create(coupon)(store2)
         _ = eventually() {
@@ -100,10 +100,10 @@ class DbMultiDomainAcsStoreTest
       val couponsAcs =
         (1 to 3)
           .map(n => appRewardCoupon(n, svcParty))
-          .map(c => toActiveContract(dummyDomain, c))
+          .map(c => toActiveContract(dummyDomain, c, 0))
       for {
         _ <- store.ingestionSink.initialize()
-        _ <- store.ingestionSink.ingestAcs("0", couponsAcs, Seq.empty)
+        _ <- store.ingestionSink.ingestAcs("0", couponsAcs, Seq.empty, Seq.empty)
         _ <- store.waitUntilAcsIngested()
       } yield {
         store

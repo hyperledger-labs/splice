@@ -22,7 +22,7 @@ import com.daml.network.environment.ledger.api.{
   ActiveContract,
   DedupConfig,
   DedupOffset,
-  InFlightTransferOutEvent,
+  IncompleteTransferEvent,
   LedgerClient,
   NoDedup,
 }
@@ -293,7 +293,9 @@ class CNLedgerConnection(
   def activeContracts(
       filter: IngestionFilter,
       offset: ParticipantOffset.Value.Absolute,
-  ): Future[(Seq[ActiveContract], Seq[InFlightTransferOutEvent])] = {
+  ): Future[
+    (Seq[ActiveContract], Seq[IncompleteTransferEvent.Out], Seq[IncompleteTransferEvent.In])
+  ] = {
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = offset.value,
@@ -308,12 +310,17 @@ class CNLedgerConnection(
         case lapi.state_service.GetActiveContractsResponse.ContractEntry.ActiveContract(contract) =>
           ActiveContract.fromProto(contract)
       }
-      inFlight = contractStateComponents.collect {
+      incompleteOut = contractStateComponents.collect {
         case lapi.state_service.GetActiveContractsResponse.ContractEntry
               .IncompleteUnassigned(ev) =>
-          InFlightTransferOutEvent.fromProto(ev)
+          IncompleteTransferEvent.fromProto(ev)
       }
-    } yield (active, inFlight)
+      incompleteIn = contractStateComponents.collect {
+        case lapi.state_service.GetActiveContractsResponse.ContractEntry
+              .IncompleteAssigned(ev) =>
+          IncompleteTransferEvent.fromProto(ev)
+      }
+    } yield (active, incompleteOut, incompleteIn)
   }
 
   def getConnectedDomains(party: PartyId): Future[Map[DomainAlias, DomainId]] =

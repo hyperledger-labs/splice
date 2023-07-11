@@ -232,7 +232,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- acs(
-          acs = Seq((c(1), d1))
+          acs = Seq((c(1), d1, 0L))
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -249,9 +249,9 @@ abstract class MultiDomainAcsStoreTest[
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
         tf0 = nextTransferId
-        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> None)
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertLookupNone(c(1))
@@ -267,14 +267,14 @@ abstract class MultiDomainAcsStoreTest[
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
         tf0 = nextTransferId
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         // Note: We cannot currently reliably order transfer events
         // so we don't know if the transfer in is actually a newer state.
         // (We could have missed the transfer out if it happened before the ACS offset).
         // So we give up on a bit of liveness and mark the contract as in-flight
         // until we see the transfer out.
         _ <- assertList(c(1) -> None)
-        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
@@ -290,12 +290,12 @@ abstract class MultiDomainAcsStoreTest[
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
         tf0 = nextTransferId
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> None)
         _ <- d2.archive(c(1))
         _ <- assertList()
         _ <- assertLookupNone(c(1))
-        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList()
         _ <- assertTestState()
       } yield succeed
@@ -306,7 +306,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- acs()
         _ <- assertList()
         tf0 = nextTransferId
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d1.create(c(1))
         // We cannot reliably order transfer in events
@@ -315,7 +315,7 @@ abstract class MultiDomainAcsStoreTest[
         // However, our implementation currently treats the initial create
         // and transfer ins uniformly and also marks this as in-flight.
         _ <- assertList(c(1) -> None)
-        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
@@ -331,19 +331,19 @@ abstract class MultiDomainAcsStoreTest[
         tf0 = nextTransferId
         tf1 = nextTransferId
         tf2 = nextTransferId
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
-        _ <- d3.transferIn(c(1) -> d1, tf2)
+        _ <- d3.transferIn(c(1) -> d1, tf2, 3)
         _ <- assertList(c(1) -> None)
-        _ <- d2.transferOut(c(1) -> d1, tf1)
+        _ <- d2.transferOut(c(1) -> d1, tf1, 2)
         _ <- assertList(c(1) -> Some(d3))
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> None)
-        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> Some(d3))
-        _ <- d1.transferIn(c(1) -> d2, tf1)
+        _ <- d1.transferIn(c(1) -> d2, tf1, 2)
         _ <- assertList(c(1) -> None)
-        _ <- d1.transferOut(c(1) -> d3, tf2)
+        _ <- d1.transferOut(c(1) -> d3, tf2, 3)
         _ <- assertList(c(1) -> Some(d3))
         _ <- d3.archive(c(1))
         _ <- assertList()
@@ -357,14 +357,14 @@ abstract class MultiDomainAcsStoreTest[
         _ <- acs()
         _ <- assertList()
         tf0 = nextTransferId
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
         _ <- assertLookupNone(c(1))
         _ <- d1.create(c(1))
         _ <- assertList()
-        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList()
         _ <- assertTestState()
       } yield succeed
@@ -378,15 +378,15 @@ abstract class MultiDomainAcsStoreTest[
         tf1 = nextTransferId
         _ <- d1.create(c(1))
         _ <- assertList(c(1) -> Some(d1))
-        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> None)
-        _ <- d3.transferIn(c(1) -> d2, tf1)
+        _ <- d3.transferIn(c(1) -> d2, tf1, 2)
         _ <- assertList(c(1) -> Some(d3))
         _ <- d3.archive(c(1))
         _ <- assertList()
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList()
-        _ <- d2.transferOut(c(1) -> d3, tf1)
+        _ <- d2.transferOut(c(1) -> d3, tf1, 2)
         _ <- assertList()
         _ <- assertTestState()
       } yield succeed
@@ -396,12 +396,12 @@ abstract class MultiDomainAcsStoreTest[
       val tf0 = nextTransferId
       for {
         _ <- acs(
-          transferOuts = Seq(
-            (c(1), d1, d2, tf0)
+          incompleteOut = Seq(
+            (c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> None)
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
@@ -413,7 +413,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- acs()
         tf0 = nextTransferId
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
@@ -430,7 +430,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- acs(
-          Seq((c(1), d1), (cFeatured(2), d1))
+          Seq((c(1), d1, 0L), (cFeatured(2), d1, 0L))
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -455,8 +455,8 @@ abstract class MultiDomainAcsStoreTest[
       val tf1 = nextTransferId
       for {
         _ <- acs()
-        _ <- d1.transferIn(c(1) -> d2, tf0)
-        _ <- d1.transferIn(cFeatured(2) -> d2, tf1)
+        _ <- d1.transferIn(c(1) -> d2, tf0, 1)
+        _ <- d1.transferIn(cFeatured(2) -> d2, tf1, 2)
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
         _ <- assertTestState(
@@ -472,7 +472,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- acs()
         _ <- d1.create(cFeatured(1))
-        _ <- d1.transferOut(c(1) -> d2, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertTestState()
       } yield succeed
     }
@@ -481,7 +481,7 @@ abstract class MultiDomainAcsStoreTest[
       val tf0 = nextTransferId
       for {
         _ <- acs(
-          transferOuts = Seq((cFeatured(1), d1, d2, tf0))
+          incompleteOut = Seq((cFeatured(1), d1, d2, tf0, 1L))
         )
         _ <- assertTestState(
         )
@@ -503,24 +503,24 @@ abstract class MultiDomainAcsStoreTest[
       for {
         // in-flight transfer out
         _ <- acs(
-          transferOuts = Seq(
-            (c(1), d1, d2, tf0)
+          incompleteOut = Seq(
+            (c(1), d1, d2, tf0, 1L)
           )
         )
         _ = eventually()(transfers.get should have length 1)
         _ <- assertReadyForTransferIn(tf0Id, true)
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertReadyForTransferIn(tf0Id, false)
         // transfer out before transfer in
-        _ <- d2.transferOut(c(1) -> d1, tf1)
+        _ <- d2.transferOut(c(1) -> d1, tf1, 2)
         _ <- assertReadyForTransferIn(tf1Id, true)
         _ = eventually()(transfers.get should have length 2)
-        _ <- d1.transferIn(c(1) -> d2, tf1)
+        _ <- d1.transferIn(c(1) -> d2, tf1, 2)
         _ <- assertReadyForTransferIn(tf1Id, false)
         // transfer in before transfer out
-        _ <- d3.transferIn(c(1) -> d1, tf2)
+        _ <- d3.transferIn(c(1) -> d1, tf2, 3)
         _ <- assertReadyForTransferIn(tf2Id, false)
-        _ <- d1.transferOut(c(1) -> d3, tf2)
+        _ <- d1.transferOut(c(1) -> d3, tf2, 3)
         _ <- assertReadyForTransferIn(tf2Id, false)
         _ <- streamF
       } yield {
@@ -539,20 +539,20 @@ abstract class MultiDomainAcsStoreTest[
       val tf2 = nextTransferId
       for {
         _ <- acs(
-          acs = Seq((c(1), d1)),
-          transferOuts = Seq((c(2), d1, d2, tf2)),
+          acs = Seq((c(1), d1, 0L)),
+          incompleteOut = Seq((c(2), d1, d2, tf2, 3L)),
         )
         _ = eventually()(readyContracts.get() should have size 1)
         // transfer out before transfer in
-        _ <- d1.transferOut(c(1) -> d2, tf0)
-        _ <- d2.transferIn(c(1) -> d1, tf0)
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
+        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ = eventually()(readyContracts.get() should have size 2)
         // transfer in before transfer out
-        _ <- d1.transferIn(c(1) -> d2, tf1)
-        _ <- d2.transferOut(c(1) -> d1, tf1)
+        _ <- d1.transferIn(c(1) -> d2, tf1, 2)
+        _ <- d2.transferOut(c(1) -> d1, tf1, 2)
         _ = eventually()(readyContracts.get() should have size 3)
         // Complete transfer in of in-flight transfer out.
-        _ <- d2.transferIn(c(2) -> d1, tf2)
+        _ <- d2.transferIn(c(2) -> d1, tf2, 3)
         _ = eventually()(readyContracts.get() should have size 4)
         _ <- d2.create(c(3))
         _ = eventually()(readyContracts.get() should have size 5)

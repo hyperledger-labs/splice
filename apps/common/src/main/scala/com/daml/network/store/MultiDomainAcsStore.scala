@@ -24,7 +24,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
-  InFlightTransferOutEvent,
+  IncompleteTransferEvent,
   TransferEvent,
   TreeUpdate,
 }
@@ -644,7 +644,8 @@ object MultiDomainAcsStore {
     def ingestAcs(
         offset: String,
         acs: Seq[ActiveContract],
-        inFlight: Seq[InFlightTransferOutEvent],
+        incompleteOut: Seq[IncompleteTransferEvent.Out],
+        incompleteIn: Seq[IncompleteTransferEvent.In],
     )(implicit traceContext: TraceContext): Future[Unit]
 
     def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit

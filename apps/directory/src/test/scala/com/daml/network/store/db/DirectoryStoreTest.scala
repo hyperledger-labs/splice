@@ -235,7 +235,7 @@ class InMemoryDirectoryStoreTest extends DirectoryStoreTest {
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty)
+        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )
@@ -293,7 +293,7 @@ class DbDirectoryStoreTest
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty)
+        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
     } yield store
   }
 

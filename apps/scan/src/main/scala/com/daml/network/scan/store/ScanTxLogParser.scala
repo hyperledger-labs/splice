@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.environment.ledger.api.ActiveContract
-import com.daml.network.environment.ledger.api.InFlightTransferOutEvent
+import com.daml.network.environment.ledger.api.IncompleteTransferEvent
 import com.digitalasset.canton.topology.DomainId
 
 class ScanTxLogParser(
@@ -93,7 +93,11 @@ class ScanTxLogParser(
   }
 
   // TODO(#4906): handle in-flight contracts when we tackle global domain migration
-  override def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(implicit
+  override def parseAcs(
+      acs: Seq[ActiveContract],
+      incompleteOut: Seq[IncompleteTransferEvent.Out],
+      incompleteIn: Seq[IncompleteTransferEvent.In],
+  )(implicit
       tc: TraceContext
   ): Seq[(DomainId, ScanTxLogParser.TxLogEntry)] = acs.collect(ac =>
     ac.createdEvent match {

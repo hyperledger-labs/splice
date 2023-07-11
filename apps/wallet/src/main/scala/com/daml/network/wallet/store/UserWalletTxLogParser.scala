@@ -53,8 +53,7 @@ import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
-import com.daml.network.environment.ledger.api.ActiveContract
-import com.daml.network.environment.ledger.api.InFlightTransferOutEvent
+import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteTransferEvent}
 import com.digitalasset.canton.topology.DomainId
 
 class UserWalletTxLogParser(
@@ -540,7 +539,11 @@ class UserWalletTxLogParser(
   }
 
   // The wallet TxLog does not currently parse from ACS
-  override def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(implicit
+  override def parseAcs(
+      acs: Seq[ActiveContract],
+      incompleteOut: Seq[IncompleteTransferEvent.Out],
+      incompleteIn: Seq[IncompleteTransferEvent.In],
+  )(implicit
       tc: TraceContext
   ): Seq[(DomainId, TxLogEntry)] = Seq.empty
 

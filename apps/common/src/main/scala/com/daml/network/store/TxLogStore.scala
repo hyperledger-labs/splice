@@ -9,8 +9,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import com.daml.network.environment.ledger.api.ActiveContract
-import com.daml.network.environment.ledger.api.InFlightTransferOutEvent
+import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteTransferEvent}
 import com.digitalasset.canton.topology.DomainId
 
 /** Stores historical information that can be used to construct application-specific historical events,
@@ -77,7 +76,11 @@ object TxLogStore {
   trait Parser[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
 
     /** Extract application-specific TxLog entries from the acs, before starting to ingest transactions */
-    def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(implicit
+    def parseAcs(
+        acs: Seq[ActiveContract],
+        incompleteOut: Seq[IncompleteTransferEvent.Out],
+        incompleteIn: Seq[IncompleteTransferEvent.In],
+    )(implicit
         tc: TraceContext
     ): Seq[(DomainId, TXE)]
 
@@ -110,8 +113,12 @@ object TxLogStore {
   object Parser {
     final case class Empty[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]]()
         extends Parser[TXI, TXE] {
-      override def parseAcs(acs: Seq[ActiveContract], inFlight: Seq[InFlightTransferOutEvent])(
-          implicit tc: TraceContext
+      override def parseAcs(
+          acs: Seq[ActiveContract],
+          incompleteOut: Seq[IncompleteTransferEvent.Out],
+          incompleteIn: Seq[IncompleteTransferEvent.In],
+      )(implicit
+          tc: TraceContext
       ): Seq[(DomainId, TXE)] = Seq.empty
       override def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE] = Seq.empty
       override def error(offset: String, eventId: String): Option[TXE] = None

@@ -55,6 +55,7 @@ class UpdateIngestionService(
                     MultiDomainAcsStore.fromParticipantOffset(participantBegin),
                     Seq.empty,
                     Seq.empty,
+                    Seq.empty,
                   )
                   .map(_ => participantBegin)
               } else
@@ -83,11 +84,12 @@ class UpdateIngestionService(
     val javaOffset = ParticipantOffset.Value.Absolute(offset)
     for {
       // TODO(#5534): stream contracts instead of ingesting them as a single Seq
-      (evs, tfs) <- connection.activeContracts(filter, javaOffset)
+      (acs, incompleteOut, incompleteIn) <- connection.activeContracts(filter, javaOffset)
       _ <- ingestionSink.ingestAcs(
         offset,
-        evs,
-        tfs,
+        acs,
+        incompleteOut,
+        incompleteIn,
       )
     } yield ()
   }

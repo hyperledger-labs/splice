@@ -10,11 +10,13 @@ import com.digitalasset.canton.topology.DomainId
 final case class ActiveContract(
     domainId: DomainId,
     createdEvent: CreatedEvent,
+    transferCounter: Long,
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(
       param("domainId", _.domainId),
       param("createdEvent", _.createdEvent),
+      param("transferCounter", _.transferCounter),
     )
 }
 
@@ -23,6 +25,7 @@ object ActiveContract {
     ActiveContract(
       DomainId.tryFromString(proto.domainId),
       CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
+      proto.reassignmentCounter,
     )
   }
 }

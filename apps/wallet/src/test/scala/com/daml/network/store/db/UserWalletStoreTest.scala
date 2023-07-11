@@ -1031,7 +1031,7 @@ class InMemoryUserWalletStoreTest extends UserWalletStoreTest {
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty)
+        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )
@@ -1071,7 +1071,7 @@ class DbUserWalletStoreTest
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty)
+        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )

@@ -9,7 +9,7 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
-  InFlightTransferOutEvent,
+  IncompleteTransferEvent,
   TransactionTreeUpdate,
   TransferEvent,
   TransferUpdate,
@@ -372,7 +372,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     override def ingestAcs(
         offset: String,
         acs: Seq[ActiveContract],
-        inFlight: Seq[InFlightTransferOutEvent],
+        incompleteOut: Seq[IncompleteTransferEvent.Out],
+        incompleteIn: Seq[IncompleteTransferEvent.In],
     )(implicit traceContext: TraceContext): Future[Unit] = {
       assert(
         finishedAcsIngestion.isCompleted == false,

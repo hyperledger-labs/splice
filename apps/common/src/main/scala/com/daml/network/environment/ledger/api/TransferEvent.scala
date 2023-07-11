@@ -9,19 +9,28 @@ import com.daml.ledger.api.v2.reassignment as multidomain
 import com.daml.ledger.api.v2.state_service
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
-case class InFlightTransferOutEvent(
-    transferEvent: TransferEvent.Out,
-    createdEvent: CreatedEvent,
-)
-
-object InFlightTransferOutEvent {
+object IncompleteTransferEvent {
+  case class Out(
+      transferEvent: TransferEvent.Out,
+      createdEvent: CreatedEvent,
+  )
+  case class In(
+      transferEvent: TransferEvent.In
+  )
   def fromProto(
       proto: state_service.IncompleteUnassigned
-  ): InFlightTransferOutEvent =
-    InFlightTransferOutEvent(
+  ): Out =
+    Out(
       transferEvent = TransferEvent.Out.fromProto(proto.getUnassignedEvent),
       createdEvent =
         CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
+    )
+
+  def fromProto(
+      proto: state_service.IncompleteAssigned
+  ): In =
+    In(
+      transferEvent = TransferEvent.In.fromProto(proto.getAssignedEvent)
     )
 }
 
@@ -31,6 +40,8 @@ sealed trait TransferEvent extends Product with Serializable with PrettyPrinting
   def source: DomainId
 
   def target: DomainId
+
+  def counter: Long
 }
 
 object TransferEvent {
@@ -44,6 +55,7 @@ object TransferEvent {
       override val target: DomainId,
       transferOutId: String,
       contractId: ContractId[_],
+      override val counter: Long,
   ) extends TransferEvent {
     def pretty: Pretty[this.type] =
       prettyOfClass(
@@ -63,6 +75,7 @@ object TransferEvent {
         target = DomainId.tryFromString(proto.target),
         transferOutId = proto.unassignId,
         contractId = new ContractId(proto.contractId),
+        counter = proto.reassignmentCounter,
       )
     }
   }
@@ -73,6 +86,7 @@ object TransferEvent {
       override val target: DomainId,
       transferOutId: String,
       createdEvent: CreatedEvent,
+      override val counter: Long,
   ) extends TransferEvent {
     def pretty: Pretty[this.type] =
       prettyOfClass(
@@ -94,6 +108,7 @@ object TransferEvent {
         transferOutId = proto.unassignId,
         createdEvent =
           CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
+        counter = proto.reassignmentCounter,
       )
     }
   }
