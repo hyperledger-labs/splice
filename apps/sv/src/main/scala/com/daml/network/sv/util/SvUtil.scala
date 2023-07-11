@@ -27,7 +27,7 @@ import java.nio.file.{Path, Paths}
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.security.{KeyFactory, SecureRandom, Signature}
-import java.time.Duration as JavaDuration
+import java.time.{Duration as JavaDuration, Instant}
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future, blocking}
@@ -199,6 +199,11 @@ object SvUtil {
     duration.toInternal.toScala.toMicros
   )
 
+  def acsStoreDumpFilename(now: Instant) =
+    Paths.get(
+      s"svc_acs_dump_${now}.json"
+    )
+
   def writeAcsStoreDump(
       acsDumpConfig: BackupDumpConfig,
       loggerFactory: NamedLoggerFactory,
@@ -210,9 +215,7 @@ object SvUtil {
       ErrorLoggingContext(logger, NamedLoggerFactory.root.properties, tc)
 
     val now = clock.now.toInstant
-    val filename = Paths.get(
-      s"svc_acs_dump_${now}.json"
-    )
+    val filename = acsStoreDumpFilename(now)
     logger.debug(
       s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription} at path: $filename"
     )

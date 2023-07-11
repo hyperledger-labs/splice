@@ -169,6 +169,7 @@ spec:
                     }
                   }
                   prefix = "{{ $clusterBaseName }}/{{ $namespace }}"
+                  backup-interval = {{ .backupInterval }}
                 }
             - name: CN_APP_SV_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
               valueFrom:
@@ -200,8 +201,8 @@ spec:
             httpGet:
               path: /readyz
               port: 5014
-            initialDelaySeconds: 20
-            periodSeconds: 20
+            initialDelaySeconds: 5
+            periodSeconds: 5
             failureThreshold: 5
             timeoutSeconds: 10
           {{- with .Values.participantBootstrappingDump }}

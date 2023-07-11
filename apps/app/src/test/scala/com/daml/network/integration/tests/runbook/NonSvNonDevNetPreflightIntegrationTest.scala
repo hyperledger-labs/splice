@@ -6,13 +6,13 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
   CNNodeIntegrationTestWithSharedEnvironment,
 }
-import com.daml.network.util.ParticipantIdentitiesTestUtil
+import com.daml.network.util.DataExportTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 // Integration test for everything that is not part of an SV node.
 final class NonSvNonDevNetPreflightIntegrationTestBase
     extends CNNodeIntegrationTestWithSharedEnvironment
-    with ParticipantIdentitiesTestUtil {
+    with DataExportTestUtil {
 
   // For now treating this as a non-SV app since it is really run directly as the SVC
   // rather than as SV-1. It just happens to be in SV-1's namespace.

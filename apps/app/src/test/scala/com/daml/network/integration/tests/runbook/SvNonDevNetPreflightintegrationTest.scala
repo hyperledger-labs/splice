@@ -7,7 +7,7 @@ import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{CoinConfigSchedule, ParticipantIdentitiesTestUtil}
+import com.daml.network.util.{CoinConfigSchedule, DataExportTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 
 import java.time.{Duration, Instant}
@@ -19,7 +19,7 @@ import java.nio.file.Paths
 abstract class SvNonDevNetPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with SvUiIntegrationTestUtil
-    with ParticipantIdentitiesTestUtil
+    with DataExportTestUtil
     with FrontendLoginUtil {
 
   override def environmentDefinition
@@ -152,9 +152,7 @@ final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightInt
 
   override protected def svNumber = 1
 
-  // TODO(#6615) once the SvApp does its own backup: replace this by only checking that a recent snapshot exists
-  // instead of triggering one.
-  "trigger ACS snapshot and check that it can be downloaded and decoded" in { implicit env =>
+  "Check that there is a recent ACS snapshot on GCP" in { implicit env =>
     val result = sv1Client.triggerAcsDump()
     val bucket = new GcpBucket(GcpBucketConfig.inferForCluster, loggerFactory)
     val dump = bucket.readStringFromBucket(Paths.get(result.filename))
