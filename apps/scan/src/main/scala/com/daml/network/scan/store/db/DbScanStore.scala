@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppBackendConfig
-import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
+import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.{Limit, LimitHelpers, MultiDomainAcsStore}
 import MultiDomainAcsStore.ContractWithState
@@ -18,7 +18,6 @@ import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -29,7 +28,6 @@ import cats.implicits.*
 import slick.dbio.DBIO
 
 import java.time.Instant
-import scala.annotation.unused
 import scala.concurrent.{ExecutionContext, Future}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
@@ -99,10 +97,32 @@ class DbScanStore(
     }
   }
 
-  // TODO (#6218): implement this
   override def ingestionTxLogInsert(record: ScanTxLogParser.TxLogIndexRecord)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = Right(DBIO.successful(())) // avoid blowing up until implemented
+  ): Either[String, DBIO[_]] = {
+    val ScanTxLogRowData(
+      eventId,
+      indexRecordType,
+      round,
+      rewardAmount,
+      rewardedParty,
+      balanceChangeToInitialAmountAsOfRoundZero,
+      balanceChangeChangeToHoldingFeesRate,
+      extraTrafficValidator,
+      extraTrafficPurchaseTrafficPurchase,
+      extraTrafficPurchaseCcSpent,
+    ) = ScanTxLogRowData.fromTxLogIndexRecord(record)
+    val safeEventId = lengthLimited(eventId)
+    Right(sqlu"""
+          insert into scan_txlog_store(store_id, event_id, index_record_type, round, reward_amount, rewarded_party,
+          balance_change_change_to_initial_amount_as_of_round_zero, balance_change_change_to_holding_fees_rate,
+          extra_traffic_validator, extra_traffic_purchase_traffic_purchased, extra_traffic_purchase_cc_spent)
+          values ($storeId, $safeEventId, $indexRecordType, $round, $rewardAmount, $rewardedParty,
+                  $balanceChangeToInitialAmountAsOfRoundZero, $balanceChangeChangeToHoldingFeesRate,
+                  $extraTrafficValidator, $extraTrafficPurchaseTrafficPurchase, $extraTrafficPurchaseCcSpent)
+          on conflict do nothing
+        """)
+  }
 
   // TODO (#5314): most queries do not properly handle multi-domain
 
@@ -255,19 +275,5 @@ object DbScanStore {
 
   val acsTableName = "scan_acs_store"
   val txLogTableName = "scan_txlog_store"
-
-  @unused
-  def txLogIndexRecordDbType(record: ScanTxLogParser.TxLogIndexRecord): String3 = {
-    val s = record match {
-      case _: ScanTxLogParser.TxLogIndexRecord.ErrorIndexRecord => "err"
-      case _: ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord => "omr"
-      case _: ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord => "cmr"
-      case _: ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord => "are"
-      case _: ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord => "vre"
-      case _: ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord => "etp"
-      case _: ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord => "bc"
-    }
-    String3.tryCreate(s)
-  }
 
 }

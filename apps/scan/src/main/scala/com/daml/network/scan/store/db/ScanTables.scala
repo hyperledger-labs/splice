@@ -8,6 +8,9 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.config.ScanAppBackendConfig
+import com.daml.network.scan.store.ScanTxLogParser
+import com.daml.network.scan.store.ScanTxLogParser.TxLogIndexRecord
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 
 object ScanTables extends AcsTables {
 
@@ -166,6 +169,137 @@ object ScanTables extends AcsTables {
           }
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the scan store.")
+      }
+    }
+
+  }
+
+  case class ScanTxLogRowData(
+      eventId: String,
+      indexRecordType: String3,
+      round: Option[Long],
+      rewardAmount: Option[BigDecimal],
+      rewardedParty: Option[PartyId],
+      balanceChangeToInitialAmountAsOfRoundZero: Option[BigDecimal],
+      balanceChangeChangeToHoldingFeesRate: Option[BigDecimal],
+      extraTrafficValidator: Option[PartyId],
+      extraTrafficPurchaseTrafficPurchase: Option[Long],
+      extraTrafficPurchaseCcSpent: Option[BigDecimal],
+  )
+
+  object ScanTxLogRowData {
+
+    def fromTxLogIndexRecord(record: ScanTxLogParser.TxLogIndexRecord): ScanTxLogRowData = {
+      record match {
+        case err @ ScanTxLogParser.TxLogIndexRecord.ErrorIndexRecord(_, eventId) =>
+          ScanTxLogRowData(
+            eventId = eventId,
+            indexRecordType = err.companion.dbType,
+            round = None,
+            rewardAmount = None,
+            rewardedParty = None,
+            balanceChangeToInitialAmountAsOfRoundZero = None,
+            balanceChangeChangeToHoldingFeesRate = None,
+            extraTrafficValidator = None,
+            extraTrafficPurchaseTrafficPurchase = None,
+            extraTrafficPurchaseCcSpent = None,
+          )
+        case omr @ ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord(_, eventId, round) =>
+          ScanTxLogRowData(
+            eventId = eventId,
+            indexRecordType = omr.companion.dbType,
+            round = Some(round),
+            rewardAmount = None,
+            rewardedParty = None,
+            balanceChangeToInitialAmountAsOfRoundZero = None,
+            balanceChangeChangeToHoldingFeesRate = None,
+            extraTrafficValidator = None,
+            extraTrafficPurchaseTrafficPurchase = None,
+            extraTrafficPurchaseCcSpent = None,
+          )
+        case cmr @ ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord(
+              _,
+              eventId,
+              round,
+              _,
+            ) =>
+          ScanTxLogRowData(
+            eventId = eventId,
+            indexRecordType = cmr.companion.dbType,
+            round = Some(round),
+            rewardAmount = None,
+            rewardedParty = None,
+            balanceChangeToInitialAmountAsOfRoundZero = None,
+            balanceChangeChangeToHoldingFeesRate = None,
+            extraTrafficValidator = None,
+            extraTrafficPurchaseTrafficPurchase = None,
+            extraTrafficPurchaseCcSpent = None,
+          )
+        case are @ TxLogIndexRecord.AppRewardIndexRecord(_, eventId, round, party, amount) =>
+          ScanTxLogRowData(
+            eventId = eventId,
+            indexRecordType = are.companion.dbType,
+            round = Some(round),
+            rewardAmount = Some(amount),
+            rewardedParty = Some(party),
+            balanceChangeToInitialAmountAsOfRoundZero = None,
+            balanceChangeChangeToHoldingFeesRate = None,
+            extraTrafficValidator = None,
+            extraTrafficPurchaseTrafficPurchase = None,
+            extraTrafficPurchaseCcSpent = None,
+          )
+        case vre @ TxLogIndexRecord.ValidatorRewardIndexRecord(_, eventId, round, party, amount) =>
+          ScanTxLogRowData(
+            eventId = eventId,
+            indexRecordType = vre.companion.dbType,
+            round = Some(round),
+            rewardAmount = Some(amount),
+            rewardedParty = Some(party),
+            balanceChangeToInitialAmountAsOfRoundZero = None,
+            balanceChangeChangeToHoldingFeesRate = None,
+            extraTrafficValidator = None,
+            extraTrafficPurchaseTrafficPurchase = None,
+            extraTrafficPurchaseCcSpent = None,
+          )
+        case etp @ ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
+              _,
+              eventId,
+              round,
+              validator,
+              trafficPurchased,
+              ccSpent,
+            ) =>
+          ScanTxLogRowData(
+            eventId = eventId,
+            indexRecordType = etp.companion.dbType,
+            round = Some(round),
+            rewardAmount = None,
+            rewardedParty = None,
+            balanceChangeToInitialAmountAsOfRoundZero = None,
+            balanceChangeChangeToHoldingFeesRate = None,
+            extraTrafficValidator = Some(validator),
+            extraTrafficPurchaseTrafficPurchase = Some(trafficPurchased),
+            extraTrafficPurchaseCcSpent = Some(ccSpent),
+          )
+        case bac @ ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord(
+              _,
+              eventId,
+              round,
+              changeToInitialAmountAsOfRoundZero,
+              changeToHoldingFeesRate,
+            ) =>
+          ScanTxLogRowData(
+            eventId = eventId,
+            indexRecordType = bac.companion.dbType,
+            round = Some(round),
+            rewardAmount = None,
+            rewardedParty = None,
+            balanceChangeToInitialAmountAsOfRoundZero = Some(changeToInitialAmountAsOfRoundZero),
+            balanceChangeChangeToHoldingFeesRate = Some(changeToHoldingFeesRate),
+            extraTrafficValidator = None,
+            extraTrafficPurchaseTrafficPurchase = None,
+            extraTrafficPurchaseCcSpent = None,
+          )
       }
     }
 

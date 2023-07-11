@@ -21,6 +21,7 @@ import java.time.Instant
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.environment.ledger.api.ActiveContract
 import com.daml.network.environment.ledger.api.IncompleteTransferEvent
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
 
 class ScanTxLogParser(
@@ -139,27 +140,59 @@ class ScanTxLogParser(
 
 object ScanTxLogParser {
 
-  sealed trait TxLogIndexRecord extends TxLogStore.IndexRecord
+  sealed trait TxLogIndexRecord extends TxLogStore.IndexRecord {
+    val companion: TxLogIndexRecordCompanion
+  }
+
+  sealed trait TxLogIndexRecordCompanion {
+    val shortType: String
+
+    def dbType: String3 = String3.tryCreate(shortType)
+  }
 
   object TxLogIndexRecord {
 
     final case class ErrorIndexRecord(
         offset: String,
         eventId: String,
-    ) extends TxLogIndexRecord { override def optOffset = Some(offset) }
+    ) extends TxLogIndexRecord {
+      override def optOffset = Some(offset)
+
+      override val companion: TxLogIndexRecordCompanion = ErrorIndexRecord
+    }
+
+    object ErrorIndexRecord extends TxLogIndexRecordCompanion {
+      override val shortType: String = "err"
+    }
 
     final case class OpenMiningRoundIndexRecord(
         offset: String,
         eventId: String,
         round: Long,
-    ) extends TxLogIndexRecord { override def optOffset = Some(offset) }
+    ) extends TxLogIndexRecord {
+      override def optOffset = Some(offset)
+
+      override val companion: TxLogIndexRecordCompanion = OpenMiningRoundIndexRecord
+    }
+
+    object OpenMiningRoundIndexRecord extends TxLogIndexRecordCompanion {
+      override val shortType: String = "omr"
+    }
 
     final case class ClosedMiningRoundIndexRecord(
         offset: String,
         eventId: String,
         round: Long,
         effectiveAt: Instant,
-    ) extends TxLogIndexRecord { override def optOffset = Some(offset) }
+    ) extends TxLogIndexRecord {
+      override def optOffset = Some(offset)
+
+      override val companion: TxLogIndexRecordCompanion = ClosedMiningRoundIndexRecord
+    }
+
+    object ClosedMiningRoundIndexRecord extends TxLogIndexRecordCompanion {
+      override val shortType: String = "cmr"
+    }
 
     sealed trait RewardIndexRecord extends TxLogIndexRecord {
       def party: PartyId
@@ -173,7 +206,15 @@ object ScanTxLogParser {
         round: Long,
         party: PartyId,
         amount: BigDecimal,
-    ) extends RewardIndexRecord { override def optOffset = Some(offset) }
+    ) extends RewardIndexRecord {
+      override def optOffset = Some(offset)
+
+      override val companion: TxLogIndexRecordCompanion = AppRewardIndexRecord
+    }
+
+    object AppRewardIndexRecord extends TxLogIndexRecordCompanion {
+      override val shortType: String = "are"
+    }
 
     final case class ValidatorRewardIndexRecord(
         offset: String,
@@ -181,7 +222,15 @@ object ScanTxLogParser {
         round: Long,
         party: PartyId,
         amount: BigDecimal,
-    ) extends RewardIndexRecord { override def optOffset = Some(offset) }
+    ) extends RewardIndexRecord {
+      override def optOffset = Some(offset)
+
+      override val companion: TxLogIndexRecordCompanion = ValidatorRewardIndexRecord
+    }
+
+    object ValidatorRewardIndexRecord extends TxLogIndexRecordCompanion {
+      override val shortType: String = "vre"
+    }
 
     final case class ExtraTrafficPurchaseIndexRecord(
         offset: String,
@@ -190,7 +239,15 @@ object ScanTxLogParser {
         validator: PartyId,
         trafficPurchased: Long,
         ccSpent: BigDecimal,
-    ) extends TxLogIndexRecord { override def optOffset = Some(offset) }
+    ) extends TxLogIndexRecord {
+      override def optOffset = Some(offset)
+
+      override val companion: TxLogIndexRecordCompanion = ExtraTrafficPurchaseIndexRecord
+    }
+
+    object ExtraTrafficPurchaseIndexRecord extends TxLogIndexRecordCompanion {
+      override val shortType: String = "etp"
+    }
 
     final case class BalanceChangeIndexRecord(
         optOffset: Option[String],
@@ -198,7 +255,13 @@ object ScanTxLogParser {
         round: Long,
         changeToInitialAmountAsOfRoundZero: BigDecimal,
         changeToHoldingFeesRate: BigDecimal,
-    ) extends TxLogIndexRecord
+    ) extends TxLogIndexRecord {
+      override val companion: TxLogIndexRecordCompanion = BalanceChangeIndexRecord
+    }
+
+    object BalanceChangeIndexRecord extends TxLogIndexRecordCompanion {
+      override val shortType: String = "bac"
+    }
 
   }
 
