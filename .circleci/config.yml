@@ -1295,6 +1295,11 @@ jobs:
       parallelism:
         type: integer
         default: 3
+      # If sync_with_cluster_version is true, then before building the tests, we will wait for the cluster to be up
+      # and checkout the corresponding git commit
+      sync_with_cluster_version:
+        type: boolean
+        default: true
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -1320,15 +1325,22 @@ jobs:
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
-          cmd_name: wait for cluster to be ready
+          cmd_name: Activate cluster (configure kubectl)
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          cmd: |
-            cncluster activate
-            cncluster wait
+          cmd: cncluster activate
           cmd_retry_count: 5
-      - checkout_cluster_version:
-          cluster: <<parameters.cluster>>
+      - when:
+          condition: << parameters.sync_with_cluster_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: wait for cluster to be ready
+                cluster: << parameters.cluster >>
+                gce_authenticate: true
+                cmd: cncluster wait
+                cmd_retry_count: 5
+            - checkout_cluster_version:
+                cluster: <<parameters.cluster>>
       # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
       # sucks at cache invalidation
       - restore_sbt_cache
@@ -1341,6 +1353,23 @@ jobs:
           no_output_timeout: "20m"
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
+      - when:
+          condition:
+            not: << parameters.sync_with_cluster_version >>
+          steps:
+            # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
+            - run_bash_command_in_nix:
+                cmd_name: wait for deployment to finish
+                cluster: << parameters.cluster >>
+                cmd: |
+                  VERSION=$(get-snapshot-version)
+                  cncluster wait_version $VERSION
+                  cncluster wait validator1 validator-app
+                  cncluster wait splitwell validator-app
+                  cncluster wait sv-1 validator-app
+                  cncluster wait sv-2 validator-app
+                  cncluster wait sv-3 validator-app
+                  cncluster wait sv-4 validator-app
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
@@ -1372,6 +1401,11 @@ jobs:
         type: string
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
+      # If sync_with_cluster_version is true, then before building the tests, we will wait for the cluster to be up
+      # and checkout the corresponding git commit
+      sync_with_cluster_version:
+        type: boolean
+        default: true
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -1387,15 +1421,22 @@ jobs:
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
-          cmd_name: wait for cluster to be ready
+          cmd_name: Activate cluster (configure kubectl)
           cluster: << parameters.cluster >>
           gce_authenticate: true
-          cmd: |
-            cncluster activate
-            cncluster wait
+          cmd: cncluster activate
           cmd_retry_count: 5
-      - checkout_cluster_version:
-          cluster: <<parameters.cluster>>
+      - when:
+          condition: << parameters.sync_with_cluster_version >>
+          steps:
+          - run_bash_command_in_nix:
+              cmd_name: wait for cluster to be ready
+              cluster: << parameters.cluster >>
+              gce_authenticate: true
+              cmd: cncluster wait
+              cmd_retry_count: 5
+          - checkout_cluster_version:
+              cluster: <<parameters.cluster>>
       # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
       # sucks at cache invalidation
       - restore_sbt_cache
@@ -1403,6 +1444,18 @@ jobs:
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
+      - when:
+          condition:
+            not: << parameters.sync_with_cluster_version >>
+          steps:
+          # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
+          - run_bash_command_in_nix:
+              cmd_name: wait for sv-runbook deployment to finish
+              cluster: << parameters.cluster >>
+              cmd: |
+                VERSION=$(get-snapshot-version)
+                cncluster wait_version $VERSION
+                cncluster wait sv validator-app
       - run_bash_command_in_nix:
           cmd_name: Run SV preflight tests
           additional_nix_args: "--keep SV_WEB_UI_PASSWORD \
@@ -1844,10 +1897,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchneta"
+          sync_with_cluster_version: false
           requires:
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
+            - hold
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -1856,8 +1908,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchneta"
+          sync_with_cluster_version: false
           requires:
-            - deploy_sv_runbook
+            - hold
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchneta"
@@ -1919,10 +1972,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetb"
+          sync_with_cluster_version: false
           requires:
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
+            - hold
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -1931,8 +1983,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetb"
+          sync_with_cluster_version: false
           requires:
-            - deploy_sv_runbook
+            - hold
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetb"
@@ -1994,10 +2047,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetc"
+          sync_with_cluster_version: false
           requires:
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
+            - hold
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -2006,8 +2058,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetc"
+          sync_with_cluster_version: false
           requires:
-            - deploy_sv_runbook
+            - hold
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetc"
@@ -2069,10 +2122,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetd"
+          sync_with_cluster_version: false
           requires:
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
+            - hold
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -2081,8 +2133,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetd"
+          sync_with_cluster_version: false
           requires:
-            - deploy_sv_runbook
+            - hold
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetd"
@@ -2144,10 +2197,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetf"
+          sync_with_cluster_version: false
           requires:
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
+            - hold
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -2156,8 +2208,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetf"
+          sync_with_cluster_version: false
           requires:
-            - deploy_sv_runbook
+            - hold
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetf"
@@ -2219,10 +2272,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetg"
+          sync_with_cluster_version: false
           requires:
-            - deployment_test
-            - docker_images_push
-            - deploy_cluster
+            - hold
       - preflight_sv_check:
           <<: *main-branch-never
           context:
@@ -2231,8 +2283,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetg"
+          sync_with_cluster_version: false
           requires:
-            - deploy_sv_runbook
+            - hold
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetg"
@@ -2296,10 +2349,7 @@ workflows:
           - canton-network-vpn
           - datadog
           - slack-context
-        requires:
-          - deployment_test
-          - docker_images_push
-          - deploy_cluster
+        sync_with_cluster_version: false
     - preflight_sv_check:
         <<: *main-branch-only
         cluster: "staging"
@@ -2308,8 +2358,7 @@ workflows:
           - canton-network-vpn
           - datadog
           - slack-context
-        requires:
-          - deploy_sv_runbook
+        sync_with_cluster_version: false
 
   deploy_devnet:
     when:
