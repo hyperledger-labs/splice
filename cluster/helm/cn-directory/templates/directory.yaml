@@ -43,10 +43,10 @@ spec:
           httpGet:
             path: /readyz
             port: 5010
-          initialDelaySeconds: 20
-          periodSeconds: 20
+          initialDelaySeconds: 5
+          periodSeconds: 5
           failureThreshold: 5
-          timeoutSeconds: 10
+          timeoutSeconds: 3
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}

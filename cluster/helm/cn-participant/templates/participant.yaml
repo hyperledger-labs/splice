@@ -73,8 +73,8 @@ spec:
         readinessProbe:
           grpc:
             port: 5061
-          initialDelaySeconds: 20
-          periodSeconds: 10
+          initialDelaySeconds: 5
+          periodSeconds: 5
           failureThreshold: 3
           timeoutSeconds: 10
         {{- end }}

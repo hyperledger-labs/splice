@@ -46,7 +46,7 @@ spec:
         {{- end }}
         readinessProbe:
           failureThreshold: 3
-          periodSeconds: 10
+          periodSeconds: 5
           successThreshold: 1
           tcpSocket:
             port: cd-pub-api

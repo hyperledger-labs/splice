@@ -152,10 +152,10 @@ spec:
           httpGet:
             path: /readyz
             port: 5003
-          initialDelaySeconds: 20
-          periodSeconds: 20
+          initialDelaySeconds: 5
+          periodSeconds: 5
           failureThreshold: 5
-          timeoutSeconds: 10
+          timeoutSeconds: 3
         {{- with .Values.participantBootstrappingDump }}
         volumeMounts:
           - name: participant-bootstrapping-dump-volume
