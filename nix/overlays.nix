@@ -24,21 +24,28 @@
     let
       inherit (super.lib.strings) hasPrefix;
 
-      neededResourcePlugins = [
-        "auth0" "gcp" "google-native" "kubernetes" "postgresql" "random" "tls" "vault"
+      # Note: remove once https://github.com/pulumi/pulumi-kubernetes/issues/2481 is resolved
+      #       and available in a release
+      pulumi-resource-kubernetes = super.callPackage ./pulumi-kubernetes { };
+
+      neededResourcePlugins = builtins.map (p: "pulumi-resource-" + p) [
+        "auth0" "gcp" "google-native" "postgresql" "random" "tls" "vault"
       ];
 
       isResourcePlugin = d: hasPrefix "pulumi-resource-" d.name;
 
-      isRequired = d: builtins.any (p: hasPrefix ("pulumi-resource-" + p) d.name) neededResourcePlugins;
+      isNeededResourcePlugin = d: builtins.any (p: hasPrefix p d.name) neededResourcePlugins;
 
-      keepSrc = d: isRequired d || ! isResourcePlugin d;
+      keepSrc = d: isNeededResourcePlugin d || ! isResourcePlugin d;
     in {
       srcs = builtins.filter keepSrc previousAttrs.srcs;
 
       installPhase = ''
         # remove unneeded language plugins
         rm -v pulumi-language-{dotnet,go,java,python,python-exec}
+
+        # copy patched pulumi kubernetes provider
+        cp --reflink=auto ${pulumi-resource-kubernetes}/bin/pulumi-resource-kubernetes .
 
         ${previousAttrs.installPhase}
       '';
