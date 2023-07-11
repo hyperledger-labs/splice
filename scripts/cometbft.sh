@@ -10,7 +10,11 @@ function create_docker_network() {
 }
 
 function delete_docker_network() {
-  docker network rm $DOCKER_COMEBFT_NETWORK_NAME || true
+  if docker network ls --format '{{.Name}}' | grep -q "^$DOCKER_COMEBFT_NETWORK_NAME$"; then
+    docker network rm $DOCKER_COMEBFT_NETWORK_NAME  || true
+  else
+    echo "No CometBFT docker network '$DOCKER_COMEBFT_NETWORK_NAME' to remove."
+  fi
 }
 
 function docker_start() {
@@ -39,8 +43,12 @@ function docker_start() {
 function docker_stop() {
   local container_sv_index=$1
   local current_container_name="${DOCKER_COMETBFT_CONTAINER_NAME}_${container_sv_index}"
-  echo "Removing Cometbft docker container $current_container_name"
-  docker stop "$current_container_name" || true
+  if docker ps -a --format '{{.Names}}' | grep -q "^$current_container_name$"; then
+    echo "Removing Cometbft docker container $current_container_name."
+    docker stop "$current_container_name" || true
+  else
+    echo "No CometBFT $current_container_name container to remove."
+  fi
 }
 
 case "$1" in
