@@ -10,6 +10,8 @@ import com.daml.network.config.GcpBucketConfig
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.sv.config.SvBootstrapDumpConfig
 import com.daml.network.util.{GcpBucket, WalletTestUtil}
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level
 
 import java.nio.file.{Files, Paths}
 import java.time.Instant
@@ -66,12 +68,38 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
   "sv1" should {
     "load the initial ACS dump" in { implicit env =>
       usingStandaloneCantonWithNewCn {
-        startAllSync(
-          sv1LocalBackend,
-          sv1ScanLocalBackend,
-          sv1ValidatorLocalBackend,
-          aliceValidatorLocalBackend,
+        clue("Start sv1Local, sv1ScanLocal, sv1ValidatorLocal, aliceValidatorLocal")(
+          loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
+            startAllSync(
+              sv1LocalBackend,
+              sv1ScanLocalBackend,
+              sv1ValidatorLocalBackend,
+              aliceValidatorLocalBackend,
+            ),
+            logEntries => {
+              forAtLeast(1, logEntries)(logEntry => {
+                logEntry.loggerName should endWith("SV=sv1Local")
+                logEntry.message should startWith("Validator license for SV party already exists")
+              })
+              forAtLeast(1, logEntries)(logEntry => {
+                logEntry.loggerName should endWith("validator=aliceValidatorLocal")
+                logEntry.message should startWith("ValidatorLicense found => already onboarded")
+              })
+            },
+          )
         )
+
+        clue("Check that there are no duplicate validator licenses") {
+          val licenses = sv1LocalBackend.participantClient.ledger_api_extensions.acs
+            .filterJava(cc.validatorlicense.ValidatorLicense.COMPANION)(
+              svcParty
+            )
+          val duplicates = licenses
+            .groupBy(_.data.validator)
+            .collect { case (validator, ls) if ls.length > 1 => validator }
+            .toSeq
+          duplicates shouldBe empty
+        }
 
         clue("Check that the open-mining rounds advanced by one tick have been restored") {
           // in an eventually because we rely on round change automation triggering once

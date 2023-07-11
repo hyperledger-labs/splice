@@ -1,19 +1,35 @@
 package com.daml.network.store
 
+import akka.Done
 import com.daml.ledger.javaapi.data
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_ValidatorLicense
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.http.v0.definitions as http
+import com.daml.network.store.MultiDomainAcsStore.ContractWithState
 import com.daml.network.util.Contract.Companion
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, DisclosedContracts, TemplateJsonDecoder}
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 object AcsStoreDump {
 
+  /** A shipment of crates ready for import -- sorry for the bad pun :D */
+  case class ImportShipment(
+      openRound: ContractWithState[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound],
+      domainId: DomainId,
+      crates: Seq[
+        ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]
+      ],
+  )
   private def fromJsonIgnoringPackageId[TCid <: ContractId[T], T <: DamlRecord[?]](
       companion: Companion.Template[TCid, T]
   )(contract: http.Contract)(implicit
@@ -64,7 +80,20 @@ object AcsStoreDump {
         ).create().commands().asScala.toSeq
       } yield cmd
 
-    val extractImportCrateCommands: Seq[data.Command] = {
+    val validatorLicenseCommands =
+      for {
+        httpCo <- contracts
+        license <- fromJsonIgnoringPackageId(cc.validatorlicense.ValidatorLicense.COMPANION)(
+          httpCo
+        ).toSeq
+        cmd <- new cc.coinimport.ImportCrate(
+          svcParty.toProtoPrimitive,
+          license.payload.validator,
+          new IP_ValidatorLicense(license.payload),
+        ).create().commands().asScala.toSeq
+      } yield cmd
+
+    val importCrateCommands: Seq[data.Command] = {
       for {
         httpCo <- contracts
         crate <- fromJsonIgnoringPackageId(cc.coinimport.ImportCrate.COMPANION)(httpCo).toSeq
@@ -78,6 +107,75 @@ object AcsStoreDump {
       } yield cmd
     }
 
-    extractImportCrateCommands ++ coinCommands
+    Seq(coinCommands, validatorLicenseCommands, importCrateCommands).flatten
   }
+
+  def receiveCratesFor(
+      party: PartyId,
+      getImportShipment: (PartyId, TraceContext) => Future[ImportShipment],
+      ledgerConnection: CNLedgerConnection,
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
+  )(implicit
+      ec: ExecutionContext
+  ): Future[Done] = TraceContext.withNewTraceContext(implicit tc => {
+
+    // Note: we receive the crates using individual commands that we submit one-by-one
+    // so that we can make progress even if the domain fees only allow us to receive one crate after the other.
+    def receiveCrates(shipment: ImportShipment): Future[Done] =
+      shipment.crates match {
+        case crate +: otherCrates =>
+          logger.debug(show"Attempting to receive $crate")
+          ledgerConnection
+            .submitCommandsNoDedup(
+              actAs = Seq(party),
+              readAs = Seq(),
+              commands = crate.contract.contractId
+                .exerciseImportCrate_Receive(
+                  party.toProtoPrimitive,
+                  shipment.openRound.contract.contractId,
+                )
+                .commands()
+                .asScala
+                .toSeq,
+              shipment.domainId,
+              disclosedContracts = DisclosedContracts(crate, shipment.openRound),
+            )
+            .flatMap(_ => receiveCrates(shipment.copy(crates = otherCrates)))
+        case _ => Future.successful(Done)
+      }
+
+    def getAndReceiveShipment(): Future[Done] = for {
+      shipment <- getImportShipment(party, tc)
+      _ = logger.debug(
+        show"Attempting to receive ${shipment.crates.size} crates on ${shipment.domainId} for $party"
+      )
+      case Done <- receiveCrates(shipment)
+    } yield {
+      logger.info(show"Received ${shipment.crates.size} crates for $party")
+      Done
+    }
+
+    retryProvider
+      .retryForAutomation(
+        show"receive shipment of crates for $party",
+        getAndReceiveShipment(),
+        logger,
+      )
+      .transform {
+        case scala.util.Success(_) => scala.util.Success(Done)
+        case scala.util.Failure(ex) if retryProvider.isClosing =>
+          logger.debug(
+            s"Ignoring exception when receiving crates for $party, as we are shutting down",
+            ex,
+          )
+          scala.util.Success(Done)
+        case scala.util.Failure(ex) =>
+          logger.error(
+            s"Unexpected exception when receiving crates for $party",
+            ex,
+          )
+          scala.util.Failure(ex)
+      }
+  })
 }

@@ -5,7 +5,7 @@ import com.daml.network.util.ParticipantIdentitiesDump
 
 import java.nio.file.Files
 
-class ParticipantIdentitiesExportImportIntegrationTest extends ParticipantIdentitiesImportTestBase {
+class ParticipantIdentitiesExportIntegrationTest extends ParticipantIdentitiesImportTestBase {
 
   lazy val sv1ParticipantDumpFile: File = Files.createTempFile("sv-participant-dump", ".json")
   lazy val aliceParticipantDumpFile: File =
@@ -52,31 +52,6 @@ class ParticipantIdentitiesExportImportIntegrationTest extends ParticipantIdenti
           Some(validatorPartyBefore),
         )
       )
-    }
-    clue("Writing dumps to file") {
-      sv1ParticipantDumpFile.overwrite(svParticipantDump.toJson.spaces2)
-      aliceParticipantDumpFile.overwrite(validatorParticipantDump.toJson.spaces2)
-    }
-    clue("Stopping nodes before reset") {
-      aliceValidatorBackend.stop()
-      sv1ValidatorBackend.stop()
-      sv1ScanBackend.stop()
-      sv1Backend.stop()
-    }
-
-    usingStandaloneCantonWithNewCn {
-      clue("Starting nodes after reset") {
-        startAllSync(sv1LocalBackend, sv1ScanLocalBackend, aliceValidatorLocalBackend)
-      }
-      clue("Checking that SV identities were transferred correctly") {
-        val svcInfoAfter = sv1LocalBackend.getSvcInfo()
-        svcInfoAfter.svParty shouldBe svcInfoBefore.svParty
-        svcInfoAfter.svcParty shouldBe svcInfoBefore.svcParty
-      }
-      clue("Checking that validator identities were transferred correctly") {
-        val aliceValidatorPartyAfter = aliceValidatorLocalBackend.getValidatorPartyId()
-        aliceValidatorPartyAfter shouldBe validatorPartyBefore
-      }
     }
   }
 }

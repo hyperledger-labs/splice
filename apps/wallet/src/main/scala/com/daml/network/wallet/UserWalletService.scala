@@ -1,12 +1,11 @@
 package com.daml.network.wallet
 
-import akka.Done
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{DisclosedContracts, HasHealth, TemplateJsonDecoder}
-import com.daml.network.util.PrettyInstances.*
+import com.daml.network.store.AcsStoreDump
+import com.daml.network.util.{HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -16,13 +15,11 @@ import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
+import scala.concurrent.ExecutionContext
 
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
 class UserWalletService(
@@ -85,7 +82,13 @@ class UserWalletService(
     loggerFactory,
   )
 
-  private val receiveImportCratesF = receiveImportCrates()
+  private val receiveImportCratesF = AcsStoreDump.receiveCratesFor(
+    key.endUserParty,
+    (party: PartyId, tc0: TraceContext) => scanConnection.getImportShipment(party)(tc0),
+    automation.connection,
+    retryProvider,
+    logger,
+  )
 
   /** The connection to use when submitting commands based on reads from the WalletStore.
     * The submission will wait for the store to ingest the effect of the command before completing the future.
@@ -104,69 +107,4 @@ class UserWalletService(
     store.close()
     super.onClosed()
   }
-
-  private def receiveImportCrates() = TraceContext.withNewTraceContext(implicit tc0 => {
-    val userPartyId = key.endUserParty
-
-    def receive(): Future[Done] = for {
-      domainId <- store.defaultAcsDomainIdF
-      // Important: we need to query the open-round before we list crates, as the availability of an open round signals
-      // that all crates have been ingested in scan.
-      (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()
-      // We're explicitly not checking for the round to be open, as we only need it to supply the CoinPrice for scan.
-      openRound = openRounds
-        .collectFirst { case co if co.state.isAssigned => co }
-        .getOrElse(
-          throw Status.Code.FAILED_PRECONDITION.toStatus
-            .withDescription(
-              show"There is at least one open round in $openRounds that is assigned to a domain."
-            )
-            .asRuntimeException()
-        )
-      crates <- scanConnection.listImportCrates(userPartyId)
-      _ = logger.debug(show"Attempting to receive ${crates.size} crates for $userPartyId")
-      _ <- Future.sequence(crates.map(crate => {
-        logger.debug(show"Attempting to receive $crate")
-        automation.connection.submitCommandsNoDedup(
-          actAs = Seq(userPartyId),
-          readAs = Seq(),
-          commands = crate.contract.contractId
-            .exerciseImportCrate_Receive(
-              userPartyId.toProtoPrimitive,
-              openRound.contract.contractId,
-            )
-            .commands()
-            .asScala
-            .toSeq,
-          domainId,
-          disclosedContracts = DisclosedContracts(crate, openRound),
-        )
-      }))
-    } yield {
-      logger.info(show"Received ${crates.size} crates for $userPartyId")
-      Done
-    }
-
-    retryProvider
-      .retryForAutomation(
-        show"receive import crates for $userPartyId",
-        receive(),
-        logger,
-      )
-      .transform {
-        case scala.util.Success(_) => scala.util.Success(Done)
-        case scala.util.Failure(ex) if isClosing =>
-          logger.debug(
-            s"Ignoring exception when receiving crates for $userPartyId, as we are shutting down",
-            ex,
-          )
-          scala.util.Success(Done)
-        case scala.util.Failure(ex) =>
-          logger.error(
-            s"Unexpected exception when receiving crates for $userPartyId",
-            ex,
-          )
-          scala.util.Failure(ex)
-      }
-  })
 }

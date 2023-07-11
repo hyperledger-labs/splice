@@ -26,6 +26,7 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
+  AcsStoreDump,
   CNNodeAppStoreWithoutHistory,
   ConfiguredDefaultDomain,
   InMemoryMultiDomainAcsStore,
@@ -35,6 +36,8 @@ import com.daml.network.store.{
 }
 import com.daml.network.store.MultiDomainAcsStore.{
   ContractCompanion,
+  ContractState,
+  ContractWithState,
   JsonAcsSnapshot,
   QueryResult,
   ReadyContract,
@@ -778,6 +781,25 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
 
   def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
     multiDomainAcsStore.getJsonAcsSnapshot(ignoredContractsForAcsDump)
+
+  def getImportShipmentFor(
+      receiver: PartyId
+  )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment] =
+    for {
+      domainId <- this.defaultAcsDomainIdF
+      openRound <- this.getLatestActiveOpenMiningRound()
+      // Listing all crates is OK, as we assume the number of crates is small.
+      allCrates <- multiDomainAcsStore.listContracts(cc.coinimport.ImportCrate.COMPANION)
+      cratesForReceiver = allCrates.filter(crate =>
+        crate.contract.payload.receiver == receiver.toProtoPrimitive
+      )
+    } yield AcsStoreDump.ImportShipment(
+      // It would be better if we received the ContractWithState directly from the underlying store.
+      // This is OK though, as eventually the defaulAcsDomainIdF and the domain of the openRound should align.
+      ContractWithState(openRound, ContractState.Assigned(domainId)),
+      domainId,
+      cratesForReceiver,
+    )
 
   protected[this] def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,

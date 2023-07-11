@@ -12,7 +12,8 @@ import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.store.MultiDomainAcsStore.ContractWithState
+import com.daml.network.store.AcsStoreDump
+import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
 import com.daml.network.util.{CNNodeUtil, Contract, DisclosedContracts, TemplateJsonDecoder}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -21,6 +22,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
@@ -311,6 +313,34 @@ final class ScanConnection private (
       config.adminApi.url,
       HttpScanAppClient.ListImportCrates(party),
     )
+
+  def getImportShipment(
+      party: PartyId
+  )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment] = {
+    for {
+      // Important: we need to query the open-round before we list crates, as the availability of an open round signals
+      // that all crates have been ingested in scan.
+      (openRounds, _) <- getOpenAndIssuingMiningRounds()
+      // We're explicitly not checking for the round to be open, as we only need it to supply the CoinPrice for scan.
+      (openRound, domainId) = openRounds
+        .collectFirst(
+          Function.unlift(co =>
+            co.state match {
+              case ContractState.Assigned(domainId) => Some((co, domainId))
+              case ContractState.InFlight => None
+            }
+          )
+        )
+        .getOrElse(
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              show"There is at least one open round in $openRounds that is assigned to a domain."
+            )
+            .asRuntimeException()
+        )
+      crates <- listImportCrates(party)
+    } yield AcsStoreDump.ImportShipment(openRound, domainId, crates)
+  }
 
 }
 

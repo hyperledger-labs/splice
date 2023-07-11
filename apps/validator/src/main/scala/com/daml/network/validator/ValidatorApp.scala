@@ -36,7 +36,7 @@ import com.daml.network.http.v0.validatorPublic.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.setup.ParticipantInitializer
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{HasHealth, UploadablePackage}
@@ -67,7 +67,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
@@ -233,7 +233,7 @@ class ValidatorApp(
     }
   }
 
-  private def ensureOnboarded(
+  private def ensureValidatorIsOnboarded(
       store: ValidatorStore,
       validatorParty: PartyId,
       onboardingConfig: Option[ValidatorOnboardingConfig],
@@ -420,6 +420,18 @@ class ValidatorApp(
           domainId,
         )
       })
+      // Receive the import crates for the validator party here, so that we can skip onboarding if there is a crate
+      // containing a validator license. This MAY contend in a benign fashion with the crate receipt in the
+      // 'UserWalletService' in case the validator app is restarted within its initialization sequence.
+      _ <- AcsStoreDump.receiveCratesFor(
+        validatorParty,
+        (party: PartyId, tc0: TraceContext) => scanConnection.getImportShipment(party)(tc0),
+        // Use the ValidatorStore's associated connection, so the later check whether a ValidatorLicense exists runs
+        // against the store updated with the results of the crate import.
+        automation.connection,
+        retryProvider,
+        logger,
+      )
       _ <- withGlobalLock[Unit, PartyId](
         ValidatorUtil.onboard(
           endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
@@ -433,7 +445,8 @@ class ValidatorApp(
           logger,
         )
       )
-      _ <- ensureOnboarded(store, validatorParty, config.onboarding)
+
+      _ <- ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)

@@ -321,10 +321,9 @@ class FoundingNodeInitializer(
           requiredDars,
           noLock,
         )
-        optOpenMiningRounds <- importAcsSnapshot()
         _ <- retryProvider.retryForAutomation(
           "bootstrapping SVC",
-          bootstrapSvc(optOpenMiningRounds),
+          bootstrapSvc(),
           logger,
         )
       } yield ()
@@ -332,8 +331,11 @@ class FoundingNodeInitializer(
 
     private def importAcsSnapshot(): Future[Option[Seq[cc.round.OpenMiningRound]]] =
       foundingConfig.bootstrappingDump match {
-        case None => Future.successful(None)
+        case None =>
+          logger.debug("Skipping importing an ACS snapshot, as none was configured.")
+          Future.successful(None)
         case Some(config) =>
+          logger.debug(s"Attempting to import ACS snapshot from ${config.description}")
           for {
             existingCrates <- svcStore.multiDomainAcsStore.listReadyContracts(
               cc.coinimport.ImportCrate.COMPANION,
@@ -351,7 +353,6 @@ class FoundingNodeInitializer(
               blocking {
                 val jsonString = config match {
                   case SvBootstrapDumpConfig.File(file) =>
-                    logger.info(s"Parsing contracts in ACS store dump: ${file.toAbsolutePath}")
                     better.files.File(file).contentAsString
                   case SvBootstrapDumpConfig.Gcp(bucketConfig, path) =>
                     val bucket = new GcpBucket(bucketConfig, loggerFactory)
@@ -398,12 +399,9 @@ class FoundingNodeInitializer(
           }
       }
 
-    // Create SvcRules and CoinRules and open the first mining round
-    private def bootstrapSvc(
-        optOpenMiningRounds: Option[Seq[cc.round.OpenMiningRound]]
-    ): Future[Unit] = {
+    // Import AcsSnapshot and Create SvcRules and CoinRules and open the first mining round
+    private def bootstrapSvc(): Future[Unit] = {
       for {
-        coinRules <- svcStore.lookupCoinRules()
         participantId <- participantAdminConnection.getParticipantId()
         svcRulesConfig = SvUtil.defaultSvcRulesConfig()
         trafficStateForAllMembers <- localDomainNode.sequencerAdminConnection
@@ -428,9 +426,9 @@ class FoundingNodeInitializer(
           Long.MaxValue,
           participantId.uid.namespace.fingerprint,
         )
-        founderDomainNodes <- SvUtil
-          .getFounderDomainNodeConfig(cometBftNode)
-        _ <- svcStore.lookupSvcRulesWithOffset().flatMap {
+        coinRules <- svcStore.lookupCoinRules()
+        svcRules <- svcStore.lookupSvcRulesWithOffset()
+        _ <- svcRules match {
           case QueryResult(offset, None) => {
             coinRules match {
               case Some(coinRules) =>
@@ -439,44 +437,49 @@ class FoundingNodeInitializer(
                     show"This should never happen.\nCoinRules: $coinRules"
                 )
               case None =>
-                logger.info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
-                svcStoreWithIngestion.connection
-                  .submitCommands(
-                    actAs = Seq(svcParty),
-                    readAs = Seq.empty,
-                    commands = new cn.svcbootstrap.SvcBootstrap(
-                      svcParty.toProtoPrimitive,
-                      svParty.toProtoPrimitive,
-                      foundingConfig.name,
-                      founderDomainNodes,
-                      defaultCoinConfig(
-                        foundingConfig.initialTickDuration,
-                        foundingConfig.initialMaxNumInputs,
-                        domainId,
-                      ),
-                      foundingConfig.initialCoinPrice.bigDecimal,
-                      svcRulesConfig,
-                      optOpenMiningRounds.map(_.asJava).toJava,
-                      trafficStateForAllMembers
-                        .map(m =>
-                          m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(
-                            m.trafficState.extraTrafficConsumed.value
+                for {
+                  optOpenMiningRounds <- importAcsSnapshot()
+                  founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(cometBftNode)
+                  _ = logger
+                    .info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
+                  _ <- svcStoreWithIngestion.connection
+                    .submitCommands(
+                      actAs = Seq(svcParty),
+                      readAs = Seq.empty,
+                      commands = new cn.svcbootstrap.SvcBootstrap(
+                        svcParty.toProtoPrimitive,
+                        svParty.toProtoPrimitive,
+                        foundingConfig.name,
+                        founderDomainNodes,
+                        defaultCoinConfig(
+                          foundingConfig.initialTickDuration,
+                          foundingConfig.initialMaxNumInputs,
+                          domainId,
+                        ),
+                        foundingConfig.initialCoinPrice.bigDecimal,
+                        svcRulesConfig,
+                        optOpenMiningRounds.map(_.asJava).toJava,
+                        trafficStateForAllMembers
+                          .map(m =>
+                            m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(
+                              m.trafficState.extraTrafficConsumed.value
+                            )
                           )
-                        )
-                        .toMap
-                        .asJava,
-                      defaultEnabledChoices,
-                      foundingConfig.isDevNet,
-                    ).createAnd
-                      .exerciseSvcBootstrap_Bootstrap()
-                      .commands
-                      .asScala
-                      .toSeq,
-                    commandId = CNLedgerConnection
-                      .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
-                    deduplicationOffset = offset,
-                    domainId = domainId,
-                  )
+                          .toMap
+                          .asJava,
+                        defaultEnabledChoices,
+                        foundingConfig.isDevNet,
+                      ).createAnd
+                        .exerciseSvcBootstrap_Bootstrap()
+                        .commands
+                        .asScala
+                        .toSeq,
+                      commandId = CNLedgerConnection
+                        .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
+                      deduplicationOffset = offset,
+                      domainId = domainId,
+                    )
+                } yield ()
             }
           }
           case QueryResult(_, Some(ReadyContract(svcRules, _))) =>

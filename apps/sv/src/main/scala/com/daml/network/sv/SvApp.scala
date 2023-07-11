@@ -25,7 +25,7 @@ import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.setup.ParticipantInitializer
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
@@ -984,8 +984,16 @@ object SvApp {
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
     val store = svcStoreWithIngestion.store
     val svParty = store.key.svParty
-    logger.debug("Creating validator license for SV party")
+    logger.debug("Receiving or creating validator license for SV party")
     for {
+      _ <- AcsStoreDump.receiveCratesFor(
+        svParty,
+        (party: PartyId, tc0: TraceContext) =>
+          svcStoreWithIngestion.store.getImportShipmentFor(party)(tc0),
+        svcStoreWithIngestion.connection,
+        retryProvider,
+        logger,
+      )
       _ <- retryProvider.retryForAutomation(
         "Create validator license for SV party",
         for {
@@ -995,7 +1003,7 @@ object SvApp {
           )
           _ <- validatorLicense match {
             case QueryResult(_, Some(_)) =>
-              logger.debug("Validator license for SV party already exists")
+              logger.info("Validator license for SV party already exists")
               Future.unit
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
@@ -1020,7 +1028,7 @@ object SvApp {
                   domainId = globalDomain,
                 )
                 .map { _ =>
-                  logger.debug("Created validator license for SV party")
+                  logger.info("Created validator license for SV party")
                 }
           }
         } yield (),
