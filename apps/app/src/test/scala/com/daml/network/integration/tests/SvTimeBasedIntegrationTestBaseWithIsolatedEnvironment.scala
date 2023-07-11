@@ -5,6 +5,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
+  CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.sv.util.SvUtil
@@ -14,19 +15,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import java.time.{Instant, Duration as JavaDuration}
 import scala.concurrent.duration.*
 
-class SvTimeBasedIntegrationTestBase
-    extends CNNodeIntegrationTest
-    with SvTestUtil
-    with WalletTestUtil
-    with TimeTestUtil {
-
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .withManualStart
-      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
-      .withoutAutomaticRewardsCollectionAndCoinMerging
+trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with TimeTestUtil {
 
   protected def readyToAdvanceAt(rounds: OpenMiningRoundsTriplet): Instant = {
     Ordering[Instant].max(
@@ -108,4 +97,27 @@ class SvTimeBasedIntegrationTestBase
         ) shouldBe (expectedDuration plus expectedDuration)
     }
   }
+}
+
+abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
+    extends CNNodeIntegrationTest
+    with SvTimeBasedIntegrationTestUtil {
+  override def environmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
+      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .withManualStart
+      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
+      .withoutAutomaticRewardsCollectionAndCoinMerging
+}
+
+abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
+    extends CNNodeIntegrationTestWithSharedEnvironment
+    with SvTimeBasedIntegrationTestUtil {
+  override def environmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
+      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
+      .withoutAutomaticRewardsCollectionAndCoinMerging
 }

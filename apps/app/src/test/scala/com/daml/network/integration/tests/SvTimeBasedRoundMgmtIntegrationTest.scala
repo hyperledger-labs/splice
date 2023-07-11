@@ -15,7 +15,7 @@ import java.time.{Duration as JavaDuration}
 import scala.jdk.CollectionConverters.*
 
 class SvTimeBasedRoundMgmtIntegrationTest
-    extends SvTimeBasedIntegrationTestBase
+    extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     with ConfigScheduleUtil {
 
   "round management" in { implicit env =>
@@ -96,7 +96,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
   }
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
-    initSvc()
+    initSvcWithSv1Only()
     val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
 
     val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
@@ -196,7 +196,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
   }
 
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
-    initSvc()
+    initSvcWithSv1Only()
     val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
 
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
@@ -371,7 +371,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
   }
 
   "round management with very tightly scheduled config" in { implicit env =>
-    initSvc()
+    initSvcWithSv1Only()
     val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
 
     val config101 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 101)

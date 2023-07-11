@@ -17,7 +17,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery
 
 /** You must `start-canton` with `-g` to run this test locally. */
 class GlobalDomainUpgradeTimeBasedIntegrationTest
-    extends SvTimeBasedIntegrationTestBase
+    extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     with ConfigScheduleUtil {
   private[this] val globalUpgradeDomain = DomainAlias.tryCreate("global-upgrade")
 

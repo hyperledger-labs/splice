@@ -12,10 +12,9 @@ import org.slf4j.event.Level
 import scala.jdk.CollectionConverters.*
 import java.math.RoundingMode
 
-class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase {
+class SvTimeBasedIssuanceIntegrationTest
+    extends SvTimeBasedIntegrationTestBaseWithSharedEnvironment {
   "SVs collect SvcReward and SvReward automatically" in { implicit env =>
-    initSvc()
-
     eventually() {
       val rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, svcParty)
       rounds should have size 3
@@ -61,62 +60,79 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
         }
       }
     }
-  }
 
-  "SvReward collection works even if some rewards are too old to collect" in { implicit env =>
-    initSvc()
-    val sv4Party = sv4Backend.getSvcInfo().svParty
-    clue("Stopping SV4 so it can't collect its rewards") {
-      sv4Backend.stop()
+    clue("SvReward collection works even if some rewards are too old to collect") {
+      val sv4Party = sv4Backend.getSvcInfo().svParty
+      clue("Stopping SV4 so it can't collect its rewards") {
+        sv4Backend.stop()
+      }
+      val (_, existingCoins) = actAndCheck(
+        "Advancing by 12 rounds",
+        (1 to 11).foreach(_ => advanceRoundsByOneTick),
+      )(
+        "SV4 has 11 unclaimed rewards contracts",
+        _ => {
+          sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cn.svcrules.SvReward.COMPANION)(
+              svcParty
+            )
+            .filter(_.data.sv == sv4Party.toProtoPrimitive) should have length 11
+          val coinsSet = sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cc.coin.Coin.COMPANION)(sv4Party)
+            .map(_.id)
+            .toSet
+          coinsSet should have size 1
+          coinsSet
+        },
+      )
+      actAndCheck()(
+        "SV4 starts again",
+        sv4Backend.startSync(),
+      )(
+        "SV4 collects all rewards it can and leaves the one it can't",
+        _ => {
+          sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cn.svcrules.SvReward.COMPANION)(
+              svcParty
+            ) should have length 1
+          // excluded existing coins
+          sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cc.coin.Coin.COMPANION)(
+              sv4Party,
+              c => !existingCoins.contains(c.id),
+            ) should have length 10
+        },
+      )
+      actAndCheck(
+        "We advance by another round",
+        advanceRoundsByOneTick,
+      )(
+        // TODO(#5059) Implement expiry of SV rewards that are too old
+        "The new reward gets collected by SV4, the old ones still remain (until we implement expiry)",
+        _ => {
+          sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cn.svcrules.SvReward.COMPANION)(
+              svcParty
+            )
+            .filter(_.data.sv == sv4Party.toProtoPrimitive) should have length 1
+
+          // excluded existing coins
+          sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cc.coin.Coin.COMPANION)(
+              sv4Party,
+              c => !existingCoins.contains(c.id),
+            ) should have length 11
+        },
+      )
     }
-    actAndCheck(
-      "Advancing by 12 rounds",
-      (1 to 11).foreach(_ => advanceRoundsByOneTick),
-    )(
-      "SV4 has 11 unclaimed rewards contracts",
-      _ => {
-        sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.SvReward.COMPANION)(
-            svcParty
-          )
-          .filter(_.data.sv == sv4Party.toProtoPrimitive) should have length 11
-        sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(sv4Party) should have length 0
-      },
-    )
-    actAndCheck(
-      "SV4 starts again",
-      sv4Backend.startSync(),
-    )(
-      "SV4 collects all rewards it can and leaves the one it can't",
-      _ => {
-        sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.SvReward.COMPANION)(
-            svcParty
-          ) should have length 1
-        sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(sv4Party) should have length 10
-      },
-    )
-    actAndCheck(
-      "We advance by another round",
-      advanceRoundsByOneTick,
-    )(
-      // TODO(#5059) Implement expiry of SV rewards that are too old
-      "The new reward gets collected by SV4, the old ones still remain (until we implement expiry)",
-      _ => {
-        sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.SvReward.COMPANION)(
-            svcParty
-          ) should have length 1
-        sv4Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.coin.Coin.COMPANION)(sv4Party) should have length 11
-      },
-    )
   }
 
   "calculation of issuance per coin" in { implicit env =>
-    initSvc()
+    val latestIssueRoundOpt = getSortedIssuingRounds(
+      sv1Backend.participantClientWithAdminToken,
+      svcParty,
+    ).lastOption
+    val currentRoundNum = latestIssueRoundOpt.map(_.data.round.number.toLong).getOrElse(0L) + 1L
 
     // 3 unfeatured app rewards & 3 featured app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
     // to check we sum up but only for the right round.
@@ -127,21 +143,21 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
         svcParty.toProtoPrimitive,
         true,
         BigDecimal(1.0).bigDecimal,
-        new Round(0),
+        new Round(currentRoundNum),
       ),
       new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         true,
         BigDecimal(199.0).bigDecimal,
-        new Round(0),
+        new Round(currentRoundNum),
       ),
       new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         true,
         BigDecimal(3.0).bigDecimal,
-        new Round(1),
+        new Round(currentRoundNum + 1L),
       ),
       // unfeatured app rewards for a total of 9800.0 in round 0
       new AppRewardCoupon(
@@ -149,40 +165,40 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
         svcParty.toProtoPrimitive,
         false,
         BigDecimal(2.5).bigDecimal,
-        new Round(0),
+        new Round(currentRoundNum),
       ),
       new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         false,
         BigDecimal(9797.5).bigDecimal,
-        new Round(0),
+        new Round(currentRoundNum),
       ),
       new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         false,
         BigDecimal(5.0).bigDecimal,
-        new Round(1),
+        new Round(currentRoundNum + 1L),
       ),
       // validator rewards for a total of 10000.0 in round 0
       new ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         BigDecimal(3.0).bigDecimal,
-        new Round(0),
+        new Round(currentRoundNum),
       ),
       new ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         BigDecimal(9997.0).bigDecimal,
-        new Round(0),
+        new Round(currentRoundNum),
       ),
       new ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         BigDecimal(15.0).bigDecimal,
-        new Round(1),
+        new Round(currentRoundNum + 1L),
       ),
     )
     // Create a bunch of rewards directly
@@ -196,10 +212,15 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
       {
         advanceRoundsByOneTick
         eventually() {
-          getSortedIssuingRounds(
+          val latestIssueRoundAfter1Tick = getSortedIssuingRounds(
             sv1Backend.participantClientWithAdminToken,
             svcParty,
-          ) should have size 1
+          ).lastOption.value
+          latestIssueRoundOpt.fold {
+            latestIssueRoundAfter1Tick.data.round.number shouldBe 0
+          } { latestIssueRound =>
+            latestIssueRoundAfter1Tick.data.round.number shouldBe latestIssueRound.data.round.number + 1L
+          }
         }
       },
       entries =>
@@ -213,13 +234,12 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
 
     def decimal(d: Double): java.math.BigDecimal = BigDecimal(d).setScale(10).bigDecimal
 
-    val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, svcParty)
+    val issuingRound =
+      getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, svcParty).lastOption.value
 
-    inside(issuingRounds) { case Seq(issuingRound) =>
-      issuingRound.data.issuancePerValidatorRewardCoupon shouldBe decimal(0.2000000000)
-      issuingRound.data.issuancePerFeaturedAppRewardCoupon shouldBe decimal(100.0000000000)
-      issuingRound.data.issuancePerUnfeaturedAppRewardCoupon shouldBe decimal(0.6000000000)
-    }
+    issuingRound.data.issuancePerValidatorRewardCoupon shouldBe decimal(0.2000000000)
+    issuingRound.data.issuancePerFeaturedAppRewardCoupon shouldBe decimal(100.0000000000)
+    issuingRound.data.issuancePerUnfeaturedAppRewardCoupon shouldBe decimal(0.6000000000)
   }
 
   "collect expired reward coupons" in { implicit env =>
@@ -238,7 +258,6 @@ class SvTimeBasedIssuanceIntegrationTest extends SvTimeBasedIntegrationTestBase 
           )
     }
 
-    initSvc()
     startAllSync(aliceValidatorBackend, bobValidatorBackend)
 
     val round =

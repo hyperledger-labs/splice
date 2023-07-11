@@ -66,11 +66,6 @@ object CNNodeTests {
       env.minimalSvcApps.local.foreach(_.start())
       env.minimalSvcApps.local.foreach(_.waitForInitialization())
     }
-
-    protected def startAllSync(nodes: CNNodeAppBackendReference*): Unit = {
-      nodes.foreach(_.start())
-      nodes.foreach(_.waitForInitialization())
-    }
   }
 
   trait CNNodeIntegrationTestWithSharedEnvironment
@@ -346,6 +341,11 @@ object CNNodeTests {
 
     implicit def javaToScalaContractId[T](cid: ContractId[T]): LfContractId =
       LfContractId.assertFromString(cid.contractId)
+
+    protected def startAllSync(nodes: CNNodeAppBackendReference*): Unit = {
+      nodes.foreach(_.start())
+      nodes.foreach(_.waitForInitialization())
+    }
   }
 
   object BracketSynchronous {
