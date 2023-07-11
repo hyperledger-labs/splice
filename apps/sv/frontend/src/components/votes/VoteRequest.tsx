@@ -98,7 +98,18 @@ const VoteRequest: React.FC = () => {
           <Typography variant="h5">Reason</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h6">URL</Typography>
+            <Typography variant="h6">Summary</Typography>
+            <TextField
+              id="create-reason-description"
+              rows={4}
+              multiline
+              onChange={e => setDescription(e.target.value)}
+              value={description}
+            />
+          </Stack>
+
+          <Stack direction="column" mb={4} spacing={1}>
+            <Typography variant="h6">URL:</Typography>
             <Box display="flex">
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
                 <TextField
@@ -107,18 +118,10 @@ const VoteRequest: React.FC = () => {
                   value={url}
                 />
               </FormControl>
+              <Button size={'small'} onClick={() => window.open(url, '_blank')}>
+                Open
+              </Button>
             </Box>
-          </Stack>
-
-          <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h6">Description</Typography>
-            <TextField
-              id="create-reason-description"
-              rows={4}
-              multiline
-              onChange={e => setDescription(e.target.value)}
-              value={description}
-            />
           </Stack>
 
           <Button

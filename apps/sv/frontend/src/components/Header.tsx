@@ -40,7 +40,9 @@ const Header: React.FC = () => {
         fontWeight={theme => theme.fonts.monospace.fontWeight}
         id="app-title"
       >
-        Super Validator Operations
+        <Link href={'/svc'} style={{ color: 'inherit', textDecoration: 'none' }}>
+          Super Validator Operations
+        </Link>
       </Typography>
       <Stack direction="row" spacing={4} alignItems="center">
         {navLinks.map((navLink, index) => (

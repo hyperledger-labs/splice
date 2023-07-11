@@ -2,6 +2,7 @@ import { CopyableTypography, DateDisplay, Loading, SvClientProvider } from 'comm
 import { Contract } from 'common-frontend';
 import React, { useMemo, useState } from 'react';
 
+import { ClickAwayListener } from '@mui/base';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -138,22 +139,24 @@ const ListVoteRequests: React.FC = () => {
         aria-describedby="voterequest-modal-description"
       >
         <Box sx={{ flex: 1, overflowY: 'scroll', maxHeight: '100%' }}>
-          <Container maxWidth="md" sx={{ marginTop: '64px' }}>
-            <Card variant="elevation" sx={{ backgroundColor: '#2F2F2F' }}>
-              <CardHeader
-                title="Vote Request"
-                action={
-                  <IconButton onClick={handleClose}>
-                    <CloseIcon />
-                  </IconButton>
-                }
-              />
-              <VoteRequestModalContent
-                voteRequestContractId={voteRequestContractId}
-                handleClose={handleClose}
-              />
-            </Card>
-          </Container>
+          <ClickAwayListener onClickAway={handleClose}>
+            <Container maxWidth="md" sx={{ marginTop: '64px' }}>
+              <Card variant="elevation" sx={{ backgroundColor: '#2F2F2F' }}>
+                <CardHeader
+                  title="Vote Request"
+                  action={
+                    <IconButton onClick={handleClose}>
+                      <CloseIcon />
+                    </IconButton>
+                  }
+                />
+                <VoteRequestModalContent
+                  voteRequestContractId={voteRequestContractId}
+                  handleClose={handleClose}
+                />
+              </Card>
+            </Container>
+          </ClickAwayListener>
         </Box>
       </Modal>
     </>

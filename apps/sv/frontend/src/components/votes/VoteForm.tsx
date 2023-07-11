@@ -119,7 +119,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
               </TableRow>
               <TableRow>
                 <TableCell>
-                  <Typography variant="h6">Vote Reason</Typography>
+                  <Typography variant="h6">Vote Reason Summary</Typography>
                 </TableCell>
                 <TableCell>
                   {isEditing ? (
@@ -141,7 +141,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
               </TableRow>
               <TableRow>
                 <TableCell>
-                  <Typography variant="h6">Reason Url</Typography>
+                  <Typography variant="h6">Vote Reason URL</Typography>
                 </TableCell>
                 <TableCell>
                   {isEditing ? (

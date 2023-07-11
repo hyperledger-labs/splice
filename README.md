@@ -910,6 +910,8 @@ our own apps. Here we use the topology from our tests:
 ./scripts/start-backends-for-local-frontend-testing.sh
 ```
 
+Note you can add the flag ``-s`` to skip ``sbt --batch bundle``.
+
 3. To build and start the frontends, type:
 ```
 ./start-frontends.sh
