@@ -4,8 +4,10 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
+import cats.data.OptionT
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
+import cats.syntax.traverse.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -59,6 +61,7 @@ import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.circe.Json
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -282,6 +285,8 @@ class SvApp(
         )
         .getOrElse(Future.unit)
 
+      _ <- waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
+
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
@@ -414,6 +419,47 @@ class SvApp(
           loggerFactory,
         )
       )
+  }
+
+  private def waitUntilConfiguredOnboardingContractsHaveBeenCreated(
+      store: SvSvStore
+  ): Future[Unit] = {
+    retryProvider.waitUntil(
+      "Onboarding contracts have been created", {
+        val expectedValidatorOnboardingSecrets = config.expectedValidatorOnboardings.map(_.secret)
+        val approvedSvIdentities = config.approvedSvIdentities.map(_.name)
+        for {
+          createdValidatorOnboardingSecrets <- expectedValidatorOnboardingSecrets.traverse {
+            secret =>
+              OptionT(store.lookupValidatorOnboardingBySecret(secret))
+                .map(_ => ())
+                .orElse(OptionT(store.lookupUsedSecret(secret)).map(_ => ()))
+                .value
+          }
+          createdApprovedSvIdentities <- approvedSvIdentities.traverse(
+            store.lookupApprovedSvIdentityByName(_)
+          )
+          missingOnboardingSecrets = createdValidatorOnboardingSecrets.zipWithIndex.filter(
+            _._1.isEmpty
+          )
+          missingApprovedIdentities = createdApprovedSvIdentities.zipWithIndex.filter(_._1.isEmpty)
+          _ <-
+            if (missingOnboardingSecrets.isEmpty && missingApprovedIdentities.isEmpty) {
+              Future.unit
+            } else {
+              Future.failed(
+                Status.NOT_FOUND
+                  .withDescription(
+                    s"Missing ${missingOnboardingSecrets.size}/${expectedValidatorOnboardingSecrets.size} onboarding secrets" +
+                      s" and ${missingApprovedIdentities.size}/${approvedSvIdentities.size} approved identities."
+                  )
+                  .asRuntimeException()
+              )
+            }
+        } yield ()
+      },
+      logger,
+    )
   }
 
   private def expectConfiguredValidatorOnboardings(
