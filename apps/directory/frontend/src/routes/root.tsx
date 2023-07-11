@@ -72,7 +72,7 @@ const Root: React.FC = () => {
         userAction="Please try again later. If the problem persists, contact the application operator."
       />
     );
-  } else if (directoryInstall.isLoading || primaryPartyQuery.isLoading) {
+  } else if (directoryInstall.isLoading || !directoryInstall.data || primaryPartyQuery.isLoading) {
     content = <Loading />;
   } else {
     content = <Outlet />;
@@ -102,8 +102,7 @@ const Root: React.FC = () => {
             </Button>
           </Toolbar>
         </Box>
-        {/* no need to show the app if it won't be usable. Creating DirectoryInstall should be fast. */}
-        {directoryInstall.data ? content : <Loading />}
+        {content}
       </Box>
     </ErrorBoundary>
   );
