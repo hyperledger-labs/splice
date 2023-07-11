@@ -3,13 +3,14 @@ package com.daml.network.integration.tests
 import com.daml.network.config.BackupDumpConfig
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.ParticipantIdentitiesDump
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 final class CombinedDumpDirectoryExportTimeBasedIntegrationTest
     extends AcsStoreDumpExportTimeBasedIntegrationTestBase[BackupDumpConfig.Directory] {
   override def acsStoreDumpConfig(testContext: String) =
     BackupDumpConfig.Directory(
       AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir,
-      None,
+      NonNegativeFiniteDuration.ofMinutes(10),
     )
 
   override def readDump(filename: String) = {

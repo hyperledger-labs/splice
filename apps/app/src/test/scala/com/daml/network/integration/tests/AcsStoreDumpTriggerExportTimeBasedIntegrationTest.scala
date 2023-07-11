@@ -20,6 +20,7 @@ import com.daml.network.util.{
   TimeTestUtil,
   WalletTestUtil,
 }
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.Assertion
 
@@ -292,7 +293,11 @@ final class GcpBucketAcsStoreDumpExportTimeBasedIntegrationTest
   val bucketConfig = GcpBucketConfig.inferForTesting
 
   override def acsStoreDumpConfig(testContext: String) =
-    BackupDumpConfig.Gcp(bucketConfig, prefix = Some(testContext), None)
+    BackupDumpConfig.Gcp(
+      bucketConfig,
+      prefix = Some(testContext),
+      NonNegativeFiniteDuration.ofMinutes(10),
+    )
 
   override def readDump(filename: String) = {
     val bucket = new GcpBucket(bucketConfig, loggerFactory)

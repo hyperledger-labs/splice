@@ -40,6 +40,16 @@ class SvSvcAutomationService(
       retryProvider,
     ) {
 
+  config.acsStoreDump.foreach(config =>
+    registerTrigger(
+      new PeriodicAcsStoreBackupTrigger(
+        config,
+        triggerContext,
+        svcStore,
+      )
+    )
+  )
+
   registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, connection))
   if (config.automation.enableSvRewards) {

@@ -10,19 +10,27 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
 import com.daml.network.codegen.java.cn.{cometbft, svc}
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.config.BackupDumpConfig
+import com.daml.network.environment.BuildInfo
+import com.daml.network.http.v0.definitions as http
+import com.daml.network.store.MultiDomainAcsStore.JsonAcsSnapshot
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.util.Contract
-import com.digitalasset.canton.tracing.TraceContext
+import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.util.{BackupDump, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
+import com.digitalasset.canton.tracing.TraceContext
 
-import java.security.{KeyFactory, SecureRandom, Signature}
+import java.nio.file.{Path, Paths}
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
+import java.security.{KeyFactory, SecureRandom, Signature}
 import java.time.Duration as JavaDuration
 import java.util.Base64
 import java.util.concurrent.TimeUnit
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 
 object SvUtil {
@@ -190,4 +198,48 @@ object SvUtil {
   def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
     duration.toInternal.toScala.toMicros
   )
+
+  def writeAcsStoreDump(
+      acsDumpConfig: BackupDumpConfig,
+      loggerFactory: NamedLoggerFactory,
+      svcStore: SvSvcStore,
+      clock: Clock,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[(Path, JsonAcsSnapshot)] = {
+    val logger = loggerFactory.getTracedLogger(this.getClass)
+    implicit val elc: ErrorLoggingContext =
+      ErrorLoggingContext(logger, NamedLoggerFactory.root.properties, tc)
+
+    val now = clock.now.toInstant
+    val filename = Paths.get(
+      s"svc_acs_dump_${now}.json"
+    )
+    logger.debug(
+      s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription} at path: $filename"
+    )
+    for {
+      snapshot <- svcStore.getJsonAcsSnapshot()
+      response <- Future {
+        blocking {
+          import io.circe.syntax.*
+
+          val httpSnapshot = http.GetAcsStoreDumpResponse(
+            offset = snapshot.offset,
+            contracts = snapshot.contracts.map(_.toJson).toVector,
+            version = Some(BuildInfo.compiledVersion),
+          )
+          val fileDesc =
+            s"ACS store dump for offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts"
+          val path = BackupDump.write(
+            acsDumpConfig,
+            filename,
+            httpSnapshot.asJson.noSpaces,
+            loggerFactory,
+          )
+
+          logger.info(s"Wrote $fileDesc to ${acsDumpConfig.locationDescription} at path: $filename")
+          (path, snapshot)
+        }
+      }
+    } yield response
+  }
 }

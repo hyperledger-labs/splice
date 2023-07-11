@@ -54,14 +54,11 @@ class ValidatorAutomationService(
     )
   )
   backupDumpConfig.foreach(config =>
-    config.backupInterval.foreach(interval =>
-      registerTrigger(
-        new PeriodicParticipantIdentitiesBackupTrigger(
-          config.locationDescription,
-          interval,
-          triggerContext,
-          participantIdentitiesStore,
-        )
+    registerTrigger(
+      new PeriodicParticipantIdentitiesBackupTrigger(
+        config,
+        triggerContext,
+        participantIdentitiesStore,
       )
     )
   )

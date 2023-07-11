@@ -10,8 +10,8 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
+import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.{
-  BuildInfo,
   CNLedgerConnection,
   ParticipantAdminConnection,
   RetryProvider,
@@ -22,7 +22,6 @@ import com.daml.network.http.v0.definitions.{
   CometBftStatusOrError,
   ErrorResponse,
 }
-import com.daml.network.config.BackupDumpConfig
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
@@ -33,7 +32,7 @@ import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
-import com.daml.network.util.{BackupDump, Codec, Contract}
+import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -46,7 +45,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.{Base64, UUID}
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
@@ -428,49 +427,21 @@ class HttpSvHandler(
             .asRuntimeException()
         )
       case Some(acsDumpConfig: BackupDumpConfig) =>
-        logger.debug(s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription}")
         for {
           // Note: we expect the snapshots to be small enough to be delivered within the request timeout.
-          snapshot <- svcStore.getJsonAcsSnapshot()
-          response <- Future {
-            blocking {
-              import io.circe.syntax.*
-              import java.nio.file.Paths
-
-              // determine target file
-              val now = clock.now.toInstant
-              // Deliberately not using better files here
-              // because it turns this into an absolute path which
-              // then makes all the logging stuff below very confusing.
-              val filename = Paths.get(
-                s"svc_acs_dump_${now}.json"
-              )
-              val httpSnapshot = definitions.GetAcsStoreDumpResponse(
-                offset = snapshot.offset,
-                contracts = snapshot.contracts.map(_.toJson).toVector,
-                version = Some(BuildInfo.compiledVersion),
-              )
-              val fileDesc =
-                s"ACS store dump as-of offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts to $filename"
-              logger.debug(s"Attempting to write $fileDesc")
-              val path = BackupDump.write(
-                acsDumpConfig,
-                filename,
-                httpSnapshot.asJson.noSpaces,
-                loggerFactory,
-              )
-
-              logger.info(s"Wrote $fileDesc")
-              v0.SvResource.TriggerAcsDumpResponseOK(
-                definitions.TriggerAcsDumpResponse(
-                  filename = path.toString,
-                  numEvents = snapshot.contracts.size,
-                  offset = snapshot.offset,
-                )
-              )
-            }
-          }
-        } yield response
+          (filename, snapshot) <- SvUtil.writeAcsStoreDump(
+            acsDumpConfig,
+            loggerFactory,
+            svcStore,
+            clock,
+          )
+        } yield v0.SvResource.TriggerAcsDumpResponseOK(
+          definitions.TriggerAcsDumpResponse(
+            filename = filename.toString,
+            numEvents = snapshot.contracts.size,
+            offset = snapshot.offset,
+          )
+        )
     }
   }
 

@@ -1,17 +1,18 @@
-package com.daml.network.validator.automation
+package com.daml.network.sv.automation
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.config.BackupDumpConfig
-import com.daml.network.validator.store.ParticipantIdentitiesStore
+import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class PeriodicParticipantIdentitiesBackupTrigger(
+class PeriodicAcsStoreBackupTrigger(
     config: BackupDumpConfig,
     triggerContext: TriggerContext,
-    participantIdentitiesStore: ParticipantIdentitiesStore,
+    svcStore: SvSvcStore,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -26,8 +27,13 @@ class PeriodicParticipantIdentitiesBackupTrigger(
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     triggerContext.retryProvider
       .retryForAutomation(
-        s"backup participant identities to: ${config.locationDescription}",
-        participantIdentitiesStore.backupParticipantIdentities(),
+        s"backup AcsStore dump to: ${config.locationDescription}",
+        SvUtil.writeAcsStoreDump(
+          config,
+          loggerFactory,
+          svcStore,
+          triggerContext.clock,
+        ),
         logger,
       )
       .map(_ =>
