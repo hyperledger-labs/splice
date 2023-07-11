@@ -394,8 +394,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         _ <- ingestWork(workTodo, txLogEntries)
       } yield {
         val summary =
-          WorkDone(None, offset, acs.map(_.createdEvent), Seq.empty, 0)
-            .toSummary(workTodo, Seq.empty)
+          WorkDone(None, offset, acs.map(_.createdEvent).toVector, Vector.empty, 0)
+            .toSummary(workTodo, Vector.empty)
         logger.debug(show"Ingested complete ACS at offset $offset: $summary")
         finishedAcsIngestion.success(())
         acsSize.set(acs.size)
@@ -548,8 +548,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     case class WorkDone(
         txId: Option[String],
         offset: String,
-        inserts: Seq[CreatedEvent],
-        deletes: Seq[ExercisedEvent],
+        inserts: Vector[CreatedEvent],
+        deletes: Vector[ExercisedEvent],
         numFilteredCreatedEvents: Int,
     ) {
       def toSummary(workTodo: WorkTodo, txEntries: Seq[TXE]): IngestionSummary[TXE] = {
@@ -568,17 +568,17 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           ingestedTxLogEntries = txEntries,
           numFilteredArchivedEvents = numDeletesWanted - numDeletesDone,
           // These are only applicable to the in-memory version:
-          addedArchivedTombstones = Seq.empty,
-          removedArchivedTombstones = Seq.empty,
+          addedArchivedTombstones = Vector.empty,
+          removedArchivedTombstones = Vector.empty,
           // TODO (#5314): all these below are multi-domain
-          addedContractLocations = Seq.empty,
-          removedContractLocations = Seq.empty,
-          addedTransferInEvents = Seq.empty,
+          addedContractLocations = Vector.empty,
+          removedContractLocations = Vector.empty,
+          addedTransferInEvents = Vector.empty,
           numFilteredTransferInEvents = 0,
-          removedTransferInEvents = Seq.empty,
-          addedTransferOutEvents = Seq.empty,
+          removedTransferInEvents = Vector.empty,
+          addedTransferOutEvents = Vector.empty,
           numFilteredTransferOutEvents = 0,
-          removedTransferOutEvents = Seq.empty,
+          removedTransferOutEvents = Vector.empty,
         )
       }
     }
