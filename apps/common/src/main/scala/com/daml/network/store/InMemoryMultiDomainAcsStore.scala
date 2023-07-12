@@ -444,7 +444,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       .slice(1, 1 + limit)
       .toSeq
 
-  override def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
+  def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
       ec: ExecutionContext
   ): Future[A] = {
     import cats.implicits.*
@@ -462,22 +462,19 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     }
   }
 
-  override def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
+  def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
       ec: ExecutionContext
   ): Future[TXI] =
     Future {
       stateVar.txLog.view
         .map(_.payload)
-        .filter(query)
-        .headOption
+        .find(query)
         .getOrElse(
           throw Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
         )
     }
 
-  override def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]] =
+  def getTxLogIndicesByFilter(filter: TXI => Boolean): Future[Seq[TXI]] =
     Future.successful(stateVar.txLog.view.map(_.payload).filter(filter).toSeq)
 
   private def offsetAndStateAfterIngestingAcs()

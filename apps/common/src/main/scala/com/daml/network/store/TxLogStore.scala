@@ -31,25 +31,6 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
   import TxLogStore.*
 
   def txLogParser: Parser[TXI, TXE]
-
-  /** Gets the latest entry that satisfies a given query.
-    * Throws [[Status.NOT_FOUND]] if no such entry exists.
-    */
-  def getLatestTxLogIndex(query: (TXI) => Boolean = (_: TXI) => true)(implicit
-      ec: ExecutionContext
-  ): Future[TXI]
-
-  /** List all events that satisfy a given filter. Currently assumes the filter is selective enough for
-    * the returned list to not be too long, i.e. does not support limiting the size of the response or pagination.
-    * Note: This is a placeholder for fast iteration, that will probably need to be replaced with a more scalable API.
-    */
-  def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit
-      ec: ExecutionContext
-  ): Future[Seq[TXI]]
-
-  def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
-      ec: ExecutionContext
-  ): Future[A]
 }
 
 object TxLogStore {
@@ -178,13 +159,6 @@ object TxLogStore {
       transactionTreeSource: TransactionTreeSource,
       override val loggerFactory: NamedLoggerFactory,
   ) extends NamedLogging {
-
-    def getLatestTxLogEntry(
-        query: (TXI) => Boolean = (_: TXI) => true
-    )(implicit ec: ExecutionContext, tc: TraceContext): Future[TXE] = for {
-      index <- txLogStore.getLatestTxLogIndex(query)
-      entry <- loadTxLogEntry(index.eventId)
-    } yield entry
 
     def loadTxLogEntry(eventId: String)(implicit
         ec: ExecutionContext,

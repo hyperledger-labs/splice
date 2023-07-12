@@ -13,7 +13,7 @@ import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
 import com.daml.network.store.MultiDomainAcsStore.ContractWithState
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.{InMemoryCNNodeAppStore, HardLimit, TxLogStore}
+import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -79,13 +79,12 @@ class InMemoryScanStore(
       round: Long
   )(implicit tc: TraceContext): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] = {
     for {
-      roundConfig <- txLogReader.getLatestTxLogEntry((indexRecord) =>
-        indexRecord match {
-          case roundConfig: ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord =>
-            roundConfig.round == round
-          case _ => false
-        }
-      )
+      indexRecord <- txLog.getLatestTxLogIndex {
+        case roundConfig: ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord =>
+          roundConfig.round == round
+        case _ => false
+      }
+      roundConfig <- txLogReader.loadTxLogEntry(indexRecord.eventId)
     } yield {
       roundConfig match {
         case r: ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry => r
@@ -147,12 +146,11 @@ class InMemoryScanStore(
   }
 
   private def sumRewardsCollectedInRound(
-      log: TxLogStore[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry],
       round: Long,
       rewardTypeFilter: (ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord) => Boolean,
   ) =
     for {
-      ret <- log
+      ret <- txLog
         .getTxLogIndicesByFilter {
           case reward: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord
               if reward.round == round && rewardTypeFilter(reward) =>
@@ -185,7 +183,7 @@ class InMemoryScanStore(
       // TODO(#2930): for now we assume that the number of rewards per round is small enough that querying the log by round
       // provides small enough partitioning of the result, thus no further pagination of the tx log query is required.
       perRound <- (0L to asOfEndOfRound).toList.traverse(
-        sumRewardsCollectedInRound(txLog, _, rewardTypeFilter)
+        sumRewardsCollectedInRound(_, rewardTypeFilter)
       )
     } yield {
       Monoid.combineAll(perRound).toSeq.sortWith(_._2 > _._2).slice(0, limit)

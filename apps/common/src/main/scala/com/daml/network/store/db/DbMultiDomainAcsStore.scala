@@ -610,14 +610,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       ContractState.Assigned(domainId)
     }
 
-  override def getLatestTxLogIndex(query: TXI => Boolean)(implicit ec: ExecutionContext) = ???
-
-  override def getTxLogIndicesByFilter(filter: TXI => Boolean)(implicit ec: ExecutionContext) = ???
-
-  override def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
-      ec: ExecutionContext
-  ): Future[A] = ???
-
   /* Returns the event ids of the first `limit` TxLog entries that were inserted after the entry
      with the given event id, in reverse insertion order (newest first). */
   def getTxLogEventIdsInReverseOrder(
