@@ -6,7 +6,6 @@ package com.digitalasset.canton.ledger.sandbox
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.lf.data.Time.Timestamp
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, Healthy}
 import com.digitalasset.canton.ledger.configuration.{
   Configuration,
@@ -16,7 +15,8 @@ import com.digitalasset.canton.ledger.configuration.{
 }
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.v2.{ReadService, Update}
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 
 import java.time.Duration
 import scala.concurrent.blocking
@@ -25,13 +25,12 @@ class BridgeReadService(
     ledgerId: LedgerId,
     maximumDeduplicationDuration: Duration,
     stateUpdatesSource: Source[(Offset, Traced[Update]), NotUsed],
-)(implicit
-    loggingContext: LoggingContext
-) extends ReadService {
-  private val logger = ContextualizedLogger.get(getClass)
+    val loggerFactory: NamedLoggerFactory,
+) extends ReadService
+    with NamedLogging {
   private var stateUpdatesWasCalledAlready = false
 
-  logger.info("Starting Sandbox-on-X read service...")
+  logger.info("Starting Sandbox-on-X read service...")(TraceContext.empty)
 
   override def ledgerInitialConditions(): Source[LedgerInitialConditions, NotUsed] =
     Source.single(
@@ -48,7 +47,7 @@ class BridgeReadService(
 
   override def stateUpdates(
       beginAfter: Option[Offset]
-  )(implicit loggingContext: LoggingContext): Source[(Offset, Traced[Update]), NotUsed] = {
+  )(implicit traceContext: TraceContext): Source[(Offset, Traced[Update]), NotUsed] = {
     // For PoC purposes:
     //   This method may only be called once, either with `beginAfter` set or unset.
     //   A second call will result in an error unless the server is restarted.

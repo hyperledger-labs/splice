@@ -4,8 +4,8 @@
 package com.digitalasset.canton.platform
 
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.metrics.Metrics
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend.LedgerEnd
 import com.digitalasset.canton.platform.store.cache.{
@@ -18,6 +18,7 @@ import com.digitalasset.canton.platform.store.interning.{
   UpdatingStringInterningView,
 }
 import com.digitalasset.canton.platform.store.packagemeta.PackageMetadataView
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
@@ -32,8 +33,9 @@ private[platform] class InMemoryState(
     val dispatcherState: DispatcherState,
     val packageMetadataView: PackageMetadataView,
     val submissionTracker: SubmissionTracker,
-)(implicit executionContext: ExecutionContext) {
-  private val logger = ContextualizedLogger.get(getClass)
+    val loggerFactory: NamedLoggerFactory,
+)(implicit executionContext: ExecutionContext)
+    extends NamedLogging {
 
   final def initialized: Boolean = dispatcherState.isRunning
 
@@ -44,7 +46,7 @@ private[platform] class InMemoryState(
   final def initializeTo(ledgerEnd: LedgerEnd)(
       updateStringInterningView: (UpdatingStringInterningView, LedgerEnd) => Future[Unit],
       updatePackageMetadataView: PackageMetadataView => Future[Unit],
-  )(implicit loggingContext: LoggingContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(s"Initializing participant in-memory state to ledger end: $ledgerEnd")
 
     for {
@@ -80,12 +82,13 @@ object InMemoryState {
       maxCommandsInFlight: Int,
       metrics: Metrics,
       executionContext: ExecutionContext,
-  )(implicit loggingContext: LoggingContext): ResourceOwner[InMemoryState] = {
+      loggerFactory: NamedLoggerFactory,
+  )(implicit traceContext: TraceContext): ResourceOwner[InMemoryState] = {
     val initialLedgerEnd = LedgerEnd.beforeBegin
 
     for {
-      dispatcherState <- DispatcherState.owner(apiStreamShutdownTimeout)
-      submissionTracker <- SubmissionTracker.owner(maxCommandsInFlight, metrics)
+      dispatcherState <- DispatcherState.owner(apiStreamShutdownTimeout, loggerFactory)
+      submissionTracker <- SubmissionTracker.owner(maxCommandsInFlight, metrics, loggerFactory)
     } yield new InMemoryState(
       ledgerEndCache = MutableLedgerEndCache()
         .tap(
@@ -97,15 +100,18 @@ object InMemoryState {
         maxContractStateCacheSize,
         maxContractKeyStateCacheSize,
         metrics,
-      )(executionContext, loggingContext),
+        loggerFactory,
+      )(executionContext),
       inMemoryFanoutBuffer = new InMemoryFanoutBuffer(
         maxBufferSize = maxTransactionsInMemoryFanOutBufferSize,
         metrics = metrics,
         maxBufferedChunkSize = bufferedStreamsPageSize,
+        loggerFactory = loggerFactory,
       ),
-      stringInterningView = new StringInterningView,
+      stringInterningView = new StringInterningView(loggerFactory),
       packageMetadataView = PackageMetadataView.create,
       submissionTracker = submissionTracker,
+      loggerFactory = loggerFactory,
     )(executionContext)
   }
 }

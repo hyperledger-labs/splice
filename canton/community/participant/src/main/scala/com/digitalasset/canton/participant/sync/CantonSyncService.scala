@@ -16,19 +16,23 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.daml_lf_dev.DamlLf
 import com.daml.error.*
+import com.daml.lf.data.Ref.{Party, SubmissionId}
 import com.daml.lf.data.{ImmArray, Ref}
 import com.daml.lf.engine.Engine
-import com.daml.logging.LoggingContext
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
-import com.daml.tracing.TelemetryContext
 import com.digitalasset.canton.*
 import com.digitalasset.canton.common.domain.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.{CryptoPureApi, SyncCryptoApiProvider}
-import com.digitalasset.canton.data.{CantonTimestamp, ProcessedDisclosedContract}
+import com.digitalasset.canton.data.{
+  CantonTimestamp,
+  ProcessedDisclosedContract,
+  TransferSubmitterMetadata,
+}
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.SyncServiceErrorGroup
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.InjectionErrorGroup
 import com.digitalasset.canton.error.*
@@ -38,8 +42,9 @@ import com.digitalasset.canton.health.HealthReporting.{
 }
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.configuration.*
-import com.digitalasset.canton.ledger.error.PackageServiceError
+import com.digitalasset.canton.ledger.error.{CommonErrors, LedgerApiErrors, PackageServiceError}
 import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.v2.ReadService.ConnectedDomainResponse
 import com.digitalasset.canton.ledger.participant.state.v2.*
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
@@ -63,7 +68,11 @@ import com.digitalasset.canton.participant.protocol.submission.{
   CommandDeduplicatorImpl,
   InFlightSubmissionTracker,
 }
-import com.digitalasset.canton.participant.protocol.transfer.TransferCoordination
+import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.TransferProcessorError
+import com.digitalasset.canton.participant.protocol.transfer.{
+  IncompleteTransferData,
+  TransferCoordination,
+}
 import com.digitalasset.canton.participant.pruning.{NoOpPruningProcessor, PruningProcessor}
 import com.digitalasset.canton.participant.store.DomainConnectionConfigStore.MissingConfigForAlias
 import com.digitalasset.canton.participant.store.MultiDomainEventLog.PublicationData
@@ -76,6 +85,7 @@ import com.digitalasset.canton.participant.sync.SyncServiceError.{
 }
 import com.digitalasset.canton.participant.topology.*
 import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
+import com.digitalasset.canton.participant.traffic.TrafficStateController
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.platform.apiserver.execution.AuthorityResolver
 import com.digitalasset.canton.protocol.*
@@ -87,10 +97,14 @@ import com.digitalasset.canton.sequencing.client.SequencerClient.CloseReason
 import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.time.{Clock, DomainTimeTracker, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced}
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.OptionUtils.OptionExtension
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
 import io.opentelemetry.api.trace.Tracer
 import org.slf4j.event.Level
 
@@ -101,6 +115,7 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
+import scala.util.chaining.scalaUtilChainingOps
 import scala.util.{Failure, Right, Success}
 
 /** The Canton-based synchronization service.
@@ -142,6 +157,7 @@ class CantonSyncService(
     futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
     skipRecipientsCheck: Boolean,
+    multiDomainLedgerAPIEnabled: Boolean,
 )(implicit ec: ExecutionContext, mat: Materializer, val tracer: Tracer)
     extends state.v2.WriteService
     with WriteParticipantPruningService
@@ -237,6 +253,7 @@ class CantonSyncService(
 
   // Track domains we would like to "keep on reconnecting until available"
   private val attemptReconnect: TrieMap[DomainAlias, AttemptReconnect] = TrieMap.empty
+
   private def resolveReconnectAttempts(alias: DomainAlias): Unit =
     attemptReconnect.remove(alias).discard
 
@@ -370,12 +387,9 @@ class CantonSyncService(
       keyResolver: LfKeyResolver,
       disclosedContracts: ImmArray[ProcessedDisclosedContract],
   )(implicit
-      _loggingContext: LoggingContext, // not used - contains same properties as canton named logger
-      telemetryContext: TelemetryContext,
+      traceContext: TraceContext
   ): CompletionStage[SubmissionResult] = {
     import scala.jdk.FutureConverters.*
-    implicit val traceContext: TraceContext =
-      TraceContext.fromDamlTelemetryContext(telemetryContext)
     withSpan("CantonSyncService.submitTransaction") { implicit traceContext => span =>
       span.setAttribute("command_id", submitterInfo.commandId)
       logger.debug(s"Received submit-transaction ${submitterInfo.commandId} from ledger-api server")
@@ -386,7 +400,13 @@ class CantonSyncService(
         keyResolver,
         disclosedContracts,
       )
-    }.asJava
+    }.map(result =>
+      result.map { _asyncResult =>
+        // It's OK to throw away the asynchronous result because its errors were already logged in `submitTransactionF`.
+        // We merely retain it until here so that the span ends only after the asynchronous computation
+        SubmissionResult.Acknowledged
+      }.merge
+    ).asJava
   }
 
   lazy val stateInspection = new SyncStateInspection(
@@ -475,19 +495,21 @@ class CantonSyncService(
       transaction: LfSubmittedTransaction,
       keyResolver: LfKeyResolver,
       explicitlyDisclosedContracts: ImmArray[ProcessedDisclosedContract],
-  )(implicit traceContext: TraceContext): Future[SubmissionResult] = {
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Either[SubmissionResult, FutureUnlessShutdown[_]]] = {
 
-    val ack = SubmissionResult.Acknowledged
-
-    def processSubmissionError(error: TransactionError): Future[SubmissionResult] = {
+    def processSubmissionError(
+        error: TransactionError
+    ): Either[SubmissionResult, FutureUnlessShutdown[_]] = {
       error.logWithContext(
         Map("commandId" -> submitterInfo.commandId, "applicationId" -> submitterInfo.applicationId)
       )
-      Future.successful(SubmissionResult.SynchronousError(error.rpcStatus()))
+      Left(SubmissionResult.SynchronousError(error.rpcStatus()))
     }
 
     if (isClosing) {
-      processSubmissionError(SubmissionDuringShutdown.Rejection())
+      Future.successful(processSubmissionError(SubmissionDuringShutdown.Rejection()))
     } else if (!isActive()) {
       // this is the only error we can not really return with a rejection, as this is the passive replica ...
       val err = SyncServiceInjectionError.PassiveReplica.Error(
@@ -497,9 +519,11 @@ class CantonSyncService(
       err.logWithContext(
         Map("commandId" -> submitterInfo.commandId, "applicationId" -> submitterInfo.applicationId)
       )
-      Future.successful(SubmissionResult.SynchronousError(err.rpcStatus()))
+      Future.successful(Left(SubmissionResult.SynchronousError(err.rpcStatus())))
     } else if (!existsReadyDomain) {
-      processSubmissionError(SyncServiceInjectionError.NotConnectedToAnyDomain.Error())
+      Future.successful(
+        processSubmissionError(SyncServiceInjectionError.NotConnectedToAnyDomain.Error())
+      )
     } else {
       val submittedFF = domainRouter.submitTransaction(
         submitterInfo,
@@ -509,34 +533,40 @@ class CantonSyncService(
         explicitlyDisclosedContracts,
       )
       // TODO(i2794) retry command if token expired
-      submittedFF.value.transformWith {
-        case Success(Right(sequencedF)) =>
-          // Reply with ACK as soon as the submission has been registered as in-flight,
-          // and asynchronously send it to the sequencer.
-          logger.debug(s"Command ${submitterInfo.commandId} is now in flight.")
-          sequencedF.onComplete {
-            case Success(UnlessShutdown.Outcome(_)) =>
-              logger.debug(s"Successfully submitted transaction ${submitterInfo.commandId}.")
-            case Success(UnlessShutdown.AbortedDueToShutdown) =>
-              logger.debug(
-                s"Transaction submission aborted due to shutdown ${submitterInfo.commandId}."
-              )
-            case Failure(ex) =>
-              logger.error(s"Command submission for ${submitterInfo.commandId} failed", ex)
-          }
-          Future.successful(ack)
-        case Success(Left(submissionError)) =>
-          processSubmissionError(submissionError)
-        case Failure(PassiveInstanceException(_reason)) =>
-          val err = SyncServiceInjectionError.PassiveReplica.Error(
-            submitterInfo.applicationId,
-            submitterInfo.commandId,
-          )
-          Future.successful(SubmissionResult.SynchronousError(err.rpcStatus()))
-        case Failure(exception) =>
-          val err = SyncServiceInjectionError.InjectionFailure.Failure(exception)
-          err.logWithContext()
-          Future.successful(SubmissionResult.SynchronousError(err.rpcStatus()))
+      submittedFF.value.transform { result =>
+        val loggedResult = result match {
+          case Success(Right(sequencedF)) =>
+            // Reply with ACK as soon as the submission has been registered as in-flight,
+            // and asynchronously send it to the sequencer.
+            logger.debug(s"Command ${submitterInfo.commandId} is now in flight.")
+            val loggedF = sequencedF.transform {
+              case Success(UnlessShutdown.Outcome(_)) =>
+                logger.debug(s"Successfully submitted transaction ${submitterInfo.commandId}.")
+                Success(UnlessShutdown.Outcome(()))
+              case Success(UnlessShutdown.AbortedDueToShutdown) =>
+                logger.debug(
+                  s"Transaction submission aborted due to shutdown ${submitterInfo.commandId}."
+                )
+                Success(UnlessShutdown.Outcome(()))
+              case Failure(ex) =>
+                logger.error(s"Command submission for ${submitterInfo.commandId} failed", ex)
+                Success(UnlessShutdown.Outcome(()))
+            }
+            Right(loggedF)
+          case Success(Left(submissionError)) =>
+            processSubmissionError(submissionError)
+          case Failure(PassiveInstanceException(_reason)) =>
+            val err = SyncServiceInjectionError.PassiveReplica.Error(
+              submitterInfo.applicationId,
+              submitterInfo.commandId,
+            )
+            Left(SubmissionResult.SynchronousError(err.rpcStatus()))
+          case Failure(exception) =>
+            val err = SyncServiceInjectionError.InjectionFailure.Failure(exception)
+            err.logWithContext()
+            Left(SubmissionResult.SynchronousError(err.rpcStatus()))
+        }
+        Success(loggedResult)
       }
     }
   }
@@ -546,21 +576,19 @@ class CantonSyncService(
       submissionId: LedgerSubmissionId,
       config: Configuration,
   )(implicit
-      _loggingContext: LoggingContext, // not used - contains same properties as canton named logger
-      telemetryContext: TelemetryContext,
+      traceContext: TraceContext
   ): CompletionStage[SubmissionResult] = {
-    implicit val traceContext: TraceContext =
-      TraceContext.fromDamlTelemetryContext(telemetryContext)
     logger.info("Canton does not support dynamic reconfiguration of time model")
     CompletableFuture.completedFuture(TransactionError.NotSupported)
   }
 
   /** Build source for subscription (for ledger api server indexer).
+    *
     * @param beginAfterOffset offset after which to emit events
     */
   override def stateUpdates(
       beginAfterOffset: Option[LedgerSyncOffset]
-  )(implicit loggingContext: LoggingContext): Source[(LedgerSyncOffset, Traced[Update]), NotUsed] =
+  )(implicit traceContext: TraceContext): Source[(LedgerSyncOffset, Traced[Update]), NotUsed] =
     TraceContext.withNewTraceContext { implicit traceContext =>
       logger.debug(s"Subscribing to stateUpdates from $beginAfterOffset")
       // Plus one since dispatchers use inclusive offsets.
@@ -574,7 +602,7 @@ class CantonSyncService(
               .map { case (offset, tracedEvent) =>
                 tracedEvent
                   .map(augmentTransactionStatistics)
-                  .map(_.toDamlUpdate())
+                  .map(_.toDamlUpdate(populateTransfers = multiDomainLedgerAPIEnabled))
                   .sequence
                   .map { tracedUpdate =>
                     implicit val traceContext: TraceContext = tracedEvent.traceContext
@@ -600,9 +628,10 @@ class CantonSyncService(
             _recordTime,
             _divulgedContracts,
             _blindingInfo,
+            _hostedWitnesses,
             _contractMetadata,
           ) =>
-        ta.copy(optCompletionInfo =
+        ta.copy(completionInfoO =
           Some(
             completionInfo.copy(statistics =
               Some(LedgerTransactionNodeStatistics(transaction, excludedPackageIds))
@@ -617,8 +646,7 @@ class CantonSyncService(
       displayName: Option[String],
       rawSubmissionId: LedgerSubmissionId,
   )(implicit
-      _loggingContext: LoggingContext, // not used - contains same properties as canton named logger
-      telemetryContext: TelemetryContext,
+      traceContext: TraceContext
   ): CompletionStage[SubmissionResult] =
     partyAllocation.allocate(hint, displayName, rawSubmissionId)
 
@@ -627,11 +655,8 @@ class CantonSyncService(
       archives: List[DamlLf.Archive],
       sourceDescription: Option[String],
   )(implicit
-      _loggingContext: LoggingContext, // not used - contains same properties as canton named logger
-      telemetryContext: TelemetryContext,
+      traceContext: TraceContext
   ): CompletionStage[SubmissionResult] = {
-    implicit val traceContext: TraceContext =
-      TraceContext.fromDamlTelemetryContext(telemetryContext)
     withSpan("CantonSyncService.uploadPackages") { implicit traceContext => span =>
       if (!isActive()) {
         logger.debug(s"Rejecting package upload on passive replica.")
@@ -763,7 +788,7 @@ class CantonSyncService(
     *
     * NOTE: Does not automatically connect the sync service to the new domain.
     *
-    * @param config   The domain configuration.
+    * @param config The domain configuration.
     * @return Error or unit.
     */
   def addDomain(
@@ -796,6 +821,7 @@ class CantonSyncService(
       (),
       SyncServiceError.SyncServiceDomainMustBeOffline.Error(alias): SyncServiceError,
     )
+
     for {
       targetDomainInfo <- performUnlessClosingEitherU(functionFullName)(
         sequencerInfoLoader
@@ -912,6 +938,7 @@ class CantonSyncService(
             res <- go(if (succeeded) connected :+ con else connected, rest)
           } yield res
       }
+
     def startDomains(domains: Seq[DomainAlias]): EitherT[Future, SyncServiceError, Unit] = {
       // we need to start all domains concurrently in order to avoid the transfer processing
       // to hang
@@ -934,13 +961,16 @@ class CantonSyncService(
         }
       })
     }
+
     val connectedDomains =
       connectedDomainsMap.keys.to(LazyList).mapFilter(aliasManager.aliasForDomainId).toSet
+
     def shouldConnectTo(config: StoredDomainConnectionConfig): Boolean = {
       config.status.isActive && !config.config.manualConnect && !connectedDomains.contains(
         config.config.domain
       )
     }
+
     for {
       configs <- EitherT.pure[FutureUnlessShutdown, SyncServiceError](
         domainConnectionConfigStore
@@ -1056,6 +1086,7 @@ class CantonSyncService(
         case None => Some(ts)
         case Some(old) => Some(ts.max(old))
       }
+
     val _ = clock.scheduleAt(
       ts => {
         val (reconnect, nextO) = {
@@ -1172,7 +1203,7 @@ class CantonSyncService(
               )
           )
         )
-        domainLoggerFactory = loggerFactory.append("domain", domainAlias.unwrap)
+        domainLoggerFactory = loggerFactory.append("domainId", domainId.toString)
 
         domainCrypto = syncCrypto.tryForDomain(domainId, Some(domainAlias))
         missingKeysAlerter = new MissingKeysAlerter(
@@ -1182,6 +1213,8 @@ class CantonSyncService(
           domainCrypto.crypto.cryptoPrivateStore,
           loggerFactory,
         )
+
+        trafficStateController = new TrafficStateController(participantId, loggerFactory)
 
         syncDomain = syncDomainFactory.create(
           domainId,
@@ -1201,6 +1234,7 @@ class CantonSyncService(
               partyNotifier,
               missingKeysAlerter,
               domainHandle.topologyClient,
+              trafficStateController,
             ),
           missingKeysAlerter,
           transferCoordination,
@@ -1208,6 +1242,7 @@ class CantonSyncService(
           clock,
           metrics.pruning,
           domainMetrics,
+          trafficStateController,
           futureSupervisor,
           domainLoggerFactory,
           skipRecipientsCheck = skipRecipientsCheck,
@@ -1426,10 +1461,22 @@ class CantonSyncService(
     acc + syncDomain.numberOfDirtyRequests()
   }
 
-  def checkOverloaded(telemetryContext: TelemetryContext): Option[state.v2.SubmissionResult] = {
-    implicit val traceContext: TraceContext =
-      TraceContext.fromDamlTelemetryContext(telemetryContext)
+  private val emitWarningOnDetailLoggingAndHighLoad =
+    (parameters.general.loggingConfig.eventDetails || parameters.general.loggingConfig.api.logMessagePayloads) && parameters.general.loggingConfig.api.warnBeyondLoad.nonEmpty
+
+  def checkOverloaded(traceContext: TraceContext): Option[state.v2.SubmissionResult] = {
+    implicit val errorLogger: ErrorLoggingContext =
+      ErrorLoggingContext.fromTracedLogger(logger)(traceContext)
     val load = computeTotalLoad
+    if (emitWarningOnDetailLoggingAndHighLoad) {
+      parameters.general.loggingConfig.api.warnBeyondLoad match {
+        case Some(warnBeyondLoad) if load > warnBeyondLoad =>
+          logger.warn(
+            "Your detailed API event logging is turned on but you are doing quite a few concurrent requests. Please note that detailed event logging comes with a performance penalty."
+          )(traceContext)
+        case _ =>
+      }
+    }
     resourceManagementService.checkOverloaded(load)
   }
 
@@ -1465,6 +1512,161 @@ class CantonSyncService(
   }
 
   override def toString: String = s"CantonSyncService($participantId)"
+
+  override def submitReassignment(
+      submitter: Party,
+      applicationId: Ref.ApplicationId,
+      commandId: Ref.CommandId,
+      submissionId: Option[SubmissionId],
+      workflowId: Option[Ref.WorkflowId],
+      reassignmentCommand: ReassignmentCommand,
+  )(implicit
+      traceContext: TraceContext
+  ): CompletionStage[SubmissionResult] = {
+    import scala.jdk.FutureConverters.*
+    withSpan("CantonSyncService.submitReassignment") { implicit traceContext => span =>
+      span.setAttribute("command_id", commandId)
+      logger.debug(s"Received submit-reassignment ${commandId} from ledger-api server")
+
+      /* @param domain For transfer-out this should be the source domain, for transfer-in this is the target domain
+       * @param remoteDomain For transfer-out this should be the target domain, for transfer-in this is the source domain
+       */
+      def doTransfer[E <: TransferProcessorError, T](
+          domain: DomainId,
+          remoteDomain: DomainId,
+      )(
+          transfer: ProtocolVersion => SyncDomain => EitherT[Future, E, FutureUnlessShutdown[T]]
+      )(implicit traceContext: TraceContext): Future[SubmissionResult] = {
+        for {
+          syncDomain <- EitherT.fromOption[Future](
+            readySyncDomainById(domain),
+            ifNone = LedgerApiErrors.RequestValidation.InvalidArgument
+              .Reject(s"Domain ID not found: $domain"): DamlError,
+          )
+          remoteProtocolVersion <- EitherT.fromOptionF(
+            protocolVersionGetter(Traced(remoteDomain)),
+            ifNone = LedgerApiErrors.RequestValidation.InvalidArgument
+              .Reject(s"Domain ID's protocol version not found: $remoteDomain"): DamlError,
+          )
+          _ <- transfer(remoteProtocolVersion)(syncDomain)
+            .leftMap(error =>
+              LedgerApiErrors.RequestValidation.InvalidArgument
+                .Reject(
+                  error.message
+                ): DamlError // TODO(i13240): Improve reassignment-submission Ledger API errors
+            )
+            .mapK(FutureUnlessShutdown.outcomeK)
+            .semiflatMap(Predef.identity)
+            .onShutdown(Left(CommonErrors.ServerIsShuttingDown.Reject()))
+        } yield SubmissionResult.Acknowledged
+      }
+        .leftMap(error => SubmissionResult.SynchronousError(error.rpcStatus()))
+        .merge
+
+      reassignmentCommand match {
+        case unassign: ReassignmentCommand.Unassign =>
+          doTransfer(
+            domain = unassign.sourceDomain.unwrap,
+            remoteDomain = unassign.targetDomain.unwrap,
+          )(protocolVersion =>
+            _.submitTransferOut(
+              submitterMetadata = TransferSubmitterMetadata(
+                submitter = submitter,
+                applicationId = applicationId,
+                submittingParticipant = participantId.toLf,
+                commandId = commandId,
+                submissionId = submissionId,
+                workflowId = workflowId,
+              ),
+              contractId = unassign.contractId,
+              targetDomain = unassign.targetDomain,
+              targetProtocolVersion = TargetProtocolVersion(protocolVersion),
+            )
+          )
+
+        case assign: ReassignmentCommand.Assign =>
+          doTransfer(
+            domain = assign.targetDomain.unwrap,
+            remoteDomain = assign.sourceDomain.unwrap,
+          )(protocolVersion =>
+            _.submitTransferIn(
+              submitterMetadata = TransferSubmitterMetadata(
+                submitter = submitter,
+                applicationId = applicationId,
+                submittingParticipant = participantId.toLf,
+                commandId = commandId,
+                submissionId = submissionId,
+                workflowId = workflowId,
+              ),
+              transferId = TransferId(assign.sourceDomain, assign.unassignId),
+              sourceProtocolVersion = SourceProtocolVersion(protocolVersion),
+            )
+          )
+      }
+    }.asJava
+  }
+
+  override def getConnectedDomains(
+      request: ReadService.ConnectedDomainRequest
+  )(implicit traceContext: TraceContext): Future[ReadService.ConnectedDomainResponse] = {
+    def getSnapshot(domainAlias: DomainAlias, domainId: DomainId): Future[TopologySnapshot] =
+      syncCrypto.ips
+        .forDomain(domainId)
+        .toFuture(
+          new Exception(
+            s"Failed retrieving DomainTopologyClient for domain `$domainId` with alias $domainAlias"
+          )
+        )
+        .map(_.currentSnapshotApproximation)
+
+    val result = readyDomains
+      // keep only healthy domains
+      .collect { case (domainAlias, (domainId, true)) =>
+        for {
+          topology <- getSnapshot(domainAlias, domainId)
+          attributesO <- topology.hostedOn(request.party, participantId = participantId)
+        } yield attributesO.map(attributes =>
+          ConnectedDomainResponse.ConnectedDomain(
+            domainAlias,
+            domainId,
+            attributes.permission,
+          )
+        )
+      }.toSeq
+
+    Future.sequence(result).map(_.flatten).map(ConnectedDomainResponse.apply)
+  }
+
+  def incompleteTransferData(
+      validAt: GlobalOffset,
+      stakeholders: Set[LfPartyId],
+  )(implicit traceContext: TraceContext): Future[List[IncompleteTransferData]] =
+    syncDomainPersistentStateManager.getAll.values.toList
+      .parTraverse {
+        _.transferStore.findIncomplete(
+          sourceDomain = None,
+          validAt = validAt,
+          stakeholders = NonEmpty.from(stakeholders),
+          limit = NonNegativeInt.maxValue,
+        )
+      }
+      .map(_.flatten)
+
+  override def incompleteReassignmentOffsets(
+      validAt: LedgerSyncOffset,
+      stakeholders: Set[LfPartyId],
+  )(implicit traceContext: TraceContext): Future[Vector[LedgerSyncOffset]] =
+    UpstreamOffsetConvert
+      .toGlobalOffset(validAt)
+      .fold(
+        error => Future.failed(new IllegalArgumentException(error)),
+        incompleteTransferData(_, stakeholders).map(
+          _.map(
+            _.transferEventGlobalOffset.globalOffset
+              .pipe(UpstreamOffsetConvert.fromGlobalOffset)
+          ).toVector
+        ),
+      )
 }
 
 object CantonSyncService {
@@ -1496,6 +1698,7 @@ object CantonSyncService {
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
         skipRecipientsCheck: Boolean,
+        multiDomainLedgerAPIEnabled: Boolean,
     )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer): T
   }
 
@@ -1527,6 +1730,7 @@ object CantonSyncService {
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
         skipRecipientsCheck: Boolean,
+        multiDomainLedgerAPIEnabled: Boolean,
     )(implicit
         ec: ExecutionContext,
         mat: Materializer,
@@ -1560,6 +1764,7 @@ object CantonSyncService {
         futureSupervisor,
         loggerFactory,
         skipRecipientsCheck = skipRecipientsCheck,
+        multiDomainLedgerAPIEnabled: Boolean,
       )
   }
 }
@@ -1660,6 +1865,7 @@ object SyncServiceError extends SyncServiceErrorGroup {
       with ParentCantonError[DomainRegistryError] {
 
     override def logOnCreation: Boolean = false
+
     override def mixinContext: Map[String, String] = Map("domain" -> domain.unwrap)
 
   }
@@ -1674,6 +1880,7 @@ object SyncServiceError extends SyncServiceErrorGroup {
       with ParentCantonError[SyncDomainMigrationError] {
 
     override def logOnCreation: Boolean = false
+
     override def mixinContext: Map[String, String] = Map("from" -> from.unwrap, "to" -> to.unwrap)
 
   }
@@ -1702,7 +1909,7 @@ object SyncServiceError extends SyncServiceErrorGroup {
   )
   @Resolution(
     """If you attempt to connect to a domain that has either been migrated off or has a pending migration,
-       |this error will be emitted. Please complete the migration before attempting to connect to it."""
+      |this error will be emitted. Please complete the migration before attempting to connect to it."""
   )
   object SyncServiceDomainIsNotActive
       extends ErrorCode(
@@ -1767,6 +1974,7 @@ object SyncServiceError extends SyncServiceErrorGroup {
     final case class UnrecoverableError(domain: DomainAlias, _reason: String)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(cause = show"$domain fatally disconnected because of ${_reason}")
+
     final case class UnrecoverableException(domain: DomainAlias, throwable: Throwable)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(

@@ -4,7 +4,6 @@
 package com.digitalasset.canton.sequencing.client
 
 import akka.stream.AbruptStageTerminationException
-import cats.data.EitherT
 import cats.syntax.functor.*
 import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.daml.nameof.NameOf.functionFullName
@@ -13,12 +12,7 @@ import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerSubscriptionErrorGroup
 import com.digitalasset.canton.health.ComponentHealthState
 import com.digitalasset.canton.health.HealthReporting.HealthComponent
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  SyncCloseable,
-}
+import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.SerializedEventHandler
 import com.digitalasset.canton.sequencing.client.ResilientSequencerSubscription.LostSequencerSubscription
@@ -38,7 +32,7 @@ import com.digitalasset.canton.{DiscardOps, SequencerCounter}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 /** Attempts to create a resilient [[SequencerSubscription]] for the [[SequencerClient]] by
@@ -73,9 +67,7 @@ class ResilientSequencerSubscription[HandlerError](
   override val closingState: ComponentHealthState =
     ComponentHealthState.failed("Disconnected from domain")
   private val nextSubscriptionRef =
-    new AtomicReference[Future[Option[SequencerSubscription[HandlerError]]]](
-      Future.successful(None)
-    )
+    new AtomicReference[Option[SequencerSubscription[HandlerError]]](None)
   private val counterCapture = new CounterCapture(startingFrom, loggerFactory)
 
   /** Start running the resilient sequencer subscription */
@@ -117,6 +109,10 @@ class ResilientSequencerSubscription[HandlerError](
             // Create a new subscription and reset the retry delay
             // It is the responsibility of the subscription factory to use the changed transport
             setupNewSubscription(retryDelayRule.initialDelay)
+
+          case Success(_: SubscriptionCloseReason.SubscriptionError) if isClosing =>
+            giveUp(Success(SubscriptionCloseReason.Shutdown))
+
           case error @ Success(subscriptionError: SubscriptionCloseReason.SubscriptionError) =>
             val canRetry =
               retryPolicy.retryOnError(subscriptionError, hasReceivedEvent.hasReceivedEvent)
@@ -157,14 +153,11 @@ class ResilientSequencerSubscription[HandlerError](
         }
       }
 
-      FutureUtil.doNotAwait(
-        createSubscription.value.map {
-          case Left(err) => failed(err)
-          case Right((hasReceivedEvent, subscription, retryPolicy)) =>
-            started(hasReceivedEvent, subscription, retryPolicy)
-        },
-        "Unexpected error creating sequencer subscription",
-      )
+      createSubscription match {
+        case Left(err) => failed(err)
+        case Right((hasReceivedEvent, subscription, retryPolicy)) =>
+          started(hasReceivedEvent, subscription, retryPolicy)
+      }
     }.onShutdown(())
 
   private def delayAndRestartSubscription(hasReceivedEvent: Boolean, delay: FiniteDuration)(implicit
@@ -179,7 +172,7 @@ class ResilientSequencerSubscription[HandlerError](
     } else if (!isClosing) {
       TraceContext.withNewTraceContext { tx =>
         this.failureOccurred(
-          LostSequencerSubscription.Warn(domainId.toString)(this.errorLoggingContext(tx))
+          LostSequencerSubscription.Warn(domainId)(this.errorLoggingContext(tx))
         )
       }
     }
@@ -194,8 +187,7 @@ class ResilientSequencerSubscription[HandlerError](
     )
   }
 
-  private def createSubscription(implicit traceContext: TraceContext): EitherT[
-    Future,
+  private def createSubscription(implicit traceContext: TraceContext): Either[
     SequencerSubscriptionCreationError,
     (HasReceivedEvent, SequencerSubscription[HandlerError], SubscriptionErrorRetryPolicy),
   ] = {
@@ -207,19 +199,12 @@ class ResilientSequencerSubscription[HandlerError](
     val (hasReceivedEvent, wrappedHandler) = HasReceivedEvent(counterCapture(handler))
     logger.debug(s"Starting new sequencer subscription from $nextCounter")
 
-    val promise = Promise[Option[SequencerSubscription[HandlerError]]]()
-    nextSubscriptionRef.set(promise.future)
-    val subscriptionET = subscriptionFactory.create(nextCounter, wrappedHandler)(traceContext)
-    promise.completeWith(
-      subscriptionET.value.map(
-        _.toOption.map { case (subscription, _retryPolicy) => subscription }
-      )
-    )
+    val subscriptionE = subscriptionFactory.create(nextCounter, wrappedHandler)(traceContext)
+    nextSubscriptionRef.set(subscriptionE.toOption.map { case (subscription, _retryPolicy) =>
+      subscription
+    })
 
-    for {
-      subscriptionAndPolicy <- subscriptionET
-    } yield {
-      val (subscription, retryPolicy) = subscriptionAndPolicy
+    subscriptionE.map { case (subscription, retryPolicy) =>
       (hasReceivedEvent, subscription, retryPolicy)
     }
   }
@@ -239,6 +224,10 @@ class ResilientSequencerSubscription[HandlerError](
         logger.warn(
           s"Closing resilient sequencer subscription because instance became passive: $reason"
         )
+      case Success(Fatal(reason)) if isClosing =>
+        logger.info(
+          s"Closing resilient sequencer subscription after an error due to an ongoing shutdown: $reason"
+        )
       case Success(error) =>
         logger.warn(s"Closing resilient sequencer subscription due to error: $error")
       case Failure(exception) =>
@@ -254,7 +243,7 @@ class ResilientSequencerSubscription[HandlerError](
     * @return The future completes after the old subscription has been closed.
     */
   def resubscribeOnTransportChange()(implicit traceContext: TraceContext): Future[Unit] = {
-    nextSubscriptionRef.get().flatMap {
+    nextSubscriptionRef.get() match {
       case None => Future.unit
       case Some(subscription) =>
         subscription.complete(SubscriptionCloseReason.TransportChange)
@@ -292,11 +281,9 @@ class ResilientSequencerSubscription[HandlerError](
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = withNewTraceContext {
     implicit traceContext =>
       Seq(
-        AsyncCloseable(
-          "underlying-subscription", {
-            nextSubscriptionRef.get().map(_.foreach(closeSubscription))
-          },
-          timeouts.shutdownNetwork.duration,
+        SyncCloseable(
+          "underlying-subscription",
+          nextSubscriptionRef.get().foreach(closeSubscription),
         ),
         SyncCloseable(
           "close-reason", {
@@ -313,7 +300,7 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
       domainId: DomainId,
       protocolVersion: ProtocolVersion,
       member: Member,
-      getTransport: => SequencerClientTransport,
+      getTransport: => UnlessShutdown[SequencerClientTransport],
       handler: SerializedEventHandler[E],
       startingFrom: SequencerCounter,
       initialDelay: FiniteDuration,
@@ -338,29 +325,35 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
     )
   }
 
+  val SubscriptionCreationShutdownError: Fatal = Fatal(
+    "Failed to create subscription due to an ongoing shutdown."
+  )
+
   /** Creates a simpler handler subscription function for the underlying class */
   private def createSubscription[E](
       member: Member,
-      getTransport: => SequencerClientTransport,
+      getTransport: => UnlessShutdown[SequencerClientTransport],
       requiresAuthentication: Boolean,
       protocolVersion: ProtocolVersion,
-  )(implicit ec: ExecutionContext): SequencerSubscriptionFactory[E] =
+  ): SequencerSubscriptionFactory[E] =
     new SequencerSubscriptionFactory[E] {
       override def create(startingCounter: SequencerCounter, handler: SerializedEventHandler[E])(
           implicit traceContext: TraceContext
-      ): EitherT[
-        Future,
+      ): Either[
         SequencerSubscriptionCreationError,
         (SequencerSubscription[E], SubscriptionErrorRetryPolicy),
       ] = {
         val request = SubscriptionRequest(member, startingCounter, protocolVersion)
-        val transport = getTransport
-        val subscription =
-          if (requiresAuthentication) transport.subscribe(request, handler)(traceContext)
-          else transport.subscribeUnauthenticated(request, handler)(traceContext)
-        EitherT.pure[Future, SequencerSubscriptionCreationError](
-          (subscription, transport.subscriptionRetryPolicy)
-        )
+        getTransport
+          .map { transport =>
+            val subscription =
+              if (requiresAuthentication) transport.subscribe(request, handler)(traceContext)
+              else transport.subscribeUnauthenticated(request, handler)(traceContext)
+            Right(
+              (subscription, transport.subscriptionRetryPolicy)
+            )
+          }
+          .onShutdown(Left(SubscriptionCreationShutdownError))
       }
     }
 
@@ -376,10 +369,14 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
         ErrorCategory.BackgroundProcessDegradationWarning,
       ) {
 
-    final case class Warn(domain: String)(implicit val loggingContext: ErrorLoggingContext)
-        extends CantonError.Impl(
-          cause = s"Lost subscription to domain ${domain}. Will try to recover automatically."
-        )
+    final case class Warn(domain: DomainId, _logOnCreation: Boolean = true)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            s"Lost subscription to domain ${domain.toString}. Will try to recover automatically."
+        ) {
+      override def logOnCreation: Boolean = _logOnCreation
+    }
   }
 
   @Explanation(
@@ -420,8 +417,7 @@ trait SequencerSubscriptionFactory[HandlerError] {
       handler: SerializedEventHandler[HandlerError],
   )(implicit
       traceContext: TraceContext
-  ): EitherT[
-    Future,
+  ): Either[
     SequencerSubscriptionCreationError,
     (SequencerSubscription[HandlerError], SubscriptionErrorRetryPolicy),
   ]

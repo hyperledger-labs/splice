@@ -26,7 +26,6 @@ import com.digitalasset.canton.environment.CantonNodeBootstrap.HealthDumpFunctio
 import com.digitalasset.canton.environment.Environment.*
 import com.digitalasset.canton.environment.ParticipantNodes.{ParticipantNodesOld, ParticipantNodesX}
 import com.digitalasset.canton.health.{HealthCheck, HealthServer}
-import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsConfig.Prometheus
@@ -35,7 +34,9 @@ import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.participant.{
   ParticipantNode,
   ParticipantNodeBootstrap,
+  ParticipantNodeBootstrapCommon,
   ParticipantNodeBootstrapX,
+  ParticipantNodeCommon,
 }
 import com.digitalasset.canton.resource.DbMigrationsFactory
 import com.digitalasset.canton.sequencing.SequencerConnections
@@ -60,11 +61,6 @@ import scala.util.control.NonFatal
 /** Holds all significant resources held by this process.
   */
 trait Environment extends NamedLogging with AutoCloseable with NoTracing {
-
-  // TODO(i10999): Remove this, once the cyclic class initialization has been fixed upstream.
-  //  https://digitalasset.atlassian.net/browse/DPP-1303
-  //  Background: https://www.farside.org.uk/201510/deadlocks_in_java_class_initialisation
-  LedgerApiErrors.discard
 
   type Config <: CantonConfig
   type Console <: ConsoleEnvironment
@@ -399,7 +395,9 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   private def reconnectParticipants(implicit
       traceContext: TraceContext
   ): Either[StartupError, Unit] = {
-    def reconnect(instance: ParticipantNodeBootstrap): Either[StartupError, Unit] = {
+    def reconnect(
+        instance: CantonNodeBootstrap[ParticipantNodeCommon] & ParticipantNodeBootstrapCommon
+    ): Either[StartupError, Unit] = {
       for {
         _ <- instance.getNode match {
           case None =>
@@ -423,8 +421,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         }
       } yield ()
     }
-    // TODO(#11255) implement the same for participantsX
-    participants.running.traverse_(reconnect)
+    (participants.running ++ participantsX.running).traverse_(reconnect)
   }
 
   /** Return current time of environment

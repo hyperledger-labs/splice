@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.7.0-snapshot.20230604.11848.0.v9f55d679"
+  val version: String = "2.7.0-snapshot.20230710.11943.0.v20c0149b"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
@@ -87,7 +87,10 @@ object CantonDependencies {
   lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
   lazy val daml_lf_transaction_test_lib =
     "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
+  lazy val daml_lf_api_type_signature =
+    "com.daml" %% "daml-lf-api-type-signature" % daml_libraries_version
 
+  lazy val daml_grpc_utils = "com.daml" %% "grpc-utils" % daml_libraries_version
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
   lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
@@ -131,6 +134,7 @@ object CantonDependencies {
   lazy val akka_stream_testkit = "com.typesafe.akka" %% "akka-stream-testkit" % akka_version
   lazy val akka_slf4j = "com.typesafe.akka" %% "akka-slf4j" % akka_version
   lazy val akka_http = "com.typesafe.akka" %% "akka-http" % akka_http_version
+  lazy val akka_http_core = "com.typesafe.akka" %% "akka-http-core" % akka_http_version
   lazy val akka_http_testkit = "com.typesafe.akka" %% "akka-http-testkit" % akka_http_version
 
   lazy val scala_logging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2"
@@ -244,4 +248,7 @@ object CantonDependencies {
   lazy val scalaz_scalacheck =
     "org.scalaz" %% "scalaz-scalacheck-binding" % "7.2.33-scalacheck-1.15"
   lazy val scalapb_json4s = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
+
+  lazy val spray_json_derived_codecs =
+    "io.github.paoloboni" %% "spray-json-derived-codecs" % "2.3.10"
 }

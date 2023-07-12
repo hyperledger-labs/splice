@@ -10,10 +10,9 @@ import cats.syntax.bifunctor.toBifunctorOps
 import com.daml.lf.crypto
 import com.daml.lf.data.Ref
 import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.transaction.test.TransactionBuilder
+import com.daml.lf.transaction.test.{TestNodeBuilder, TreeTransactionBuilder}
 import com.daml.lf.transaction.{CommittedTransaction, TransactionNodeStatistics}
 import com.daml.lf.value.Value
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.configuration.{
   Configuration,
@@ -27,8 +26,9 @@ import com.digitalasset.canton.ledger.participant.state.v2.{
   TransactionMeta,
   Update,
 }
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext.wrapWithNewTraceContext
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 
 import java.time.Instant
 import scala.concurrent.blocking
@@ -42,12 +42,12 @@ import scala.concurrent.blocking
 final case class EndlessReadService(
     updatesPerSecond: Int,
     name: String,
-)(implicit loggingContext: LoggingContext)
+    loggerFactory: NamedLoggerFactory,
+)(implicit traceContext: TraceContext)
     extends ReadService
+    with NamedLogging
     with AutoCloseable {
   import EndlessReadService.*
-
-  private val logger = ContextualizedLogger.get(this.getClass)
 
   override def currentHealth(): HealthStatus = blocking(
     synchronized(
@@ -76,7 +76,7 @@ final case class EndlessReadService(
     */
   override def stateUpdates(
       beginAfter: Option[Offset]
-  )(implicit loggingContext: LoggingContext): Source[(Offset, Traced[Update]), NotUsed] =
+  )(implicit traceContext: TraceContext): Source[(Offset, Traced[Update]), NotUsed] =
     blocking(synchronized {
       logger.info(s"EndlessReadService.stateUpdates($beginAfter) called")
       stateUpdatesCalls += 1
@@ -108,24 +108,26 @@ final case class EndlessReadService(
             )
           case i if i % 2 == 0 =>
             offset(i) -> Update.TransactionAccepted(
-              optCompletionInfo = Some(completionInfo(i)),
+              completionInfoO = Some(completionInfo(i)),
               transactionMeta = transactionMeta(i),
               transaction = createTransaction(i),
               transactionId = transactionId(i),
               recordTime = recordTime(i),
               divulgedContracts = List.empty,
-              blindingInfo = None,
+              blindingInfoO = None,
+              hostedWitnesses = Nil,
               contractMetadata = Map.empty,
             )
           case i =>
             offset(i) -> Update.TransactionAccepted(
-              optCompletionInfo = Some(completionInfo(i)),
+              completionInfoO = Some(completionInfo(i)),
               transactionMeta = transactionMeta(i),
               transaction = exerciseTransaction(i),
               transactionId = transactionId(i),
               recordTime = recordTime(i),
               divulgedContracts = List.empty,
-              blindingInfo = None,
+              blindingInfoO = None,
+              hostedWitnesses = Nil,
               contractMetadata = Map.empty,
             )
         }
@@ -200,33 +202,29 @@ object EndlessReadService {
     optUsedPackages = None,
     optNodeSeeds = None,
     optByKeyNodes = None,
+    optDomainId = None,
   )
   // Creates contract #i
   private def createTransaction(i: Int): CommittedTransaction = {
-    val builder = TransactionBuilder()
-    val createNode = builder.create(
+    val createNode = TestNodeBuilder.create(
       id = cid(i),
       templateId = templateId,
       argument = Value.ValueUnit,
       signatories = Set(party),
       observers = Set.empty,
-      key = None,
     )
-    builder.add(createNode)
-    builder.buildCommitted()
+    TreeTransactionBuilder.toCommittedTransaction(createNode)
   }
   // Archives contract #(i-1)
   private def exerciseTransaction(i: Int): CommittedTransaction = {
-    val builder = TransactionBuilder()
-    val createNode = builder.create(
+    val createNode = TestNodeBuilder.create(
       id = cid(i - 1),
       templateId = templateId,
       argument = Value.ValueUnit,
       signatories = Set(party),
       observers = Set.empty,
-      key = None,
     )
-    val exerciseNode = builder.exercise(
+    val exerciseNode = TestNodeBuilder.exercise(
       contract = createNode,
       choice = choiceName,
       consuming = true,
@@ -236,7 +234,6 @@ object EndlessReadService {
       choiceObservers = Set.empty,
       byKey = false,
     )
-    builder.add(exerciseNode)
-    builder.buildCommitted()
+    TreeTransactionBuilder.toCommittedTransaction(exerciseNode)
   }
 }

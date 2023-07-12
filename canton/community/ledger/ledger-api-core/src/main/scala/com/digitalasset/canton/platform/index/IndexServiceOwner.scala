@@ -7,13 +7,15 @@ import com.daml.executors.InstrumentedExecutors
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.lf.data.Ref
 import com.daml.lf.engine.Engine
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.metrics.Metrics
 import com.daml.resources.ProgramResource.StartupException
 import com.daml.timer.RetryStrategy
 import com.digitalasset.canton.ledger.api.domain.LedgerId
 import com.digitalasset.canton.ledger.error.IndexErrors.IndexDbException
+import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.index.v2.IndexService
+import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.InMemoryState
 import com.digitalasset.canton.platform.apiserver.TimedIndexService
 import com.digitalasset.canton.platform.common.{LedgerIdNotFoundException, MismatchException}
@@ -30,6 +32,7 @@ import com.digitalasset.canton.platform.store.dao.{
   LedgerReadDao,
 }
 import com.digitalasset.canton.platform.store.interning.StringInterning
+import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.duration.*
@@ -46,13 +49,12 @@ final class IndexServiceOwner(
     participantId: Ref.ParticipantId,
     inMemoryState: InMemoryState,
     tracer: Tracer,
-)(implicit
-    loggingContext: LoggingContext
-) extends ResourceOwner[IndexService] {
+    val loggerFactory: NamedLoggerFactory,
+    incompleteOffsets: (Offset, Set[Ref.Party], TraceContext) => Future[Vector[Offset]],
+) extends ResourceOwner[IndexService]
+    with NamedLogging {
   private val initializationRetryDelay = 100.millis
   private val initializationMaxAttempts = 3000 // give up after 5min
-
-  private val logger = ContextualizedLogger.get(getClass)
 
   def acquire()(implicit context: ResourceContext): Resource[IndexService] = {
     val ledgerDao = createLedgerReadDao(
@@ -68,6 +70,7 @@ final class IndexServiceOwner(
         metrics,
         ledgerDao.contractsReader,
         contractStateCaches = inMemoryState.contractStateCaches,
+        loggerFactory = loggerFactory,
       )(servicesExecutionContext)
 
       lfValueTranslation = new LfValueTranslation(
@@ -75,6 +78,7 @@ final class IndexServiceOwner(
         engineO = Some(engine),
         loadPackage = (packageId, loggingContext) =>
           ledgerDao.getLfArchive(packageId)(loggingContext),
+        loggerFactory = loggerFactory,
       )
 
       inMemoryFanOutExecutionContext <- buildInMemoryFanOutExecutionContext(
@@ -88,12 +92,14 @@ final class IndexServiceOwner(
         lfValueTranslation = lfValueTranslation,
         metrics = metrics,
         eventProcessingParallelism = config.bufferedEventsProcessingParallelism,
+        loggerFactory = loggerFactory,
       )(inMemoryFanOutExecutionContext)
 
       bufferedCommandCompletionsReader = BufferedCommandCompletionsReader(
         inMemoryFanoutBuffer = inMemoryState.inMemoryFanoutBuffer,
         delegate = ledgerDao.completions,
         metrics = metrics,
+        loggerFactory = loggerFactory,
       )(inMemoryFanOutExecutionContext)
 
       indexService = new IndexServiceImpl(
@@ -107,6 +113,7 @@ final class IndexServiceOwner(
         dispatcher = () => inMemoryState.dispatcherState.getDispatcher,
         packageMetadataView = inMemoryState.packageMetadataView,
         metrics = metrics,
+        loggerFactory = loggerFactory,
       )
     } yield new TimedIndexService(indexService, metrics)
   }
@@ -121,7 +128,7 @@ final class IndexServiceOwner(
       if (!inMemoryState.initialized) {
         logger.info(
           s"Participant in-memory state not initialized on attempt $attempt/$initializationMaxAttempts. Retrying again in $initializationRetryDelay."
-        )
+        )(TraceContext.empty)
         Future.failed(InMemoryStateNotInitialized)
       } else {
         Future.unit
@@ -131,8 +138,7 @@ final class IndexServiceOwner(
   private def verifyLedgerId(
       ledgerDao: LedgerReadDao
   )(implicit
-      executionContext: ExecutionContext,
-      loggingContext: LoggingContext,
+      executionContext: ExecutionContext
   ): Future[LedgerId] = {
     // If the index database is not yet fully initialized,
     // querying for the ledger ID will throw different errors,
@@ -148,6 +154,8 @@ final class IndexServiceOwner(
       attempts = Some(initializationMaxAttempts),
       waitTime = initializationRetryDelay,
     )(isRetryable) { (attempt, _) =>
+      implicit val loggingContext: LoggingContextWithTrace =
+        LoggingContextWithTrace(loggerFactory)(TraceContext.empty)
       ledgerDao
         .lookupLedgerId()
         .flatMap {
@@ -186,6 +194,8 @@ final class IndexServiceOwner(
       globalMaxEventIdQueries = config.globalMaxEventIdQueries,
       globalMaxEventPayloadQueries = config.globalMaxEventPayloadQueries,
       tracer = tracer,
+      loggerFactory = loggerFactory,
+      incompleteOffsets = incompleteOffsets,
     )
 
   private def buildInMemoryFanOutExecutionContext(

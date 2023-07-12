@@ -6,9 +6,10 @@ package com.digitalasset.canton.platform.indexer.ha
 import akka.stream.KillSwitch
 import akka.testkit.TestProbe
 import com.daml.ledger.api.testing.utils.AkkaBeforeAndAfterAll
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.logging.{SuppressingLogger, TracedLogger}
 import com.digitalasset.canton.platform.store.backend.DBLockStorageBackend
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -27,8 +28,9 @@ class HaCoordinatorSpec
     with Eventually {
   implicit val ec: ExecutionContext =
     system.dispatcher // we need this to not use the default EC which is coming from AsyncTestSuite, and which is serial
-  private implicit val loggingContext: LoggingContext = LoggingContext.ForTesting
-  private val logger = ContextualizedLogger.get(this.getClass)
+  private val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
+  private implicit val traceContext: TraceContext = TraceContext.empty
+  private val logger = TracedLogger(loggerFactory.getLogger(getClass))
   private val timer = new Timer(true)
 
   private val mainLockAcquireRetryMillis = 20L
@@ -134,7 +136,12 @@ class HaCoordinatorSpec
       _ <- protectedHandle.completed
     } yield {
       logger.info("Protected Handle is completed successfully")
-      Try(connectionInitializer.initialize(new TestConnection)).isFailure shouldBe true
+      loggerFactory.assertLogs(
+        Try(connectionInitializer.initialize(new TestConnection)).isFailure shouldBe true,
+        _.errorMessage should include(
+          "Internal Error: This check should not be called from outside by the time the PollingChecker is closed."
+        ),
+      )
       logger.info("Connection initializer does not work anymore")
       1 shouldBe 1
     }
@@ -176,7 +183,12 @@ class HaCoordinatorSpec
       _ <- protectedHandle.completed
     } yield {
       logger.info("Protected Handle is completed successfully")
-      Try(connectionInitializer.initialize(new TestConnection)).isFailure shouldBe true
+      loggerFactory.assertLogs(
+        Try(connectionInitializer.initialize(new TestConnection)).isFailure shouldBe true,
+        _.errorMessage should include(
+          "Internal Error: This check should not be called from outside by the time the PollingChecker is closed."
+        ),
+      )
       logger.info("Connection initializer does not work anymore")
       1 shouldBe 1
     }
@@ -216,7 +228,12 @@ class HaCoordinatorSpec
       _ <- protectedHandle.completed
     } yield {
       logger.info("Protected Handle is completed successfully")
-      Try(connectionInitializer.initialize(new TestConnection)).isFailure shouldBe true
+      loggerFactory.assertLogs(
+        Try(connectionInitializer.initialize(new TestConnection)).isFailure shouldBe true,
+        _.errorMessage should include(
+          "Internal Error: This check should not be called from outside by the time the PollingChecker is closed."
+        ),
+      )
       logger.info("Connection initializer does not work anymore")
       1 shouldBe 1
     }
@@ -306,11 +323,18 @@ class HaCoordinatorSpec
     connectionInitializerFuture.isCompleted shouldBe false
     protectedHandle.completed.isCompleted shouldBe false
     logger.info("Initialization should be waiting")
-    mainConnection.close()
-    logger.info("As main connection is closed (triggers exception as used for acquiring lock)")
 
     for {
-      failure <- protectedHandle.completed.failed
+      failure <- loggerFactory.assertLogs(
+        {
+          mainConnection.close()
+          logger.info(
+            "As main connection is closed (triggers exception as used for acquiring lock)"
+          )
+          protectedHandle.completed.failed
+        },
+        _.warningMessage should include("Failure not retryable"),
+      )
     } yield {
       logger.info("Protected Handle is completed with a failure")
       failure.getMessage shouldBe "trying to acquire on a closed connection"
@@ -418,16 +442,21 @@ class HaCoordinatorSpec
     connectionInitializerFuture.isCompleted shouldBe false
     protectedHandle.completed.isCompleted shouldBe false
     logger.info("Initialization should be waiting")
-    mainConnection.close()
-    logger.info("As main connection is closed (triggers exception as used for acquiring lock)")
 
-    for {
-      failure <- protectedHandle.completed.failed
-    } yield {
-      logger.info("Protected Handle completed with a failure")
-      failure.getMessage shouldBe "trying to acquire on a closed connection"
-      connectionInitializerFuture.isCompleted shouldBe false
-    }
+    loggerFactory.assertLogs(
+      {
+        mainConnection.close()
+        logger.info("As main connection is closed (triggers exception as used for acquiring lock)")
+        for {
+          failure <- protectedHandle.completed.failed
+        } yield {
+          logger.info("Protected Handle completed with a failure")
+          failure.getMessage shouldBe "trying to acquire on a closed connection"
+          connectionInitializerFuture.isCompleted shouldBe false
+        }
+      },
+      _.warningMessage should include("Failure not retryable."),
+    )
   }
 
   it should "fail if worker lock cannot be acquired in time due to shared blocking" in {
@@ -435,19 +464,24 @@ class HaCoordinatorSpec
     val blockingConnection = new TestConnection
     dbLock.tryAcquire(worker, DBLockStorageBackend.LockMode.Shared)(blockingConnection).pick
     logger.info("As acquiring the worker lock from the outside")
-    val protectedSetup = setup(
-      dbLock = dbLock,
-      workerLockAcquireMaxRetry = 2,
+    loggerFactory.assertLogs(
+      within = {
+        val protectedSetup = setup(
+          dbLock = dbLock,
+          workerLockAcquireMaxRetry = 2,
+        )
+        import protectedSetup.*
+        Threading.sleep(200)
+        logger.info("And as waiting for 200 millis")
+        for {
+          failure <- protectedHandle.completed.failed
+        } yield {
+          logger.info("Initialisation should completed with failure")
+          failure.getMessage shouldBe "Cannot acquire lock TestLockId(20) in lock-mode Exclusive"
+        }
+      },
+      _.warningMessage should include("Maximum amount of retries reached (0). Failing permanently."),
     )
-    import protectedSetup.*
-    Threading.sleep(200)
-    logger.info("And as waiting for 200 millis")
-    for {
-      failure <- protectedHandle.completed.failed
-    } yield {
-      logger.info("Initialisation should completed with failure")
-      failure.getMessage shouldBe "Cannot acquire lock TestLockId(20) in lock-mode Exclusive"
-    }
   }
 
   it should "fail if execution initialization fails" in {
@@ -871,6 +905,7 @@ class HaCoordinatorSpec
           indexerLockId = 10,
           indexerWorkerLockId = 20,
         ),
+        loggerFactory = loggerFactory,
       )
       .protectedExecution { connectionInitializer =>
         connectionInitializerPromise.success(connectionInitializer)

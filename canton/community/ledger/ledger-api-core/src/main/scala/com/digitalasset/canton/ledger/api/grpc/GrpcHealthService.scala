@@ -7,11 +7,12 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import com.daml.error.ContextualizedErrorLogger
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
+import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.grpc.GrpcHealthService.*
 import com.digitalasset.canton.ledger.api.health.HealthChecks
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors.invalidArgument
-import com.digitalasset.canton.ledger.error.DamlContextualizedErrorLogger
+import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import io.grpc.ServerServiceDefinition
 import io.grpc.health.v1.health.{HealthCheckRequest, HealthCheckResponse, HealthGrpc}
 import io.grpc.stub.StreamObserver
@@ -22,30 +23,33 @@ import scala.util.{Failure, Success, Try}
 
 class GrpcHealthService(
     healthChecks: HealthChecks,
+    telemetry: Telemetry,
+    val loggerFactory: NamedLoggerFactory,
     maximumWatchFrequency: FiniteDuration = 1.second,
 )(implicit
     esf: ExecutionSequencerFactory,
     mat: Materializer,
     executionContext: ExecutionContext,
-    loggingContext: LoggingContext,
 ) extends HealthGrpc.Health
     with StreamingServiceLifecycleManagement
-    with GrpcApiService {
-
-  private val logger = ContextualizedLogger.get(getClass)
-  protected val contextualizedErrorLogger: ContextualizedErrorLogger =
-    new DamlContextualizedErrorLogger(logger, loggingContext, None)
+    with GrpcApiService
+    with NamedLogging {
 
   override def bindService(): ServerServiceDefinition =
     HealthGrpc.bindService(this, executionContext)
 
-  override def check(request: HealthCheckRequest): Future[HealthCheckResponse] =
+  override def check(request: HealthCheckRequest): Future[HealthCheckResponse] = {
+    implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
+
     Future.fromTry(matchResponse(serviceFrom(request)))
+  }
 
   override def watch(
       request: HealthCheckRequest,
       responseObserver: StreamObserver[HealthCheckResponse],
   ): Unit = registerStream(responseObserver) {
+    implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
+
     Source
       .fromIterator(() =>
         Iterator.continually(matchResponse(serviceFrom(request)).fold(throw _, identity))
@@ -54,12 +58,14 @@ class GrpcHealthService(
       .via(DropRepeated())
   }
 
-  private def matchResponse(componentName: Option[String]): Try[HealthCheckResponse] =
+  private def matchResponse(
+      componentName: Option[String]
+  )(implicit errorLogger: ContextualizedErrorLogger): Try[HealthCheckResponse] =
     componentName
       .collect {
         case component if !healthChecks.hasComponent(component) =>
           Failure(
-            invalidArgument(s"Component $component does not exist.")(contextualizedErrorLogger)
+            invalidArgument(s"Component $component does not exist.")
           )
       }
       .getOrElse {

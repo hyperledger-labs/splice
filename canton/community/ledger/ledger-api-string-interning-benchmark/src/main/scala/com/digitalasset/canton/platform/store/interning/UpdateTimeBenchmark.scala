@@ -3,25 +3,26 @@
 
 package com.digitalasset.canton.platform.store.interning
 
-import com.daml.logging.LoggingContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import org.openjdk.jmh.annotations.*
 
 import scala.concurrent.Await
 
 class UpdateTimeBenchmark extends BenchmarkState {
+
+  private val loggerFactory = NamedLoggerFactory.root
+
   // Set up some extra entries for the repeated update() calls.
   // Give a large number so that not all of the strings can be ingested
   override def extraStringCount = 15000000
 
   @Setup(Level.Iteration)
   def setupIteration(): Unit = {
-    interning = new StringInterningView()
+    interning = new StringInterningView(loggerFactory)
 
     interningEnd = stringCount
     Await.result(
-      interning.update(interningEnd)(BenchmarkState.loadStringInterningEntries(entries))(
-        LoggingContext.ForTesting
-      ),
+      interning.update(interningEnd)(BenchmarkState.loadStringInterningEntries(entries)),
       perfTestTimeout,
     )
   }
@@ -36,9 +37,7 @@ class UpdateTimeBenchmark extends BenchmarkState {
     if (interningEnd > entries.length) throw new RuntimeException("Can't ingest any more strings")
 
     Await.result(
-      interning.update(interningEnd)(BenchmarkState.loadStringInterningEntries(entries))(
-        LoggingContext.ForTesting
-      ),
+      interning.update(interningEnd)(BenchmarkState.loadStringInterningEntries(entries)),
       perfTestTimeout,
     )
   }

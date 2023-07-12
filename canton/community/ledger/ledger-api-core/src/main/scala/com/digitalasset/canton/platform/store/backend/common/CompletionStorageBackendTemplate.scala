@@ -3,31 +3,32 @@
 
 package com.digitalasset.canton.platform.store.backend.common
 
-import anorm.SqlParser.{array, byteArray, int, long, str}
+import anorm.SqlParser.*
 import anorm.{Row, RowParser, SimpleSql, ~}
-import com.daml.ledger.api.v1.command_completion_service.CompletionStreamResponse
+import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.lf.data.Time.Timestamp
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.platform.index.index.StatusDetails
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.store.CompletionFromTransaction
 import com.digitalasset.canton.platform.store.backend.CompletionStorageBackend
 import com.digitalasset.canton.platform.store.backend.Conversions.{offset, timestampFromMicros}
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.SqlStringInterpolation
 import com.digitalasset.canton.platform.store.interning.StringInterning
 import com.digitalasset.canton.platform.{ApplicationId, Party}
+import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.any
-import com.google.rpc.status.{Status as StatusProto}
+import com.google.rpc.status.Status as StatusProto
 
 import java.sql.Connection
 
 class CompletionStorageBackendTemplate(
     queryStrategy: QueryStrategy,
     stringInterning: StringInterning,
-) extends CompletionStorageBackend {
+    val loggerFactory: NamedLoggerFactory,
+) extends CompletionStorageBackend
+    with NamedLogging {
   import com.digitalasset.canton.platform.store.backend.Conversions.ArrayColumnToIntArray.*
-
-  private val logger: ContextualizedLogger = ContextualizedLogger.get(this.getClass)
 
   override def commandCompletions(
       startExclusive: Offset,
@@ -36,9 +37,9 @@ class CompletionStorageBackendTemplate(
       parties: Set[Party],
       limit: Int,
   )(connection: Connection): Vector[CompletionStreamResponse] = {
+    import ComposableQuery.*
     import com.digitalasset.canton.platform.store.backend.Conversions.applicationIdToStatement
     import com.digitalasset.canton.platform.store.backend.common.SimpleSqlAsVectorOf.*
-    import ComposableQuery.*
     val internedParties =
       parties.view.map(stringInterning.party.tryInternalize).flatMap(_.toList).toSet
     if (internedParties.isEmpty) {
@@ -59,7 +60,8 @@ class CompletionStorageBackendTemplate(
           deduplication_offset,
           deduplication_duration_seconds,
           deduplication_duration_nanos,
-          deduplication_start
+          deduplication_start,
+          domain_id
         FROM
           participant_command_completions
         WHERE
@@ -78,18 +80,21 @@ class CompletionStorageBackendTemplate(
     }
   }
 
-  private val sharedColumns
-      : RowParser[Array[Int] ~ Offset ~ Timestamp ~ String ~ String ~ Option[String]] = {
+  private val sharedColumns: RowParser[
+    Array[Int] ~ Offset ~ Timestamp ~ String ~ String ~ Option[String] ~ Option[Int]
+  ] = {
     array[Int]("submitters") ~
       offset("completion_offset") ~
       timestampFromMicros("record_time") ~
       str("command_id") ~
       str("application_id") ~
-      str("submission_id").?
+      str("submission_id").? ~
+      int("domain_id").?
   }
 
-  private val acceptedCommandSharedColumns
-      : RowParser[Array[Int] ~ Offset ~ Timestamp ~ String ~ String ~ Option[String] ~ String] =
+  private val acceptedCommandSharedColumns: RowParser[
+    Array[Int] ~ Offset ~ Timestamp ~ String ~ String ~ Option[String] ~ Option[Int] ~ String
+  ] =
     sharedColumns ~ str("transaction_id")
 
   private val deduplicationOffsetColumn: RowParser[Option[String]] =
@@ -106,7 +111,7 @@ class CompletionStorageBackendTemplate(
       deduplicationOffsetColumn ~
       deduplicationDurationSecondsColumn ~ deduplicationDurationNanosColumn ~
       deduplicationStartColumn map {
-        case submitters ~ offset ~ recordTime ~ commandId ~ applicationId ~ submissionId ~ transactionId ~
+        case submitters ~ offset ~ recordTime ~ commandId ~ applicationId ~ submissionId ~ internedDomainId ~ transactionId ~
             deduplicationOffset ~ deduplicationDurationSeconds ~ deduplicationDurationNanos ~ _ =>
           submitters -> CompletionFromTransaction.acceptedCompletion(
             recordTime = recordTime,
@@ -118,6 +123,7 @@ class CompletionStorageBackendTemplate(
             optDeduplicationOffset = deduplicationOffset,
             optDeduplicationDurationSeconds = deduplicationDurationSeconds,
             optDeduplicationDurationNanos = deduplicationDurationNanos,
+            domainId = internedDomainId.map(stringInterning.domainId.unsafe.externalize),
           )
       }
 
@@ -134,7 +140,7 @@ class CompletionStorageBackendTemplate(
       rejectionStatusCodeColumn ~
       rejectionStatusMessageColumn ~
       rejectionStatusDetailsColumn map {
-        case submitters ~ offset ~ recordTime ~ commandId ~ applicationId ~ submissionId ~
+        case submitters ~ offset ~ recordTime ~ commandId ~ applicationId ~ submissionId ~ internedDomainId ~
             deduplicationOffset ~ deduplicationDurationSeconds ~ deduplicationDurationNanos ~ _ ~
             rejectionStatusCode ~ rejectionStatusMessage ~ rejectionStatusDetails =>
           val status =
@@ -149,6 +155,7 @@ class CompletionStorageBackendTemplate(
             optDeduplicationOffset = deduplicationOffset,
             optDeduplicationDurationSeconds = deduplicationDurationSeconds,
             optDeduplicationDurationNanos = deduplicationDurationNanos,
+            domainId = internedDomainId.map(stringInterning.domainId.unsafe.externalize),
           )
       }
 
@@ -176,18 +183,20 @@ class CompletionStorageBackendTemplate(
 
   override def pruneCompletions(
       pruneUpToInclusive: Offset
-  )(connection: Connection, loggingContext: LoggingContext): Unit = {
+  )(connection: Connection, traceContext: TraceContext): Unit = {
     pruneWithLogging(queryDescription = "Command completions pruning") {
       import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
       SQL"delete from participant_command_completions where completion_offset <= $pruneUpToInclusive"
-    }(connection, loggingContext)
+    }(connection, traceContext)
   }
 
   private def pruneWithLogging(queryDescription: String)(query: SimpleSql[Row])(
       connection: Connection,
-      loggingContext: LoggingContext,
+      traceContext: TraceContext,
   ): Unit = {
     val deletedRows = query.executeUpdate()(connection)
-    logger.info(s"$queryDescription finished: deleted $deletedRows rows.")(loggingContext)
+    logger.info(s"$queryDescription finished: deleted $deletedRows rows.")(
+      traceContext
+    )
   }
 }

@@ -3,29 +3,29 @@
 
 package com.digitalasset.canton.traffic
 
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveLong}
+import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt, PositiveLong}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.traffic.v0.MemberTrafficStatus.TopUpEvent as TopUpEventP
-import com.digitalasset.canton.{ProtoDeserializationError, SequencerCounter}
 import slick.jdbc.GetResult
 
 object TopUpEvent {
   implicit val ordering: Ordering[TopUpEvent] = {
-    // Order first by timestamp then by sequencer counter to differentiate if necessary
+    // Order first by timestamp then by serial number to differentiate if necessary
     (x: TopUpEvent, y: TopUpEvent) =>
       {
         x.validFromInclusive compare y.validFromInclusive match {
-          case 0 => x.sequencerCounter compare y.sequencerCounter
+          case 0 => x.serial compare y.serial
           case c => c
         }
       }
   }
 
-  import com.digitalasset.canton.store.db.RequiredTypesCodec.positiveLongGetResult
+  import com.digitalasset.canton.store.db.RequiredTypesCodec.*
 
   implicit val topUpEventGetResult: GetResult[TopUpEvent] =
-    GetResult.createGetTuple3[CantonTimestamp, PositiveLong, SequencerCounter].andThen {
+    GetResult.createGetTuple3[CantonTimestamp, PositiveLong, PositiveInt].andThen {
       case (ts, limit, sc) =>
         TopUpEvent(limit, ts, sc)
     }
@@ -40,16 +40,16 @@ object TopUpEvent {
   ): Either[ProtoDeserializationError, TopUpEvent] = {
     for {
       limit <- ProtoConverter.parsePositiveLong(topUp.extraTrafficLimit)
+      serial <- ProtoConverter.parsePositiveInt(topUp.serial)
       validFrom <- ProtoConverter.parseRequired(
         CantonTimestamp.fromProtoPrimitive,
         "effective_at",
         topUp.effectiveAt,
       )
-      sequencerCounter = SequencerCounter(topUp.sequencerCounter)
     } yield TopUpEvent(
       limit,
       validFrom,
-      sequencerCounter,
+      serial,
     )
   }
 }
@@ -57,12 +57,12 @@ object TopUpEvent {
 final case class TopUpEvent(
     limit: PositiveLong,
     validFromInclusive: CantonTimestamp,
-    sequencerCounter: SequencerCounter,
+    serial: PositiveInt,
 ) {
   def toProtoV0: TopUpEventP = {
     TopUpEventP(
       Some(validFromInclusive.toProtoPrimitive),
-      sequencerCounter = sequencerCounter.toProtoPrimitive,
+      serial = serial.value,
       extraTrafficLimit = limit.value,
     )
   }

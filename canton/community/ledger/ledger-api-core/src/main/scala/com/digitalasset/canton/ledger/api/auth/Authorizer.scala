@@ -4,15 +4,16 @@
 package com.digitalasset.canton.ledger.api.auth
 
 import akka.actor.Scheduler
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.ledger.api.v1.transaction_filter.TransactionFilter
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
+import com.daml.ledger.api.v1.transaction_filter.Filters
+import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.auth.interceptor.AuthorizationInterceptor
 import com.digitalasset.canton.ledger.api.domain.IdentityProviderId
 import com.digitalasset.canton.ledger.api.validation.ValidationErrors
-import com.digitalasset.canton.ledger.error.{DamlContextualizedErrorLogger, LedgerApiErrors}
+import com.digitalasset.canton.ledger.error.LedgerApiErrors
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.localstore.api.UserManagementStore
+import com.digitalasset.canton.tracing.{TelemetryTracing, TraceContext}
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import scalapb.lenses.Lens
@@ -33,10 +34,10 @@ final class Authorizer(
     userRightsCheckIntervalInSeconds: Int,
     akkaScheduler: Scheduler,
     jwtTimestampLeeway: Option[JwtTimestampLeeway] = None,
-)(implicit loggingContext: LoggingContext) {
-  private val logger = ContextualizedLogger.get(this.getClass)
-  private implicit val errorLogger: ContextualizedErrorLogger =
-    new DamlContextualizedErrorLogger(logger, loggingContext, None)
+    protected val telemetry: Telemetry,
+    val loggerFactory: NamedLoggerFactory,
+) extends NamedLogging
+    with TelemetryTracing {
 
   /** Validates all properties of claims that do not depend on the request,
     * such as expiration time or ledger ID.
@@ -237,11 +238,11 @@ final class Authorizer(
 
   /** Checks whether the current Claims authorize to read data for all parties mentioned in the given transaction filter */
   def requireReadClaimsForTransactionFilterOnStream[Req, Res](
-      filter: Option[TransactionFilter],
+      filter: Option[Map[String, Filters]],
       call: (Req, StreamObserver[Res]) => Unit,
   ): (Req, StreamObserver[Res]) => Unit =
     requireReadClaimsForAllPartiesOnStream(
-      filter.map(_.filtersByParty).fold(Set.empty[String])(_.keySet),
+      filter.fold(Set.empty[String])(_.keySet),
       call,
     )
 
@@ -328,7 +329,8 @@ final class Authorizer(
     userRightsCheckIntervalInSeconds = userRightsCheckIntervalInSeconds,
     akkaScheduler = akkaScheduler,
     jwtTimestampLeeway = jwtTimestampLeeway,
-  )(loggingContext, ec)
+    loggerFactory = loggerFactory,
+  )(ec, TraceContext.empty)
 
   /** Directly access the authenticated claims from the thread-local context.
     *

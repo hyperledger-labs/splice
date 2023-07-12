@@ -10,9 +10,16 @@ import com.daml.metrics.Metrics
 import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
 import com.daml.platform.hello.{HelloRequest, HelloResponse, HelloServiceGrpc}
 import com.daml.ports.Port
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelConfiguration
-import com.digitalasset.canton.ledger.error.{DamlContextualizedErrorLogger, LedgerApiErrors}
+import com.digitalasset.canton.ledger.error.LedgerApiErrors
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  LoggingContextWithTrace,
+  NamedLoggerFactory,
+  SuppressingLogger,
+}
 import com.digitalasset.canton.platform.apiserver.GrpcServerSpec.*
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
 import com.digitalasset.canton.platform.apiserver.ratelimiting.{
@@ -21,7 +28,6 @@ import com.digitalasset.canton.platform.apiserver.ratelimiting.{
 }
 import com.google.protobuf.ByteString
 import io.grpc.{ManagedChannel, ServerInterceptor, StatusRuntimeException}
-import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.util.concurrent.Executors
@@ -29,12 +35,12 @@ import scala.concurrent.Future
 
 final class GrpcServerSpec
     extends AsyncWordSpec
-    with Matchers
+    with BaseTest
     with TestResourceContext
     with MetricValues {
   "a GRPC server" should {
     "handle a request to a valid service" in {
-      resources().use { channel =>
+      resources(loggerFactory).use { channel =>
         val helloService = HelloServiceGrpc.stub(channel)
         for {
           response <- helloService.single(HelloRequest(7))
@@ -45,7 +51,7 @@ final class GrpcServerSpec
     }
 
     "fail with a nice exception" in {
-      resources().use { channel =>
+      resources(loggerFactory).use { channel =>
         val helloService = HelloServiceGrpc.stub(channel)
         for {
           exception <- helloService
@@ -60,7 +66,7 @@ final class GrpcServerSpec
     "fail with a nice exception, even when the text is quite long" in {
       val errorMessage = "There was an error. " + "x" * 2048
       val returnedMessage = "There was an error. " + "x" * 447 + "..."
-      resources().use { channel =>
+      resources(loggerFactory).use { channel =>
         val helloService = HelloServiceGrpc.stub(channel)
         for {
           exception <- helloService
@@ -79,7 +85,7 @@ final class GrpcServerSpec
           LazyList.continually("x").take(length).mkString +
           " And then some extra text that won't be sent."
 
-      resources().use { channel =>
+      resources(loggerFactory).use { channel =>
         val helloService = HelloServiceGrpc.stub(channel)
         for {
           exception <- helloService
@@ -102,8 +108,9 @@ final class GrpcServerSpec
         100,
         59,
         "test",
-      )(DamlContextualizedErrorLogger.forTesting(getClass))
+      )
       val rateLimitingInterceptor = RateLimitingInterceptor(
+        loggerFactory,
         metrics,
         rateLimitingConfig,
         additionalChecks = List((_, _) => {
@@ -112,7 +119,7 @@ final class GrpcServerSpec
           )
         }),
       )
-      resources(metrics, List(rateLimitingInterceptor)).use { channel =>
+      resources(loggerFactory, metrics, List(rateLimitingInterceptor)).use { channel =>
         val helloService = HelloServiceGrpc.stub(channel)
         helloService.single(HelloRequest(7)).failed.map {
           case s: StatusRuntimeException =>
@@ -133,8 +140,10 @@ object GrpcServerSpec {
 
   class TestedHelloService extends HelloServiceReferenceImplementation {
     override def fails(request: HelloRequest): Future[HelloResponse] = {
-      val errorLogger =
-        DamlContextualizedErrorLogger.forTesting(getClass)
+      val loggerFactory = SuppressingLogger(getClass)
+      val logger = loggerFactory.getTracedLogger(getClass)
+      val errorLogger = ErrorLoggingContext(logger, LoggingContextWithTrace.ForTesting)
+
       Future.failed(
         LedgerApiErrors.RequestValidation.InvalidArgument
           .Reject(request.payload.toStringUtf8)(errorLogger)
@@ -144,6 +153,7 @@ object GrpcServerSpec {
   }
 
   private def resources(
+      loggerFactory: NamedLoggerFactory,
       metrics: Metrics = Metrics.ForTesting,
       interceptors: List[ServerInterceptor] = List.empty,
   ): ResourceOwner[ManagedChannel] =
@@ -157,6 +167,7 @@ object GrpcServerSpec {
         servicesExecutor = executor,
         services = Seq(new TestedHelloService),
         interceptors = interceptors,
+        loggerFactory = loggerFactory,
       )
       channel <- new GrpcChannel.Owner(
         Port(server.getPort),

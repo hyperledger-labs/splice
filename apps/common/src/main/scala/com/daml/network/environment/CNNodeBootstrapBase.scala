@@ -152,7 +152,7 @@ abstract class CNNodeBootstrapBase[
 
   override protected val timeouts: ProcessingTimeout = parameterConfig.processingTimeouts
 
-  protected def isActive: Boolean
+  def isActive: Boolean
 
   protected val grpcAdminServers: List[AutoCloseable] = List()
 

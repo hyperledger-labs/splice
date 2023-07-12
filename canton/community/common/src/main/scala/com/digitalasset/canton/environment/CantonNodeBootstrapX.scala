@@ -159,11 +159,15 @@ abstract class CantonNodeBootstrapX[
           )
           .map { crypto =>
             addCloseable(crypto)
-            val certificateGenerator = new X509CertificateGenerator(crypto, loggerFactory)
             adminServerRegistry.addServiceU(
               VaultServiceGrpc.bindService(
                 arguments.grpcVaultServiceFactory
-                  .create(crypto, certificateGenerator, loggerFactory),
+                  .create(
+                    crypto,
+                    parameterConfig.enablePreviewFeatures,
+                    timeouts,
+                    loggerFactory,
+                  ),
                 executionContext,
               )
             )
@@ -431,7 +435,7 @@ abstract class CantonNodeBootstrapX[
   }
 
   override protected def onClosed(): Unit = {
-    Lifecycle.close(initQueue, adminServerRegistry, adminServer, startupStage)(
+    Lifecycle.close(clock, initQueue, adminServerRegistry, adminServer, startupStage)(
       logger
     )
     super.onClosed()

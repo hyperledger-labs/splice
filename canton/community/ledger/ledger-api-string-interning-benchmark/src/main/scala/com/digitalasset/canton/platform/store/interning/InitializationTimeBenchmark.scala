@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.platform.store.interning
 
-import com.daml.logging.LoggingContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import org.openjdk.jmh.annotations.{
   Benchmark,
   BenchmarkMode,
@@ -20,9 +20,12 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.Await
 
 class InitializationTimeBenchmark extends BenchmarkState {
+
+  private val loggerFactory = NamedLoggerFactory.root
+
   @Setup(Level.Invocation)
   def setupIteration(): Unit = {
-    interning = new StringInterningView()
+    interning = new StringInterningView(loggerFactory)
   }
 
   @Benchmark
@@ -34,9 +37,7 @@ class InitializationTimeBenchmark extends BenchmarkState {
   def run(): Unit = {
     Await.result(
       interning
-        .update(stringCount)(BenchmarkState.loadStringInterningEntries(entries))(
-          LoggingContext.ForTesting
-        ),
+        .update(stringCount)(BenchmarkState.loadStringInterningEntries(entries)),
       perfTestTimeout,
     )
   }

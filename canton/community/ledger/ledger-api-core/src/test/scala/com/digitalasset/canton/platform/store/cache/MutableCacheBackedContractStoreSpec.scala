@@ -6,30 +6,37 @@ package com.digitalasset.canton.platform.store.cache
 import com.daml.ledger.resources.Resource
 import com.daml.lf.crypto.Hash
 import com.daml.lf.data.ImmArray
+import com.daml.lf.data.Ref.IdString
 import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.transaction.GlobalKey
-import com.daml.lf.transaction.test.TransactionBuilder
+import com.daml.lf.transaction.{GlobalKey, TransactionVersion, Versioned}
 import com.daml.lf.value.Value.{ContractInstance, ValueRecord, ValueText}
-import com.daml.logging.LoggingContext
 import com.daml.metrics.Metrics
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.index.v2.ContractState
-import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractStoreSpec.{cId_5, *}
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
+import com.digitalasset.canton.platform.store.cache.MutableCacheBackedContractStoreSpec.*
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader.{
   KeyAssigned,
   KeyUnassigned,
 }
+import com.digitalasset.canton.{HasExecutionContext, TestEssentials}
 import org.mockito.MockitoSugar
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.annotation.nowarn
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers with MockitoSugar {
-  private implicit val loggingContext: LoggingContext = LoggingContext.ForTesting
+class MutableCacheBackedContractStoreSpec
+    extends AsyncWordSpec
+    with Matchers
+    with MockitoSugar
+    with TestEssentials
+    with HasExecutionContext {
+
+  implicit val loggingContext: LoggingContextWithTrace = LoggingContextWithTrace.ForTesting
 
   "push" should {
     "update the contract state caches" in {
@@ -38,6 +45,7 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
         metrics = Metrics.ForTesting,
         contractsReader = mock[LedgerDaoContractsReader],
         contractStateCaches = contractStateCaches,
+        loggerFactory = loggerFactory,
       )
 
       val event1 = ContractStateEvent.Archived(
@@ -62,7 +70,11 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
       val spyContractsReader = spy(ContractsReaderFixture())
 
       for {
-        store <- contractStore(cachesSize = 1L, spyContractsReader).asFuture
+        store <- contractStore(
+          cachesSize = 1L,
+          loggerFactory = loggerFactory,
+          spyContractsReader,
+        ).asFuture
         _ = store.contractStateCaches.contractState.cacheIndex = offset1
         cId2_lookup <- store.lookupActiveContract(Set(alice), cId_2)
         another_cId2_lookup <- store.lookupActiveContract(Set(alice), cId_2)
@@ -95,7 +107,11 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
     "read-through the cache without storing negative lookups" in {
       val spyContractsReader = spy(ContractsReaderFixture())
       for {
-        store <- contractStore(cachesSize = 1L, spyContractsReader).asFuture
+        store <- contractStore(
+          cachesSize = 1L,
+          loggerFactory = loggerFactory,
+          spyContractsReader,
+        ).asFuture
         _ = store.contractStateCaches.contractState.cacheIndex = offset1
         negativeLookup_cId6 <- store.lookupActiveContract(Set(alice), cId_6)
         positiveLookup_cId6 <- store.lookupActiveContract(Set(alice), cId_6)
@@ -112,7 +128,11 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
     "resort to resolveDivulgenceLookup on not found" in {
       val spyContractsReader = spy(ContractsReaderFixture())
       for {
-        store <- contractStore(cachesSize = 1L, spyContractsReader).asFuture
+        store <- contractStore(
+          cachesSize = 1L,
+          loggerFactory = loggerFactory,
+          spyContractsReader,
+        ).asFuture
         _ = store.contractStateCaches.contractState.cacheIndex = offset1
         resolvedLookup_cId7 <- store.lookupActiveContract(Set(bob), cId_7)
       } yield {
@@ -125,7 +145,7 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
 
     "present the contract state if visible at specific cache offsets (with no cache)" in {
       for {
-        store <- contractStore(cachesSize = 0L).asFuture
+        store <- contractStore(cachesSize = 0L, loggerFactory).asFuture
         cId1_lookup0 <- store.lookupActiveContract(Set(alice), cId_1)
         cId2_lookup0 <- store.lookupActiveContract(Set(bob), cId_2)
 
@@ -157,7 +177,11 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
       val unassignedKey = globalKey("unassigned")
 
       for {
-        store <- contractStore(cachesSize = 1L, spyContractsReader).asFuture
+        store <- contractStore(
+          cachesSize = 1L,
+          loggerFactory = loggerFactory,
+          spyContractsReader,
+        ).asFuture
         assigned_firstLookup <- store.lookupContractKey(Set(alice), someKey)
         assigned_secondLookup <- store.lookupContractKey(Set(alice), someKey)
 
@@ -180,7 +204,7 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
 
     "present the key state if visible at specific cache offsets (with no cache)" in {
       for {
-        store <- contractStore(cachesSize = 0L).asFuture
+        store <- contractStore(cachesSize = 0L, loggerFactory).asFuture
         key_lookup0 <- store.lookupContractKey(Set(alice), someKey)
 
         _ = store.contractStateCaches.keyState.cacheIndex = offset1
@@ -205,7 +229,7 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
   "lookupContractStateWithoutDivulgence" should {
     "resolve lookup from cache" in {
       for {
-        store <- contractStore(cachesSize = 2L).asFuture
+        store <- contractStore(cachesSize = 2L, loggerFactory).asFuture
         _ = store.contractStateCaches.contractState.putBatch(
           offset2,
           Map(
@@ -231,7 +255,7 @@ class MutableCacheBackedContractStoreSpec extends AsyncWordSpec with Matchers wi
 
     "resolve lookup from the ContractsReader when not cached" in {
       for {
-        store <- contractStore(cachesSize = 0L).asFuture
+        store <- contractStore(cachesSize = 0L, loggerFactory).asFuture
         activeContractLookupResult <- store.lookupContractStateWithoutDivulgence(cId_4)
         archivedContractLookupResult <- store.lookupContractStateWithoutDivulgence(cId_5)
         nonExistentContractLookupResult <- store.lookupContractStateWithoutDivulgence(cId_7)
@@ -265,21 +289,18 @@ object MutableCacheBackedContractStoreSpec {
 
   private def contractStore(
       cachesSize: Long,
+      loggerFactory: NamedLoggerFactory,
       readerFixture: LedgerDaoContractsReader = ContractsReaderFixture(),
-      startIndexExclusive: Offset = offset0,
-  )(implicit loggingContext: LoggingContext) = {
+  )(implicit ec: ExecutionContext) = {
     val metrics = Metrics.ForTesting
-    // TODO(#13019) Avoid the global execution context
-    @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
+    val startIndexExclusive: Offset = offset0
     val contractStore = new MutableCacheBackedContractStore(
       metrics,
       readerFixture,
-      contractStateCaches =
-        ContractStateCaches.build(startIndexExclusive, cachesSize, cachesSize, metrics)(
-          scala.concurrent.ExecutionContext.global,
-          loggingContext,
-        ),
-    )(scala.concurrent.ExecutionContext.global)
+      contractStateCaches = ContractStateCaches
+        .build(startIndexExclusive, cachesSize, cachesSize, metrics, loggerFactory),
+      loggerFactory = loggerFactory,
+    )
 
     Resource.successful(contractStore)
   }
@@ -290,7 +311,7 @@ object MutableCacheBackedContractStoreSpec {
       Future.successful(Option.empty[LedgerDaoContractsReader.ContractState])
 
     override def lookupKeyState(key: Key, validAt: Offset)(implicit
-        loggingContext: LoggingContext
+        loggingContext: LoggingContextWithTrace
     ): Future[LedgerDaoContractsReader.KeyState] = (key, validAt) match {
       case (`someKey`, `offset0`) => Future.successful(KeyAssigned(cId_1, Set(alice)))
       case (`someKey`, `offset2`) => Future.successful(KeyAssigned(cId_2, Set(bob)))
@@ -298,7 +319,7 @@ object MutableCacheBackedContractStoreSpec {
     }
 
     override def lookupContractState(contractId: ContractId, validAt: Offset)(implicit
-        loggingContext: LoggingContext
+        loggingContext: LoggingContextWithTrace
     ): Future[Option[LedgerDaoContractsReader.ContractState]] = {
       (contractId, validAt) match {
         case (`cId_1`, `offset0`) => activeContract(contract1, Set(alice), t1)
@@ -319,7 +340,7 @@ object MutableCacheBackedContractStoreSpec {
     override def lookupActiveContractAndLoadArgument(
         forParties: Set[Party],
         contractId: ContractId,
-    )(implicit loggingContext: LoggingContext): Future[Option[Contract]] =
+    )(implicit loggingContext: LoggingContextWithTrace): Future[Option[Contract]] =
       (contractId, forParties) match {
         case (`cId_2`, parties) if parties.contains(charlie) =>
           // Purposely return a wrong associated contract than the cId so it can be distinguished upstream
@@ -335,7 +356,7 @@ object MutableCacheBackedContractStoreSpec {
         forParties: Set[Party],
         contractId: ContractId,
         createArgument: Value,
-    )(implicit loggingContext: LoggingContext): Future[Option[Contract]] =
+    )(implicit loggingContext: LoggingContextWithTrace): Future[Option[Contract]] =
       (contractId, forParties) match {
         case (`cId_2`, parties) if parties.contains(charlie) => Future.successful(Some(contract2))
         case _ => Future.successful(Option.empty)
@@ -346,15 +367,17 @@ object MutableCacheBackedContractStoreSpec {
       contract: Contract,
       parties: Set[Party],
       ledgerEffectiveTime: Timestamp,
-  ) =
+  ): Future[Option[LedgerDaoContractsReader.ActiveContract]] =
     Future.successful(
       Some(LedgerDaoContractsReader.ActiveContract(contract, parties, ledgerEffectiveTime))
     )
 
-  private def archivedContract(parties: Set[Party]) =
+  private def archivedContract(
+      parties: Set[Party]
+  ): Future[Option[LedgerDaoContractsReader.ArchivedContract]] =
     Future.successful(Some(LedgerDaoContractsReader.ArchivedContract(parties)))
 
-  private def party(name: String) = Party.assertFromString(name)
+  private def party(name: String): IdString.Party = Party.assertFromString(name)
 
   private def contract(templateName: String): Contract = {
     val templateId = Identifier.assertFromString(s"some:template:$templateName")
@@ -363,7 +386,7 @@ object MutableCacheBackedContractStoreSpec {
       ImmArray.Empty,
     )
     val contractInstance = ContractInstance(templateId, contractArgument)
-    TransactionBuilder().versionContract(contractInstance)
+    Versioned(TransactionVersion.StableVersions.max, contractInstance)
   }
 
   private def contractId(id: Int): ContractId =

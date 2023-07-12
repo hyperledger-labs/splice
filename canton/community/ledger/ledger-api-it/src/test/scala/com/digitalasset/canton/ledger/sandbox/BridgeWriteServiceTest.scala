@@ -7,13 +7,13 @@ import com.daml.lf.crypto
 import com.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.daml.lf.transaction.*
 import com.daml.lf.value.Value.{ContractId, ValueNone}
-import com.daml.logging.LoggingContext
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod
 import com.digitalasset.canton.ledger.configuration.Configuration
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.v2.{SubmitterInfo, TransactionMeta}
 import com.digitalasset.canton.ledger.sandbox.bridge.LedgerBridge
 import com.digitalasset.canton.ledger.sandbox.domain.Submission
+import com.digitalasset.canton.logging.LoggingContextWithTrace
 import org.mockito.MockitoSugar
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -56,6 +56,7 @@ class BridgeWriteServiceTest extends AnyFlatSpec with MockitoSugar with Matchers
     optUsedPackages = None,
     optNodeSeeds = None,
     optByKeyNodes = None,
+    optDomainId = None,
   )
 
   private val submission = Submission.Transaction(
@@ -64,7 +65,7 @@ class BridgeWriteServiceTest extends AnyFlatSpec with MockitoSugar with Matchers
     transaction = tx,
     estimatedInterpretationCost = 0,
     processedDisclosedContracts = ImmArray.empty,
-  )(LoggingContext.ForTesting)
+  )(LoggingContextWithTrace.ForTesting)
 
   "Success Mapper" should "add transaction statistics" in {
     val expected = TransactionNodeStatistics(tx)
@@ -75,7 +76,7 @@ class BridgeWriteServiceTest extends AnyFlatSpec with MockitoSugar with Matchers
         index = 0,
         currentTimestamp = Time.Timestamp.now(),
       )
-    update.optCompletionInfo.flatMap(_.statistics) shouldBe Some(expected)
+    update.completionInfoO.flatMap(_.statistics) shouldBe Some(expected)
   }
 
   "toTransactionAccepted" should "forward populate contract metadata" in {

@@ -447,7 +447,7 @@ class CNNodeConsoleEnvironment(
     Help.getItems(remoteDomain, baseTopic = Seq("$domain"), scope = scope)
 
   override protected def createDomainReference(name: String): CommunityLocalDomainReference =
-    new CommunityLocalDomainReference(this, name)
+    new CommunityLocalDomainReference(this, name, environment.executionContext)
 
   override protected def createRemoteDomainReference(name: String): CommunityRemoteDomainReference =
     new CommunityRemoteDomainReference(this, name)

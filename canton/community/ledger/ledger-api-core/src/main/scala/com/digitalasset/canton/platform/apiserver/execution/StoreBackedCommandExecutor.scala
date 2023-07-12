@@ -18,7 +18,6 @@ import com.daml.lf.engine.{
   ResultNeedPackage,
 }
 import com.daml.lf.transaction.{Node, SubmittedTransaction, Transaction}
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.metrics.{Metrics, Timed, Tracked}
 import com.digitalasset.canton.data.ProcessedDisclosedContract
 import com.digitalasset.canton.ledger.api.domain.Commands as ApiCommands
@@ -28,10 +27,10 @@ import com.digitalasset.canton.ledger.participant.state.index.v2.{
   IndexPackagesService,
 }
 import com.digitalasset.canton.ledger.participant.state.v2 as state
-import com.digitalasset.canton.logging.LoggingContextWithTrace
+import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
-import com.digitalasset.canton.tracing.TraceContext
 import scalaz.syntax.tag.*
 
 import java.util.concurrent.TimeUnit
@@ -48,10 +47,11 @@ private[apiserver] final class StoreBackedCommandExecutor(
     contractStore: ContractStore,
     authorityResolver: AuthorityResolver,
     metrics: Metrics,
+    val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
-) extends CommandExecutor {
-  private val logger: ContextualizedLogger = ContextualizedLogger.get(getClass)
+) extends CommandExecutor
+    with NamedLogging {
   private[this] val packageLoader = new DeduplicatingPackageLoader()
 
   override def execute(
@@ -121,6 +121,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
             .collect { case (nodeId, node: Node.Action) if node.byKey => nodeId }
             .to(ImmArray)
         ),
+        commands.domainId,
       ),
       transaction = updateTx,
       dependsOnLedgerTime = meta.dependsOnTime,
@@ -142,7 +143,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
       submissionSeed: crypto.Hash,
       interpretationTimeNanos: AtomicLong,
   )(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[(SubmittedTransaction, Transaction.Metadata)]] =
     Tracked.future(
       metrics.daml.execution.engineRunning,
@@ -171,7 +172,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
       result: Result[A],
       interpretationTimeNanos: AtomicLong,
   )(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Either[DamlLfError, A]] = {
     val readers = actAs ++ readAs
 
@@ -250,9 +251,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
         case ResultNeedAuthority(holding @ _, requesting @ _, resume) =>
           authorityResolver
             // TODO(i12742) DomainId is required to be passed here
-            .resolve(AuthorityResolver.AuthorityRequest(holding, requesting, domainId = None))(
-              TraceContext.empty
-            )
+            .resolve(AuthorityResolver.AuthorityRequest(holding, requesting, domainId = None))
             .flatMap { response =>
               val resumed = response match {
                 case AuthorityResolver.AuthorityResponse.MissingAuthorisation(parties) =>

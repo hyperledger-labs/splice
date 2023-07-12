@@ -11,9 +11,9 @@ object Dependencies {
 
   lazy val scalatestScalacheck = CD.scalatestScalacheck
 
-  // We may want to remove this in favor of CantonDependencies.daml_libraries_version
-  // at some point but they can also be decoupled.
-  lazy val ledgerApiVersion = "2.7.0-snapshot.20230612.11864.0.v3514a4a0"
+  // Note that this can be out of sync if the Canton binary we use
+  // is on a newer version.
+  lazy val ledgerApiVersion = CD.version
 
   // Picked up automatically by the scalapb compiler. Contains common dependencies such as protocol buffers like google/protobuf/timestamp.proto
   lazy val scalapb_runtime =
@@ -40,9 +40,6 @@ object Dependencies {
 
   lazy val daml_bindings_java =
     "com.daml" % "bindings-java" % CantonDependencies.daml_libraries_version
-
-  lazy val daml_lf_value_json =
-    "com.daml" %% "lf-value-json" % CantonDependencies.daml_libraries_version
 
   lazy val daml_lf_validation =
     "com.daml" %% "daml-lf-validation" % CantonDependencies.daml_libraries_version

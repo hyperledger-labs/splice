@@ -7,32 +7,31 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.{Done, NotUsed}
 import com.daml.ledger.api.testing.utils.AkkaBeforeAndAfterAll
 import com.daml.lf.data.Time.Timestamp
-import com.daml.logging.LoggingContext
 import com.daml.metrics.Metrics
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReader.FetchFromPersistence
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReaderSpec.*
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
+import com.digitalasset.canton.{BaseTest, HasExecutionContext, HasExecutorServiceGeneric}
 import org.scalatest.Assertion
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.annotation.nowarn
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Success
 import scala.util.chaining.*
 
-// TODO(#13019) Avoid the global execution context
-@SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
 class BufferedStreamsReaderSpec
     extends AnyWordSpec
     with Matchers
     with AkkaBeforeAndAfterAll
-    with TestFixtures {
+    with TestFixtures
+    with HasExecutionContext {
 
   "stream (static)" when {
     "buffer filter" should {
@@ -242,13 +241,18 @@ class BufferedStreamsReaderSpec
 }
 
 @nowarn("msg=match may not be exhaustive")
-// TODO(#13019) Avoid the global execution context
-@SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
 object BufferedStreamsReaderSpec {
-  trait TestFixtures extends Matchers with ScalaFutures with IntegrationPatience {
-    self: AkkaBeforeAndAfterAll =>
 
-    implicit val lc: LoggingContext = LoggingContext.ForTesting
+  trait TestFixtures
+      extends Matchers
+      with ScalaFutures
+      with BaseTest
+      with HasExecutorServiceGeneric { self: AkkaBeforeAndAfterAll =>
+
+    implicit val loggingContext: LoggingContextWithTrace = LoggingContextWithTrace.ForTesting
+
+    implicit val ec: ExecutionContext = executorService
+
     val metrics = Metrics.ForTesting
     val Seq(offset0, offset1, offset2, offset3) = (0 to 3) map { idx => offset(idx.toLong) }
     val offsetUpdates: Seq[(Offset, TransactionLogUpdate.TransactionAccepted)] =
@@ -264,26 +268,35 @@ object BufferedStreamsReaderSpec {
       maxBufferSize = 3,
       metrics = metrics,
       maxBufferedChunkSize = 3,
+      loggerFactory = loggerFactory,
     ).tap(inMemoryFanoutBuffer => offsetUpdates.foreach(Function.tupled(inMemoryFanoutBuffer.push)))
 
     val inMemoryFanoutBufferWithSmallChunkSize: InMemoryFanoutBuffer = new InMemoryFanoutBuffer(
       maxBufferSize = 3,
       metrics = metrics,
       maxBufferedChunkSize = 1,
+      loggerFactory = loggerFactory,
     ).tap(inMemoryFanoutBuffer => offsetUpdates.foreach(Function.tupled(inMemoryFanoutBuffer.push)))
 
     val smallInMemoryFanoutBuffer: InMemoryFanoutBuffer = new InMemoryFanoutBuffer(
       maxBufferSize = 1,
       metrics = metrics,
       maxBufferedChunkSize = 1,
+      loggerFactory = loggerFactory,
     ).tap(inMemoryFanoutBuffer => offsetUpdates.foreach(Function.tupled(inMemoryFanoutBuffer.push)))
 
     trait StaticTestScope {
+
       val streamElements: ArrayBuffer[(Offset, String)] = ArrayBuffer.empty[(Offset, String)]
 
       private val failingPersistenceFetch = new FetchFromPersistence[Object, String] {
-        override def apply(startExclusive: Offset, endInclusive: Offset, filter: Object)(implicit
-            loggingContext: LoggingContext
+        override def apply(
+            startExclusive: Offset,
+            endInclusive: Offset,
+            filter: Object,
+            multiDomainEnabled: Boolean,
+        )(implicit
+            loggingContext: LoggingContextWithTrace
         ): Source[(Offset, String), NotUsed] = fail("Unexpected call to fetch from persistence")
       }
 
@@ -303,13 +316,15 @@ object BufferedStreamsReaderSpec {
           bufferedStreamEventsProcessingParallelism = 2,
           metrics = metrics,
           streamName = "some_tx_stream",
-        )
+          loggerFactory,
+        )(executorService)
           .stream[TransactionLogUpdate.TransactionAccepted](
             startExclusive = startExclusive,
             endInclusive = endInclusive,
             persistenceFetchArgs = persistenceFetchArgs,
             bufferFilter = bufferSliceFilter,
             toApiResponse = tx => Future.successful(tx.transactionId),
+            multiDomainEnabled = false,
           )
           .runWith(Sink.foreach(streamElements.addOne))
           .futureValue
@@ -321,8 +336,13 @@ object BufferedStreamsReaderSpec {
           thenReturnStream: Source[(Offset, String), NotUsed],
       ): FetchFromPersistence[Object, String] =
         new FetchFromPersistence[Object, String] {
-          override def apply(startExclusive: Offset, endInclusive: Offset, filter: Object)(implicit
-              loggingContext: LoggingContext
+          override def apply(
+              startExclusive: Offset,
+              endInclusive: Offset,
+              filter: Object,
+              multiDomainEnabled: Boolean,
+          )(implicit
+              loggingContext: LoggingContextWithTrace
           ): Source[(Offset, String), NotUsed] =
             (startExclusive, endInclusive, filter) match {
               case (`expectedStartExclusive`, `expectedEndInclusive`, `expectedFilter`) =>
@@ -338,11 +358,16 @@ object BufferedStreamsReaderSpec {
         Vector.empty[(Offset, TransactionLogUpdate.TransactionAccepted)]
       @volatile private var ledgerEndIndex = 0L
       private val inMemoryFanoutBuffer =
-        new InMemoryFanoutBuffer(maxBufferSize, metrics, maxBufferChunkSize)
+        new InMemoryFanoutBuffer(maxBufferSize, metrics, maxBufferChunkSize, loggerFactory)
 
       private val fetchFromPersistence = new FetchFromPersistence[Object, String] {
-        override def apply(startExclusive: Offset, endInclusive: Offset, filter: Object)(implicit
-            loggingContext: LoggingContext
+        override def apply(
+            startExclusive: Offset,
+            endInclusive: Offset,
+            filter: Object,
+            multiDomainEnabled: Boolean,
+        )(implicit
+            loggingContext: LoggingContextWithTrace
         ): Source[(Offset, String), NotUsed] = {
           if (startExclusive > endInclusive) fail("startExclusive after endInclusive")
           else if (endInclusive > offset(ledgerEndIndex)) fail("endInclusive after ledgerEnd")
@@ -361,6 +386,7 @@ object BufferedStreamsReaderSpec {
         bufferedStreamEventsProcessingParallelism = 2,
         metrics = metrics,
         streamName = "some_tx_stream",
+        loggerFactory,
       )
 
       def updateStores(count: Int): Future[Done] = {
@@ -406,6 +432,7 @@ object BufferedStreamsReaderSpec {
             persistenceFetchArgs = new Object, // Not used
             bufferFilter = noFilterBufferSlice, // Do not filter
             toApiResponse = tx => Future.successful(tx.transactionId),
+            false,
           )
           .async
           .mapAsync(1) { idx =>
@@ -449,6 +476,7 @@ object BufferedStreamsReaderSpec {
       offset = Offset.beforeBegin,
       events = Vector(null),
       completionDetails = None,
+      domainId = None,
     )
 
   private def offset(idx: Long): Offset = {

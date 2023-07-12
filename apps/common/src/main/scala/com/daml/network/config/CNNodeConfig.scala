@@ -15,6 +15,7 @@ abstract class CNNodeBackendConfig extends LocalNodeConfig {
   override val crypto: CryptoConfig = CommunityCryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
   override val caching: CachingConfigs = CachingConfigs()
+  override val topologyX: TopologyXConfig = TopologyXConfig()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
   def participantClient: CNParticipantClientConfig

@@ -19,9 +19,8 @@ import com.daml.ledger.api.v1.admin.config_management_service.{
 }
 import com.daml.lf.data.Ref.SubmissionId
 import com.daml.lf.data.{Ref, Time}
-import com.daml.logging.LoggingContext
 import com.daml.tracing.TelemetrySpecBase.*
-import com.daml.tracing.{DefaultOpenTelemetry, NoOpTelemetry, TelemetryContext}
+import com.daml.tracing.{DefaultOpenTelemetry, NoOpTelemetry}
 import com.digitalasset.canton.ledger.api.domain.{ConfigurationEntry, LedgerOffset}
 import com.digitalasset.canton.ledger.configuration.{Configuration, LedgerTimeModel}
 import com.digitalasset.canton.ledger.participant.state.index.v2.IndexConfigManagementService
@@ -31,13 +30,15 @@ import com.digitalasset.canton.ledger.participant.state.v2.{
   WriteService,
 }
 import com.digitalasset.canton.ledger.participant.state.v2 as state
+import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.apiserver.services.admin.ApiConfigManagementServiceSpec.*
-import com.digitalasset.canton.tracing.TestTelemetrySetup
+import com.digitalasset.canton.tracing.{TestTelemetrySetup, TraceContext}
 import com.digitalasset.canton.{BaseTest, DiscardOps}
 import com.google.protobuf.duration.Duration as DurationProto
 import com.google.protobuf.timestamp.Timestamp
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
+import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
 import org.scalatest.matchers.should.Matchers
@@ -63,8 +64,6 @@ class ApiConfigManagementServiceSpec
     with ErrorsAssertions
     with BaseTest
     with BeforeAndAfterEach {
-
-  private implicit val loggingContext: LoggingContext = LoggingContext.ForTesting
 
   var testTelemetrySetup: TestTelemetrySetup = _
 
@@ -206,33 +205,39 @@ class ApiConfigManagementServiceSpec
         loggerFactory = loggerFactory,
       )
 
-      apiConfigManagementService
-        .setTimeModel(
-          SetTimeModelRequest.of(
-            "a submission ID",
-            maximumRecordTime = Some(Timestamp.of(maximumRecordTime.getEpochSecond, 0)),
-            configurationGeneration = initialGeneration,
-            newTimeModel = Some(
-              TimeModel(
-                avgTransactionLatency = Some(DurationProto.of(10, 0)),
-                minSkew = Some(DurationProto.of(20, 0)),
-                maxSkew = Some(DurationProto.of(40, 0)),
+      loggerFactory.assertLogs(
+        within = {
+          apiConfigManagementService
+            .setTimeModel(
+              SetTimeModelRequest.of(
+                "a submission ID",
+                maximumRecordTime = Some(Timestamp.of(maximumRecordTime.getEpochSecond, 0)),
+                configurationGeneration = initialGeneration,
+                newTimeModel = Some(
+                  TimeModel(
+                    avgTransactionLatency = Some(DurationProto.of(10, 0)),
+                    minSkew = Some(DurationProto.of(20, 0)),
+                    maxSkew = Some(DurationProto.of(40, 0)),
+                  )
+                ),
               )
-            ),
-          )
-        )
-        .transform(Success.apply)
-        .map { response =>
-          verifyZeroInteractions(writeService)
-          response should matchPattern { case Failure(GrpcException(GrpcStatus.NOT_FOUND(), _)) =>
-          }
-        }
+            )
+            .transform(Success.apply)
+            .map { response =>
+              verifyZeroInteractions(writeService)
+              response should matchPattern {
+                case Failure(GrpcException(GrpcStatus.NOT_FOUND(), _)) =>
+              }
+            }
+        },
+        assertions = _.warningMessage should include("Could not get the current time model."),
+      )
     }
 
     "propagate trace context" in {
       val apiConfigManagementService = ApiConfigManagementService.createApiService(
         new FakeStreamingIndexConfigManagementService(someConfigurationEntries),
-        TestWriteConfigService,
+        TestWriteConfigService(testTelemetrySetup.tracer),
         TimeProvider.UTC,
         _ => Ref.SubmissionId.assertFromString("aSubmission"),
         telemetry = new DefaultOpenTelemetry(OpenTelemetrySdk.builder().build()),
@@ -260,7 +265,7 @@ class ApiConfigManagementServiceSpec
           any[Time.Timestamp],
           any[Ref.SubmissionId],
           any[Configuration],
-        )(any[LoggingContext], any[TelemetryContext])
+        )(any[TraceContext])
       ).thenReturn(CompletableFuture.completedFuture(SubmissionResult.Acknowledged))
 
       val indexConfigManagementService = new FakeCurrentIndexConfigManagementService(
@@ -299,6 +304,7 @@ class ApiConfigManagementServiceSpec
                     "submissionId" -> s"'$aSubmissionId'",
                     "category" -> "1",
                     "definite_answer" -> "false",
+                    "test" -> s"'${getClass.getSimpleName}'",
                   ),
                 ),
                 RetryInfoDetail(1.second),
@@ -347,12 +353,12 @@ object ApiConfigManagementServiceSpec {
 
   private object EmptyIndexConfigManagementService extends IndexConfigManagementService {
     override def lookupConfiguration()(implicit
-        loggingContext: LoggingContext
+        loggingContext: LoggingContextWithTrace
     ): Future[Option[(LedgerOffset.Absolute, Configuration)]] =
       Future.successful(None)
 
     override def configurationEntries(startExclusive: Option[LedgerOffset.Absolute])(implicit
-        loggingContext: LoggingContext
+        loggingContext: LoggingContextWithTrace
     ): Source[(LedgerOffset.Absolute, ConfigurationEntry), NotUsed] =
       Source.never
   }
@@ -362,12 +368,12 @@ object ApiConfigManagementServiceSpec {
       configuration: Configuration,
   ) extends IndexConfigManagementService {
     override def lookupConfiguration()(implicit
-        loggingContext: LoggingContext
+        loggingContext: LoggingContextWithTrace
     ): Future[Option[(LedgerOffset.Absolute, Configuration)]] =
       Future.successful(Some(offset -> configuration))
 
     override def configurationEntries(startExclusive: Option[LedgerOffset.Absolute])(implicit
-        loggingContext: LoggingContext
+        loggingContext: LoggingContextWithTrace
     ): Source[(LedgerOffset.Absolute, ConfigurationEntry), NotUsed] = {
       nextConfigurationEntriesPromise.getAndSet(Promise[Unit]()).success(())
       Source.never
@@ -387,25 +393,25 @@ object ApiConfigManagementServiceSpec {
       }.lastOption
 
     override def lookupConfiguration()(implicit
-        loggingContext: LoggingContext
+        loggingContext: LoggingContextWithTrace
     ): Future[Option[(LedgerOffset.Absolute, Configuration)]] =
       Future.successful(currentConfiguration)
 
     override def configurationEntries(startExclusive: Option[LedgerOffset.Absolute])(implicit
-        loggingContext: LoggingContext
+        loggingContext: LoggingContextWithTrace
     ): Source[(LedgerOffset.Absolute, ConfigurationEntry), NotUsed] =
       Source(entries)
   }
 
-  private object TestWriteConfigService extends state.WriteConfigService {
+  private final case class TestWriteConfigService(tracer: Tracer) extends state.WriteConfigService {
     override def submitConfiguration(
         maxRecordTime: Time.Timestamp,
         submissionId: Ref.SubmissionId,
         config: Configuration,
     )(implicit
-        loggingContext: LoggingContext,
-        telemetryContext: TelemetryContext,
+        traceContext: TraceContext
     ): CompletionStage[state.SubmissionResult] = {
+      val telemetryContext = traceContext.toDamlTelemetryContext(tracer)
       telemetryContext.setAttribute(
         anApplicationIdSpanAttribute._1,
         anApplicationIdSpanAttribute._2,
@@ -444,12 +450,12 @@ object ApiConfigManagementServiceSpec {
       Await.result(atLeastOneConfig.future, ScalaDuration.Inf)
 
       override def lookupConfiguration()(implicit
-          loggingContext: LoggingContext
+          loggingContext: LoggingContextWithTrace
       ): Future[Option[(LedgerOffset.Absolute, Configuration)]] =
         Future.successful(currentConfiguration.get())
 
       override def configurationEntries(startExclusive: Option[LedgerOffset.Absolute])(implicit
-          loggingContext: LoggingContext
+          loggingContext: LoggingContextWithTrace
       ): Source[(LedgerOffset.Absolute, ConfigurationEntry), NotUsed] =
         source._2
     }
@@ -459,8 +465,7 @@ object ApiConfigManagementServiceSpec {
           submissionId: SubmissionId,
           configuration: Configuration,
       )(implicit
-          loggingContext: LoggingContext,
-          telemetryContext: TelemetryContext,
+          traceContext: TraceContext
       ): CompletionStage[SubmissionResult] = {
         configurationQueue.offer((currentOffset.getAndIncrement(), submissionId, configuration))
         completedFuture(state.SubmissionResult.Acknowledged)

@@ -3,12 +3,13 @@
 
 package com.digitalasset.canton.platform.store.backend.postgresql
 
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.platform.store.backend.*
 import com.digitalasset.canton.platform.store.backend.common.*
 import com.digitalasset.canton.platform.store.cache.LedgerEndCache
 import com.digitalasset.canton.platform.store.interning.StringInterning
 
-object PostgresStorageBackendFactory
+final case class PostgresStorageBackendFactory(loggerFactory: NamedLoggerFactory)
     extends StorageBackendFactory
     with CommonStorageBackendFactory {
 
@@ -27,9 +28,10 @@ object PostgresStorageBackendFactory
     new PartyStorageBackendTemplate(PostgresQueryStrategy, ledgerEndCache)
 
   override def createCompletionStorageBackend(
-      stringInterning: StringInterning
+      stringInterning: StringInterning,
+      loggerFactory: NamedLoggerFactory,
   ): CompletionStorageBackend =
-    new CompletionStorageBackendTemplate(PostgresQueryStrategy, stringInterning)
+    new CompletionStorageBackendTemplate(PostgresQueryStrategy, stringInterning, loggerFactory)
 
   override def createContractStorageBackend(
       ledgerEndCache: LedgerEndCache,
@@ -40,14 +42,16 @@ object PostgresStorageBackendFactory
   override def createEventStorageBackend(
       ledgerEndCache: LedgerEndCache,
       stringInterning: StringInterning,
+      loggerFactory: NamedLoggerFactory,
   ): EventStorageBackend =
     new PostgresEventStorageBackend(
       ledgerEndCache = ledgerEndCache,
       stringInterning = stringInterning,
+      loggerFactory = loggerFactory,
     )
 
   override val createDataSourceStorageBackend: DataSourceStorageBackend =
-    PostgresDataSourceStorageBackend()
+    PostgresDataSourceStorageBackend(loggerFactory)
 
   override val createDBLockStorageBackend: DBLockStorageBackend =
     PostgresDBLockStorageBackend

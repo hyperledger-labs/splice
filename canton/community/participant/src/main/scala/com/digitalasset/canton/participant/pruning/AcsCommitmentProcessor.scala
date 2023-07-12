@@ -22,6 +22,7 @@ import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.Acs
 import com.digitalasset.canton.error.{Alarm, AlarmErrorCode, CantonError}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.*
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.event.{AcsChange, AcsChangeListener, RecordTime}
 import com.digitalasset.canton.participant.metrics.PruningMetrics
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.Errors.MismatchError.AcsCommitmentAlarm
@@ -42,6 +43,7 @@ import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.EitherUtil.RichEither
 import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.retry.Policy
 import com.digitalasset.canton.version.ProtocolVersion
@@ -332,10 +334,14 @@ class AcsCommitmentProcessor(
 
     def processCompletedPeriod(
         snapshot: RunningCommitments
-    )(completedPeriod: CommitmentPeriod): Future[Unit] = {
+    )(completedPeriod: CommitmentPeriod, cryptoSnapshot: SyncCryptoApi): Future[Unit] = {
       val snapshotRes = snapshot.snapshot()
+      logger.debug(show"Commitment snapshot for completed period $completedPeriod: $snapshotRes")
       for {
-        msgs <- commitmentMessages(completedPeriod, snapshotRes.active)
+        msgs <- commitmentMessages(completedPeriod, snapshotRes.active, cryptoSnapshot)
+        _ = logger.debug(
+          show"Commitment messages for $completedPeriod: ${msgs.fmap(_.message.commitment)}"
+        )
         _ <- storeAndSendCommitmentMessages(completedPeriod, msgs)
         _ <- store.markOutstanding(completedPeriod, msgs.keySet)
         _ <- persistRunningCommitments(snapshotRes)
@@ -358,18 +364,20 @@ class AcsCommitmentProcessor(
     }
 
     def performPublish(
-        snapshot: RunningCommitments,
+        acsSnapshot: RunningCommitments,
         reconciliationIntervals: SortedReconciliationIntervals,
+        cryptoSnapshotO: Option[SyncCryptoApi],
+        periodEndO: Option[CantonTimestampSecond],
     ): FutureUnlessShutdown[Unit] = {
       // Check whether this change pushes us to a new commitment period; if so, the previous one is completed
-      val optCompletedPeriod = reconciliationIntervals
-        .commitmentPeriodPreceding(endOfLastProcessedPeriod)(toc.timestamp)
-        .tapLeft { err =>
-          logger.info(
-            s"Unable to compute commitment period preceding ${toc.timestamp}: $err. Keeping the current period"
-          )
-        }
-        .getOrElse(None)
+      val completedPeriodAndCryptoO = for {
+        periodEnd <- periodEndO
+        completedPeriod <- reconciliationIntervals
+          .commitmentPeriodPreceding(periodEnd, endOfLastProcessedPeriod)
+        cryptoSnapshot <- cryptoSnapshotO
+      } yield {
+        (completedPeriod, cryptoSnapshot)
+      }
 
       for {
         // Important invariant:
@@ -380,37 +388,42 @@ class AcsCommitmentProcessor(
         //   otherwise, we lose the ability to compute the commitments at t'
         // Hence, the order here is critical for correctness; if the change moves us beyond t', first compute
         // the commitments at t', and only then update the snapshot
-        _ <- optCompletedPeriod.traverse_(commitmentPeriod =>
+        _ <- completedPeriodAndCryptoO.traverse_ { case (commitmentPeriod, cryptoSnapshot) =>
           performUnlessClosingF(functionFullName)(
-            processCompletedPeriod(snapshot)(commitmentPeriod)
+            processCompletedPeriod(acsSnapshot)(commitmentPeriod, cryptoSnapshot)
           )
-        )
+        }
 
         _ <- FutureUnlessShutdown.outcomeF(updateSnapshot(toc, acsChange))
       } yield ()
     }
 
-    // On the `publishQueue`, obtain the running commitment and the reconciliation parameters on the `publishQueue`
+    // On the `publishQueue`, obtain the running commitment, the reconciliation parameters, and topology snapshot,
     // and check whether this is a replay of something we've already seen. If not, then do publish the change,
     // which runs on the `dbQueue`.
     val fut = publishQueue
       .executeUS(
         for {
-          snapshot <- performUnlessClosingF(functionFullName)(runningCommitments)
+          acsSnapshot <- performUnlessClosingF(functionFullName)(runningCommitments)
           reconciliationIntervals <- getReconciliationIntervals(toc.timestamp)
+          periodEndO = reconciliationIntervals
+            .tickBefore(toc.timestamp)
+          cryptoSnapshotO <- periodEndO.traverse(periodEnd =>
+            domainCrypto.awaitSnapshotUS(periodEnd.forgetRefinement)
+          )
         } yield {
-          if (snapshot.watermark >= toc) {
+          if (acsSnapshot.watermark >= toc) {
             logger.debug(s"ACS change at $toc is a replay, treating it as a no-op")
             // This is a replay of an already processed ACS change, ignore
             FutureUnlessShutdown.unit
           } else {
-            // Serialize the access to the DB only after having obtained the reconciliation interval.
-            // During crash recovery, the topology client may only be able to serve the intervals
+            // Serialize the access to the DB only after having obtained the reconciliation intervals and topology snapshot.
+            // During crash recovery, the topology client may only be able to serve the intervals and snapshots
             // for re-published ACS changes after some messages have been processed,
             // which may include ACS commitments that go through the same queue.
             dbQueue.executeUS(
               Policy.noisyInfiniteRetryUS(
-                performPublish(snapshot, reconciliationIntervals),
+                performPublish(acsSnapshot, reconciliationIntervals, cryptoSnapshotO, periodEndO),
                 this,
                 timeouts.storageMaxRetryInterval.asFiniteApproximation,
                 s"publish ACS change at $toc",
@@ -466,10 +479,6 @@ class AcsCommitmentProcessor(
           .flatMap { reconciliationIntervals =>
             validateEnvelope(timestamp, envelope, reconciliationIntervals) match {
               case Right(()) =>
-                val payload = envelope.protocolMessage.message
-                logger.debug(
-                  s"Checking commitment (purportedly by) ${payload.sender} for period ${payload.period}"
-                )
                 checkSignedMessage(timestamp, envelope.protocolMessage)
 
               case Left(errors) =>
@@ -536,8 +545,8 @@ class AcsCommitmentProcessor(
       res: CommitmentSnapshot
   )(implicit traceContext: TraceContext): Future[Unit] = {
     store.runningCommitments
-      .update(res.rt, res.delta, res.deleted)
-      .map(_ => logger.debug(s"Persisted ACS commitments at ${res.rt}"))
+      .update(res.recordTime, res.delta, res.deleted)
+      .map(_ => logger.debug(s"Persisted ACS commitments at ${res.recordTime}"))
   }
 
   private def updateSnapshot(rt: RecordTime, acsChange: AcsChange)(implicit
@@ -572,7 +581,10 @@ class AcsCommitmentProcessor(
   private def checkSignedMessage(
       timestamp: CantonTimestamp,
       message: SignedProtocolMessage[AcsCommitment],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+    logger.debug(
+      s"Checking commitment (purportedly by) ${message.message.sender} for period ${message.message.period}"
+    )
     for {
       validSig <- FutureUnlessShutdown.outcomeF(checkCommitmentSignature(message))
 
@@ -594,6 +606,7 @@ class AcsCommitmentProcessor(
           .report()
       }
     }
+  }
 
   private def checkCommitmentSignature(
       message: SignedProtocolMessage[AcsCommitment]
@@ -641,6 +654,7 @@ class AcsCommitmentProcessor(
   private def processBuffered(
       timestamp: CantonTimestampSecond
   )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.debug(s"Processing buffered commitments until $timestamp")
     for {
       toProcess <- store.queue.peekThrough(timestamp.forgetRefinement)
       _ <- checkMatchAndMarkSafe(toProcess)
@@ -684,12 +698,11 @@ class AcsCommitmentProcessor(
   private def checkMatchAndMarkSafe(
       remote: List[AcsCommitment]
   )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.debug(s"Processing ${remote.size} remote commitments")
     remote.parTraverse_ { cmt =>
       for {
         commitments <- store.getComputed(cmt.period, cmt.sender)
-        lastPruningTime <- store.pruningStatus.valueOr { err =>
-          ErrorUtil.internalError(new RuntimeException(s"Can't get the pruning status: $err"))
-        }
+        lastPruningTime <- store.pruningStatus
         _ <-
           if (matches(cmt, commitments, lastPruningTime.map(_.timestamp))) {
             store.markSafe(cmt.sender, cmt.period, sortedReconciliationIntervalsProvider)
@@ -720,6 +733,7 @@ class AcsCommitmentProcessor(
   private def commitmentMessages(
       period: CommitmentPeriod,
       commitmentSnapshot: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
+      cryptoSnapshot: SyncCryptoApi,
   )(implicit
       traceContext: TraceContext
   ): Future[Map[ParticipantId, SignedProtocolMessage[AcsCommitment]]] = {
@@ -727,7 +741,6 @@ class AcsCommitmentProcessor(
       s"Computing commitments for $period, number of stakeholder sets: ${commitmentSnapshot.keySet.size}"
     )
     for {
-      crypto <- domainCrypto.awaitSnapshot(period.toInclusive.forgetRefinement)
       cmts <- commitments(
         participantId,
         commitmentSnapshot,
@@ -739,7 +752,7 @@ class AcsCommitmentProcessor(
       msgs <- cmts
         .collect {
           case (counterParticipant, cmt) if LtHash16.isNonEmptyCommitment(cmt) =>
-            signCommitment(crypto, counterParticipant, cmt, period).map(msg =>
+            signCommitment(cryptoSnapshot, counterParticipant, cmt, period).map(msg =>
               (counterParticipant, msg)
             )
         }
@@ -810,17 +823,24 @@ object AcsCommitmentProcessor extends HasLoggerName {
 
   /** A snapshot of ACS commitments per set of stakeholders
     *
-    * @param rt           The timestamp and tie-breaker of the snapshot
+    * @param recordTime           The timestamp and tie-breaker of the snapshot
     * @param active       Maps stakeholders to the commitment to their shared ACS, if the shared ACS is not empty
     * @param delta        A sub-map of active with those stakeholders whose commitments have changed since the last snapshot
     * @param deleted      Stakeholder sets whose ACS has gone to empty since the last snapshot (no longer active)
     */
   final case class CommitmentSnapshot(
-      rt: RecordTime,
+      recordTime: RecordTime,
       active: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
       delta: Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType],
       deleted: Set[SortedSet[LfPartyId]],
-  )
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[CommitmentSnapshot] = prettyOfClass(
+      param("record time", _.recordTime),
+      param("active", _.active),
+      param("delta (parties)", _.delta.keySet),
+      param("deleted", _.deleted),
+    )
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   class RunningCommitments(
@@ -858,14 +878,12 @@ object AcsCommitmentProcessor extends HasLoggerName {
           val activeDelta = (delta -- deleted).fmap(_.getByteString())
           // Note that it's crucial to eagerly (via fmap, as opposed to, say mapValues) snapshot the LtHash16 values,
           // since they're mutable
-          val res =
-            CommitmentSnapshot(
-              rt,
-              commitments.readOnlySnapshot().toMap.fmap(_.getByteString()),
-              activeDelta,
-              deleted,
-            )
-          res
+          CommitmentSnapshot(
+            rt,
+            commitments.readOnlySnapshot().toMap.fmap(_.getByteString()),
+            activeDelta,
+            deleted,
+          )
         }
       }
     }

@@ -4,13 +4,13 @@
 package com.digitalasset.canton.participant.protocol.transfer
 
 import cats.syntax.either.*
+import com.digitalasset.canton.RequestCounter
 import com.digitalasset.canton.data.{CantonTimestamp, FullTransferOutTree}
 import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.protocol.transfer.IncompleteTransferData.TransferEventGlobalOffset
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.DeliveredTransferOutResult
 import com.digitalasset.canton.version.Transfer.SourceProtocolVersion
-import com.digitalasset.canton.{RequestCounter, TransferCounter}
 import io.scalaland.chimney.dsl.*
 
 /** Stores the data for a transfer that is incomplete, i.e., for which only the transfer-in or the transfer-out was
@@ -28,7 +28,6 @@ final case class IncompleteTransferData private (
     transferOutRequest: FullTransferOutTree,
     transferOutDecisionTime: CantonTimestamp,
     contract: SerializableContract,
-    transferCounter: TransferCounter,
     creatingTransactionId: TransactionId,
     transferOutResult: Option[DeliveredTransferOutResult],
     transferEventGlobalOffset: TransferEventGlobalOffset,
@@ -49,7 +48,18 @@ final case class IncompleteTransferData private (
     s"Supplied contract with ID ${contract.contractId} differs from the ID ${transferOutRequest.contractId} of the transfer-out request.",
   )
 
-  def toTransferData: TransferData = this.into[TransferData].enableMethodAccessors.transform
+  def toTransferData: TransferData = this
+    .into[TransferData]
+    .withFieldComputed(
+      _.transferGlobalOffset,
+      _.transferEventGlobalOffset match {
+        case IncompleteTransferData.TransferInEventGlobalOffset(globalOffset) =>
+          Some(TransferData.TransferInGlobalOffset(globalOffset))
+        case IncompleteTransferData.TransferOutEventGlobalOffset(globalOffset) =>
+          Some(TransferData.TransferOutGlobalOffset(globalOffset))
+      },
+    )
+    .transform
 }
 
 object IncompleteTransferData {

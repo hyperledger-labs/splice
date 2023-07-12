@@ -17,6 +17,7 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ConflictDetector,
   NaiveRequestTracker,
   RequestTracker,
+  RequestTrackerLookup,
 }
 import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker.InFlightSubmissionTrackerDomainState
 import com.digitalasset.canton.participant.protocol.submission.{
@@ -30,10 +31,12 @@ import com.digitalasset.canton.participant.protocol.{
   ProcessingStartingPoints,
   RequestCounterAllocatorImpl,
   RequestJournal,
+  SubmissionTracker,
 }
 import com.digitalasset.canton.participant.store.memory.TransferCache
 import com.digitalasset.canton.protocol.RootHash
 import com.digitalasset.canton.time.DomainTimeTracker
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.concurrent.TrieMap
@@ -44,6 +47,7 @@ import scala.concurrent.ExecutionContext
   * provided that the local processing continues as far as possible.
   */
 class SyncDomainEphemeralState(
+    participantId: ParticipantId,
     persistentState: SyncDomainPersistentState,
     multiDomainEventLog: Eval[MultiDomainEventLog],
     inFlightSubmissionTracker: InFlightSubmissionTracker,
@@ -144,6 +148,15 @@ class SyncDomainEphemeralState(
   // request time proofs
   val timeTracker: DomainTimeTracker = createTimeTracker(loggerFactory)
 
+  val submissionTracker: SubmissionTracker =
+    SubmissionTracker(persistentState.protocolVersion)(
+      participantId,
+      persistentState.submissionTrackerStore,
+      futureSupervisor,
+      timeouts,
+      loggerFactory,
+    )
+
   def markAsRecovered()(implicit tc: TraceContext): Unit = {
     if (!resolveUnhealthy)
       throw new IllegalStateException("SyncDomainState has already been marked as recovered.")
@@ -154,6 +167,7 @@ class SyncDomainEphemeralState(
     Lifecycle.close(
       requestTracker,
       recordOrderPublisher,
+      submissionTracker,
       AsyncCloseable(
         "request-journal-flush",
         requestJournal.flush(),
@@ -178,5 +192,6 @@ trait SyncDomainEphemeralStateLookup {
 
   def transferLookup: TransferLookup = transferCache
 
+  def tracker: RequestTrackerLookup = requestTracker
   def observedTimestampLookup: WatermarkLookup[CantonTimestamp] = observedTimestampTracker
 }

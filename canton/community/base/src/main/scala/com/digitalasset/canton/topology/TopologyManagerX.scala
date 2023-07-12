@@ -91,7 +91,9 @@ class TopologyManagerX(
   ): EitherT[FutureUnlessShutdown, TopologyManagerError, GenericSignedTopologyTransactionX] = {
     logger.debug(show"Attempting to build, sign, and ${op} ${mapping} with serial $serial")
     for {
-      tx <- build(op, mapping, serial, protocolVersion).mapK(FutureUnlessShutdown.outcomeK)
+      tx <- build(op, mapping, serial, protocolVersion, signingKeys).mapK(
+        FutureUnlessShutdown.outcomeK
+      )
       signedTx <- signTransaction(tx, signingKeys, isProposal = !expectFullAuthorization)
         .mapK(FutureUnlessShutdown.outcomeK)
       _ <- add(Seq(signedTx), force = force, expectFullAuthorization)
@@ -148,6 +150,7 @@ class TopologyManagerX(
       mapping: M,
       serial: Option[PositiveInt],
       protocolVersion: ProtocolVersion,
+      newSigningKeys: Seq[Fingerprint],
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TopologyManagerError, TopologyTransactionX[Op, M]] = {
@@ -155,47 +158,63 @@ class TopologyManagerX(
       existingTransactions <- EitherT.right(
         store.findTransactionsForMapping(EffectiveTime.MaxValue, NonEmpty(Set, mapping.uniqueKey))
       )
-      _ = if (existingTransactions.size > 1)
+      _ = if (existingTransactions.sizeCompare(1) > 0)
         logger.warn(
           s"found more than one valid mapping for unique key ${mapping.uniqueKey} of type ${mapping.code}"
         )
       existingTransaction = existingTransactions
         .sortBy(_.transaction.serial)
         .lastOption
-        .map(t => (t.transaction.op, t.transaction.mapping, t.transaction.serial))
+        .map(t => (t.transaction.op, t.transaction.mapping, t.transaction.serial, t.signatures))
+
+      // If the same operation and mapping is proposed repeatedly, insist that
+      // new keys are being added. Otherwise reject consistently with daml 2.x-based topology management.
+      _ <- existingTransaction match {
+        case Some((`op`, `mapping`, _, existingSignatures)) if op == TopologyChangeOpX.Replace =>
+          EitherT.cond[Future][TopologyManagerError, Unit](
+            (newSigningKeys.toSet -- existingSignatures.map(_.signedBy).toSet).nonEmpty,
+            (),
+            TopologyManagerError.MappingAlreadyExists
+              .FailureX(mapping, existingSignatures.map(_.signedBy)),
+          )
+        case _ => EitherT.rightT[Future, TopologyManagerError](())
+      }
 
       theSerial <- ((existingTransaction, serial) match {
-        case (None, proposedO) =>
+        case (None, None) =>
+          // auto-select 1
+          EitherT.rightT(PositiveInt.one)
+        case (None, Some(proposed)) =>
           // didn't find an existing transaction, therefore the proposed serial must be 1
           EitherT.cond[Future][TopologyManagerError, PositiveInt](
-            proposedO.forall(_ == PositiveInt.one),
+            proposed == PositiveInt.one,
             PositiveInt.one,
-            TopologyManagerError.InternalError.Other(
-              "TODO(#11255) use proper error code: the first mapping must have serial 1"
-            ),
+            TopologyManagerError.SerialMismatch.Failure(PositiveInt.one, proposed),
           )
 
-        case (Some((`op`, `mapping`, existingSerial)), proposedO) =>
-          // TODO(#11255) existing mapping and the proposed mapping are the same. does this only add a (superfluous) signature?
-          //              maybe we should reject this proposal, but for now we need this to pass through successfully, because we don't
-          //              support proper topology transaction validation yet, especially not for multi-sig transactions.
+        // TODO(#11255) existing mapping and the proposed mapping are the same. does this only add a (superfluous) signature?
+        //              maybe we should reject this proposal, but for now we need this to pass through successfully, because we don't
+        //              support proper topology transaction validation yet, especially not for multi-sig transactions.
+        case (Some((`op`, `mapping`, existingSerial, _)), None) =>
+          // auto-select existing
+          EitherT.rightT(existingSerial)
+        case (Some((`op`, `mapping`, existingSerial, _)), Some(proposed)) =>
           EitherT.cond[Future](
-            proposedO.forall(existingSerial == _),
+            existingSerial == proposed,
             existingSerial,
-            TopologyManagerError.InternalError.Other(
-              s"TODO(#11255) use proper error code: proposed serial $proposedO should match the identical existing serial $existingSerial for adding (superfluous) signatures"
-            ),
+            TopologyManagerError.SerialMismatch.Failure(existingSerial, proposed),
           )
 
-        case (Some((_, _, existingSerial)), proposedO) =>
-          // check that the proposed serial matches existing+1 or auto-select existing+1
+        case (Some((_, _, existingSerial, _)), None) =>
+          // auto-select existing+1
+          EitherT.rightT(existingSerial + PositiveInt.one)
+        case (Some((_, _, existingSerial, _)), Some(proposed)) =>
+          // check that the proposed serial matches existing+1
           val next = existingSerial + PositiveInt.one
           EitherT.cond[Future](
-            proposedO.forall(_ == next),
+            next == proposed,
             next,
-            TopologyManagerError.InternalError.Other(
-              s"TODO(#11255) use proper error code: proposed serial $proposedO doesn't immediately follow the existing serial $existingSerial"
-            ),
+            TopologyManagerError.SerialMismatch.Failure(next, proposed),
           )
       }): EitherT[Future, TopologyManagerError, PositiveInt]
     } yield TopologyTransactionX(op, theSerial, mapping, protocolVersion)

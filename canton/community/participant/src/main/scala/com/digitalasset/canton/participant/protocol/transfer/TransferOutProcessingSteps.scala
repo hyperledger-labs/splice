@@ -57,6 +57,7 @@ import com.digitalasset.canton.{
   RequestCounter,
   SequencerCounter,
   TransferCounter,
+  TransferCounterO,
   checked,
 }
 
@@ -147,6 +148,23 @@ class TransferOutProcessingSteps(
       (timeProof, targetCrypto) = timeProofAndSnapshot
       _ = logger.debug(withDetails(s"Picked time proof ${timeProof.timestamp}"))
 
+      transferCounter <- EitherT(
+        ephemeralState.tracker
+          .getApproximateStates(Seq(contractId))
+          .map(_.get(contractId) match {
+            case Some(state) if state.status.isActive => Right(state.status.transferCounter)
+            case Some(state) =>
+              Left(TransferOutProcessorError.DeactivatedContract(contractId, status = state.status))
+            case None => Left(TransferOutProcessorError.UnknownContract(contractId))
+          })
+      ).mapK(FutureUnlessShutdown.outcomeK)
+
+      newTransferCounter <- EitherT.fromEither[FutureUnlessShutdown](
+        transferCounter
+          .traverse(_.increment)
+          .leftMap(_ => TransferOutProcessorError.TransferCounterOverflow)
+      )
+
       validated <- TransferOutRequest.validated(
         participantId,
         timeProof,
@@ -161,7 +179,7 @@ class TransferOutProcessingSteps(
         targetProtocolVersion,
         sourceRecentSnapshot.ipsSnapshot,
         targetCrypto.ipsSnapshot,
-        TransferCounter.Genesis, // TODO(#12286): replace by the value from the stored contract
+        newTransferCounter,
         logger,
       )
 
@@ -176,7 +194,6 @@ class TransferOutProcessingSteps(
             transferOutUuid,
           )
         )
-        .leftMap(GenericError)
       mediatorMessage = fullTree.mediatorMessage
       rootHash = fullTree.rootHash
       viewMessage <- EncryptedViewMessageFactory
@@ -253,6 +270,8 @@ class TransferOutProcessingSteps(
 
   override protected def decryptTree(sourceSnapshot: DomainSnapshotSyncCryptoApi)(
       envelope: OpenEnvelope[EncryptedViewMessage[TransferOutViewType]]
+  )(implicit
+      tc: TraceContext
   ): EitherT[Future, EncryptedViewMessageDecryptionError[TransferOutViewType], WithRecipients[
     FullTransferOutTree
   ]] = {
@@ -337,7 +356,7 @@ class TransferOutProcessingSteps(
     * so event emission to the event log blocks, too.
     *
     * No deadlocks can arise under normal behaviour though.
-    * For a deadlock, we would need cyclic waiting, i.e., a transfer out request on one domain D1 references
+    * For a deadlock, we would need cyclic waiting, i.e., a transfer-out request on one domain D1 references
     * a time proof on another domain D2 and a earlier transfer-out request on D2 references a time proof on D3
     * and so on to domain Dn and an earlier transfer-out request on Dn references a later time proof on D1.
     * This, however, violates temporal causality of events.
@@ -377,6 +396,7 @@ class TransferOutProcessingSteps(
       activenessF: FutureUnlessShutdown[ActivenessResult],
       pendingCursor: Future[Unit],
       mediator: MediatorRef,
+      freshOwnTimelyTx: Boolean,
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -442,6 +462,7 @@ class TransferOutProcessingSteps(
         sc,
         fullTree.tree.rootHash,
         WithContractHash.fromContract(storedContract.contract, fullTree.contractId),
+        fullTree.transferCounter,
         storedContract.contract.rawContractInstance.contractInstance.unversioned.template,
         transferringParticipant,
         fullTree.submitterMetadata,
@@ -466,12 +487,9 @@ class TransferOutProcessingSteps(
         transferOutRequest = fullTree,
         transferOutDecisionTime = transferOutDecisionTime,
         contract = storedContract.contract,
-        transferCounter =
-          TransferCounter.Genesis, // TODO(#12286) add a transfer counter to the StoredContract
         creatingTransactionId = creatingTransactionId,
         transferOutResult = None,
-        transferOutGlobalOffset = None,
-        transferInGlobalOffset = None,
+        transferGlobalOffset = None,
       )
       _ <- ifThenET(transferringParticipant) {
         transferCoordination.addTransferOutRequest(transferData).mapK(FutureUnlessShutdown.outcomeK)
@@ -535,6 +553,7 @@ class TransferOutProcessingSteps(
       requestSequencerCounter,
       rootHash,
       WithContractHash(contractId, contractHash),
+      transferCounter,
       templateId,
       transferringParticipant,
       submitterMetadata,
@@ -555,8 +574,12 @@ class TransferOutProcessingSteps(
         val commitSet = CommitSet(
           archivals = Map.empty,
           creations = Map.empty,
-          transferOuts =
-            Map(contractId -> WithContractHash(targetDomain -> stakeholders, contractHash)),
+          transferOuts = Map(
+            contractId -> WithContractHash(
+              CommitSet.TransferOutCommit(targetDomain, stakeholders, transferCounter),
+              contractHash,
+            )
+          ),
           transferIns = Map.empty,
           keyUpdates = Map.empty,
         )
@@ -587,6 +610,7 @@ class TransferOutProcessingSteps(
             rootHash,
             transferInExclusivity,
             isTransferringParticipant = transferringParticipant,
+            transferCounter,
             hostedStakeholders.toList,
           )
         } yield CommitAndStoreContractsAndPublishEvent(
@@ -632,6 +656,7 @@ class TransferOutProcessingSteps(
       rootHash: RootHash,
       transferInExclusivity: Option[CantonTimestamp],
       isTransferringParticipant: Boolean,
+      transferCounter: TransferCounterO,
       hostedStakeholders: List[LfPartyId],
   ): EitherT[Future, TransferProcessorError, LedgerSyncEvent.TransferredOut] = {
     for {
@@ -654,15 +679,18 @@ class TransferOutProcessingSteps(
       updateId = updateId,
       optCompletionInfo = completionInfo,
       submitter = submitterMetadata.submitter,
-      transferId = transferId,
       contractId = contractId,
       templateId = Some(templateId),
       contractStakeholders = contractStakeholders,
+      transferId = transferId,
       targetDomain = targetDomain,
       transferInExclusivity = transferInExclusivity.map(_.toLf),
       workflowId = submitterMetadata.workflowId,
       isTransferringParticipant = isTransferringParticipant,
       hostedStakeholders = hostedStakeholders,
+      transferCounter = transferCounter.getOrElse(
+        TransferCounter.MinValue
+      ),
     )
   }
 
@@ -749,6 +777,7 @@ object TransferOutProcessingSteps {
       override val requestSequencerCounter: SequencerCounter,
       rootHash: RootHash,
       contractIdAndHash: WithContractHash[LfContractId],
+      transferCounter: TransferCounterO,
       templateId: LfTemplateId,
       transferringParticipant: Boolean,
       submitterMetadata: TransferSubmitterMetadata,

@@ -11,13 +11,14 @@ import com.daml.lf.data.Ref.ParticipantId
 import com.daml.lf.data.{Bytes, Ref, Time}
 import com.daml.lf.transaction.{CommittedTransaction, TransactionNodeStatistics}
 import com.daml.lf.value.Value.ContractId
-import com.daml.logging.LoggingContext
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.index.v2.IndexService
 import com.digitalasset.canton.ledger.participant.state.v2.Update
 import com.digitalasset.canton.ledger.sandbox.BridgeConfig
 import com.digitalasset.canton.ledger.sandbox.bridge.validate.ConflictCheckingLedgerBridge
 import com.digitalasset.canton.ledger.sandbox.domain.Submission
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory}
+import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.primitives.Longs
 
 import java.util.UUID
@@ -36,9 +37,9 @@ object LedgerBridge {
       servicesThreadPoolSize: Int,
       timeProvider: TimeProvider,
       stageBufferSize: Int,
+      loggerFactory: NamedLoggerFactory,
   )(implicit
-      loggingContext: LoggingContext,
-      servicesExecutionContext: ExecutionContext,
+      servicesExecutionContext: ExecutionContext
   ): ResourceOwner[LedgerBridge] =
     if (bridgeConfig.conflictCheckingEnabled)
       buildConfigCheckingLedgerBridge(
@@ -48,6 +49,7 @@ object LedgerBridge {
         servicesThreadPoolSize,
         timeProvider,
         stageBufferSize,
+        loggerFactory,
       )
     else
       ResourceOwner.forValue(() => new PassThroughLedgerBridge(participantId, timeProvider))
@@ -59,10 +61,13 @@ object LedgerBridge {
       servicesThreadPoolSize: Int,
       timeProvider: TimeProvider,
       stageBufferSize: Int,
+      loggerFactory: NamedLoggerFactory,
   )(implicit
-      loggingContext: LoggingContext,
-      servicesExecutionContext: ExecutionContext,
-  ) =
+      servicesExecutionContext: ExecutionContext
+  ) = {
+    implicit val loggingContextWithTrace =
+      LoggingContextWithTrace(loggerFactory)(TraceContext.empty)
+
     for {
       initialLedgerEnd <- ResourceOwner.forFuture(() => indexService.currentLedgerEnd())
       initialLedgerConfiguration <- ResourceOwner.forFuture(() =>
@@ -85,8 +90,9 @@ object LedgerBridge {
         .map(_.maxDeduplicationDuration)
         .getOrElse(BridgeConfig.DefaultMaximumDeduplicationDuration),
       stageBufferSize = stageBufferSize,
+      loggerFactory = loggerFactory,
     )
-
+  }
   private[bridge] def packageUploadSuccess(
       s: Submission.UploadPackages,
       currentTimestamp: Time.Timestamp,
@@ -147,13 +153,14 @@ object LedgerBridge {
         }
         .toMap
     Update.TransactionAccepted(
-      optCompletionInfo = completionInfo,
+      completionInfoO = completionInfo,
       transactionMeta = transactionSubmission.transactionMeta,
       transaction = CommittedTransaction(submittedTransaction),
       transactionId = Ref.TransactionId.assertFromString(index.toString),
       recordTime = currentTimestamp,
       divulgedContracts = Nil,
-      blindingInfo = None,
+      blindingInfoO = None,
+      hostedWitnesses = Nil,
       contractMetadata = contractMetadata,
     )
   }

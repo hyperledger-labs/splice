@@ -7,11 +7,11 @@ import akka.actor.{Cancellable, Scheduler}
 import com.daml.clock.AdjustableClock
 import com.daml.error.ErrorsAssertions
 import com.daml.jwt.JwtTimestampLeeway
-import com.daml.logging.LoggingContext
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.api.auth.AuthorizationError.Expired
 import com.digitalasset.canton.ledger.error.LedgerApiErrors
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.platform.localstore.api.UserManagementStore
-import com.digitalasset.canton.testing.ErrorAssertionsWithLogCollectorAssertions
 import io.grpc.StatusRuntimeException
 import io.grpc.stub.ServerCallStreamObserver
 import org.mockito.{ArgumentCaptor, ArgumentMatchersSugar, MockitoSugar}
@@ -25,13 +25,19 @@ import scala.concurrent.duration.FiniteDuration
 
 class OngoingAuthorizationObserverSpec
     extends AsyncFlatSpec
+    with BaseTest
     with Matchers
     with Eventually
     with IntegrationPatience
     with MockitoSugar
     with ArgumentMatchersSugar
-    with ErrorsAssertions
-    with ErrorAssertionsWithLogCollectorAssertions {
+    with ErrorsAssertions {
+
+  private implicit val errorLogger = ErrorLoggingContext(
+    loggerFactory.getTracedLogger(getClass),
+    loggerFactory.properties,
+    traceContext,
+  )
 
   it should "signal onError aborting the stream when user rights state hasn't been refreshed in a timely manner" in {
     val clock = AdjustableClock(
@@ -59,7 +65,8 @@ class OngoingAuthorizationObserverSpec
       // This is also the user rights state refresh timeout
       userRightsCheckIntervalInSeconds = userRightsCheckIntervalInSeconds,
       akkaScheduler = mockScheduler,
-    )(LoggingContext.ForTesting, executionContext)
+      loggerFactory = loggerFactory,
+    )(executionContext, traceContext)
 
     // After 20 seconds pass we expect onError to be called due to lack of user rights state refresh task inactivity
     tested.onNext(1)
@@ -79,8 +86,8 @@ class OngoingAuthorizationObserverSpec
     verify(cancellableMock, times(1)).cancel()
     assertError(
       actual = captor.getValue,
-      expectedF = LedgerApiErrors.AuthorizationChecks.StaleUserManagementBasedStreamClaims
-        .Reject()(_)
+      expected = LedgerApiErrors.AuthorizationChecks.StaleUserManagementBasedStreamClaims
+        .Reject()
         .asGrpcError,
     )
 
@@ -121,7 +128,8 @@ class OngoingAuthorizationObserverSpec
       akkaScheduler = mockScheduler,
       // defined default leeway of 1 second for authorization
       jwtTimestampLeeway = Some(JwtTimestampLeeway(default = Some(1))),
-    )(LoggingContext.ForTesting, executionContext)
+      loggerFactory = loggerFactory,
+    )(executionContext, traceContext)
 
     tested.onNext(1)
     clock.fastForward(Duration.ofSeconds(1))
@@ -163,7 +171,8 @@ class OngoingAuthorizationObserverSpec
       userRightsCheckIntervalInSeconds = 10,
       akkaScheduler = mockScheduler,
       jwtTimestampLeeway = Some(JwtTimestampLeeway(default = Some(1))),
-    )(LoggingContext.ForTesting, executionContext)
+      loggerFactory = loggerFactory,
+    )(executionContext, traceContext)
 
     // After 2 seconds have passed we expect onError to be called due to invalid expiration claim
     tested.onNext(1)
@@ -177,13 +186,19 @@ class OngoingAuthorizationObserverSpec
     order.verify(delegate, times(1)).onError(captor.capture())
     order.verifyNoMoreInteractions()
 
-    // Scheduled task is cancelled
-    verify(cancellableMock, times(1)).cancel()
-    assertError(
-      actual = captor.getValue,
-      expectedF = LedgerApiErrors.AuthorizationChecks.PermissionDenied
-        .Reject(Expired(expiration, clock.instant).reason)(_)
-        .asGrpcError,
+    loggerFactory.assertLogs(
+      within = {
+        // Scheduled task is cancelled
+        verify(cancellableMock, times(1)).cancel()
+        assertError(
+          actual = captor.getValue,
+          expected = LedgerApiErrors.AuthorizationChecks.PermissionDenied
+            .Reject(Expired(expiration, clock.instant).reason)
+            .asGrpcError,
+        )
+      },
+      assertions =
+        _.warningMessage should include("PERMISSION_DENIED(7,0): Claims were valid until "),
     )
 
     // onError has already been called by tested implementation so subsequent onNext, onError and onComplete

@@ -36,6 +36,14 @@ trait CryptoPublicStore extends AutoCloseable {
       traceContext: TraceContext
   ): EitherT[Future, CryptoPublicStoreError, Unit]
 
+  protected[crypto] def listAllKeyFingerprints(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, CryptoPublicStoreError, Set[Fingerprint]] =
+    for {
+      signingKeys <- listSigningKeys
+      encryptionKeys <- listEncryptionKeys
+    } yield signingKeys.map(_.publicKey.id) ++ encryptionKeys.map(_.publicKey.id)
+
   @VisibleForTesting
   private[store] def listSigningKeys(implicit
       traceContext: TraceContext
@@ -137,13 +145,6 @@ trait CryptoPublicStore extends AutoCloseable {
         val _ = encryptionKeyMap.put(key.id, EncryptionPublicKeyWithName(key, name))
       }
 
-  def storeCertificate(cert: X509Certificate)(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, CryptoPublicStoreError, Unit]
-  def listCertificates()(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, CryptoPublicStoreError, Set[X509Certificate]]
-
   private def retrieveKeyAndUpdateCache[KN <: PublicKeyWithName](
       cache: TrieMap[Fingerprint, KN],
       readKey: Fingerprint => EitherT[Future, CryptoPublicStoreError, Option[KN]],
@@ -203,22 +204,6 @@ object CryptoPublicStoreError {
       extends CryptoPublicStoreError {
     override def pretty: Pretty[FailedToInsertKey] =
       prettyOfClass(param("keyId", _.keyId), param("reason", _.reason.unquoted))
-  }
-
-  final case class FailedToInsertCertificate(certId: CertificateId, reason: String)
-      extends CryptoPublicStoreError {
-    override def pretty: Pretty[FailedToInsertCertificate] =
-      prettyOfClass(param("certId", _.certId), param("reason", _.reason.unquoted))
-  }
-
-  final case class FailedToListCertificates(reason: String) extends CryptoPublicStoreError {
-    override def pretty: Pretty[FailedToListCertificates] = prettyOfClass(
-      unnamedParam(_.reason.unquoted)
-    )
-  }
-
-  final case class CertificateAlreadyExists(certId: CertificateId) extends CryptoPublicStoreError {
-    override def pretty: Pretty[CertificateAlreadyExists] = prettyOfClass(param("certId", _.certId))
   }
 
   final case class KeyAlreadyExists(keyId: Fingerprint, existingKeyName: Option[String])

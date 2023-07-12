@@ -26,6 +26,7 @@ import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.participant.{
   ParticipantNode,
   ParticipantNodeBootstrapX,
+  ParticipantNodeCommon,
   ParticipantNodeX,
 }
 import com.digitalasset.canton.sequencing.{SequencerConnection, SequencerConnections}
@@ -33,6 +34,7 @@ import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId}
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ErrorUtil
 
+import scala.concurrent.ExecutionContext
 import scala.util.hashing.MurmurHash3
 
 trait InstanceReferenceCommon
@@ -40,11 +42,12 @@ trait InstanceReferenceCommon
     with Helpful
     with NamedLogging
     with FeatureFlagFilter
-    with PrettyPrinting
-    with CertificateAdministration {
+    with PrettyPrinting {
 
   val name: String
   protected val instanceType: String
+
+  protected[canton] def executionContext: ExecutionContext
 
   override def pretty: Pretty[InstanceReferenceCommon] =
     prettyOfString(inst => show"${inst.instanceType.unquoted} ${inst.name.singleQuoted}")
@@ -138,6 +141,7 @@ trait LocalInstanceReferenceCommon extends InstanceReferenceCommon with NoTracin
       consoleEnvironment.run(repairMigrationCommand(force))
 
   }
+
   @Help.Summary("Start the instance")
   def start(): Unit = consoleEnvironment.run(startCommand())
 
@@ -158,7 +162,9 @@ trait LocalInstanceReferenceCommon extends InstanceReferenceCommon with NoTracin
   override def keys: LocalKeyAdministrationGroup = _keys
 
   private val _keys =
-    new LocalKeyAdministrationGroup(this, this, consoleEnvironment, crypto)
+    new LocalKeyAdministrationGroup(this, this, consoleEnvironment, crypto, loggerFactory)(
+      executionContext
+    )
 
   private[console] def migrateDbCommand(): ConsoleCommandResult[Unit] =
     migrateInstanceDb().toResult(_.message, _ => ())
@@ -218,7 +224,7 @@ trait RemoteInstanceReference extends InstanceReferenceCommon {
   @Help.Summary("Manage public and secret keys")
   @Help.Group("Keys")
   override val keys: KeyAdministrationGroup =
-    new KeyAdministrationGroup(this, this, consoleEnvironment)
+    new KeyAdministrationGroup(this, this, consoleEnvironment, loggerFactory)
 }
 
 trait GrpcRemoteInstanceReference extends RemoteInstanceReference {
@@ -341,7 +347,11 @@ trait CommunityDomainReference {
 class CommunityRemoteDomainReference(val consoleEnvironment: ConsoleEnvironment, val name: String)
     extends DomainReference
     with CommunityDomainReference
-    with RemoteDomainReference
+    with RemoteDomainReference {
+
+  override protected[canton] def executionContext: ExecutionContext =
+    consoleEnvironment.environment.executionContext
+}
 
 trait InstanceReferenceWithSequencerConnection extends InstanceReferenceCommon {
   def sequencerConnection: SequencerConnection
@@ -369,11 +379,15 @@ trait LocalDomainReference
 
   override protected[console] def runningNode: Option[DomainNodeBootstrap] =
     consoleEnvironment.environment.domains.getRunning(name)
+
+  override protected[console] def startingNode: Option[DomainNodeBootstrap] =
+    consoleEnvironment.environment.domains.getStarting(name)
 }
 
 class CommunityLocalDomainReference(
     override val consoleEnvironment: ConsoleEnvironment,
     val name: String,
+    override protected[canton] val executionContext: ExecutionContext,
 ) extends DomainReference
     with CommunityDomainReference
     with LocalDomainReference
@@ -587,7 +601,7 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
 
 }
 
-trait LocalParticipantReferenceCommon
+sealed trait LocalParticipantReferenceCommon
     extends LedgerApiCommandRunner
     with ParticipantReferenceCommon
     with LocalInstanceReferenceCommon {
@@ -603,6 +617,10 @@ trait LocalParticipantReferenceCommon
       consoleEnvironment.grpcAdminCommandRunner
         .runCommand(name, command, config.clientLedgerApi, adminToken)
     )
+
+  @Help.Summary("Commands to repair the local participant contract state", FeatureFlag.Repair)
+  @Help.Group("Repair")
+  def repair: LocalParticipantRepairAdministration
 }
 
 class LocalParticipantReference(
@@ -638,7 +656,7 @@ class LocalParticipantReference(
 
   private lazy val repair_ =
     new LocalParticipantRepairAdministration(consoleEnvironment, this, loggerFactory) {
-      override protected def access[T](handler: ParticipantNode => T): T =
+      override protected def access[T](handler: ParticipantNodeCommon => T): T =
         LocalParticipantReference.this.access(handler)
     }
   @Help.Summary("Commands to repair the local participant contract state", FeatureFlag.Repair)
@@ -665,6 +683,9 @@ class LocalParticipantReference(
 
   override def runningNode: Option[CantonNodeBootstrap[ParticipantNode]] =
     consoleEnvironment.environment.participants.getRunning(name)
+
+  override def startingNode: Option[CantonNodeBootstrap[ParticipantNode]] =
+    consoleEnvironment.environment.participants.getStarting(name)
 
 }
 
@@ -755,6 +776,9 @@ class LocalParticipantReferenceX(
   override def runningNode: Option[ParticipantNodeBootstrapX] =
     consoleEnvironment.environment.participantsX.getRunning(name)
 
+  override def startingNode: Option[ParticipantNodeBootstrapX] =
+    consoleEnvironment.environment.participantsX.getStarting(name)
+
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 
@@ -778,4 +802,13 @@ class LocalParticipantReferenceX(
   @Help.Group("Participant Pruning")
   def pruning: ParticipantPruningAdministrationGroup = pruning_
 
+  private lazy val repair_ =
+    new LocalParticipantRepairAdministration(consoleEnvironment, this, loggerFactory) {
+      override protected def access[T](handler: ParticipantNodeCommon => T): T =
+        LocalParticipantReferenceX.this.access(handler)
+    }
+
+  @Help.Summary("Commands to repair the local participant contract state", FeatureFlag.Repair)
+  @Help.Group("Repair")
+  def repair: LocalParticipantRepairAdministration = repair_
 }

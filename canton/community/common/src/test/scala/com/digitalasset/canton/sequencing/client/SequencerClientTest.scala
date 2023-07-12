@@ -7,19 +7,12 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.daml.metrics.api.MetricName
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{
-  DefaultProcessingTimeouts,
-  DomainTimeTrackerConfig,
-  LoggingConfig,
-  ProcessingTimeout,
-  TestingConfigInternal,
-}
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
-import com.digitalasset.canton.crypto.{CryptoPureApi, HashPurpose}
+import com.digitalasset.canton.crypto.{CryptoPureApi, Fingerprint, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{
@@ -38,6 +31,7 @@ import com.digitalasset.canton.sequencing.client.SequencerClient.CloseReason.{
   ClientShutdown,
   UnrecoverableError,
 }
+import com.digitalasset.canton.sequencing.client.SequencerClient.SequencerTransports
 import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionError.{
   ApplicationHandlerException,
   EventValidationError,
@@ -63,9 +57,15 @@ import com.digitalasset.canton.store.{
   SequencerCounterTrackerStore,
 }
 import com.digitalasset.canton.time.{DomainTimeTracker, MockTimeRequestSubmitter, SimClock}
-import com.digitalasset.canton.topology.DefaultTestIdentities.participant1
+import com.digitalasset.canton.topology.DefaultTestIdentities.{participant1, sequencerId}
 import com.digitalasset.canton.topology.client.{DomainTopologyClient, TopologySnapshot}
-import com.digitalasset.canton.topology.{DefaultTestIdentities, SequencerId}
+import com.digitalasset.canton.topology.{
+  DefaultTestIdentities,
+  Identifier,
+  Namespace,
+  SequencerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.ProtocolVersion
@@ -95,7 +95,7 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
       DefaultTestIdentities.domainId,
     )
   private lazy val signedDeliver: OrdinarySerializedEvent = {
-    OrdinarySequencedEvent(SequencerTestUtils.sign(deliver))(traceContext)
+    OrdinarySequencedEvent(SequencerTestUtils.sign(deliver), None)(traceContext)
   }
 
   private lazy val nextDeliver: Deliver[Nothing] = SequencerTestUtils.mockDeliver(
@@ -113,6 +113,7 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
     CantonTimestamp.ofEpochSecond(3),
     DefaultTestIdentities.domainId,
   )
+
   def deliver(i: Long): Deliver[Nothing] = SequencerTestUtils.mockDeliver(
     i,
     CantonTimestamp.Epoch.plusSeconds(i),
@@ -746,6 +747,57 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
 
       testF.futureValue
     }
+
+    "have new transport be used with same sequencerId but different sequencer alias" in {
+      val secondTransport = new MockTransport
+
+      val testF = for {
+        env <- Env.create(useParallelExecutionContext = true)
+        _ <- env.subscribeAfter()
+        _ <- env.changeTransport(
+          SequencerTransports.single(
+            SequencerAlias.tryCreate("somethingElse"),
+            sequencerId,
+            secondTransport,
+          )
+        )
+        _ <- env.sendAsync(Batch.empty(testedProtocolVersion))
+      } yield {
+        env.transport.lastSend.get() shouldBe None
+        secondTransport.lastSend.get() should not be None
+      }
+
+      testF.futureValue
+    }
+
+    "fail to reassign sequencerId" in {
+      val secondTransport = new MockTransport
+      val secondSequencerId = SequencerId(
+        UniqueIdentifier(Identifier.tryCreate("da2"), Namespace(Fingerprint.tryCreate("default")))
+      )
+
+      val testF = for {
+        env <- Env.create(useParallelExecutionContext = true)
+        _ <- env.subscribeAfter()
+        error <- loggerFactory
+          .assertLogs(
+            env
+              .changeTransport(
+                SequencerTransports.default(
+                  secondSequencerId,
+                  secondTransport,
+                )
+              ),
+            _.errorMessage shouldBe "Adding or removing sequencer subscriptions is not supported at the moment",
+          )
+          .failed
+      } yield {
+        error
+      }
+
+      testF.futureValue shouldBe an[IllegalArgumentException]
+      testF.futureValue.getMessage shouldBe "Adding or removing sequencer subscriptions is not supported at the moment"
+    }
   }
 
   private case class Subscriber[E](
@@ -754,15 +806,16 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
       subscription: MockSubscription[E],
   ) {
     def sendToHandler(event: SequencedEvent[ClosedEnvelope]): Future[Unit] = {
-      handler(OrdinarySequencedEvent(SequencerTestUtils.sign(event))(traceContext)).transform {
-        case Success(Right(_)) => Success(())
-        case Success(Left(err)) =>
-          subscription.closeSubscription(err)
-          Success(())
-        case Failure(ex) =>
-          subscription.closeSubscription(ex)
-          Success(())
-      }
+      handler(OrdinarySequencedEvent(SequencerTestUtils.sign(event), None)(traceContext))
+        .transform {
+          case Success(Right(_)) => Success(())
+          case Success(Left(err)) =>
+            subscription.closeSubscription(err)
+            Success(())
+          case Failure(ex) =>
+            subscription.closeSubscription(ex)
+            Success(())
+        }
     }
   }
 
@@ -786,8 +839,14 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
         PeriodicAcknowledgements.noAcknowledgements,
       )
 
-    def changeTransport(newTransport: SequencerClientTransport): Future[Unit] =
-      client.changeTransport(newTransport)
+    def changeTransport(newTransport: SequencerClientTransport): Future[Unit] = {
+      client.changeTransport(
+        SequencerTransports.default(sequencerId, newTransport)
+      )
+    }
+
+    def changeTransport(sequencerTransports: SequencerTransports): Future[Unit] =
+      client.changeTransport(sequencerTransports)
 
     def sendAsync(
         batch: Batch[DefaultOpenEnvelope]
@@ -799,14 +858,18 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
   private class MockSubscription[E] extends SequencerSubscription[E] {
     override protected def loggerFactory: NamedLoggerFactory =
       SequencerClientTest.this.loggerFactory
+
     override protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
+
     override private[canton] def complete(reason: SubscriptionCloseReason[E])(implicit
         traceContext: TraceContext
     ): Unit = {
       closeReasonPromise.success(reason)
       close()
     }
+
     def closeSubscription(reason: E): Unit = this.closeReasonPromise.success(HandlerError(reason))
+
     def closeSubscription(error: Throwable): Unit =
       this.closeReasonPromise.success(HandlerException(error))
   }
@@ -831,6 +894,7 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
             subscriber(retry - 1)
           case None => None
         }
+
       subscriber(retry = 10)
     }
 
@@ -883,9 +947,11 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
 
     override def subscriptionRetryPolicy: SubscriptionErrorRetryPolicy =
       SubscriptionErrorRetryPolicy.never
+
     override def handshake(request: HandshakeRequest)(implicit
         traceContext: TraceContext
     ): EitherT[Future, HandshakeRequestError, HandshakeResponse] = ???
+
     override protected def loggerFactory: NamedLoggerFactory =
       SequencerClientTest.this.loggerFactory
 
@@ -917,10 +983,10 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
     )
 
     /** @param useParallelExecutionContext Set to true to use a parallel execution context which is handy for
-      *                                    verifying close behavior that can involve an Await that would deadlock
-      *                                    on ScalaTest's default serial execution context. However by enabling this
-      *                                    it means the order of asynchronous operations within the SequencerClient
-      *                                    will no longer be deterministic.
+      *                                     verifying close behavior that can involve an Await that would deadlock
+      *                                     on ScalaTest's default serial execution context. However by enabling this
+      *                                     it means the order of asynchronous operations within the SequencerClient
+      *                                     will no longer be deterministic.
       */
     def create(
         storedEvents: Seq[SequencedEvent[ClosedEnvelope]] = Seq.empty,
@@ -984,7 +1050,7 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
       val client = new SequencerClientImpl(
         DefaultTestIdentities.domainId,
         participant1,
-        transport,
+        SequencerTransports.default(DefaultTestIdentities.sequencerId, transport),
         options,
         TestingConfigInternal(),
         domainParameters.protocolVersion,
@@ -1016,14 +1082,13 @@ class SequencerClientTest extends AnyWordSpec with BaseTest with HasExecutorServ
         mock[CryptoPureApi],
         LoggingConfig(),
         loggerFactory,
-        expectedSequencers =
-          NonEmpty.mk(Set, SequencerAlias.Default -> DefaultTestIdentities.sequencerId).toMap,
+        futureSupervisor,
       )(executionContext, tracer)
       val signedEvents = storedEvents.map(SequencerTestUtils.sign)
 
       for {
         _ <- sequencedEventStore.store(
-          signedEvents.map(OrdinarySequencedEvent(_)(TraceContext.empty))
+          signedEvents.map(OrdinarySequencedEvent(_, None)(TraceContext.empty))
         )
         _ <- cleanPrehead.traverse_(prehead =>
           sequencerCounterTrackerStore.advancePreheadSequencerCounterTo(prehead)

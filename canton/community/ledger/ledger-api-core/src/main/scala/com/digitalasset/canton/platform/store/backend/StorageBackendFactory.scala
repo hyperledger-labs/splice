@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.platform.store.backend
 
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.platform.store.DbType
 import com.digitalasset.canton.platform.store.backend.h2.H2StorageBackendFactory
 import com.digitalasset.canton.platform.store.backend.localstore.{
@@ -23,7 +24,10 @@ trait StorageBackendFactory {
   def createPartyStorageBackend(ledgerEndCache: LedgerEndCache): PartyStorageBackend
   def createPartyRecordStorageBackend: PartyRecordStorageBackend
   def createPackageStorageBackend(ledgerEndCache: LedgerEndCache): PackageStorageBackend
-  def createCompletionStorageBackend(stringInterning: StringInterning): CompletionStorageBackend
+  def createCompletionStorageBackend(
+      stringInterning: StringInterning,
+      loggerFactory: NamedLoggerFactory,
+  ): CompletionStorageBackend
   def createContractStorageBackend(
       ledgerEndCache: LedgerEndCache,
       stringInterning: StringInterning,
@@ -31,6 +35,7 @@ trait StorageBackendFactory {
   def createEventStorageBackend(
       ledgerEndCache: LedgerEndCache,
       stringInterning: StringInterning,
+      loggerFactory: NamedLoggerFactory,
   ): EventStorageBackend
   def createDataSourceStorageBackend: DataSourceStorageBackend
   def createDBLockStorageBackend: DBLockStorageBackend
@@ -45,23 +50,25 @@ trait StorageBackendFactory {
   final def readStorageBackend(
       ledgerEndCache: LedgerEndCache,
       stringInterning: StringInterning,
+      loggerFactory: NamedLoggerFactory,
   ): ReadStorageBackend =
     ReadStorageBackend(
       configurationStorageBackend = createConfigurationStorageBackend(ledgerEndCache),
       partyStorageBackend = createPartyStorageBackend(ledgerEndCache),
       packageStorageBackend = createPackageStorageBackend(ledgerEndCache),
-      completionStorageBackend = createCompletionStorageBackend(stringInterning),
+      completionStorageBackend = createCompletionStorageBackend(stringInterning, loggerFactory),
       contractStorageBackend = createContractStorageBackend(ledgerEndCache, stringInterning),
-      eventStorageBackend = createEventStorageBackend(ledgerEndCache, stringInterning),
+      eventStorageBackend =
+        createEventStorageBackend(ledgerEndCache, stringInterning, loggerFactory),
       meteringStorageBackend = createMeteringStorageReadBackend(ledgerEndCache),
     )
 }
 
 object StorageBackendFactory {
-  def of(dbType: DbType): StorageBackendFactory =
+  def of(dbType: DbType, loggerFactory: NamedLoggerFactory): StorageBackendFactory =
     dbType match {
       case DbType.H2Database => H2StorageBackendFactory
-      case DbType.Postgres => PostgresStorageBackendFactory
+      case DbType.Postgres => PostgresStorageBackendFactory(loggerFactory)
       case DbType.Oracle => OracleStorageBackendFactory
     }
 }

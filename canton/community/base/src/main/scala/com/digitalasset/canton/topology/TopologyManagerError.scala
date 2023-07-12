@@ -4,6 +4,8 @@
 package com.digitalasset.canton.topology
 
 import com.daml.error.*
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPublicStoreError}
 import com.digitalasset.canton.error.CantonErrorGroups.TopologyManagementErrorGroup.TopologyManagerErrorGroup
@@ -14,6 +16,7 @@ import com.digitalasset.canton.topology.store.ValidatedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.{
   TopologyChangeOp,
   TopologyMapping,
+  TopologyMappingX,
   TopologyStateElement,
   TopologyTransaction,
 }
@@ -144,6 +147,16 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         with TopologyManagerError
   }
 
+  object SerialMismatch
+      extends ErrorCode(id = "SERIAL_MISMATCH", ErrorCategory.InvalidGivenCurrentSystemStateOther) {
+    final case class Failure(expected: PositiveInt, actual: PositiveInt)(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"The given serial $actual did not match the expected serial $expected."
+        )
+        with TopologyManagerError
+  }
+
   @Explanation(
     """This error indicates that a transaction has already been added previously."""
   )
@@ -183,6 +196,14 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
             "A matching topology mapping authorized with the same key already exists in this state"
         )
         with TopologyManagerError
+
+    final case class FailureX(existing: TopologyMappingX, keys: NonEmpty[Set[Fingerprint]])(implicit
+        val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause =
+            "A matching topology mapping x authorized with the same keys already exists in this state"
+        )
+        with TopologyManagerError
   }
 
   @Explanation(
@@ -200,23 +221,6 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = "Could not find an appropriate signing key to issue the topology transaction"
-        )
-        with TopologyManagerError
-  }
-
-  @Explanation(
-    """This error indicates that the desired certificate could not be created."""
-  )
-  @Resolution("""Inspect the underlying error for details.""")
-  object CertificateGenerationError
-      extends ErrorCode(
-        id = "CERTIFICATE_GENERATION_ERROR",
-        ErrorCategory.SystemInternalAssumptionViolated,
-      ) {
-    final case class Failure(error: X509CertificateError)(implicit
-        val loggingContext: ErrorLoggingContext
-    ) extends CantonError.Impl(
-          cause = "Failed to generate the certificate"
         )
         with TopologyManagerError
   }

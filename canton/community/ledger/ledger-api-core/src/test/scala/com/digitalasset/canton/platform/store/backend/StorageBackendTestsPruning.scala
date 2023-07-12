@@ -4,11 +4,10 @@
 package com.digitalasset.canton.platform.store.backend
 
 import com.daml.lf.data.Ref
-import com.daml.logging.LoggingContext
 import com.daml.scalautil.Statement
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.platform.store.backend.PruningDto
 import com.digitalasset.canton.platform.store.backend.PruningDto.*
+import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{Assertion, Checkpoints, OptionValues}
@@ -32,10 +31,10 @@ private[backend] trait StorageBackendTestsPruning
   private val actorParty = Ref.Party.assertFromString("actor")
 
   def pruneEventsSql(pruneUpToInclusive: Offset, pruneAllDivulgedContracts: Boolean)(implicit
-      loggingContext: LoggingContext
+      traceContext: TraceContext
   ): Unit =
     executeSql(
-      backend.event.pruneEvents(pruneUpToInclusive, pruneAllDivulgedContracts)(_, loggingContext)
+      backend.event.pruneEvents(pruneUpToInclusive, pruneAllDivulgedContracts)(_, traceContext)
     )
 
   it should "correctly update the pruning offset" in {
@@ -43,7 +42,7 @@ private[backend] trait StorageBackendTestsPruning
     val offset_2 = offset(2)
     val offset_3 = offset(4)
 
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     val initialPruningOffset = executeSql(backend.parameter.prunedUpToInclusive)
 
     executeSql(backend.parameter.updatePrunedUptoInclusive(offset_1))
@@ -66,7 +65,7 @@ private[backend] trait StorageBackendTestsPruning
     val offset_1 = offset(3)
     val offset_2 = offset(2)
     val offset_3 = offset(4)
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     val initialPruningOffset = executeSql(
       backend.parameter.participantAllDivulgedContractsPrunedUpToInclusive
     )
@@ -96,7 +95,7 @@ private[backend] trait StorageBackendTestsPruning
   }
 
   it should "prune consuming and non-consuming events" in {
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     // Ingest a create and archive event
     executeSql(
       ingest(
@@ -193,7 +192,7 @@ private[backend] trait StorageBackendTestsPruning
       contractId = hashCid("#1"),
       signatory = signatoryParty,
     )
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     // Ingest a create and archive event
     executeSql(
       ingest(
@@ -268,7 +267,7 @@ private[backend] trait StorageBackendTestsPruning
       nonStakeholderInformees = Set(nonStakeholderInformeeParty),
     )
     val createTxId = dtoTransactionId(create)
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     // Ingest a create and archive event
     executeSql(
       ingest(
@@ -334,7 +333,7 @@ private[backend] trait StorageBackendTestsPruning
         contractId = contract1_id,
         divulgee = partyName,
       )
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     // Ingest
     executeSql(
       ingest(
@@ -392,7 +391,7 @@ private[backend] trait StorageBackendTestsPruning
       contractId = contract2_id,
       divulgee = divulgee,
     )
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     // Ingest
     executeSql(
       ingest(
@@ -438,13 +437,13 @@ private[backend] trait StorageBackendTestsPruning
       offset = offset(1),
       submitter = someParty,
     )
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     // Ingest a completion
     executeSql(ingest(Vector(completion), _))
     executeSql(updateLedgerEnd(offset(1), 1L))
     assertIndexDbDataSql(completion = Seq(PruningDto.Completion("00000001")))
     // Prune
-    executeSql(backend.completion.pruneCompletions(offset(1))(_, loggingContext))
+    executeSql(backend.completion.pruneCompletions(offset(1))(_, TraceContext.empty))
     assertIndexDbDataSql(completion = Seq.empty)
   }
 

@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.topology
 import akka.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.functor.*
+import cats.syntax.option.*
 import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
@@ -15,7 +16,7 @@ import com.digitalasset.canton.common.domain.{
   SequencerBasedRegisterTopologyTransactionHandle,
   SequencerBasedRegisterTopologyTransactionHandleX,
 }
-import com.digitalasset.canton.config.{DomainTimeTrackerConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{DomainTimeTrackerConfig, LocalNodeConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
@@ -33,13 +34,10 @@ import com.digitalasset.canton.participant.store.{
 }
 import com.digitalasset.canton.participant.sync.SyncDomainPersistentStateManagerImpl
 import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.protocol.messages.{
-  DefaultOpenEnvelope,
-  RegisterTopologyTransactionResponseResult,
-}
+import com.digitalasset.canton.protocol.messages.RegisterTopologyTransactionResponseResult
 import com.digitalasset.canton.sequencing.client.{SequencerClient, SequencerClientFactory}
 import com.digitalasset.canton.sequencing.protocol.Batch
-import com.digitalasset.canton.sequencing.{EnvelopeHandler, HandlerResult, SequencerConnections}
+import com.digitalasset.canton.sequencing.{EnvelopeHandler, SequencerConnections}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId, TopologyStoreX}
@@ -54,7 +52,7 @@ import com.digitalasset.canton.topology.{
   TopologyManagerX,
   *,
 }
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -81,7 +79,7 @@ trait ParticipantTopologyDispatcherHandle {
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, DomainRegistryError, Unit]
 
-  def processor: Traced[Seq[DefaultOpenEnvelope]] => HandlerResult
+  def processor: EnvelopeHandler
 
 }
 
@@ -234,7 +232,7 @@ class ParticipantTopologyDispatcher(
       participantId,
       protocolVersion,
       timeouts,
-      loggerFactory,
+      loggerFactory.append("domainId", domainId.toString),
     )
 
     override def domainConnected()(implicit
@@ -252,7 +250,7 @@ class ParticipantTopologyDispatcher(
             manager.store,
             state.topologyStore,
             timeouts,
-            loggerFactory.appendUnnamedKey("domain", domain.unwrap),
+            loggerFactory.append("domainId", domainId.toString),
             crypto,
           )
           ErrorUtil.requireState(
@@ -265,7 +263,7 @@ class ParticipantTopologyDispatcher(
             .leftMap(DomainRegistryError.DomainRegistryInternalError.InitialOnboardingError(_))
         }
 
-    override def processor: Traced[Seq[DefaultOpenEnvelope]] => HandlerResult = handle.processor
+    override def processor: EnvelopeHandler = handle.processor
 
   }
 
@@ -298,7 +296,7 @@ class ParticipantTopologyDispatcher(
         clock,
         timeTrackerConfig,
         timeouts,
-        loggerFactory.appendUnnamedKey("onboarding", alias.unwrap),
+        loggerFactory.append("domainId", domainId.toString),
         sequencerClientFactory,
         sequencerConnection,
         crypto,
@@ -315,6 +313,7 @@ class ParticipantTopologyDispatcherX(
     state: SyncDomainPersistentStateManagerImpl[SyncDomainPersistentStateX],
     crypto: Crypto,
     clock: Clock,
+    config: LocalNodeConfig,
     override protected val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -419,10 +418,11 @@ class ParticipantTopologyDispatcherX(
         clock,
         timeTrackerConfig,
         timeouts,
-        loggerFactory.appendUnnamedKey("onboarding", alias.unwrap),
+        loggerFactory.append("domainId", domainId.toString),
         sequencerClientFactory,
         sequencerConnections,
         crypto,
+        config.topologyX,
         protocolVersion,
         expectedSequencers,
       )).run()
@@ -436,6 +436,7 @@ class ParticipantTopologyDispatcherX(
       client: DomainTopologyClientWithInit,
       sequencerClient: SequencerClient,
   ): ParticipantTopologyDispatcherHandle = {
+    val domainLoggerFactory = loggerFactory.append("domainId", domainId.toString)
     new ParticipantTopologyDispatcherHandle {
       val handle = new SequencerBasedRegisterTopologyTransactionHandleX(
         (traceContext, env) =>
@@ -445,9 +446,11 @@ class ParticipantTopologyDispatcherX(
         domainId,
         participantId,
         participantId,
+        clock.some,
+        config.topologyX,
         protocolVersion,
         timeouts,
-        loggerFactory,
+        domainLoggerFactory,
       )
 
       override def domainConnected()(implicit
@@ -465,7 +468,7 @@ class ParticipantTopologyDispatcherX(
               manager.store,
               state.topologyStore,
               timeouts,
-              loggerFactory.appendUnnamedKey("domain", domain.unwrap),
+              domainLoggerFactory,
               crypto,
             )
             ErrorUtil.requireState(
@@ -607,7 +610,7 @@ object DomainOnboardingOutbox {
       authorizedStore,
       targetStore,
       timeouts,
-      loggerFactory.append("domain", domain.unwrap),
+      loggerFactory.append("domainId", domainId.toString),
       crypto,
     )
     outbox.run().transform { res =>
@@ -741,7 +744,7 @@ object DomainOnboardingOutboxX {
       authorizedStore,
       targetStore,
       timeouts,
-      loggerFactory.append("domain", domain.unwrap),
+      loggerFactory,
       crypto,
     )
     outbox.run().transform { res =>

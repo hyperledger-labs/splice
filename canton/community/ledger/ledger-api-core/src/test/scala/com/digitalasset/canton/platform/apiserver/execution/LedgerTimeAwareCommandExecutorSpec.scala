@@ -8,11 +8,11 @@ import com.daml.lf.crypto.Hash
 import com.daml.lf.data.Ref.Identifier
 import com.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.daml.lf.transaction.TransactionVersion
-import com.daml.lf.transaction.test.TransactionBuilder
+import com.daml.lf.transaction.test.{TestNodeBuilder, TransactionBuilder}
 import com.daml.lf.value.Value
 import com.daml.lf.value.Value.ContractId
-import com.daml.logging.LoggingContext
 import com.daml.metrics.Metrics
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.ProcessedDisclosedContract
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod.DeduplicationDuration
@@ -23,10 +23,8 @@ import com.digitalasset.canton.ledger.participant.state.v2.{SubmitterInfo, Trans
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause
 import com.digitalasset.canton.platform.apiserver.services.ErrorCause.LedgerTime
-import com.digitalasset.canton.tracing.TraceContext
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
 import org.scalatest.Assertion
-import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.Duration
@@ -34,12 +32,12 @@ import scala.concurrent.Future
 
 class LedgerTimeAwareCommandExecutorSpec
     extends AsyncWordSpec
-    with Matchers
     with MockitoSugar
-    with ArgumentMatchersSugar {
+    with ArgumentMatchersSugar
+    with BaseTest {
 
   private val loggingContext =
-    LoggingContextWithTrace(TraceContext.empty)(LoggingContext.ForTesting)
+    LoggingContextWithTrace.ForTesting
 
   private val submissionSeed = Hash.hashPrivateKey("a key")
   private val configuration = Configuration(
@@ -53,18 +51,20 @@ class LedgerTimeAwareCommandExecutorSpec
   )
 
   private val cid = TransactionBuilder.newCid
+
   private val transaction = TransactionBuilder.justSubmitted(
-    TransactionBuilder().fetch(
-      TransactionBuilder().create(
-        cid,
-        Ref.Identifier(
+    TestNodeBuilder.fetch(
+      TestNodeBuilder.create(
+        id = cid,
+        templateId = Ref.Identifier(
           Ref.PackageId.assertFromString("abc"),
           Ref.QualifiedName.assertFromString("Main:Template"),
         ),
-        Value.ValueUnit,
-        Set.empty,
-        Set.empty,
-      )
+        argument = Value.ValueUnit,
+        signatories = Set.empty,
+        observers = Set.empty,
+      ),
+      byKey = false,
     )
   )
 
@@ -99,7 +99,7 @@ class LedgerTimeAwareCommandExecutorSpec
         None,
         configuration,
       ),
-      TransactionMeta(let, None, Time.Timestamp.Epoch, submissionSeed, None, None, None),
+      TransactionMeta(let, None, Time.Timestamp.Epoch, submissionSeed, None, None, None, None),
       transaction,
       dependsOnLedgerTime,
       5L,
@@ -124,7 +124,7 @@ class LedgerTimeAwareCommandExecutorSpec
           eqTo(processedDisclosedContracts),
           any[Set[ContractId]],
         )(
-          any[LoggingContext]
+          any[LoggingContextWithTrace]
         )
       )
         .thenReturn(Future.successful(resolveMaximumLedgerTimeResults.head))
@@ -155,6 +155,7 @@ class LedgerTimeAwareCommandExecutorSpec
       mockResolveMaximumLedgerTime,
       3,
       Metrics.ForTesting,
+      loggerFactory,
     )
 
     instance.execute(commands, submissionSeed, configuration)(loggingContext).map { actual =>
@@ -169,7 +170,7 @@ class LedgerTimeAwareCommandExecutorSpec
             None,
             configuration,
           ),
-          TransactionMeta(let, None, Time.Timestamp.Epoch, submissionSeed, None, None, None),
+          TransactionMeta(let, None, Time.Timestamp.Epoch, submissionSeed, None, None, None, None),
           transaction,
           dependsOnLedgerTime,
           5L,

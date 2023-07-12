@@ -48,7 +48,8 @@ trait CryptoPrivateStore extends AutoCloseable {
   )(implicit traceContext: TraceContext): EitherT[Future, CryptoPrivateStoreError, Unit]
 
   def existsPrivateKey(
-      keyId: Fingerprint
+      keyId: Fingerprint,
+      purpose: KeyPurpose,
   )(implicit traceContext: TraceContext): EitherT[Future, CryptoPrivateStoreError, Boolean]
 
   def existsSigningKey(signingKeyId: Fingerprint)(implicit
@@ -73,7 +74,8 @@ object CryptoPrivateStore {
         timeouts: ProcessingTimeout,
         loggerFactory: NamedLoggerFactory,
     )(implicit
-        ec: ExecutionContext
+        ec: ExecutionContext,
+        traceContext: TraceContext,
     ): EitherT[Future, CryptoPrivateStoreError, CryptoPrivateStore]
   }
 
@@ -84,7 +86,8 @@ object CryptoPrivateStore {
         timeouts: ProcessingTimeout,
         loggerFactory: NamedLoggerFactory,
     )(implicit
-        ec: ExecutionContext
+        ec: ExecutionContext,
+        traceContext: TraceContext,
     ): EitherT[Future, CryptoPrivateStoreError, CryptoPrivateStore] =
       storage match {
         case _: MemoryStorage =>

@@ -204,6 +204,11 @@ class ServicesMetrics(
     val getLedgerInitialConditions: Timer = factory.timer(prefix :+ "get_ledger_initial_conditions")
     @MetricDoc.FanInstanceTag
     val stateUpdates: Timer = factory.timer(prefix :+ "state_updates")
+    @MetricDoc.FanInstanceTag
+    val getConnectedDomains: Timer = factory.timer(prefix :+ "get_connected_domains")
+    @MetricDoc.FanInstanceTag
+    val incompleteReassignmentOffsets: Timer =
+      factory.timer(prefix :+ "incomplete_reassignment_offsets")
   }
 
   @MetricDoc.FanTag(
@@ -235,6 +240,11 @@ class ServicesMetrics(
     val submitTransaction: Timer = factory.timer(prefix :+ "submit_transaction")
     @MetricDoc.FanInstanceTag
     val submitTransactionRunning: Counter = factory.counter(prefix :+ "submit_transaction_running")
+    @MetricDoc.FanInstanceTag
+    val submitReassignment: Timer = factory.timer(prefix :+ "submit_reassignment")
+    @MetricDoc.FanInstanceTag
+    val submitReassignmentRunning: Counter =
+      factory.counter(prefix :+ "submit_reassignment_running")
     @MetricDoc.FanInstanceTag
     val uploadPackages: Timer = factory.timer(prefix :+ "upload_packages")
     @MetricDoc.FanInstanceTag

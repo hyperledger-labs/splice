@@ -28,7 +28,6 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added `class UnitCommand` for admin commands that do not take arguments
 * Adds some more utility methods to `PartyId`
 * Added `com.daml.network.integration.CNNodeEnvironmentDefinition` to `LogEntry.scala`
-* Added `DecodeUtil.decodeArchivedExercise`
 * Support `readAs` in `commands.submit`, should be upstreamed
 * Added `internalErrorGrpc` to `ErrorUtil`
 * Generalized `ApiRequestLogger` to allow its definition to be reused to build an Api Client request logger.

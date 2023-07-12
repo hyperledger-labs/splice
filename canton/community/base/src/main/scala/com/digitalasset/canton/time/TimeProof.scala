@@ -104,7 +104,7 @@ object TimeProof {
         "Time Proof event should have no envelopes",
       )
       _ <- Either.cond(
-        deliver.messageId.exists(isTimeEventMessageId),
+        deliver.messageIdO.exists(isTimeEventMessageId),
         (),
         "Time Proof event should have an expected message id",
       )
@@ -154,7 +154,7 @@ object TimeProof {
     * Currently adding a short prefix for debugging at the sequencer so floods of time requests will be observable.
     */
   @VisibleForTesting
-  private[time] def mkTimeProofRequestMessageId: MessageId =
+  def mkTimeProofRequestMessageId: MessageId =
     MessageId(
       String73(s"$timeEventMessageIdPrefix${UUID.randomUUID()}")("time-proof-message-id".some)
     )

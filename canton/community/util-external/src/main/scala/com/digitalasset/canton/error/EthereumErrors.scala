@@ -16,7 +16,6 @@ import org.slf4j.event.Level
 
 import java.math.BigInteger
 
-// TODO(i9610): We don't have test cases for most of these errors
 object EthereumErrors extends EthereumErrorGroup {
 
   object ConfigurationErrors extends ErrorGroup {
@@ -100,7 +99,6 @@ object EthereumErrors extends EthereumErrorGroup {
           )
     }
 
-    // TODO(i11028): consider setting the TPM ID during contract creation in constructor so these errors are redundant
     @Explanation(
       """The sequencer smart contract has detected that a value that is immutable after being set for the first time
         | (either the signing tolerance or the topology manager ID) was attempted to be changed.
@@ -130,15 +128,15 @@ object EthereumErrors extends EthereumErrorGroup {
 
     @Explanation(
       """Canton validates on startup that the configured address on the blockchain contains the EVM bytecode of the
-      | sequencer smart contract in the latest block. This error indicates that no bytecode or the wrong bytecode was found.
-      | This is a serious error and means that the sequencer can't sequence events.
-      |"""
+        | sequencer smart contract in the latest block. This error indicates that no bytecode or the wrong bytecode was found.
+        | This is a serious error and means that the sequencer can't sequence events.
+        |"""
     )
     @Resolution("""This frequently error occurs when updating the Canton system without updating the sequencer
-      | contract deployed on the blockchain. Validate that the sequencer contract corresponding to the current Canton release
-      | is deployed in the latest blockchain blocks on the configured address.
-      | Another common reason for this error is that the wrong contract address was configured.
-      |""")
+                  | contract deployed on the blockchain. Validate that the sequencer contract corresponding to the current Canton release
+                  | is deployed in the latest blockchain blocks on the configured address.
+                  | Another common reason for this error is that the wrong contract address was configured.
+                  |""")
     object WrongEVMBytecode
         extends ErrorCode("WRONG_EVM_BYTECODE", InvalidGivenCurrentSystemStateOther) {
       final case class Error(
@@ -154,14 +152,14 @@ object EthereumErrors extends EthereumErrorGroup {
     }
 
     @Explanation("""
-        |As one of the first steps when initializing a Besu sequencer, Canton attempts to query the version (attribute)
-        |of the Sequencer.sol contract.
-        |""")
+                   |As one of the first steps when initializing a Besu sequencer, Canton attempts to query the version (attribute)
+                   |of the Sequencer.sol contract.
+                   |""")
     @Resolution("""Usually, the root cause of this is a deployment or configuration problem.
-        | Ensure that a Sequencer.sol contract is deployed on the configured address on the latest block when attempting
-        |  to initialize the Canton Besu sequencer node. If this error persists, a malicious user may
-        |  be attempting to interfere with the Ethereum network.
-        |""")
+                  | Ensure that a Sequencer.sol contract is deployed on the configured address on the latest block when attempting
+                  |  to initialize the Canton Besu sequencer node. If this error persists, a malicious user may
+                  |  be attempting to interfere with the Ethereum network.
+                  |""")
     object UnableToQueryVersion
         extends ErrorCode("ETHEREUM_CANT_QUERY_VERSION", InvalidGivenCurrentSystemStateOther) {
       final case class Error(throwable: Throwable)(implicit
@@ -177,17 +175,17 @@ object EthereumErrors extends EthereumErrorGroup {
 
   object TransactionErrors extends ErrorGroup {
     @Explanation("""
-        |This error is logged when the Sequencer Ethereum application receives an error when attempting to submit a
-        | transaction to the transaction pool of the Ethereum client. Common causes for this are network errors,
-        | or when the Ethereum account of the Sequencer Ethereum application is used by another application.
-        | Less commonly, this error might also indirectly be caused if the transaction pool of the Ethereum client is
-        | full or flushed.
-        |""")
+                   |This error is logged when the Sequencer Ethereum application receives an error when attempting to submit a
+                   | transaction to the transaction pool of the Ethereum client. Common causes for this are network errors,
+                   | or when the Ethereum account of the Sequencer Ethereum application is used by another application.
+                   | Less commonly, this error might also indirectly be caused if the transaction pool of the Ethereum client is
+                   | full or flushed.
+                   |""")
     @Resolution("""Generally, Canton should recover automatically from this error.
-        | If you continue to see this error, investigate possible root causes such as poor network connections,
-        | if the Ethereum wallet of the Ethereum Sequencer application is being reused by another application, and the
-        | health of the Ethereum client.
-        |""")
+                  | If you continue to see this error, investigate possible root causes such as poor network connections,
+                  | if the Ethereum wallet of the Ethereum Sequencer application is being reused by another application, and the
+                  | health of the Ethereum client.
+                  |""")
     object SubmissionFailed
         extends ErrorCode(
           "ETHEREUM_TRANSACTION_SUBMISSION_FAILED",
@@ -224,19 +222,19 @@ object EthereumErrors extends EthereumErrorGroup {
     }
 
     @Explanation("""This error occurs when the Ethereum sequencer attempts to fetch the transaction receipt for a
-        |previously submitted transaction but receives an exception. Usually, this is caused by network errors,
-        |the Ethereum client node being overloaded or the Ethereum sequencer reaching its `transactionReceiptPollingAttempts`
-        |for a given transaction.
-        |The fetching of transaction receipts of submitted transactions is separate from the Ethereum sequencer's
-        |read-stream used to ingest new transactions. Thus, in this sense, this error is purely informative and can be
-        |caused by transient issues (such as a transient network outage). Note, that the Canton nonce manager
-        |refreshes his cache whenever this error occurs which may unblock stuck transactions with a too-high nonce.
-        |""")
+                   |previously submitted transaction but receives an exception. Usually, this is caused by network errors,
+                   |the Ethereum client node being overloaded or the Ethereum sequencer reaching its `transactionReceiptPollingAttempts`
+                   |for a given transaction.
+                   |The fetching of transaction receipts of submitted transactions is separate from the Ethereum sequencer's
+                   |read-stream used to ingest new transactions. Thus, in this sense, this error is purely informative and can be
+                   |caused by transient issues (such as a transient network outage). Note, that the Canton nonce manager
+                   |refreshes his cache whenever this error occurs which may unblock stuck transactions with a too-high nonce.
+                   |""")
     @Resolution("""Usually, this error should resolve by itself. If you frequently see this error, ensure that
-        |the Ethereum account of the Ethereum sequencer is used by no one else and that the Ethereum client doesn't
-        |drop submitted transactions through being overloaded or reaching a full txpool. If this errors keeps occurring,
-        |please contact support.
-        |""")
+                  |the Ethereum account of the Ethereum sequencer is used by no one else and that the Ethereum client doesn't
+                  |drop submitted transactions through being overloaded or reaching a full txpool. If this errors keeps occurring,
+                  |please contact support.
+                  |""")
     object ReceiptFetchingFailed
         extends ErrorCode(
           "ETHEREUM_TRANSACTION_RECEIPT_FETCHING_FAILED",

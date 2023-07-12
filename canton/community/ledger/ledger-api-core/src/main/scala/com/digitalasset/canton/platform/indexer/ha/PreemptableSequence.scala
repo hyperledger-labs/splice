@@ -3,7 +3,8 @@
 
 package com.digitalasset.canton.platform.indexer.ha
 
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.tracing.TraceContext
 
 import java.util.{Timer, TimerTask}
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
@@ -82,19 +83,19 @@ trait SequenceHelper {
 }
 
 object PreemptableSequence {
-  private val logger = ContextualizedLogger.get(this.getClass)
 
   /** @param executionContext this execution context will be used to:
     *   - execute future transformations
     *   - and encapsulate synchronous work in futures (this could be possibly blocking)
     *   Because of the possible blocking nature a dedicated pool is recommended.
     */
-  def apply(timer: Timer)(implicit
+  def apply(timer: Timer, loggerFactory: NamedLoggerFactory)(implicit
       executionContext: ExecutionContext,
-      loggingContext: LoggingContext,
+      traceContext: TraceContext,
   ): PreemptableSequence = { sequence =>
+    val logger = TracedLogger(loggerFactory.getLogger(getClass))
     val resultCompleted = Promise[Unit]()
-    val killSwitchCaptor = new KillSwitchCaptor
+    val killSwitchCaptor = new KillSwitchCaptor(loggerFactory)
     val resultHandle = Handle(resultCompleted.future, killSwitchCaptor)
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     var releaseStack: List[() => Future[Unit]] = Nil
@@ -122,7 +123,7 @@ object PreemptableSequence {
             // Failing Future here means we interrupt the Future sequencing.
             // The failure itself is not important, since the returning Handle-s completion-future-s result is overridden in case KillSwitch was used.
             logger.info(s"KillSwitch already used, interrupting sequence!")
-            Future.failed(new Exception("UsedKillSwitch"))
+            Future.failed(new UsedKillSwitch)
 
           case _ =>
             f
@@ -156,6 +157,9 @@ object PreemptableSequence {
                 retry(waitMillisBetweenRetries, maxAmountOfRetries - 1, retryable)(body)
               )
             }
+
+          case Failure(ex: UsedKillSwitch) =>
+            Future.failed(ex)
 
           case Failure(ex) =>
             logger.warn(s"Failure not retryable.", ex)
@@ -213,4 +217,6 @@ object PreemptableSequence {
 
     resultHandle
   }
+
+  class UsedKillSwitch extends Exception("UsedKillSwitch")
 }

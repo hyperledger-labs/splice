@@ -35,6 +35,7 @@ import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CryptoPrivateStor
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStore, CryptoPublicStore}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ReleaseProtocolVersion
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 
@@ -51,7 +52,8 @@ trait CryptoFactory {
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      traceContext: TraceContext,
   ): EitherT[Future, String, Crypto]
 
   def createPureCrypto(
@@ -67,7 +69,7 @@ trait CryptoFactory {
         case _: CryptoProvider.TinkCryptoProvider =>
           TinkPureCrypto.create(symmetricKeyScheme, hashAlgorithm)
         case _: CryptoProvider.JceCryptoProvider =>
-          val javaKeyConverter = new JceJavaConverter(hashAlgorithm, requiredSigningKeySchemes)
+          val javaKeyConverter = new JceJavaConverter(requiredSigningKeySchemes)
           Right(
             new JcePureCrypto(javaKeyConverter, symmetricKeyScheme, hashAlgorithm, loggerFactory)
           )
@@ -84,7 +86,8 @@ trait CryptoFactory {
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      traceContext: TraceContext,
   ): EitherT[Future, String, CryptoStoresAndSchemes] =
     for {
       cryptoPublicStore <- EitherT.rightT[Future, String](
@@ -180,7 +183,8 @@ class CommunityCryptoFactory extends CryptoFactory {
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      traceContext: TraceContext,
   ): EitherT[Future, String, Crypto] =
     for {
       storesAndSchemes <- initStoresAndSelectSchemes(
@@ -261,8 +265,7 @@ object JceCrypto {
       _ = Security.addProvider(new BouncyCastleProvider)
       requiredSigningKeySchemes <- selectAllowedSigningKeyScheme(config).toEitherT[Future]
       javaKeyConverter = new JceJavaConverter(
-        storesAndSchemes.hashAlgorithm,
-        requiredSigningKeySchemes,
+        requiredSigningKeySchemes
       )
       pureCrypto =
         new JcePureCrypto(

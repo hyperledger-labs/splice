@@ -48,6 +48,8 @@ final case class AcsStreamsConfig(
     // Must be a power of 2
     maxParallelPayloadCreateQueries: Int = AcsStreamsConfig.DefaultAcsContractFetchingParallelism,
     contractProcessingParallelism: Int = AcsStreamsConfig.DefaultContractProcessingParallelism,
+    // Temporary incomplete population parameters
+    maxIncompletePageSize: Int = 20,
 )
 
 object AcsStreamsConfig {
@@ -70,8 +72,12 @@ final case class TransactionFlatStreamsConfig(
     maxPayloadsPerPayloadsPage: Int = 1000,
     maxParallelIdCreateQueries: Int = 4,
     maxParallelIdConsumingQueries: Int = 4,
+    maxParallelIdAssignQueries: Int = 4,
+    maxParallelIdUnassignQueries: Int = 4,
     maxParallelPayloadCreateQueries: Int = 2,
     maxParallelPayloadConsumingQueries: Int = 2,
+    maxParallelPayloadAssignQueries: Int = 2,
+    maxParallelPayloadUnassignQueries: Int = 2,
     maxParallelPayloadQueries: Int = 2,
     transactionsProcessingParallelism: Int = 8,
 )
@@ -87,9 +93,13 @@ final case class TransactionTreeStreamsConfig(
     maxParallelIdCreateQueries: Int = 8,
     maxParallelIdConsumingQueries: Int = 8,
     maxParallelIdNonConsumingQueries: Int = 4,
+    maxParallelIdAssignQueries: Int = 4,
+    maxParallelIdUnassignQueries: Int = 4,
     maxParallelPayloadCreateQueries: Int = 2,
     maxParallelPayloadConsumingQueries: Int = 2,
     maxParallelPayloadNonConsumingQueries: Int = 2,
+    maxParallelPayloadAssignQueries: Int = 2,
+    maxParallelPayloadUnassignQueries: Int = 2,
     maxParallelPayloadQueries: Int = 2,
     transactionsProcessingParallelism: Int = 8,
 )

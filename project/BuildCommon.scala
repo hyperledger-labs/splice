@@ -407,6 +407,7 @@ object BuildCommon {
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
+          daml_grpc_utils,
           daml_lf_data,
           daml_metrics,
           daml_telemetry,
@@ -825,6 +826,7 @@ object BuildCommon {
       .dependsOn(
         `canton-community-common` % "compile->compile;test->test",
         `canton-ledger-api-core` % "compile->compile;test->test",
+        `canton-ledger-json-api`,
       )
       .enablePlugins(DamlPlugin)
       .settings(
@@ -997,6 +999,7 @@ object BuildCommon {
         //      addProtobufFilesToHeaderCheck(Compile),
         libraryDependencies ++= Seq(
           daml_contextualized_logging,
+          daml_grpc_utils,
           daml_lf_engine,
           daml_lf_archive_reader,
           daml_tracing,
@@ -1094,6 +1097,49 @@ object BuildCommon {
         ),
         Test / parallelExecution := true,
         Test / fork := false,
+      )
+  }
+
+  lazy val `canton-ledger-json-api` = {
+    import CantonDependencies.*
+    sbt.Project
+      .apply("canton-ledger-json-api", file("canton/community/ledger/ledger-json-api"))
+      .dependsOn(
+        `canton-ledger-api-core`,
+        `canton-ledger-common` % "test->test",
+        `canton-community-testing` % Test,
+      )
+      .disablePlugins(
+        ScalafixPlugin,
+        ScalafmtPlugin,
+        WartRemover,
+      ) // to accommodate different daml repo coding style
+      .enablePlugins(DamlPlugin)
+      .settings(
+        removeTestSources,
+        sharedSettings,
+        scalacOptions --= removeCompileFlagsForDaml
+          // needed for foo.bar.{this as that} imports
+          .filterNot(_ == "-Xsource:3"),
+        scalacOptions += "-Wconf:src=src_managed/.*:silent",
+        libraryDependencies ++= Seq(
+          akka_http,
+          akka_http_core,
+          daml_lf_api_type_signature,
+          spray_json_derived_codecs,
+          akka_stream_testkit % Test,
+          scalatest % Test,
+          scalacheck % Test,
+          scalaz_scalacheck % Test,
+          scalatestScalacheck % Test,
+        ),
+        Test / damlCodeGeneration := Seq(
+          (
+            (Test / sourceDirectory).value / "daml",
+            (Test / damlDarOutput).value / "JsonEncodingTest.dar",
+            "com.digitalasset.canton.http.json.encoding",
+          )
+        ),
       )
   }
 

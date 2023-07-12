@@ -3,35 +3,53 @@
 
 package com.digitalasset.canton.sequencing
 
-import com.daml.nonempty.NonEmpty
+import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{CryptoPureApi, Hash, HashPurpose, Signature}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  PromiseUnlessShutdown,
+}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.sequencing.SequencerAggregator.SequencerAggregatorError
+import com.digitalasset.canton.sequencing.SequencerAggregator.{
+  MessageAggregationConfig,
+  SequencerAggregatorError,
+}
 import com.digitalasset.canton.sequencing.protocol.SignedContent
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.common.annotations.VisibleForTesting
 
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue}
 import scala.collection.mutable
-import scala.concurrent.{Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, blocking}
 
 class SequencerAggregator(
     cryptoPureApi: CryptoPureApi,
     eventInboxSize: PositiveInt,
     val loggerFactory: NamedLoggerFactory,
-    expectedSequencers: NonEmpty[Set[SequencerId]],
-) extends NamedLogging {
+    initialConfig: MessageAggregationConfig,
+    override val timeouts: ProcessingTimeout,
+    futureSupervisor: FutureSupervisor,
+) extends NamedLogging
+    with FlagCloseable {
 
-  private val expectedSequencersSize: Int = expectedSequencers.size
+  private val configRef: AtomicReference[MessageAggregationConfig] =
+    new AtomicReference[MessageAggregationConfig](initialConfig)
+  def expectedSequencers: NonEmpty[Set[SequencerId]] = configRef.get().expectedSequencers
+
+  def sequencerTrustThreshold: PositiveInt = configRef.get().sequencerTrustThreshold
 
   private case class SequencerMessageData(
       eventBySequencer: Map[SequencerId, OrdinarySerializedEvent],
-      promise: Promise[Either[SequencerAggregatorError, SequencerId]],
+      promise: PromiseUnlessShutdown[Either[SequencerAggregatorError, SequencerId]],
   )
 
   /** Queue containing received and not yet handled events.
@@ -41,6 +59,9 @@ class SequencerAggregator(
     new ArrayBlockingQueue[OrdinarySerializedEvent](eventInboxSize.unwrap)
 
   private val sequenceData = mutable.TreeMap.empty[CantonTimestamp, SequencerMessageData]
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  private var cursor: Option[CantonTimestamp] = None
 
   def eventQueue: BlockingQueue[OrdinarySerializedEvent] = receivedEvents
 
@@ -104,57 +125,109 @@ class SequencerAggregator(
   }
 
   private def addEventToQueue(
-      nextData: SequencerMessageData
-  ): Either[SequencerAggregatorError, Unit] = {
-    val messages =
-      expectedSequencers.map(nextData.eventBySequencer).toSeq
+      messages: NonEmpty[List[OrdinarySerializedEvent]]
+  ): Either[SequencerAggregatorError, Unit] =
     combine(messages).map(addEventToQueue)
-  }
 
   def combineAndMergeEvent(
       sequencerId: SequencerId,
       message: OrdinarySerializedEvent,
-  ): Future[Either[SequencerAggregatorError, SequencerId]] = {
+  )(implicit
+      ec: ExecutionContext
+  ): FutureUnlessShutdown[Either[SequencerAggregatorError, Boolean]] = {
     if (!expectedSequencers.contains(sequencerId)) {
       throw new IllegalArgumentException(s"Unexpected sequencerId: $sequencerId")
     }
     blocking {
       this.synchronized {
+        if (cursor.forall(message.timestamp > _)) {
+          val sequencerMessageData = updatedSequencerMessageData(sequencerId, message)
+          sequenceData.put(message.timestamp, sequencerMessageData): Unit
 
-        val sequencerMessageData = updatedSequencerMessageData(sequencerId, message)
+          val (nextMinimumTimestamp, nextData) =
+            sequenceData.headOption.getOrElse(
+              (message.timestamp, sequencerMessageData)
+            ) // returns min message.timestamp
 
-        sequenceData.put(message.timestamp, sequencerMessageData): Unit
+          pushDownstreamIfConsensusIsReached(nextMinimumTimestamp, nextData)
 
-        val (nextMinimumTimestamp, nextData) =
-          sequenceData.headOption.getOrElse(
-            (message.timestamp, sequencerMessageData)
-          ) // returns min message.timestamp
-
-        if (nextData.eventBySequencer.sizeCompare(expectedSequencersSize) == 0) {
-          sequenceData.remove(nextMinimumTimestamp): Unit
-
-          nextData.promise.success(addEventToQueue(nextData).map(_ => sequencerId)): Unit
-        }
-
-        sequencerMessageData.promise.future
+          sequencerMessageData.promise.futureUS.map(_.map(_ == sequencerId))
+        } else
+          FutureUnlessShutdown.pure(Right(false))
       }
+    }
+  }
+
+  private def pushDownstreamIfConsensusIsReached(
+      nextMinimumTimestamp: CantonTimestamp,
+      nextData: SequencerMessageData,
+  ): Unit = {
+    val expectedMessages = nextData.eventBySequencer.view.filterKeys { sequencerId =>
+      expectedSequencers.contains(sequencerId)
+    }
+
+    if (expectedMessages.sizeCompare(sequencerTrustThreshold.unwrap) >= 0) {
+      cursor = Some(nextMinimumTimestamp)
+      sequenceData.remove(nextMinimumTimestamp): Unit
+
+      val nonEmptyMessages = NonEmptyUtil.fromUnsafe(expectedMessages.toMap)
+      val messagesToCombine = nonEmptyMessages.map(_._2).toList
+      val (sequencerIdToNotify, _) = nonEmptyMessages.head1
+
+      nextData.promise
+        .outcome(
+          addEventToQueue(messagesToCombine).map(_ => sequencerIdToNotify)
+        )
     }
   }
 
   private def updatedSequencerMessageData(
       sequencerId: SequencerId,
       message: OrdinarySerializedEvent,
+  )(implicit
+      ec: ExecutionContext
   ): SequencerMessageData = {
+    implicit val traceContext = message.traceContext
+    val promise = new PromiseUnlessShutdown[Either[SequencerAggregatorError, SequencerId]](
+      "replica-manager-sync-service",
+      futureSupervisor,
+    )
     val data =
       sequenceData.getOrElse(
         message.timestamp,
-        SequencerMessageData(Map(), Promise[Either[SequencerAggregatorError, SequencerId]]()),
+        SequencerMessageData(Map(), promise),
       )
     data.copy(eventBySequencer = data.eventBySequencer.updated(sequencerId, message))
   }
 
+  def changeMessageAggregationConfig(
+      newConfig: MessageAggregationConfig
+  ): Unit = blocking {
+    this.synchronized {
+      configRef.set(newConfig)
+      sequenceData.headOption.foreach { case (nextMinimumTimestamp, nextData) =>
+        pushDownstreamIfConsensusIsReached(
+          nextMinimumTimestamp,
+          nextData,
+        )
+      }
+    }
+  }
+
+  @SuppressWarnings(Array("NonUnitForEach"))
+  override protected def onClosed(): Unit =
+    blocking {
+      this.synchronized {
+        sequenceData.view.values
+          .foreach(_.promise.shutdown())
+      }
+    }
 }
 object SequencerAggregator {
+  final case class MessageAggregationConfig(
+      expectedSequencers: NonEmpty[Set[SequencerId]],
+      sequencerTrustThreshold: PositiveInt,
+  )
   sealed trait SequencerAggregatorError extends Product with Serializable with PrettyPrinting
   object SequencerAggregatorError {
     final case class NotTheSameContentHash(hashes: NonEmpty[Set[Hash]])

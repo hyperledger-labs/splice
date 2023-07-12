@@ -28,6 +28,7 @@ lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
 lazy val `canton-akka-fork` = BuildCommon.`canton-akka-fork`
 lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
+lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
 lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
 
 inThisBuild(
@@ -290,7 +291,6 @@ lazy val `apps-common` =
     .settings(
       libraryDependencies ++= Seq(
         google_cloud_storage,
-        Dependencies.daml_lf_value_json,
         Dependencies.daml_lf_validation,
         scalatestScalacheck % Test,
         scalapb_runtime_grpc,

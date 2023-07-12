@@ -6,12 +6,14 @@ package com.digitalasset.canton.platform.localstore
 import com.daml.api.util.TimeProvider
 import com.daml.lf.data.Ref
 import com.daml.lf.data.Ref.Party
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.metrics.{DatabaseMetrics, Metrics}
 import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.IdentityProviderId
 import com.digitalasset.canton.ledger.api.validation.ResourceAnnotationValidator
+import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.localstore.PersistentPartyRecordStore.{
   ConcurrentPartyRecordUpdateDetectedRuntimeException,
   MaxAnnotationsSizeExceededException,
@@ -39,7 +41,6 @@ object PersistentPartyRecordStore {
       extends RuntimeException
 
   final case class MaxAnnotationsSizeExceededException(party: Ref.Party) extends RuntimeException
-
 }
 
 class PersistentPartyRecordStore(
@@ -47,19 +48,19 @@ class PersistentPartyRecordStore(
     metrics: Metrics,
     timeProvider: TimeProvider,
     executionContext: ExecutionContext,
-) extends PartyRecordStore {
+    val loggerFactory: NamedLoggerFactory,
+) extends PartyRecordStore
+    with NamedLogging {
 
   private implicit val ec: ExecutionContext = executionContext
+
+  private val directEc = DirectExecutionContext(logger)
 
   private val backend = dbSupport.storageBackendFactory.createPartyRecordStorageBackend
   private val dbDispatcher = dbSupport.dbDispatcher
 
-  private val logger = ContextualizedLogger.get(getClass)
-
-  // TODO(#13019) Replace parasitic with DirectExecutionContext
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   override def createPartyRecord(partyRecord: PartyRecord)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[PartyRecord]] = {
     inTransaction(_.createPartyRecord) { implicit connection: Connection =>
       for {
@@ -72,14 +73,14 @@ class PersistentPartyRecordStore(
       logger.info(
         s"Created new party record in participant local store: ${partyRecord}"
       )
-    })(scala.concurrent.ExecutionContext.parasitic)
+    })(directEc)
   }
 
   override def updatePartyRecord(
       partyRecordUpdate: PartyRecordUpdate,
       ledgerPartyIsLocal: Boolean,
   )(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[PartyRecord]] = {
     val party = partyRecordUpdate.party
     for {
@@ -126,7 +127,7 @@ class PersistentPartyRecordStore(
       ledgerPartyIsLocal: Boolean,
       sourceIdp: IdentityProviderId,
       targetIdp: IdentityProviderId,
-  )(implicit loggingContext: LoggingContext): Future[Result[PartyRecord]] = {
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[PartyRecord]] = {
     for {
       updatedPartyRecord <- inTransaction(_.updatePartyRecordIdp) { implicit connection =>
         backend.getPartyRecord(party = party)(connection) match {
@@ -176,7 +177,7 @@ class PersistentPartyRecordStore(
   override def getPartyRecordO(
       party: Party
   )(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[Option[PartyRecord]]] = {
     inTransaction(_.getPartyRecord) { implicit connection =>
       doFetchDomainPartyRecordO(party)
@@ -318,18 +319,18 @@ class PersistentPartyRecordStore(
     }
   }
 
-  // TODO(#13019) Replace parasitic with DirectExecutionContext
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   private def inTransaction[T](
       dbMetric: metrics.daml.partyRecordStore.type => DatabaseMetrics
-  )(thunk: Connection => Result[T])(implicit loggingContext: LoggingContext): Future[Result[T]] = {
+  )(
+      thunk: Connection => Result[T]
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[T]] = {
     dbDispatcher
       .executeSql(dbMetric(metrics.daml.partyRecordStore))(thunk)
       .recover[Result[T]] {
         case ConcurrentPartyRecordUpdateDetectedRuntimeException(userId) =>
           Left(ConcurrentPartyUpdate(userId))
         case MaxAnnotationsSizeExceededException(userId) => Left(MaxAnnotationsSizeExceeded(userId))
-      }(ExecutionContext.parasitic)
+      }(directEc)
   }
 
   private def tapSuccess[T](f: T => Unit)(r: Result[T]): Result[T] = {
@@ -343,7 +344,7 @@ class PersistentPartyRecordStore(
   }
 
   override def filterExistingParties(parties: Set[Party], identityProviderId: IdentityProviderId)(
-      implicit loggingContext: LoggingContext
+      implicit loggingContext: LoggingContextWithTrace
   ): Future[Set[Party]] = inTransaction(_.partiesExist) { implicit connection =>
     Right(backend.filterExistingParties(parties, identityProviderId.toDb)(connection))
   }.map {
@@ -352,7 +353,7 @@ class PersistentPartyRecordStore(
   }
 
   override def filterExistingParties(parties: Set[Party])(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Set[Party]] = inTransaction(_.partiesExist) { implicit connection =>
     Right(backend.filterExistingParties(parties)(connection))
   }.map {

@@ -4,7 +4,9 @@
 package com.digitalasset.canton.platform.localstore
 
 import com.daml.metrics.Metrics
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.localstore.api.IdentityProviderConfigStore.{
   IdentityProviderConfigByIssuerNotFound,
   IdentityProviderConfigNotFound,
@@ -22,10 +24,14 @@ class CachedIdentityProviderConfigStoreSpec
     extends AsyncFreeSpec
     with IdentityProviderConfigStoreTests
     with MockitoSugar
-    with ArgumentMatchersSugar {
+    with ArgumentMatchersSugar
+    with BaseTest {
+
+  private implicit val loggingContext: LoggingContextWithTrace =
+    LoggingContextWithTrace.ForTesting
 
   override def newStore(): IdentityProviderConfigStore = createTested(
-    new InMemoryIdentityProviderConfigStore()
+    new InMemoryIdentityProviderConfigStore(loggerFactory)
   )
 
   private def createTested(
@@ -36,10 +42,11 @@ class CachedIdentityProviderConfigStoreSpec
       cacheExpiryAfterWrite = 1.second,
       maximumCacheSize = 10,
       Metrics.ForTesting,
+      loggerFactory,
     )
 
   "test identity-provider-config cache result gets invalidated after new config creation" in {
-    val delegate = spy(new InMemoryIdentityProviderConfigStore())
+    val delegate = spy(new InMemoryIdentityProviderConfigStore(loggerFactory))
     val tested = createTested(delegate)
     val cfg = config()
     for {
@@ -53,7 +60,7 @@ class CachedIdentityProviderConfigStoreSpec
   }
 
   "test cache population" in {
-    val delegate = spy(new InMemoryIdentityProviderConfigStore())
+    val delegate = spy(new InMemoryIdentityProviderConfigStore(loggerFactory))
     val tested = createTested(delegate)
     val cfg = config()
     for {
@@ -75,7 +82,7 @@ class CachedIdentityProviderConfigStoreSpec
   }
 
   "test cache invalidation after every write method" in {
-    val delegate = spy(new InMemoryIdentityProviderConfigStore())
+    val delegate = spy(new InMemoryIdentityProviderConfigStore(loggerFactory))
     val tested = createTested(delegate)
     val cfg = config()
     for {
@@ -124,7 +131,7 @@ class CachedIdentityProviderConfigStoreSpec
   }
 
   "listing all users should not be cached" in {
-    val delegate = spy(new InMemoryIdentityProviderConfigStore())
+    val delegate = spy(new InMemoryIdentityProviderConfigStore(loggerFactory))
     val tested = createTested(delegate)
     val cfg1 = config()
     val cfg2 = config()
@@ -143,7 +150,7 @@ class CachedIdentityProviderConfigStoreSpec
   }
 
   "cache entries expire after a set time" in {
-    val delegate = spy(new InMemoryIdentityProviderConfigStore())
+    val delegate = spy(new InMemoryIdentityProviderConfigStore(loggerFactory))
     val tested = createTested(delegate)
     val cfg = config()
     for {

@@ -3,10 +3,10 @@
 
 package com.digitalasset.canton.platform.localstore
 
-import com.daml.logging.LoggingContext
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{IdentityProviderConfig, IdentityProviderId}
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.localstore.api.IdentityProviderConfigStore.*
 import com.digitalasset.canton.platform.localstore.api.{
   IdentityProviderConfigStore,
@@ -16,13 +16,17 @@ import com.digitalasset.canton.platform.localstore.api.{
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{Future, blocking}
 
-class InMemoryIdentityProviderConfigStore(maxIdentityProviderConfigs: Int = 10)
-    extends IdentityProviderConfigStore {
+class InMemoryIdentityProviderConfigStore(
+    override protected val loggerFactory: NamedLoggerFactory,
+    maxIdentityProviderConfigs: Int = 10,
+) extends IdentityProviderConfigStore
+    with NamedLogging {
+
   private val state: TrieMap[IdentityProviderId.Id, IdentityProviderConfig] =
     TrieMap[IdentityProviderId.Id, IdentityProviderConfig]()
 
   override def createIdentityProviderConfig(identityProviderConfig: domain.IdentityProviderConfig)(
-      implicit loggingContext: LoggingContext
+      implicit loggingContext: LoggingContextWithTrace
   ): Future[Result[domain.IdentityProviderConfig]] = withState {
     for {
       _ <- checkIssuerDoNotExists(
@@ -36,13 +40,13 @@ class InMemoryIdentityProviderConfigStore(maxIdentityProviderConfigs: Int = 10)
   }
 
   override def getIdentityProviderConfig(id: IdentityProviderId.Id)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[domain.IdentityProviderConfig]] = withState {
     state.get(id).toRight(IdentityProviderConfigNotFound(id))
   }
 
   override def deleteIdentityProviderConfig(id: IdentityProviderId.Id)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[Unit]] = withState {
     for {
       _ <- checkIdExists(id)
@@ -52,13 +56,13 @@ class InMemoryIdentityProviderConfigStore(maxIdentityProviderConfigs: Int = 10)
   }
 
   override def listIdentityProviderConfigs()(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[Seq[domain.IdentityProviderConfig]]] = withState {
     Right(state.values.toSeq)
   }
 
   override def updateIdentityProviderConfig(update: IdentityProviderConfigUpdate)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[IdentityProviderConfig]] = withState {
     val id = update.identityProviderId
     for {
@@ -78,7 +82,7 @@ class InMemoryIdentityProviderConfigStore(maxIdentityProviderConfigs: Int = 10)
   }
 
   override def getIdentityProviderConfig(issuer: String)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[IdentityProviderConfig]] = withState {
     state
       .collectFirst { case (_, config) if config.issuer == issuer => Right(config) }
@@ -86,7 +90,7 @@ class InMemoryIdentityProviderConfigStore(maxIdentityProviderConfigs: Int = 10)
   }
 
   override def identityProviderConfigExists(id: IdentityProviderId.Id)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Boolean] = withState {
     state.isDefinedAt(id)
   }

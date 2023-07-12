@@ -5,10 +5,11 @@ package com.digitalasset.canton.platform.store.dao
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.logging.LoggingContext
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.{Metrics, Timed}
+import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer
 import com.digitalasset.canton.platform.store.cache.InMemoryFanoutBuffer.BufferSlice
 import com.digitalasset.canton.platform.store.dao.BufferedStreamsReader.FetchFromPersistence
@@ -34,7 +35,12 @@ class BufferedStreamsReader[PERSISTENCE_FETCH_ARGS, API_RESPONSE](
     bufferedStreamEventsProcessingParallelism: Int,
     metrics: Metrics,
     streamName: String,
-)(implicit executionContext: ExecutionContext) {
+    override protected val loggerFactory: NamedLoggerFactory,
+)(implicit executionContext: ExecutionContext)
+    extends NamedLogging {
+
+  private val directEc = DirectExecutionContext(logger)
+
   private val bufferReaderMetrics = metrics.daml.services.index.BufferedReader(streamName)
 
   /** Serves processed and filtered events from the buffer, with fallback to persistence fetches
@@ -55,11 +61,10 @@ class BufferedStreamsReader[PERSISTENCE_FETCH_ARGS, API_RESPONSE](
       persistenceFetchArgs: PERSISTENCE_FETCH_ARGS,
       bufferFilter: TransactionLogUpdate => Option[BUFFER_OUT],
       toApiResponse: BUFFER_OUT => Future[API_RESPONSE],
+      multiDomainEnabled: Boolean,
   )(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Source[(Offset, API_RESPONSE), NotUsed] = {
-    // TODO(#13019) Replace parasitic with DirectExecutionContext
-    @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
     def toApiResponseStream(
         slice: Vector[(Offset, BUFFER_OUT)]
     ): Source[(Offset, API_RESPONSE), NotUsed] =
@@ -70,7 +75,7 @@ class BufferedStreamsReader[PERSISTENCE_FETCH_ARGS, API_RESPONSE](
             bufferReaderMetrics.fetchedBuffered.inc()
             Timed.future(
               bufferReaderMetrics.conversion,
-              toApiResponse(payload).map(offset -> _)(ExecutionContext.parasitic),
+              toApiResponse(payload).map(offset -> _)(directEc),
             )
           }
 
@@ -101,6 +106,7 @@ class BufferedStreamsReader[PERSISTENCE_FETCH_ARGS, API_RESPONSE](
                     startExclusive = scannedToInclusive,
                     endInclusive = bufferedStartExclusive,
                     filter = persistenceFetchArgs,
+                    multiDomainEnabled = multiDomainEnabled,
                   )(loggingContext)
                     .concat(toApiResponseStream(slice))
                 Some(endInclusive -> sourceFromBuffer)
@@ -125,6 +131,7 @@ private[platform] object BufferedStreamsReader {
         startExclusive: Offset,
         endInclusive: Offset,
         filter: FILTER,
-    )(implicit loggingContext: LoggingContext): Source[(Offset, API_RESPONSE), NotUsed]
+        multiDomainEnabled: Boolean,
+    )(implicit loggingContext: LoggingContextWithTrace): Source[(Offset, API_RESPONSE), NotUsed]
   }
 }

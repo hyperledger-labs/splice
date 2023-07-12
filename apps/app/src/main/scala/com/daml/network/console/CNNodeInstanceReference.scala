@@ -33,6 +33,7 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId}
 
 import java.io.File
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -44,6 +45,9 @@ trait CNNodeAppReference extends InstanceReference {
 
   override implicit val consoleEnvironment: ConsoleEnvironment = cnNodeConsoleEnvironment
   implicit val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment
+
+  override def executionContext: ExecutionContext =
+    consoleEnvironment.environment.executionContext
 
   override protected val loggerFactory: NamedLoggerFactory =
     consoleEnvironment.environment.loggerFactory.append("app", name)
@@ -107,6 +111,9 @@ trait CNNodeAppReference extends InstanceReference {
 
   def runningNode: Option[CantonNodeBootstrap[ParticipantNode]] =
     consoleEnvironment.environment.participants.getRunning(name)
+
+  def startingNode: Option[CantonNodeBootstrap[ParticipantNode]] =
+    consoleEnvironment.environment.participants.getStarting(name)
 }
 
 trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {

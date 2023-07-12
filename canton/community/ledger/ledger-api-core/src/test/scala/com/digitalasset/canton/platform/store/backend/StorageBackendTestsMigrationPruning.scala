@@ -26,7 +26,7 @@ private[backend] trait StorageBackendTestsMigrationPruning
     val divulgence = dtoDivulgence(None, 2L, cid, submitter, divulgee)
     val archive = dtoExercise(offset(2), 3L, consuming = true, cid, submitter)
 
-    executeSql(backend.parameter.initializeParameters(someIdentityParams))
+    executeSql(backend.parameter.initializeParameters(someIdentityParams, loggerFactory))
     executeSql(ingest(Vector(create, divulgence, archive), _))
     executeSql(updateLedgerEnd(offset(2), 3L))
 
@@ -63,7 +63,7 @@ private[backend] trait StorageBackendTestsMigrationPruning
     executeSql(
       backend.event.pruneEvents(offset(2), pruneAllDivulgedContracts = true)(
         _,
-        loggingContext,
+        traceContext,
       )
     )
 

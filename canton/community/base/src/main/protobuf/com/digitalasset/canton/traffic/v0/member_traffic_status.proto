@@ -10,9 +10,13 @@ import "google/protobuf/timestamp.proto";
 
 // Full traffic status for a member at a point in time
 message MemberTrafficStatus {
+  // Represents a top up event valid from a certain timestamp
   message TopUpEvent {
+    // Timestamp at which the top up becomes valid (inclusive)
     google.protobuf.Timestamp effective_at = 1;
-    uint64 sequencer_counter = 2;
+    // Topology transaction serial id that is used to discriminate between top ups with the same effective_at, which is possible
+    uint32 serial = 2;
+    // Traffic limit of the top up
     uint64 extra_traffic_limit = 3;
   }
 

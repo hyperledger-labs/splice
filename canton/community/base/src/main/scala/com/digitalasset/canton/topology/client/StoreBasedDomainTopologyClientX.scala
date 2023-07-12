@@ -10,7 +10,6 @@ import com.daml.lf.data.Ref.PackageId
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.DynamicDomainParametersWithValidity
@@ -21,13 +20,7 @@ import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient.{
   AuthorityOfResponse,
   PartyInfo,
 }
-import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
-  StoredTopologyTransactionsX,
-  TimeQueryX,
-  TopologyStoreId,
-  TopologyStoreX,
-}
+import com.digitalasset.canton.topology.store.*
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
@@ -220,7 +213,7 @@ class StoreBasedTopologySnapshotX(
       participantStates: Seq[ParticipantId] => Future[Map[ParticipantId, ParticipantAttributes]],
   ): Future[PartyInfo] =
     loadBatchActiveParticipantsOf(Seq(party), participantStates).map(
-      _.getOrElse(party, PartyInfo(false, PositiveInt.one, Map.empty))
+      _.getOrElse(party, PartyInfo.EmptyPartyInfo)
     )
 
   override private[client] def loadBatchActiveParticipantsOf(
@@ -298,12 +291,9 @@ class StoreBasedTopologySnapshotX(
           participantToAttributesMap
             .get(participantId)
             .map(attrs =>
-              participantId.adminParty -> PartyInfo(
-                // participant admin parties are never consortium parties
-                groupAddressing = false,
-                threshold = PositiveInt.one,
-                Map(participantId -> attrs),
-              )
+              // participant admin parties are never consortium parties
+              participantId.adminParty -> PartyInfo
+                .nonConsortiumPartyInfo(Map(participantId -> attrs))
             )
         )
         .toMap
@@ -312,7 +302,7 @@ class StoreBasedTopologySnapshotX(
       // by loadParticipantStates, filter out participants with "empty" permissions and transitively
       // parties whose participants have all been filtered out this way.
       // this can only affect participants that have left the domain
-      result = {
+      partiesToPartyInfos = {
         val p2pMappings = partyToParticipantMap.toSeq.mapFilter {
           case (partyId, (groupAddressing, threshold, participantToPermissionsMap)) =>
             val participantIdToAttribs = participantToPermissionsMap.toSeq.mapFilter {
@@ -343,7 +333,14 @@ class StoreBasedTopologySnapshotX(
             case x @ (adminPartyId, _) if !p2pMappings.contains(adminPartyId) => x
           }
       }
-    } yield result
+      // For each party we must return a result to satisfy the expectations of the
+      // calling CachingTopologySnapshot's caffeine partyCache per findings in #11598.
+      // This includes parties not found in the topology store or parties filtered out
+      // above, e.g. parties whose participants have left the domain.
+      fullySpecifiedPartyMap = parties.map { party =>
+        party -> partiesToPartyInfos.getOrElse(party, PartyInfo.EmptyPartyInfo)
+      }.toMap
+    } yield fullySpecifiedPartyMap
   }
 
   /** returns the list of currently known mediator groups */
@@ -606,7 +603,6 @@ class StoreBasedTopologySnapshotX(
         s"Participants lookup not supported by StoreBasedDomainTopologyClientX. This is a coding bug."
       )
     )
-
   override def findParticipantCertificate(participantId: ParticipantId)(implicit
       traceContext: TraceContext
   ): Future[Option[LegalIdentityClaimEvidence.X509Cert]] =
@@ -631,6 +627,67 @@ class StoreBasedTopologySnapshotX(
       ).fold(keys)(_.keys.foldLeft(keys) { case (keys, key) => keys.addTo(key) })
     }
 
+  override def allMembers(): Future[Set[Member]] = {
+    findTransactions(
+      asOfInclusive = false,
+      types = Seq(
+        DomainTrustCertificateX.code,
+        MediatorDomainStateX.code,
+        SequencerDomainStateX.code,
+      ),
+      filterUid = None,
+      filterNamespace = None,
+    ).map(
+      _.result.view
+        .map(_.transaction.transaction.mapping)
+        .flatMap {
+          case dtc: DomainTrustCertificateX => Seq(dtc.participantId)
+          case mds: MediatorDomainStateX => mds.active ++ mds.observers
+          case sds: SequencerDomainStateX => sds.active ++ sds.observers
+          case _ => Seq.empty
+        }
+        .toSet
+    )
+  }
+
+  override def isMemberKnown(member: Member): Future[Boolean] = {
+    member match {
+      case ParticipantId(pid) =>
+        findTransactions(
+          asOfInclusive = false,
+          types = Seq(DomainTrustCertificateX.code),
+          filterUid = Some(Seq(pid)),
+          filterNamespace = None,
+        ).map(_.result.nonEmpty)
+      case mediatorId @ MediatorId(_) =>
+        findTransactions(
+          asOfInclusive = false,
+          types = Seq(MediatorDomainStateX.code),
+          filterUid = None,
+          filterNamespace = None,
+        ).map(
+          _.collectOfMapping[MediatorDomainStateX].result
+            .exists(_.transaction.transaction.mapping.allMediatorsInGroup.contains(mediatorId))
+        )
+      case sequencerId @ SequencerId(_) =>
+        findTransactions(
+          asOfInclusive = false,
+          types = Seq(SequencerDomainStateX.code),
+          filterUid = None,
+          filterNamespace = None,
+        ).map(
+          _.collectOfMapping[SequencerDomainStateX].result
+            .exists(_.transaction.transaction.mapping.allSequencers.contains(sequencerId))
+        )
+      case _ =>
+        Future.failed(
+          new IllegalArgumentException(
+            s"Checking whether member is known for an unexpected member type: $member"
+          )
+        )
+    }
+  }
+
   private def collectLatestMapping[T <: TopologyMappingX](
       typ: TopologyMappingX.Code,
       transactions: Seq[StoredTopologyTransactionX[TopologyChangeOpX.Replace, T]],
@@ -640,8 +697,10 @@ class StoreBasedTopologySnapshotX(
       typ: TopologyMappingX.Code,
       transactions: Seq[StoredTopologyTransactionX[TopologyChangeOpX.Replace, T]],
   ): Option[StoredTopologyTransactionX[TopologyChangeOpX.Replace, T]] = {
-    if (transactions.size > 1) {
-      logger.warn(s"Expected unique \"${typ.code}\", but found multiple instances")
+    if (transactions.sizeCompare(1) > 0) {
+      logger.warn(
+        s"Expected unique \"${typ.code}\" at $referenceTime, but found multiple instances"
+      )
       transactions
         .foldLeft(CantonTimestamp.Epoch) { case (previous, tx) =>
           val validFrom = tx.validFrom.value

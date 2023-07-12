@@ -3,10 +3,13 @@
 
 package com.digitalasset.canton.util
 
+import com.daml.nameof.NameOf.functionFullName
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+
 import java.util.concurrent.ScheduledExecutorService
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
@@ -51,6 +54,16 @@ object DelayUtil extends NamedLogging {
       },
     )
 
+  private[util] def delay(
+      executor: ScheduledExecutorService,
+      delay: FiniteDuration,
+      complete: Promise[Unit] => Unit,
+  ): Future[Unit] = {
+    val promise = Promise[Unit]()
+    executor.schedule((() => complete(promise)): Runnable, delay.length, delay.unit)
+    promise.future
+  }
+
   /** Creates a future that succeeds after the given delay provided that `flagCloseable` has not yet been closed then.
     * The future completes fast with UnlessShutdown.AbortedDueToShutdown if `flagCloseable` is already closing.
     */
@@ -62,28 +75,19 @@ object DelayUtil extends NamedLogging {
 
     import com.digitalasset.canton.lifecycle.RunOnShutdown
     flagCloseable.runOnShutdown(new RunOnShutdown() {
-      val name = "delayOrAborted-shutdown"
+      val name = s"$functionFullName-shutdown"
       def done = promise.isCompleted
       def run(): Unit = {
-        val _ = promise.trySuccess(UnlessShutdown.AbortedDueToShutdown)
+        promise.trySuccess(UnlessShutdown.AbortedDueToShutdown).discard
       }
     })
 
     val trySuccess: Runnable = { () =>
-      val _ = promise.trySuccess(UnlessShutdown.Outcome(()))
+      promise.trySuccess(UnlessShutdown.Outcome(())).discard
     }
 
+    // TODO(i4245): Use Clock instead
     scheduledExecutorService.schedule(trySuccess, delay.length, delay.unit)
     FutureUnlessShutdown(future)
-  }
-
-  private[util] def delay(
-      executor: ScheduledExecutorService,
-      delay: FiniteDuration,
-      complete: Promise[Unit] => Unit,
-  ): Future[Unit] = {
-    val promise = Promise[Unit]()
-    executor.schedule((() => complete(promise)): Runnable, delay.length, delay.unit)
-    promise.future
   }
 }

@@ -14,6 +14,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.{
   String256M,
 }
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{PublicKey, SignatureCheckError}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -128,7 +129,7 @@ object PartyMetadataStore {
 
 }
 
-sealed trait TopologyStoreId {
+sealed trait TopologyStoreId extends PrettyPrinting {
   def filterName: String = dbString.unwrap
   def dbString: LengthLimitedString
   def dbStringWithDaml2xUniquifier(uniquifier: String): LengthLimitedString
@@ -153,6 +154,16 @@ object TopologyStoreId {
           .tryConcatenate(dbStringWithoutDiscriminator)
     }
 
+    override def pretty: Pretty[this.type] = {
+      if (discriminator.nonEmpty) {
+        prettyOfString(storeId =>
+          show"${storeId.discriminator}${SafeSimpleString.delimiter}${storeId.domainId}"
+        )
+      } else {
+        prettyOfParam(_.domainId)
+      }
+    }
+
     // The reason for this somewhat awkward method is backward compat with uniquifier inserted in the middle of
     // discriminator and domain id. Can be removed once fully on daml 3.0:
     override def dbStringWithDaml2xUniquifier(uniquifier: String): LengthLimitedString = {
@@ -173,6 +184,10 @@ object TopologyStoreId {
         .tryCreate(uniquifier + "::", uniquifier.length + 2)
         .tryConcatenate(dbString)
     }
+
+    override def pretty: Pretty[AuthorizedStore.this.type] = prettyOfString(
+      _.dbString.unwrap
+    )
   }
 
   def apply(fName: String): TopologyStoreId = fName match {
@@ -225,6 +240,13 @@ object TopologyTransactionRejection {
   final case class WrongDomain(wrong: DomainId) extends TopologyTransactionRejection {
     def asString: String = show"Wrong domain $wrong"
     override def pretty: Pretty[WrongDomain] = prettyOfClass(param("wrong", _.wrong))
+  }
+  final case class SerialMismatch(expected: PositiveInt, actual: PositiveInt)
+      extends TopologyTransactionRejection {
+    def asString: String =
+      show"The given serial $actual does not match the expected serial $expected"
+    override def pretty: Pretty[SerialMismatch] =
+      prettyOfClass(param("expected", _.expected), param("actual", _.actual))
   }
   final case class Other(str: String) extends TopologyTransactionRejection {
     def asString: String = str

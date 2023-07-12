@@ -10,6 +10,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.admin.RepairServiceError
 import com.digitalasset.canton.participant.admin.grpc.util.AcsUtil
 import com.digitalasset.canton.participant.admin.v0.*
 import com.digitalasset.canton.participant.domain.{DomainAliasManager, DomainConnectionConfig}
@@ -23,7 +24,7 @@ import com.google.protobuf.ByteString
 import io.grpc.stub.StreamObserver
 
 import java.io.ByteArrayOutputStream
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -58,21 +59,24 @@ class GrpcParticipantRepairService(
       lazy val acsFile = for {
         parties <- EitherT.fromEither[Future](
           request.parties
-            .map(x => UniqueIdentifier.fromProtoPrimitive_(x).map(PartyId.apply))
+            .map(x =>
+              UniqueIdentifier
+                .fromProtoPrimitive_(x)
+                .bimap(error => RepairServiceError.InvalidArgument.Error(error), PartyId.apply)
+            )
             .sequence
         )
         timestamp <- EitherT.fromEither[Future](
           request.timestamp
             .map(CantonTimestamp.fromProtoPrimitive)
             .sequence
-            .left
-            .map(x => x.message)
+            .leftMap(error => RepairServiceError.InvalidArgument.Error(error.message))
         )
         pv <- EitherT.fromEither[Future](
           OptionUtil
             .emptyStringAsNone(request.protocolVersion)
-            .map(ProtocolVersion.create)
-            .sequence
+            .traverse(ProtocolVersion.create)
+            .leftMap(error => RepairServiceError.InvalidArgument.Error(error))
         )
         acs <-
           sync.stateInspection
@@ -83,13 +87,10 @@ class GrpcParticipantRepairService(
               timestamp,
               pv,
             )
-
       } yield acs
 
       // Create a context that will be automatically cancelled after the processing timeout deadline
-      val context = io.grpc.Context
-        .current()
-        .withCancellation()
+      val context = io.grpc.Context.current().withCancellation()
 
       context.run { () =>
         val response = acsFile.map { file =>
@@ -115,7 +116,7 @@ class GrpcParticipantRepairService(
               ()
             }
           case Left(error) =>
-            responseObserver.onError(new Exception(s"error $error"))
+            responseObserver.onError(error.asGrpcError)
             context.cancel(new io.grpc.StatusRuntimeException(io.grpc.Status.CANCELLED))
             ()
         }
@@ -132,9 +133,12 @@ class GrpcParticipantRepairService(
   ): StreamObserver[UploadRequest] = {
     // TODO(i12481): This buffer will contain the whole ACS snapshot.
     val outputStream = new ByteArrayOutputStream()
+    val gzip = new AtomicBoolean(false)
 
     new StreamObserver[UploadRequest] {
       override def onNext(value: UploadRequest): Unit = {
+        if (value.gzipFormat && !gzip.get())
+          gzip.set(true)
         Try(outputStream.write(value.acsSnapshot.toByteArray)) match {
           case Failure(exception) =>
             outputStream.close()
@@ -150,7 +154,8 @@ class GrpcParticipantRepairService(
 
       // TODO(i12481): implement a solution to prevent the client from sending infinite streams
       override def onCompleted(): Unit = {
-        val res = convertAndAddContractsToStore(ByteString.copyFrom(outputStream.toByteArray))
+        val res =
+          convertAndAddContractsToStore(ByteString.copyFrom(outputStream.toByteArray), gzip.get())
         Try(Await.result(res, processingTimeout.unbounded.duration)) match {
           case Failure(exception) => responseObserver.onError(exception)
           case Success(_) =>
@@ -205,10 +210,13 @@ class GrpcParticipantRepairService(
     }
   }
 
-  private def convertAndAddContractsToStore(content: ByteString): Future[UploadResponse] = {
+  private def convertAndAddContractsToStore(
+      content: ByteString,
+      gzip: Boolean,
+  ): Future[UploadResponse] = {
     TraceContext.withNewTraceContext { implicit traceContext =>
       val resultE = for {
-        lazyContracts <- AcsUtil.loadFromByteString(content)
+        lazyContracts <- AcsUtil.loadFromByteString(content, gzip)
         grouped = lazyContracts
           .grouped(GrpcParticipantRepairService.groupBy)
           .map(_.groupMap(_.domainId)(_.contract))

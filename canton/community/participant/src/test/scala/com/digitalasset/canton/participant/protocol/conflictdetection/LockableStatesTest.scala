@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.protocol.conflictdetection
 
-import cats.data.EitherT
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -12,7 +11,6 @@ import com.digitalasset.canton.participant.protocol.conflictdetection.LockableSt
   PendingActivenessCheckCounter,
   PendingWriteCounter,
 }
-import com.digitalasset.canton.participant.protocol.conflictdetection.LockableStates.ConflictDetectionStoreAccessError
 import com.digitalasset.canton.participant.store.{ConflictDetectionStore, HasPrunable}
 import com.digitalasset.canton.participant.util.{StateChange, TimeOfChange}
 import com.digitalasset.canton.store.memory.InMemoryPrunableByTime
@@ -22,10 +20,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.{ExecutionContext, Future}
 
-private[conflictdetection] class LockableStatesTest
-    extends AsyncWordSpec
-    with BaseTest
-    with HasExecutorService {
+class LockableStatesTest extends AsyncWordSpec with BaseTest with HasExecutorService {
   import ConflictDetectionHelpers.*
   import LockableStatesTest.*
 
@@ -59,20 +54,13 @@ private[conflictdetection] class LockableStatesTest
 
   def mkSut(
       states: Map[StateId, StateChange[Status]] = Map.empty
-  ): LockableStates[StateId, Status, StoreError] =
+  ): LockableStates[StateId, Status] =
     LockableStates.empty(
       new TestConflictDetectionStore(states, loggerFactory)(executorService),
       loggerFactory,
       timeouts,
       executionContext = executorService,
     )
-
-  def mkSutWithErrStore(): LockableStates[StateId, Status, StoreError] = LockableStates.empty(
-    new ErringConflictDetectionStore(loggerFactory)(executorService),
-    loggerFactory,
-    timeouts,
-    executionContext = executorService,
-  )
 
   def mkState(
       state: Option[StateChange[Status]] = None,
@@ -87,8 +75,8 @@ private[conflictdetection] class LockableStatesTest
       PendingWriteCounter.assertFromInt(writes),
     )
 
-  def pendingAndCheck(
-      sut: LockableStates[StateId, Status, StoreError],
+  private def pendingAndCheck(
+      sut: LockableStates[StateId, Status],
       rc: RequestCounter,
       check: ActivenessCheck[StateId],
   ): Future[(ActivenessCheckResult[StateId, Status], Seq[StateId])] = {
@@ -292,19 +280,6 @@ private[conflictdetection] class LockableStatesTest
           sut.getInternalState(id) should contain(mkState(state = preload.get(id)))
         }
         sut.getInternalState(fresh3Id) should contain(mkState(activenessChecks = 1))
-      }
-    }
-
-    "propagate store errors" in {
-      val sut = mkSutWithErrStore()
-      for {
-        failure <- pendingAndCheck(
-          sut,
-          RequestCounter(0),
-          mkActivenessCheck(fresh = Set(freshId)),
-        ).failed
-      } yield {
-        failure shouldBe a[ConflictDetectionStoreAccessError]
       }
     }
 
@@ -522,17 +497,15 @@ object LockableStatesTest {
     val evictableActive: Status = Status(2)
   }
 
-  final case class StoreError(error: String)
-
   type StateId = String
 
   class TestConflictDetectionStore(
       states: Map[StateId, StateChange[Status]],
       override val loggerFactory: NamedLoggerFactory,
   )(implicit override val ec: ExecutionContext)
-      extends ConflictDetectionStore[StateId, Status, StoreError]
+      extends ConflictDetectionStore[StateId, Status]
       with NamedLogging
-      with InMemoryPrunableByTime[StoreError] {
+      with InMemoryPrunableByTime {
 
     override def fetchStates(
         ids: Iterable[StateId]
@@ -547,24 +520,6 @@ object LockableStatesTest {
 
     override protected[canton] def doPrune(limit: CantonTimestamp)(implicit
         traceContext: TraceContext
-    ): EitherT[Future, StoreError, Unit] = EitherT.pure[Future, StoreError](())
+    ): Future[Unit] = Future.successful(())
   }
-
-  class ErringConflictDetectionStore(override val loggerFactory: NamedLoggerFactory)(implicit
-      override val ec: ExecutionContext
-  ) extends ConflictDetectionStore[StateId, Status, StoreError]
-      with NamedLogging
-      with InMemoryPrunableByTime[StoreError] {
-
-    override def fetchStates(id: Iterable[StateId])(implicit
-        traceContext: TraceContext
-    ): Future[Map[StateId, StateChange[Status]]] =
-      Future.failed(new RuntimeException("Conflict detection store failure"))
-
-    override protected[canton] def doPrune(limit: CantonTimestamp)(implicit
-        traceContext: TraceContext
-    ): EitherT[Future, StoreError, Unit] =
-      EitherT.leftT[Future, Unit](StoreError("Conflict detection store error"))
-  }
-
 }

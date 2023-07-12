@@ -23,9 +23,8 @@ import com.daml.lf.engine.Engine
 import com.daml.lf.language.Ast.Expr
 import com.daml.lf.language.{Ast, LanguageVersion}
 import com.daml.lf.testing.parser.Implicits.defaultParserParameters
-import com.daml.logging.LoggingContext
 import com.daml.tracing.TelemetrySpecBase.*
-import com.daml.tracing.{DefaultOpenTelemetry, NoOpTelemetry, TelemetryContext}
+import com.daml.tracing.{DefaultOpenTelemetry, NoOpTelemetry}
 import com.digitalasset.canton.ledger.api.domain.LedgerOffset.Absolute
 import com.digitalasset.canton.ledger.api.domain.PackageEntry
 import com.digitalasset.canton.ledger.participant.state.index.v2.{
@@ -34,12 +33,13 @@ import com.digitalasset.canton.ledger.participant.state.index.v2.{
 }
 import com.digitalasset.canton.ledger.participant.state.v2.SubmissionResult
 import com.digitalasset.canton.ledger.participant.state.v2 as state
-import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.tracing.TestTelemetrySetup
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, SuppressionRule}
+import com.digitalasset.canton.tracing.{TestTelemetrySetup, TraceContext}
 import com.digitalasset.canton.{BaseTest, DiscardOps}
 import com.google.protobuf.ByteString
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
+import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import org.mockito.{ArgumentMatchersSugar, MockitoSugar}
 import org.scalatest.BeforeAndAfterEach
@@ -67,8 +67,6 @@ class ApiPackageManagementServiceSpec
 
   import ApiPackageManagementServiceSpec.*
 
-  private implicit val loggingContext: LoggingContext = LoggingContext.ForTesting
-
   var testTelemetrySetup: TestTelemetrySetup = _
 
   override def beforeEach(): Unit = {
@@ -79,11 +77,9 @@ class ApiPackageManagementServiceSpec
     testTelemetrySetup.close()
   }
 
-  val apiService = createApiService()
-
   "ApiPackageManagementService $suffix" should {
     "propagate trace context" in {
-
+      val apiService = createApiService()
       val span = testTelemetrySetup.anEmptySpan()
       val scope = span.makeCurrent()
       apiService
@@ -99,6 +95,7 @@ class ApiPackageManagementServiceSpec
     }
 
     "have a tid" in {
+      val apiService = createApiService()
       val span = testTelemetrySetup.anEmptySpan()
       val _ = span.makeCurrent()
 
@@ -121,8 +118,7 @@ class ApiPackageManagementServiceSpec
       val writeService = mock[state.WritePackagesService]
       when(
         writeService.uploadPackages(any[Ref.SubmissionId], any[List[Archive]], any[Option[String]])(
-          any[LoggingContext],
-          any[TelemetryContext],
+          any[TraceContext]
         )
       ).thenReturn(CompletableFuture.completedFuture(SubmissionResult.Acknowledged))
 
@@ -130,7 +126,9 @@ class ApiPackageManagementServiceSpec
         mockedServices()
       val promise = Promise[Unit]()
 
-      when(mockIndexPackagesService.packageEntries(any[Option[Absolute]])(any[LoggingContext]))
+      when(
+        mockIndexPackagesService.packageEntries(any[Option[Absolute]])(any[LoggingContextWithTrace])
+      )
         .thenReturn(
           {
             promise.success(())
@@ -171,6 +169,7 @@ class ApiPackageManagementServiceSpec
                     "submissionId" -> s"'$aSubmissionId'",
                     "category" -> "1",
                     "definite_answer" -> "false",
+                    "test" -> s"'${getClass.getSimpleName}'",
                   ),
                 ),
                 RetryInfoDetail(1.second),
@@ -197,11 +196,13 @@ class ApiPackageManagementServiceSpec
     ).thenReturn(Right(()))
 
     val mockIndexTransactionsService = mock[IndexTransactionsService]
-    when(mockIndexTransactionsService.currentLedgerEnd()(any[LoggingContext]))
+    when(mockIndexTransactionsService.currentLedgerEnd())
       .thenReturn(Future.successful(Absolute(Ref.LedgerString.assertFromString("0"))))
 
     val mockIndexPackagesService = mock[IndexPackagesService]
-    when(mockIndexPackagesService.packageEntries(any[Option[Absolute]])(any[LoggingContext]))
+    when(
+      mockIndexPackagesService.packageEntries(any[Option[Absolute]])(any[LoggingContextWithTrace])
+    )
       .thenReturn(
         Source.single(
           PackageEntry.PackageUploadAccepted(aSubmissionId, Timestamp.Epoch)
@@ -217,7 +218,7 @@ class ApiPackageManagementServiceSpec
     ApiPackageManagementService.createApiService(
       mockIndexPackagesService,
       mockIndexTransactionsService,
-      TestWritePackagesService,
+      TestWritePackagesService(testTelemetrySetup.tracer),
       Duration.Zero,
       mockEngine,
       mockDarReader,
@@ -250,15 +251,16 @@ object ApiPackageManagementServiceSpec {
     )
   }
 
-  private object TestWritePackagesService extends state.WritePackagesService {
+  private final case class TestWritePackagesService(tracer: Tracer)
+      extends state.WritePackagesService {
     override def uploadPackages(
         submissionId: Ref.SubmissionId,
         archives: List[DamlLf.Archive],
         sourceDescription: Option[String],
     )(implicit
-        loggingContext: LoggingContext,
-        telemetryContext: TelemetryContext,
+        traceContext: TraceContext
     ): CompletionStage[state.SubmissionResult] = {
+      val telemetryContext = traceContext.toDamlTelemetryContext(tracer)
       telemetryContext.setAttribute(
         anApplicationIdSpanAttribute._1,
         anApplicationIdSpanAttribute._2,

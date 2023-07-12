@@ -4,30 +4,37 @@
 package com.digitalasset.canton.platform
 
 import com.daml.ledger.resources.ResourceOwner
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.timer.Timeout.*
-import com.digitalasset.canton.ledger.error.{CommonErrors, DamlContextualizedErrorLogger}
+import com.digitalasset.canton.concurrent.DirectExecutionContext
+import com.digitalasset.canton.ledger.error.CommonErrors
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.DispatcherState.{
   DispatcherNotRunning,
   DispatcherRunning,
   DispatcherStateShutdown,
 }
 import com.digitalasset.canton.platform.akkastreams.dispatcher.Dispatcher
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.StatusRuntimeException
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{Future, blocking}
 import scala.util.{Failure, Success}
 
 /** Life-cycle manager for the Ledger API streams offset dispatcher. */
-class DispatcherState(dispatcherShutdownTimeout: Duration)(implicit
-    loggingContext: LoggingContext
-) {
+class DispatcherState(
+    dispatcherShutdownTimeout: Duration,
+    override protected val loggerFactory: NamedLoggerFactory,
+)(implicit
+    traceContext: TraceContext
+) extends NamedLogging {
+
   private val ServiceName = "Ledger API offset dispatcher"
-  private val logger = ContextualizedLogger.get(getClass)
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var dispatcherStateRef: DispatcherState.State = DispatcherNotRunning
+
+  private val directEc = DirectExecutionContext(logger)
 
   def isRunning: Boolean = blocking(synchronized {
     dispatcherStateRef match {
@@ -60,8 +67,6 @@ class DispatcherState(dispatcherShutdownTimeout: Duration)(implicit
     }
   })
 
-  // TODO(#13019) Replace parasitic with DirectExecutionContext
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   def stopDispatcher(): Future[Unit] = blocking(synchronized {
     logger.info(s"Stopping active $ServiceName.")
     dispatcherStateRef match {
@@ -79,12 +84,10 @@ class DispatcherState(dispatcherShutdownTimeout: Duration)(implicit
             case f @ Failure(failure) =>
               logger.warn(s"Failed stopping active $ServiceName", failure)
               f
-          }(ExecutionContext.parasitic)
+          }(directEc)
     }
   })
 
-  // TODO(#13019) Replace parasitic with DirectExecutionContext
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   private[platform] def shutdown(): Future[Unit] = blocking(synchronized {
     logger.info(s"Shutting down $ServiceName state.")
 
@@ -113,7 +116,7 @@ class DispatcherState(dispatcherShutdownTimeout: Duration)(implicit
             case f @ Failure(failure) =>
               logger.warn(s"Error during $ServiceName shutdown", failure)
               f
-          }(ExecutionContext.parasitic)
+          }(directEc)
     }
   })
 
@@ -125,11 +128,10 @@ class DispatcherState(dispatcherShutdownTimeout: Duration)(implicit
     )
 
   private def dispatcherNotRunning: StatusRuntimeException = {
-    val contextualizedErrorLogger = new DamlContextualizedErrorLogger(
+    val contextualizedErrorLogger = ErrorLoggingContext(
       logger = logger,
-      // TODO(i12281): Use request contextual LoggingContext once a correlation id can be provided
-      loggingContext = loggingContext,
-      None,
+      loggerFactory.properties,
+      traceContext,
     )
     CommonErrors.ServiceNotRunning.Reject(ServiceName)(contextualizedErrorLogger).asGrpcError
   }
@@ -142,9 +144,9 @@ object DispatcherState {
   private final case object DispatcherStateShutdown extends State
   private final case class DispatcherRunning(dispatcher: Dispatcher[Offset]) extends State
 
-  def owner(apiStreamShutdownTimeout: Duration)(implicit
-      loggingContext: LoggingContext
+  def owner(apiStreamShutdownTimeout: Duration, loggerFactory: NamedLoggerFactory)(implicit
+      traceContext: TraceContext
   ): ResourceOwner[DispatcherState] = ResourceOwner.forReleasable(() =>
-    new DispatcherState(apiStreamShutdownTimeout)(loggingContext)
+    new DispatcherState(apiStreamShutdownTimeout, loggerFactory)
   )(_.shutdown())
 }

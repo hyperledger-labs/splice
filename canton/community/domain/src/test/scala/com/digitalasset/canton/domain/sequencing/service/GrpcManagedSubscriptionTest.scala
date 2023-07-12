@@ -20,6 +20,7 @@ import com.digitalasset.canton.topology.{
   ParticipantId,
   UniqueIdentifier,
 }
+import com.digitalasset.canton.tracing.SerializableTraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, SequencerCounter}
 import io.grpc.stub.ServerCallStreamObserver
 import org.scalatest.wordspec.AnyWordSpec
@@ -73,9 +74,15 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
         testedProtocolVersion,
       )
       handler.fold(fail("handler not registered"))(h =>
-        Await.result(h(OrdinarySequencedEvent(event)(traceContext)), 5.seconds)
+        Await.result(h(OrdinarySequencedEvent(event, None)(traceContext)), 5.seconds)
       )
     }
+
+    private def toSubscriptionResponseV0(event: OrdinarySerializedEvent) =
+      v0.SubscriptionResponse(
+        signedSequencedEvent = Some(event.signedEvent.toProtoV0),
+        Some(SerializableTraceContext(event.traceContext).toProtoV0),
+      )
 
     def createManagedSubscription() =
       new GrpcManagedSubscription(
@@ -85,6 +92,7 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
         None,
         timeouts,
         loggerFactory,
+        toSubscriptionResponseV0,
       )
   }
 

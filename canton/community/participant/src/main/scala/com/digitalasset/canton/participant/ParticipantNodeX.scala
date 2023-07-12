@@ -53,13 +53,13 @@ import com.digitalasset.canton.topology.client.IdentityProvidingServiceClient
 import com.digitalasset.canton.topology.store.{PartyMetadataStore, TopologyStoreId, TopologyStoreX}
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.SingleUseCell
+import com.digitalasset.canton.util.{EitherTUtil, SingleUseCell}
 import com.digitalasset.canton.version.ProtocolVersion
-import io.grpc.ServerServiceDefinition
+import io.grpc.{BindableService, ServerServiceDefinition}
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 class ParticipantNodeBootstrapX(
     arguments: CantonNodeBootstrapCommonArguments[
@@ -102,6 +102,7 @@ class ParticipantNodeBootstrapX(
         case s: TopologyStoreX[TopologyStoreId] => s
       }
     )
+
   override protected def customNodeStages(
       storage: Storage,
       crypto: Crypto,
@@ -111,6 +112,7 @@ class ParticipantNodeBootstrapX(
       healthService: HealthReporting.HealthService,
   ): BootstrapStageOrLeaf[ParticipantNodeX] =
     new StartupNode(storage, crypto, nodeId, manager, healthReporter, healthService)
+
   private class StartupNode(
       storage: Storage,
       crypto: Crypto,
@@ -149,6 +151,7 @@ class ParticipantNodeBootstrapX(
             manager,
             crypto,
             clock,
+            config,
             parameterConfig.processingTimeouts,
             loggerFactory,
           )
@@ -165,16 +168,20 @@ class ParticipantNodeBootstrapX(
         override def packageVetted(packageId: PackageId)(implicit
             tc: TraceContext
         ): EitherT[Future, PackageRemovalErrorCode.PackageVetted, Unit] = ???
+
         override def packageUnused(packageId: PackageId)(implicit
             tc: TraceContext
         ): EitherT[Future, PackageRemovalErrorCode.PackageInUse, Unit] = ???
+
         override def runTx(tx: TopologyTransaction[TopologyChangeOp], force: Boolean)(implicit
             tc: TraceContext
         ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = ???
+
         override def genRevokePackagesTx(packages: List[LfPackageId])(implicit
             tc: TraceContext
         ): EitherT[Future, ParticipantTopologyManagerError, TopologyTransaction[TopologyChangeOp]] =
           ???
+
         override protected def loggerFactory: NamedLoggerFactory = ???
       }
     }
@@ -207,24 +214,26 @@ class ParticipantNodeBootstrapX(
             .map(_.transaction.transaction.mapping.packageIds)
             .getOrElse(Seq.empty)
           nextSerial = currentMapping.map(_.transaction.transaction.serial + PositiveInt.one)
-          _ <- performUnlessClosingEitherUSF(functionFullName)(
-            topologyManager
-              .proposeAndAuthorize(
-                TopologyChangeOpX.Replace,
-                VettedPackagesX(
-                  participantId = participantId,
-                  domainId = None,
-                  (currentPackages ++ packages).distinct,
-                ),
-                serial = nextSerial,
-                // TODO(#11255) auto-determine signing keys
-                signingKeys = Seq(participantId.uid.namespace.fingerprint),
-                parameters.initialProtocolVersion,
-                expectFullAuthorization = true,
-              )
-              .leftMap(IdentityManagerParentError(_): ParticipantTopologyManagerError)
-              .map(_ => ())
-          )
+          _ <- EitherTUtil.ifThenET(packages.diff(currentPackages).nonEmpty) {
+            performUnlessClosingEitherUSF(functionFullName)(
+              topologyManager
+                .proposeAndAuthorize(
+                  TopologyChangeOpX.Replace,
+                  VettedPackagesX(
+                    participantId = participantId,
+                    domainId = None,
+                    (currentPackages ++ packages).distinct,
+                  ),
+                  serial = nextSerial,
+                  // TODO(#11255) auto-determine signing keys
+                  signingKeys = Seq(participantId.uid.namespace.fingerprint),
+                  parameters.initialProtocolVersion,
+                  expectFullAuthorization = true,
+                )
+                .leftMap(IdentityManagerParentError(_): ParticipantTopologyManagerError)
+                .map(_ => ())
+            )
+          }
         } yield ()
       }
 
@@ -316,6 +325,7 @@ class ParticipantNodeBootstrapX(
         participantOps,
         componentFactory,
         skipRecipientsCheck,
+        overrideKeyUniqueness = Some(false),
       ).map {
         case (
               partyNotifier,
@@ -361,6 +371,7 @@ class ParticipantNodeBootstrapX(
   }
 
   override protected def member(uid: UniqueIdentifier): Member = ParticipantId(uid)
+
   override protected def mkNodeHealthService(storage: Storage): HealthReporting.HealthService =
     HealthReporting.HealthService(
       "participant",
@@ -384,6 +395,10 @@ object ParticipantNodeBootstrapX {
   object CommunityParticipantFactory
       extends CommunityParticipantFactoryCommon[ParticipantNodeBootstrapX] {
 
+    override protected def createEngine(arguments: Arguments): Engine = super.createEngine(
+      arguments.copy(parameterConfig = arguments.parameterConfig.copy(uniqueContractKeys = false))
+    )
+
     override protected def createNode(
         arguments: Arguments,
         engine: Engine,
@@ -393,7 +408,7 @@ object ParticipantNodeBootstrapX {
         scheduler: ScheduledExecutorService,
         actorSystem: ActorSystem,
         executionSequencerFactory: ExecutionSequencerFactory,
-    ): ParticipantNodeBootstrapX =
+    ): ParticipantNodeBootstrapX = {
       new ParticipantNodeBootstrapX(
         arguments,
         createEngine(arguments),
@@ -405,6 +420,15 @@ object ParticipantNodeBootstrapX {
         ledgerApiServerFactory = ledgerApiServerFactory,
         skipRecipientsCheck = true,
       )
+    }
+
+    override protected def additionalGrpcServices(arguments: Arguments)(implicit
+        executionContext: ExecutionContext,
+        actorSystem: ActorSystem,
+    ): (CantonSyncService, Eval[ParticipantNodePersistentState]) => List[BindableService] =
+      (_, _) => Nil
+
+    override protected def multiDomainEnabledForLedgerApiServer: Boolean = true
   }
 }
 
@@ -418,14 +442,14 @@ class ParticipantNodeX(
     val cryptoPureApi: CryptoPureApi,
     identityPusher: ParticipantTopologyDispatcherCommon,
     private[canton] val ips: IdentityProvidingServiceClient,
-    private[canton] val sync: CantonSyncService,
+    override private[canton] val sync: CantonSyncService,
     val adminToken: CantonAdminToken,
     val recordSequencerInteractions: AtomicReference[Option[RecordingConfig]],
     val replaySequencerConfig: AtomicReference[Option[ReplayConfig]],
     val schedulers: SchedulersWithPruning,
     val loggerFactory: NamedLoggerFactory,
     healthData: => Seq[ComponentStatus],
-) extends ParticipantNodeCommon {
+) extends ParticipantNodeCommon(sync) {
 
   override def close(): Unit = () // closing is done in the bootstrap class
 

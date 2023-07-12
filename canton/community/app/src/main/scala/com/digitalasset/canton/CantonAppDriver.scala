@@ -8,7 +8,6 @@ import cats.syntax.either.*
 import ch.qos.logback.classic.{Logger, LoggerContext}
 import ch.qos.logback.core.status.{ErrorStatus, Status, StatusListener, WarnStatus}
 import com.daml.nonempty.NonEmpty
-
 import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.cli.{Cli, Command, LogFileAppender}
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError

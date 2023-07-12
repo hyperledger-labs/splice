@@ -120,8 +120,6 @@ class ParticipantAdminConnection(
   )(implicit traceContext: TraceContext): Future[MemberTrafficStatus] = {
     runCmd(
       ParticipantAdminCommands.TrafficControl.GetTrafficControlState(domainId)
-    ).map(
-      _.getOrElse(throw Status.NOT_FOUND.withDescription("No traffic state").asRuntimeException())
     )
   }
 
@@ -142,15 +140,17 @@ class ParticipantAdminConnection(
         None,
         chunkSize,
         observer,
-        gzipFormat = false,
+        gzipFormat = true,
       )
     ).discard
     requestComplete.future
   }
 
-  def uploadAcsSnapshot(acsBytes: ByteString)(implicit traceContext: TraceContext): Future[Unit] = {
+  def uploadAcsSnapshot(acsBytes: ByteString)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
     runCmd(
-      ParticipantAdminCommands.ParticipantRepairManagement.Upload(acsBytes)
+      ParticipantAdminCommands.ParticipantRepairManagement.Upload(acsBytes, gzip = true)
     )
   }
 

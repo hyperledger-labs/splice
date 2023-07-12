@@ -65,6 +65,17 @@ class TopUpQueue(
     }
   }
 
+  /** Prune until currentTimestamp and return the current and all following top ups
+    */
+  def pruneUntilAndGetAllTopUpsFor(cantonTimestamp: CantonTimestamp): List[TopUpEvent] = blocking {
+    timestampedTopUps.synchronized {
+      pruneUntilAndGetTopUpFor(cantonTimestamp)._1.toList ++ timestampedTopUps
+        .clone()
+        .dequeueAll
+        .toList
+    }
+  }
+
   /** Return a list of all the top ups without modifying the internal state.
     */
   def getAllTopUps: List[TopUpEvent] = {

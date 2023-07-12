@@ -4,12 +4,13 @@
 package com.digitalasset.canton.platform.localstore
 
 import com.daml.lf.data.Ref
-import com.daml.logging.LoggingContext
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.api.domain.{
   IdentityProviderConfig,
   IdentityProviderId,
   JwksUrl,
 }
+import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.platform.localstore.api.IdentityProviderConfigStore.{
   IdentityProviderConfigByIssuerNotFound,
   IdentityProviderConfigExists,
@@ -23,9 +24,10 @@ import org.scalatest.freespec.AsyncFreeSpec
 import java.util.UUID
 import scala.concurrent.Future
 
-trait IdentityProviderConfigStoreTests extends IdentityProviderConfigStoreSpecBase {
+trait IdentityProviderConfigStoreTests extends IdentityProviderConfigStoreSpecBase with BaseTest {
   self: AsyncFreeSpec =>
-  implicit val lc: LoggingContext = LoggingContext.ForTesting
+  implicit val lc: LoggingContextWithTrace =
+    LoggingContextWithTrace.ForTesting
 
   val MaxIdentityProviderConfigs = 10
 

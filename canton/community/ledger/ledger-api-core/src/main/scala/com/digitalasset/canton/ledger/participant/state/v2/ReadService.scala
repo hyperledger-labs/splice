@@ -5,11 +5,15 @@ package com.digitalasset.canton.ledger.participant.state.v2
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.logging.LoggingContext
 import com.digitalasset.canton.ledger.api.health.ReportsHealth
 import com.digitalasset.canton.ledger.configuration.LedgerInitialConditions
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.{DomainAlias, LfPartyId}
+
+import scala.concurrent.Future
 
 /** An interface for reading the state of a ledger participant.
   * '''Please note that this interface is unstable and may significantly change.'''
@@ -142,5 +146,39 @@ trait ReadService extends ReportsHealth {
     */
   def stateUpdates(
       beginAfter: Option[Offset]
-  )(implicit loggingContext: LoggingContext): Source[(Offset, Traced[Update]), NotUsed]
+  )(implicit traceContext: TraceContext): Source[(Offset, Traced[Update]), NotUsed]
+
+  def getConnectedDomains(request: ReadService.ConnectedDomainRequest)(implicit
+      traceContext: TraceContext
+  ): Future[ReadService.ConnectedDomainResponse] =
+    throw new UnsupportedOperationException()
+
+  /** Get the offsets of the incomplete assigned/unassigned events for a set of stakeholders.
+    *
+    * @param validAt The offset of validity in participant offset terms.
+    * @param stakeholders Only offsets are returned which have at least one stakeholder from this set.
+    * @return All the offset of assigned/unassigned events which do not have their conterparts visible at
+    *         the validAt offset, and only for the reassignments for which this participant is reassigning.
+    */
+  def incompleteReassignmentOffsets(
+      validAt: Offset,
+      stakeholders: Set[LfPartyId],
+  )(implicit traceContext: TraceContext): Future[Vector[Offset]] =
+    throw new UnsupportedOperationException()
+}
+
+object ReadService {
+  final case class ConnectedDomainRequest(party: LfPartyId)
+
+  final case class ConnectedDomainResponse(
+      connectedDomains: Seq[ConnectedDomainResponse.ConnectedDomain]
+  )
+
+  object ConnectedDomainResponse {
+    final case class ConnectedDomain(
+        domainAlias: DomainAlias,
+        domainId: DomainId,
+        permission: ParticipantPermission,
+    )
+  }
 }

@@ -9,45 +9,41 @@ import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.bifunctor.toBifunctorOps
 import com.daml.daml_lf_dev.DamlLf.Archive
 import com.daml.error.ContextualizedErrorLogger
+import com.daml.lf.data.Ref.*
 import com.daml.lf.data.{ImmArray, Ref, Time}
 import com.daml.lf.transaction.{GlobalKey, SubmittedTransaction}
 import com.daml.lf.value.Value
-import com.daml.logging.{ContextualizedLogger, LoggingContext}
 import com.daml.metrics.InstrumentedGraph
-import com.daml.tracing.TelemetryContext
 import com.digitalasset.canton.data.ProcessedDisclosedContract
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, Healthy}
 import com.digitalasset.canton.ledger.configuration.Configuration
-import com.digitalasset.canton.ledger.error.{
-  CommonErrors,
-  DamlContextualizedErrorLogger,
-  LedgerApiErrors,
-}
+import com.digitalasset.canton.ledger.error.{CommonErrors, LedgerApiErrors}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.v2.*
 import com.digitalasset.canton.ledger.sandbox.bridge.{BridgeMetrics, LedgerBridge}
 import com.digitalasset.canton.ledger.sandbox.domain.{Rejection, Submission}
+import com.digitalasset.canton.logging.*
 import com.digitalasset.canton.tracing.TraceContext.wrapWithNewTraceContext
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 
 import java.time.Duration
 import java.util.concurrent.{CompletableFuture, CompletionStage}
+import javax.naming.OperationNotSupportedException
 
 class BridgeWriteService(
     feedSink: Sink[(Offset, Traced[Update]), NotUsed],
     submissionBufferSize: Int,
     ledgerBridge: LedgerBridge,
     bridgeMetrics: BridgeMetrics,
-)(implicit mat: Materializer, loggingContext: LoggingContext)
+    val loggerFactory: NamedLoggerFactory,
+)(implicit mat: Materializer)
     extends WriteService
-    with AutoCloseable {
-  import BridgeWriteService.*
-
-  private[this] val logger = ContextualizedLogger.get(getClass)
+    with AutoCloseable
+    with NamedLogging {
 
   override def close(): Unit = {
-    logger.info("Shutting down BridgeWriteService.")
+    logger.info("Shutting down BridgeWriteService.")(TraceContext.empty)
     queue.complete()
   }
 
@@ -59,11 +55,14 @@ class BridgeWriteService(
       globalKeyMapping: Map[GlobalKey, Option[Value.ContractId]],
       processedDisclosedContracts: ImmArray[ProcessedDisclosedContract],
   )(implicit
-      loggingContext: LoggingContext,
-      telemetryContext: TelemetryContext,
+      traceContext: TraceContext
   ): CompletionStage[SubmissionResult] = {
-    implicit val errorLogger: ContextualizedErrorLogger =
-      new DamlContextualizedErrorLogger(logger, loggingContext, submitterInfo.submissionId)
+    implicit val errorLoggingContext: ContextualizedErrorLogger =
+      ErrorLoggingContext.fromOption(
+        logger,
+        LoggingContextWithTrace(loggerFactory),
+        submitterInfo.submissionId,
+      )
     submitterInfo.deduplicationPeriod match {
       case DeduplicationPeriod.DeduplicationDuration(deduplicationDuration) =>
         validateDeduplicationDurationAndSubmit(
@@ -90,15 +89,14 @@ class BridgeWriteService(
       submissionId: Ref.SubmissionId,
       config: Configuration,
   )(implicit
-      loggingContext: LoggingContext,
-      telemetryContext: TelemetryContext,
+      traceContext: TraceContext
   ): CompletionStage[SubmissionResult] =
     submit(
       Submission.Config(
         maxRecordTime = maxRecordTime,
         submissionId = submissionId,
         config = config,
-      )
+      )(LoggingContextWithTrace(loggerFactory))
     )
 
   override def currentHealth(): HealthStatus = Healthy
@@ -108,15 +106,14 @@ class BridgeWriteService(
       displayName: Option[String],
       submissionId: Ref.SubmissionId,
   )(implicit
-      loggingContext: LoggingContext,
-      telemetryContext: TelemetryContext,
+      traceContext: TraceContext
   ): CompletionStage[SubmissionResult] =
     submit(
       Submission.AllocateParty(
         hint = hint,
         displayName = displayName,
         submissionId = submissionId,
-      )
+      )(LoggingContextWithTrace(loggerFactory))
     )
 
   override def uploadPackages(
@@ -124,15 +121,14 @@ class BridgeWriteService(
       archives: List[Archive],
       sourceDescription: Option[String],
   )(implicit
-      loggingContext: LoggingContext,
-      telemetryContext: TelemetryContext,
+      traceContext: TraceContext
   ): CompletionStage[SubmissionResult] =
     submit(
       Submission.UploadPackages(
         submissionId = submissionId,
         archives = archives,
         sourceDescription = sourceDescription,
-      )
+      )(LoggingContextWithTrace(loggerFactory))
     )
 
   override def prune(
@@ -160,11 +156,13 @@ class BridgeWriteService(
     queueSource.runWith(feedSink)
     logger.info(
       s"Write service initialized. Configuration: [submissionBufferSize: $submissionBufferSize]"
-    )
+    )(TraceContext.empty)
     queue
   }
 
-  private def submit(submission: Submission): CompletionStage[SubmissionResult] =
+  private def submit(submission: Submission)(implicit
+      traceContext: TraceContext
+  ): CompletionStage[SubmissionResult] =
     toSubmissionResult(submission.submissionId, queue.offer(submission))
 
   private def validateDeduplicationDurationAndSubmit(
@@ -174,7 +172,10 @@ class BridgeWriteService(
       estimatedInterpretationCost: Long,
       deduplicationDuration: Duration,
       processedDisclosedContracts: ImmArray[ProcessedDisclosedContract],
-  )(implicit errorLogger: ContextualizedErrorLogger): CompletionStage[SubmissionResult] = {
+  )(implicit
+      errorLoggingContext: ContextualizedErrorLogger,
+      traceContext: TraceContext,
+  ): CompletionStage[SubmissionResult] = {
     val maxDeduplicationDuration = submitterInfo.ledgerConfiguration.maxDeduplicationDuration
     if (deduplicationDuration.compareTo(maxDeduplicationDuration) > 0)
       CompletableFuture.completedFuture(
@@ -196,22 +197,29 @@ class BridgeWriteService(
           transaction = transaction,
           estimatedInterpretationCost = estimatedInterpretationCost,
           processedDisclosedContracts = processedDisclosedContracts,
-        )
+        )(LoggingContextWithTrace(loggerFactory))
       )
   }
-}
 
-object BridgeWriteService {
-  private[this] val logger = ContextualizedLogger.get(getClass)
+  override def submitReassignment(
+      submitter: Party,
+      applicationId: ApplicationId,
+      commandId: CommandId,
+      submissionId: Option[SubmissionId],
+      workflowId: Option[WorkflowId],
+      reassignmentCommand: ReassignmentCommand,
+  )(implicit
+      traceContext: TraceContext
+  ): CompletionStage[SubmissionResult] = throw new OperationNotSupportedException()
 
   def toSubmissionResult(
       submissionId: Ref.SubmissionId,
       queueOfferResult: QueueOfferResult,
   )(implicit
-      loggingContext: LoggingContext
+      traceContext: TraceContext
   ): CompletableFuture[SubmissionResult] = {
-    implicit val errorLogger: ContextualizedErrorLogger =
-      new DamlContextualizedErrorLogger(logger, loggingContext, Some(submissionId))
+    implicit val errorLoggingContext: ContextualizedErrorLogger =
+      LedgerErrorLoggingContext(logger, loggerFactory.properties, traceContext, submissionId)
 
     CompletableFuture.completedFuture(
       queueOfferResult match {

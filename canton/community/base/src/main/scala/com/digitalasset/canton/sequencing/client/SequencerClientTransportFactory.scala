@@ -5,11 +5,14 @@ package com.digitalasset.canton.sequencing.client
 
 import akka.stream.Materializer
 import cats.data.EitherT
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.digitalasset.canton.SequencerAlias
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.sequencing.*
+import com.digitalasset.canton.sequencing.client.SequencerClientTransportFactory.ValidateTransportResult
 import com.digitalasset.canton.sequencing.client.grpc.GrpcSequencerChannelBuilder
 import com.digitalasset.canton.sequencing.client.transports.*
 import com.digitalasset.canton.topology.*
@@ -22,6 +25,56 @@ import io.grpc.ConnectivityState
 import scala.concurrent.*
 
 trait SequencerClientTransportFactory {
+
+  def makeTransport(
+      sequencerConnections: SequencerConnections,
+      member: Member,
+      requestSigner: RequestSigner,
+  )(implicit
+      executionContext: ExecutionContextExecutor,
+      materializer: Materializer,
+      traceContext: TraceContext,
+  ): EitherT[Future, String, NonEmpty[Map[SequencerAlias, SequencerClientTransport]]] =
+    MonadUtil
+      .sequentialTraverse(sequencerConnections.connections)(conn =>
+        makeTransport(conn, member, requestSigner)
+          .map(transport => conn.sequencerAlias -> transport)
+      )
+      .map(transports => NonEmptyUtil.fromUnsafe(transports.toMap))
+
+  def validateTransport(
+      sequencerConnections: SequencerConnections,
+      logWarning: Boolean,
+  )(implicit
+      executionContext: ExecutionContextExecutor,
+      errorLoggingContext: ErrorLoggingContext,
+      closeContext: CloseContext,
+  ): EitherT[FutureUnlessShutdown, String, Unit] =
+    MonadUtil
+      .sequentialTraverse(sequencerConnections.connections)(conn =>
+        validateTransport(conn, logWarning)
+          .transform {
+            case Right(_) => Right(ValidateTransportResult.Valid)
+            case Left(error) => Right(ValidateTransportResult.NotValid(error))
+          }
+      )
+      .flatMap(checkAgainstTrustThreshold(sequencerConnections.sequencerTrustThreshold, _))
+
+  private def checkAgainstTrustThreshold(
+      sequencerTrustThreshold: PositiveInt,
+      results: Seq[ValidateTransportResult],
+  )(implicit
+      executionContext: ExecutionContextExecutor
+  ): EitherT[FutureUnlessShutdown, String, Unit] = EitherT.fromEither[FutureUnlessShutdown] {
+    if (results.count(_ == ValidateTransportResult.Valid) >= sequencerTrustThreshold.unwrap)
+      Right(())
+    else {
+      val errors = results
+        .collect { case ValidateTransportResult.NotValid(message) => message }
+      Left(errors.mkString(", "))
+    }
+  }
+
   def makeTransport(
       connection: SequencerConnection,
       member: Member,
@@ -44,6 +97,12 @@ trait SequencerClientTransportFactory {
 }
 
 object SequencerClientTransportFactory {
+  sealed trait ValidateTransportResult extends Product with Serializable
+  object ValidateTransportResult {
+    final case object Valid extends ValidateTransportResult
+    final case class NotValid(message: String) extends ValidateTransportResult
+  }
+
   def validateTransport(
       connection: SequencerConnection,
       traceContextPropagation: TracingConfig.Propagation,

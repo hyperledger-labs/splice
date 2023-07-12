@@ -14,7 +14,13 @@ import com.digitalasset.canton.participant.store.{ActiveContractStore, ContractK
 import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.{ExampleTransactionFactory, LfContractId}
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.{BaseTest, RequestCounter, SequencerCounter}
+import com.digitalasset.canton.{
+  BaseTest,
+  RequestCounter,
+  SequencerCounter,
+  TransferCounter,
+  TransferCounterO,
+}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -31,7 +37,12 @@ private[conflictdetection] trait RequestTrackerTest {
   val coid10: LfContractId = ExampleTransactionFactory.suffixedId(1, 0)
   val coid11: LfContractId = ExampleTransactionFactory.suffixedId(1, 1)
 
-  def requestTracker(
+  private val initialTransferCounter: TransferCounterO =
+    TransferCounter.forCreatedContract(testedProtocolVersion)
+
+  private val active = Active(initialTransferCounter)
+
+  protected def requestTracker(
       genMk: (
           RequestCounter,
           SequencerCounter,
@@ -268,8 +279,12 @@ private[conflictdetection] trait RequestTrackerTest {
         )
         _ <- checkFinalize(rc0, finalize0)
 
-        _ <- checkContractState(acs, coid00, (Active, rc, tsCR0))("contract 00 created")
-        _ <- checkContractState(acs, coid01, (Active, rc, tsCR0))("contract 01 created")
+        _ <- checkContractState(acs, coid00, (active, rc, tsCR0))(
+          "contract 00 created"
+        )
+        _ <- checkContractState(acs, coid01, (active, rc, tsCR0))(
+          "contract 01 created"
+        )
 
         _ = enterTick(rt, SequencerCounter(3), tsCommit0.addMicros(1))
 
@@ -288,8 +303,22 @@ private[conflictdetection] trait RequestTrackerTest {
         _ = enterTick(rt, SequencerCounter(7), tsCommit1.plusMillis(5))
         _ <- checkFinalize(rc1, finalize1)
 
-        _ <- checkSnapshot(acs, tsCR0.addMicros(1), Map(coid00 -> tsCR0, coid01 -> tsCR0))
-        _ <- checkSnapshot(acs, tsCR1.addMicros(1), Map(coid01 -> tsCR0, coid10 -> tsCR1))
+        _ <- checkSnapshot(
+          acs,
+          tsCR0.addMicros(1),
+          Map(
+            coid00 -> (tsCR0, TransferCounter.Genesis),
+            coid01 -> (tsCR0, TransferCounter.Genesis),
+          ),
+        )
+        _ <- checkSnapshot(
+          acs,
+          tsCR1.addMicros(1),
+          Map(
+            coid01 -> (tsCR0, TransferCounter.Genesis),
+            coid10 -> (tsCR1, TransferCounter.Genesis),
+          ),
+        )
       } yield succeed
     }
 
@@ -302,9 +331,9 @@ private[conflictdetection] trait RequestTrackerTest {
       val toc0 = TimeOfChange(RequestCounter(0), CantonTimestamp.Epoch)
       for {
         acs <- mkAcs(
-          (coid00, toc0, Active),
-          (coid01, toc0, Active),
-          (coid10, toc0, Active),
+          (coid00, toc0, active),
+          (coid01, toc0, active),
+          (coid10, toc0, active),
         )
         ckj <- mkCkj()
         rt = mk(rc, sc, CantonTimestamp.Epoch, acs, ckj)
@@ -357,11 +386,11 @@ private[conflictdetection] trait RequestTrackerTest {
       val toc2 = TimeOfChange(RequestCounter(2), ts.minusMillis(1))
       for {
         acs <- mkAcs(
-          (coid00, toc0, Active),
-          (coid01, toc0, Active),
+          (coid00, toc0, active),
+          (coid01, toc0, active),
           (coid01, toc1, Archived),
-          (coid10, toc2, Active),
-          (coid11, toc2, Active),
+          (coid10, toc2, active),
+          (coid11, toc2, active),
         )
         ckj <- mkCkj()
         rt = mk(rc, sc, ts.addMicros(-1), acs, ckj)
@@ -419,7 +448,7 @@ private[conflictdetection] trait RequestTrackerTest {
       val ts = ofEpochMilli(1)
       val toc0 = TimeOfChange(RequestCounter(0), CantonTimestamp.Epoch)
       for {
-        acs <- mkAcs((coid00, toc0, Active), (coid01, toc0, Active))
+        acs <- mkAcs((coid00, toc0, active), (coid01, toc0, active))
         ckj <- mkCkj()
         rt = mk(RequestCounter(1), SequencerCounter(1), CantonTimestamp.Epoch, acs, ckj)
         activenessSet = mkActivenessSet(deact = Set(coid00, coid10), useOnly = Set(coid01))
@@ -555,7 +584,7 @@ private[conflictdetection] trait RequestTrackerTest {
       val ts = CantonTimestamp.assertFromInstant(Instant.parse("2010-10-10T12:00:00.00Z"))
       val tocN1 = TimeOfChange(rc - 1, ts.minusMillis(1))
       for {
-        acs <- mkAcs((coid00, tocN1, Active), (coid01, tocN1, Active))
+        acs <- mkAcs((coid00, tocN1, active), (coid01, tocN1, active))
         ckj <- mkCkj()
         rt = mk(rc, sc, ts.minusMillis(1), acs, ckj)
 
@@ -783,7 +812,7 @@ private[conflictdetection] trait RequestTrackerTest {
       val tocN2 = TimeOfChange(rc - 2, ts.minusMillis(20))
       val tocN1 = TimeOfChange(rc - 1, ts.minusMillis(10))
       for {
-        acs <- mkAcs((coid10, tocN2, Active), (coid00, tocN1, Active), (coid01, tocN1, Active))
+        acs <- mkAcs((coid10, tocN2, active), (coid00, tocN1, active), (coid01, tocN1, active))
         ckj <- mkCkj()
         rt = mk(rc, sc, CantonTimestamp.Epoch, acs, ckj)
         activenessSet0 = mkActivenessSet(deact = Set(coid00), useOnly = Set(coid01))
@@ -809,10 +838,18 @@ private[conflictdetection] trait RequestTrackerTest {
         _ <- checkContractState(acs, coid01, (Archived, rc + 1, ts.plusMillis(1)))(
           s"contract $coid01 archived by second confirmation request"
         )
-        _ <- checkContractState(acs, coid00, (Active, rc - 1, ts.minusMillis(10)))(
+        _ <- checkContractState(
+          acs,
+          coid00,
+          (active, rc - 1, ts.minusMillis(10)),
+        )(
           s"contract $coid00 still active"
         )
-        _ <- checkContractState(acs, coid11, (Active, rc + 1, ts.plusMillis(1)))(
+        _ <- checkContractState(
+          acs,
+          coid11,
+          (active, rc + 1, ts.plusMillis(1)),
+        )(
           s"contract $coid11 created by second transaction"
         )
         finalize0 <- enterTR(
@@ -934,7 +971,11 @@ private[conflictdetection] trait RequestTrackerTest {
         _ <- checkFinalize(RequestCounter(2), finalize1)
 
         _ <- checkContractState(acs, coid00, None)(s"contract $coid00's creation is rolled back")
-        _ <- checkContractState(acs, coid01, (Active, RequestCounter(1), ofEpochMilli(1)))(
+        _ <- checkContractState(
+          acs,
+          coid01,
+          (active, RequestCounter(1), ofEpochMilli(1)),
+        )(
           s"contract $coid01 is active"
         )
       } yield succeed
@@ -995,7 +1036,9 @@ private[conflictdetection] trait RequestTrackerTest {
         finalize2 <- enterTR(rt, rc + 2, sc + 5, ts.plusMillis(7), CommitSet.empty, 0L, toF2)
         _ <- checkFinalize(rc + 2, finalize2)
         _ <- List(coid00, coid01).parTraverse_ { coid =>
-          checkContractState(acs, coid, (Active, rc, ts))(s"contract $coid was created")
+          checkContractState(acs, coid, (active, rc, ts))(
+            s"contract $coid was created"
+          )
         }
         activenessSet3 = mkActivenessSet(useOnly = Set(coid00, coid01))
         (cdF3, toF3) <- enterCR(rt, rc + 3, sc + 6, ts.plusMillis(10), timeout, activenessSet3)
@@ -1070,11 +1113,11 @@ private[conflictdetection] trait RequestTrackerTest {
     }
   }
 
-  def enterTick(rt: RequestTracker, sc: SequencerCounter, ts: CantonTimestamp): Unit = {
+  protected def enterTick(rt: RequestTracker, sc: SequencerCounter, ts: CantonTimestamp): Unit = {
     rt.tick(sc, ts)
   }
 
-  def enterCR(
+  protected def enterCR(
       rt: RequestTracker,
       rc: RequestCounter,
       sc: SequencerCounter,
@@ -1092,7 +1135,7 @@ private[conflictdetection] trait RequestTrackerTest {
       activenessSet,
     )
 
-  def enterCR(
+  protected def enterCR(
       rt: RequestTracker,
       rc: RequestCounter,
       sc: SequencerCounter,
@@ -1114,7 +1157,7 @@ private[conflictdetection] trait RequestTrackerTest {
     }
   }
 
-  def enterCR_US(
+  protected def enterCR_US(
       rt: RequestTracker,
       rc: RequestCounter,
       sc: SequencerCounter,
@@ -1132,7 +1175,7 @@ private[conflictdetection] trait RequestTrackerTest {
       activenessSet,
     )
 
-  def enterCR_US(
+  protected def enterCR_US(
       rt: RequestTracker,
       rc: RequestCounter,
       sc: SequencerCounter,
@@ -1157,7 +1200,7 @@ private[conflictdetection] trait RequestTrackerTest {
       .failOnShutdown("add request")
   }
 
-  def checkConflictResult(
+  protected def checkConflictResult(
       rc: RequestCounter,
       conflictResultFuture: Future[ActivenessResult],
       activenessResult: ActivenessResult,
@@ -1170,7 +1213,7 @@ private[conflictdetection] trait RequestTrackerTest {
       )
     )
 
-  def enterTR(
+  protected def enterTR(
       rt: RequestTracker,
       rc: RequestCounter,
       sc: SequencerCounter,
@@ -1191,36 +1234,36 @@ private[conflictdetection] trait RequestTrackerTest {
     } yield resCS.value.value.failOnShutdown("add commit set")
   }
 
-  def checkFinalize(
+  protected def checkFinalize(
       rc: RequestCounter,
       finalizeFuture: Future[Either[NonEmptyChain[RequestTrackerStoreError], Unit]],
   ): Future[Assertion] =
     finalizeFuture.map(result => assert(result == Right(()), s"request $rc finalized"))
 
-  def checkContractState(
+  protected def checkContractState(
       acs: ActiveContractStore,
       coid: LfContractId,
       cs: (Status, RequestCounter, CantonTimestamp),
   )(clue: String): Future[Assertion] =
     checkContractState(acs, coid, Some(ContractState(cs._1, cs._2, cs._3)))(clue)
 
-  def checkContractState(
+  protected def checkContractState(
       acs: ActiveContractStore,
       coid: LfContractId,
       state: Option[ContractState],
   )(clue: String): Future[Assertion] =
     acs.fetchState(coid).map(result => assert(result == state, clue))
 
-  def checkSnapshot(
+  protected def checkSnapshot(
       acs: ActiveContractStore,
       ts: CantonTimestamp,
-      expected: Map[LfContractId, CantonTimestamp],
+      expected: Map[LfContractId, (CantonTimestamp, TransferCounter)],
   ): Future[Assertion] =
     acs
       .snapshot(ts)
       .map(snapshot => assert(snapshot == expected, s"ACS snapshot at time $ts correct"))
 
-  def singleCRwithTR(
+  protected def singleCRwithTR(
       rt: RequestTracker,
       rc: RequestCounter,
       sc: SequencerCounter,
@@ -1242,7 +1285,7 @@ private[conflictdetection] trait RequestTrackerTest {
       commitDelay,
     )
 
-  def singleCRwithTR(
+  protected def singleCRwithTR(
       rt: RequestTracker,
       rc: RequestCounter,
       sc: SequencerCounter,

@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.platform.store.cache
 
-import com.daml.logging.LoggingContext
 import com.daml.metrics.CacheMetrics
 import com.daml.metrics.api.MetricName
 import com.daml.metrics.api.noop.{NoOpMetricsFactory, NoOpTimer}
 import com.digitalasset.canton.caching.{CaffeineCache, ConcurrentCache, SizedCache}
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.github.benmanes.caffeine.cache.Caffeine
 import org.mockito.MockitoSugar
 import org.scalatest.Assertion
@@ -18,19 +18,19 @@ import org.scalatest.matchers.should.Matchers
 
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.{FiniteDuration, *}
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Future, Promise}
 import scala.math.BigInt.long2bigInt
 import scala.util.Success
 
-class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with Eventually {
-  private val className = classOf[StateCache[_, _]].getSimpleName
+class StateCacheSpec
+    extends AsyncFlatSpec
+    with Matchers
+    with MockitoSugar
+    with Eventually
+    with BaseTest
+    with HasExecutionContext {
 
-  private implicit val loggingContext: LoggingContext = LoggingContext.ForTesting
-
-  // TODO(#13019) Avoid the global execution context
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
-  override implicit def executionContext: ExecutionContext =
-    scala.concurrent.ExecutionContext.global
+  private val className = classOf[StateCache[?, ?]].getSimpleName
 
   private val cacheUpdateTimer = NoOpTimer("state_update")
 
@@ -43,6 +43,7 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
       initialCacheIndex = someOffset,
       cache = cache,
       registerUpdateTimer = cacheUpdateTimer,
+      loggerFactory = loggerFactory,
     )
 
     val asyncUpdatePromise = Promise[String]()
@@ -122,6 +123,7 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
       initialCacheIndex = initialOffset,
       cache = cache,
       registerUpdateTimer = cacheUpdateTimer,
+      loggerFactory = loggerFactory,
     )
 
     val asyncUpdatePromise = Promise[String]()
@@ -148,12 +150,22 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
 
   it should "not update the cache if called with a non-increasing `validAt`" in {
     val cache = mock[ConcurrentCache[String, String]]
-    val stateCache = StateCache[String, String](offset(0L), cache, cacheUpdateTimer)
+    val stateCache = StateCache[String, String](offset(0L), cache, cacheUpdateTimer, loggerFactory)
 
     stateCache.putBatch(offset(2L), Map("key" -> "value"))
-    // `Put` at a decreasing validAt
-    stateCache.putBatch(offset(1L), Map("key" -> "earlier value"))
-    stateCache.putBatch(offset(2L), Map("key" -> "value at same validAt"))
+    loggerFactory.assertLogs(
+      within = {
+        // `Put` at a decreasing validAt
+        stateCache.putBatch(offset(1L), Map("key" -> "earlier value"))
+        stateCache.putBatch(offset(2L), Map("key" -> "value at same validAt"))
+      },
+      assertions = _.warningMessage should include(
+        "Ignoring incoming synchronous update at an index (Offset(Bytes(0100000001))) equal to or before the cache index (Offset(Bytes(0100000002)))"
+      ),
+      _.warningMessage should include(
+        "Ignoring incoming synchronous update at an index (Offset(Bytes(0100000002))) equal to or before the cache index (Offset(Bytes(0100000002)))"
+      ),
+    )
 
     verify(cache).putAll(Map("key" -> "value"))
     verifyNoMoreInteractions(cache)
@@ -174,6 +186,7 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
           ),
         ),
         registerUpdateTimer = cacheUpdateTimer,
+        loggerFactory = loggerFactory,
       )
 
     val syncUpdateKey = "key"
@@ -186,7 +199,12 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
     // Register async update to the cache
     val asyncUpdatePromise = Promise[String]()
     val putAsyncF =
-      stateCache.putAsync(asyncUpdateKey, Map(offset(2L) -> asyncUpdatePromise.future))
+      loggerFactory.assertLogs(
+        within = stateCache.putAsync(asyncUpdateKey, Map(offset(2L) -> asyncUpdatePromise.future)),
+        assertions = _.warningMessage should include(
+          "Pending updates tracker for other_key not registered. This could be due to a transient error causing a restart in the index service."
+        ),
+      )
 
     // Reset the cache
     stateCache.reset(offset(1L))
@@ -201,8 +219,6 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
     }
   }
 
-  // TODO(#13019) Avoid the global execution context
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   private def buildStateCache(cacheSize: Long): StateCache[String, String] =
     StateCache[String, String](
       initialCacheIndex = Offset.beforeBegin,
@@ -213,7 +229,8 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
         None,
       ),
       registerUpdateTimer = cacheUpdateTimer,
-    )(scala.concurrent.ExecutionContext.global)
+      loggerFactory = loggerFactory,
+    )
 
   private def prepare(
       `number of competing updates`: Long,
@@ -240,8 +257,6 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
     stateCache.pendingUpdates shouldBe empty
   }
 
-  // TODO(#13019) Avoid the global execution context
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   private def insertTimed(stateCache: StateCache[String, String])(
       insertions: Seq[(String, (Promise[String], String))]
   ): (Seq[Future[Unit]], FiniteDuration) =
@@ -259,7 +274,7 @@ class StateCacheSpec extends AsyncFlatSpec with Matchers with MockitoSugar with 
               case _ => fail()
             },
           )
-          .map(_ => ())(scala.concurrent.ExecutionContext.global)
+          .map(_ => ())
       }
     }
 

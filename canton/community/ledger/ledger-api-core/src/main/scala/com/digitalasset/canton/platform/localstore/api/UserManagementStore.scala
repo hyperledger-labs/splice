@@ -3,9 +3,14 @@
 
 package com.digitalasset.canton.platform.localstore.api
 
+import com.daml.error.ContextualizedErrorLogger
 import com.daml.lf.data.Ref
-import com.daml.logging.LoggingContext
+import com.digitalasset.canton.concurrent.DirectExecutionContext
+import com.digitalasset.canton.ledger.api.domain
 import com.digitalasset.canton.ledger.api.domain.{IdentityProviderId, User, UserRight}
+import com.digitalasset.canton.ledger.error.LedgerApiErrors
+import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLogging}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -29,14 +34,16 @@ object ObjectMetaUpdate {
   )
 }
 
-trait UserManagementStore {
+trait UserManagementStore { self: NamedLogging =>
+
+  private val directEc = DirectExecutionContext(logger)
 
   import UserManagementStore.*
 
   // read access
 
   def getUserInfo(id: Ref.UserId, identityProviderId: IdentityProviderId)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[UserInfo]]
 
   /** Always returns `maxResults` if possible, i.e. if a call to this method
@@ -47,52 +54,72 @@ trait UserManagementStore {
       maxResults: Int,
       identityProviderId: IdentityProviderId,
   )(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[UsersPage]]
 
   // write access
 
   def createUser(user: User, rights: Set[UserRight])(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[User]]
 
   def updateUser(userUpdate: UserUpdate)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[User]]
 
   def deleteUser(id: Ref.UserId, identityProviderId: IdentityProviderId)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[Unit]]
 
   def grantRights(id: Ref.UserId, rights: Set[UserRight], identityProviderId: IdentityProviderId)(
-      implicit loggingContext: LoggingContext
+      implicit loggingContext: LoggingContextWithTrace
   ): Future[Result[Set[UserRight]]]
 
   def revokeRights(id: Ref.UserId, rights: Set[UserRight], identityProviderId: IdentityProviderId)(
-      implicit loggingContext: LoggingContext
+      implicit loggingContext: LoggingContextWithTrace
   ): Future[Result[Set[UserRight]]]
 
   def updateUserIdp(
       id: Ref.UserId,
       sourceIdp: IdentityProviderId,
       targetIdp: IdentityProviderId,
-  )(implicit loggingContext: LoggingContext): Future[Result[User]]
+  )(implicit loggingContext: LoggingContextWithTrace): Future[Result[User]]
   // read helpers
 
-  // TODO(#13019) Replace parasitic with DirectExecutionContext
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   final def getUser(id: Ref.UserId, identityProviderId: IdentityProviderId)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[User]] = {
-    getUserInfo(id, identityProviderId).map(_.map(_.user))(ExecutionContext.parasitic)
+    getUserInfo(id, identityProviderId).map(_.map(_.user))(directEc)
   }
 
-  // TODO(#13019) Replace parasitic with DirectExecutionContext
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
   final def listUserRights(id: Ref.UserId, identityProviderId: IdentityProviderId)(implicit
-      loggingContext: LoggingContext
+      loggingContext: LoggingContextWithTrace
   ): Future[Result[Set[UserRight]]] = {
-    getUserInfo(id, identityProviderId).map(_.map(_.rights))(ExecutionContext.parasitic)
+    getUserInfo(id, identityProviderId).map(_.map(_.rights))(directEc)
+  }
+
+  def createExtraAdminUser(rawUserId: String)(implicit
+      loggingContext: LoggingContextWithTrace,
+      ec: ExecutionContext,
+  ): Future[Unit] = {
+    val userId = Ref.UserId.assertFromString(rawUserId)
+    createUser(
+      user = domain.User(
+        id = userId,
+        primaryParty = None,
+        identityProviderId = IdentityProviderId.Default,
+      ),
+      rights = Set(UserRight.ParticipantAdmin),
+    )
+      .flatMap {
+        case Left(UserManagementStore.UserExists(_)) =>
+          logger.info(
+            s"Creating admin user with id $userId failed. User with this id already exists"
+          )
+          Future.successful(())
+        case other =>
+          handleResult("creating extra admin user")(other).map(_ => ())
+      }
   }
 
 }
@@ -116,4 +143,53 @@ object UserManagementStore {
   final case class ConcurrentUserUpdate(userId: Ref.UserId) extends Error
   final case class MaxAnnotationsSizeExceeded(userId: Ref.UserId) extends Error
   final case class PermissionDenied(userId: Ref.UserId) extends Error
+
+  def handleResult[T](operation: String)(
+      result: UserManagementStore.Result[T]
+  )(implicit errorLogger: ContextualizedErrorLogger): Future[T] =
+    result match {
+      case Left(UserManagementStore.PermissionDenied(id)) =>
+        Future.failed(
+          LedgerApiErrors.AuthorizationChecks.PermissionDenied
+            .Reject(s"User $id belongs to another Identity Provider")
+            .asGrpcError
+        )
+      case Left(UserManagementStore.UserNotFound(id)) =>
+        Future.failed(
+          LedgerApiErrors.Admin.UserManagement.UserNotFound
+            .Reject(operation, id)
+            .asGrpcError
+        )
+
+      case Left(UserManagementStore.UserExists(id)) =>
+        Future.failed(
+          LedgerApiErrors.Admin.UserManagement.UserAlreadyExists
+            .Reject(operation, id)
+            .asGrpcError
+        )
+
+      case Left(UserManagementStore.TooManyUserRights(id)) =>
+        Future.failed(
+          LedgerApiErrors.Admin.UserManagement.TooManyUserRights
+            .Reject(operation, id: String)
+            .asGrpcError
+        )
+      case Left(e: UserManagementStore.ConcurrentUserUpdate) =>
+        Future.failed(
+          LedgerApiErrors.Admin.UserManagement.ConcurrentUserUpdateDetected
+            .Reject(userId = e.userId)
+            .asGrpcError
+        )
+
+      case Left(e: UserManagementStore.MaxAnnotationsSizeExceeded) =>
+        Future.failed(
+          LedgerApiErrors.Admin.UserManagement.MaxUserAnnotationsSizeExceeded
+            .Reject(userId = e.userId)
+            .asGrpcError
+        )
+
+      case scala.util.Right(t) =>
+        Future.successful(t)
+    }
+
 }

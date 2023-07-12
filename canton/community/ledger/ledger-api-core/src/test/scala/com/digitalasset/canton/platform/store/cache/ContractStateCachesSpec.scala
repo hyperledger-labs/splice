@@ -5,13 +5,12 @@ package com.digitalasset.canton.platform.store.cache
 
 import com.daml.lf.crypto.Hash
 import com.daml.lf.data.{ImmArray, Ref, Time}
-import com.daml.lf.transaction.GlobalKey
-import com.daml.lf.transaction.test.TransactionBuilder
+import com.daml.lf.transaction.{GlobalKey, TransactionVersion, Versioned}
 import com.daml.lf.value.Value.{ContractInstance, ValueInt64, ValueRecord}
-import com.daml.logging.LoggingContext
 import com.daml.metrics.Metrics
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.platform.store.dao.events.ContractStateEvent
+import com.digitalasset.canton.{HasExecutionContext, TestEssentials}
 import org.mockito.MockitoSugar
 import org.scalatest.OptionValues
 import org.scalatest.flatspec.AnyFlatSpec
@@ -23,20 +22,21 @@ class ContractStateCachesSpec
     extends AnyFlatSpec
     with Matchers
     with MockitoSugar
-    with OptionValues {
-  private val loggingContext = LoggingContext.ForTesting
+    with OptionValues
+    with TestEssentials
+    with HasExecutionContext {
   behavior of classOf[ContractStateCaches].getSimpleName
 
   "build" should "set the cache index to the initialization index" in {
     val cacheInitializationOffset = offset(1337)
-    // TODO(#13019) Avoid the global execution context
     @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
     val contractStateCaches = ContractStateCaches.build(
       cacheInitializationOffset,
-      1L,
-      1L,
+      maxContractsCacheSize = 1L,
+      maxKeyCacheSize = 1L,
       metrics = Metrics.ForTesting,
-    )(scala.concurrent.ExecutionContext.global, loggingContext)
+      loggerFactory,
+    )
 
     contractStateCaches.keyState.cacheIndex shouldBe cacheInitializationOffset
     contractStateCaches.contractState.cacheIndex shouldBe cacheInitializationOffset
@@ -63,8 +63,8 @@ class ContractStateCachesSpec
     )
 
     contractStateCaches.push(batch)
-    verify(contractStateCache).putBatch(offset(4), expectedContractStateUpdates)(loggingContext)
-    verify(keyStateCache).putBatch(offset(4), expectedKeyStateUpdates)(loggingContext)
+    verify(contractStateCache).putBatch(offset(4), expectedContractStateUpdates)
+    verify(keyStateCache).putBatch(offset(4), expectedKeyStateUpdates)
   }
 
   "push" should "not update the key state cache if no key updates" in new TestScope {
@@ -74,12 +74,16 @@ class ContractStateCachesSpec
     val expectedContractStateUpdates = Map(create1.contractId -> contractActive(create1))
 
     contractStateCaches.push(batch)
-    verify(contractStateCache).putBatch(offset(2), expectedContractStateUpdates)(loggingContext)
+    verify(contractStateCache).putBatch(offset(2), expectedContractStateUpdates)
     verifyZeroInteractions(keyStateCache)
   }
 
   "push" should "ignore empty batches" in new TestScope {
-    contractStateCaches.push(Vector.empty)
+    loggerFactory.assertLogs(
+      within = contractStateCaches.push(Vector.empty),
+      assertions = _.errorMessage should include("push triggered with empty events batch"),
+    )
+
     verifyZeroInteractions(contractStateCache, keyStateCache)
   }
 
@@ -103,7 +107,8 @@ class ContractStateCachesSpec
     val contractStateCaches = new ContractStateCaches(
       keyStateCache,
       contractStateCache,
-    )(loggingContext)
+      loggerFactory,
+    )
 
     def createEvent(
         offset: Offset,
@@ -165,7 +170,7 @@ class ContractStateCachesSpec
       ImmArray(None -> ValueInt64(id.toLong)),
     )
     val contractInstance = ContractInstance(templateId, contractArgument)
-    TransactionBuilder().versionContract(contractInstance)
+    Versioned(TransactionVersion.StableVersions.max, contractInstance)
   }
 
   private def offset(idx: Int) = Offset.fromByteArray(BigInt(idx.toLong).toByteArray)

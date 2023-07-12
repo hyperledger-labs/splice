@@ -4,7 +4,7 @@
 package com.digitalasset.canton.store.db
 
 import cats.syntax.either.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveLong}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt, PositiveLong}
 import slick.jdbc.{GetResult, SetParameter}
 
 object RequiredTypesCodec {
@@ -15,11 +15,24 @@ object RequiredTypesCodec {
       )
     }
 
+  def positiveIntDBDeserializer(i: Int): PositiveInt =
+    PositiveInt.create(i).getOrElse {
+      throw new DbDeserializationException(
+        s"$i cannot be deserialized to a positive int"
+      )
+    }
+
   implicit val positiveLongSetResult: SetParameter[PositiveLong] = (v: PositiveLong, pp) =>
+    pp >> v.value
+
+  implicit val positiveIntSetResult: SetParameter[PositiveInt] = (v: PositiveInt, pp) =>
     pp >> v.value
 
   implicit val positiveLongGetResult: GetResult[PositiveLong] =
     GetResult.GetLong.andThen(positiveLongDBDeserializer)
+
+  implicit val positiveIntGetResult: GetResult[PositiveInt] =
+    GetResult.GetInt.andThen(positiveIntDBDeserializer)
 
   def nonNegativeLongDBDeserializer(l: Long): NonNegativeLong =
     NonNegativeLong.create(l).valueOr { err =>
