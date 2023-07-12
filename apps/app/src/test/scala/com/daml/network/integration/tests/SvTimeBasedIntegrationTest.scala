@@ -193,14 +193,14 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBaseWithShare
           newRounds.length should be >= 1
         }
       }
+    }
 
-      clue("All `SvReward` are collected") {
-        eventually() {
-          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(SvReward.COMPANION)(
-              svcParty
-            ) shouldBe empty
-        }
+    clue("wait for the system to quiet down after sv1Backend back up") {
+      eventually() {
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(SvcReward.COMPANION)(svcParty) shouldBe empty
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(SvReward.COMPANION)(svcParty) shouldBe empty
       }
     }
   }
