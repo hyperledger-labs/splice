@@ -27,7 +27,6 @@ abstract class MultiDomainAcsStoreTest[
 ] extends StoreTest { this: HasActorSystem =>
 
   import MultiDomainAcsStore.*
-  import MultiDomainAcsStore.InterfaceImplementation
 
   private var transferCounter = 0
   protected def nextTransferId: String = {
@@ -79,9 +78,8 @@ abstract class MultiDomainAcsStoreTest[
   protected type CReady = ReadyContract[AppRewardCoupon.ContractId, AppRewardCoupon]
 
   protected def assertTestState(
-      contractStateEventsById: Map[ContractId[_], Long] = Map.empty,
-      archivedTombstones: Set[ContractId[_]] = Set.empty,
-      pendingTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
+      contractStateEventsById: Map[ContractId[_], ContractStateEvent] = Map.empty,
+      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
   )(implicit store: Store): Future[Assertion]
 
   protected def assertList(
@@ -108,10 +106,14 @@ abstract class MultiDomainAcsStoreTest[
   protected def assertLookupNone(c: C)(implicit store: MultiDomainAcsStore) =
     store.lookupContractById(AppRewardCoupon.COMPANION)(c.contractId)
 
-  protected def assertReadyForTransferIn(transferId: TransferId, expected: Boolean)(implicit
+  protected def assertReadyForTransferIn(
+      contractId: ContractId[_],
+      transferId: TransferId,
+      expected: Boolean,
+  )(implicit
       store: MultiDomainAcsStore
   ) =
-    store.isReadyForTransferIn(transferId).map {
+    store.isReadyForTransferIn(contractId, transferId).map {
       _ shouldBe expected
     }
 
@@ -239,6 +241,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertTestState()
       } yield succeed
     }
+
     "filtering of acs" in {
       implicit val store = mkStore()
       for {

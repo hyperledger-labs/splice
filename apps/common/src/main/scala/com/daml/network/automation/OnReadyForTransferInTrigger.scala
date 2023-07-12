@@ -27,7 +27,9 @@ abstract class OnReadyForTransferInTrigger(
       task: TransferEvent.Out
   )(implicit tc: TraceContext): Future[Boolean] = {
     import MultiDomainAcsStore.TransferId
-    store.multiDomainAcsStore.isReadyForTransferIn(TransferId.fromTransferOut(task)).map(!_)
+    store.multiDomainAcsStore
+      .isReadyForTransferIn(task.contractId, TransferId.fromTransferOut(task))
+      .map(!_)
   }
 
 }

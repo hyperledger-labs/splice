@@ -189,7 +189,7 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
   /** Returns true if the transfer out event can still potentially be transferred in.
     * Intended to be used as a staleness check for the results of `streamReadyForTransferIn`.
     */
-  def isReadyForTransferIn(out: TransferId): Future[Boolean]
+  def isReadyForTransferIn(contractId: ContractId[_], out: TransferId): Future[Boolean]
 
   /** Signal when the store has finished ingesting ledger data from the given offset
     * or a larger one or node-level shutdown was initiated
@@ -673,4 +673,62 @@ object MultiDomainAcsStore {
         ParticipantOffset.Value.Boundary(ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN)
       )
     else ParticipantOffset(ParticipantOffset.Value.Absolute(offset))
+
+  // The state of a contract in the store. Note that, contrary to `ContractState`, this can
+  // also include archived contracts.
+  sealed abstract class StoreContractState extends PrettyPrinting {
+    def toActiveState: Option[MultiDomainAcsStore.ContractState] =
+      this match {
+        case StoreContractState.Assigned(domain) =>
+          Some(MultiDomainAcsStore.ContractState.Assigned(domain))
+        case StoreContractState.InFlight(_) => Some(MultiDomainAcsStore.ContractState.InFlight)
+        case StoreContractState.Archived => None
+      }
+
+  }
+  object StoreContractState {
+
+    /** Observed activation (transfer in/create).
+      */
+    final case class Assigned(domain: DomainId) extends StoreContractState {
+      override def pretty: Pretty[this.type] = prettyOfClass(
+        param("domain", _.domain)
+      )
+    }
+
+    /** Observed transfer out but not transfer in.
+      */
+    final case class InFlight(out: TransferEvent.Out) extends StoreContractState {
+      override def pretty: Pretty[this.type] = prettyOfClass(
+        param("out", _.out)
+      )
+    }
+
+    /** Observed archive but there are still incomplete transfers.
+      */
+    final case object Archived extends StoreContractState {
+      override def pretty: Pretty[this.type] = prettyOfObject[Archived.type]
+    }
+  }
+
+  /** The "most recent" state for a contract where "most recent"
+    * is defined based as the highest transfer counter
+    */
+  case class ContractStateEvent(
+      contractId: ContractId[_],
+      transferCounter: Long,
+      state: StoreContractState,
+  ) extends PrettyPrinting {
+
+    def toAssigned: Option[DomainId] = state match {
+      case StoreContractState.Assigned(domain) => Some(domain)
+      case StoreContractState.InFlight(_) | StoreContractState.Archived => None
+    }
+
+    override def pretty: Pretty[this.type] = prettyOfClass(
+      param("contractId", _.contractId),
+      param("transferCounter", _.transferCounter),
+      param("state", _.state),
+    )
+  }
 }

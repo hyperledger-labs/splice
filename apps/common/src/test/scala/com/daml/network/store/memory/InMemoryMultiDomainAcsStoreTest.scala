@@ -39,23 +39,18 @@ class InMemoryMultiDomainAcsStoreTest
     )(actorSystem.dispatcher)
 
   override def assertTestState(
-      contractStateEventsById: Map[ContractId[_], Long] = Map.empty,
-      archivedTombstones: Set[ContractId[_]] = Set.empty,
-      pendingTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
+      contractStateEventsById: Map[ContractId[_], ContractStateEvent] = Map.empty,
+      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
   )(implicit store: Store) =
     for {
       actualContractStateEventsById <- store.contractStateEventsById
-      actualArchivedTombstones <- store.archivedTombstones
-      actualPendingTransfersById <- store.pendingTransfersById
+      actualIncompleteTransfersById <- store.incompleteTransfersById
     } yield {
       clue("contractStateEventsById") {
         actualContractStateEventsById shouldBe contractStateEventsById
       }
-      clue("archivedTombstones") {
-        actualArchivedTombstones shouldBe archivedTombstones
-      }
-      clue("pendingTransfersById") {
-        actualPendingTransfersById shouldBe pendingTransfersById
+      clue("incompleteTransfersById") {
+        actualIncompleteTransfersById shouldBe incompleteTransfersById
       }
     }
 
@@ -166,12 +161,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertList(c(1) -> Some(d1))
         tf0 = nextTransferId
         _ <- d2.transferIn(c(1) -> d1, tf0, 1)
-        // Note: We cannot currently reliably order transfer events
-        // so we don't know if the transfer in is actually a newer state.
-        // (We could have missed the transfer out if it happened before the ACS offset).
-        // So we give up on a bit of liveness and mark the contract as in-flight
-        // until we see the transfer out.
-        _ <- assertList(c(1) -> None)
+        _ <- assertList(c(1) -> Some(d2))
         _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
@@ -189,7 +179,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertList(c(1) -> Some(d1))
         tf0 = nextTransferId
         _ <- d2.transferIn(c(1) -> d1, tf0, 1)
-        _ <- assertList(c(1) -> None)
+        _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
         _ <- assertLookupNone(c(1))
@@ -207,12 +197,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d1.create(c(1))
-        // We cannot reliably order transfer in events
-        // We could however order this one here since a transfer in
-        // naturally has to happen after the first create.
-        // However, our implementation currently treats the initial create
-        // and transfer ins uniformly and also marks this as in-flight.
-        _ <- assertList(c(1) -> None)
+        _ <- assertList(c(1) -> Some(d2))
         _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
@@ -232,15 +217,15 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d2.transferIn(c(1) -> d1, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d3.transferIn(c(1) -> d1, tf2, 3)
-        _ <- assertList(c(1) -> None)
+        _ <- assertList(c(1) -> Some(d3))
         _ <- d2.transferOut(c(1) -> d1, tf1, 2)
         _ <- assertList(c(1) -> Some(d3))
         _ <- d1.create(c(1))
-        _ <- assertList(c(1) -> None)
+        _ <- assertList(c(1) -> Some(d3))
         _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> Some(d3))
         _ <- d1.transferIn(c(1) -> d2, tf1, 2)
-        _ <- assertList(c(1) -> None)
+        _ <- assertList(c(1) -> Some(d3))
         _ <- d1.transferOut(c(1) -> d3, tf2, 3)
         _ <- assertList(c(1) -> Some(d3))
         _ <- d3.archive(c(1))
@@ -289,7 +274,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertTestState()
       } yield succeed
     }
-    "in-flight transfer out + transfer in" in {
+    "incomplete transfer out + transfer in" in {
       implicit val store = mkStore()
       val tf0 = nextTransferId
       for {
@@ -306,24 +291,27 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertTestState()
       } yield succeed
     }
-    "no in-flight transfer out, transfer in" in {
+    "incomplete transfer in + transfer out" in {
       implicit val store = mkStore()
+      val tf0 = nextTransferId
       for {
-        _ <- acs()
-        tf0 = nextTransferId
-        _ <- d2.transferIn(c(1) -> d1, tf0, 1)
+        _ <- acs(
+          incompleteIn = Seq(
+            (c(1), d1, d2, tf0, 1L)
+          )
+        )
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d1.create(c(1))
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
-        _ <- assertLookupNone(c(1))
         _ <- assertTestState(
-          // Currently, we leak these two states for contracts where we see the transfer in but not transfer out
-          // which can happen during bootstrapping. See the docs on InMemoryMultiDomainAcsStore.State for details.
-          archivedTombstones = Set(c(1).contractId),
-          pendingTransfersById = Map(c(1).contractId -> NonEmpty(Set, TransferId(d1, tf0))),
         )
       } yield succeed
     }
+
     "filtering of transfer in" in {
       implicit val store = mkStore()
       val tf0 = nextTransferId
@@ -336,8 +324,10 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d1.archive(c(1))
         _ <- assertTestState(
           // We've not yet seen the transfer out
-          archivedTombstones = Set(c(1).contractId),
-          pendingTransfersById = Map(c(1).contractId -> NonEmpty(Set, TransferId(d2, tf0))),
+          contractStateEventsById = Map(
+            c(1).contractId -> ContractStateEvent(c(1).contractId, 1, StoreContractState.Archived)
+          ),
+          incompleteTransfersById = Map(c(1).contractId -> NonEmpty(Set, TransferId(d2, tf0))),
         )
       } yield succeed
     }
@@ -351,7 +341,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertTestState()
       } yield succeed
     }
-    "filtering of in-flight transfer outs" in {
+    "filtering of incomplete transfer outs" in {
       implicit val store = mkStore()
       val tf0 = nextTransferId
       for {
@@ -375,28 +365,29 @@ class InMemoryMultiDomainAcsStoreTest
       val tf1Id = TransferId(d2, tf1)
       val tf2 = nextTransferId
       val tf2Id = TransferId(d1, tf2)
+      val cid = c(1).contractId
       for {
-        // in-flight transfer out
+        // incomplete transfer out
         _ <- acs(
           incompleteOut = Seq(
             (c(1), d1, d2, tf0, 1L)
           )
         )
         _ = eventually()(transfers.get should have length 1)
-        _ <- assertReadyForTransferIn(tf0Id, true)
+        _ <- assertReadyForTransferIn(cid, tf0Id, true)
         _ <- d2.transferIn(c(1) -> d1, tf0, 1)
-        _ <- assertReadyForTransferIn(tf0Id, false)
+        _ <- assertReadyForTransferIn(cid, tf0Id, false)
         // transfer out before transfer in
         _ <- d2.transferOut(c(1) -> d1, tf1, 2)
-        _ <- assertReadyForTransferIn(tf1Id, true)
+        _ <- assertReadyForTransferIn(cid, tf1Id, true)
         _ = eventually()(transfers.get should have length 2)
         _ <- d1.transferIn(c(1) -> d2, tf1, 2)
-        _ <- assertReadyForTransferIn(tf1Id, false)
+        _ <- assertReadyForTransferIn(cid, tf1Id, false)
         // transfer in before transfer out
         _ <- d3.transferIn(c(1) -> d1, tf2, 3)
-        _ <- assertReadyForTransferIn(tf2Id, false)
+        _ <- assertReadyForTransferIn(cid, tf2Id, false)
         _ <- d1.transferOut(c(1) -> d3, tf2, 3)
-        _ <- assertReadyForTransferIn(tf2Id, false)
+        _ <- assertReadyForTransferIn(cid, tf2Id, false)
         _ <- streamF
       } yield {
         transfers.get().map(TransferId.fromTransferOut(_)) shouldBe Seq(tf0Id, tf1Id)
@@ -426,7 +417,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d1.transferIn(c(1) -> d2, tf1, 2)
         _ <- d2.transferOut(c(1) -> d1, tf1, 2)
         _ = eventually()(readyContracts.get() should have size 3)
-        // Complete transfer in of in-flight transfer out.
+        // Complete transfer in of incomplete transfer out.
         _ <- d2.transferIn(c(2) -> d1, tf2, 3)
         _ = eventually()(readyContracts.get() should have size 4)
         _ <- d2.create(c(3))

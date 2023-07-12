@@ -293,7 +293,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
   override def streamReadyForTransferIn(): Source[TransferEvent.Out, NotUsed] = ???
 
-  override def isReadyForTransferIn(out: TransferId): Future[Boolean] = ???
+  override def isReadyForTransferIn(contractId: ContractId[_], out: TransferId): Future[Boolean] =
+    ???
 
   override def signalWhenIngestedOrShutdown(offset: String)(implicit
       tc: TraceContext
@@ -568,18 +569,15 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           ingestedArchivedEvents = deletes,
           ingestedTxLogEntries = txEntries,
           numFilteredArchivedEvents = numDeletesWanted - numDeletesDone,
-          // These are only applicable to the in-memory version:
-          addedArchivedTombstones = Vector.empty,
-          removedArchivedTombstones = Vector.empty,
           // TODO (#5314): all these below are multi-domain
-          addedContractLocations = Vector.empty,
-          removedContractLocations = Vector.empty,
+          updatedContractStates = Vector.empty,
           addedTransferInEvents = Vector.empty,
           numFilteredTransferInEvents = 0,
           removedTransferInEvents = Vector.empty,
           addedTransferOutEvents = Vector.empty,
           numFilteredTransferOutEvents = 0,
           removedTransferOutEvents = Vector.empty,
+          prunedContracts = Vector.empty,
         )
       }
     }

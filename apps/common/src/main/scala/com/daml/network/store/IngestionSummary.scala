@@ -2,7 +2,7 @@ package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
-import com.daml.network.store.MultiDomainAcsStore.TransferId
+import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, TransferId}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 
@@ -14,16 +14,14 @@ private[store] case class IngestionSummary[TXE <: TxLogStore.Entry[?]](
     numFilteredCreatedEvents: Int,
     ingestedArchivedEvents: Vector[ExercisedEvent],
     numFilteredArchivedEvents: Int,
-    addedContractLocations: Vector[ContractLocation],
-    removedContractLocations: Vector[ContractLocation],
+    updatedContractStates: Vector[ContractStateEvent],
     addedTransferInEvents: Vector[(ContractId[?], TransferId)],
     numFilteredTransferInEvents: Int,
     removedTransferInEvents: Vector[(ContractId[?], TransferId)],
     addedTransferOutEvents: Vector[(ContractId[?], TransferId)],
     numFilteredTransferOutEvents: Int,
     removedTransferOutEvents: Vector[(ContractId[?], TransferId)],
-    addedArchivedTombstones: Vector[ContractId[?]],
-    removedArchivedTombstones: Vector[ContractId[?]],
+    prunedContracts: Vector[ContractId[_]],
     ingestedTxLogEntries: Seq[TXE],
 ) extends PrettyPrinting {
 
@@ -57,16 +55,14 @@ private[store] case class IngestionSummary[TXE <: TxLogStore.Entry[?]](
       paramIfNonZero("numFilteredCreatedEvents", _.numFilteredCreatedEvents),
       paramIfNonEmpty("ingestedArchivedEvents", _.ingestedArchivedEvents),
       paramIfNonZero("numFilteredArchivedEvents", _.numFilteredArchivedEvents),
-      paramIfNonEmpty("addedContractLocations", _.addedContractLocations),
-      paramIfNonEmpty("removedContractLocations", _.removedContractLocations),
+      paramIfNonEmpty("updatedContractStates", _.updatedContractStates),
       paramIfNonEmpty("addedTransferInEvents", _.addedTransferInEvents),
       paramIfNonZero("numFilteredTransferInEvents", _.numFilteredTransferInEvents),
       paramIfNonEmpty("removedTransferInEvents", _.removedTransferInEvents),
       paramIfNonEmpty("addedTransferOutEvents", _.addedTransferOutEvents),
       paramIfNonZero("numFilteredTransferOutEvents", _.numFilteredTransferOutEvents),
       paramIfNonEmpty("removedTransferOutEvents", _.removedTransferOutEvents),
-      paramIfNonEmpty("addedArchivedTombstones", _.addedArchivedTombstones),
-      paramIfNonEmpty("removedArchivedTombstones", _.removedArchivedTombstones),
+      paramIfNonEmpty("prunedContracts", _.prunedContracts),
       paramIfNonEmpty(
         "ingestedTxLogEntries",
         _.ingestedTxLogEntries,
@@ -81,19 +77,17 @@ private[store] object IngestionSummary {
     offset = None,
     newAcsSize = 0,
     ingestedCreatedEvents = Vector.empty,
+    updatedContractStates = Vector.empty,
     numFilteredCreatedEvents = 0,
     ingestedArchivedEvents = Vector.empty,
     numFilteredArchivedEvents = 0,
-    addedContractLocations = Vector.empty,
-    removedContractLocations = Vector.empty,
     addedTransferInEvents = Vector.empty,
     numFilteredTransferInEvents = 0,
     removedTransferInEvents = Vector.empty,
     addedTransferOutEvents = Vector.empty,
     numFilteredTransferOutEvents = 0,
     removedTransferOutEvents = Vector.empty,
-    addedArchivedTombstones = Vector.empty,
-    removedArchivedTombstones = Vector.empty,
+    prunedContracts = Vector.empty,
     ingestedTxLogEntries = Seq.empty,
   )
 }
