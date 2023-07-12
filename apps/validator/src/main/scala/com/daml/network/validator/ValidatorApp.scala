@@ -426,6 +426,7 @@ class ValidatorApp(
       _ <- AcsStoreDump.receiveCratesFor(
         validatorParty,
         (party: PartyId, tc0: TraceContext) => scanConnection.getImportShipment(party)(tc0),
+        useReadAs = None,
         // Use the ValidatorStore's associated connection, so the later check whether a ValidatorLicense exists runs
         // against the store updated with the results of the crate import.
         automation.connection,
