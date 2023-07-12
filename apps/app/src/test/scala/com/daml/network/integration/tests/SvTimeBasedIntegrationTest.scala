@@ -10,7 +10,6 @@ import org.slf4j.event.Level
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
 import CNNodeTests.BracketSynchronous.*
-import com.daml.network.codegen.java.cn.svcrules.SvReward
 
 class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBaseWithSharedEnvironment {
   "auto-merge unclaimed rewards" in { implicit env =>
@@ -119,6 +118,13 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBaseWithShare
         },
       )
     }
+
+    clue(
+      "wait for the system to quiet down after sv2Backend, sv3Backend and sv4Backend come back up"
+    ) {
+      waitForAllSvcRewardsToBeCollected()
+      waitForAllSvRewardsToBeCollected()
+    }
   }
 
   "detect an inactive leader" in { implicit env =>
@@ -196,12 +202,8 @@ class SvTimeBasedIntegrationTest extends SvTimeBasedIntegrationTestBaseWithShare
     }
 
     clue("wait for the system to quiet down after sv1Backend back up") {
-      eventually() {
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(SvcReward.COMPANION)(svcParty) shouldBe empty
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(SvReward.COMPANION)(svcParty) shouldBe empty
-      }
+      waitForAllSvcRewardsToBeCollected()
+      waitForAllSvRewardsToBeCollected()
     }
   }
 }
