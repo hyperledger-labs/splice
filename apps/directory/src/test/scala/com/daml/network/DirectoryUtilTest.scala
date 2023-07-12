@@ -29,6 +29,8 @@ class DirectoryUtilTest extends BaseTest with BaseTestWordSpec {
       "be false for names with" should {
         val validNames = Table(
           ("statement", "name"),
+          ("empty string", ""),
+          ("empty string with suffix", ".unverified.cns"),
           ("restricted special characters", "aliceentry~$!@%^&*()+.unverified.cns"),
           ("dots before the required suffix", "alice.entry.unverified.cns"),
           ("incorrect suffix", "alice.cns"),

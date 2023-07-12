@@ -5,7 +5,6 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, DirectoryFrontendTestUtil, WalletTestUtil}
 
-import scala.concurrent.duration.*
 import org.openqa.selenium.support.ui.ExpectedConditions
 
 class DirectoryFrontendIntegrationTest
@@ -75,7 +74,7 @@ class DirectoryFrontendIntegrationTest
         // login to wallet UI once to create saved localstorage auth session
         login(3000, aliceDamlUser)
         login(3004, aliceDamlUser)
-        waitForQuery(id("entry-name-field"), timeUntilSuccess = Some(100.seconds))
+        waitForQuery(id("entry-name-field"))
 
         clue("requesting an invalid name to check invalid name message") {
           waitForQuery(id("entry-name-field"))
@@ -85,6 +84,9 @@ class DirectoryFrontendIntegrationTest
           waitForCondition(id("search-entry-button")) { ExpectedConditions.elementToBeClickable(_) }
           click on "search-entry-button"
           waitForQuery(id("unavailable-icon"))
+          find(id("entry-name-validation-message")).fold(fail("Unable to find validation message"))(
+            _.text should startWith("The provided entry name has an invalid format")
+          )
         }
       }
     }
