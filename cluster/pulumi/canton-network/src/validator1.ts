@@ -20,32 +20,30 @@ export async function installValidator1(
   onboarding: ValidatorOnboarding,
   withDomainFees = false,
   isDevNet: boolean,
-  postgresPassword: pulumi.Input<string>,
   validatorWalletUser: string,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name);
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres', postgresPassword);
+  const postgresDb = postgres.installPostgres(xns, 'postgres');
 
   const participant = installParticipant(
     xns,
     'participant',
     postgresDb,
     auth0UserNameEnvVarSource('validator'),
-    postgresPassword,
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump
   );
 
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [
-    await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
+    installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
   const extraDependsOn: pulumi.Resource[] = [svc];
 
-  return await installValidatorApp({
+  return installValidatorApp({
     auth0Client,
     withDomainFees,
     validatorWalletUser,

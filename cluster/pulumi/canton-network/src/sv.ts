@@ -59,7 +59,7 @@ export type SvOnboarding =
       type: 'join-with-key';
       publicKey: string;
       privateKey: string;
-      postgresPassword: pulumi.Input<string>;
+      sequencerDatabase: postgres.Postgres;
       sponsorRelease?: pulumi.Resource;
       sponsorApiUrl: string;
     };
@@ -104,7 +104,6 @@ export type SvConfig = {
   approvedSvIdentities: ApprovedSvIdentity[];
   withScan: boolean;
   withDirectoryBackend: boolean;
-  postgresPassword: pulumi.Input<string>;
   expectedValidatorOnboardings: ValidatorOnboarding[];
   isDevNet: boolean;
   backupConfig?: BackupConfig;
@@ -121,15 +120,18 @@ async function getAcsBootstrappingDump(xns: ExactNamespace, config: Bootstrappin
   };
 }
 
-export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> {
+export function installSvNode(config: SvConfig): {
+  svApp: pulumi.Resource;
+  postgresDatabase: postgres.Postgres;
+} {
   const xns = exactNamespace(config.nodename);
 
   const auth0BackendSecrets: pulumi.Resource[] = [
-    await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
+    installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
-    await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
+    installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
   const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
@@ -137,7 +139,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     : undefined;
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined = config.bootstrappingDumpConfig
-    ? await fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
+    ? fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
     : undefined;
 
   const dependsOn: pulumi.Resource[] = auth0BackendSecrets
@@ -160,23 +162,21 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres', config.postgresPassword);
+  const postgresDb = postgres.installPostgres(xns, 'postgres');
 
   const domain = undefined;
 
   if (config.withDomainNode) {
-    const sequencerPassword =
-      config.onboarding.type === 'join-with-key'
-        ? config.onboarding.postgresPassword
-        : config.postgresPassword;
+    const sequencerDatabase =
+      config.onboarding.type === 'join-with-key' ? config.onboarding.sequencerDatabase : postgresDb;
 
     installGlobalDomain(
       xns,
       'global-domain',
-      postgresDb,
+      postgresDb.address,
       config.withDomainFees,
-      config.postgresPassword,
-      sequencerPassword
+      postgresDb,
+      sequencerDatabase
     );
   }
 
@@ -185,7 +185,6 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     'participant',
     postgresDb,
     auth0UserNameEnvVarSource('sv'),
-    config.postgresPassword,
     // If we have a dump, we disable auto init.
     !!config.bootstrappingDumpConfig
   );
@@ -254,7 +253,7 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     }
   }
 
-  await installValidatorApp({
+  installValidatorApp({
     auth0Client: config.auth0Client,
     withDomainFees: config.withDomainFees,
     xns,
@@ -286,5 +285,5 @@ export async function installSvNode(config: SvConfig): Promise<pulumi.Resource> 
     [xns.ns]
   );
 
-  return svApp;
+  return { svApp, postgresDatabase: postgresDb };
 }

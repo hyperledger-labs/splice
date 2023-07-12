@@ -20,22 +20,20 @@ export async function installSplitwell(
   providerWalletUser: string,
   onboarding: ValidatorOnboarding,
   withDomainFees = false,
-  postgresPassword: pulumi.Input<string>,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell');
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres', postgresPassword);
+  const postgresDb = postgres.installPostgres(xns, 'postgres');
 
-  const domain = installDomain(xns, 'domain', postgresDb, postgresPassword);
+  const domain = installDomain(xns, 'domain', postgresDb);
 
   const participant = installParticipant(
     xns,
     'participant',
     postgresDb,
     auth0UserNameEnvVarSource('validator'),
-    postgresPassword,
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
     [domain]
@@ -46,18 +44,15 @@ export async function installSplitwell(
     'splitwell-app',
     'cn-splitwell-app',
     {
-      postgres: postgresDb,
-      postgresPassword,
+      postgres: postgresDb.address,
+      postgresPassword: postgresDb.password,
     },
     [svc, participant]
   );
 
-  const extraDependsOn = [
-    svc,
-    await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
-  ];
+  const extraDependsOn = [svc, installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell')];
 
-  return await installValidatorApp({
+  return installValidatorApp({
     auth0Client,
     xns,
     withDomainFees,

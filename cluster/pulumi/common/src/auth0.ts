@@ -279,12 +279,19 @@ async function auth0Secret(
   }
 }
 
-export async function installAuth0Secret(
+export function installAuth0Secret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
-): Promise<k8s.core.v1.Secret> {
+): k8s.core.v1.Secret {
+  async function secretFor(
+    auth0Client: Auth0Client,
+    clientName: string
+  ): Promise<{ [key: string]: string }> {
+    return await auth0Secret(auth0Client, await auth0Client.getSecrets(), clientName);
+  }
+
   return new k8s.core.v1.Secret(
     'auth0-secret-' + xns.logicalName + '-' + clientName,
     {
@@ -292,7 +299,7 @@ export async function installAuth0Secret(
         name: 'cn-app-' + secretNameApp + '-ledger-api-auth',
         namespace: xns.ns.metadata.name,
       },
-      stringData: await auth0Secret(auth0Client, await auth0Client.getSecrets(), clientName),
+      stringData: secretFor(auth0Client, clientName),
     },
     {
       dependsOn: xns.ns,
@@ -300,20 +307,28 @@ export async function installAuth0Secret(
   );
 }
 
-export async function installAuth0UISecret(
+export function installAuth0UISecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
-): Promise<k8s.core.v1.Secret> {
-  const clientSecrets = lookupClientSecrets(
-    await auth0Client.getSecrets(),
-    auth0Client.getCfg().namespaceToUiClientId,
-    xns.logicalName
-  );
-  const clientId = clientSecrets.client_id;
+): k8s.core.v1.Secret {
+  async function getClientId() {
+    const clientSecrets = lookupClientSecrets(
+      await auth0Client.getSecrets(),
+      auth0Client.getCfg().namespaceToUiClientId,
+      xns.logicalName
+    );
+    return clientSecrets.client_id;
+  }
 
-  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, clientId);
+  return installAuth0UiSecretWithClientId(
+    auth0Client,
+    xns,
+    secretNameApp,
+    clientName,
+    getClientId()
+  );
 }
 
 export function installAuth0UiSecretWithClientId(
@@ -321,7 +336,7 @@ export function installAuth0UiSecretWithClientId(
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string,
-  clientId: string
+  clientId: string | Promise<string>
 ): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(
     'auth0-ui-secret-' + xns.logicalName + '-' + clientName,

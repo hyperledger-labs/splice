@@ -1,5 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as sinon from 'sinon';
+import { MockMonitor } from '@pulumi/pulumi/runtime/mocks';
 
 import { Auth0ClientSecret } from './auth0types';
 
@@ -43,8 +44,22 @@ export function initDumpConfig(): void {
   const projectName = 'test-project';
   const stackName = 'test-stack';
 
-  pulumi.runtime.setMocks(
-    {
+  class MockMonitorWithFeatures extends MockMonitor {
+    public supportsFeature(req: any, callback: (err: any, innerResponse: any) => void): void {
+      const id = req.getId();
+
+      // Support for "outputValues" is deliberately disabled for the mock monitor so
+      // instances of `Output` don't show up in `MockResourceArgs` inputs.
+      const hasSupport = 'outputValues' !== id;
+
+      callback(null, {
+        getHassupport: () => hasSupport,
+      });
+    }
+  }
+
+  pulumi.runtime.setMockOptions(
+    new MockMonitorWithFeatures({
       newResource: function (args: pulumi.runtime.MockResourceArgs): {
         id: string;
         state: any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -74,7 +89,7 @@ export function initDumpConfig(): void {
         }
         return args.inputs;
       },
-    },
+    }),
     projectName,
     stackName
   );

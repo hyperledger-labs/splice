@@ -1,4 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import { Bucket, File, Storage } from '@google-cloud/storage';
 import { ExactNamespace, config } from 'cn-pulumi-common';
 import { exit } from 'process';
@@ -126,7 +127,7 @@ export function getLatestSvcAcsDumpFile(
 export function installParticipantIdentitySecret(
   xns: ExactNamespace,
   secretName: string,
-  content: string
+  content: pulumi.Input<string>
 ): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(`cn-app-${xns.logicalName}-${secretName}`, {
     metadata: {
@@ -135,7 +136,7 @@ export function installParticipantIdentitySecret(
     },
     type: 'Opaque',
     data: {
-      content: Buffer.from(content, 'ascii').toString('base64'),
+      content: pulumi.output(content).apply(c => Buffer.from(c, 'ascii').toString('base64')),
     },
   });
 }
@@ -149,12 +150,12 @@ export type BootstrappingDumpConfig = {
   end: Date;
 };
 
-export async function fetchAndInstallParticipantBootstrapDump(
+export function fetchAndInstallParticipantBootstrapDump(
   xns: ExactNamespace,
   config: BootstrappingDumpConfig
-): Promise<k8s.core.v1.Secret> {
+): k8s.core.v1.Secret {
   const bucket = getGcpBucket(config.bucket.config, config.bucket.jsonCredentials);
-  const content = await getLatestParticipantIdentityDump(
+  const content = getLatestParticipantIdentityDump(
     bucket,
     xns,
     config.cluster,

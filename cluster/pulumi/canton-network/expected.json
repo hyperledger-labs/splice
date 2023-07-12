@@ -1546,7 +1546,7 @@
           }
         },
         "sequencerDriver": {
-          "address": "postgres.sv-1"
+          "address": "postgres.sv-1.svc.cluster.local"
         },
         "trafficControl": {}
       }
@@ -2299,7 +2299,7 @@
           }
         },
         "sequencerDriver": {
-          "address": "postgres.sv-1"
+          "address": "postgres.sv-1.svc.cluster.local"
         },
         "trafficControl": {}
       }
@@ -3030,7 +3030,7 @@
           }
         },
         "sequencerDriver": {
-          "address": "postgres.sv-1"
+          "address": "postgres.sv-1.svc.cluster.local"
         },
         "trafficControl": {}
       }
@@ -3686,7 +3686,7 @@
           }
         },
         "sequencerDriver": {
-          "address": "postgres.sv-1"
+          "address": "postgres.sv-1.svc.cluster.local"
         },
         "trafficControl": {}
       }
@@ -4630,6 +4630,26 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "splitwell-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "splitwell-postgres",
+    "provider": "",
+    "type": "canton:network:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -4649,21 +4669,17 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell",
+    "name": "sv-1-postgres-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
   {
-    "custom": true,
+    "custom": false,
     "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-postgres-passwd",
+    "inputs": {},
+    "name": "sv-1-postgres",
     "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
+    "type": "canton:network:postgres"
   },
   {
     "custom": true,
@@ -4693,6 +4709,14 @@
     "type": "random:index/randomPassword:RandomPassword"
   },
   {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-2-postgres",
+    "provider": "",
+    "type": "canton:network:postgres"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -4718,6 +4742,14 @@
     "name": "sv-3-postgres-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-3-postgres",
+    "provider": "",
+    "type": "canton:network:postgres"
   },
   {
     "custom": true,
@@ -4747,6 +4779,14 @@
     "type": "random:index/randomPassword:RandomPassword"
   },
   {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-4-postgres",
+    "provider": "",
+    "type": "canton:network:postgres"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -4769,9 +4809,17 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "validator1-password",
+    "name": "validator1-postgres-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-postgres",
+    "provider": "",
+    "type": "canton:network:postgres"
   },
   {
     "custom": true,

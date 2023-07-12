@@ -48,18 +48,18 @@ export type ValidatorConfig = {
   participantBootstrapDump?: BootstrappingDumpConfig;
 };
 
-export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
+export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     config.participantBootstrapDump
-      ? await fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
+      ? fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
       : undefined;
 
   const dependsOn: pulumi.Resource[] = [
     config.xns.ns,
     config.participant,
-    await installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName),
-    await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
-    await installAuth0UISecret(config.auth0Client, config.xns, 'directory', 'directory'),
+    installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName),
+    installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
+    installAuth0UISecret(config.auth0Client, config.xns, 'directory', 'directory'),
   ]
     .concat(
       config.onboarding ? [installValidatorOnboardingSecret(config.xns, config.onboarding)] : []

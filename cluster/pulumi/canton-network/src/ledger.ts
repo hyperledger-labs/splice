@@ -3,16 +3,16 @@ import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 import { domainFeesConfig } from './domainFeesCfg';
+import { Postgres } from './postgres';
 
 export function installDomain(
   xns: ExactNamespace,
   name: string,
-  postgresDb: pulumi.Output<string>,
-  postgresPassword: pulumi.Input<string>
+  postgresDb: Postgres
 ): pulumi.Resource {
   return installCNHelmChart(xns, name, 'cn-domain', {
-    postgres: postgresDb,
-    postgresPassword,
+    postgres: postgresDb.address,
+    postgresPassword: postgresDb.password,
   });
 }
 
@@ -21,18 +21,18 @@ export function installGlobalDomain(
   name: string,
   postgresDb: pulumi.Output<string>,
   withDomainFees: boolean,
-  postgresPassword: pulumi.Input<string>,
-  postgresSequencerPassword: undefined | pulumi.Input<string> = undefined
+  postgres: Postgres,
+  sequencerPostgres: Postgres
 ): pulumi.Resource {
   if (withDomainFees) {
     console.error('Running with domain fees');
   }
   return installCNHelmChart(xns, name, 'cn-global-domain', {
-    postgres: postgresDb,
-    postgresPassword,
+    postgres: postgres.address,
+    postgresPassword: postgres.password,
     sequencerDriver: {
-      address: 'postgres.sv-1',
-      password: postgresSequencerPassword,
+      address: sequencerPostgres.address,
+      password: sequencerPostgres.password,
     },
     trafficControl: withDomainFees
       ? {
@@ -47,9 +47,8 @@ export function installGlobalDomain(
 export function installParticipant(
   xns: ExactNamespace,
   name: string,
-  postgresDb: pulumi.Output<string>,
+  postgresDb: Postgres,
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
-  postgresPassword: pulumi.Input<string>,
   disableAutoInit = false,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource {
@@ -58,8 +57,8 @@ export function installParticipant(
     name,
     'cn-participant',
     {
-      postgres: postgresDb,
-      postgresPassword,
+      postgres: postgresDb.address,
+      postgresPassword: postgresDb.password,
       postgresSchema: xns.logicalName + '_participant',
       participantAdminUserNameFrom,
       disableAutoInit,
