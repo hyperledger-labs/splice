@@ -19,6 +19,12 @@ app_charts := \
 
 all_charts := $(app_charts) cn-util-lib
 
+HELM_VERSION_TAG := cluster/helm/.version-tag
+
+.PHONY: cluster/helm/write-version
+cluster/helm/write-version:
+	overwrite-if-changed '$(shell get-snapshot-version)' $(HELM_VERSION_TAG)
+
 .PHONY: cluster/helm/build
 cluster/helm/build: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-build)
 
@@ -26,11 +32,11 @@ cluster/helm/build: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-bui
 cluster/helm/clean: $(foreach chart,$(all_charts),cluster/helm/$(chart)/helm-clean)
 	rm -rfv cluster/helm/target
 
-%/values.yaml: %/values-template.yaml HELM_CHART_VERSION
-	cat $< | version-tag-subst > $@
+%/values.yaml: %/values-template.yaml cluster/helm/write-version
+	@version-tag-subst "$$(< $(HELM_VERSION_TAG))" < $< > $@
 
-%/Chart.yaml: %/Chart-template.yaml HELM_CHART_VERSION
-	cat $< | version-tag-subst > $@
+%/Chart.yaml: %/Chart-template.yaml cluster/helm/write-version
+	@version-tag-subst "$$(< $(HELM_VERSION_TAG))" < $< > $@
 
 #########
 # Helm pattern rules

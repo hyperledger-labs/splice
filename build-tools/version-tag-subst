@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-SNAPSHOT_VERSION=$(get-snapshot-version)
+SNAPSHOT_VERSION="${1:?expected a version as first argument}"
 
 sed --expression="s/IMAGE_TAG/${SNAPSHOT_VERSION}/g" | \
     sed --expression="s/VERSION_NUMBER/${SNAPSHOT_VERSION}/g"
