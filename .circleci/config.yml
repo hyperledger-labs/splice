@@ -139,10 +139,6 @@ commands:
           key: &compiled_classes_key classes-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} openapi={{ checksum "openapi-cache-key.txt" }} rev:{{ .Revision }}
           paths:
             - /tmp/classes
-      - store_artifacts:
-          name: Storing archive of compiled classes
-          path: /tmp/classes
-          destination: classes
 
   # restore pre-compiled target directories from cache (so we don't recompile everything again and again)
   # uses the target directories in the project (e.g. `canton-network-node/target`) which sbt doesn't cache.
