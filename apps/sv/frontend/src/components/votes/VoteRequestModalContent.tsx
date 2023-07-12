@@ -48,7 +48,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
 
   // allVotes being empty means that the vote request has been executed, as the initiator of the request must vote on his proposition. Therefore, we can close the modal.
   useEffect(() => {
-    if (votesQuery.data!.length === 0) {
+    if (votesQuery.data?.length === 0) {
       handleClose();
     }
   }, [votesQuery, handleClose]);

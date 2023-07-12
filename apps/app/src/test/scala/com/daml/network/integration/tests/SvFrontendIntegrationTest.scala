@@ -7,8 +7,8 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.util.{FrontendLoginUtil, SvTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
+import org.openqa.selenium.{By, Keys}
 
 class SvFrontendIntegrationTest
     extends FrontendIntegrationTest("sv1", "sv2")
@@ -697,7 +697,7 @@ class SvFrontendIntegrationTest
 
     }
 
-    "can create a valid CRARC_SetConfigSchedule(future coin configurations) vote request" in {
+    "can create a valid CRARC_SetConfigSchedule (with two future coin configurations) vote request" in {
       implicit env =>
         val requestNewTransferConfigFeeValue = "42"
         val requestReasonUrl = "This is a request reason url."
@@ -720,11 +720,16 @@ class SvFrontendIntegrationTest
             "sv1 operator can create a new vote request with two future schedules on different dates", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("CRARC_SetConfigSchedule")
+              val inputElement = webDriver.findElement(By.id("datetime-picker-coin-configuration"))
 
-              Seq(("12-12-002030T12:12", 1), ("12-12-002031T12:12", 2)).foreach(e => {
-                inside(find(id("datetime-schedule-configuration-value"))) { case Some(element) =>
-                  element.underlying.clear()
-                  element.underlying.sendKeys(e._1)
+              Seq(("07/12/2030 12:12 AM", 1), ("07/12/2031 12:12 AM", 2)).foreach(e => {
+                eventually() {
+                  clue(s"sv1 select a date $e") {
+                    inputElement.clear()
+                    inputElement.click()
+                    inputElement.sendKeys(e._1)
+                    inputElement.sendKeys(Keys.RETURN)
+                  }
                 }
 
                 click on "button-schedule-new-configuration"

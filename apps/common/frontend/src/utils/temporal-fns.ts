@@ -71,3 +71,16 @@ export const formatDatetime: (datetime: string) => FormattedDateTime = (datetime
     }),
   };
 };
+
+export function getUTCWithOffset(): string {
+  const dt = new Date();
+  let timezoneOffset = dt.getTimezoneOffset();
+
+  const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60.0);
+  const offsetMinutes = Math.abs(timezoneOffset) % 60;
+  const offsetSign = timezoneOffset < 0 ? '+' : '-';
+
+  return `UTC${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes
+    .toString()
+    .padStart(2, '0')}`;
+}

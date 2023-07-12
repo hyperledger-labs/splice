@@ -11,6 +11,8 @@ import {
 } from 'react-router-dom';
 
 import { ThemeProvider, CssBaseline } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import AuthCheck from './routes/authCheck';
@@ -39,7 +41,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
       <QueryClientProvider client={queryClient}>
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-          <SvAdminClientProvider url={config.services.sv.url}>{children}</SvAdminClientProvider>
+          <SvAdminClientProvider url={config.services.sv.url}>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
+          </SvAdminClientProvider>
         </UserProvider>
       </QueryClientProvider>
     </AuthProvider>

@@ -1,6 +1,9 @@
+import { getUTCWithOffset } from 'common-frontend';
+import { Dayjs } from 'dayjs';
 import React, { useState } from 'react';
 
-import { Button, Card, CardContent, CardHeader, Input, Stack } from '@mui/material';
+import { Button, Card, CardContent, CardHeader, Stack } from '@mui/material';
+import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
 import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
@@ -8,6 +11,10 @@ import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
 
 import JsonEditor from './JsonEditor';
 import { JSONValue } from './JsonType';
+
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+dayjs.extend(utc);
 
 interface ComponentSwitcherProps {
   data: Schedule<string, CoinConfig<'USD'>> | undefined;
@@ -30,9 +37,9 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
 
   const handleAddComponent = () => {
     const newComponent = baseComponent;
-    newComponent._1 = date + ':00Z';
-    // TODO(#6100): we should use a correct mui date picker which includes directly right format!
-    if (!components.map(e => e._1).includes(newComponent._1) && /^\d{4}-/.test(newComponent._1)) {
+    newComponent._1 = dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]');
+
+    if (!components.map(e => e._1).includes(newComponent._1)) {
       setComponents(prevComponents => [...prevComponents, newComponent]);
     }
   };
@@ -43,27 +50,27 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
   };
 
   function addCoinConfigSchedule(coinConfig: Record<string, JSONValue>, time?: string | undefined) {
-    // @ts-ignore
-    const decodedNewConfig = new Tuple2<string, CoinConfig<'USD'>>();
-    decodedNewConfig._1 = time;
-    decodedNewConfig._2 = CoinConfig(USD).decoder.runWithException(coinConfig);
-
-    const newComponents = components.filter(comp => comp._1 !== decodedNewConfig._1);
-    newComponents.push(decodedNewConfig);
-    setComponents(newComponents);
-    onChange(newComponents);
+    components.filter(comp => comp._1 === time)[0]._2 =
+      CoinConfig(USD).decoder.runWithException(coinConfig);
+    onChange(components);
   }
 
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState<Dayjs | null>(dayjs());
 
   return (
     <Stack>
-      <Input
-        type="datetime-local"
+      <DesktopDateTimePicker
+        label={`Enter time in local timezone (${getUTCWithOffset()})`}
         value={date}
-        id={'datetime-schedule-configuration-value'}
-        style={{ textAlign: 'right' }}
-        onChange={e => setDate(e.target.value)}
+        minDate={dayjs()}
+        readOnly={false}
+        onChange={(newValue: React.SetStateAction<Dayjs | null>) => setDate(newValue)}
+        slotProps={{
+          textField: {
+            id: 'datetime-picker-coin-configuration',
+          },
+        }}
+        closeOnSelect
       />
       <Button id={'button-schedule-new-configuration'} onClick={handleAddComponent}>
         Schedule New Configuration
@@ -72,7 +79,7 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
         <CardComponent
           key={index}
           index={index + 1}
-          datum={Component._1}
+          date={dayjs(Component._1).toString().replace('GMT', 'UTC')}
           removeFunction={() => handleRemoveComponent(index)}
         >
           <JsonEditor
@@ -92,9 +99,9 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
 const CardComponent: React.FC<{
   children: React.ReactNode;
   index: number;
-  datum: string;
+  date: string;
   removeFunction: () => void;
-}> = ({ children, index, datum, removeFunction }) => {
+}> = ({ children, index, date, removeFunction }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   const toggleCollapse = () => {
@@ -110,7 +117,7 @@ const CardComponent: React.FC<{
             <Button id={'button-collapse-schedule-configuration-' + index} onClick={toggleCollapse}>
               {isCollapsed ? '▶' : '▼'}
             </Button>
-            Schedule {index}: {datum}
+            Schedule {index}: {date}
             <span style={{ marginRight: '400px' }} />
             <Button id={'button-remove-schedule-configuration-' + index} onClick={removeFunction}>
               Remove
