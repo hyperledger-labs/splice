@@ -488,13 +488,6 @@ commands:
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
             ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
 
-            if [[ << parameters.cluster >> =~ (dev|test)net  ]]; then
-              ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_DEVNET_KEY"
-            fi
-            if [[ << parameters.cluster >> =~ ^(staging.*|scratchnet.*)$ ]]; then
-              ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
-            fi
-
             nix develop \
               path:nix \
               --ignore-environment \
@@ -503,6 +496,9 @@ commands:
               --keep TERM \
               --keep CI \
               --keep RUN_SPLITTED_TESTS_CMD \
+              --keep GCP_DA_CN_DEVNET_KEY \
+              --keep GCP_DA_CN_SCRATCHNET_KEY \
+              --keep GCP_DA_CN_SCRATCHNET2_KEY \
               $ADDITIONAL_NIX_ARGS \
               --command bash \<<'EOF'
 
@@ -514,16 +510,30 @@ commands:
               fi
 
               if [[ << parameters.gce_authenticate >> == true ]]; then
-                if [[ << parameters.cluster >> =~ (dev|test)net ]]; then
-                  echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
-                  # GOOGLE_CREDENTIALS variable is used by pulumi
-                  export GOOGLE_CREDENTIALS=${GCP_DA_CN_DEVNET_KEY}
-                fi
-                if [[ << parameters.cluster >> =~ ^(staging.*|scratchnet.*)$ ]]; then
-                  echo $GCP_DA_CN_SCRATCHNET_KEY | gcloud auth activate-service-account --key-file=-
-                  # GOOGLE_CREDENTIALS variable is used by pulumi
-                  export GOOGLE_CREDENTIALS=${GCP_DA_CN_SCRATCHNET_KEY}
-                fi
+                # Authenticate to the correct GCP project for the cluster
+                echo "Authenticating to cluster \"<< parameters.cluster >>\" in project \"${CLOUDSDK_CORE_PROJECT}\""
+                case ${CLOUDSDK_CORE_PROJECT} in
+                  da-cn-scratchnet)
+                    export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_SCRATCHNET_KEY}"
+                    ;;
+
+                  da-cn-scratchnet2)
+                    export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_SCRATCHNET2_KEY}"
+                    ;;
+
+                  da-cn-devnet)
+                    export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_DEVNET_KEY}"
+                    ;;
+
+                  *)
+                    echo "Cannot authenticate to GCP project without key: ${CLOUDSDK_CORE_PROJECT}"
+                    exit 1
+                    ;;
+                esac
+
+                # GOOGLE_CREDENTIALS variable is used by pulumi
+                echo ${CN_ACTIVE_ENVIRONMENT_KEY} | gcloud auth activate-service-account --key-file=-
+                export GOOGLE_CREDENTIALS=${CN_ACTIVE_ENVIRONMENT_KEY}
               fi
 
               MAX_RETRY=<< parameters.cmd_retry_count >>
