@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
@@ -44,16 +44,6 @@ class ExpireRewardCouponsTrigger(
         expiredRewardsTask.appCoupons
       )
     } yield !(allValidatorCouponsExist && allAppCouponsExist)
-  }
-
-  override def completeTaskAsFollower(
-      expiredRewardsTask: ExpiredRewardCouponsBatch
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    Future.successful(
-      TaskSuccess(
-        show"ignoring ${expiredRewardsTask}, as we're not the leader"
-      )
-    )
   }
 
   override def completeTaskAsLeader(

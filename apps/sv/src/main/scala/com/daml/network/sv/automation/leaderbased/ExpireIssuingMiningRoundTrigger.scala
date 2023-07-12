@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.{
   MultiDomainExpiredContractTrigger,
@@ -10,7 +10,6 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -57,15 +56,4 @@ class ExpireIssuingMiningRoundTrigger(
         .submitWithResultNoDedup(Seq(store.key.svParty), Seq(store.key.svcParty), cmd, domainId)
     } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")
   }
-
-  override protected def completeTaskAsFollower(
-      task: ScheduledTaskTrigger.ReadyTask[
-        ReadyContract[IssuingMiningRound.ContractId, IssuingMiningRound]
-      ]
-  )(implicit tc: TraceContext): Future[TaskOutcome] =
-    Future.successful(
-      TaskSuccess(
-        s"ignoring mining round ${PrettyContractId(task.work.contract)}, as we're not the leader"
-      )
-    )
 }

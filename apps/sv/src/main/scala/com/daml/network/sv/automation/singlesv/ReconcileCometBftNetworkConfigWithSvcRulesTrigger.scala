@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.singlesv
 
 import cats.data.OptionT
 import cats.implicits.catsSyntaxApplicativeId

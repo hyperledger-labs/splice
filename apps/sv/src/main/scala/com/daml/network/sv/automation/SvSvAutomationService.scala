@@ -3,6 +3,7 @@ package com.daml.network.sv.automation
 import akka.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvSvStore
 import com.digitalasset.canton.logging.NamedLoggerFactory

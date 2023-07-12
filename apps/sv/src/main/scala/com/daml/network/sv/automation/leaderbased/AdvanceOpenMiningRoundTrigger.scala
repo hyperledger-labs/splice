@@ -1,16 +1,13 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.util.SvUtil
 
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -69,63 +66,6 @@ class AdvanceOpenMiningRoundTrigger(
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
     )
-  }
-
-  override def completeTaskAsFollower(
-      task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    logger.debug(show"Starting check for leader inactivity for ${task.work}")
-    store
-      .getSvcRules()
-      .flatMap(rules => {
-        val (monitoredEpoch, monitoredLeader) = (rules.payload.epoch, rules.payload.leader)
-        context.retryProvider
-          .waitUnlessShutdown(
-            context.clock
-              .scheduleAfter(
-                _ => {
-                  // No work done here, as we are only interested in the scheduling notification
-                  ()
-                },
-                // NOTE: We don't restart existing inactivity checks when the leaderInactiveTimeout changes
-                SvUtil
-                  .fromRelTime(rules.payload.config.leaderInactiveTimeout)
-                  .plus(context.config.pollingInterval.asJava),
-              )
-          )
-          .unwrap
-          .flatMap {
-            case UnlessShutdown.AbortedDueToShutdown =>
-              Future.successful(
-                TaskSuccess(
-                  show"Shutting down leader inactivity check for ${task.work}"
-                )
-              )
-            case UnlessShutdown.Outcome(()) => {
-              val isLeaderInactive = for {
-                sameEpoch <- store
-                  .getSvcRules()
-                  .map(_.payload.epoch == monitoredEpoch)
-                taskStale <- isStaleTask(task)
-              } yield sameEpoch && !taskStale
-
-              isLeaderInactive.flatMap(isInactive => {
-                if (isInactive) {
-                  voteForNewLeader(
-                    monitoredLeader
-                  )
-                } else {
-                  Future.successful(
-                    TaskSuccess(
-                      show"Leader inactivity check completed for ${task.work}"
-                    )
-                  )
-                }
-              })
-            }
-          }
-
-      })
   }
 
   override protected def isStaleTask(

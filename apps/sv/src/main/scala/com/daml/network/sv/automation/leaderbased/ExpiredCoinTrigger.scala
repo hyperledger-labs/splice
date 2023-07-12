@@ -1,11 +1,9 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cc
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -53,11 +51,4 @@ class ExpiredCoinTrigger(
         domainId = co.work.domain,
       )
     } yield TaskSuccess("archived expired coin")
-
-  override def completeTaskAsFollower(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
-    Future.successful(
-      TaskSuccess(show"ignoring ${PrettyContractId(co.work.contract)}, as we're not the leader")
-    )
-  }
-
 }

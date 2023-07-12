@@ -7,6 +7,20 @@ import com.daml.network.automation.{
   TransferInTrigger,
 }
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.sv.automation.confirmation.{
+  ArchiveClosedMiningRoundsTrigger,
+  ElectionRequestTrigger,
+  SummarizingMiningRoundTrigger,
+  SvOnboardingRequestTrigger,
+}
+import com.daml.network.sv.automation.singlesv.{
+  PublishLocalCometBftNodeConfigTrigger,
+  ReconcileCometBftNetworkConfigWithSvcRulesTrigger,
+  ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger,
+  RestartLeaderBasedAutomationTrigger,
+  SvcRulesTransferTrigger,
+  SvRewardTrigger,
+}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
@@ -16,6 +30,7 @@ import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.sv.automation.singlesv.PeriodicAcsStoreBackupTrigger
 
 class SvSvcAutomationService(
     clock: Clock,
@@ -83,7 +98,9 @@ class SvSvcAutomationService(
       )
     )
   )
-  registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
+  if (config.automation.enableLeaderReplacement) {
+    registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
+  }
 
   registerTrigger(
     new RestartLeaderBasedAutomationTrigger(

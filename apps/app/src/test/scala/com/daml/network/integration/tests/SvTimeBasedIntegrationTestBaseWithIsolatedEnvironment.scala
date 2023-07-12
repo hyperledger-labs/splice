@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.round.*
+import com.daml.network.codegen.java.cc.round.{OpenMiningRound}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -99,16 +99,24 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
   }
 }
 
-abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
+abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections
     extends CNNodeIntegrationTest
     with SvTimeBasedIntegrationTestUtil {
+  protected val baseEnvironmentDefinition: CNNodeEnvironmentDefinition = CNNodeEnvironmentDefinition
+    .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+    .withManualStart
+    // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
+    .withoutAutomaticRewardsCollectionAndCoinMerging
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .withManualStart
-      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
-      .withoutAutomaticRewardsCollectionAndCoinMerging
+    baseEnvironmentDefinition
+}
+
+abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
+    extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
+  override def environmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    baseEnvironmentDefinition.withoutLeaderReplacement
 }
 
 abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
@@ -120,4 +128,5 @@ abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
       .withoutAutomaticRewardsCollectionAndCoinMerging
+      .withoutLeaderReplacement
 }

@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
@@ -81,15 +81,4 @@ class ArchiveDuplicateValidatorTrafficTrigger(
       }
     }
   }
-
-  override def completeTaskAsFollower(
-      validatorTraffic: ReadyContract[ValidatorTraffic.ContractId, ValidatorTraffic]
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    Future.successful(
-      TaskSuccess(
-        show"ignoring ${PrettyContractId(validatorTraffic.contract)}, as we're not the leader"
-      )
-    )
-  }
-
 }

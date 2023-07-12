@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.singlesv
 
 import cats.data.OptionT
 import com.daml.network.automation.{
@@ -10,7 +10,6 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cn.cometbft.SequencingKeyConfig
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.sv.automation.PublishLocalCometBftNodeConfigTrigger.*
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
@@ -35,11 +34,13 @@ class PublishLocalCometBftNodeConfigTrigger(
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[PublishLocalConfigTask] {
+) extends PollingParallelTaskExecutionTrigger[
+      PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask
+    ] {
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
-  ): Future[Seq[PublishLocalConfigTask]] =
+  ): Future[Seq[PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask]] =
     (for {
       svcRulesRC <- OptionT(store.lookupSvcRules())
       svcRules = svcRulesRC.contract
@@ -55,10 +56,16 @@ class PublishLocalCometBftNodeConfigTrigger(
         .get(SvUtil.defaultSvcDomainNumber)
         .map(domainNodeConfig => CometBftNode.svNodeConfigToProto(domainNodeConfig.cometBft))
         .contains(localSvNodeConfig)
-    } yield PublishLocalConfigTask(svNodeMemberInfo.name, svcRules, localSvNodeConfig)).value
+    } yield PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask(
+      svNodeMemberInfo.name,
+      svcRules,
+      localSvNodeConfig,
+    )).value
       .map(_.toList)
 
-  override protected def completeTask(task: PublishLocalConfigTask)(implicit
+  override protected def completeTask(
+      task: PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask
+  )(implicit
       tc: TraceContext
   ): Future[TaskOutcome] =
     for {
@@ -77,7 +84,7 @@ class PublishLocalCometBftNodeConfigTrigger(
     } yield TaskSuccess(show"Updated SVC-wide CometBFT node configuration for ${store.key.svParty}")
 
   override protected def isStaleTask(
-      task: PublishLocalConfigTask
+      task: PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask
   )(implicit tc: TraceContext): Future[Boolean] = {
     for {
       contract <- store.multiDomainAcsStore

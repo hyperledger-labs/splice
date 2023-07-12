@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
@@ -9,16 +9,13 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-//TODO(#3756) reconsider this trigger
-class CompletedSvOnboardingTrigger(
+class GarbageCollectCoinPriceVotesTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
@@ -41,38 +38,40 @@ class CompletedSvOnboardingTrigger(
     SvcRules,
   ]
 
-  private val store = svTaskContext.svcStore
+  val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(
       svcRules: SvcRulesContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svOnboardings <- store.listSvOnboardingRequestsBySvcMembers(svcRules.contract)
-      cmds = svOnboardings.map(co =>
-        svcRules.contract.contractId
-          .exerciseSvcRules_ArchiveSvOnboardingRequest(co.contractId)
+      coinPriceVotes <- store.listAllCoinPriceVotes()
+      (memberVotes, nonMemberVotes) = coinPriceVotes.partition(v =>
+        svcRules.contract.payload.members.asScala.contains(v.payload.sv)
       )
-      _ <- Future.sequence(
-        cmds.map(cmd =>
+      nonMemberVoteCids = nonMemberVotes.map(_.contractId)
+      memberDuplicatedVoteCids =
+        memberVotes
+          .groupBy(_.payload.sv)
+          .values
+          .filter(_.size > 1)
+          .map(_.map(_.contractId).asJava)
+          .toSeq
+      _ <-
+        if (nonMemberVoteCids.nonEmpty || memberDuplicatedVoteCids.nonEmpty) {
+          val cmd = svcRules.contract.contractId
+            .exerciseSvcRules_GarbageCollectCoinPriceVotes(
+              nonMemberVoteCids.asJava,
+              memberDuplicatedVoteCids.asJava,
+            )
           svTaskContext.connection.submitCommandsNoDedup(
             Seq(store.key.svParty),
             Seq(store.key.svcParty),
             commands = cmd.commands.asScala.toSeq,
             domainId = svcRules.domain,
           )
-        )
-      )
+        } else Future.successful(())
     } yield TaskSuccess(
-      show"Archived ${cmds.size} `SvOnboardingRequest` contract(s) as the SV(s) are added to SVC."
+      s"Archived ${nonMemberVoteCids.size} non member votes and deduplicated votes for ${memberDuplicatedVoteCids.size} SVs"
     )
   }
-
-  override def completeTaskAsFollower(
-      svcRules: SvcRulesContract
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    Future.successful(
-      TaskSuccess(show"ignoring ${PrettyContractId(svcRules.contract)}, as we're not the leader")
-    )
-  }
-
 }

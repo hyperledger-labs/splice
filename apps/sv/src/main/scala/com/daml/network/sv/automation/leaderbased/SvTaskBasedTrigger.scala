@@ -1,17 +1,21 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.util.SvUtil
+import com.digitalasset.canton.lifecycle.UnlessShutdown
+import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
-trait SvTaskBasedTrigger[T] { this: TaskbasedTrigger[T] =>
+trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
   protected def svTaskContext: SvTaskBasedTrigger.Context
 
@@ -28,7 +32,7 @@ trait SvTaskBasedTrigger[T] { this: TaskbasedTrigger[T] =>
           if (isLeader) {
             completeTaskAsLeader(task)
           } else {
-            completeTaskAsFollower(task)
+            monitorTaskAsFollower(task)
           }
         } else {
           Future.successful(
@@ -98,9 +102,63 @@ trait SvTaskBasedTrigger[T] { this: TaskbasedTrigger[T] =>
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome]
 
-  protected def completeTaskAsFollower(
+  private val store = svTaskContext.svcStore
+
+  final protected def monitorTaskAsFollower(
       task: T
-  )(implicit tc: TraceContext): Future[TaskOutcome]
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    logger.debug(show"Starting check for leader inactivity")
+    for {
+      svcRules <- store.getSvcRules()
+      monitoredEpoch = svcRules.payload.epoch
+      monitoredLeader = svcRules.payload.leader
+      timer = context.retryProvider
+        .waitUnlessShutdown(
+          context.clock
+            .scheduleAfter(
+              _ => {
+                // No work done here, as we are only interested in the scheduling notification
+                ()
+              },
+              // NOTE: We don't restart existing inactivity checks when the leaderInactiveTimeout changes
+              SvUtil
+                .fromRelTime(svcRules.payload.config.leaderInactiveTimeout)
+                .plus(context.config.pollingInterval.asJava),
+            )
+        )
+        .unwrap
+      result <- timer.flatMap {
+        case UnlessShutdown.AbortedDueToShutdown =>
+          Future.successful(
+            TaskSuccess(
+              show"stopping the check for leader inactivity, as the trigger is being shut down"
+            )
+          )
+        case UnlessShutdown.Outcome(()) => {
+          val isLeaderInactiveF = for {
+            sameEpoch <- store
+              .getSvcRules()
+              .map(_.payload.epoch == monitoredEpoch)
+            taskStale <- isStaleTask(task)
+          } yield sameEpoch && !taskStale
+
+          isLeaderInactiveF.flatMap(isLeaderInactive => {
+            if (isLeaderInactive) {
+              voteForNewLeader(
+                monitoredLeader
+              )
+            } else {
+              Future.successful(
+                TaskSuccess(
+                  show"Leader inactivity check completed, leader is active"
+                )
+              )
+            }
+          })
+        }
+      }
+    } yield result
+  }
 }
 
 object SvTaskBasedTrigger {

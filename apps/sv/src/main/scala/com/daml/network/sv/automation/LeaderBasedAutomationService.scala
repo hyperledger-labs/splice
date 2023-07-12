@@ -9,6 +9,24 @@ import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
+import com.daml.network.sv.automation.leaderbased.{
+  AdvanceOpenMiningRoundTrigger,
+  CompletedSvOnboardingTrigger,
+  SvTaskBasedTrigger,
+  ExecuteConfirmedActionTrigger,
+  ExecuteVoteRequestActionTrigger,
+  ArchiveDuplicateValidatorTrafficTrigger,
+  ExpiredCoinTrigger,
+  ExpiredLockedCoinTrigger,
+  ExpiredSvOnboardingRequestTrigger,
+  ExpiredSvOnboardingConfirmedTrigger,
+  SvcRewardTrigger,
+  ExpireIssuingMiningRoundTrigger,
+  ExpireStaleConfirmationsTrigger,
+  GarbageCollectCoinPriceVotesTrigger,
+  MergeUnclaimedRewardsTrigger,
+  ExpireRewardCouponsTrigger,
+}
 
 class LeaderBasedAutomationService(
     clock: Clock,

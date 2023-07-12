@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.{
   TriggerContext,
@@ -11,8 +11,8 @@ import com.daml.network.codegen.java.cn.svcrules.SvcRules_MergeUnclaimedRewards
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
 
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 
 import io.opentelemetry.api.trace.Tracer
 
@@ -25,19 +25,14 @@ class MergeUnclaimedRewardsTrigger(
 )(implicit
     override val ec: ExecutionContext,
     tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[
-      Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]
-    ]
-    with SvTaskBasedTrigger[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] {
+) extends PollingParallelTaskExecutionTrigger[MergeUnclaimedRewardsTask]
+    with SvTaskBasedTrigger[MergeUnclaimedRewardsTask] {
 
   private val store = svTaskContext.svcStore
 
   protected def retrieveTasks()(implicit
       tc: TraceContext
-  ): Future[Seq[Seq[Contract[
-    UnclaimedReward.ContractId,
-    UnclaimedReward,
-  ]]]] =
+  ): Future[Seq[MergeUnclaimedRewardsTask]] =
     for {
       svcRules <- store.getSvcRules()
       threshold = svcRules.payload.config.numUnclaimedRewardsThreshold
@@ -45,36 +40,23 @@ class MergeUnclaimedRewardsTrigger(
     } yield
       (
         if (unclaimedRewards.length > threshold) {
-          Seq(unclaimedRewards)
+          Seq(MergeUnclaimedRewardsTask(unclaimedRewards))
         } else {
           Seq()
         }
       )
 
   protected def isStaleTask(
-      unclaimedRewards: Seq[Contract[
-        UnclaimedReward.ContractId,
-        UnclaimedReward,
-      ]]
+      unclaimedRewardsTask: MergeUnclaimedRewardsTask
   )(implicit tc: TraceContext): Future[Boolean] =
     for {
       unclaimedRewardsExist <- store.multiDomainAcsStore.allKnownAndNotArchived(
-        unclaimedRewards.map(_.contractId)
+        unclaimedRewardsTask.contracts.map(_.contractId)
       )
     } yield !unclaimedRewardsExist
 
-  override def completeTaskAsFollower(
-      unclaimedRewards: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    Future.successful(
-      TaskSuccess(
-        show"ignoring ${unclaimedRewards}, as we're not the leader"
-      )
-    )
-  }
-
   override def completeTaskAsLeader(
-      unclaimedRewards: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]
+      unclaimedRewardsTask: MergeUnclaimedRewardsTask
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svcRules <- store.getSvcRules()
@@ -82,7 +64,7 @@ class MergeUnclaimedRewardsTrigger(
       domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       arg = new SvcRules_MergeUnclaimedRewards(
         coinRules.contractId,
-        unclaimedRewards.map(_.contractId).asJava,
+        unclaimedRewardsTask.contracts.map(_.contractId).asJava,
       )
       cmd = svcRules.contractId.exerciseSvcRules_MergeUnclaimedRewards(arg)
       res <- for {
@@ -104,4 +86,11 @@ class MergeUnclaimedRewardsTrigger(
         .getOrElse(TaskSuccess(s"Not enough unclaimed rewards to merge"))
     }
   }
+}
+
+case class MergeUnclaimedRewardsTask(
+    contracts: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]
+) extends PrettyPrinting {
+  override def pretty: Pretty[this.type] =
+    prettyOfClass(param("contracts", _.contracts))
 }

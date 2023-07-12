@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation
+package com.daml.network.sv.automation.leaderbased
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
@@ -96,16 +96,6 @@ class ExecuteConfirmedActionTrigger(
               )
         } yield taskOutcome
     }
-  }
-
-  override def completeTaskAsFollower(
-      confirmationContract: ReadyContract[Confirmation.ContractId, Confirmation]
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    Future.successful(
-      TaskSuccess(
-        show"ignoring ${PrettyContractId(confirmationContract.contract)}, as we're not the leader"
-      )
-    )
   }
 
   private def isStaleAction(

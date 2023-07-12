@@ -118,6 +118,13 @@ case class CNNodeEnvironmentDefinition(
       )(config)
     )
 
+  def withoutLeaderReplacement: CNNodeEnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      CNNodeConfigTransforms.updateAllAutomationConfigs(
+        _.focus(_.enableLeaderReplacement).replace(false)
+      )(config)
+    )
+
   def withHttpSettingsForHigherThroughput: CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       config.copy(akkaConfig =

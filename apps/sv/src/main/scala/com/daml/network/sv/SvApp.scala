@@ -28,7 +28,8 @@ import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
-import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.automation.SvSvcAutomationService
+import com.daml.network.sv.automation.SvSvAutomationService
 import com.daml.network.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
