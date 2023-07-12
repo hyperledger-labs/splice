@@ -10,7 +10,6 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
-import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.{
   CNLedgerConnection,
   ParticipantAdminConnection,
@@ -50,7 +49,6 @@ import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
     globalDomain: DomainId,
-    optAcsDumpConfig: Option[BackupDumpConfig],
     svUserName: String,
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
@@ -415,54 +413,6 @@ class HttpSvHandler(
     } {
       call
     }
-
-  override def triggerAcsDump(respond: v0.SvResource.TriggerAcsDumpResponse.type)()(
-      fake: Unit
-  ): Future[v0.SvResource.TriggerAcsDumpResponse] = withNewTrace(workflowId) { implicit tc => _ =>
-    optAcsDumpConfig match {
-      case None =>
-        Future.failed(
-          Status.FAILED_PRECONDITION
-            .withDescription("No ACS store dump directory configured")
-            .asRuntimeException()
-        )
-      case Some(acsDumpConfig: BackupDumpConfig) =>
-        for {
-          // Note: we expect the snapshots to be small enough to be delivered within the request timeout.
-          (filename, snapshot) <- SvUtil.writeAcsStoreDump(
-            acsDumpConfig,
-            loggerFactory,
-            svcStore,
-            clock,
-          )
-        } yield v0.SvResource.TriggerAcsDumpResponseOK(
-          definitions.TriggerAcsDumpResponse(
-            filename = filename.toString,
-            numEvents = snapshot.contracts.size,
-            offset = snapshot.offset,
-          )
-        )
-    }
-  }
-
-  override def getAcsStoreDump(
-      respond: v0.SvResource.GetAcsStoreDumpResponse.type
-  )()(fake: Unit): scala.concurrent.Future[
-    v0.SvResource.GetAcsStoreDumpResponse
-  ] = {
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      svcStore
-        .getJsonAcsSnapshot()
-        .map(snapshot =>
-          v0.SvResource.GetAcsStoreDumpResponse.OK(
-            definitions.GetAcsStoreDumpResponse(
-              offset = snapshot.offset,
-              contracts = snapshot.contracts.map(_.toJson).toVector,
-            )
-          )
-        )
-    }
-  }
 
   private def isOnboardingConfirmed(party: PartyId)(implicit tc: TraceContext): Future[Boolean] = {
     // wait for a bit as it is possible the store ingression is not complete

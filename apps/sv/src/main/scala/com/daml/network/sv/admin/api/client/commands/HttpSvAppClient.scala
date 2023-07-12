@@ -3,7 +3,6 @@ package com.daml.network.sv.admin.api.client.commands
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
-import cats.syntax.either.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
@@ -363,54 +362,6 @@ object HttpSvAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ReleaseGlobalLockResponse.OK => Right(())
-    }
-  }
-
-  case class TriggerAcsDump()
-      extends BaseCommand[
-        http.TriggerAcsDumpResponse,
-        definitions.TriggerAcsDumpResponse,
-      ] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.TriggerAcsDumpResponse] =
-      client.triggerAcsDump(
-        headers = headers
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ): PartialFunction[
-      http.TriggerAcsDumpResponse,
-      Either[String, definitions.TriggerAcsDumpResponse],
-    ] = { case http.TriggerAcsDumpResponse.OK(response) =>
-      Either.right(response)
-    }
-  }
-
-  case class GetAcsStoreDump()
-      extends BaseCommand[
-        http.GetAcsStoreDumpResponse,
-        definitions.GetAcsStoreDumpResponse,
-      ] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAcsStoreDumpResponse] =
-      client.getAcsStoreDump(
-        headers = headers
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ): PartialFunction[
-      http.GetAcsStoreDumpResponse,
-      Either[String, definitions.GetAcsStoreDumpResponse],
-    ] = { case http.GetAcsStoreDumpResponse.OK(response) =>
-      Either.right(response)
     }
   }
 

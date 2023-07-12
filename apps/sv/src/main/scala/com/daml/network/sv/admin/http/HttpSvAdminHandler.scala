@@ -3,6 +3,7 @@ package com.daml.network.sv.admin.http
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cn
+import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.{
   CNNodeStatus,
   MediatorAdminConnection,
@@ -21,6 +22,7 @@ import com.daml.network.http.v0.{definitions, svAdmin as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
@@ -31,10 +33,12 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
+import io.grpc.Status
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpSvAdminHandler(
     globalDomain: DomainId,
+    optAcsDumpConfig: Option[BackupDumpConfig],
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
@@ -325,6 +329,54 @@ class HttpSvAdminHandler(
               abciInfo = response.abciInfo,
               validators = response.validators,
             ).some
+          )
+        )
+    }
+  }
+
+  override def triggerAcsDump(respond: SvAdminResource.TriggerAcsDumpResponse.type)()(
+      adminUser: String
+  ): Future[SvAdminResource.TriggerAcsDumpResponse] = withNewTrace(workflowId) { implicit tc => _ =>
+    optAcsDumpConfig match {
+      case None =>
+        Future.failed(
+          Status.FAILED_PRECONDITION
+            .withDescription("No ACS store dump directory configured")
+            .asRuntimeException()
+        )
+      case Some(acsDumpConfig: BackupDumpConfig) =>
+        for {
+          // Note: we expect the snapshots to be small enough to be delivered within the request timeout.
+          (filename, snapshot) <- SvUtil.writeAcsStoreDump(
+            acsDumpConfig,
+            loggerFactory,
+            svcStore,
+            clock,
+          )
+        } yield SvAdminResource.TriggerAcsDumpResponseOK(
+          definitions.TriggerAcsDumpResponse(
+            filename = filename.toString,
+            numEvents = snapshot.contracts.size,
+            offset = snapshot.offset,
+          )
+        )
+    }
+  }
+
+  override def getAcsStoreDump(
+      respond: SvAdminResource.GetAcsStoreDumpResponse.type
+  )()(adminUser: String): scala.concurrent.Future[
+    SvAdminResource.GetAcsStoreDumpResponse
+  ] = {
+    withNewTrace(workflowId) { _ => _ =>
+      svcStore
+        .getJsonAcsSnapshot()
+        .map(snapshot =>
+          SvAdminResource.GetAcsStoreDumpResponse.OK(
+            definitions.GetAcsStoreDumpResponse(
+              offset = snapshot.offset,
+              contracts = snapshot.contracts.map(_.toJson).toVector,
+            )
           )
         )
     }
