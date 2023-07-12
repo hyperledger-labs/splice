@@ -1766,7 +1766,7 @@ workflows:
         test_names_file: "test-full-class-names.log"
         start_canton_options: "-d -p external -w"
         resource_class: "xlarge"
-        parallelism: 10
+        parallelism: 6
     - scala_test:
         <<: *notify-fail
         context:
@@ -1777,7 +1777,7 @@ workflows:
         test_names_file: "test-full-class-names-sim-time.log"
         start_canton_options: "-d -p external -s"
         resource_class: "xlarge"
-        parallelism: 4
+        parallelism: 6
     - scala_test:
         <<: *notify-fail
         context:
