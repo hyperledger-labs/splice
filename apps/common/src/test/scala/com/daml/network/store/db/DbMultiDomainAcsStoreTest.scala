@@ -6,15 +6,17 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.StoreTest.TestTxLogStoreParser
+import com.daml.network.store.MultiDomainAcsStore.TransferId
+import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
 import com.daml.network.store.db.AcsTables.*
-import com.daml.network.store.{MultiDomainAcsStore, PageLimit, StoreTest}
+import com.daml.network.store.{MultiDomainAcsStoreTest, PageLimit, StoreTest}
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import org.scalatest.Assertion
 import slick.jdbc.JdbcProfile
 import slick.lifted.ProvenShape
 
@@ -22,7 +24,9 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 
 class DbMultiDomainAcsStoreTest
-    extends StoreTest
+    extends MultiDomainAcsStoreTest[
+      DbMultiDomainAcsStore[TestTxLogIndexRecord, TestTxLogEntry]
+    ]
     with CNPostgresTest
     with HasActorSystem
     with AcsJdbcTypes {
@@ -44,13 +48,12 @@ class DbMultiDomainAcsStoreTest
         .take(3)
         .runForeach(coupon => seenCoupons.updateAndGet(x => x.appended(coupon.contract)))
       for {
-        _ <- store.ingestionSink.initialize()
-        _ <- store.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty, Seq.empty)
-        _ <- dummyDomain.create(coupons.head)
+        _ <- acs()
+        _ <- d1.create(coupons.head)
         _ = eventually()(seenCoupons.get() should be(Seq(coupons.head)))
-        _ <- dummyDomain.create(coupons(1))
+        _ <- d1.create(coupons(1))
         _ = eventually()(seenCoupons.get() should be(coupons.take(2)))
-        _ <- dummyDomain.create(coupons(2))
+        _ <- d1.create(coupons(2))
         _ <- done
       } yield {
         seenCoupons.get() should be(coupons)
@@ -60,60 +63,19 @@ class DbMultiDomainAcsStoreTest
     "allow creating & deleting same contract id in different stores" in {
       val store1 = mkStore(id = 1)
       val store2 = mkStore(id = 2)
-      val coupon = appRewardCoupon(1, svcParty)
+      val coupon = c(1)
       for {
-        _ <- store1.ingestionSink.initialize()
-        _ <- store1.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty, Seq.empty)
-        _ <- store2.ingestionSink.initialize()
-        _ <- store2.ingestionSink.ingestAcs("0", Seq.empty, Seq.empty, Seq.empty)
-        _ <- dummyDomain.create(coupon)(store1)
-        _ <- dummyDomain.create(coupon)(store2)
-        _ = eventually() {
-          store1
-            .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
-            .futureValue
-            .map(_.contract) should be(Seq(coupon))
-          store2
-            .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
-            .futureValue
-            .map(_.contract) should be(Seq(coupon))
-        }
-        _ <- dummyDomain.archive(coupon)(store1)
-      } yield {
-        eventually() {
-          // deleted from store1
-          store1
-            .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
-            .futureValue
-            .map(_.contract) should have size 0
-          // but not from store2
-          store2
-            .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
-            .futureValue
-            .map(_.contract) should be(Seq(coupon))
-        }
-      }
+        _ <- acs()(store1)
+        _ <- acs()(store2)
+        _ <- d1.create(coupon)(store1)
+        _ <- d1.create(coupon)(store2)
+        _ <- assertList(coupon -> Some(d1))(store1)
+        _ <- assertList(coupon -> Some(d1))(store2)
+        _ <- d1.archive(coupon)(store1)
+        _ <- assertList()(store1) // deleted from store1
+        _ <- assertList(coupon -> Some(d1))(store2) // but not from store2
+      } yield succeed
     }
-
-    "ingest the initial acs" in {
-      implicit val store = mkStore()
-      val couponsAcs =
-        (1 to 3)
-          .map(n => appRewardCoupon(n, svcParty))
-          .map(c => toActiveContract(dummyDomain, c, 0))
-      for {
-        _ <- store.ingestionSink.initialize()
-        _ <- store.ingestionSink.ingestAcs("0", couponsAcs, Seq.empty, Seq.empty)
-        _ <- store.waitUntilAcsIngested()
-      } yield {
-        store
-          .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
-          .futureValue
-          // Note: the ACS is not ordered
-          .map(_.contract.payload.round.number) should contain theSameElementsAs (1L to 3L)
-      }
-    }
-
   }
 
   private def storeDescriptor(id: Int) =
@@ -121,18 +83,11 @@ class DbMultiDomainAcsStoreTest
       .parse(raw"""{"test": "DbMultiDomainAcsStoreTest", "id": $id}""")
       .getOrElse(sys.error("Why is it so hard to define a JSON literal"))
 
-  private def mkStore(id: Int = 1) = {
+  override def mkStore(id: Int) = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResource("dar/canton-coin-0.1.0.dar")
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
-
-    val contractFilter = MultiDomainAcsStore
-      .SimpleContractFilter(
-        PartyId.tryFromProtoPrimitive("aaaa::bbbb"),
-        Map(MultiDomainAcsStore.mkFilter(coinCodegen.AppRewardCoupon.COMPANION)(_ => true)),
-        Map.empty,
-      )
 
     lazy val store
         : DbMultiDomainAcsStore[StoreTest.TestTxLogIndexRecord, StoreTest.TestTxLogEntry] =
@@ -141,7 +96,7 @@ class DbMultiDomainAcsStoreTest
         "acs_store_template",
         "txlog_store_template",
         storeDescriptor(id),
-        _ => Future.successful(DomainId.tryFromString("domain1::domain")),
+        _ => Future.successful(d1),
         loggerFactory,
         contractFilter,
         TestTxLogStoreParser,
@@ -151,6 +106,11 @@ class DbMultiDomainAcsStoreTest
       )
     store
   }
+  override def assertTestState(
+      contractStateEventsById: Map[ContractId[_], Long] = Map.empty,
+      archivedTombstones: Set[ContractId[_]] = Set.empty,
+      pendingTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
+  )(implicit store: Store): Future[Assertion] = Future.successful(succeed)
 
   private var eventNumber = 0L
   private def create(
