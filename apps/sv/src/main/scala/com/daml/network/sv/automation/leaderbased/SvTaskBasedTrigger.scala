@@ -3,8 +3,11 @@ package com.daml.network.sv.automation.leaderbased
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
+import com.daml.network.util.Contract
+
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.PartyId
@@ -18,16 +21,16 @@ import scala.util.Random
 trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
   protected def svTaskContext: SvTaskBasedTrigger.Context
+  private val store = svTaskContext.svcStore
 
   final protected override def completeTask(
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    svTaskContext.svcStore
-      .getSvcRules()
-      .flatMap(svcRules => {
-        val sameEpoch = svcRules.payload.epoch == svTaskContext.epoch
-        val isLeader =
-          svcRules.payload.leader == svTaskContext.svcStore.key.svParty.toProtoPrimitive
+    for {
+      svcRules <- store.getSvcRules()
+      sameEpoch = svcRules.payload.epoch == svTaskContext.epoch
+      isLeader = svcRules.payload.leader == store.key.svParty.toProtoPrimitive
+      result <-
         if (sameEpoch) {
           if (isLeader) {
             completeTaskAsLeader(task)
@@ -41,68 +44,68 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
             )
           )
         }
-      })
+    } yield result
   }
 
   /** Handle leader failure by voting for a new leader
     */
-  final protected def voteForNewLeader(currentLeader: String)(implicit
+  final protected def voteForNewLeader(
+      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      currentLeader: String,
+  )(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-
-    val store = svTaskContext.svcStore
-
     for {
       domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-      svcRules <- store.getSvcRules()
-      currentRequesters <- store.listElectionRequests(svcRules).map(_.map(_.payload.requester))
-      self = store.key.svParty.toProtoPrimitive
-      otherParties = svcRules.payload.members.keySet.asScala.to(Set) - currentLeader - self
-      ranking = self :: Random.shuffle(otherParties.toList) ++ List(currentLeader)
-      cmd = svcRules.contractId.exerciseSvcRules_RequestElection(
-        self,
-        new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
-          com.daml.ledger.javaapi.data.Unit.getInstance()
-        ),
-        ranking.asJava,
+      queryResult <- store.lookupElectionRequestByRequesterWithOffset(
+        store.key.svParty,
+        svTaskContext.epoch,
       )
-
-      retVal <-
-        if (svcRules.payload.epoch != svTaskContext.epoch) {
+      retVal <- queryResult match {
+        case QueryResult(_, Some(_)) =>
           Future.successful(
             TaskSuccess(
-              s"Skipping vote to replace leader $currentLeader because current epoch ${svcRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
+              s"already voted in an election for epoch ${svTaskContext.epoch} to replace inactive leader ${currentLeader}"
             )
           )
-        } else if (!currentRequesters.contains(self)) {
-          // TODO(#4846) Use command deduplication to avoid crossing inflight requests for SvcRules_RequestElection
+        case QueryResult(offset, None) => {
+          val self = store.key.svParty.toProtoPrimitive
+          val otherParties =
+            svcRules.payload.members.keySet.asScala.to(Set) - currentLeader - self
+          val ranking = self :: Random.shuffle(otherParties.toList) ++ List(currentLeader)
+          val cmd = svcRules.contractId.exerciseSvcRules_RequestElection(
+            self,
+            new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
+              com.daml.ledger.javaapi.data.Unit.getInstance()
+            ),
+            ranking.asJava,
+          )
           svTaskContext.connection
-            .submitWithResultAndOffsetNoDedup(
-              Seq(store.key.svParty),
-              Seq(store.key.svcParty),
-              cmd,
+            .submitCommands(
+              actAs = Seq(store.key.svParty),
+              readAs = Seq(store.key.svcParty),
+              commands = cmd.commands.asScala.toSeq,
+              commandId = CNLedgerConnection.CommandId(
+                "com.daml.network.sv.requestElection",
+                Seq(store.key.svParty, store.key.svcParty),
+                svTaskContext.epoch.toString,
+              ),
+              deduplicationOffset = offset,
               domainId = domainId,
             )
             .map(_ => {
               TaskSuccess(
-                s"Successfully requested an election to replace inactive leader ${currentLeader}"
+                s"successfully requested an election to replace inactive leader ${currentLeader}"
               )
             })
-        } else {
-          Future.successful(
-            TaskSuccess(
-              s"Already voted in an election this epoch to replace inactive leader ${currentLeader}"
-            )
-          )
         }
+      }
     } yield retVal
   }
 
   protected def completeTaskAsLeader(
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome]
-
-  private val store = svTaskContext.svcStore
 
   final protected def monitorTaskAsFollower(
       task: T
@@ -112,7 +115,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
       svcRules <- store.getSvcRules()
       monitoredEpoch = svcRules.payload.epoch
       monitoredLeader = svcRules.payload.leader
-      timer = context.retryProvider
+      timer <- context.retryProvider
         .waitUnlessShutdown(
           context.clock
             .scheduleAfter(
@@ -127,7 +130,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
             )
         )
         .unwrap
-      result <- timer.flatMap {
+      result <- timer match {
         case UnlessShutdown.AbortedDueToShutdown =>
           Future.successful(
             TaskSuccess(
@@ -143,10 +146,14 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
           } yield sameEpoch && !taskStale
 
           isLeaderInactiveF.flatMap(isLeaderInactive => {
-            if (isLeaderInactive) {
-              voteForNewLeader(
-                monitoredLeader
+            if (isLeaderInactive && svcRules.payload.epoch != svTaskContext.epoch) {
+              Future.successful(
+                TaskSuccess(
+                  s"skipping vote to replace leader $monitoredLeader because current epoch ${svcRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
+                )
               )
+            } else if (isLeaderInactive) {
+              voteForNewLeader(svcRules, monitoredLeader)
             } else {
               Future.successful(
                 TaskSuccess(

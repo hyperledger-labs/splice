@@ -779,6 +779,21 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       )
       .map(dict => dict.values.toSeq)
 
+  def lookupElectionRequestByRequesterWithOffset(
+      requester: PartyId,
+      epoch: Long,
+  )(implicit tc: TraceContext): Future[
+    QueryResult[Option[
+      Contract[cn.svcrules.ElectionRequest.ContractId, cn.svcrules.ElectionRequest]
+    ]]
+  ] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore.findContractOnDomainWithOffset(cn.svcrules.ElectionRequest.COMPANION)(
+        _,
+        co => co.payload.epoch == epoch && co.payload.requester == requester.toProtoPrimitive,
+      )
+    )
+
   def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
     multiDomainAcsStore.getJsonAcsSnapshot(ignoredContractsForAcsDump)
 
