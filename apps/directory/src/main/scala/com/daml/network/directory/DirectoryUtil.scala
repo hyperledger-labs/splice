@@ -5,9 +5,8 @@ import com.digitalasset.canton.topology.PartyId
 
 object DirectoryUtil {
 
-  private val entryNameSuffix = ".unverified.cns"
-  private val entryNameLength = 40
-  private val entryNameRegex = "[a-z0-9_-]+"
+  val entryNameSuffix = ".unverified.cns"
+  val entryNameRegex2 = "^[a-z0-9_-]{1,25}\\.unverified\\.cns$"
 
   /** The command-id to use for all command submissions that create a directory entry. */
   def createDirectoryEntryCommandId(
@@ -22,10 +21,7 @@ object DirectoryUtil {
 
   /** Validate the format of a directory entry name
     */
-  def isValidEntryName(name: String): Boolean = {
-    name.size <= entryNameLength && name
-      .stripSuffix(entryNameSuffix)
-      .matches(entryNameRegex) && name.endsWith(entryNameSuffix)
-  }
+  def isValidEntryName(name: String): Boolean =
+    name.matches(entryNameRegex2)
 
 }

@@ -9,6 +9,7 @@ import org.scalatest.compatible.Assertion
 
 import java.time.format.DateTimeFormatter
 import java.time.{Duration, LocalDateTime}
+import com.daml.network.directory.DirectoryUtil
 
 trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
@@ -19,13 +20,14 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )(implicit
       webDriver: WebDriverType
   ) = {
+    val entryNameWithoutSuffix = entryName.stripSuffix(DirectoryUtil.entryNameSuffix)
     directoryUiLogin()
 
     // 100 seconds waiting here because we need to wait on the JSON API being ready which is sloooow.
     waitForQuery(id("entry-name-field"), timeUntilSuccess = Some(100.seconds))
 
     click on "entry-name-field"
-    textField("entry-name-field").value = entryName
+    textField("entry-name-field").value = entryNameWithoutSuffix
 
     waitForCondition(id("search-entry-button")) { ExpectedConditions.elementToBeClickable(_) }
     click on "search-entry-button"
@@ -43,6 +45,7 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )(implicit
       webDriver: WebDriverType
   ): Assertion = {
+
     clue(s"Reserving directory name: ${expectedName}") {
       allocateDirectoryEntry(directoryUiLogin, expectedName)
 

@@ -10,17 +10,26 @@ import { config } from '../utils';
 
 type NameLookupStatus = 'available' | 'taken' | 'loading';
 
+const entryNameSuffix = '.unverified.cns';
+const entryNameRegex = /^[a-z0-9_-]{1,25}\.unverified\.cns$/;
+const isEntryNameValid = (name: string) => {
+  return entryNameRegex.test(name);
+};
+
+const toFullEntryName = (name: string) => `${name}${entryNameSuffix}`;
+
 const RequestDirectoryEntry: React.FC = () => {
   const [entryName, setEntryName] = useState<string>('');
 
-  const [displaySearchResult, setDisplaySearchResult] = useState(false);
-  const { data: entryLookupResult, isLoading } = useLookupEntryByName(entryName);
+  const [displayValidationResult, setDisplayValidationResult] = useState(false);
+  const { data: entryLookupResult, isLoading } = useLookupEntryByName(toFullEntryName(entryName));
 
   const nameLookupStatus: NameLookupStatus = isLoading
     ? 'loading'
     : entryLookupResult?.entryContract === undefined
     ? 'available'
     : 'taken';
+  const searchButtonDisabled = nameLookupStatus === 'loading';
 
   return (
     <Stack justifyContent="center" mt={2} spacing={2}>
@@ -31,7 +40,7 @@ const RequestDirectoryEntry: React.FC = () => {
           sx={{ flexGrow: '1' }}
           value={entryName}
           onKeyDown={event => {
-            setDisplaySearchResult(event.key === 'Enter');
+            setDisplayValidationResult(event.key === 'Enter');
           }}
           onChange={event => setEntryName(event.target.value)}
           id="entry-name-field"
@@ -39,14 +48,17 @@ const RequestDirectoryEntry: React.FC = () => {
         <Button
           variant="pill"
           id="search-entry-button"
-          disabled={nameLookupStatus === 'loading'}
-          onClick={() => setDisplaySearchResult(true)}
+          disabled={searchButtonDisabled}
+          onClick={() => setDisplayValidationResult(true)}
         >
           Search
         </Button>
       </Stack>
-      {displaySearchResult && (
-        <SubscriptionBar entryName={entryName} nameLookupStatus={nameLookupStatus} />
+      {displayValidationResult && (
+        <SubscriptionBar
+          entryName={toFullEntryName(entryName)}
+          nameLookupStatus={nameLookupStatus}
+        />
       )}
     </Stack>
   );
@@ -68,7 +80,11 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
   const entryFee = directoryInstall.payload.entryFee;
   const entryInterval = directoryInstall.payload.entryLifetime.microseconds;
 
-  if (nameLookupStatus === 'available') {
+  if (!isEntryNameValid(entryName)) {
+    message =
+      'The provided entry name has an invalid format. Maximum 40 characters, a-z, 0-9, - and _ are supported.';
+    icon = <ErrorOutline id="unavailable-icon" color="error" />;
+  } else if (nameLookupStatus === 'available') {
     message = 'is available!';
     icon = <CheckCircleOutline color="success" />;
     additionalContent = (
@@ -91,9 +107,7 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
         />
       </Stack>
     );
-  }
-
-  if (nameLookupStatus === 'taken') {
+  } else if (nameLookupStatus === 'taken') {
     message = 'is not available. Please try a different name.';
     icon = <ErrorOutline id="unavailable-icon" color="error" />;
   }
