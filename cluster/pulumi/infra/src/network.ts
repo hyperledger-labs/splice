@@ -4,7 +4,7 @@ import * as certmanager from '@pulumi/kubernetes-cert-manager';
 import * as pulumi from '@pulumi/pulumi';
 import { config } from 'cn-pulumi-common';
 
-const DNS01_SA_KEY_JSON = config.require('DNA01_SA_KEY_JSON');
+const DNS01_SA_KEY_JSON = config.require('DNS01_SA_KEY_JSON');
 
 // btoa is only available in DOM so inline the definition here.
 const btoa = (s: string) => Buffer.from(s).toString('base64');

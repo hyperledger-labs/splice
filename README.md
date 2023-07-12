@@ -1080,7 +1080,7 @@ account. This must be done manually when deleting a project through
 To the keys currently allocated, you can go to  https://console.cloud.google.com/iam-admin/serviceaccounts/details/111557570113518692244/keys?project=da-gcp-canton-domain.
 
 To see which key is used for a given cluster, go to the cluster
-directory and run this command. The DNS SA key is stored under `DNA01_SA_KEY_JSON`:
+directory and run this command. The DNS SA key is stored under `DNS01_SA_KEY_JSON`:
 
 ```
 cncluster pulumi infra config
