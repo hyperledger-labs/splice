@@ -1156,6 +1156,9 @@ Preflight tests:
   which contain a key for `da-cn-data-exports@da-cn-devnet.iam.gserviceaccount.com`
 - read from the `da-cn-data-dumps` bucket in the `da-cn-devnet` project
 
+Note that you don't need to set any special environment variables when running these tests locally,
+as they will automatically use your local Google Cloud SDK credentials setup through direnv.
+
 ### Pruning Data Dumps
 
 Both of the buckets used for data dumps are setup to prune data automatically:
