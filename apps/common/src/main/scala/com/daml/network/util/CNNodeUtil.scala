@@ -118,7 +118,7 @@ object CNNodeUtil {
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
   // Using the issuance config for the 10+ years segment of the curve
-  private def issuanceConfig(
+  def issuanceConfig(
       coinsToIssuePerYear: Double,
       validatorPercentage: Double,
       appPercentage: Double,

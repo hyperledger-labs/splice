@@ -35,7 +35,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 ) extends MultiDomainAcsStore
     with TxLogStore[TXI, TXE]
     with NamedLogging
-    with LimitHelpers {
+    with LimitHelpers
+    with TxLogStoreErrors {
 
   import MultiDomainAcsStore.*
 
@@ -472,10 +473,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
         .foldM[Either[A, *], Z](init) { case (z, t) => p(z, t.payload) }
         .fold(
           identity,
-          _ =>
-            throw Status.NOT_FOUND
-              .withDescription("No matching log indices found")
-              .asRuntimeException,
+          _ => throw txLogNotFound(),
         )
     }
   }
@@ -487,9 +485,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       stateVar.txLog.view
         .map(_.payload)
         .find(query)
-        .getOrElse(
-          throw Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
-        )
+        .getOrElse(throw txLogNotFound())
     }
 
   def getTxLogIndicesByFilter(filter: TXI => Boolean): Future[Seq[TXI]] =

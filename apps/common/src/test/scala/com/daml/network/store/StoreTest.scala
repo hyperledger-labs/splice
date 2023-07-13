@@ -54,6 +54,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       round: Int,
       provider: PartyId,
       featured: Boolean = false,
+      amount: Numeric.Numeric = numeric(1.0),
   ): Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon] =
     Contract(
       identifier = coinCodegen.AppRewardCoupon.TEMPLATE_ID,
@@ -62,7 +63,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
         featured,
-        numeric(1.0),
+        amount,
         new apiCodegen.v1.round.Round(round),
       ),
       metadata = ContractMetadata.Empty(),
@@ -76,6 +77,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def validatorRewardCoupon(
       round: Int,
       user: PartyId,
+      amount: Numeric.Numeric = numeric(1.0),
   ): Contract[
     coinCodegen.ValidatorRewardCoupon.ContractId,
     coinCodegen.ValidatorRewardCoupon,
@@ -86,7 +88,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       payload = new coinCodegen.ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         user.toProtoPrimitive,
-        BigDecimal(1.0).bigDecimal,
+        amount,
         new apiCodegen.v1.round.Round(round),
       ),
       metadata = ContractMetadata.Empty(),
@@ -219,7 +221,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val dummy2Domain = DomainId.tryFromString("dummy2::domain")
 
-  protected val effectiveAt: Instant = CantonTimestamp.Epoch.toInstant
+  protected val defaultEffectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
   protected def toIncompleteTransferOut[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],
@@ -298,7 +300,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def mkCreateTx[TCid <: ContractId[T], T](
       offset: String,
       createRequests: Seq[Contract[TCid, T]],
-  ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent))
+      effectiveAt: Instant,
+  ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent), effectiveAt)
 
   protected def acs[TCid <: ContractId[T], T](
       acs: Seq[(Contract[TCid, T], DomainId, Long)] = Seq.empty,
@@ -339,99 +342,120 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def create[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
         offset: String = nextOffset,
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransactionTreeUpdate(
-          mkCreateTx(
-            offset,
-            Seq(c),
-          )
-        ),
+        txEffectiveAt: Instant = defaultEffectiveAt,
+    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+      val tx = mkCreateTx(
+        offset,
+        Seq(c),
+        txEffectiveAt,
       )
+
+      store.ingestionSink
+        .ingestUpdate(
+          domain,
+          TransactionTreeUpdate(tx),
+        )
+        .map(_ => tx)
+    }
 
     def createMulti[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
         offset: String = nextOffset,
-    )(implicit stores: Seq[MultiDomainAcsStore]) = {
-      val tx = TransactionTreeUpdate(
-        mkCreateTx(
-          offset,
-          Seq(c),
-        )
+        txEffectiveAt: Instant = defaultEffectiveAt,
+    )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
+      val tx = mkCreateTx(
+        offset,
+        Seq(c),
+        txEffectiveAt,
       )
+      val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
-      stores.foldLeft(Future.unit) { (acc, store) =>
-        for {
-          _ <- acc
-          _ <- store.ingestionSink.ingestUpdate(domain, tx)
-        } yield ()
-      }
+      stores
+        .foldLeft(Future.unit) { (acc, store) =>
+          for {
+            _ <- acc
+            _ <- store.ingestionSink.ingestUpdate(domain, txUpdate)
+          } yield ()
+        }
+        .map(_ => tx)
     }
 
     def archive[TCid <: ContractId[T], T](
-        c: Contract[TCid, T]
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransactionTreeUpdate(
-          mkTx(nextOffset, Seq(toArchivedEvent(c)))
-        ),
-      )
+        c: Contract[TCid, T],
+        txEffectiveAt: Instant = defaultEffectiveAt,
+    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+      val tx = mkTx(nextOffset, Seq(toArchivedEvent(c)), txEffectiveAt)
+      store.ingestionSink
+        .ingestUpdate(
+          domain,
+          TransactionTreeUpdate(
+            tx
+          ),
+        )
+        .map(_ => tx)
+    }
 
     def ingest(
         makeTx: String => TransactionTree
-    )(implicit store: MultiDomainAcsStore) = {
+    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
       val tx = makeTx(nextOffset)
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransactionTreeUpdate(
-          tx
-        ),
-      )
+      store.ingestionSink
+        .ingestUpdate(
+          domain,
+          TransactionTreeUpdate(
+            tx
+          ),
+        )
+        .map(_ => tx)
     }
 
     def transferOut[TCid <: ContractId[T], T](
         contractAndDomain: (Contract[TCid, T], DomainId),
         transferId: String,
         counter: Long,
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransferUpdate(
-          mkTransfer(
-            nextOffset,
-            toTransferOutEvent(
-              contractAndDomain._1.contractId,
-              transferId,
-              domain,
-              contractAndDomain._2,
-              counter,
-            ),
-          )
+    )(implicit store: MultiDomainAcsStore): Future[Transfer[TransferEvent.Out]] = {
+      val transfer = mkTransfer(
+        nextOffset,
+        toTransferOutEvent(
+          contractAndDomain._1.contractId,
+          transferId,
+          domain,
+          contractAndDomain._2,
+          counter,
         ),
       )
+
+      store.ingestionSink
+        .ingestUpdate(
+          domain,
+          TransferUpdate(transfer),
+        )
+        .map(_ => transfer)
+    }
 
     def transferIn[TCid <: ContractId[T], T](
         contractAndDomain: (Contract[TCid, T], DomainId),
         transferId: String,
         counter: Long,
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransferUpdate(
-          mkTransfer(
-            nextOffset,
-            toTransferInEvent(
-              contractAndDomain._1,
-              transferId,
-              contractAndDomain._2,
-              domain,
-              counter,
-            ),
-          )
+    )(implicit store: MultiDomainAcsStore): Future[Transfer[TransferEvent.In]] = {
+      val transfer = mkTransfer(
+        nextOffset,
+        toTransferInEvent(
+          contractAndDomain._1,
+          transferId,
+          contractAndDomain._2,
+          domain,
+          counter,
         ),
       )
+
+      store.ingestionSink
+        .ingestUpdate(
+          domain,
+          TransferUpdate(transfer),
+        )
+        .map(_ => transfer)
+    }
 
     def exercise[TCid <: ContractId[T], T](
         contract: Contract[TCid, T],
@@ -440,21 +464,29 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         choiceArgument: damlValue,
         exerciseResult: damlValue,
         offset: String = nextOffset,
-    )(implicit store: MultiDomainAcsStore) =
-      store.ingestionSink.ingestUpdate(
-        domain,
-        TransactionTreeUpdate(
-          mkTx(
-            offset,
-            Seq(mkExercise(contract, interfaceId, choiceName, choiceArgument, exerciseResult)),
-          )
-        ),
+        txEffectiveAt: Instant = defaultEffectiveAt,
+    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+      val tx = mkTx(
+        offset,
+        Seq(mkExercise(contract, interfaceId, choiceName, choiceArgument, exerciseResult)),
+        txEffectiveAt,
       )
+      store.ingestionSink
+        .ingestUpdate(
+          domain,
+          TransactionTreeUpdate(tx),
+        )
+        .map(_ => tx)
+    }
   }
 
   private def nextTransactionId(): String = java.util.UUID.randomUUID().toString.replace("-", "")
 
-  protected def mkTx(offset: String, events: Seq[TreeEvent]): TransactionTree = {
+  protected def mkTx(
+      offset: String,
+      events: Seq[TreeEvent],
+      effectiveAt: Instant = defaultEffectiveAt,
+  ): TransactionTree = {
     val transactionId = nextTransactionId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withEventId(e, s"$transactionId:$i")
@@ -476,6 +508,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       offset: String,
       root: ExercisedEvent,
       children: Seq[TreeEvent],
+      effectiveAt: Instant = defaultEffectiveAt,
   ): TransactionTree = {
     val transactionId = nextTransactionId()
     val childrenWithId = children.zipWithIndex.map { case (e, i) =>

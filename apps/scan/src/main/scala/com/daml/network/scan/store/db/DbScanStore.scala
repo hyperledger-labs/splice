@@ -195,35 +195,195 @@ class DbScanStore(
   override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext
   ): Future[BigDecimal] =
-    ??? // TODO (#6194): this requires scan_txlog_store
+    waitUntilAcsIngested {
+      for {
+        result <- storage.query(
+          sql"""
+               select sum(balance_change_change_to_initial_amount_as_of_round_zero) -
+                     ($asOfEndOfRound + 1) * sum(balance_change_change_to_holding_fees_rate)
+               from scan_txlog_store
+               where store_id = $storeId
+                 and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord.dbType}
+                 and round <= $asOfEndOfRound;
+             """.as[Option[BigDecimal]].headOption,
+          "getTotalCoinBalance",
+        )
+      } yield result.flatten.getOrElse(0)
+    }
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
-    ??? // TODO (#6194): this requires scan_txlog_store
+    waitUntilAcsIngested {
+      for {
+        result <- storage.query(
+          sql"""
+                  select sum(reward_amount)
+                  from scan_txlog_store
+                  where store_id = $storeId
+                    and index_record_type in (
+                      ${ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord.dbType},
+                      ${ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord.dbType}
+                    );
+               """.as[BigDecimal].headOption,
+          "getRewardsCollectedInRound",
+        )
+      } yield result.getOrElse(0)
+    }
 
   override def getRewardsCollectedInRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[BigDecimal] = ??? // TODO (#6194): this requires scan_txlog_store
+  ): Future[BigDecimal] = waitUntilAcsIngested {
+    for {
+      result <- storage.query(
+        sql"""
+              select sum(reward_amount)
+              from scan_txlog_store
+              where store_id = $storeId
+                and index_record_type in (
+                  ${ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord.dbType},
+                  ${ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord.dbType}
+                )
+                and round = $round;
+           """.as[BigDecimal].headOption,
+        "getRewardsCollectedInRound",
+      )
+    } yield result.getOrElse(0)
+  }
 
   override def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] =
-    ??? // TODO (#6194): this requires scan_txlog_store
+  ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] = waitUntilAcsIngested {
+    for {
+      eventId <- storage
+        .querySingle(
+          sql"""
+                select event_id
+                from scan_txlog_store
+                where store_id = $storeId
+                  and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType}
+                  and round = $round
+                order by entry_number desc
+                limit 1;
+               """.as[String].headOption,
+          "getCoinConfigForRound",
+        )
+        .value
+      entry <- eventId.traverse(txLogReader.loadTxLogEntry)
+      result <- entry match {
+        case Some(omr: ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry) =>
+          Future.successful(omr)
+        case Some(_) =>
+          Future.failed(txLogIsOfWrongType())
+        case None =>
+          Future.failed(txLogNotFound())
+      }
+    } yield result
+  }
 
   override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
-    ??? // TODO (#6194): this requires scan_txlog_store
+    waitUntilAcsIngested {
+      for {
+        latestClosedRound <- storage
+          .querySingle(
+            sql"""
+               select closed.event_id, closed.round
+               from scan_txlog_store closed
+               where closed.store_id = $storeId
+                and closed.index_record_type = ${ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord.dbType}
+               order by closed.round desc
+               limit 1;
+             """.as[(String, Long)].headOption,
+            "getRoundOfLatestData.latestClosedRound",
+          )
+          .value
+        earliestOpenRound <- storage
+          .querySingle(
+            sql"""
+               select min(open.round)
+               from scan_txlog_store open
+               where open.store_id = $storeId
+                and open.index_record_type = ${ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType};
+             """.as[Long].headOption,
+            "getRoundOfLatestData.earliestOpenRound",
+          )
+          .value
+        entry <- (latestClosedRound, earliestOpenRound) match {
+          case (Some((closedEventId, closedRound)), Some(openRound)) if openRound <= closedRound =>
+            txLogReader.loadTxLogEntry(closedEventId)
+          case _ =>
+            Future.failed(txLogNotFound())
+        }
+        result <- entry.indexRecord match {
+          case cmr: ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord =>
+            Future.successful(cmr)
+          case _ =>
+            Future.failed(txLogIsOfWrongType())
+        }
+      } yield result.round -> result.effectiveAt
+    }
 
   override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[(PartyId, BigDecimal)]] = ??? // TODO (#6194): this requires scan_txlog_store
+  ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
+    for {
+      rows <- storage.query(
+        sql"""
+              select rewarded_party, sum(reward_amount) as total_app_rewards
+              from scan_txlog_store
+              where store_id = $storeId
+                and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord.dbType}
+                and round <= $asOfEndOfRound
+              group by rewarded_party
+              order by total_app_rewards desc
+              limit $limit;
+           """.as[(PartyId, BigDecimal)],
+        "getTopProvidersByAppRewards",
+      )
+    } yield rows
+  }
 
   override def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[(PartyId, BigDecimal)]] = ??? // TODO (#6194): this requires scan_txlog_store
+  ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
+    for {
+      rows <- storage.query(
+        sql"""
+              select rewarded_party, sum(reward_amount) as total_app_rewards
+              from scan_txlog_store
+              where store_id = $storeId
+                and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord.dbType}
+                and round <= $asOfEndOfRound
+              group by rewarded_party
+              order by total_app_rewards desc
+              limit $limit;
+           """.as[(PartyId, BigDecimal)],
+        "getTopValidatorsByValidatorRewards",
+      )
+    } yield rows
+  }
 
   override def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] =
-    ??? // TODO (#6194): this requires scan_txlog_store
+  ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] = waitUntilAcsIngested {
+    for {
+      rows <- storage.query(
+        sql"""
+              select extra_traffic_validator                       as validator,
+                     count(*)                                      as num_purchases,
+                     sum(extra_traffic_purchase_traffic_purchased) as total_traffic_purchased,
+                     sum(extra_traffic_purchase_cc_spent)          as total_cc_spent,
+                     max(round)                                    as last_purchased_in_round
+              from scan_txlog_store
+              where store_id = $storeId
+                and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord.dbType}
+                and round <= $asOfEndOfRound
+              group by extra_traffic_validator
+              order by total_traffic_purchased desc
+              limit $limit;
+           """.as[(PartyId, Long, Long, BigDecimal, Long)],
+        "getTopValidatorsByPurchasedTraffic",
+      )
+    } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
+  }
 
   override def listImportCrates(receiverParty: PartyId)(implicit
       tc: TraceContext

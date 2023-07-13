@@ -11,7 +11,8 @@ trait CNNodeAppStore[
     TXI <: TxLogStore.IndexRecord,
     TXE <: TxLogStore.Entry[TXI],
 ] extends NamedLogging
-    with AutoCloseable {
+    with AutoCloseable
+    with TxLogStoreErrors {
 
   implicit protected def ec: ExecutionContext
 
