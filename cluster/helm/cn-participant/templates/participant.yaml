@@ -10,6 +10,8 @@ spec:
   selector:
     matchLabels:
       app: {{ .Release.Name }}
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
