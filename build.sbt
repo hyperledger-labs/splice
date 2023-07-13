@@ -87,7 +87,7 @@ lazy val root = (project in file("."))
     BuildCommon.sharedSettings,
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
     // Needed to be able to resolve scalafmt snapshot versions
-    resolvers += Resolver.sonatypeRepo("snapshots"),
+    resolvers ++= Resolver.sonatypeOssRepos("snapshots"),
     damlDarsLockCheckerFileArg := {
       val darFiles: Seq[File] = damlBuild.all(allDarsFilter).value.flatten
       val basePath = baseDirectory.value.toPath
