@@ -231,10 +231,12 @@ object CNNodeTests {
     )(check: String, checkFun: T => U): (T, U) = {
       {
         val x = clue(s"(act) $action")(actionExpr)
-        clue(s"(check) $check") {
-          eventually(timeUntilSuccess, maxPollInterval) {
-            val y = checkFun(x)
-            (x, y)
+        withClue(s"Check $check for $action") {
+          clue(s"(check) $check") {
+            eventually(timeUntilSuccess, maxPollInterval) {
+              val y = checkFun(x)
+              (x, y)
+            }
           }
         }
       }
