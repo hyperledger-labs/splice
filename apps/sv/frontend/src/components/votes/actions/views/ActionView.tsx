@@ -1,4 +1,5 @@
 import { PartyId } from 'common-frontend';
+import dayjs from 'dayjs';
 import React, { useState } from 'react';
 
 import {
@@ -15,6 +16,7 @@ import {
 
 import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
+import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
 import { SvcRulesConfig } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { ActionRequiringConfirmation } from '../../../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
@@ -78,7 +80,7 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
           <ActionValueTable
             actionType={actionType}
             actionName={coinRulesAction.tag}
-            dropdownMap={coinRulesAction.value.newConfigSchedule.futureValues}
+            dropdownMap={coinRulesAction.value.newConfigSchedule}
           />
         );
       }
@@ -91,7 +93,7 @@ const ActionValueTable: React.FC<{
   actionType: string;
   actionName: string;
   valuesMap?: { [key: string]: React.ReactElement };
-  dropdownMap?: Tuple2<string, CoinConfig<USD>>[];
+  dropdownMap?: Schedule<string, CoinConfig<USD>>;
 }> = ({ actionType, actionName, valuesMap, dropdownMap }) => {
   return (
     <>
@@ -126,7 +128,12 @@ const ActionValueTable: React.FC<{
           </TableBody>
         </Table>
       </TableContainer>
-      {dropdownMap && <DropdownSchedules values={dropdownMap} />}
+      {dropdownMap && (
+        <DropdownSchedules
+          initialValue={dropdownMap.initialValue}
+          futureValues={dropdownMap.futureValues}
+        />
+      )}
     </>
   );
 };
@@ -143,24 +150,26 @@ const PrettyJsonPrint: React.FC<{
 };
 
 const DropdownSchedules: React.FC<{
-  values: Tuple2<string, CoinConfig<USD>>[];
-}> = ({ values }) => {
+  initialValue: CoinConfig<USD>;
+  futureValues: Tuple2<string, CoinConfig<USD>>[];
+}> = ({ initialValue, futureValues }) => {
   interface DropdownOption {
     value: string;
     label: string;
   }
 
-  const dropdownOptions: DropdownOption[] = values.map(value => ({
-    value: JSON.stringify(value._2, null, 2),
-    label: value._1,
-  }));
+  const dropdownOptions: DropdownOption[] = [
+    { value: JSON.stringify(initialValue, null, 2), label: 'Current Configuration' },
+    ...futureValues.map(value => ({
+      value: JSON.stringify(value._2, null, 2),
+      label: `Configuration from: ${dayjs(value._1).toString().replace('GMT', 'UTC')}`,
+    })),
+  ];
 
-  const [selectedOption, setSelectedOption] = useState<React.ReactElement>(
-    <PrettyJsonPrint data={dropdownOptions[0].value} />
-  );
+  const [selectedOption, setSelectedOption] = useState<string>('Current Configuration');
 
-  const handleOptionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedOption(<PrettyJsonPrint data={e.target.value} />);
+  const handleOptionChange = (option: string) => {
+    setSelectedOption(option);
   };
 
   return (
@@ -169,17 +178,17 @@ const DropdownSchedules: React.FC<{
         <NativeSelect
           inputProps={{ id: 'dropdown-display-schedules-datetime' }}
           value={selectedOption}
-          onChange={handleOptionChange}
+          onChange={e => handleOptionChange(e.target.value)}
         >
-          {dropdownOptions.map((scheduleDate, index) => (
-            <option key={'schedule-option-' + index} value={scheduleDate.value}>
-              {scheduleDate.label}
-            </option>
-          ))}
+          {dropdownOptions &&
+            dropdownOptions.map((option, index) => (
+              <option key={'member-option-' + index} value={option.label}>
+                {option.label}
+              </option>
+            ))}
         </NativeSelect>
       </FormControl>
-
-      {selectedOption}
+      <PrettyJsonPrint data={dropdownOptions.filter(e => e.label === selectedOption)[0].value} />
     </>
   );
 };

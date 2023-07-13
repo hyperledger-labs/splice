@@ -767,7 +767,7 @@ class SvFrontendIntegrationTest
 
               val dropDownSchedules =
                 new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
-              dropDownSchedules.getOptions.size() shouldBe 2
+              dropDownSchedules.getOptions.size() shouldBe 3
 
             },
           )

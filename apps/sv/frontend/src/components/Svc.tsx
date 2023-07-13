@@ -22,7 +22,7 @@ import { useSvcInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';
 import { useMediatorStatus } from '../hooks/useMediatorStatus';
 import { useSequencerStatus } from '../hooks/useSequencerStatus';
-import { config } from '../utils';
+import { config, getCoinConfigurationAsOfNow } from '../utils';
 
 function getInfoTable(title: string, rows: { key: string; value: string; isParty: boolean }[]) {
   return (
@@ -230,6 +230,14 @@ const SvcViewPrettyJSON = () => {
 
   const cometBftDebugTab = getCometBftDebugData(cometBftNodeDebugQuery);
 
+  const updatedCoinRules: CoinRules = {
+    svc: svcInfoData?.coinRules.payload.svc!,
+    lock: svcInfoData?.coinRules.payload.lock!,
+    isDevNet: svcInfoData?.coinRules.payload.isDevNet!,
+    enabledChoices: svcInfoData?.coinRules.payload.enabledChoices!,
+    configSchedule: getCoinConfigurationAsOfNow(svcInfoData?.coinRules.payload.configSchedule!),
+  };
+
   return (
     <>
       <Box mt={4} sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -256,7 +264,7 @@ const SvcViewPrettyJSON = () => {
         <JSONPretty
           id="coin-rules-information"
           style={{ fontSize: '10pt' }}
-          data={CoinRules.encode(svcInfoData?.coinRules.payload!)}
+          data={CoinRules.encode(updatedCoinRules)}
           theme={JSONPrettyMon}
         />
       </TabPanel>

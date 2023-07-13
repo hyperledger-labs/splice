@@ -3,13 +3,12 @@ import React from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';
 
-import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
-import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
+import { CoinConfig } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
 import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
-import { Time } from '@daml/types';
 
 import { useSvcInfos } from '../../../contexts/SvContext';
+import { getCoinConfigurationAsOfNow } from '../../../utils';
 import ConfigurationNavigator from '../../../utils/ConfigurationNavigator';
 
 const SetCoinConfig: React.FC<{
@@ -25,18 +24,30 @@ const SetCoinConfig: React.FC<{
     return <p>Not yet implemented.</p>;
   }
 
-  async function setCoinConfigAction(config: Tuple2<Time, CoinConfig<USD>>[]) {
-    const mergedConfig: Schedule<Time, CoinConfig<USD>> = {
-      initialValue: svcInfosQuery.data?.coinRules.payload.configSchedule.initialValue!,
-      futureValues: config,
-    };
+  if (!svcInfosQuery.data) {
+    return <p>no VoteRequest contractId is specified</p>;
+  }
+
+  async function setCoinConfigAction(config: Schedule<string, CoinConfig<'USD'>>) {
+    if (svcInfosQuery.isLoading) {
+      return <Loading />;
+    }
+
+    if (svcInfosQuery.isError) {
+      return <p>Not yet implemented.</p>;
+    }
+
+    if (!svcInfosQuery.data) {
+      return <p>no VoteRequest contractId is specified</p>;
+    }
+
     chooseAction({
       tag: 'ARC_CoinRules',
       value: {
-        coinRulesCid: svcInfosQuery.data?.coinRules.contractId!,
+        coinRulesCid: svcInfosQuery.data.coinRules.contractId,
         coinRulesAction: {
           tag: 'CRARC_SetConfigSchedule',
-          value: { newConfigSchedule: mergedConfig },
+          value: { newConfigSchedule: config },
         },
       },
     });
@@ -47,7 +58,7 @@ const SetCoinConfig: React.FC<{
       <Typography variant="h6">Configuration</Typography>
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
         <ConfigurationNavigator
-          data={svcInfosQuery.data?.coinRules.payload.configSchedule!}
+          data={getCoinConfigurationAsOfNow(svcInfosQuery.data.coinRules.payload.configSchedule)}
           onChange={setCoinConfigAction}
         />
       </FormControl>

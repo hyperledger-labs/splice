@@ -18,24 +18,36 @@ dayjs.extend(utc);
 
 interface ComponentSwitcherProps {
   data: Schedule<string, CoinConfig<'USD'>> | undefined;
-  onChange: (updatedJson: Tuple2<string, CoinConfig<'USD'>>[]) => void;
+  onChange: (updatedJson: Schedule<string, CoinConfig<'USD'>>) => void;
 }
 
 const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChange }) => {
-  // @ts-ignore
-  const baseComponent: Tuple2<string, CoinConfig<'USD'>> = new Tuple2<string, CoinConfig<'USD'>>();
-  baseComponent._2 = data?.initialValue!;
+  // use to schedule new configuration (futureValues)
+  const baseComponent: Tuple2<string, CoinConfig<'USD'>> = {
+    _1: '',
+    _2: data?.initialValue!,
+  };
 
-  const initialValues: Tuple2<string, CoinConfig<'USD'>>[] = [];
+  const [initialComponent, setInitialComponent] = useState<CoinConfig<'USD'>>(data?.initialValue!);
+  const [components, setComponents] = useState<Tuple2<string, CoinConfig<'USD'>>[]>(
+    data?.futureValues!
+  );
 
-  // Add initial CoinConfig along with the valid CoinConfig futureValues
-  const [components, setComponents] = useState<Tuple2<string, CoinConfig<'USD'>>[]>(initialValues);
+  async function setDecodedInitialComponent(svcRulesConfig: Record<string, JSONValue>) {
+    const decodedConfig = CoinConfig(USD).decoder.runWithException(svcRulesConfig);
+    setInitialComponent(decodedConfig);
+    onChange({ initialValue: initialComponent, futureValues: components });
+  }
 
   const handleResetComponents = () => {
     setComponents([]);
   };
 
   const handleAddComponent = () => {
+    if (dayjs(date).isBefore(dayjs.utc())) {
+      return;
+    }
+
     const newComponent = baseComponent;
     newComponent._1 = dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]');
 
@@ -50,13 +62,13 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
 
   const handleRemoveComponent = (index: number) => {
     setComponents(prevComponents => prevComponents.filter((_, i) => i !== index));
-    onChange(components);
+    onChange({ initialValue: initialComponent, futureValues: components });
   };
 
   function addCoinConfigSchedule(coinConfig: Record<string, JSONValue>, time?: string | undefined) {
     components.filter(comp => comp._1 === time)[0]._2 =
       CoinConfig(USD).decoder.runWithException(coinConfig);
-    onChange(components);
+    onChange({ initialValue: initialComponent, futureValues: components });
   }
 
   const [date, setDate] = useState<Dayjs | null>(dayjs());
@@ -79,9 +91,15 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
       <Button id={'button-schedule-new-configuration'} onClick={handleAddComponent}>
         Schedule New Configuration
       </Button>
+      <CardComponent key={0}>
+        <JsonEditor
+          data={CoinConfig(USD).encode(initialComponent) as Record<string, JSONValue>}
+          onChange={setDecodedInitialComponent}
+        />
+      </CardComponent>
       {components.map((Component, index: number) => (
         <CardComponent
-          key={index}
+          key={index + 1}
           index={index + 1}
           date={dayjs(Component._1).toString().replace('GMT', 'UTC')}
           removeFunction={() => handleRemoveComponent(index)}
@@ -102,9 +120,9 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
 
 const CardComponent: React.FC<{
   children: React.ReactNode;
-  index: number;
-  date: string;
-  removeFunction: () => void;
+  index?: number;
+  date?: string;
+  removeFunction?: () => void;
 }> = ({ children, index, date, removeFunction }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
 
@@ -122,11 +140,13 @@ const CardComponent: React.FC<{
               {isCollapsed ? '▶' : '▼'}
             </Button>
             <Typography style={{ flex: 1, marginRight: '10px' }}>
-              Schedule {index}: {date}
+              {index ? `Schedule ${index}: ${date}` : 'Current Configuration'}
             </Typography>
-            <Button id={'button-remove-schedule-configuration-' + index} onClick={removeFunction}>
-              Remove
-            </Button>
+            {removeFunction && (
+              <Button id={'button-remove-schedule-configuration-' + index} onClick={removeFunction}>
+                Remove
+              </Button>
+            )}
           </Box>
         }
       />
