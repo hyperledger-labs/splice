@@ -58,4 +58,7 @@ Synchronous event processing failed for event batch with sequencer counters.*
 # Detailed API logging is extremely useful for debugging so we turn this on in our tests.
 Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
 
+# TODO(#6616): Remove this once fixed upstream
+TOPOLOGY_MANAGER_INTERNAL_ERROR(4,0): .* other failure: [The given serial .* does not match the expected serial .*]
+
 # Make sure to have a trailing newline
