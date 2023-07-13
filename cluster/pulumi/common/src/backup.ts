@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import * as fs from 'fs/promises';
 import { Bucket, File, Storage } from '@google-cloud/storage';
 import { ExactNamespace, config } from 'cn-pulumi-common';
 import { exit } from 'process';
@@ -28,6 +29,7 @@ export function installGcpBucket(config: GcpBucketConfig): GcpBucket {
 export type BackupConfig = {
   bucket: GcpBucket;
   backupInterval: string;
+  prefix?: string;
 };
 
 // Install the bucket's secret into a namespace so apps in there can access the GCP bucket
@@ -162,5 +164,13 @@ export function fetchAndInstallParticipantBootstrapDump(
     config.start,
     config.end
   );
+  return installParticipantIdentitySecret(xns, participantBootstrapDumpSecretName, content);
+}
+
+export async function readAndInstallParticipantBootstrapDump(
+  xns: ExactNamespace,
+  file: string
+): Promise<k8s.core.v1.Secret> {
+  const content = await fs.readFile(file, { encoding: 'utf-8' });
   return installParticipantIdentitySecret(xns, participantBootstrapDumpSecretName, content);
 }

@@ -1,9 +1,15 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Auth0Client } from 'cn-pulumi-common';
-import { infraStack, InfrastructureOutputs } from 'cn-pulumi-common';
+import {
+  BackupConfig,
+  installGcpBucket,
+  GcpBucketConfig,
+  BootstrappingDumpConfig,
+  infraStack,
+  InfrastructureOutputs,
+} from 'cn-pulumi-common';
 import { exit } from 'process';
 
-import { BackupConfig, installGcpBucket, GcpBucketConfig, BootstrappingDumpConfig } from './backup';
 import { installDocs } from './docs';
 import { configureForwardAll } from './gateway';
 import { installClusterIngress } from './ingress';

@@ -652,4 +652,6 @@ This allows the public to inspect multiple Scan UIs and compare their data, so t
 Transitioning Across Network Resets
 -----------------------------------
 
-Please consult the :ref:`relevant section of the validator runbook <validator_continuity>` to ensure that coin balances associated with your SV's validator node (which likely includes rewards earned by your SV nodes) are preserved across a network reset.
+Please consult the :ref:`relevant section of the validator runbook <validator_continuity>` on how to backup the identity of your participant,
+to ensure that coin balances associated with your SV's validator node (which likely includes rewards earned by your SV nodes) are preserved across a network reset.
+Please consult the :ref:`relevant section above <sv-participant-identities-restore>` on how to restore from an existing participant identities backup.

@@ -2,25 +2,23 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
   auth0UserNameEnvVarSource,
-  installAuth0Secret,
-  installAuth0UISecret,
+  BackupConfig,
+  BootstrappingDumpConfig,
   ChartValues,
+  CLUSTER_BASENAME,
   ExactNamespace,
   exactNamespace,
+  fetchAndInstallParticipantBootstrapDump,
+  getLatestSvcAcsDumpFile,
+  installAuth0Secret,
+  installAuth0UISecret,
   installCNHelmChart,
-  CLUSTER_BASENAME,
+  installGcpBucketSecret,
+  participantBootstrapDumpSecretName,
 } from 'cn-pulumi-common';
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import {
-  BackupConfig,
-  BootstrappingDumpConfig,
-  fetchAndInstallParticipantBootstrapDump,
-  getLatestSvcAcsDumpFile,
-  installGcpBucketSecret,
-  participantBootstrapDumpSecretName,
-} from './backup';
 import { installCometBftNode } from './cometbft';
 import { installGlobalDomain, installParticipant } from './ledger';
 import { installValidatorApp } from './validator';
@@ -134,6 +132,15 @@ export function installSvNode(config: SvConfig): {
     installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
+  const backupConfig: BackupConfig | undefined = config.backupConfig
+    ? {
+        ...config.backupConfig,
+        prefix: config.backupConfig.prefix
+          ? config.backupConfig.prefix
+          : `${CLUSTER_BASENAME}/${xns.logicalName}`,
+      }
+    : undefined;
+
   const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
     ? installGcpBucketSecret(xns, config.backupConfig.bucket)
     : undefined;
@@ -217,7 +224,7 @@ export function installSvNode(config: SvConfig): {
     })),
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
-    acsStoreDump: config.backupConfig,
+    acsStoreDump: backupConfig,
     acsBootstrappingDump:
       config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
         ? getAcsBootstrappingDump(xns, config.bootstrappingDumpConfig)
@@ -261,9 +268,9 @@ export function installSvNode(config: SvConfig): {
     participant,
     auth0AppName: config.auth0ValidatorAppName,
     backupConfig:
-      config.backupConfig && backupConfigSecret
+      backupConfig && backupConfigSecret
         ? {
-            config: config.backupConfig,
+            config: backupConfig,
             secret: backupConfigSecret,
           }
         : undefined,

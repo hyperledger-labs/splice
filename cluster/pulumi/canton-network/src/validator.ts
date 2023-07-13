@@ -1,15 +1,17 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { installAuth0Secret, installAuth0UISecret, installCNHelmChart } from 'cn-pulumi-common';
-import type { Auth0Client, ExactNamespace } from 'cn-pulumi-common';
-
 import {
+  Auth0Client,
   BackupConfig,
   BootstrappingDumpConfig,
+  CLUSTER_BASENAME,
+  ExactNamespace,
   fetchAndInstallParticipantBootstrapDump,
   installGcpBucketSecret,
   participantBootstrapDumpSecretName,
-} from './backup';
+} from 'cn-pulumi-common';
+
 import { domainFeesConfig } from './domainFeesCfg';
 import {
   ValidatorOnboarding,
@@ -54,6 +56,21 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
       ? fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
       : undefined;
 
+  const backupConfig: BackupConfig | undefined = config.backupConfig
+    ? {
+        ...config.backupConfig.config,
+        prefix: config.backupConfig.config.prefix
+          ? config.backupConfig.config.prefix
+          : `${CLUSTER_BASENAME}/${config.xns.logicalName}`,
+      }
+    : undefined;
+
+  const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
+    ? config.backupConfig.secret
+      ? config.backupConfig.secret
+      : installGcpBucketSecret(config.xns, config.backupConfig.config.bucket)
+    : undefined;
+
   const dependsOn: pulumi.Resource[] = [
     config.xns.ns,
     config.participant,
@@ -64,15 +81,9 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
     .concat(
       config.onboarding ? [installValidatorOnboardingSecret(config.xns, config.onboarding)] : []
     )
-    .concat(
-      config.backupConfig
-        ? config.backupConfig.secret
-          ? [config.backupConfig.secret]
-          : [installGcpBucketSecret(config.xns, config.backupConfig.config.bucket)]
-        : []
-    )
-    .concat(config.extraDependsOn || [])
-    .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
+    .concat(backupConfigSecret ? [backupConfigSecret] : [])
+    .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
+    .concat(config.extraDependsOn || []);
 
   return installCNHelmChart(
     config.xns,
@@ -104,7 +115,7 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
           }
         : {},
       disableAdminAuth: config.disableAdminAuth,
-      participantIdentitiesBackup: config.backupConfig?.config,
+      participantIdentitiesBackup: backupConfig,
       additionalConfig: config.additionalConfig,
       participantBootstrappingDump: config.participantBootstrapDump
         ? { secretName: participantBootstrapDumpSecretName }

@@ -1,6 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as fs from 'fs/promises';
 import {
   Auth0Client,
   ExactNamespace,
@@ -126,22 +125,4 @@ export function svKeySecret(
       dependsOn: [ns.ns],
     }
   );
-}
-
-export async function participantBootstrapDumpSecret(
-  ns: ExactNamespace,
-  file: string
-): Promise<k8s.core.v1.Secret> {
-  const secretName = 'cn-app-sv-participant-bootstrapping-dump';
-  const content = await fs.readFile(file, { encoding: 'utf-8' });
-  return new k8s.core.v1.Secret(secretName, {
-    metadata: {
-      name: secretName,
-      namespace: ns.logicalName,
-    },
-    type: 'Opaque',
-    data: {
-      content: Buffer.from(content, 'utf8').toString('base64'),
-    },
-  });
 }

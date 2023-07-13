@@ -6,10 +6,9 @@ import {
   exactNamespace,
   installCNHelmChart,
 } from 'cn-pulumi-common';
-import type { Auth0Client } from 'cn-pulumi-common';
+import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { BackupConfig, BootstrappingDumpConfig } from './backup';
 import { installDomain, installParticipant } from './ledger';
 import { ValidatorOnboarding } from './sv';
 import { installValidatorApp } from './validator';

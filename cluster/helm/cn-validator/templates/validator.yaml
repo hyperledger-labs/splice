@@ -104,8 +104,6 @@ spec:
         - name: CN_APP_VALIDATOR_ENABLE_ADMIN_AUTH
           value: "false"
         {{- end }}
-        {{- $clusterBaseName := .Values.cluster.basename -}}
-        {{- $namespace := .Release.Namespace -}}
         {{- with .Values.participantIdentitiesBackup }}
         - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_BACKUP
           value: |
@@ -119,7 +117,7 @@ spec:
                   json-credentials = ${CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
                 }
               }
-              prefix = "{{ $clusterBaseName }}/{{ $namespace }}"
+              prefix = {{ .prefix | quote }}
               backup-interval = {{ .backupInterval }}
             }
         - name: CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS

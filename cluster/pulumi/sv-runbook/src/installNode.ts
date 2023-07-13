@@ -2,12 +2,20 @@ import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
 import {
   Auth0Client,
+  BackupConfig,
   ChartValues,
   exactNamespace,
+  fetchAndInstallParticipantBootstrapDump,
   fixedTokens,
+  GcpBucketConfig,
   infraStack,
+  installGcpBucket,
+  installGcpBucketSecret,
   loadYamlFromFile,
+  participantBootstrapDumpSecretName,
+  readAndInstallParticipantBootstrapDump,
 } from 'cn-pulumi-common';
+import { exit } from 'process';
 
 import { auth0Cfg } from './auth0cfg';
 import { installCometBftNode } from './cometbft';
@@ -20,7 +28,6 @@ import {
   imagePullSecret,
   imagePullSecretByNamespaceName,
   svKeySecret,
-  participantBootstrapDumpSecret,
 } from './secrets';
 import { CLUSTER_BASENAME, TARGET_CLUSTER, REPO_ROOT, SV_NAME } from './utils';
 
@@ -29,7 +36,21 @@ if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
+type BootstrapCliConfig = {
+  cluster: string;
+  date: string;
+};
+
+const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
+  ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
+  : undefined;
+
 const participantIdentityFile = process.env.PARTICIPANT_IDENTITY_FILE;
+
+const backupBucketConfig: GcpBucketConfig = {
+  projectId: 'da-cn-devnet',
+  bucketName: 'da-cn-data-dumps',
+};
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const version = process.env.CHARTS_VERSION;
@@ -69,9 +90,54 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     special: true,
   }).result;
 
-  const participantIdentitySecret = participantIdentityFile
-    ? await participantBootstrapDumpSecret(svNamespace, participantIdentityFile)
-    : undefined;
+  if (participantIdentityFile && bootstrappingConfig) {
+    console.error(
+      `We can restore participant identities from *either* a file or from GCP,` +
+        `but both PARTICIPANT_IDENTITY_FILE and BOOTSTRAPPING_CONFIG have been set.`
+    );
+    exit(1);
+  } else if (participantIdentityFile) {
+    console.error(`Bootstrapping participant identity from file ${participantIdentityFile}`);
+  } else if (bootstrappingConfig) {
+    console.error(`Bootstrapping participant identity from cluster ${bootstrappingConfig.cluster}`);
+  } else {
+    console.error(`Bootstraping participant with fresh identity`);
+  }
+
+  let participantBootstrapDumpSecret: pulumi.Resource | undefined;
+  let backupConfigSecret: pulumi.Resource | undefined;
+  let backupConfig: BackupConfig | undefined;
+
+  if (participantIdentityFile) {
+    participantBootstrapDumpSecret = await readAndInstallParticipantBootstrapDump(
+      svNamespace,
+      participantIdentityFile
+    );
+  } else if (bootstrappingConfig) {
+    const backupBucket = installGcpBucket(backupBucketConfig);
+    backupConfig = {
+      prefix: `${CLUSTER_BASENAME}/${SV_NAMESPACE}`,
+      backupInterval: '10m',
+      bucket: backupBucket,
+    };
+    const end = new Date(Date.parse(bootstrappingConfig.date));
+    // We search within an interval of 10 weeks. Given that we typically deploy
+    // the SV runbook against testnet-preview once per week, and so get backups once per week,
+    // this gives us a threshold to make sure each node has one backup in that interval
+    // while also having sufficiently few backups that the bucket query is fast.
+    const start = new Date(end.valueOf() - 10 * 7 * 24 * 60 * 60 * 1000);
+    const bootstrappingDumpConfig = {
+      bucket: backupBucket,
+      cluster: bootstrappingConfig.cluster,
+      start,
+      end,
+    };
+    participantBootstrapDumpSecret = fetchAndInstallParticipantBootstrapDump(
+      svNamespace,
+      bootstrappingDumpConfig
+    );
+    backupConfigSecret = installGcpBucketSecret(svNamespace, backupConfig.bucket);
+  }
 
   const postgres = installCNSVHelmChart(
     svNamespace,
@@ -84,13 +150,14 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     version
   );
 
-  const participantValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
-    {
+  const participantValues: ChartValues = {
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-    }
-  );
+    }),
+    postgresPassword: password,
+    disableAutoInit: !!participantBootstrapDumpSecret,
+  };
 
   const participantValuesWithSpecifiedAud: ChartValues = {
     ...participantValues,
@@ -98,8 +165,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       ...participantValues.auth,
       targetAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
-    postgresPassword: password,
-    disableAutoInit: !!participantIdentitySecret,
   };
 
   const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
@@ -119,15 +184,17 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       .concat(loopback !== null ? loopback : [])
   );
 
-  const svValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
-    {
+  const svValues: ChartValues = {
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: SV_NAME,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
       'Digital-Asset': isDevNet ? 'Canton-Foundation-2' : 'Digital-Asset',
-    }
-  );
+    }),
+    participantBootstrappingDump: participantBootstrapDumpSecret
+      ? { secretName: participantBootstrapDumpSecretName }
+      : undefined,
+  };
 
   const svValuesWithSpecifiedAud: ChartValues = {
     ...svValues,
@@ -135,9 +202,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       ...svValues.auth,
       audience: auth0Cfg.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
     },
-    participantBootstrappingDump: participantIdentitySecret
-      ? participantIdentitySecret.metadata.name.apply(n => ({ secretName: n }))
-      : undefined,
   };
 
   const fixedTokensValue: ChartValues = {
@@ -161,7 +225,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     svImagePullDeps
       .concat([participant])
       .concat([svAppSecret, svAppUISecret])
-      .concat(participantIdentitySecret ? [participantIdentitySecret] : [])
+      .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
   );
 
   installCNSVHelmChart(
@@ -174,14 +238,14 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     svImagePullDeps.concat([sv, participant]).concat(svAppSecret)
   );
 
-  const validatorValues = loadYamlFromFile(
-    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`,
-    {
+  const validatorValues = {
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
       SV_WALLET_USER_ID: SV_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-    }
-  );
+    }),
+    participantIdentitiesBackup: backupConfig,
+  };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
     ...validatorValues,
@@ -216,6 +280,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       .concat([sv, participant])
       .concat([svValidatorAppSecret, svValidatorUISecret])
       .concat([svDirectoryUiSecret(svNamespace, auth0Client)])
+      .concat(backupConfigSecret ? [backupConfigSecret] : [])
   );
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
