@@ -1171,6 +1171,9 @@ jobs:
       use_published_artifacts:
         type: boolean
         default: false
+      restore_cluster:
+        type: boolean
+        default: false
     steps:
       - checkout
       - record_job_start_time
@@ -1186,6 +1189,16 @@ jobs:
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping_config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping_config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
             cncluster activate
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -2530,6 +2543,16 @@ workflows:
           - deployment_test
           - docker_images_push
           - deploy_cluster
+    - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "testnet-preview"
+          restore_cluster: true
+          requires:
+            - deploy_cluster
 
   testnet_health_check:
     when:

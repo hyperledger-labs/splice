@@ -1279,6 +1279,14 @@ function subcmd_ci_apply_sv() {
         args+=(-c "FIXED_TOKENS=0")
     fi
 
+    # By default, this is unset and we infer the previous values based on the currently running cluster.
+    # However, we allow overwriting it to account for cases where the previous cluster is broken in some way.
+    if [ -n "${RESTORE_CLUSTER:-}" ] && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
+        CLUSTER="$GCP_CLUSTER_BASENAME"
+        NOW="$(date +"%Y-%m-%dT%H:%M:%S.000Z")"
+        export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"date\": \"$NOW\"}"
+    fi
+
     _cluster_show
 
     local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
