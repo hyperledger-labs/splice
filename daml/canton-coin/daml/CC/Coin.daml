@@ -295,19 +295,14 @@ template CoinRules
         let configUsd = getValueAsOf now configSchedule
         let minTopupAmount = configUsd.globalDomain.fees.minTopupAmount
         require "extraTraffic is at least as much as the configured minTopupAmount" (extraTraffic >= minTopupAmount)
-        -- TODO(#6112) - Move domain fees computation into separate function
-        -- compute price in CC
-        contextMiningRound <- exercise context.context.openMiningRound (API.OpenMiningRound_Fetch validator)
-        let extraTrafficPrice = configUsd.globalDomain.fees.extraTrafficPrice
-        let usdSpent = intToDecimal extraTraffic / 1e6 * extraTrafficPrice
-        let ccSpent = usdSpent / contextMiningRound.coinPrice
+        (trafficCostCc, trafficCostUsd) <- computeDomainFees validator extraTraffic this context
         let transfer = API.Transfer with
               sender = validator
               provider = svc
               inputs
               outputs = [ API.TransferOutput with
                             receiver = svc
-                            amount = ccSpent
+                            amount = trafficCostCc
                             receiverFeeRatio = 0.0
                             lock = None
                         ]
@@ -334,8 +329,8 @@ template CoinRules
               validator = traffic.validator
               totalPurchased = traffic.totalPurchased + extraTraffic
               numPurchases = traffic.numPurchases + 1
-              ccSpent = traffic.ccSpent + ccSpent
-              usdSpent = traffic.usdSpent + usdSpent
+              ccSpent = traffic.ccSpent + trafficCostCc
+              usdSpent = traffic.usdSpent + trafficCostUsd
               lastPurchasedAt = now
               domainId = traffic.domainId
         return (newTraffic, result.senderChangeCoin)
@@ -1057,3 +1052,16 @@ requireCoinExpiredForAllOpenRounds roundCid coin = do
   -- point in time; and we ensure that a coin can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
   require "Coin is expired" (isCoinExpired round coin.amount)
+
+-- | Computing domain fees
+computeDomainFees : Party -> Int -> CoinRules -> API.PaymentTransferContext -> Update (Decimal, Decimal)
+computeDomainFees validator trafficAmount coinRules context = do
+  -- compute traffic cost in USD
+  now <- getTime
+  let configUsd = getValueAsOf now coinRules.configSchedule
+  let extraTrafficPrice = configUsd.globalDomain.fees.extraTrafficPrice
+  let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
+  -- compute traffic cost in CC
+  contextMiningRound <- exercise context.context.openMiningRound (API.OpenMiningRound_Fetch validator)
+  let trafficCostCc = trafficCostUsd / contextMiningRound.coinPrice
+  pure (trafficCostCc, trafficCostUsd)

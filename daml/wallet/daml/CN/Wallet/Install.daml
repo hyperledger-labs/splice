@@ -6,7 +6,7 @@ import DA.Time
 import qualified CC.API.V1.Coin as API
 
 import CC.Round (OpenMiningRound)
-import CC.Coin (Coin, CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..), CoinRules_BuyExtraTraffic(..), CoinRules_Fetch(..))
+import CC.Coin (Coin, CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..), CoinRules_BuyExtraTraffic(..), CoinRules_Fetch(..), computeDomainFees)
 import CC.GlobalDomain
 
 import CN.Util.ExpiringContract
@@ -15,8 +15,6 @@ import CN.Wallet.Subscriptions
 import CN.Wallet.TransferOffer
 import Prelude
 import CN.Util.Assert (require)
-import CC.Schedule (getValueAsOf)
-import qualified CC.API.V1.Round as API
 
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
@@ -93,16 +91,9 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
         if (coinRules.isDevNet)
           -- Tap enough CC to buy extra traffic on DevNet
           then do
-            -- TODO(#6112) - Move domain fees computation into separate function
             -- Calculate CC required to buy extra traffic
-            now <- getTime
-            let configUsd = getValueAsOf now coinRules.configSchedule
-            let contextOpenRoundCid = context.context.openMiningRound
-            contextOpenRound <- exercise contextOpenRoundCid (API.OpenMiningRound_Fetch validatorP)
-            let extraTrafficPrice = configUsd.globalDomain.fees.extraTrafficPrice
-            let trafficCostUsd = intToDecimal extraTraffic / 1e6 * extraTrafficPrice
-            let trafficCostCc = trafficCostUsd / contextOpenRound.coinPrice
-            -- Calcualte transfer fees to be paid
+            (trafficCostCc, _) <- computeDomainFees validatorP extraTraffic coinRules context
+            -- Calculate transfer fees to be paid
             let outputs = [ API.TransferOutput with
                             receiver = coinRules.svc
                             amount = trafficCostCc
@@ -111,7 +102,7 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
             [fees] <- exercise context.coinRules (API.CoinRules_ComputeFees context.context validatorP outputs)
             -- Tap enough CC to cover extra traffic purchase including fees
             ccsum <- exercise coinRulesCid (CoinRules_DevNet_Tap validatorP (trafficCostCc + fees)
-              (fromInterfaceContractId @OpenMiningRound contextOpenRoundCid))
+              (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound))
             let newCoin = toInterfaceContractId @API.Coin ccsum.coin
             pure $ (API.InputCoin newCoin) :: inputs
           else
