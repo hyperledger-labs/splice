@@ -474,15 +474,15 @@ Configuring the Cluster Ingress
 
 The following routes should be configured in your cluster ingress controller:
 
-* ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``wallet-web-ui`` in the ``sv`` namespace
-* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5003 of pod ``validator-app`` in the ``sv`` namespace
-* ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``sv-web-ui`` in the ``sv`` namespace
-* ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/*`` should be routed to port 5014 of pod ``sv-app`` in the ``sv`` namespace
-* ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``scan-web-ui`` in the ``sv`` namespace
-* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/v0/scan/*`` should be routed to port 5012 in pod ``scan-app`` in the ``sv`` namespace
+* ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace
+* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5003 of service ``validator-app`` in the ``sv`` namespace
+* ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace
+* ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/*`` should be routed to port 5014 of service ``sv-app`` in the ``sv`` namespace
+* ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace
+* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/v0/scan/*`` should be routed to port 5012 in service ``scan-app`` in the ``sv`` namespace
 * ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol
-* ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to pod ``directory-web-ui`` in the ``sv`` namespace
-* ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*`` should be routed to port 7575 in pod ``participant`` in the ``sv`` namespace
+* ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``sv`` namespace
+* ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*`` should be routed to port 7575 in service ``participant`` in the ``sv`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have
