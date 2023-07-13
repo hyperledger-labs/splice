@@ -49,21 +49,23 @@ trait SplitwellFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ): String = {
     createGroup(groupName)
     eventually() {
-      inside(
-        findAll(className("create-invite-link"))
-          .filter(_.attribute("data-group") == Some(groupName))
+      val createInviteElements = findAll(className("create-invite-link"))
+      withClue(s"Create invite elements not found $createInviteElements") {
+        val createInviteButton = createInviteElements
+          .filter(_.attribute("data-group").contains(groupName))
           .toSeq
-      ) { case Seq(button) =>
-        click on button
+          .loneElement
+        click on createInviteButton
       }
     }
     eventually() {
-      inside(
-        findAll(className("invite-copy-button"))
-          .filter(_.attribute("data-group-id") == Some(groupName))
+      val inviteCopyElements = findAll(className("invite-copy-button"))
+      withClue(s"Invite copy button not found $inviteCopyElements") {
+        val inviteCopyButton = inviteCopyElements
+          .filter(_.attribute("data-group-id").contains(groupName))
           .toSeq
-      ) { case Seq(button) =>
-        button.attribute("data-invite-contract").value
+          .loneElement
+        inviteCopyButton.attribute("data-invite-contract").value
       }
     }
   }
