@@ -478,6 +478,7 @@ object RetryProvider {
       Status.Code.UNIMPLEMENTED,
       Status.Code.UNAVAILABLE,
       Status.Code.NOT_FOUND,
+      Status.Code.ALREADY_EXISTS,
       Status.Code.FAILED_PRECONDITION,
       Status.Code.DEADLINE_EXCEEDED,
       Status.Code.ABORTED,
