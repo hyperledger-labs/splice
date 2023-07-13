@@ -105,29 +105,52 @@ fetch_pages() {
     write_pages "$url" "$output_file" "$max_age_seconds"
 }
 
-tmp_pipelines_file="/tmp/pipelines.json"
-tmp_workflows_file="/tmp/workflows.json"
-fetch_pages "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=main" "$tmp_pipelines_file" "$MAX_AGE_SECONDS"
+run() {
+  tmp_pipelines_file="/tmp/pipelines.json"
+  tmp_workflows_file="/tmp/workflows.json"
+  fetch_pages "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=main" "$tmp_pipelines_file" "$MAX_AGE_SECONDS"
 
-PREVIOUS_JOBS=$(jq -c < $tmp_pipelines_file ".items | map(select(.number < $CURRENT_PIPELINE_NUMBER)) | .[] | { number: .number, id: .id}")
-if [ "${#PREVIOUS_JOBS}" -gt 0 ]; then
-    while IFS= read -r JOB; do
-        PIPELINE_NUMBER=$(jq <<< "$JOB" -r '.number')
-        PIPELINE_ID=$(jq <<< "$JOB" -r '.id')
-        echo "Checking pipeline $PIPELINE_NUMBER ($PIPELINE_ID) ..."
-        fetch_pages "https://circleci.com/api/v2/pipeline/$PIPELINE_ID/workflow" "$tmp_workflows_file" "$MAX_AGE_SECONDS"
-        while IFS= read -r WORKFLOW; do
-            WORKFLOW_NAME=$(jq -r <<< "$WORKFLOW" '.name')
-            if [[ " ${WORKFLOW_NAMES} " == *" ${WORKFLOW_NAME} "* ]]; then
-                echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
-                wait_for_pipeline_to_complete "$PIPELINE_ID"
-            else
-                echo "Ignoring workflow $WORKFLOW_NAME"
-            fi
-        done <<< "$(jq -c < "$tmp_workflows_file" ".items | .[]")"
-    done <<< "$PREVIOUS_JOBS"
-    echo "Checked all pipelines created up to $((MAX_AGE_SECONDS / 3600)) hours ago before pipeline $CURRENT_PIPELINE_NUMBER"
-else
-    echo "No pipelines found before pipeline $CURRENT_PIPELINE_NUMBER, failing!"
-    exit 1
+  PREVIOUS_JOBS=$(jq -c < $tmp_pipelines_file ".items | map(select(.number < $CURRENT_PIPELINE_NUMBER)) | .[] | { number: .number, id: .id}")
+  if [ "${#PREVIOUS_JOBS}" -gt 0 ]; then
+      while IFS= read -r JOB; do
+          PIPELINE_NUMBER=$(jq <<< "$JOB" -r '.number')
+          PIPELINE_ID=$(jq <<< "$JOB" -r '.id')
+          echo "Checking pipeline $PIPELINE_NUMBER ($PIPELINE_ID) ..."
+          fetch_pages "https://circleci.com/api/v2/pipeline/$PIPELINE_ID/workflow" "$tmp_workflows_file" "$MAX_AGE_SECONDS"
+          while IFS= read -r WORKFLOW; do
+              WORKFLOW_NAME=$(jq -r <<< "$WORKFLOW" '.name')
+              if [[ " ${WORKFLOW_NAMES} " == *" ${WORKFLOW_NAME} "* ]]; then
+                  echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
+                  wait_for_pipeline_to_complete "$PIPELINE_ID"
+              else
+                  echo "Ignoring workflow $WORKFLOW_NAME"
+              fi
+          done <<< "$(jq -c < "$tmp_workflows_file" ".items | .[]")"
+      done <<< "$PREVIOUS_JOBS"
+      echo "Checked all pipelines created up to $((MAX_AGE_SECONDS / 3600)) hours ago before pipeline $CURRENT_PIPELINE_NUMBER"
+  else
+      echo "No pipelines found before pipeline $CURRENT_PIPELINE_NUMBER, failing!"
+      exit 1
+  fi
+}
+
+max_retries=5
+counter=1
+while [[ $counter -le max_retries ]] ; do
+  echo "Attempt $counter"
+  run
+  rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo "Failed with error code $rc. Retrying in 5 seconds..."
+    echo
+    sleep 5
+    ((counter++))
+  else
+    break
+  fi
+done
+
+if [[ $counter -eq $max_retries ]]; then
+  echo "Failed after $max_retries attempts."
+  exit 1
 fi
