@@ -48,7 +48,7 @@ final case class GcpBucketConfig(
 object GcpBucketConfig {
   def inferForTesting: GcpBucketConfig =
     infer(
-      "GCP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS",
+      "GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS",
       "da-cn-scratchnet",
       "da-cn-scratch-acs-store-dumps",
     )

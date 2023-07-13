@@ -348,7 +348,7 @@ commands:
           cmd_name: Executing "sbt << parameters.cmd >>"
           no_output_timeout: << parameters.no_output_timeout >>
           when: << parameters.when >>
-          additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
+          additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
           cmd: |
             on_exit() {
               local CODE="$?"
