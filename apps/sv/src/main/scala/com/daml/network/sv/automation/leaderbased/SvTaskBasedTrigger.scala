@@ -12,7 +12,6 @@ import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -21,6 +20,7 @@ import scala.util.Random
 trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
   protected def svTaskContext: SvTaskBasedTrigger.Context
+  protected def enableLeaderMonitoring: Boolean = false
   private val store = svTaskContext.svcStore
 
   final protected override def completeTask(
@@ -34,6 +34,12 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
         if (sameEpoch) {
           if (isLeader) {
             completeTaskAsLeader(task)
+          } else if (!enableLeaderMonitoring) {
+            Future.successful(
+              TaskSuccess(
+                s"Skipping leader inactivity check"
+              )
+            )
           } else {
             monitorTaskAsFollower(task)
           }
@@ -110,7 +116,8 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   final protected def monitorTaskAsFollower(
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    logger.debug(show"Starting check for leader inactivity")
+
+    logger.debug(s"Starting check for leader inactivity")
     for {
       svcRules <- store.getSvcRules()
       monitoredEpoch = svcRules.payload.epoch
@@ -134,7 +141,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
         case UnlessShutdown.AbortedDueToShutdown =>
           Future.successful(
             TaskSuccess(
-              show"stopping the check for leader inactivity, as the trigger is being shut down"
+              s"stopping the check for leader inactivity, as the trigger is being shut down"
             )
           )
         case UnlessShutdown.Outcome(()) => {
@@ -157,7 +164,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
             } else {
               Future.successful(
                 TaskSuccess(
-                  show"Leader inactivity check completed, leader is active"
+                  s"Leader inactivity check completed, leader is active"
                 )
               )
             }
