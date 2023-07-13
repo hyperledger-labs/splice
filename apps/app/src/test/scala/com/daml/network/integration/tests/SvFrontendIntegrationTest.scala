@@ -632,10 +632,6 @@ class SvFrontendIntegrationTest
               inside(tbody) { case Some(tb) =>
                 val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
                 rows should have size 2
-                (
-                  rows.head.childElement(className("vote-row-action")).text,
-                  rows.head.childElement(className("vote-row-requester")).text,
-                )
               }
             },
           )

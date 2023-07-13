@@ -3,6 +3,8 @@ import { Contract } from 'common-frontend';
 import React, { useMemo, useState } from 'react';
 
 import { ClickAwayListener } from '@mui/base';
+import CheckIcon from '@mui/icons-material/Check';
+import ClearIcon from '@mui/icons-material/Clear';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -14,6 +16,7 @@ import {
   Collapse,
   IconButton,
   Modal,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -185,6 +188,17 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
   openModalWithVoteRequest,
 }) => {
   const [open, setOpen] = useState(-1);
+  const votesQuery = useListVotes(contractId ? [contractId] : []);
+
+  const allVotes = votesQuery.data
+    ? votesQuery.data.sort((a, b) => {
+        return b.expiresAt.valueOf() - a.expiresAt.valueOf();
+      })
+    : [];
+
+  const acceptedVotes = allVotes.filter(v => v.accept);
+  const rejectedVotes = allVotes.filter(v => !v.accept);
+
   return (
     <>
       <TableRow key={idx} className="vote-request-row">
@@ -201,6 +215,16 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
           <CopyableTypography text={action} />
         </TableCell>
         <TableCell className="vote-row-requester">{requester}</TableCell>
+        <TableCell className="vote-row-vote-status" color="default">
+          <Stack spacing={4} direction="row">
+            <Typography id={'vote-request-modal-rejected-count-' + idx} variant="h6">
+              <ClearIcon color="error" fontSize="inherit" /> {rejectedVotes.length}
+            </Typography>
+            <Typography id={'vote-request-modal-accepted-count-' + idx} variant="h6">
+              <CheckIcon color="success" fontSize="inherit" /> {acceptedVotes.length}
+            </Typography>
+          </Stack>
+        </TableCell>
         <TableCell>
           <DateDisplay datetime={expires.toISOString()} />
         </TableCell>
@@ -237,7 +261,7 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
                 >
                   <TableBody>
                     <TableCell>
-                      <span style={{ fontWeight: 'bold' }}>Description:</span> {description}
+                      <span style={{ fontWeight: 'bold' }}>Summary:</span> {description}
                     </TableCell>
                     <TableCell>
                       <span style={{ fontWeight: 'bold' }}>URL:</span> <Link href={url}>{url}</Link>
@@ -276,6 +300,7 @@ const ListVoteRequestsTable: React.FC<ListVoteRequestsTableProps> = ({
             <TableCell></TableCell>
             <TableCell>Action</TableCell>
             <TableCell>Requester</TableCell>
+            <TableCell>Vote Status</TableCell>
             <TableCell>Expires At</TableCell>
             <TableCell></TableCell>
           </TableRow>

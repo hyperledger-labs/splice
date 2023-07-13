@@ -2,7 +2,7 @@ import { getUTCWithOffset } from 'common-frontend';
 import { Dayjs } from 'dayjs';
 import React, { useState } from 'react';
 
-import { Button, Card, CardContent, CardHeader, Stack } from '@mui/material';
+import { Box, Button, Card, CardContent, CardHeader, Stack, Typography } from '@mui/material';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
 import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
@@ -40,7 +40,11 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
     newComponent._1 = dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]');
 
     if (!components.map(e => e._1).includes(newComponent._1)) {
-      setComponents(prevComponents => [...prevComponents, newComponent]);
+      setComponents(prevComponents =>
+        [...prevComponents, newComponent].sort((a, b) => {
+          return parseInt(a._1) - parseInt(b._1);
+        })
+      );
     }
   };
 
@@ -113,16 +117,17 @@ const CardComponent: React.FC<{
       <CardHeader
         onClick={toggleCollapse}
         title={
-          <React.Fragment>
+          <Box style={{ display: 'flex', alignItems: 'center' }}>
             <Button id={'button-collapse-schedule-configuration-' + index} onClick={toggleCollapse}>
               {isCollapsed ? '▶' : '▼'}
             </Button>
-            Schedule {index}: {date}
-            <span style={{ marginRight: '400px' }} />
+            <Typography style={{ flex: 1, marginRight: '10px' }}>
+              Schedule {index}: {date}
+            </Typography>
             <Button id={'button-remove-schedule-configuration-' + index} onClick={removeFunction}>
               Remove
             </Button>
-          </React.Fragment>
+          </Box>
         }
       />
       {!isCollapsed && <CardContent>{children}</CardContent>}
