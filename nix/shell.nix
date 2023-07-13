@@ -30,7 +30,6 @@ in pkgs.mkShell {
     hub # Github CLI for todo checker
     jq
     jsonnet
-    jsonapi
     k9s
     kubectl
     kubernetes-helm

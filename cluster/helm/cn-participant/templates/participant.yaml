@@ -58,6 +58,9 @@ spec:
         - containerPort: 5001
           name: lg-api
           protocol: TCP
+        - containerPort: 7575
+          name: json-api
+          protocol: TCP
         - containerPort: 10013
           name: metrics-api
           protocol: TCP
@@ -100,18 +103,6 @@ spec:
             memory: 256Mi
           requests:
             memory: 256Mi
-      - name: json-api
-        image: "{{ .Values.imageRepo }}/json-api:{{ .Values.cluster.imageTag }}"
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 7575
-          name: json-api
-          protocol: TCP
-        resources:
-          limits:
-            memory: 512Mi
-          requests:
-            memory: 512Mi
 ---
 apiVersion: v1
 kind: Service

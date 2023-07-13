@@ -42,14 +42,6 @@ root directory. The commands will look similar to these:
   tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
   cd cn-node-0.1.0-SNAPSHOT
 
-Install the Daml SDK. We will use the JSON API from that later on. For full details refer to the `documentation <https://docs.daml.com/getting-started/installation.html#install-daml-open-source-sdk>`_. On MacOS and Linux you can use the following command:
-
-.. code-block:: bash
-
-  curl -sSL https://get.daml.com/ | sh
-
-.. _validator_onboarding:
-
 Onboarding Validator
 --------------------
 
@@ -206,12 +198,6 @@ open ``web-uis/directory/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluste
     :start-after: BEGIN_DIRECTORY_CONFIG
     :end-before: END_DIRECTORY_CONFIG
 
-The Directory UI connects to the validator's participant by using the JSON API server. Open a new terminal and run:
-
-.. parsed-literal::
-
-    DAML_SDK_VERSION=\ |daml_sdk_version| daml json-api --config examples/validator/json-api-app.conf
-
 .. _splitwell-user:
 
 Configuring the Splitwell UI
@@ -281,7 +267,7 @@ The Directory UI should be accessible at http://directory.localhost:3000.
 You can login there using the same method you used for the wallet (either username if using the default insecure test
 authentication, or through Auth0 if configured).
 
-In case the page doesn't load after the login, please make sure that your local firewall rules allow you to proxy the JSON API endpoint running outside of Docker through the NGINX container that serves the UIs.
+In case the page doesn't load after the login, please make sure that your local firewall rules allow you to proxy the HTTP Ledger API endpoint running outside of Docker through the NGINX container that serves the UIs.
 On Linux, you can try the following command to update the firewall rules if you're using iptables: ::
 
   sudo iptables -A INPUT -i docker0 -p tcp -m tcp --dport 7575:7575 -j ACCEPT
@@ -392,7 +378,7 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
     setup.  Follow the steps for :ref:`configuring the wallet UI <configuring-wallet-ui>`
     and :ref:`configuring the directory UI <configuring-directory-ui>`. For the next steps, the occurences of
     ``TARGET_CLUSTER`` in the ``config.js`` files should have been
-    replaced and the JSON API should be running.
+    replaced.
 
 12. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
 

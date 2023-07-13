@@ -28,6 +28,8 @@ class DFWalletSurviveCantonRestartIntegrationTest
     "-c",
     (validatorPath / "validator-participant.conf").toString,
     "-c",
+    (testResourcesPath / "self-hosted-validator-disable-json-api.conf").toString,
+    "-c",
     (testResourcesPath / "self-hosted-validator-participant-postgres-storage.conf").toString,
     "-c",
     (testResourcesPath / "storage-postgres.conf").toString,

@@ -85,18 +85,6 @@ function start_frontend() {
     npm start 2>&1 | tee -a $log_file" C-m
 }
 
-function start_json_api() {
-  local ledger_api_port=$1
-  local extra_args=$2
-  local log_file="${LOG_DIR}/participant-json-api.clog"
-  local conf="--log-encoder json --log-level DEBUG --ledger-host localhost --ledger-port $ledger_api_port --address 0.0.0.0 --http-port 7575 $extra_args";
-
-  tmux_cmd "json-api" "alice" ":"
-
-  tmux send-keys -t "${tmux_session}:$((tmux_window-1))" \
-    "json-api $conf  2>&1 | tee -a $log_file" C-m
-}
-
 function usage() {
   echo "Usage: ./start-frontends.sh <flags>"
   echo "Flags:"
@@ -197,7 +185,6 @@ function start_local_frontends() {
   start_frontend   sv        3010 sv1     "sv1"                $enable_test_auth
   start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth
   start_frontend   scan      3006 scan    "scan"               "false"           "none"
-  start_json_api 5201 "--allow-insecure-tokens"
 
   if [ $multiple_svs -eq 1 ]; then
     start_frontend sv 3012 sv2 "sv2" $enable_test_auth

@@ -71,19 +71,4 @@ trait ProcessTestUtil {
       defaultArgsCanton(logSuffix) ++ args,
       extraEnv = extraEnv,
     )
-
-  private def defaultArgsJsonApi(port: Int) =
-    Seq(
-      "json-api",
-      "--log-encoder=json",
-      "--log-level=DEBUG",
-      "--ledger-host=localhost",
-      s"--ledger-port=$port",
-      "--address=0.0.0.0",
-      "--http-port=7575",
-      "--allow-insecure-tokens",
-    )
-
-  protected def startJsonApi(port: Int, logFile: File): Process =
-    startProcess(defaultArgsJsonApi(port), outputFile = Some(logFile))
 }

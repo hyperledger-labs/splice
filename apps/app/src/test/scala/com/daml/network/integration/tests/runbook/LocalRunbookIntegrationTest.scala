@@ -22,6 +22,7 @@ class LocalRunbookIntegrationTest
   import ProcessTestUtil.Process
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
+  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources" / "include"
   val validatorPath: File = examplesPath / "validator"
 
   val svNodePath: File = "apps" / "app" / "src" / "test" / "resources" / "local-sv-node"
@@ -55,6 +56,8 @@ class LocalRunbookIntegrationTest
       Seq(
         "-c",
         (validatorPath / "validator-participant.conf").toString,
+        "-c",
+        (testResourcesPath / "self-hosted-validator-disable-json-api.conf").toString,
         "-c",
         (svParticipantPath / "canton.conf").toString,
         "-c",
