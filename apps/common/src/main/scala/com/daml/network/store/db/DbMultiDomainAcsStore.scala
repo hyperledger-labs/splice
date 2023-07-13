@@ -26,9 +26,9 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
-import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
+import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.unused
-import scala.collection.immutable.VectorMap
+import scala.collection.immutable.{SortedMap, VectorMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -58,14 +58,16 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     with LimitHelpers {
 
   import MultiDomainAcsStore.*
+  import DbMultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods
 
-  // storeId is the primary keys of rows in the store_descriptors table.
-  // This ID is immutable and used in many queries, that's why it is cached here.
-  private val storeIdA: AtomicReference[Option[Int]] = new AtomicReference(None)
-  def storeId: Int = storeIdA
-    .get()
-    .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
+  private val state = new AtomicReference[State](State.empty())
+
+  def storeId: Int =
+    state
+      .get()
+      .storeId
+      .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
 
   // Some callers depend on all queries always returning sensible data, but may perform queries
   // before the ACS is fully ingested. We therefore delay all queries until the ACS is ingested.
@@ -75,11 +77,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   def waitUntilAcsIngested(): Future[Unit] =
     finishedAcsIngestion.future
 
-  private val acsSize = new AtomicInteger(0)
-
   def lastIngestedOffset(
-      storage: DbStorage,
-      storeId: Int,
+      storage: DbStorage
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -89,7 +88,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .querySingle(
         sql"""
               select last_ingested_offset from store_descriptors
-              where id = $storeId
+              where id = ${storeId}
            """.as[String].headOption,
         "minimumLastOffset",
       )
@@ -255,7 +254,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .flatMapConcat { domainId =>
         Source
           .unfoldAsync(0L) { fromEventNumber =>
-            val offsetPromise = offsetChangedAfterStreamingQuery.get()
+            val offsetPromise = state.get().offsetChanged
             storage
               .query( // index: acs_store_template_sid_tid_en
                 (selectFromAcsTable(acsTableName) ++
@@ -288,9 +287,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .mapConcat(identity)
   }
 
-  private val offsetChangedAfterStreamingQuery: AtomicReference[Promise[Unit]] =
-    new AtomicReference(Promise())
-
   override def streamReadyForTransferIn(): Source[TransferEvent.Out, NotUsed] = ???
 
   override def isReadyForTransferIn(contractId: ContractId[_], out: TransferId): Future[Boolean] =
@@ -298,7 +294,22 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
   override def signalWhenIngestedOrShutdown(offset: String)(implicit
       tc: TraceContext
-  ): Future[Unit] = ???
+  ): Future[Unit] = {
+    state
+      .updateAndGet(_.withOffsetToSignal(offset))
+      .offsetIngestionsToSignal
+      .get(offset) match {
+      case None => Future.unit
+      case Some(offsetIngestedPromise) =>
+        val name = s"signalWhenIngested($offset)"
+        val ingestedOrShutdown = retryProvider
+          .waitUnlessShutdown(offsetIngestedPromise.future)
+          .onShutdown(
+            logger.debug(s"Aborted $name, as we are shutting down")
+          )
+        retryProvider.futureSupervisor.supervised(name)(ingestedOrShutdown)
+    }
+  }
 
   override def ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
     override def ingestionFilter: IngestionFilter = contractFilter.ingestionFilter
@@ -349,12 +360,19 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             Future.successful(0)
           }
       } yield {
-        storeIdA.set(Some(newStoreId))
-        logger.info(s"Store $storeDescriptor initialized with storeId $storeId")
+        logger.info(s"Store $storeDescriptor initialized with storeId $newStoreId")
+
+        state.getAndUpdate(
+          _.copy(
+            storeId = Some(newStoreId),
+            acsSize = acsSizeInDb,
+            offset = lastIngestedOffset,
+            offsetChanged = Promise(),
+          )
+        )
 
         if (alreadyIngestedAcs) {
           finishedAcsIngestion.success(())
-          acsSize.set(acsSizeInDb)
         }
 
         lastIngestedOffset
@@ -395,13 +413,18 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         )
         _ <- ingestWork(workTodo, txLogEntries)
       } yield {
+        state
+          .getAndUpdate(
+            _.withUpdate(acs.size, offset)
+          )
+          .signalOffsetChanged(offset)
+
         val summary =
           WorkDone(None, offset, acs.map(_.createdEvent).toVector, Vector.empty, 0)
             .toSummary(workTodo, Vector.empty)
         logger.debug(show"Ingested complete ACS at offset $offset: $summary")
+
         finishedAcsIngestion.success(())
-        acsSize.set(acs.size)
-        notifyStreamsOfNewOffset()
         logger.info(
           s"Store $storeId ingested the ACS and switched to ingesting updates at $offset"
         )
@@ -415,16 +438,18 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         (todo, txEntries) <- getIngestionWork(transfer)
         workDone <- ingestWork(todo, txEntries)
       } yield {
-        val summary = workDone.toSummary(todo, txEntries)
-        acsSize.set(summary.newAcsSize)
-        logger.debug(show"Ingested transaction $summary")
-        notifyStreamsOfNewOffset()
-      }
-    }
+        state
+          .getAndUpdate(s =>
+            s.withUpdate(
+              s.acsSize + workDone.inserts.size - workDone.deletes.size,
+              workDone.offset,
+            )
+          )
+          .signalOffsetChanged(workDone.offset)
 
-    private def notifyStreamsOfNewOffset(): Unit = {
-      val previousPromise = offsetChangedAfterStreamingQuery.getAndSet(Promise())
-      previousPromise.success(())
+        val summary = workDone.toSummary(todo, txEntries)
+        logger.debug(show"Ingested transaction $summary")
+      }
     }
 
     private def getIngestionWork(
@@ -554,7 +579,10 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         deletes: Vector[ExercisedEvent],
         numFilteredCreatedEvents: Int,
     ) {
-      def toSummary(workTodo: WorkTodo, txEntries: Seq[TXE]): IngestionSummary[TXE] = {
+      def toSummary(
+          workTodo: WorkTodo,
+          txEntries: Seq[TXE],
+      ): IngestionSummary[TXE] = {
         val numDeletesWanted = workTodo.todo.count {
           case (_, _: Delete) => true
           case _ => false
@@ -563,7 +591,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         IngestionSummary(
           txId = txId,
           offset = Some(offset),
-          newAcsSize = acsSize.get() + inserts.size - numDeletesDone,
+          // Note: accessing shared mutable state here, but it's fine since all operations that
+          // modify the ACS size are executed sequentially.
+          newAcsSize = state.get().acsSize,
           ingestedCreatedEvents = inserts,
           numFilteredCreatedEvents = numFilteredCreatedEvents,
           ingestedArchivedEvents = deletes,
@@ -646,4 +676,80 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot] =
     // TODO(#6400): implement snapshot reading for the DB store
     ???
+
+}
+
+object DbMultiDomainAcsStore {
+
+  /** @param storeId The primary key of this stores entry in the store_descriptors table
+    * @param offset The last ingested offset, if any
+    * @param acsSize The number of active contracts in the store
+    * @param offsetChanged A promise that is not yet completed, and will be completed the next time the offset changes
+    * @param offsetIngestionsToSignal A map from offsets to promises. The keys are offsets that are not ingested yet.
+    *                                 The values are promises that are not completed, and will be completed when
+    *                                 the corresponding offset is ingested.
+    */
+  private case class State(
+      storeId: Option[Int],
+      offset: Option[String],
+      acsSize: Int,
+      offsetChanged: Promise[Unit],
+      offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
+  ) {
+    def withUpdate(newAcsSize: Int, newOffset: String): State =
+      if (!offset.contains(newOffset)) {
+        this.copy(
+          acsSize = newAcsSize,
+          offset = Some(newOffset),
+          offsetChanged = Promise(),
+          offsetIngestionsToSignal = offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
+            offsetToSignal > newOffset
+          },
+        )
+      } else {
+        this.copy(
+          acsSize = newAcsSize
+        )
+      }
+
+    def signalOffsetChanged(newOffset: String): Unit = {
+      if (!offset.contains(newOffset)) {
+        offsetChanged.success(())
+        offsetIngestionsToSignal.foreach { case (offsetToSignal, promise) =>
+          if (offsetToSignal <= newOffset) {
+            promise.success(())
+          }
+        }
+      }
+    }
+
+    /** Update the state by adding another offset whose ingestion should be signalled. If the signalling of that
+      * offset has already been requested, don't change the state.
+      */
+    def withOffsetToSignal(
+        offsetToSignal: String
+    ): State = {
+      if (offset.exists(_ >= offsetToSignal)) {
+        this
+      } else {
+        offsetIngestionsToSignal.get(offsetToSignal) match {
+          case None =>
+            val p = Promise[Unit]()
+            copy(
+              offsetIngestionsToSignal = offsetIngestionsToSignal + (offsetToSignal -> p)
+            )
+          case Some(_) => this
+        }
+      }
+    }
+  }
+  private object State {
+    def empty(): State = State(
+      storeId = None,
+      offset = None,
+      acsSize = 0,
+      offsetChanged = Promise(),
+      offsetIngestionsToSignal = SortedMap.empty,
+    )
+  }
 }

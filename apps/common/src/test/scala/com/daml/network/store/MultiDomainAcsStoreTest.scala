@@ -264,5 +264,35 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertTestState()
       } yield succeed
     }
+    "signals offsets as ingestion progresses" in {
+      implicit val store = mkStore()
+
+      val acsOffset = "010"
+      val tx1Offset = "012"
+
+      val signal_010 = store.signalWhenIngestedOrShutdown("010")
+      val signal_011 = store.signalWhenIngestedOrShutdown("011")
+      val signal_012 = store.signalWhenIngestedOrShutdown("012")
+
+      def notCompleted(futures: Future[Unit]*) =
+        forAll(futures)(_.isCompleted shouldBe false)
+
+      notCompleted(
+        signal_010,
+        signal_011,
+        signal_012,
+      )
+
+      for {
+        _ <- acs(acsOffset = acsOffset)
+        _ <- signal_010
+        _ = notCompleted(signal_011, signal_012)
+        _ <- d1.create(c(1), tx1Offset)
+        _ <- signal_011
+        _ <- signal_012
+        // We can still register signals for already ingested offsets
+        _ <- store.signalWhenIngestedOrShutdown("010")
+      } yield succeed
+    }
   }
 }

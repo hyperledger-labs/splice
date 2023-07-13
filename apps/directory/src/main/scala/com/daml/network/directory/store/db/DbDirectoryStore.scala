@@ -100,7 +100,7 @@ class DbDirectoryStore(
     MultiDomainAcsStore.QueryResult[Option[Contract[DirectoryInstall.ContractId, DirectoryInstall]]]
   ] = waitUntilAcsIngested {
     for {
-      offset <- lastIngestedOffset(storage, storeId)
+      offset <- lastIngestedOffset(storage)
       row <- storage
         .querySingle(
           (selectFromAcsTable(DbDirectoryStore.tableName) ++
@@ -123,7 +123,7 @@ class DbDirectoryStore(
     MultiDomainAcsStore.QueryResult[Option[Contract[DirectoryEntry.ContractId, DirectoryEntry]]]
   ] = waitUntilAcsIngested {
     for {
-      offset <- lastIngestedOffset(storage, storeId)
+      offset <- lastIngestedOffset(storage)
       row <- storage
         .querySingle(
           (selectFromAcsTable(DbDirectoryStore.tableName) ++
