@@ -7,21 +7,20 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{ConfigScheduleUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-class SvcTimeBasedIntegrationTest
+class ScanConnectionIntegrationTest
     extends CNNodeIntegrationTest
     with ConfigScheduleUtil
-    with WalletTestUtil
-    with TimeTestUtil {
+    with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1

@@ -40,9 +40,11 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   )(implicit
       env: CNNodeTests.CNNodeTestConsoleEnvironment
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
-    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     val activeDomainId =
-      CoinConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain
+      CoinConfigSchedule(currentSchedule)
+        .getConfigAsOf(env.environment.clock.now)
+        .globalDomain
+        .activeDomain
     defaultCoinConfig(
       tickDuration,
       maxNumInputs,
@@ -59,14 +61,13 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
       currentSchedule: Schedule[Instant, CoinConfig[USD]],
       newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
   )(implicit env: CNNodeTestConsoleEnvironment): Schedule[Instant, CoinConfig[USD]] = {
-    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     val configSchedule = {
       new cc.schedule.Schedule(
         mkUpdatedCoinConfig(currentSchedule, defaultTickDuration),
         newSchedules
           .map { case (durationUntilScheduled, config) =>
             new Tuple2(
-              now.add(durationUntilScheduled).toInstant,
+              env.environment.clock.now.add(durationUntilScheduled).toInstant,
               config,
             )
           }
