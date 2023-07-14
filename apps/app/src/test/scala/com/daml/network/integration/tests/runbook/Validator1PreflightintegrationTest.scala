@@ -197,6 +197,9 @@ class Validator1PreflightIntegrationTest
     }
 
     withFrontEnd("alice-validator1") { implicit webDriver =>
+      eventually() {
+        findAll("add-user-link").toSeq should not be (empty)
+      }
       actAndCheck("add user", click on className("add-user-link"))(
         "user has been added and invite link disappears",
         _ => findAll(className("add-user-link")).toSeq shouldBe empty,
