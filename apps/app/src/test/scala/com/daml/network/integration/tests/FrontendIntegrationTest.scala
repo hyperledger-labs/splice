@@ -327,7 +327,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   // each call site try to catch that seems unlikely to be reliable.
   override def eventually[T](
       timeUntilSuccess: FiniteDuration = 20.seconds,
-      maxPollInterval: FiniteDuration = 5.seconds,
+      maxPollInterval: FiniteDuration = 100.millis,
   )(testCode: => T): T = super.eventually(timeUntilSuccess, maxPollInterval) {
     try {
       testCode

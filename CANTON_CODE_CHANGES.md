@@ -43,6 +43,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * LogReporter logs location, message and throwable on TestFailed event.
 * CommunityStorageFactory matches last branch on `CommunityDbConfig` instead of `DbConfig`
 * Added an optional `darFile` parameter to `ParticipantAdminCommands.UploadDar` so we can more conveniently upload DARs from weird locations (like JARs).
+* Decreases the `maxPollInterval` to 100ms from 5s, in the `eventually` methods in `BaseTest`
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

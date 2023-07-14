@@ -177,7 +177,7 @@ trait BaseTest
 
   def eventually[T](
       timeUntilSuccess: FiniteDuration = 20.seconds,
-      maxPollInterval: FiniteDuration = 5.seconds,
+      maxPollInterval: FiniteDuration = 100.millis,
   )(testCode: => T): T = BaseTest.eventually(timeUntilSuccess, maxPollInterval)(testCode)
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
@@ -345,14 +345,14 @@ object BaseTest {
   )
   def eventually[T](
       timeUntilSuccess: FiniteDuration = 20.seconds,
-      maxPollInterval: FiniteDuration = 5.seconds,
+      maxPollInterval: FiniteDuration = 100.millis,
   )(testCode: => T): T = {
     require(
       timeUntilSuccess >= Duration.Zero,
       s"The timeout must not be negative, but is $timeUntilSuccess",
     )
     val deadline = timeUntilSuccess.fromNow
-    var sleepMs = 1L
+    var sleepMs = 10L
     while (deadline.hasTimeLeft()) {
       try {
         return testCode
