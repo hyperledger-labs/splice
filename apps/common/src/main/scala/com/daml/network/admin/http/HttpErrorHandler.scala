@@ -95,9 +95,14 @@ final class HttpErrorHandler(
       case Status.Code.UNAVAILABLE => StatusCodes.ServiceUnavailable
       case Status.Code.INTERNAL => StatusCodes.InternalServerError
       case Status.Code.FAILED_PRECONDITION =>
-        if (
-          ErrorCodeUtils.isError(grpcStatus.getDescription, Interpreter.GenericInterpretationError)
+        val grpcDesc = grpcStatus.getDescription
+        val conflictErrorCodes = Seq(
+          Interpreter.GenericInterpretationError,
+          Interpreter.UnhandledException,
+          Interpreter.UserError,
+          Interpreter.TemplatePreconditionViolated,
         )
+        if (conflictErrorCodes.exists(ErrorCodeUtils.isError(grpcDesc, _)))
           StatusCodes.Conflict
         else
           StatusCodes.BadRequest
