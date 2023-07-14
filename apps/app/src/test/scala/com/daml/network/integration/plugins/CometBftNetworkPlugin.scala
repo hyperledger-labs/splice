@@ -24,13 +24,14 @@ class CometBftNetworkPlugin(
 ) extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] {
 
   private val runningContainers = new TrieMap[CometBftConnectionConfig, CometBftContainer]()
+  private val networks = new TrieMap[CometBftConnectionConfig, Network]()
   override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
     val network = Network.newNetwork()
 
     /** SV1 is the validator so it must always be started first
       */
     val sv1Node: CometBftConnectionConfig = startNewCometBftContainer("sv1", network)
-
+    networks.put(sv1Node, network)
     CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
       val container = if (name == "sv1") sv1Node else startNewCometBftContainer(name, network)
       config.focus(_.cometBftConfig).modify(_.map(_.focus(_.connectionUri).replace(container.uri)))
@@ -39,9 +40,14 @@ class CometBftNetworkPlugin(
   }
 
   override def afterEnvironmentDestroyed(config: CNNodeConfig): Unit = {
-    config.svApps.values.flatMap(_.cometBftConfig.map(_.connectionUri)).foreach { connectionUri =>
-      runningContainers(CometBftConnectionConfig(connectionUri)).shutdown()
+    val containerConnectionKeys = config.svApps.values
+      .flatMap(svApp => svApp.cometBftConfig.map(_.connectionUri))
+      .map(CometBftConnectionConfig)
+    containerConnectionKeys.foreach { connectionKey =>
+      val container = runningContainers(connectionKey)
+      container.shutdown()
     }
+    containerConnectionKeys.foreach(networks.get(_).foreach(_.close()))
   }
 
   def startNewCometBftContainer(id: String, network: Network): CometBftConnectionConfig = {

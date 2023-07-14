@@ -424,7 +424,7 @@ skip_timeout_commit = true
 
 # EmptyBlocks mode and possible interval between empty blocks
 create_empty_blocks = false
-create_empty_blocks_interval = "5s"
+create_empty_blocks_interval = "0"
 
 # Reactor sleep duration parameters
 peer_gossip_sleep_duration = "100ms"
@@ -439,7 +439,7 @@ peer_query_maj23_sleep_duration = "2s"
 # considerable amount of disk space. Set to false to ensure ABCI responses are
 # persisted. ABCI responses are required for /block_results RPC queries, and to
 # reindex events in the command-line tool.
-discard_abci_responses = true
+discard_abci_responses = false
 
 #######################################################
 ###   Transaction Indexer Configuration Options     ###

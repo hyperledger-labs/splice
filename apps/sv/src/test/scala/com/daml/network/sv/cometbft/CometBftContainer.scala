@@ -7,7 +7,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.{GenericContainer, Network}
-import org.testcontainers.images.ImagePullPolicy
+import org.testcontainers.images.{AbstractImagePullPolicy, ImageData}
 import org.testcontainers.utility.{DockerImageName, MountableFile}
 
 import java.io.{FileWriter, PrintWriter}
@@ -26,9 +26,25 @@ class CometBftContainer(testIdentifier: String, nodeType: ContainerType = Single
         )
       )
 
-  case object NeverPullOnCIImagePolicy extends ImagePullPolicy {
-    override def shouldPull(imageName: DockerImageName): Boolean =
-      !sys.env.contains("CI")
+  /** If the we're in CI, the image should not be pulled as we expect all images to be present in CI.
+    * If not we pull only if the image is not present.
+    */
+  case object NeverPullOnCIImagePolicy extends AbstractImagePullPolicy {
+
+    override def shouldPull(imageName: DockerImageName): Boolean = {
+      val isCI = sys.env.contains("CI")
+      if (isCI) {
+        false
+      } else {
+        super.shouldPull(imageName)
+      }
+    }
+
+    override def shouldPullCached(
+        imageName: DockerImageName,
+        localImageData: ImageData,
+    ): Boolean = false
+
   }
 
   private val logWriter = new PrintWriter(

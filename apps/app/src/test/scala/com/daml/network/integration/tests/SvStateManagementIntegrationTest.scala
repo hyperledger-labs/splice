@@ -309,7 +309,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )(
       "The vote request has been created and SV1 accepts as he created it",
       _ => {
-        sv1Backend.listVoteRequests() should not be empty
+        svs.foreach { sv => sv.listVoteRequests() should not be empty }
         val head = sv1Backend.listVoteRequests().head.contractId
         sv1Backend.listVotes(Vector(head.contractId)) should have size 1
         (head, sv1Backend.getSvcInfo().coinRules.payload.configSchedule.futureValues.size())

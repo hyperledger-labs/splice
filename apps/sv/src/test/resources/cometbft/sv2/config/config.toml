@@ -240,14 +240,13 @@ persistent_peers_max_dial_period = "0s"
 flush_throttle_timeout = "100ms"
 
 # Maximum size of a message packet payload, in bytes
-max_packet_msg_payload_size = 1024
+max_packet_msg_payload_size = 100000
 
 # Rate at which packets can be sent, in bytes/second
-send_rate = 5120000
+send_rate = 300000000
 
 # Rate at which packets can be received, in bytes/second
-recv_rate = 5120000
-
+recv_rate = 1000000000
 # Set true to enable the peer-exchange reactor
 pex = true
 
@@ -409,7 +408,7 @@ skip_timeout_commit = true
 
 # EmptyBlocks mode and possible interval between empty blocks
 create_empty_blocks = false
-create_empty_blocks_interval = "5s"
+create_empty_blocks_interval = "0"
 
 # Reactor sleep duration parameters
 peer_gossip_sleep_duration = "100ms"

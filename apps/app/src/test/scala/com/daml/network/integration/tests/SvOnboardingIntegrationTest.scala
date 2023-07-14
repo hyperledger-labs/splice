@@ -356,7 +356,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         }
       })
     }
-    actAndCheck("SV2 comes back online", sv2Backend.start())(
+    actAndCheck(timeUntilSuccess = 1.minute)("SV2 comes back online", sv2Backend.start())(
       "SV4's onboarding gathers suffcient confirmations and is completed",
       { _ =>
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs

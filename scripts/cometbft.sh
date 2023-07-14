@@ -37,6 +37,8 @@ function docker_start() {
   docker cp "${cometbft_config_path}/sv${container_sv_index}/config" "$current_container_name:/cometbft/"
   docker cp "${cometbft_config_path}/sv${container_sv_index}/data" "$current_container_name:/cometbft/"
   docker start "$current_container_name"
+  # For some reason even if we create this from direnv, in CI it does not exist
+  mkdir -p "$LOGS_PATH"
   docker logs -f "$current_container_name" > "$LOGS_PATH/$current_container_name.log" &
 }
 
