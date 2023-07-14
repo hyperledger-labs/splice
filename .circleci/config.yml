@@ -265,6 +265,41 @@ commands:
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
 
+  save_frontend_builds:
+    steps:
+      - save_cache:
+          name: Uploading frontend build artifacts to cache
+          # Components of the cache key:
+          # - Keyword "frontend-builds" for uniqueness
+          # - The branch name
+          # - rev: to allow for updating the cache when sources have changed
+          key: &frontend_builds_key frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} rev:{{ .Revision }}
+          paths:
+            - ./apps/common/frontend/target
+            - ./apps/directory/frontend/build
+            - ./apps/directory/frontend/target
+            - ./apps/scan/frontend/build
+            - ./apps/scan/frontend/target
+            - ./apps/sv/frontend/build
+            - ./apps/sv/frontend/target
+            - ./apps/splitwell/frontend/build
+            - ./apps/splitwell/frontend/target
+            - ./apps/wallet/frontend/build
+            - ./apps/wallet/frontend/target
+
+  restore_frontend_builds:
+    steps:
+      - restore_cache:
+          name: Restoring frontend build artifacts from cache
+          keys:
+            # Try to download a cache with an exact match
+            - *frontend_builds_key
+            # Then, try to download a cache from the same branch
+            - frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }}
+            # Then, try to download a cache from main branch
+            - frontend-builds-<< pipeline.parameters.cache-version >> branch:main
+
+
   cluster_lock_reaper:
     parameters:
       cluster:
@@ -1603,6 +1638,7 @@ jobs:
     steps:
       - checkout
       - record_job_start_time
+      - restore_frontend_builds
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
@@ -1625,6 +1661,7 @@ jobs:
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
            make docker-push -j
          cmd_retry_count: 5
+      - save_frontend_builds
       - cleanup_sbt_test_job
       - collect_test_timings_and_send_to_datadog
 
@@ -1695,6 +1732,7 @@ jobs:
     steps:
       - checkout
       - record_job_start_time
+      - restore_frontend_builds
       - setup_sbt_test_job
       - run_bash_command_in_nix:
          cmd_name: Build app
@@ -1704,6 +1742,7 @@ jobs:
            --keep ARTIFACTORY_PASSWORD"
       - docker_login_artifactory
       - docker_build
+      - save_frontend_builds
       - cleanup_sbt_test_job
       - collect_test_timings_and_send_to_datadog
 

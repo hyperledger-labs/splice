@@ -1196,7 +1196,7 @@ object BuildCommon {
   lazy val bundleFrontend: Def.Initialize[Task[(File, Set[File])]] = Def.task {
     val commonFrontendFiles = commonFrontendBundle.value
     val log = streams.value.log
-    val cacheDir = streams.value.cacheDirectory
+    val cacheDir = streams.value.cacheDirectory / "bundleFrontend"
     TS.buildFrontend(
       commonFrontendFiles,
       baseDirectory.value / "../../",
@@ -1219,7 +1219,9 @@ object BuildCommon {
       val sourceFiles =
         (baseDir ** ("*.tsx" || "*.ts" || "*.js" || "*.json") --- baseDir / "build" ** "*" --- baseDir / "node_modules" ** "*").get.toSet
       val cache =
-        FileFunction.cached(cacheDir) { _ =>
+        // We use hashes to detect changes in input files, thus avoid having to deal with file timestamps,
+        // and also support cases where we don't cache the entire build pipeline
+        FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
           runBuildCommand(workingDir, workspace, log)
           val buildFiles = (baseDir / "build" ** "*").get.toSet
           buildFiles
