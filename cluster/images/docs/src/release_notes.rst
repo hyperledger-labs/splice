@@ -3,7 +3,7 @@
 Release Notes
 =============
 
-2023-07-09
+2023-07-16
 ----------
 
 * Deployment
@@ -19,6 +19,7 @@ Release Notes
 
   * Total coin balance in Scan UI now shows real data from the backend, and also reflects data from network inception and not only from the point the specific backend was created.
     Note that this holds only for total coin balance for now, not for all data in the Scan UI.
+  * Various SV UI improvements.
 
 2023-07-02
 ----------
