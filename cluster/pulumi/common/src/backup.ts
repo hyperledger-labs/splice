@@ -5,8 +5,6 @@ import { Bucket, File, Storage } from '@google-cloud/storage';
 import { ExactNamespace, config } from 'cn-pulumi-common';
 import { exit } from 'process';
 
-const DATA_EXPORT_BUCKET_SA_KEY_JSON = config.require('DATA_EXPORT_BUCKET_SA_KEY_JSON');
-
 export type GcpBucketConfig = {
   projectId: string;
   bucketName: string;
@@ -18,11 +16,11 @@ export type GcpBucket = {
   jsonCredentials: string;
 };
 
-export function installGcpBucket(config: GcpBucketConfig): GcpBucket {
+export function installGcpBucket(bucketConfig: GcpBucketConfig): GcpBucket {
   return {
-    config: config,
-    secretName: `cn-gcp-bucket-${config.projectId}-${config.bucketName}`,
-    jsonCredentials: DATA_EXPORT_BUCKET_SA_KEY_JSON,
+    config: bucketConfig,
+    secretName: `cn-gcp-bucket-${bucketConfig.projectId}-${bucketConfig.bucketName}`,
+    jsonCredentials: config.require('DATA_EXPORT_BUCKET_SA_KEY_JSON'),
   };
 }
 
