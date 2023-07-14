@@ -20,10 +20,7 @@ import com.digitalasset.canton.console.{
   Help,
   LedgerApiCommandRunner,
 }
-import com.digitalasset.canton.console.commands.{
-  BaseLedgerApiAdministration,
-  ParticipantAdministration,
-}
+import com.digitalasset.canton.console.commands.{BaseLedgerApiAdministration}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
@@ -40,8 +37,6 @@ abstract class SplitwellAppReference(
   // ledger connection since that one is already setup to be easily used
   // from the console.
   def ledgerApi: BaseLedgerApiAdministration with LedgerApiCommandRunner
-
-  def participantAdminApi: ParticipantAdministration
 
   protected val scanClientConfig: ScanAppClientConfig
 
@@ -62,6 +57,12 @@ abstract class SplitwellAppReference(
   def getSplitwellDomainIds(): GrpcSplitwellAppClient.SplitwellDomains =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwellAppClient.GetSplitwellDomainIds())
+    }
+
+  @Help.Summary("Get the domain ids the party is hosted on")
+  def getConnectedDomains(partyId: PartyId): Seq[DomainId] =
+    consoleEnvironment.run {
+      adminCommand(GrpcSplitwellAppClient.GetConnectedDomains(partyId))
     }
 }
 
@@ -86,13 +87,6 @@ final class SplitwellAppClientReference(
       config.participantClient.ledgerApi.clientConfig.tls,
       config.participantClient.ledgerApi.getToken().map(_.accessToken),
     )(consoleEnvironment)
-
-  override lazy val participantAdminApi =
-    new CNParticipantClientReference(
-      cnNodeConsoleEnvironment,
-      "splitwell participant admin api",
-      config.participantClient.getParticipantClientConfig(),
-    )
 
   val userId: String = config.ledgerApiUser
 
@@ -197,7 +191,7 @@ final class SplitwellAppClientReference(
     val party = getUserPrimaryParty()
     val provider = getProviderPartyId()
     val splitwellDomains = getSplitwellDomainIds()
-    val connectedDomains = participantAdminApi.domains.list_connected().map(_.domainId).toSet
+    val connectedDomains = getConnectedDomains(party)
     val connectedSplitwellDomains =
       (splitwellDomains.preferred +: splitwellDomains.others).filter(connectedDomains.contains(_))
     // We unconditionally create install contracts on all domains and rely on the provider's backend to reject them
@@ -454,8 +448,6 @@ final class SplitwellAppBackendReference(
   override protected val nodes = consoleEnvironment.environment.splitwells
 
   override lazy val ledgerApi = participantClient
-
-  override lazy val participantAdminApi = participantClient
 
   @Help.Summary("Return local splitwell app config")
   def config: SplitwellAppBackendConfig =

@@ -18,6 +18,11 @@ service SplitwellService {
   rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
 
   rpc GetSplitwellDomainIds (google.protobuf.Empty) returns (GetSplitwellDomainIdsResponse);
+
+  // We expose this in splitwell instead of going through the user's participant
+  // because the JSON API does not expose this atm. Once the JSON API properly
+  // supports ledger API v2 we should be able to drop this.
+  rpc GetConnectedDomains (GetConnectedDomainsRequest) returns (GetConnectedDomainsResponse);
 }
 
 // The context from which a request originates.
@@ -104,4 +109,12 @@ message SplitwellInstall {
 
 message ListSplitwellInstallsResponse {
   repeated SplitwellInstall installs = 1;
+}
+
+message GetConnectedDomainsRequest {
+  string party_id = 1;
+}
+
+message GetConnectedDomainsResponse {
+  repeated string domain_ids = 1;
 }

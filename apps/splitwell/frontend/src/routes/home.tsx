@@ -1,6 +1,7 @@
 import { usePrimaryParty } from 'common-frontend';
 import { useGetSvcPartyId } from 'common-frontend/scan-api';
 import {
+  GetConnectedDomainsRequest,
   ListSplitwellInstallsRequest,
   SplitwellContext,
 } from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
@@ -70,15 +71,17 @@ const Home: React.FC = () => {
   useEffect(() => {
     const queryConnectedDomains = async (partyId: string) => {
       console.debug('Querying for connected domains');
-      const domains = await ledgerApiClient.getConnectedDomains(partyId);
-      const domainIds = domains.map(domain => domain.getDomainId());
+      const response = await splitwellClient.getConnectedDomains(
+        new GetConnectedDomainsRequest().setPartyId(partyId)
+      );
+      const domainIds = response.getDomainIdsList();
       setConnectedDomainIds(domainIds);
       console.debug(`Connected domains: ${domainIds}`);
     };
     if (primaryPartyId) {
       queryConnectedDomains(primaryPartyId);
     }
-  }, [ledgerApiClient, primaryPartyId]);
+  }, [splitwellClient, primaryPartyId]);
 
   useEffect(() => {
     const queryInstall = async (

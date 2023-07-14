@@ -1,6 +1,7 @@
 package com.daml.network.splitwell.admin.grpc
 
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.splitwell.v0
@@ -20,6 +21,7 @@ import scala.jdk.CollectionConverters.*
 
 @nowarn("cat=unused")
 class GrpcSplitwellService(
+    participantAdminConnection: ParticipantAdminConnection,
     splitwellDomains: SplitwellDomains,
     providerParty: PartyId,
     store: SplitwellStore,
@@ -182,6 +184,25 @@ class GrpcSplitwellService(
           splitwellDomains.preferred.toProtoPrimitive,
           splitwellDomains.others.map(_.toProtoPrimitive),
         )
+      )
+    }
+
+  override def getConnectedDomains(
+      request: v0.GetConnectedDomainsRequest
+  ): Future[v0.GetConnectedDomainsResponse] =
+    withSpanFromGrpcContext("GrpcSplitwellService") { implicit traceContext => _ =>
+      for {
+        mappings <- participantAdminConnection.listPartyToParticipant(
+          filterParty = request.partyId
+        )
+      } yield v0.GetConnectedDomainsResponse(
+        mappings
+          .map(_.base.domain)
+          .filter(storeId =>
+            // While the field is called `domain` this is really a store id not a domain id.
+            // We only want domain stores so we filter to store ids that are domain ids.
+            Codec.decode(Codec.DomainId)(storeId).isRight
+          )
       )
     }
 

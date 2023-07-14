@@ -5,7 +5,7 @@ import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNNode}
+import com.daml.network.environment.{CNLedgerClient, CNNode, ParticipantAdminConnection}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.admin.grpc.GrpcSplitwellService
@@ -72,6 +72,12 @@ class SplitwellApp(
         retryProvider,
         loggerFactory,
       )
+    participantAdminConnection = new ParticipantAdminConnection(
+      config.participantClient.adminApi,
+      loggerFactory,
+      retryProvider,
+      clock,
+    )
     automation = new SplitwellAutomationService(
       config.automation,
       clock,
@@ -93,6 +99,7 @@ class SplitwellApp(
       .addService(
         SplitwellServiceGrpc.bindService(
           new GrpcSplitwellService(
+            participantAdminConnection,
             splitwellDomains,
             party,
             store,
@@ -107,6 +114,7 @@ class SplitwellApp(
       storage,
       store,
       scanConnection,
+      participantAdminConnection,
       loggerFactory.getTracedLogger(SplitwellApp.State.getClass),
     )
   }
@@ -120,6 +128,7 @@ object SplitwellApp {
       storage: Storage,
       store: SplitwellStore,
       scanConnection: ScanConnection,
+      participantAdminConnection: ParticipantAdminConnection,
       logger: TracedLogger,
   ) extends AutoCloseable
       with HasHealth {
@@ -131,6 +140,7 @@ object SplitwellApp {
         storage,
         store,
         scanConnection,
+        participantAdminConnection,
       )(logger)
   }
 }

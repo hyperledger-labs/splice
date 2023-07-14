@@ -26,10 +26,6 @@ import {
 import { TransactionTree } from 'common-protobuf/com/daml/ledger/api/v1/transaction_pb';
 import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
 import { StateServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v2/state_service_grpc_web_pb';
-import {
-  GetConnectedDomainsRequest,
-  GetConnectedDomainsResponse,
-} from 'common-protobuf/com/daml/ledger/api/v2/state_service_pb';
 import grpcWeb from 'grpc-web';
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -252,12 +248,6 @@ export class LedgerApiClient {
       this.metaData
     );
     return user.getUser()!.getPrimaryParty();
-  }
-
-  async getConnectedDomains(party: string): Promise<GetConnectedDomainsResponse.ConnectedDomain[]> {
-    const request = new GetConnectedDomainsRequest().setParty(party);
-    const response = await this.stateServiceClient.getConnectedDomains(request, this.metaData);
-    return response.getConnectedDomainsList();
   }
 }
 

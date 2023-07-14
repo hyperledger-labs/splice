@@ -230,6 +230,25 @@ object GrpcSplitwellAppClient {
       } yield SplitwellDomains(preferred, others)
   }
 
+  case class GetConnectedDomains(
+      partyId: PartyId
+  ) extends BaseCommand[v0.GetConnectedDomainsRequest, v0.GetConnectedDomainsResponse, Seq[
+        DomainId
+      ]] {
+    override def createRequest(): Either[String, v0.GetConnectedDomainsRequest] =
+      Right(v0.GetConnectedDomainsRequest(Codec.encode(partyId)))
+
+    override def submitRequest(
+        service: SplitwellServiceStub,
+        request: v0.GetConnectedDomainsRequest,
+    ): Future[v0.GetConnectedDomainsResponse] = service.getConnectedDomains(request)
+
+    override def handleResponse(
+        response: v0.GetConnectedDomainsResponse
+    ): Either[String, Seq[DomainId]] =
+      response.domainIds.traverse(id => Codec.decode(Codec.DomainId)(id))
+  }
+
   case class ListSplitwellInstalls(context: SplitwellContext)
       extends BaseCommand[
         v0.ListSplitwellInstallsRequest,
