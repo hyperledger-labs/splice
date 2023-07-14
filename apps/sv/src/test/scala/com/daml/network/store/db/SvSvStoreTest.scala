@@ -1,8 +1,11 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.ContractMetadata
+import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
+import com.daml.network.codegen.java.cn.validatoronboarding.UsedSecret
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.store.db.DbSvSvStore
@@ -22,19 +25,74 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
 
   "SvSvStore" should {
 
-    // TODO (#6443): once the queries are implemented, write more succinct tests.
-    "ingest" in {
+    "lookupValidatorOnboardingBySecretWithOffset" should {
 
-      for {
-        store <- mkStore()
-        aContract = validatorOnboarding()
-        _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
-      } yield {
-        eventually() {
-          store.multiDomainAcsStore
-            .listContracts(vo.ValidatorOnboarding.COMPANION)
-            .futureValue
-            .map(_.contract) should be(Seq(aContract))
+      "find a ValidatorOnboarding by secret" in {
+        val wanted = validatorOnboarding("good_secret")
+        val unwanted = validatorOnboarding("bad_secret")
+        val firstOffset = "0101"
+        val secondOffset = "0202"
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(wanted, firstOffset)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwanted, secondOffset)(store.multiDomainAcsStore)
+        } yield {
+          eventually() {
+            store.lookupValidatorOnboardingBySecretWithOffset("good_secret").futureValue should be(
+              QueryResult(secondOffset, Some(wanted))
+            )
+          }
+        }
+      }
+
+      "return just the offset if there's no entries" in {
+        for {
+          store <- mkStore()
+          result <- store.lookupValidatorOnboardingBySecretWithOffset("whatever")
+        } yield result should be(QueryResult(acsOffset.toHexString, None))
+      }
+
+    }
+
+    "lookupValidatorOnboardingBySecretWithOffset" should {
+
+      "find a UsedSecret by secret" in {
+        val wanted = usedSecret("good_secret")
+        val unwanted = usedSecret("bad_secret")
+        val firstOffset = "0101"
+        val secondOffset = "0202"
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(wanted, firstOffset)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwanted, secondOffset)(store.multiDomainAcsStore)
+        } yield {
+          eventually() {
+            store.lookupUsedSecretWithOffset("good_secret").futureValue should be(
+              QueryResult(secondOffset, Some(wanted))
+            )
+          }
+        }
+      }
+
+    }
+
+    "lookupApprovedSvIdentityByNameWithOffset" should {
+
+      "find an ApprovedSvIdentity by name" in {
+        val wanted = approvedSvIdentity("good_name")
+        val unwanted = approvedSvIdentity("bad_name")
+        val firstOffset = "0101"
+        val secondOffset = "0202"
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(wanted, firstOffset)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwanted, secondOffset)(store.multiDomainAcsStore)
+        } yield {
+          eventually() {
+            store.lookupApprovedSvIdentityByNameWithOffset("good_name").futureValue should be(
+              QueryResult(secondOffset, Some(wanted))
+            )
+          }
         }
       }
 
@@ -42,11 +100,11 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
 
   }
 
-  private def validatorOnboarding() = {
+  private def validatorOnboarding(secret: String) = {
     val template =
       new vo.ValidatorOnboarding(
         storeSvParty.toProtoPrimitive,
-        "supersecret",
+        secret,
         Instant.now().plusSeconds(3600),
       )
     val templateId = vo.ValidatorOnboarding.TEMPLATE_ID
@@ -60,9 +118,36 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
+  private def usedSecret(secret: String) = {
+    val template =
+      new UsedSecret(storeSvParty.toProtoPrimitive, secret, storeSvParty.toProtoPrimitive)
+
+    val templateId = vo.UsedSecret.TEMPLATE_ID
+
+    Contract(
+      templateId,
+      new UsedSecret.ContractId(validContractId(1)),
+      template,
+      ContractMetadata.Empty(),
+      protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  private def approvedSvIdentity(name: String) = {
+    val template = new ApprovedSvIdentity(storeSvParty.toProtoPrimitive, name, "some key")
+
+    Contract(
+      ApprovedSvIdentity.TEMPLATE_ID,
+      new ApprovedSvIdentity.ContractId(validContractId(1)),
+      template,
+      ContractMetadata.Empty(),
+      protobuf.Any.getDefaultInstance,
+    )
+  }
+
   protected def mkStore(): Future[SvSvStore]
 
-  lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
+  lazy val acsOffset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val storeSvParty = providerParty(42)
   lazy val svDomainConfig = SvDomainConfig(
@@ -81,7 +166,7 @@ class InMemorySvSvStoreTest extends SvSvStoreTest {
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(acsOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )
@@ -118,7 +203,7 @@ class DbSvSvStoreTest
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(acsOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )

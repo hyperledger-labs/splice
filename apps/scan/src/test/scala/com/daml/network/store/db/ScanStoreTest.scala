@@ -32,7 +32,7 @@ import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.ScanTxLogParser.TxLogIndexRecord
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{StoreTest, TxLogStore, TxLogStoreErrors}
+import com.daml.network.store.{StoreTest, TxLogStore, StoreErrors}
 import com.daml.network.util.{CNNodeUtil, Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -47,7 +47,7 @@ import java.time.{Duration, Instant}
 import java.util.Optional
 import scala.concurrent.Future
 
-abstract class ScanStoreTest extends StoreTest with HasExecutionContext with TxLogStoreErrors {
+abstract class ScanStoreTest extends StoreTest with HasExecutionContext with StoreErrors {
 
   "ScanStore" should {
 

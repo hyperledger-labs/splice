@@ -6,8 +6,8 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.MultiDomainAcsStore
-import MultiDomainAcsStore.{ContractCompanion, ReadyContract}
+import com.daml.network.store.{MultiDomainAcsStore, StoreErrors}
+import MultiDomainAcsStore.{ContractCompanion, QueryResult, ReadyContract}
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
@@ -47,9 +47,11 @@ class DbSvSvStore(
     with SvSvStore
     with AcsTables
     with AcsQueries
+    with StoreErrors
     with NamedLogging {
 
   import storage.DbStorageConverters.setParameterByteArray
+  import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
 
@@ -79,24 +81,79 @@ class DbSvSvStore(
     }
   }
 
-  // TODO (#6443): implement queries
   override def lookupValidatorOnboardingBySecretWithOffset(
       secret: String
   )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[
     Option[Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding]]
-  ]] = ???
+  ]] = waitUntilAcsIngested {
+    (for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            DbSvSvStore.tableName,
+            storeId,
+            sql"""
+            template_id = ${ValidatorOnboarding.TEMPLATE_ID}
+              and onboarding_secret = ${lengthLimited(secret)}
+          """,
+          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          "lookupValidatorOnboardingBySecretWithOffset",
+        )
+    } yield QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(contractFromRow(ValidatorOnboarding.COMPANION)(_)),
+    )).getOrRaise(offsetExpectedError())
+  }
 
   override def lookupUsedSecretWithOffset(secret: String)(implicit
       tc: TraceContext
   ): Future[MultiDomainAcsStore.QueryResult[Option[Contract[UsedSecret.ContractId, UsedSecret]]]] =
-    ???
+    waitUntilAcsIngested {
+      (for {
+        resultWithOffset <- storage
+          .querySingle(
+            selectFromAcsTableWithOffset(
+              DbSvSvStore.tableName,
+              storeId,
+              sql"""
+                  template_id = ${UsedSecret.TEMPLATE_ID}
+                    and onboarding_secret = ${lengthLimited(secret)}
+                """,
+            ).as[AcsStoreRowTemplateWithOffset].headOption,
+            "lookupUsedSecretWithOffset",
+          )
+      } yield QueryResult(
+        resultWithOffset.offset,
+        resultWithOffset.row.map(contractFromRow(UsedSecret.COMPANION)(_)),
+      )).getOrRaise(offsetExpectedError())
+    }
 
   override def lookupApprovedSvIdentityByNameWithOffset(
       name: String
   )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[
     Option[Contract[ApprovedSvIdentity.ContractId, ApprovedSvIdentity]]
-  ]] = ???
+  ]] = waitUntilAcsIngested {
+    (for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            DbSvSvStore.tableName,
+            storeId,
+            sql"""
+              template_id = ${ApprovedSvIdentity.TEMPLATE_ID}
+                and sv_candidate_name = ${lengthLimited(name)}
+            """,
+          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          "lookupApprovedSvIdentityByNameWithOffset",
+        )
+    } yield QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(contractFromRow(ApprovedSvIdentity.COMPANION)(_)),
+    )).getOrRaise(offsetExpectedError())
+  }
 
+  // TODO (#5314): this depends on contracts being in domains, which we don't currently track in the DB
+  // also: consider moving it to MultiDomainAcsStore (not SvSvStore), as this is generic
   protected[this] override def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
       c: C,

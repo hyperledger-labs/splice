@@ -36,7 +36,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     with TxLogStore[TXI, TXE]
     with NamedLogging
     with LimitHelpers
-    with TxLogStoreErrors {
+    with StoreErrors {
 
   import MultiDomainAcsStore.*
 
