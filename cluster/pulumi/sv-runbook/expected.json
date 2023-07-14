@@ -401,7 +401,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 33300
         },
-        "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
+        "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       }
     },
     "name": "validator",

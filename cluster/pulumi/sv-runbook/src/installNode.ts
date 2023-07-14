@@ -55,7 +55,9 @@ const backupBucketConfig: GcpBucketConfig = {
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const version = process.env.CHARTS_VERSION;
   const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
-  const SV_WALLET_USER_ID = process.env.SV_WALLET_USER_ID || 'auth0|64553aa683015a9687d9cc2e'; // Default to admin@sv.com at the sv-test tenant by default
+  const SV_WALLET_USER_ID =
+    process.env.SV_WALLET_USER_ID ||
+    (isDevNet ? 'auth0|64b16b9ff7a0dfd00ea3704e' : 'auth0|64553aa683015a9687d9cc2e'); // Default to admin@sv-dev.com (devnet) or admin@sv.com (non devnet) at the sv-test tenant by default
   const SV_NAMESPACE = process.env.SV_NAMESPACE || 'sv';
   const DEFAULT_AUDIENCE = 'https://canton.network.global';
   const withDomainFees = process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '';

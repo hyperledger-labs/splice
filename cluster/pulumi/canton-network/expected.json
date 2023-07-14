@@ -2285,7 +2285,7 @@
           }
         },
         "topup": {},
-        "validatorWalletUser": "auth0|64529b128448ded6aa68048f"
+        "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7"
       }
     },
     "name": "helm-sv-1-validator-sv-1",
@@ -3048,7 +3048,7 @@
           }
         },
         "topup": {},
-        "validatorWalletUser": "auth0|64529b6852dd694167351045"
+        "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       }
     },
     "name": "helm-sv-2-validator-sv-2",
@@ -3732,7 +3732,7 @@
           }
         },
         "topup": {},
-        "validatorWalletUser": "auth0|64529bb10c1aee4f2c819218"
+        "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       }
     },
     "name": "helm-sv-3-validator-sv-3",
@@ -4416,7 +4416,7 @@
           }
         },
         "topup": {},
-        "validatorWalletUser": "auth0|64529bc58d30358eacae5611"
+        "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       }
     },
     "name": "helm-sv-4-validator-sv-4",

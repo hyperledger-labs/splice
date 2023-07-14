@@ -25,7 +25,7 @@ class SvNodePreflightSvIntegrationTest
 
   "The SV UI of the node is working as expected" in { _ =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val svUsername = s"admin@sv.com";
+    val svUsername = s"admin@sv-dev.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
     withFrontEnd("sv") { implicit webDriver =>
       testSvUi(svUiUrl, svUsername, svPassword, None, Seq())
@@ -34,7 +34,7 @@ class SvNodePreflightSvIntegrationTest
 
   "CometBFT is working" in { _ =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val svUsername = s"admin@sv.com";
+    val svUsername = s"admin@sv-dev.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
 
     withFrontEnd("sv") { implicit webDriver =>
@@ -64,7 +64,7 @@ class SvNodePreflightSvIntegrationTest
 
   "The SV can log in to their wallet" in { _ =>
     val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
-    val svUsername = s"admin@sv.com";
+    val svUsername = s"admin@sv-dev.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
 
     withFrontEnd("sv") { implicit webDriver =>
@@ -102,7 +102,7 @@ class SvNodePreflightSvIntegrationTest
 
   "The Directory UI is working" in { _ =>
     val directoryUrl = s"https://directory.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
-    val svUsername = s"admin@sv.com";
+    val svUsername = s"admin@sv-dev.com";
     val svPassword = sys.env(s"SV_WEB_UI_PASSWORD");
     val cnsName = s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.cns"
 
