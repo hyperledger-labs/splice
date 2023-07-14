@@ -2062,7 +2062,7 @@
         "approvedSvIdentities": [
           {
             "name": "sbi",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETM+CeyHvphl9RiPDKL3vVX7F+Qo4fIhJopmgU5B7IzkwSdFic20hFB6tnAuCTU+UBjqZgh8N/h9r+CTrXMPsRg=="
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA=="
           },
           {
             "name": "intellecteu-canton-da-test",
@@ -2071,10 +2071,6 @@
           {
             "name": "Canton-Foundation-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
-          },
-          {
-            "name": "DA-Helm-Test-Node",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
           },
           {
             "name": "DA-Test-Node",
@@ -2087,6 +2083,10 @@
           {
             "name": "dasc-test-sv-01",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU/AYexo+CmqZxcNEnKgaNoJmdqhHP2nElBymaE4HREPQ0VgObBRNNMlgU/WfUUKElmn2u2D/b/wNtKKrtTA99A=="
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
           },
           {
             "name": "damlHub",
@@ -2843,7 +2843,7 @@
         "approvedSvIdentities": [
           {
             "name": "sbi",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETM+CeyHvphl9RiPDKL3vVX7F+Qo4fIhJopmgU5B7IzkwSdFic20hFB6tnAuCTU+UBjqZgh8N/h9r+CTrXMPsRg=="
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA=="
           },
           {
             "name": "intellecteu-canton-da-test",
@@ -2852,10 +2852,6 @@
           {
             "name": "Canton-Foundation-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
-          },
-          {
-            "name": "DA-Helm-Test-Node",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
           },
           {
             "name": "DA-Test-Node",
@@ -2868,6 +2864,10 @@
           {
             "name": "dasc-test-sv-01",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU/AYexo+CmqZxcNEnKgaNoJmdqhHP2nElBymaE4HREPQ0VgObBRNNMlgU/WfUUKElmn2u2D/b/wNtKKrtTA99A=="
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
           },
           {
             "name": "damlHub",
@@ -3527,7 +3527,7 @@
         "approvedSvIdentities": [
           {
             "name": "sbi",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETM+CeyHvphl9RiPDKL3vVX7F+Qo4fIhJopmgU5B7IzkwSdFic20hFB6tnAuCTU+UBjqZgh8N/h9r+CTrXMPsRg=="
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA=="
           },
           {
             "name": "intellecteu-canton-da-test",
@@ -3536,10 +3536,6 @@
           {
             "name": "Canton-Foundation-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
-          },
-          {
-            "name": "DA-Helm-Test-Node",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
           },
           {
             "name": "DA-Test-Node",
@@ -3552,6 +3548,10 @@
           {
             "name": "dasc-test-sv-01",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU/AYexo+CmqZxcNEnKgaNoJmdqhHP2nElBymaE4HREPQ0VgObBRNNMlgU/WfUUKElmn2u2D/b/wNtKKrtTA99A=="
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
           },
           {
             "name": "damlHub",
@@ -4211,7 +4211,7 @@
         "approvedSvIdentities": [
           {
             "name": "sbi",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETM+CeyHvphl9RiPDKL3vVX7F+Qo4fIhJopmgU5B7IzkwSdFic20hFB6tnAuCTU+UBjqZgh8N/h9r+CTrXMPsRg=="
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYLQlS5zhE+om9CMqAz8BLuNEGqPp/E17DNiaGkLVLfPA=="
           },
           {
             "name": "intellecteu-canton-da-test",
@@ -4220,10 +4220,6 @@
           {
             "name": "Canton-Foundation-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA=="
-          },
-          {
-            "name": "DA-Helm-Test-Node",
-            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
           },
           {
             "name": "DA-Test-Node",
@@ -4236,6 +4232,10 @@
           {
             "name": "dasc-test-sv-01",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU/AYexo+CmqZxcNEnKgaNoJmdqhHP2nElBymaE4HREPQ0VgObBRNNMlgU/WfUUKElmn2u2D/b/wNtKKrtTA99A=="
+          },
+          {
+            "name": "DA-Helm-Test-Node",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
           },
           {
             "name": "damlHub",
