@@ -17,9 +17,9 @@ window.canton_network_config = {
     wallet: {
       uiUrl: 'http://wallet.localhost:3000',
     },
-    ledgerApi: {
-      // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-      url: 'http://localhost:6201',
+    jsonApi: {
+      // URL of the JSON API for the participant
+      url: 'http://' + window.location.host + '/api/json-api/',
     },
     // BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
     splitwell: {

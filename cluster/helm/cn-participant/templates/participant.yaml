@@ -86,25 +86,6 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-      - name: envoy-proxy-lg-api
-        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ .Values.cluster.imageTag }}"
-        imagePullPolicy: Always
-        env:
-        - name: GRPC_ADDRESS
-          value: 127.0.0.1
-        - name: GRPC_PORT
-          value: "5001"
-        - name: GRPC_WEB_PORT
-          value: "6001"
-        ports:
-        - containerPort: 6001
-          name: lg-api-gw
-          protocol: TCP
-        resources:
-          limits:
-            memory: 256Mi
-          requests:
-            memory: 256Mi
 ---
 apiVersion: v1
 kind: Service

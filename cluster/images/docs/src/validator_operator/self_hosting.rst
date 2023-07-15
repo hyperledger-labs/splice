@@ -222,15 +222,6 @@ are running the validator (the one using "validator.conf"), and type:
    operated by Digital Asset, the Domain URL here will be different. Ask
    the operator for the correct URL.
 
-The splitwell UI connects to the ledger API of your participant
-through `Envoy
-<https://www.envoyproxy.io/docs/envoy/latest/start/install>`_. Follow
-the installation instructions to install it on your machine.
-
-Once you completed the installation, open a new terminal and start it ::
-
-  envoy -c examples/validator/envoy.yaml
-
 As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| like you did earlier for the directory and wallet UIs:
 
 .. literalinclude:: ../../../../../apps/splitwell/frontend/public/config.js

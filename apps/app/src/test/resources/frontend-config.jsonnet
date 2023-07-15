@@ -38,10 +38,10 @@ local testAuth(enabled) =
   else
     {};
 
-local validatorNodes(clusterProtocol, clusterAddress) = {
+local validatorNodes(clusterProtocol, clusterAddress, port) = {
   alice: {
-    ledgerApi: { url: "http://localhost:6201" },
-    jsonApi: { url: "http://localhost:3004/api/json-api/" },
+    jsonApiBackend: { url: "http://localhost:6201" },
+    jsonApi: { url: "http://localhost:" + port + "/api/json-api/" },
     participantAdmin: { url: "http://localhost:6202" },
     validator: { url: "http://localhost:5203" },
     wallet: { url: "http://localhost:5203", uiUrl: "http://localhost:3000" },
@@ -50,8 +50,8 @@ local validatorNodes(clusterProtocol, clusterAddress) = {
     scan: { url: "http://localhost:5012" },
   },
   bob: {
-    ledgerApi: { url: "http://localhost:6301" },
-    jsonApi: { url: "http://localhost:3004/api/json-api/" },
+    jsonApiBackend: { url: "http://localhost:6301" },
+    jsonApi: { url: "http://localhost:" + port + "/api/json-api/" },
     participantAdmin: { url: "http://localhost:6302" },
     validator: { url: "http://localhost:5303" },
     wallet: { url: "http://localhost:5303", uiUrl: "http://localhost:3001" },
@@ -60,8 +60,8 @@ local validatorNodes(clusterProtocol, clusterAddress) = {
     scan: { url: "http://localhost:5012" },
   },
   preflight: {
-    ledgerApi: { url: "http://localhost:8001" },
-    jsonApi: { url: "http://localhost:3004/api/json-api/" },
+    jsonApiBackend: { url: "http://localhost:7575" },
+    jsonApi: { url: "http://localhost:" + port + "/api/json-api/" },
     participantAdmin: { url: "http://localhost:8002" },
     validator: { url: "http://localhost:5003" },
     wallet: { url: "http://localhost:5003", uiUrl: "http://localhost:3000" },
@@ -86,9 +86,9 @@ local validatorNodes(clusterProtocol, clusterAddress) = {
   },
 };
 
-local services(node, clusterProtocol, clusterAddress) =
-  if (std.objectHas(validatorNodes(clusterProtocol, clusterAddress), node)) then
-    { services: validatorNodes(clusterProtocol, clusterAddress)[node] }
+local services(node, clusterProtocol, clusterAddress, port) =
+  if (std.objectHas(validatorNodes(clusterProtocol, clusterAddress, port), node)) then
+    { services: validatorNodes(clusterProtocol, clusterAddress, port)[node] }
   else
     error "Unknown node name " + node;
 
@@ -98,5 +98,6 @@ function(
   validatorNode,
   app,
   clusterProtocol,
-  clusterAddress
-) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterProtocol, clusterAddress)
+  clusterAddress,
+  port,
+) auth(authAlgorithm) + testAuth(std.parseJson(enableTestAuth)) + services(validatorNode, clusterProtocol, clusterAddress, port)

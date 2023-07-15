@@ -22,9 +22,9 @@ window.canton_network_config = {
       // URL of the gRPC-Web envoy proxy, proxying the splitwell gRPC API
       url: `https://splitwell.${cluster}`,
     },
-    ledgerApi: {
-      // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-      url: "https://" + window.location.hostname + "/api/v0/ledger-api",
+    jsonApi: {
+      // URL of the JSON API for the participant
+      url: "https://" + window.location.hostname + "/api/json-api/",
     },
     directory: {
       // URL of the directory backend. Note that this is not (yet) exposed over TLS.

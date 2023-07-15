@@ -1,11 +1,11 @@
-import { Loading } from 'common-frontend';
+import { Loading, usePrimaryParty } from 'common-frontend';
 import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { CloseRounded, DoneRounded } from '@mui/icons-material';
 import { Button, Stack, Typography } from '@mui/material';
 
-import { useLookupEntryByName, usePrimaryParty } from '../hooks';
+import { useLookupEntryByName } from '../hooks';
 
 export const PostPayment: React.FC = () => {
   const [searchParams] = useSearchParams();

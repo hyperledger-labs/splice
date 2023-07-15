@@ -6,14 +6,13 @@ set -eou pipefail
 
 rm -rf src/com/daml/ledger
 DIR=$(mktemp -d)
+mkdir -p "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v1/"
 trap 'rm -rf "$DIR"' EXIT
 
-cp -r "${DAML_PROTOBUFS}"/* "$DIR"
-chmod -R +w "$DIR"/*
 # We only generate sources for the subset we use.
-rm -rf "$DIR/protos-$SDK_VERSION/com/daml"/daml_lf_*
-
-cp -r "${REPO_ROOT}/3rdparty/protobuf/google" "$DIR/protos-$SDK_VERSION/google"
+cp "${DAML_PROTOBUFS}/protos-$SDK_VERSION/com/daml/ledger/api/v1/value.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v1/value.proto"
+cp "${DAML_PROTOBUFS}/protos-$SDK_VERSION/com/daml/ledger/api/v1/contract_metadata.proto" "$DIR/protos-$SDK_VERSION/com/daml/ledger/api/v1/contract_metadata.proto"
+chmod -R +w "$DIR"/*
 
 mkdir "$DIR/ts"
 

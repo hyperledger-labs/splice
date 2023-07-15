@@ -53,7 +53,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
           <SplitwellClientProvider url={config.services.splitwell.url}>
             <DirectoryClientProvider url={config.services.directory.url}>
               <ScanClientProvider url={config.services.scan.url}>
-                <SplitwellLedgerApiClientProvider url={config.services.ledgerApi.url}>
+                <SplitwellLedgerApiClientProvider jsonApiUrl={config.services.jsonApi.url}>
                   {children}
                 </SplitwellLedgerApiClientProvider>
               </ScanClientProvider>

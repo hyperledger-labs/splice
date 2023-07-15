@@ -1,10 +1,9 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract, useLedgerApiClient, usePrimaryParty } from 'common-frontend';
 
 import { SubscriptionIdleState } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 
-import { useProviderParty, usePrimaryParty } from '..';
-import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
+import { useProviderParty } from '..';
 
 const useSubscriptionIdleStates = (): UseQueryResult<Contract<SubscriptionIdleState>[]> => {
   const operationName = 'querySubscriptionIdleStates';

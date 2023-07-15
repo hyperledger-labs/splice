@@ -72,8 +72,13 @@ function start_frontend() {
     --tla-str enableTestAuth="$test_auth" \
     --tla-str validatorNode="$node_name" \
     --tla-str app="$app" \
+    --tla-str port="$port" \
     "$REPO_ROOT/apps/app/src/test/resources/frontend-config.jsonnet" \
     > "$config_file"
+
+  # This is the URL the frontend talks to which is then rewritten using setupProxy.js
+  # to the actual URL of the backend.
+  JSON_API_URL=$(jq -r '.services.jsonApiBackend.url' < "$config_file")
 
   local log_file="${LOG_DIR}/npm-${app}-${user}.log"
 
@@ -81,7 +86,7 @@ function start_frontend() {
     "trap \"rm -f ${config_file}\" EXIT"
 
   tmux send-keys -t "${tmux_session}:$((tmux_window-1))" \
-    "BROWSER=none PORT=$port REACT_APP_CANTON_NETWORK_CONFIG=\"\$(cat $config_file)\" \
+    "BROWSER=none PORT=$port JSON_API_URL=$JSON_API_URL REACT_APP_CANTON_NETWORK_CONFIG=\"\$(cat $config_file)\" \
     npm start 2>&1 | tee -a $log_file" C-m
 }
 

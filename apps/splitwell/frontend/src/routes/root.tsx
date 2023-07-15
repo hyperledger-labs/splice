@@ -8,14 +8,11 @@ import { Outlet } from 'react-router-dom';
 
 import { AppBar, Box, Button, CssBaseline, Toolbar, Typography } from '@mui/material';
 
-import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
 import './root.css';
 
 const Root: React.FC = () => {
-  const ledgerApiClient = useSplitwellLedgerApiClient();
-
   const { logout } = useUserState();
-  const primaryPartyId = usePrimaryParty(ledgerApiClient);
+  const primaryPartyId = usePrimaryParty().data;
 
   return (
     <ErrorBoundary>

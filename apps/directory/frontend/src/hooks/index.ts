@@ -4,7 +4,6 @@ import useDirectoryEntries from './queries/useDirectoryEntries';
 import useDirectoryEntryContexts from './queries/useDirectoryEntryContexts';
 import useDirectoryInstall from './queries/useDirectoryInstall';
 import useLookupEntryByName from './queries/useLookupEntryByName';
-import usePrimaryParty from './queries/usePrimaryParty';
 import useProviderParty from './queries/useProviderParty';
 import useSubscriptionIdleStates from './queries/useSubscriptionIdleStates';
 import useSubscriptionPayments from './queries/useSubscriptionPayments';
@@ -18,7 +17,6 @@ export {
   useDirectoryEntryContexts,
   useDirectoryInstall,
   useLookupEntryByName,
-  usePrimaryParty,
   useProviderParty,
   useSubscriptionIdleStates,
   useSubscriptionPayments,

@@ -43,7 +43,8 @@ const Home: React.FC = () => {
   const [splitwellDomainIds, setSplitwellDomainIds] = useState<SplitwellDomains | undefined>();
   const [connectedDomainIds, setConnectedDomainIds] = useState<string[]>([]);
 
-  const primaryPartyId = usePrimaryParty(ledgerApiClient);
+  const primaryPartyQuery = usePrimaryParty();
+  const primaryPartyId = primaryPartyQuery.data;
 
   useEffect(() => {
     const fetchProvider = async () => {

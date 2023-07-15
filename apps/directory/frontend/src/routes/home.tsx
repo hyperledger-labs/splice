@@ -1,11 +1,11 @@
-import { ErrorDisplay, Loading } from 'common-frontend';
+import { ErrorDisplay, Loading, usePrimaryParty } from 'common-frontend';
 import React from 'react';
 
 import { Box, Container } from '@mui/material';
 
 import DirectoryEntries from '../components/DirectoryEntries';
 import RequestDirectoryEntry from '../components/RequestDirectoryEntry';
-import { useDirectoryInstall, usePrimaryParty } from '../hooks';
+import { useDirectoryInstall } from '../hooks';
 
 const Home: React.FC = () => {
   const primaryPartyIdQuery = usePrimaryParty();

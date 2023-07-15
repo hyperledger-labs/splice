@@ -9,7 +9,6 @@ import {
   TestAuthConfig,
 } from '../config/schema';
 import { generateToken, isHs256UnsafeToken, tryDecodeTokenSub } from '../utils/auth';
-import { LedgerApiClient } from './LedgerApiContext';
 
 interface UserState {
   // undefined when not logged in
@@ -161,24 +160,3 @@ export const useUserState: () => UserState = () => {
   console.debug(`user state: userId: ${user.userId}, isAuthenticated: ${user.isAuthenticated}`);
   return user;
 };
-
-// TODO(#4363) - delete this in favor of the react-query based usePrimaryParty hook (currently in directory codebase)
-export function usePrimaryParty(ledgerApiClient: LedgerApiClient): string | undefined {
-  const [primaryParty, setPrimaryParty] = useState<string>();
-
-  useEffect(() => {
-    const fetchPrimaryParty = async () => {
-      try {
-        setPrimaryParty(await ledgerApiClient.getPrimaryParty());
-      } catch (err) {
-        console.error(`Error finding primary party for user: ${JSON.stringify(err)}`);
-        throw new Error(
-          'Error finding primary party for user, please confirm user onboarded to this participant.'
-        );
-      }
-    };
-    fetchPrimaryParty();
-  }, [ledgerApiClient]);
-
-  return primaryParty;
-}

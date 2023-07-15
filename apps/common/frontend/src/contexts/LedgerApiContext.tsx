@@ -1,308 +1,157 @@
-import { ActiveContractsServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_grpc_web_pb';
-import { GetActiveContractsRequest } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_pb';
-import { UserManagementServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_grpc_web_pb';
-import {
-  GetUserRequest,
-  ListUserRightsRequest,
-} from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_pb';
-import { CommandServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/command_service_grpc_web_pb';
-import {
-  SubmitAndWaitForTransactionTreeResponse,
-  SubmitAndWaitRequest,
-} from 'common-protobuf/com/daml/ledger/api/v1/command_service_pb';
-import {
-  Command,
-  Commands,
-  CreateCommand,
-  DisclosedContract,
-  ExerciseCommand,
-} from 'common-protobuf/com/daml/ledger/api/v1/commands_pb';
-import { CreatedEvent } from 'common-protobuf/com/daml/ledger/api/v1/event_pb';
-import {
-  Filters,
-  InclusiveFilters,
-  TransactionFilter,
-} from 'common-protobuf/com/daml/ledger/api/v1/transaction_filter_pb';
-import { TransactionTree } from 'common-protobuf/com/daml/ledger/api/v1/transaction_pb';
-import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
-import { StateServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v2/state_service_grpc_web_pb';
-import grpcWeb from 'grpc-web';
+import { callWithLogging, Contract, useUserState } from 'common-frontend';
+import { ContractMetadata } from 'directory-openapi';
 import React, { useContext } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 
-import { Choice, ContractId, Template } from '@daml/types';
+import Ledger, { CommandMeta, CreateEvent, DisclosedContract, LedgerOptions } from '@daml/ledger';
+import { Query } from '@daml/ledger';
+import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
-import { Contract, decodeProtoMetadata, useUserState } from '..';
+const DIRECTORY_LEDGER_NAME = 'directory-ledger';
 
-// Description of a command that we can log
-type CommandDescription =
-  | { type: 'create'; templateId: string; payload: unknown }
-  | {
-      type: 'exercise';
-      templateId: string;
-      choice: string;
-      contractId: ContractId<unknown>;
-      argument: unknown;
-    };
-
-// exported so it can be extended by apps
+// Uses the JSON API (via @daml/ledger) to connect to the ledger.
 export class LedgerApiClient {
-  activeContractsServiceClient: ActiveContractsServicePromiseClient;
-  commandServiceClient: CommandServicePromiseClient;
-  userManagementServiceClient: UserManagementServicePromiseClient;
-  stateServiceClient: StateServicePromiseClient;
-  userId: string;
-  metaData: grpcWeb.Metadata;
-
-  constructor(
-    activeContractsServiceClient: ActiveContractsServicePromiseClient,
-    commandServiceClient: CommandServicePromiseClient,
-    userManagementServiceClient: UserManagementServicePromiseClient,
-    stateServiceClient: StateServicePromiseClient,
-    userId: string,
-    token: string | undefined
-  ) {
-    this.activeContractsServiceClient = activeContractsServiceClient;
-    this.commandServiceClient = commandServiceClient;
-    this.userManagementServiceClient = userManagementServiceClient;
-    this.stateServiceClient = stateServiceClient;
+  private ledger: Ledger;
+  private userId: string;
+  constructor(ledger: Ledger, userId: string) {
+    this.ledger = ledger;
     this.userId = userId;
-    this.metaData = token !== undefined ? { Authorization: 'Bearer ' + token } : {};
   }
-
-  templateIdToIdentifier(templateId: string): Identifier {
-    const [packageId, moduleName, entityName] = templateId.split(':');
-    return new Identifier()
-      .setPackageId(packageId)
-      .setModuleName(moduleName)
-      .setEntityName(entityName);
-  }
-
-  decodeCreateEvent<T extends object, K>(template: Template<T, K>, ev: CreatedEvent): Contract<T> {
-    return {
-      contractId: ev.getContractId() as ContractId<T>,
-      payload: template.decodeProto(new Value().setRecord(ev.getCreateArguments())),
-      metadata: decodeProtoMetadata(ev.getMetadata()!),
-    };
+  async getPrimaryParty(): Promise<string> {
+    const user = await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      'getUser',
+      userId => this.ledger.getUser(userId),
+      this.userId
+    );
+    return user.primaryParty!;
   }
 
   async create<T extends object, K>(
     actAs: string[],
     template: Template<T, K>,
     payload: T,
-    domainId: string | undefined = undefined,
-    disclosedContracts: DisclosedContract[] = []
+    domainId?: string
   ): Promise<Contract<T>> {
-    const templateId = this.templateIdToIdentifier(template.templateId);
-    const cmd = new Command().setCreate(
-      new CreateCommand()
-        .setTemplateId(templateId)
-        .setCreateArguments(template.encodeProto(payload).getRecord())
+    console.debug(
+      `Creating template templateId=${template.templateId}, actAs=${JSON.stringify(
+        actAs
+      )}, payload=${JSON.stringify(payload)}`
     );
-    const jsonCmd: CommandDescription = {
-      type: 'create',
-      templateId: template.templateId,
-      payload: template.encode(payload),
+    const meta: CommandMeta = {
+      workflowId: domainId ? `domain-id:${domainId}` : undefined,
     };
-    const transaction = await this.submitCommand(
-      actAs,
-      [],
-      cmd,
-      jsonCmd,
-      domainId,
-      disclosedContracts
-    );
-    const createdEv = transaction
-      .getEventsByIdMap()
-      .get(transaction.getRootEventIdsList()[0])
-      ?.getCreated()!;
-    return this.decodeCreateEvent(template, createdEv);
+    const response = await this.ledger
+      .create(template, payload, meta)
+      .then(r => {
+        console.debug(
+          `Create template: actAs=${JSON.stringify(actAs)}, templateId=${
+            template.templateId
+          } succeeded, contractId=${r.contractId}`
+        );
+        return r;
+      })
+      .catch(e => {
+        console.debug(
+          `Create template: actAs=${JSON.stringify(actAs)}, templateId=${
+            template.templateId
+          } failed: ${JSON.stringify(e)}`
+        );
+        throw e;
+      });
+    return this.toContract(response);
   }
-
   async exercise<T extends object, C, R, K>(
     actAs: string[],
     readAs: string[],
     choice: Choice<T, C, R, K>,
     contractId: ContractId<T>,
     argument: C,
-    domainId: string | undefined = undefined,
+    domainId?: string,
     disclosedContracts: DisclosedContract[] = []
   ): Promise<R> {
-    const encodedArg = choice.argumentSerializable().encodeProto(argument);
-    const templateId = this.templateIdToIdentifier(choice.template().templateId);
-    const cmd = new Command().setExercise(
-      new ExerciseCommand()
-        .setTemplateId(templateId)
-        .setChoice(choice.choiceName)
-        .setContractId(contractId)
-        .setChoiceArgument(encodedArg)
-    );
-    const jsonCmd: CommandDescription = {
-      type: 'exercise',
-      templateId: choice.template().templateId,
-      choice: choice.choiceName,
-      contractId: contractId,
-      argument: choice.argumentEncode(argument),
-    };
-    const transaction = await this.submitCommand(
-      actAs,
-      readAs,
-      cmd,
-      jsonCmd,
-      domainId,
-      disclosedContracts
-    );
-    const exerciseEv = transaction
-      .getEventsByIdMap()
-      .get(transaction.getRootEventIdsList()[0])
-      ?.getExercised()!;
-    const exerciseResult = choice.resultSerializable().decodeProto(exerciseEv.getExerciseResult()!);
-    return exerciseResult;
-  }
-
-  async submitCommand(
-    actAs: string[],
-    readAs: string[],
-    command: Command,
-    jsonCommand: CommandDescription,
-    domainId: string | undefined,
-    disclosedContracts: DisclosedContract[] = []
-  ): Promise<TransactionTree> {
-    const commandId = uuidv4();
-    const cmds = new Commands()
-      .setCommandsList([command])
-      .setActAsList(actAs)
-      .setReadAsList(readAs)
-      .setApplicationId(this.userId)
-      .setCommandId(commandId)
-      .setDisclosedContractsList(disclosedContracts);
-    if (domainId) {
-      cmds.setWorkflowId(`domain-id:${domainId}`);
-    }
-    const request = new SubmitAndWaitRequest().setCommands(cmds);
     console.debug(
-      `Submitting command: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
+      `Exercising choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
         readAs
-      )}, commandId=${commandId}, domainId=${domainId}, cmd=${JSON.stringify(jsonCommand)}`
+      )}, choiceName=${choice.choiceName}, templateId=${
+        choice.template().templateId
+      }, contractId=${contractId}.`
     );
-    const response: SubmitAndWaitForTransactionTreeResponse = await this.commandServiceClient
-      .submitAndWaitForTransactionTree(request, this.metaData)
+    const meta: CommandMeta = {
+      workflowId: domainId ? `domain-id:${domainId}` : undefined,
+      disclosedContracts,
+    };
+    const result = await this.ledger
+      .exercise(choice, contractId, argument, meta)
       .then(r => {
-        console.debug(`Command with commandId=${commandId} succeeded`);
+        console.debug(
+          `Exercised choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
+            readAs
+          )}, choiceName=${choice.choiceName}, templateId=${
+            choice.template().templateId
+          }, contractId=${contractId} succeeded.`
+        );
         return r;
       })
       .catch(e => {
-        console.debug(`Command with commandId=${commandId} failed: ${JSON.stringify(e)}`);
+        console.debug(
+          `Exercised choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
+            readAs
+          )}, choiceName=${choice.choiceName}, templateId=${
+            choice.template().templateId
+          }, contractId=${contractId} failed: ${JSON.stringify(e)}`
+        );
         throw e;
       });
-    return response.getTransaction()!;
-  }
-  async queryAcs<T extends object, K, I extends string>(
-    p: string,
-    t: Template<T, K, I>
-  ): Promise<Contract<T>[]> {
-    const filter = new TransactionFilter();
-    const [packageId, moduleName, entityName] = t.templateId.split(':');
-    const templateId = new Identifier()
-      .setPackageId(packageId)
-      .setModuleName(moduleName)
-      .setEntityName(entityName);
-    filter
-      .getFiltersByPartyMap()
-      .set(p, new Filters().setInclusive(new InclusiveFilters().setTemplateIdsList([templateId])));
-    // TODO(tech-debt) Avoid relying on verbose mode. This needs changes in decoding of the protobuf values.
-    const request = new GetActiveContractsRequest().setFilter(filter).setVerbose(true);
-    const response = this.activeContractsServiceClient.getActiveContracts(request, this.metaData);
-    const contracts = await new Promise<Contract<T>[]>(resolve => {
-      let acc: Contract<T>[] = [];
-      response.on('data', el => {
-        const decoded: Contract<T>[] = el
-          .getActiveContractsList()
-          .map(ev => this.decodeCreateEvent(t, ev));
-        acc = acc.concat(decoded);
-      });
-      response.on('error', err => {
-        console.error(`ACS stream for ${t.templateId} failed: ${err}`);
-      });
-      response.on('end', () => {
-        resolve(acc);
-      });
-    });
-    return contracts;
+    return result[0];
   }
 
-  async getUserReadAs(userId: string): Promise<string[]> {
-    const userRightsResponse = await this.userManagementServiceClient.listUserRights(
-      new ListUserRightsRequest().setUserId(this.userId),
-      this.metaData
+  async query<T extends object, K, I extends string>(
+    operationName: string,
+    template: TemplateOrInterface<T, K, I>,
+    query?: Query<T>
+  ): Promise<CreateEvent<T, K, I>[]> {
+    return await callWithLogging(
+      DIRECTORY_LEDGER_NAME,
+      operationName,
+      (t, q) => this.ledger.query(t, q),
+      template,
+      query
     );
-    return userRightsResponse.getRightsList().flatMap(right => {
-      const readAs = right.getCanReadAs();
-      return readAs ? [readAs.getParty()] : [];
-    });
   }
 
-  async getPrimaryParty(): Promise<string> {
-    const user = await this.userManagementServiceClient.getUser(
-      new GetUserRequest().setUserId(this.userId),
-      this.metaData
-    );
-    return user.getUser()!.getPrimaryParty();
+  toContract<T extends object, K, I extends string = string>(
+    ev: CreateEvent<T, K, I>
+  ): Contract<T> {
+    return {
+      contractId: ev.contractId,
+      payload: ev.payload,
+      metadata: new ContractMetadata(),
+    };
   }
 }
 
-export interface LedgerApiClientProps {
-  url: string;
+const LedgerApiContext = React.createContext<LedgerApiClient | undefined>(undefined);
+
+export interface LedgerApiProps {
+  jsonApiUrl: string;
 }
 
-// use this to create a Provider component and a use function in case you extended LedgerApiClient
-export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
-  new (
-    activeContractsServiceClient: ActiveContractsServicePromiseClient,
-    commandServiceClient: CommandServicePromiseClient,
-    userManagementServiceClient: UserManagementServicePromiseClient,
-    stateServiceCilent: StateServicePromiseClient,
-    userId: string,
-    token: string
-  ): T;
-}): [React.FC<React.PropsWithChildren<LedgerApiClientProps>>, () => T] => {
-  const context = React.createContext<T | undefined>(undefined);
+export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApiProps>> = ({
+  jsonApiUrl,
+  children,
+}) => {
+  const { userAccessToken, userId } = useUserState();
 
-  const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApiClientProps>> = ({
-    children,
-    url,
-  }) => {
-    const { userAccessToken, userId } = useUserState();
-    if (!userAccessToken || !userId) {
-      // The expectation is that useLedgerApiClient() is only called from components that are
-      // rendered only if the user is logged in.
-      return <context.Provider value={undefined}>{children}</context.Provider>;
-    }
-    const activeContractsClient = new ActiveContractsServicePromiseClient(url);
-    const commandServiceClient = new CommandServicePromiseClient(url);
-    const userManagementClient = new UserManagementServicePromiseClient(url);
-    const stateServiceClient = new StateServicePromiseClient(url);
-    const apiClient = new c(
-      activeContractsClient,
-      commandServiceClient,
-      userManagementClient,
-      stateServiceClient,
-      userId,
-      userAccessToken
-    );
-    return <context.Provider value={apiClient}>{children}</context.Provider>;
-  };
+  let ledgerApiClient: LedgerApiClient | undefined;
 
-  const useLedgerApiClient: () => T = () => {
-    const client = useContext(context);
-    if (!client) {
-      throw new Error('Ledger API client not initialized');
-    }
-    return client;
-  };
+  if (userAccessToken && userId) {
+    const ledgerOptions: LedgerOptions = { httpBaseUrl: jsonApiUrl, token: userAccessToken };
+    ledgerApiClient = new LedgerApiClient(new Ledger(ledgerOptions), userId);
+  }
 
-  return [LedgerApiClientProvider, useLedgerApiClient];
+  return <LedgerApiContext.Provider value={ledgerApiClient}>{children}</LedgerApiContext.Provider>;
 };
 
-export const [LedgerApiClientProvider, useLedgerApiClient] =
-  buildLedgerApiClientInterface(LedgerApiClient);
+export const useLedgerApiClient: () => LedgerApiClient | undefined = () => {
+  return useContext(LedgerApiContext);
+};

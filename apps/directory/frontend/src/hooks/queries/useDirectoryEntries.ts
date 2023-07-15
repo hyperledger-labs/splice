@@ -1,10 +1,9 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract, useLedgerApiClient, usePrimaryParty } from 'common-frontend';
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
-import { useProviderParty, usePrimaryParty } from '..';
-import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
+import { useProviderParty } from '..';
 
 const useDirectoryEntries = (): UseQueryResult<Contract<DirectoryEntry>[]> => {
   const operationName = 'queryDirectoryEntries';

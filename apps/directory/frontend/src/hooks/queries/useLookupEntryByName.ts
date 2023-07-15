@@ -1,9 +1,7 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { Contract, useDirectoryClient } from 'common-frontend';
+import { Contract, useDirectoryClient, usePrimaryParty } from 'common-frontend';
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
-
-import { usePrimaryParty } from '..';
 
 type LookupEntryResponse = {
   entryContract?: Contract<DirectoryEntry>;

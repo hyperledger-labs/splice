@@ -1,10 +1,9 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract, useLedgerApiClient, usePrimaryParty } from 'common-frontend';
 
 import { DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 
-import { useProviderParty, usePrimaryParty } from '..';
-import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
+import { useProviderParty } from '..';
 
 export const QueryDirectoryInstallOperationName = 'queryDirectoryInstall';
 const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall> | null> => {

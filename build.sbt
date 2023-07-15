@@ -618,13 +618,7 @@ lazy val `apps-common-frontend-protobuf` = {
   project
     .in(file("apps/common/frontend-protobuf"))
     .dependsOn(
-      `apps-common` % "compile->protocGenerate",
-      `apps-directory` % "compile->protocGenerate",
-      `apps-sv` % "compile->protocGenerate",
-      `apps-wallet` % "compile->protocGenerate",
-      `apps-splitwell` % "compile->protocGenerate",
-      `apps-validator` % "compile->protocGenerate",
-      `apps-scan` % "compile->protocGenerate",
+      `apps-splitwell` % "compile->protocGenerate"
     )
     .settings(
       Compile / sourceGenerators += Def.task {

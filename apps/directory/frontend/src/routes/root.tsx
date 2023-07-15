@@ -1,16 +1,18 @@
-import { ErrorBoundary, ErrorDisplay, Loading, PartyId, useUserState } from 'common-frontend';
+import {
+  ErrorBoundary,
+  ErrorDisplay,
+  Loading,
+  PartyId,
+  useLedgerApiClient,
+  usePrimaryParty,
+  useUserState,
+} from 'common-frontend';
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 
 import { Box, Button, Toolbar, Typography } from '@mui/material';
 
-import { useLedgerApiClient } from '../contexts/LedgerApiContext';
-import {
-  useDirectoryInstall,
-  usePrimaryParty,
-  useProviderParty,
-  useRequestDirectoryInstall,
-} from '../hooks';
+import { useDirectoryInstall, useProviderParty, useRequestDirectoryInstall } from '../hooks';
 import { isDarFileMissingError } from '../utils/errors';
 
 const Root: React.FC = () => {

@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider, DirectoryClientProvider, theme, UserProvider } from 'common-frontend';
+import {
+  AuthProvider,
+  DirectoryClientProvider,
+  LedgerApiClientProvider,
+  theme,
+  UserProvider,
+} from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {
@@ -12,7 +18,6 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
-import { LedgerApiClientProvider } from './contexts/LedgerApiContext';
 import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
 import PostPayment from './routes/postPayment';

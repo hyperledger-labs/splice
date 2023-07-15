@@ -1,5 +1,3 @@
-import * as google_protobuf_timestamp_pb from 'google-protobuf/google/protobuf/timestamp_pb';
-import { DisclosedContract } from 'common-protobuf/com/daml/ledger/api/v1/commands_pb';
 import { ContractMetadata } from 'common-protobuf/com/daml/ledger/api/v1/contract_metadata_pb';
 import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
 import { Contract as ProtoContract } from 'common-protobuf/com/daml/network/v0/contract_pb';
@@ -9,6 +7,7 @@ import {
   ContractMetadata as OpenAPIContractMetadata,
 } from 'directory-openapi';
 
+import { DisclosedContract } from '@daml/ledger';
 import { ContractId, ContractTypeCompanion, Template } from '@daml/types';
 
 export interface Contract<T> {
@@ -30,35 +29,24 @@ export const templateIdToIdentifier = (templateId: string): Identifier => {
     .setEntityName(entityName);
 };
 
-const fromHexString = (hexString: string) => {
-  return Uint8Array.from((hexString.match(/.{1,2}/g) || []).map(byte => parseInt(byte, 16)));
-};
-
 const toHexString = (bytes: Uint8Array) =>
   bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, '0'), '');
 
 export const decodeProtoMetadata = (metadata: ContractMetadata): OpenAPIContractMetadata => {
+  const totalMillis =
+    BigInt(metadata.getCreatedAt()!.getSeconds()) * BigInt(1000) +
+    BigInt(metadata.getCreatedAt()!.getNanos()) / BigInt(1000_000);
+  const micros = (BigInt(metadata.getCreatedAt()!.getNanos()) / BigInt(1000)) % BigInt(1000);
+  // JS date APIs only support millisecond precision so we need to do some hackery to get the microseconds in the string.
+  const totalMillisFormatted = new Date(Number(totalMillis)).toISOString();
+  const createdAt = `${totalMillisFormatted.slice(0, -1)}${String(micros).padStart(3, '0')}Z`;
   return {
-    createdAt: (
-      BigInt(metadata.getCreatedAt()!.getSeconds()) * BigInt(1000_000) +
-      BigInt(metadata.getCreatedAt()!.getNanos()) / BigInt(1000)
-    ).toString(10),
+    createdAt: createdAt,
     contractKeyHash: toHexString(metadata.getContractKeyHash_asU8()),
-    driverMetadata: toHexString(metadata.getDriverMetadata_asU8()),
+    // for some reason the JSON API uses URL-safe base64 encoding
+    // https://github.com/openjdk/jdk/blob/0d2196f8e5b03577a14ff97505718f4fa53f3792/src/java.base/share/classes/java/util/Base64.java#L230
+    driverMetadata: metadata.getDriverMetadata_asB64().replace(/\+/g, '-').replace(/\//g, '_'),
   };
-};
-
-export const encodeProtoMetadata = (metadata: OpenAPIContractMetadata): ContractMetadata => {
-  const createdAtMicros = BigInt(metadata.createdAt);
-  const createdAtSeconds = createdAtMicros / BigInt(1000_000);
-  const createdAtNanos = (createdAtMicros % BigInt(1000_000)) * BigInt(1000);
-  const createdAt = new google_protobuf_timestamp_pb.Timestamp()
-    .setSeconds(Number(createdAtSeconds))
-    .setNanos(Number(createdAtNanos));
-  return new ContractMetadata()
-    .setCreatedAt(createdAt)
-    .setContractKeyHash(fromHexString(metadata.contractKeyHash))
-    .setDriverMetadata(fromHexString(metadata.driverMetadata));
 };
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
@@ -82,13 +70,16 @@ export const Contract = {
   toDisclosedContract: <T extends object, K>(
     tmpl: Template<T, K>,
     c: Contract<T>
-  ): DisclosedContract => {
-    return new DisclosedContract()
-      .setTemplateId(templateIdToIdentifier(tmpl.templateId))
-      .setContractId(c.contractId)
-      .setCreateArguments(tmpl.encodeProto(c.payload).getRecord())
-      .setMetadata(encodeProtoMetadata(c.metadata));
-  },
+  ): DisclosedContract => ({
+    templateId: tmpl.templateId,
+    contractId: c.contractId,
+    payload: tmpl.encode(c.payload),
+    metadata: {
+      createdAt: c.metadata.createdAt,
+      keyHash: c.metadata.contractKeyHash,
+      driverMetadata: c.metadata.driverMetadata,
+    },
+  }),
 };
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare

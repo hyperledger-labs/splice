@@ -1,8 +1,8 @@
 import { UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
+import { LedgerApiClient } from 'common-frontend';
 
 import { DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
 
-import { LedgerApiClient } from '../../contexts/LedgerApiContext';
 import { QueryDirectoryInstallOperationName } from '../queries/useDirectoryInstall';
 
 interface RequestDirectoryInstallArgs {

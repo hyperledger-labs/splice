@@ -12,7 +12,7 @@ const reader = new ConfigReader(
       scan: serviceSchema,
       directory: serviceSchema,
       splitwell: serviceSchema,
-      ledgerApi: serviceSchema,
+      jsonApi: serviceSchema,
     }),
   })
 );

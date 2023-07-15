@@ -1,10 +1,12 @@
 import {
   LedgerApiClient,
-  LedgerApiClientProps,
-  buildLedgerApiClientInterface,
   Contract,
   ReadyContract,
+  LedgerApiProps,
+  useUserState,
+  LedgerApiClientProvider,
 } from 'common-frontend';
+import React, { useContext } from 'react';
 
 import {
   AcceptedGroupInvite,
@@ -14,6 +16,7 @@ import {
   SplitwellInstall,
 } from '@daml.js/splitwell/lib/CN/Splitwell';
 import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import Ledger, { LedgerOptions } from '@daml/ledger';
 import { ContractId } from '@daml/types';
 
 class SplitwellLedgerApiClient extends LedgerApiClient {
@@ -168,7 +171,35 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
   }
 }
 
-export const [SplitwellLedgerApiClientProvider, useSplitwellLedgerApiClient]: [
-  React.FC<React.PropsWithChildren<LedgerApiClientProps>>,
-  () => SplitwellLedgerApiClient
-] = buildLedgerApiClientInterface(SplitwellLedgerApiClient);
+const SplitwellLedgerApiContext = React.createContext<SplitwellLedgerApiClient | undefined>(
+  undefined
+);
+
+export const SplitwellLedgerApiClientProvider: React.FC<
+  React.PropsWithChildren<LedgerApiProps>
+> = ({ jsonApiUrl, children }) => {
+  const { userAccessToken, userId } = useUserState();
+
+  let ledgerApiClient: SplitwellLedgerApiClient | undefined;
+
+  if (userAccessToken && userId) {
+    const ledgerOptions: LedgerOptions = { httpBaseUrl: jsonApiUrl, token: userAccessToken };
+    ledgerApiClient = new SplitwellLedgerApiClient(new Ledger(ledgerOptions), userId);
+  }
+
+  // We instantiate both the basic ledger api context and the one for splitwell so hooks like
+  // usePrimaryParty that only rely on the basic one work as well
+  return (
+    <SplitwellLedgerApiContext.Provider value={ledgerApiClient}>
+      <LedgerApiClientProvider jsonApiUrl={jsonApiUrl}>{children}</LedgerApiClientProvider>
+    </SplitwellLedgerApiContext.Provider>
+  );
+};
+
+export const useSplitwellLedgerApiClient: () => SplitwellLedgerApiClient = () => {
+  const client = useContext(SplitwellLedgerApiContext);
+  if (!client) {
+    throw new Error('Ledger API client is not initialized');
+  }
+  return client;
+};
