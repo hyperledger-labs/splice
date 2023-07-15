@@ -7,7 +7,9 @@ import com.google.protobuf.ByteString
 import org.apache.commons.codec.binary.Hex
 
 import java.time.Instant
+import java.util.Base64
 import java.util.concurrent.TimeUnit
+import scala.util.Try
 
 object ContractMetadataUtil {
 
@@ -18,18 +20,27 @@ object ContractMetadataUtil {
   def toJson(contractMetadata: ContractMetadata): http.ContractMetadata = {
 
     val res = http.ContractMetadata(
-      createdAt = instantToMicros(contractMetadata.createdAt).toString,
+      createdAt = Timestamp.assertFromInstant(contractMetadata.createdAt).toString,
       contractKeyHash = Hex.encodeHexString(contractMetadata.contractKeyHash.toByteArray),
-      driverMetadata = Hex.encodeHexString(contractMetadata.driverMetadata.toByteArray),
+      driverMetadata =
+        Base64.getUrlEncoder.encodeToString(contractMetadata.driverMetadata.toByteArray),
     )
     res
   }
 
   def fromJson(metadata: http.ContractMetadata): ContractMetadata = {
+    // For backwards compatibility (required for ACS dumps) we also support an
+    // older format where createdAt stores the micros since unix epoch and
+    // driverMetadata is base16 encoded.
     val res = new ContractMetadata(
-      Timestamp.assertFromLong(metadata.createdAt.toLong).toInstant,
+      Try(Timestamp.assertFromLong(metadata.createdAt.toLong))
+        .getOrElse(Timestamp.assertFromString(metadata.createdAt))
+        .toInstant,
       ByteString.copyFrom(Hex.decodeHex(metadata.contractKeyHash)),
-      ByteString.copyFrom(Hex.decodeHex(metadata.driverMetadata)),
+      ByteString.copyFrom(
+        Try(Hex.decodeHex(metadata.driverMetadata))
+          .getOrElse(Base64.getUrlDecoder.decode(metadata.driverMetadata))
+      ),
     )
     res
   }

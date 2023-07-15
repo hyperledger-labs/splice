@@ -1,9 +1,5 @@
 import { QueryClient, UseQueryResult, useQuery } from '@tanstack/react-query';
 import { ReadyContract } from 'common-frontend';
-import {
-  ListGroupsRequest,
-  SplitwellContext,
-} from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
 
 import { Group } from '@daml.js/splitwell/lib/CN/Splitwell';
 
@@ -21,12 +17,7 @@ export const useGroups = (party: string): UseQueryResult<ReadyContract<Group>[]>
   return useQuery({
     queryKey: groupsQueryKey(party),
     queryFn: async () => {
-      const newGroups = (
-        await splitwellClient.listGroups(
-          new ListGroupsRequest().setContext(new SplitwellContext().setUserPartyId(party)),
-          undefined
-        )
-      ).getGroupsList();
+      const newGroups = (await splitwellClient.listGroups(party)).groups;
       return newGroups.flatMap(g => {
         // don't display groups in-flight from one domain to another
         const d = ReadyContract.decodeContractWithState(g, Group);

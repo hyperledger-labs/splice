@@ -32,25 +32,6 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-      - name: envoy-proxy-sw-api
-        image: "{{ .Values.imageRepo }}/envoy-proxy:{{ (.Values.cluster).imageTag }}"
-        imagePullPolicy: Always
-        env:
-        - name: GRPC_ADDRESS
-          value: 127.0.0.1
-        - name: GRPC_PORT
-          value: "5213"
-        - name: GRPC_WEB_PORT
-          value: "6213"
-        ports:
-        - containerPort: 6213
-          name: sw-api-gw
-          protocol: TCP
-        resources:
-          limits:
-            memory: 256Mi
-          requests:
-            memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
@@ -63,7 +44,4 @@ spec:
   ports:
   - name: sw-api
     port: 5213
-    protocol: TCP
-  - name: sw-api-gw
-    port: 6213
     protocol: TCP

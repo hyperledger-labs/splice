@@ -5,8 +5,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CNNodeBootstrapBaseGrpc
+import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -36,7 +35,6 @@ class SplitwellAppBootstrap(
     metrics: SplitwellAppMetrics,
     storageFactory: StorageFactory,
     loggerFactory: NamedLoggerFactory,
-    writeHealthDumpToFile: HealthDumpFunction,
     futureSupervisor: FutureSupervisor,
     configuredOpenTelemetry: ConfiguredOpenTelemetry,
 )(implicit
@@ -44,7 +42,7 @@ class SplitwellAppBootstrap(
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
-) extends CNNodeBootstrapBaseGrpc[
+) extends CNNodeBootstrapBase[
       SplitwellApp,
       SplitwellAppBackendConfig,
       SharedCNNodeAppParameters,
@@ -56,7 +54,6 @@ class SplitwellAppBootstrap(
       metrics,
       storageFactory,
       loggerFactory,
-      writeHealthDumpToFile,
       configuredOpenTelemetry,
     ) {
 
@@ -71,7 +68,6 @@ class SplitwellAppBootstrap(
           clock,
           loggerFactory,
           tracerProvider,
-          adminServerRegistry,
           futureSupervisor,
         )
       )
@@ -93,7 +89,6 @@ object SplitwellAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
-      writeHealthDumpToFile: HealthDumpFunction,
       configuredOpenTelemetry: ConfiguredOpenTelemetry,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
@@ -113,7 +108,6 @@ object SplitwellAppBootstrap {
           splitwellMetrics,
           new CommunityStorageFactory(splitwellConfig.storage),
           loggerFactory,
-          writeHealthDumpToFile,
           futureSupervisor,
           configuredOpenTelemetry,
         )

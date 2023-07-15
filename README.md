@@ -144,8 +144,7 @@ clusters.)
     If you encounter issues, try exiting and reentering the directory to reactivate direnv.
 
 9. On MacOS, please install the following globally:
-   1. Envoy, by running: `brew update ; brew install envoy`
-   2. Firefox, by following the process here: <https://www.firefox.com>
+   1. Firefox, by following the process here: <https://www.firefox.com>
 
 ### Directory Layout
 
@@ -507,8 +506,7 @@ Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
       5. Change the JSON API hash in `jsonapi.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `jsonapi.nix`, and then call `direnv reload`,
          to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
          Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
-      6.  Repeat the same with the sha256 of the protobufs in `daml_pbs.nix`.
-      7. You might also want to bump ``ledgerApiVersion`` in ``Dependencies.scala``. However, in general this must be kept in sync with the ledger API version
+      6. You might also want to bump ``ledgerApiVersion`` in ``Dependencies.scala``. However, in general this must be kept in sync with the ledger API version
          server by the Canton binary not the Canton fork.
    6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions"`
 5. Test whether things compile using `sbt Test/compile`.
@@ -668,8 +666,6 @@ Your new package will need its own `tsconfig.json` file that inherits from the r
 In `apps/common/frontend` we have an NPM package containing common code. This package (named `common-frontend`) can be installed with `npm install common-frontend -w my-workspace-pkg`. You can import anything from it with `import { ... } from 'common-frontend'` in your package's source code.
 
 You're also free to add more things in `common-frontend` to use across multiple frontend apps. This can really include anything: utility functions, reusable React components, shared config, etc. Just ensure whatever you add is exposed via the lib's entrypoint, `index.ts` (we use the [barreling](https://basarat.gitbook.io/typescript/main-1/barrel) technique to expose all modules from the root of the library).
-
-There is also a package available named `common-protobuf`, located in `apps/common/frontend-protobuf`. This simply contains all the web-gRPC protobuf bindings for all our services in Typescript.
 
 ### Conversions between Java & Scala types
 

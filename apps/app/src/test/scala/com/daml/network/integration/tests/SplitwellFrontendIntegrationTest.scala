@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -36,6 +37,7 @@ class SplitwellFrontendIntegrationTest
       .withAdditionalSetup(implicit env => {
         CNNodeEnvironmentDefinition
           .simpleTopology(this.getClass.getSimpleName)
+          .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
           .setup(env)
         Seq(splitwellDarPath, directoryDarPath).foreach { path =>
           aliceValidatorBackend.participantClient.upload_dar_unless_exists(path)
@@ -147,25 +149,25 @@ class SplitwellFrontendIntegrationTest
           forExactly(1, rows)(row =>
             matchRow(
               Seq("sender", "description", "receiver"),
-              Seq(bobParty, "sent 111.0000000000 CC to", charlieParty),
+              Seq(bobParty, "sent 111.0 CC to", charlieParty),
             )(row)
           )
           forExactly(1, rows)(row =>
             matchRow(
               Seq("sender", "description", "receiver"),
-              Seq(bobParty, "sent 400.0000000000 CC to", aliceParty),
+              Seq(bobParty, "sent 400.0 CC to", aliceParty),
             )(row)
           )
           forExactly(1, rows)(row =>
             matchRow(
               Seq("sender", "description"),
-              Seq(charlieParty, "paid 333.0000000000 CC for Digestivs"),
+              Seq(charlieParty, "paid 333.0 CC for Digestivs"),
             )(row)
           )
           forExactly(1, rows)(row =>
             matchRow(
               Seq("sender", "description"),
-              Seq(aliceParty, "paid 1200.0000000000 CC for Team lunch"),
+              Seq(aliceParty, "paid 1200.0 CC for Team lunch"),
             )(row)
           )
         }
@@ -234,12 +236,12 @@ class SplitwellFrontendIntegrationTest
             case Seq(row1, row2) =>
               matchRow(
                 Seq("directory-entry", "description"),
-                Seq(aliceCns, "paid 1000.0000000000 CC for Team lunch"),
+                Seq(aliceCns, "paid 1000.0 CC for Team lunch"),
               )(row1)
 
               matchRow(
                 Seq("sender", "description", "receiver"),
-                Seq(bobCns, "sent 500.0000000000 CC to", aliceCns),
+                Seq(bobCns, "sent 500.0 CC to", aliceCns),
               )(row2)
           }
         }

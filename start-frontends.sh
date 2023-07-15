@@ -18,32 +18,6 @@ function tmux_cmd() {
   tmux_window=$((tmux_window+1))
 }
 
-function start_envoy() {
-  jsonnet --tla-str hostname="127.0.0.1" "${REPO_ROOT}/envoy-proxy-dev/envoy.jsonnet" > "${REPO_ROOT}/envoy-proxy-dev/envoy-config.json"
-  if [ -z "$(which envoy)" ]; then
-    echo "envoy executable not found. On MacOS, please install envoy globally using brew" >&2
-    exit 1
-  fi
-  tmux_cmd "envoy" "${REPO_ROOT}/envoy-proxy-dev" "envoy --log-level debug --log-path ${LOG_DIR}/envoy-system.log -c envoy-config.json | tee ${LOG_DIR}/envoy-out.log 2>&1"
-}
-
-function check_envoy_running() {
-  # envoy refuses to come back to the foreground if originally started in the background,
-  # so we can't write out its PID in the same script we start it in
-  ENVOY_PID=$(pgrep envoy)
-  if [[ -z "$ENVOY_PID" ]] || [[ -z "$(ps -p "$ENVOY_PID" -o pid=)" ]]; then
-    return 1
-  fi
-}
-
-function check_envoy_working() {
-  # Call the admin API of envoy to check whether envoy is ready.
-  # This port used by envoy is defined in `envoy-proxy-dev/envoy.jsonnet`.
-  if [[ "$(curl -s localhost:9901/ready)" != "LIVE" ]]; then
-    return 1
-  fi
-}
-
 function start_frontend() {
   local app=$1
   local port=$2
@@ -141,22 +115,10 @@ tmux_window=0
 
 LOG_DIR="${REPO_ROOT}/log"
 
-if check_envoy_running; then
-  echo "envoy is already running, exiting"
-  exit 1
-fi
-
 (cd "$REPO_ROOT" && sbt --batch apps-frontends/compile)
 
 tmux new-session -d -s "${tmux_session}"
 mkdir -p "${LOG_DIR}"
-
-start_envoy
-# envoy's startup is weird, so we check this here...
-while ! check_envoy_working; do
-    echo "Waiting for envoy to start..."
-    sleep 1s;
-done
 
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"

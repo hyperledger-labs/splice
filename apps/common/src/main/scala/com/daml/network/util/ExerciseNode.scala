@@ -52,11 +52,11 @@ object ExerciseNode {
   )(
       exercised: ExercisedEvent
   ): Either[ProtoDeserializationError, ExerciseNode[companion.Arg, companion.Res]] = for {
-    argument <- decodeValue(companion.argDecoder, companion.argToValue)(
+    argument <- decodeValue(companion.argDecoder)(
       "choiceArgument",
       exercised.getChoiceArgument,
     )
-    result <- decodeValue(companion.resDecoder, companion.resToValue)(
+    result <- decodeValue(companion.resDecoder)(
       "exerciseResult",
       exercised.getExerciseResult,
     )
@@ -87,7 +87,7 @@ object ExerciseNode {
   )(implicit lc: ErrorLoggingContext): Option[ExerciseNode[companion.Arg, companion.Res]] =
     Option.when(isChoice(companion)(event))(ExerciseNode.tryFromProtoEvent(companion)(event))
 
-  private def decodeValue[A](valueDecoder: ValueDecoder[A], toValue: A => CodegenValue)(
+  private def decodeValue[A](valueDecoder: ValueDecoder[A])(
       field: String,
       value: CodegenValue,
   ): Either[ProtoDeserializationError, Value[A]] = {
@@ -99,7 +99,7 @@ object ExerciseNode {
             s"Unexpectedly couldn't decode LF-value $value. Did you specify the wrong type to decode to?",
           )
         )
-      case Success(value) => Right(new Value(value, toValue))
+      case Success(value) => Right(new Value(value))
     }
   }
 }

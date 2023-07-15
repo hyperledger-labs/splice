@@ -5,7 +5,7 @@ let
   cometbftDriverSources = builtins.fromJSON (builtins.readFile ./cometbft-driver-sources.json);
 
   # No macOS support for firefox
-  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox iproute2 util-linux ];
+  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -19,7 +19,6 @@ in pkgs.mkShell {
     canton
     circleci-cli
     curl
-    daml_pbs
     docker
     evans
     geckodriver
@@ -46,7 +45,6 @@ in pkgs.mkShell {
     pre-commit
     procps
     protobuf3_19
-    protoc-gen-grpc-web
     ps
     pulumi-bin
     python3
@@ -68,9 +66,8 @@ in pkgs.mkShell {
     zip
   ] ++ linuxOnly;
 
-  DAML_PROTOBUFS = "${pkgs.daml_pbs}";
   CANTON = "${pkgs.canton}";
-  SDK_VERSION = "${pkgs.daml_pbs.sdk_version}";
+  SDK_VERSION = "${sources.daml_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
 }

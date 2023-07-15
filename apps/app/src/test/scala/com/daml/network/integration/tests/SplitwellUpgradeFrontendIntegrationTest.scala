@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.GroupKey
+import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient.GroupKey
 import CNNodeTests.BracketSynchronous.*
 import com.daml.network.util.{
   FrontendLoginUtil,
@@ -90,8 +90,6 @@ class SplitwellUpgradeFrontendIntegrationTest
       }
       val aliceDamlUser = aliceSplitwellClient.config.ledgerApiUser
       val bobDamlUser = bobSplitwellClient.config.ledgerApiUser
-
-      val provider = splitwellBackend.getProviderPartyId()
 
       val abGroupName = "group1"
       val aGroupName = "group2"
@@ -258,7 +256,7 @@ class SplitwellUpgradeFrontendIntegrationTest
                 _ => {
                   currentUrl should startWith(s"http://localhost:3003")
                   val balanceUpdates =
-                    bobSplitwellClient.listBalanceUpdates(GroupKey(alice, provider, abGroupName))
+                    bobSplitwellClient.listBalanceUpdates(GroupKey(abGroupName, alice))
                   balanceUpdates should have size 3
                   assertAllOn(splitwellUpgradeAlias)(balanceUpdates.map(_.contractId): _*)
                 },

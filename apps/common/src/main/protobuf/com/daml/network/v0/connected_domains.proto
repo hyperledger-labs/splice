@@ -1,6 +1,0 @@
-syntax = "proto3";
-package com.daml.network.v0;
-
-message ConnectedDomains {
-  map<string, string> connected_domains = 1;
-}

@@ -472,6 +472,10 @@ lazy val `apps-common-frontend` = {
             (`apps-wallet` / Compile / compile).value,
             (`apps-wallet` / Compile / baseDirectory).value,
           ),
+          (
+            (`apps-splitwell` / Compile / compile).value,
+            (`apps-splitwell` / Compile / baseDirectory).value,
+          ),
         ),
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value / "../..",
@@ -481,7 +485,6 @@ lazy val `apps-common-frontend` = {
       },
       bundle := {
         (Compile / compile).value
-        (`apps-common-frontend-protobuf` / Compile / compile).value
         val log = streams.value.log
         val cacheDir = streams.value.cacheDirectory
         val sourceFiles =
@@ -515,6 +518,11 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runBuildCommand(
               npmRootDir.value,
               "wallet/openapi-ts-client",
+              log,
+            )
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "splitwell/openapi-ts-client",
               log,
             )
             BuildCommon.TS.runBuildCommand(
@@ -614,25 +622,8 @@ lazy val `apps-sv-frontend` = {
     )
 }
 
-lazy val `apps-common-frontend-protobuf` = {
-  project
-    .in(file("apps/common/frontend-protobuf"))
-    .dependsOn(
-      `apps-splitwell` % "compile->protocGenerate"
-    )
-    .settings(
-      Compile / sourceGenerators += Def.task {
-        val log = streams.value.log
-        runCommand(Seq(s"${baseDirectory.value}/gen-ledger-api-proto.sh"), log)
-        Seq()
-      }.taskValue,
-      cleanFiles += baseDirectory.value / "com",
-    )
-}
-
 lazy val `apps-frontends` = {
   project.aggregate(
-    `apps-common-frontend-protobuf`,
     `apps-common-frontend`,
     `apps-wallet-frontend`,
     `apps-directory-frontend`,
@@ -719,7 +710,25 @@ lazy val `apps-splitwell` =
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.TS.openApiSettings(
+        npmName = "splitwell-openapi",
+        openApiSpec = "splitwell.yaml",
+      ),
       BuildCommon.sharedAppSettings,
+      Compile / guardrailTasks :=
+        List(
+          ScalaServer(
+            new File("apps/splitwell/src/main/openapi/splitwell.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+            customExtraction = true,
+          ),
+          ScalaClient(
+            new File("apps/splitwell/src/main/openapi/splitwell.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+        ),
     )
 
 lazy val pulumi =

@@ -4,7 +4,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient
+import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.console.{
@@ -105,10 +105,9 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       },
     )
 
-    val key = GrpcSplitwellAppClient.GroupKey(
-      aliceUserParty,
-      aliceSplitwellClient.getProviderPartyId(),
+    val key = HttpSplitwellAppClient.GroupKey(
       group,
+      aliceUserParty,
     )
 
     clue("grant featured app right to splitwell provider") {
@@ -123,7 +122,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       senderWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
-      key: GrpcSplitwellAppClient.GroupKey,
+      key: HttpSplitwellAppClient.GroupKey,
   ) = {
     senderSplitwell.initiateTransfer(
       key,

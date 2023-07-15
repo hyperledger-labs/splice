@@ -28,8 +28,6 @@
     "@mui/material": "^5.11.9",
     "@tanstack/react-query": "4.29.5",
     "common-frontend": "0.1.0",
-    "common-protobuf": "0.1.0",
-    "google-protobuf": "3.21.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-router-dom": "6.8.1",

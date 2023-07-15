@@ -72,8 +72,6 @@ class TopologyAdminConnection(
     extends AppConnection(
       config,
       loggerFactory,
-      // The version endpoint is only injected into our own apps so we cannot run this against the admin API.
-      enableVersionCompatCheck = false,
     )
     with RetryProvider.Has {
   import TopologyAdminConnection.TopologyResult

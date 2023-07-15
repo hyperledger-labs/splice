@@ -8,13 +8,6 @@ import {
   Loading,
   ErrorDisplay,
 } from 'common-frontend';
-import {
-  GroupKey,
-  ListAcceptedGroupInvitesRequest,
-  ListBalancesRequest,
-  ListBalanceUpdatesRequest,
-  SplitwellContext,
-} from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
 import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
 
@@ -55,12 +48,6 @@ import {
 import { config } from '../utils/config';
 import { SplitwellInstalls } from '../utils/installs';
 
-const key = (group: Contract<CodegenGroup>) =>
-  new GroupKey()
-    .setId(group.payload.id.unpack)
-    .setOwnerPartyId(group.payload.owner)
-    .setProviderPartyId(group.payload.provider);
-
 interface BalancesProps {
   group: Contract<CodegenGroup>;
   party: string;
@@ -87,17 +74,12 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, i
   const [balances, setBalances] = useState<Map<string, string>>(new Map());
   const fetchBalances = useCallback(async () => {
     const balanceMap = (
-      await splitwellClient.listBalances(
-        new ListBalancesRequest()
-          .setGroupKey(key(group))
-          .setContext(new SplitwellContext().setUserPartyId(party)),
-        undefined
-      )
-    ).getBalancesMap();
+      await splitwellClient.listBalances(party, group.payload.id.unpack, group.payload.owner)
+    ).balances;
     let balances = new Map<string, string>();
     [group.payload.owner].concat(group.payload.members).forEach(p => {
       if (p !== party) {
-        const balance = balanceMap.get(p);
+        const balance: string | undefined = balanceMap[p];
         if (balance) {
           balances.set(p, balance);
         } else {
@@ -176,15 +158,9 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   const splitwellClient = useSplitwellClient();
   const [acceptedInvites, setAcceptedInvites] = useState<Contract<AcceptedGroupInvite>[]>([]);
   const fetchAcceptedInvites = useCallback(async () => {
-    const invites = (
-      await splitwellClient.listAcceptedGroupInvites(
-        new ListAcceptedGroupInvitesRequest()
-          .setGroupId(group.payload.id.unpack)
-          .setContext(new SplitwellContext().setUserPartyId(party)),
-        undefined
-      )
-    ).getAcceptedGroupInvitesList();
-    const decoded = invites.map(c => Contract.decode(c, AcceptedGroupInvite));
+    const invites = (await splitwellClient.listAcceptedGroupInvites(party, group.payload.id.unpack))
+      .acceptedGroupInvites;
+    const decoded = invites.map(c => Contract.decodeOpenAPI(c, AcceptedGroupInvite));
     setAcceptedInvites(prev => (sameContracts(decoded, prev) ? prev : decoded));
   }, [group.payload.id.unpack, party, splitwellClient]);
   useInterval(fetchAcceptedInvites);
@@ -311,14 +287,9 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
   const [balanceUpdates, setBalanceUpdates] = useState<Contract<BalanceUpdate>[]>([]);
   const fetchBalanceUpdates = useCallback(async () => {
     const balanceUpdates = (
-      await splitwellClient.listBalanceUpdates(
-        new ListBalanceUpdatesRequest()
-          .setGroupKey(key(group))
-          .setContext(new SplitwellContext().setUserPartyId(party)),
-        undefined
-      )
-    ).getBalanceUpdatesList();
-    const decoded = balanceUpdates.reverse().map(c => Contract.decode(c, BalanceUpdate));
+      await splitwellClient.listBalanceUpdates(party, group.payload.id.unpack, group.payload.owner)
+    ).balanceUpdates;
+    const decoded = balanceUpdates.reverse().map(c => Contract.decodeOpenAPI(c, BalanceUpdate));
     setBalanceUpdates(prev => (sameContracts(decoded, prev) ? prev : decoded));
   }, [splitwellClient, group, party]);
   useInterval(fetchBalanceUpdates);

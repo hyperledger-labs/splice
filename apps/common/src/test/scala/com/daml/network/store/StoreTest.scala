@@ -98,10 +98,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def toCreatedEvent[TCid <: ContractId[T], T](
       contract: Contract[TCid, T]
   ): CreatedEvent = {
-    val contractP = contract.toProtoV0
     new CreatedEvent(
       eventId = "dummyEventId",
-      contractId = contractP.contractId,
+      contractId = contract.contractId.contractId,
       interfaceViews = Map.empty.asJava,
       failedInterfaceViews = Map.empty.asJava,
       templateId = contract.identifier,

@@ -1,0 +1,235 @@
+package com.daml.network.splitwell.admin.api.client.commands
+
+import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import akka.stream.Materializer
+import cats.implicits.*
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
+import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.http.v0.definitions
+import com.daml.network.http.v0.splitwell as http
+import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
+import com.daml.network.util.{Contract, Codec, TemplateJsonDecoder}
+import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
+
+import scala.concurrent.{ExecutionContext, Future}
+
+object HttpSplitwellAppClient {
+
+  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = http.SplitwellClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      http.SplitwellClient.httpClient(
+        HttpClientBuilder().buildClient,
+        host,
+      )
+  }
+
+  case class ListGroups(party: PartyId)
+      extends BaseCommand[http.ListGroupsResponse, Seq[
+        ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]
+      ]] {
+
+    override def submitRequest(client: Client, headers: List[HttpHeader]) =
+      client.listGroups(Codec.encode(party), headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListGroupsResponse.OK(response) =>
+        response.groups
+          .traverse {
+            contractWithStateFromJson(Contract.fromJson(splitwellCodegen.Group.COMPANION))
+          }
+          .leftMap(_.toString)
+    }
+  }
+
+  private[HttpSplitwellAppClient] def contractWithStateFromJson[TCid, T](
+      decodeContract: definitions.Contract => Either[ProtoDeserializationError, Contract[TCid, T]]
+  )(encG: definitions.ContractWithState) = {
+    for {
+      contract <- decodeContract(encG.contract)
+      domainId <- encG.domainId
+        .traverse(DomainId.fromProtoPrimitive(_, "domain_id"))
+    } yield ContractWithState(
+      contract,
+      domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+    )
+  }
+
+  case class ListGroupInvites(party: PartyId)
+      extends BaseCommand[
+        http.ListGroupInvitesResponse,
+        Seq[
+          ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]
+        ],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.listGroupInvites(Codec.encode(party), headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListGroupInvitesResponse.OK(response) =>
+        response.groupInvites
+          .traverse(
+            contractWithStateFromJson(Contract.fromJson(splitwellCodegen.GroupInvite.COMPANION))
+          )
+          .leftMap(_.toString)
+    }
+  }
+
+  case class ListAcceptedGroupInvites(
+      party: PartyId,
+      id: String,
+  ) extends BaseCommand[
+        http.ListAcceptedGroupInvitesResponse,
+        Seq[Contract[
+          splitwellCodegen.AcceptedGroupInvite.ContractId,
+          splitwellCodegen.AcceptedGroupInvite,
+        ]],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.listAcceptedGroupInvites(Codec.encode(party), id, headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListAcceptedGroupInvitesResponse.OK(response) =>
+        response.acceptedGroupInvites
+          .traverse(Contract.fromJson(splitwellCodegen.AcceptedGroupInvite.COMPANION)(_))
+          .leftMap(_.toString)
+    }
+  }
+
+  case class ListBalanceUpdates(
+      party: PartyId,
+      key: GroupKey,
+  ) extends BaseCommand[http.ListBalanceUpdatesResponse, Seq[
+        Contract[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.listBalanceUpdates(Codec.encode(party), key.id, Codec.encode(key.owner), headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListBalanceUpdatesResponse.OK(response) =>
+        response.balanceUpdates
+          .traverse(Contract.fromJson(splitwellCodegen.BalanceUpdate.COMPANION)(_))
+          .leftMap(_.toString)
+    }
+  }
+
+  case class ListBalances(
+      party: PartyId,
+      key: GroupKey,
+  ) extends BaseCommand[http.ListBalancesResponse, Map[PartyId, BigDecimal]] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.listBalances(Codec.encode(party), key.id, Codec.encode(key.owner), headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListBalancesResponse.OK(response) =>
+        response.balances.toList
+          .traverse { case (k, v) =>
+            for {
+              k <- Codec.decode(Codec.Party)(k)
+              v <- Codec.decode(Codec.BigDecimal)(v)
+            } yield k -> v
+          }
+          .map(_.toMap)
+          .leftMap(_.toString)
+    }
+  }
+
+  case class GetProviderPartyId(
+  ) extends BaseCommand[http.GetProviderPartyIdResponse, PartyId] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.getProviderPartyId(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetProviderPartyIdResponse.OK(response) =>
+        Codec.decode(Codec.Party)(response.providerPartyId)
+    }
+  }
+
+  case class SplitwellDomains(
+      preferred: DomainId,
+      others: Seq[DomainId],
+  )
+  case class GetSplitwellDomainIds(
+  ) extends BaseCommand[http.GetSplitwellDomainIdsResponse, SplitwellDomains] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.getSplitwellDomainIds(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetSplitwellDomainIdsResponse.OK(response) =>
+        for {
+          preferred <- Codec.decode(Codec.DomainId)(response.preferred)
+          others <- response.otherDomainIds.traverse(id => Codec.decode(Codec.DomainId)(id))
+        } yield SplitwellDomains(preferred, others)
+    }
+  }
+
+  case class GetConnectedDomains(
+      partyId: PartyId
+  ) extends BaseCommand[http.GetConnectedDomainsResponse, Seq[
+        DomainId
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.getConnectedDomains(Codec.encode(partyId), headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetConnectedDomainsResponse.OK(response) =>
+        response.domainIds.traverse(id => Codec.decode(Codec.DomainId)(id))
+    }
+  }
+
+  case class ListSplitwellInstalls(partyId: PartyId)
+      extends BaseCommand[
+        http.ListSplitwellInstallsResponse,
+        Map[DomainId, splitwellCodegen.SplitwellInstall.ContractId],
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.listSplitwellInstalls(Codec.encode(partyId), headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListSplitwellInstallsResponse.OK(response) =>
+        for {
+          installs <- response.installs.traverse(install =>
+            for {
+              domain <- Codec.decode(Codec.DomainId)(install.domainId)
+              cid <- Codec.decodeJavaContractId(splitwellCodegen.SplitwellInstall.COMPANION)(
+                install.contractId
+              )
+            } yield domain -> cid
+          )
+        } yield installs.toMap
+    }
+  }
+
+  final case class GroupKey(
+      id: String,
+      owner: PartyId,
+  )
+}

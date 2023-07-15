@@ -237,13 +237,13 @@ class Validator1PreflightIntegrationTest
         forExactly(1, rows)(row =>
           matchRow(
             Seq("sender", "description"),
-            Seq(aliceUserPartyId, "paid 100.0000000000 CC for Team lunch"),
+            Seq(aliceUserPartyId, "paid 100.0 CC for Team lunch"),
           )(row)
         )
         forExactly(1, rows)(row =>
           matchRow(
             Seq("sender", "description", "receiver"),
-            Seq(bobUserPartyId, "sent 50.0000000000 CC to", aliceUserPartyId),
+            Seq(bobUserPartyId, "sent 50.0 CC to", aliceUserPartyId),
           )(row)
         )
       }

@@ -1,9 +1,0 @@
-syntax = "proto3";
-package com.daml.network.v0;
-
-import "com/daml/network/v0/contract.proto";
-
-message ContractWithState {
-  com.daml.network.v0.Contract contract = 1; // required
-  string domain_id = 2; // optional; unset if in-flight
-}

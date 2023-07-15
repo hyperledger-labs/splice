@@ -135,17 +135,3 @@ spec:
         host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 6201
-  - match:
-    - port: 5213
-    route:
-    - destination:
-        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
-        port:
-          number: 5213
-  - match:
-    - port: 6213
-    route:
-    - destination:
-        host: external-proxy-full.{{ .Release.Namespace }}.svc.cluster.local
-        port:
-          number: 6213

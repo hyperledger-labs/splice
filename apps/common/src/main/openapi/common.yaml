@@ -109,14 +109,11 @@ components:
       required: ["createdAt", "driverMetadata", "contractKeyHash"]
       properties:
         createdAt:
-          type: string # micros since EPOCH
-          # Javascript has no support for sub milisecond dates (nor do third-party libs) so
-          # we send micros rather than a human readable string that would need to be parsed.
-          # Represented as a string since openapi-generator does not handle `format: int64`
+          type: string # ISO 8601
         contractKeyHash:
           type: string # base-16 encoded.
         driverMetadata:
-          type: string # base-16 encoded.
+          type: string # base-64 encoded.
 
     Contract:
       type: object
@@ -139,6 +136,15 @@ components:
           "metadata",
           "create_arguments_blob",
         ]
+    ContractWithState:
+      type: object
+      properties:
+        contract:
+          $ref: "#/components/schemas/Contract"
+        domain_id:
+          type: string
+      required:
+        [ "contract" ]
     ContractId:
       type: string
     # Represents a contract that is maybe already cached by the client. If the client sends along a contract-id that

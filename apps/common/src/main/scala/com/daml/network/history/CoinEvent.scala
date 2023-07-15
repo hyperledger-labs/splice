@@ -113,7 +113,7 @@ object ImportCrate_ReceiveCoin {
       .unapply(event)
       .flatMap(node =>
         node.result.value.toScala.map(summary =>
-          node.copy(result = new com.daml.network.util.Value(summary, _.toValue(_.toValue)))
+          node.copy(result = new com.daml.network.util.Value(summary))
         )
       )
 }

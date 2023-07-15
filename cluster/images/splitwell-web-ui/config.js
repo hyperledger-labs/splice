@@ -19,7 +19,7 @@ window.canton_network_config = {
       uiUrl: window.location.origin.replace("splitwell", "wallet"),
     },
     splitwell: {
-      // URL of the gRPC-Web envoy proxy, proxying the splitwell gRPC API
+      // URL of the splitwell backend
       url: `https://splitwell.${cluster}`,
     },
     jsonApi: {

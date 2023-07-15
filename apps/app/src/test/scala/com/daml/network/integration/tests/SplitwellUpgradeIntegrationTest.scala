@@ -193,17 +193,15 @@ class SplitwellUpgradeIntegrationTest
       }
 
       val abGroupName = "group1"
-      import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.GroupKey
+      import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient.GroupKey
       val abGroupKey = GroupKey(
-        alice,
-        aliceSplitwellClient.getProviderPartyId(),
         abGroupName,
+        alice,
       )
       val aGroupName = "group2"
       val aGroupKey = GroupKey(
-        alice,
-        aliceSplitwellClient.getProviderPartyId(),
         aGroupName,
+        alice,
       )
 
       val (abGroup, aGroup, bGroup, abBalanceUpdate, aBalanceUpdate, bobPyReq) = clue(

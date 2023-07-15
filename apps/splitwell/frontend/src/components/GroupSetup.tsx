@@ -1,8 +1,4 @@
 import { Contract, ReadyContract, sameReadyContracts, useInterval } from 'common-frontend';
-import {
-  ListGroupInvitesRequest,
-  SplitwellContext,
-} from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
 import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
@@ -56,12 +52,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
   const [groupInvites, setGroupInvites] = useState<ReadyContract<GroupInvite>[]>([]);
 
   const fetchInvites = useCallback(async () => {
-    const groupInvites = (
-      await splitwellClient.listGroupInvites(
-        new ListGroupInvitesRequest().setContext(new SplitwellContext().setUserPartyId(party)),
-        undefined
-      )
-    ).getGroupInvitesList();
+    const groupInvites = (await splitwellClient.listGroupInvites(party)).groupInvites;
     const decoded = groupInvites.flatMap(c => {
       const d = ReadyContract.decodeContractWithState(c, GroupInvite);
       return d === undefined ? [] : [d];

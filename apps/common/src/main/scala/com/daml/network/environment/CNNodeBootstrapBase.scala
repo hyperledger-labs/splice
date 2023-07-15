@@ -4,31 +4,21 @@ import akka.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
 import com.daml.network.CNNodeMetrics
-import com.daml.network.admin.grpc.GrpcVersionService
-import com.daml.network.environment.CNNodeBootstrap.HealthDumpFunction
-import com.daml.network.v0.VersionServiceGrpc
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
-import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.health.admin.grpc.GrpcStatusService
-import com.digitalasset.canton.health.admin.v0.StatusServiceGrpc
 import com.digitalasset.canton.lifecycle.{HasCloseContext, Lifecycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.NodeId
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
-import com.digitalasset.canton.util.ShowUtil.*
 import com.daml.nameof.NameOf.functionFullName
-import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
-import java.lang.management.ManagementFactory
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{blocking, Future}
@@ -182,84 +172,4 @@ abstract class CNNodeBootstrapBase[
       }
     }
   }
-}
-
-abstract class CNNodeBootstrapBaseGrpc[
-    T <: CantonNode,
-    NodeConfig <: LocalNodeConfig,
-    ParameterConfig <: CantonNodeParameters,
-](
-    override val name: InstanceName,
-    config: NodeConfig,
-    parameterConfig: ParameterConfig,
-    override val clock: Clock,
-    nodeMetrics: CNNodeMetrics,
-    storageFactory: StorageFactory,
-    override val loggerFactory: NamedLoggerFactory,
-    writeHealthDumpToFile: HealthDumpFunction,
-    configuredOpenTelemetry: ConfiguredOpenTelemetry,
-)(
-    override implicit val executionContext: ExecutionContextIdlenessExecutorService,
-    override implicit val scheduler: ScheduledExecutorService,
-    override implicit val actorSystem: ActorSystem,
-) extends CNNodeBootstrapBase[T, NodeConfig, ParameterConfig](
-      name,
-      config,
-      parameterConfig,
-      clock,
-      nodeMetrics,
-      storageFactory,
-      loggerFactory,
-      configuredOpenTelemetry,
-    ) {
-  def status: Future[NodeStatus[NodeStatus.Status]] = {
-    getNode
-      .map(_.status.map(NodeStatus.Success(_)))
-      .getOrElse(Future.successful(NodeStatus.NotInitialized(isActive)))
-  }
-
-  // The admin-API services
-  logger.info(s"Starting admin-api services on ${adminApiConfig}")
-  protected val (adminServer, adminServerRegistry) = {
-    val builder = CantonServerBuilder
-      .forConfig(
-        adminApiConfig,
-        nodeMetrics.prefix,
-        nodeMetrics.dropwizardFactory,
-        executionContext,
-        loggerFactory,
-        parameterConfig.loggingConfig.api,
-        parameterConfig.tracing,
-        nodeMetrics.grpcMetrics,
-      )
-
-    val registry = builder.mutableHandlerRegistry()
-    val ourProcessDesc = ManagementFactory.getRuntimeMXBean.getName
-    logger.debug(
-      show"About to start the gRPC server (ourProcessDesc=${ourProcessDesc.singleQuoted})"
-    )
-    val server = builder
-      .addService(
-        StatusServiceGrpc.bindService(
-          new GrpcStatusService(
-            status,
-            writeHealthDumpToFile,
-            parameterConfig.processingTimeouts,
-          ),
-          executionContext,
-        )
-      )
-      .addService(
-        VersionServiceGrpc.bindService(
-          new GrpcVersionService(loggerFactory),
-          executionContext,
-        )
-      )
-      .addService(ProtoReflectionService.newInstance(), false)
-      .build
-      .start()
-    (Lifecycle.toCloseableServer(server, logger, "AdminServer"), registry)
-  }
-
-  override val grpcAdminServers = List(adminServer, adminServerRegistry)
 }

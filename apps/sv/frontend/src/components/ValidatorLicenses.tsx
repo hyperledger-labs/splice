@@ -24,7 +24,15 @@ const ValidatorLicenses: React.FC = () => {
   }
 
   const validatorLicenses = validatorLicensesQuery.data.sort((a, b) => {
-    return parseInt(b.metadata.createdAt) - parseInt(a.metadata.createdAt);
+    const createdAtA = a.metadata.createdAt;
+    const createdAtB = b.metadata.createdAt;
+    if (createdAtA === createdAtB) {
+      return 0;
+    } else if (createdAtA < createdAtB) {
+      return 1;
+    } else {
+      return -1;
+    }
   });
 
   return (

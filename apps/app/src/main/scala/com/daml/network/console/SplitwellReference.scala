@@ -6,17 +6,17 @@ import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.console.LedgerApiExtensions.*
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient
+import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
 import com.daml.network.store.MultiDomainAcsStore.{ContractWithState, ContractState, ReadyContract}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
-  GrpcRemoteInstanceReference,
   Help,
   LedgerApiCommandRunner,
 }
@@ -31,7 +31,7 @@ import scala.jdk.CollectionConverters.*
 abstract class SplitwellAppReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
-) extends CNNodeAppReference {
+) extends HttpCNNodeAppReference {
 
   // We go through BaseLedgerApiAdministration here rather than creating a
   // ledger connection since that one is already setup to be easily used
@@ -50,19 +50,19 @@ abstract class SplitwellAppReference(
   @Help.Summary("Get the primary party of the provider’s daml user specified in the config.")
   def getProviderPartyId(): PartyId =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.GetProviderPartyId())
+      httpCommand(HttpSplitwellAppClient.GetProviderPartyId())
     }
 
   @Help.Summary("Get the domain ids for the private splitwell app domains")
-  def getSplitwellDomainIds(): GrpcSplitwellAppClient.SplitwellDomains =
+  def getSplitwellDomainIds(): HttpSplitwellAppClient.SplitwellDomains =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.GetSplitwellDomainIds())
+      httpCommand(HttpSplitwellAppClient.GetSplitwellDomainIds())
     }
 
   @Help.Summary("Get the domain ids the party is hosted on")
   def getConnectedDomains(partyId: PartyId): Seq[DomainId] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.GetConnectedDomains(partyId))
+      httpCommand(HttpSplitwellAppClient.GetConnectedDomains(partyId))
     }
 }
 
@@ -71,14 +71,14 @@ final class SplitwellAppClientReference(
     name: String,
     val config: SplitwellAppClientConfig, // adding this explicitly for easier overriding
 )(implicit actorSystem: ActorSystem)
-    extends SplitwellAppReference(cnNodeConsoleEnvironment, name)
-    with GrpcRemoteInstanceReference
-    with BaseInspection[ParticipantNode] {
+    extends SplitwellAppReference(cnNodeConsoleEnvironment, name) {
   private val acceptDuration = new RelTime(
     60_000_000
   )
 
   override protected val instanceType = "Splitwell Client"
+
+  override def httpClientConfig = config.adminApi
 
   override lazy val ledgerApi =
     new ExternalLedgerApiClient(
@@ -90,8 +90,7 @@ final class SplitwellAppClientReference(
 
   val userId: String = config.ledgerApiUser
 
-  lazy val context =
-    GrpcSplitwellAppClient.SplitwellContext(getUserPrimaryParty())
+  lazy val userParty = getUserPrimaryParty()
 
   // return the install on the leftmost configured domain (e.g. preferred first)
   private def getFavoredSplitwellInstall()
@@ -133,13 +132,23 @@ final class SplitwellAppClientReference(
 
   private def getGroup(
       groupKey: splitwellCodegen.GroupKey
+  ): (DomainId, splitwellCodegen.Group.ContractId) =
+    getGroup(
+      HttpSplitwellAppClient.GroupKey(
+        groupKey.id.unpack,
+        PartyId.tryFromProtoPrimitive(groupKey.owner),
+      )
+    )
+
+  private def getGroup(
+      groupKey: HttpSplitwellAppClient.GroupKey
   ): (DomainId, splitwellCodegen.Group.ContractId) = {
     val groups = listGroups().collect(Function unlift {
       case ContractWithState(contract, ContractState.Assigned(domain)) =>
         val group = contract.payload
         Option.when(
-          group.provider == groupKey.provider && group.owner == groupKey.owner
-            && group.id == groupKey.id
+          group.owner == groupKey.owner.toProtoPrimitive
+            && group.id.unpack == groupKey.id
         )((domain, contract.contractId))
       case _ => None
     })
@@ -150,15 +159,6 @@ final class SplitwellAppClientReference(
           s"Expected exactly one Group contract for key $groupKey but got $groups"
         )
     }
-  }
-
-  private def groupKey_(owner: PartyId, id: String): splitwellCodegen.GroupKey = {
-    val provider = getProviderPartyId()
-    new splitwellCodegen.GroupKey(
-      owner.toProtoPrimitive,
-      provider.toProtoPrimitive,
-      new splitwellCodegen.GroupId(id),
-    )
   }
 
   def submitWithResult[T](
@@ -244,7 +244,7 @@ final class SplitwellAppClientReference(
       id: String
   ): ReadyContract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite] = {
     val party = getUserPrimaryParty()
-    val (domain, group) = getGroup(groupKey_(party, id))
+    val (domain, group) = getGroup(HttpSplitwellAppClient.GroupKey(id, party))
     val install = getSplitwellInstall(domain)
     ReadyContract(
       ledgerApi.ledger_api_extensions.commands.submitWithCreate(
@@ -312,12 +312,12 @@ final class SplitwellAppClientReference(
     "Enter a payment to the group on your behalf. Payment amount is split equally between current group members."
   )
   def enterPayment(
-      key: GrpcSplitwellAppClient.GroupKey,
+      key: HttpSplitwellAppClient.GroupKey,
       amount: BigDecimal,
       description: String,
   ): splitwellCodegen.BalanceUpdate.ContractId = {
     val party = getUserPrimaryParty()
-    val (domain, group) = getGroup(key.toPrim)
+    val (domain, group) = getGroup(key)
     val install = getSplitwellInstall(domain)
     submitWithResult(
       actAs = Seq(party),
@@ -333,11 +333,11 @@ final class SplitwellAppClientReference(
 
   @Help.Summary("Initiate a transfer. Must be confirmed in the wallet.")
   def initiateTransfer(
-      key: GrpcSplitwellAppClient.GroupKey,
+      key: HttpSplitwellAppClient.GroupKey,
       receiverAmounts: Seq[walletCodegen.ReceiverCCAmount],
   ): walletCodegen.AppPaymentRequest.ContractId = {
     val party = getUserPrimaryParty()
-    val (domain, group) = getGroup(key.toPrim)
+    val (domain, group) = getGroup(key)
     val install = getSplitwellInstall(domain)
     submitWithResult(
       actAs = Seq(party),
@@ -359,7 +359,7 @@ final class SplitwellAppClientReference(
       |"""
   )
   def net(
-      key: GrpcSplitwellAppClient.GroupKey,
+      key: HttpSplitwellAppClient.GroupKey,
       balanceChanges: Map[PartyId, Map[PartyId, BigDecimal]],
   ): splitwellCodegen.BalanceUpdate.ContractId = {
     val party = getUserPrimaryParty()
@@ -371,7 +371,7 @@ final class SplitwellAppClientReference(
           java.math.BigDecimal,
         ]).asJava
       }.asJava
-    val (domain, group) = getGroup(key.toPrim)
+    val (domain, group) = getGroup(key)
     val install = getSplitwellInstall(domain)
     submitWithResult(
       actAs = Seq(party),
@@ -390,7 +390,7 @@ final class SplitwellAppClientReference(
   def listGroups()
       : Seq[ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.ListGroups(context))
+      httpCommand(HttpSplitwellAppClient.ListGroups(userParty))
     }
 
   @Help.Summary("List all group invites that you have not already accepted")
@@ -398,7 +398,7 @@ final class SplitwellAppClientReference(
     ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]
   ] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.ListGroupInvites(context))
+      httpCommand(HttpSplitwellAppClient.ListGroupInvites(userParty))
     }
 
   @Help.Summary("List accepted group invites for the given group that can be used in joinGroup")
@@ -408,28 +408,28 @@ final class SplitwellAppClientReference(
     Contract[splitwellCodegen.AcceptedGroupInvite.ContractId, splitwellCodegen.AcceptedGroupInvite]
   ] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.ListAcceptedGroupInvites(id, context))
+      httpCommand(HttpSplitwellAppClient.ListAcceptedGroupInvites(userParty, id))
     }
 
   @Help.Summary("List balance updates for the given group")
-  def listBalanceUpdates(key: GrpcSplitwellAppClient.GroupKey): Seq[
+  def listBalanceUpdates(key: HttpSplitwellAppClient.GroupKey): Seq[
     Contract[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
   ] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.ListBalanceUpdates(key, context))
+      httpCommand(HttpSplitwellAppClient.ListBalanceUpdates(userParty, key))
     }
 
   @Help.Summary(
     "List balances for the given group. Positive balance means that party owes you, negative balance means you owe that party."
   )
-  def listBalances(key: GrpcSplitwellAppClient.GroupKey): Map[PartyId, BigDecimal] =
+  def listBalances(key: HttpSplitwellAppClient.GroupKey): Map[PartyId, BigDecimal] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.ListBalances(key, context))
+      httpCommand(HttpSplitwellAppClient.ListBalances(userParty, key))
     }
 
   def listSplitwellInstalls(): Map[DomainId, splitwellCodegen.SplitwellInstall.ContractId] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwellAppClient.ListSplitwellInstalls(context))
+      httpCommand(HttpSplitwellAppClient.ListSplitwellInstalls(userParty))
     }
 
   override val scanClientConfig = config.scanClient
@@ -444,6 +444,10 @@ final class SplitwellAppBackendReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Splitwell Backend"
+
+  override def httpClientConfig = NetworkAppClientConfig(
+    s"http://127.0.0.1:${config.clientAdminApi.port}"
+  )
 
   override protected val nodes = consoleEnvironment.environment.splitwells
 

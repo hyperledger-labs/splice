@@ -1,5 +1,4 @@
 import { callWithLogging, Contract, useUserState } from 'common-frontend';
-import { ContractMetadata } from 'directory-openapi';
 import React, { useContext } from 'react';
 
 import Ledger, { CommandMeta, CreateEvent, DisclosedContract, LedgerOptions } from '@daml/ledger';
@@ -125,7 +124,13 @@ export class LedgerApiClient {
     return {
       contractId: ev.contractId,
       payload: ev.payload,
-      metadata: new ContractMetadata(),
+      // For now, we set dummy values here because the JSON API does not
+      // yet expose this properly.
+      metadata: {
+        createdAt: '',
+        keyHash: '',
+        driverMetadata: '',
+      },
     };
   }
 }

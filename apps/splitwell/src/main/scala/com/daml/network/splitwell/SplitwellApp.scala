@@ -1,24 +1,36 @@
 package com.daml.network.splitwell
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Directives.*
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNNode, ParticipantAdminConnection}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  CNNode,
+  CNNodeStatus,
+  ParticipantAdminConnection,
+}
+import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.splitwell.SplitwellResource
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.splitwell.admin.api.client.commands.GrpcSplitwellAppClient.SplitwellDomains
-import com.daml.network.splitwell.admin.grpc.GrpcSplitwellService
+import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient.SplitwellDomains
+import com.daml.network.splitwell.admin.http.HttpSplitwellHandler
 import com.daml.network.splitwell.automation.SplitwellAutomationService
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.splitwell.store.SplitwellStore
-import com.daml.network.splitwell.v0.SplitwellServiceGrpc
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -39,7 +51,6 @@ class SplitwellApp(
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
-    adminServerRegistry: CantonMutableHandlerRegistry,
     futureSupervisor: FutureSupervisor,
 )(implicit
     ac: ActorSystem,
@@ -93,29 +104,50 @@ class SplitwellApp(
       .map(_.alias)
       .toList
       .traverse(store.domains.waitForDomainConnection(_))
-  } yield {
-    val splitwellDomains = SplitwellDomains(preferred, others)
-    adminServerRegistry
-      .addService(
-        SplitwellServiceGrpc.bindService(
-          new GrpcSplitwellService(
-            participantAdminConnection,
-            splitwellDomains,
-            party,
-            store,
-            loggerFactory,
-          ),
-          ec,
-        )
+    handler = new HttpSplitwellHandler(
+      participantAdminConnection,
+      SplitwellDomains(preferred, others),
+      party,
+      store,
+      loggerFactory,
+    )
+    adminHandler = new HttpAdminHandler(
+      status
+        .map(CNNodeStatus.fromNodeStatus)
+        .map(NodeStatus.Success(_)),
+      loggerFactory,
+    )
+    routes = cors() {
+      newTraceContext { traceContext =>
+        requestLogger(traceContext) {
+          HttpErrorHandler(loggerFactory)(traceContext) {
+            concat(
+              SplitwellResource.routes(handler, _ => provide(())),
+              CommonAdminResource.routes(adminHandler, _ => provide(())),
+            )
+          }
+        }
+      }
+    }
+    _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
+    binding <- Http()
+      .newServerAt(
+        config.adminApi.clientConfig.address,
+        config.adminApi.clientConfig.port.unwrap,
       )
-      .discard
+      .bind(
+        routes
+      )
+  } yield {
     SplitwellApp.State(
       automation,
       storage,
       store,
       scanConnection,
+      binding,
       participantAdminConnection,
       loggerFactory.getTracedLogger(SplitwellApp.State.getClass),
+      timeouts,
     )
   }
 
@@ -128,14 +160,22 @@ object SplitwellApp {
       storage: Storage,
       store: SplitwellStore,
       scanConnection: ScanConnection,
+      binding: Http.ServerBinding,
       participantAdminConnection: ParticipantAdminConnection,
       logger: TracedLogger,
-  ) extends AutoCloseable
+      timeouts: ProcessingTimeout,
+  )(implicit el: ErrorLoggingContext)
+      extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(
+        AsyncCloseable(
+          "http binding",
+          binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
+          timeouts.shutdownNetwork.unwrap,
+        ),
         automation,
         storage,
         store,

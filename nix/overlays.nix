@@ -4,7 +4,6 @@
   lnav = super.callPackage ./lnav.nix {};
   canton = super.callPackage ./canton.nix {};
   cometbft_driver = super.callPackage ./cometbft-driver.nix {};
-  daml_pbs = super.callPackage ./daml_pbs.nix {};
   haskellPackages = super.haskellPackages.override {
     overrides = hsSelf: hsSuper: {
       data-diverse = super.haskell.lib.unmarkBroken (super.haskell.lib.dontCheck hsSuper.data-diverse);

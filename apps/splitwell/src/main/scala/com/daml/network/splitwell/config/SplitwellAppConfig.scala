@@ -4,8 +4,9 @@ import com.daml.network.config.{
   AutomationConfig,
   CNNodeBackendConfig,
   CNParticipantClientConfig,
-  GrpcCNNodeClientConfig,
   DomainConfig,
+  HttpCNNodeClientConfig,
+  NetworkAppClientConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
@@ -43,11 +44,11 @@ case class SplitwellAppBackendConfig(
 
 case class SplitwellAppClientConfig(
     // Admin API for reads.
-    adminApi: ClientConfig,
+    adminApi: NetworkAppClientConfig,
     // Ledger API for writes.
     participantClient: CNParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     ledgerApiUser: String,
-) extends GrpcCNNodeClientConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+) extends HttpCNNodeClientConfig {
+  override def clientAdminApi: NetworkAppClientConfig = adminApi
 }

@@ -5,14 +5,12 @@ package com.daml.network.util
 
 import cats.syntax.either.*
 import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue}
-import com.daml.ledger.api.v1.contract_metadata.ContractMetadata.toJavaProto
 import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Value}
 import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,
   ContractId,
   DamlRecord,
   InterfaceCompanion,
-  ValueDecoder,
   Contract as CodegenContract,
 }
 import com.daml.lf.value as lf
@@ -20,13 +18,11 @@ import com.daml.lf.data.Ref.Identifier as LfIdentifier
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.http.v0.definitions.MaybeCachedContract
-import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
-import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf
 import io.circe.{Json, parser as circe}
@@ -53,16 +49,6 @@ final case class Contract[TCid, T](
     createArgumentsBlob: protobuf.Any,
 ) extends PrettyPrinting
     with Contract.Has[TCid, T] {
-
-  def toProtoV0: v0.Contract = v0.Contract(
-    templateId = Some(scalaValue.Identifier.fromJavaProto(identifier.toProto)),
-    contractId = contractId.contractId,
-    payload = Some(scalaValue.Record.fromJavaProto(payload.toValue.toProtoRecord)),
-    metadata = Some(
-      com.daml.ledger.api.v1.contract_metadata.ContractMetadata.fromJavaProto(metadata.toProto)
-    ),
-    createArgumentsBlob = Some(com.google.protobuf.any.Any.fromJavaProto(createArgumentsBlob)),
-  )
 
   def toJson(implicit elc: ErrorLoggingContext): http.Contract = {
     http.Contract(
@@ -128,49 +114,6 @@ object Contract {
     NoLoggingValueValidator
       .validateValue(scalaValue.Value.fromJavaProto(v.toProto))
       .valueOr(err => ErrorUtil.internalError(err))
-
-  def fromProto[TCid <: ContractId[T], T <: DamlRecord[?]](
-      companion: Companion.Template[TCid, T]
-  )(contract: v0.Contract): Either[ProtoDeserializationError, Contract[TCid, T]] = {
-    val decoder: ValueDecoder[T] = ContractCompanion.valueDecoder[T](companion)
-    for {
-      templateId <- ProtoConverter.required("templateId", contract.templateId)
-      javaTemplateId = Identifier.fromProto(scalaValue.Identifier.toJavaProto(templateId))
-      _ <- Either.cond(
-        javaTemplateId == companion.TEMPLATE_ID,
-        (),
-        ProtoDeserializationError.ValueConversionError(
-          "templateId",
-          s"Actual template id $javaTemplateId does not match expected template id ${companion.TEMPLATE_ID}",
-        ),
-      )
-      contractId = companion.toContractId(new ContractId[T](contract.contractId))
-      payloadP <- ProtoConverter.required("payload", contract.payload)
-      payload <- Try(
-        decoder.decode(
-          Value.fromProto(scalaValue.Value.toJavaProto(scalaValue.Value().withRecord(payloadP)))
-        )
-      ).toEither.left.map(ex =>
-        ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
-      )
-      metadata <- ProtoConverter.required(
-        "ContractMetadata",
-        contract.metadata.map(m => ContractMetadata.fromProto(toJavaProto(m))),
-      )
-      createArgumentsBlob <- ProtoConverter
-        .required(
-          "createArgumentsBlob",
-          contract.createArgumentsBlob,
-        )
-        .map(com.google.protobuf.any.Any.toJavaProto)
-    } yield Contract[TCid, T](
-      identifier = javaTemplateId,
-      contractId = contractId,
-      payload = payload,
-      metadata = metadata,
-      createArgumentsBlob = createArgumentsBlob,
-    )
-  }
 
   def fromJson[TCid <: ContractId[T], T <: DamlRecord[?]](
       companion: Companion.Template[TCid, T]

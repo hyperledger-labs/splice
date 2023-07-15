@@ -2,7 +2,7 @@ package com.daml.network.environment
 
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import akka.stream.Materializer
-import com.daml.network.admin.api.client.{GrpcVersionClient, HttpAdminAppClient}
+import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.util.TemplateJsonDecoder
@@ -27,8 +27,6 @@ abstract class BaseAppConnection(
     override val loggerFactory: NamedLoggerFactory
 ) extends FlagCloseableAsync
     with NamedLogging {
-
-  protected def checkVersionCompatibility(): Future[Unit];
 
   def serviceName: String
 
@@ -67,12 +65,11 @@ object BaseAppConnection {
       extends Throwable(s"Unexpected Http Response: $response")
 }
 
-/** Base class for connecting and calling the gRPC/Admin API exposed by a CN App.
+/** Base class for connecting and calling Canton gRPC APIs.
   */
 abstract class AppConnection(
     config: ClientConfig,
     override val loggerFactory: NamedLoggerFactory,
-    enableVersionCompatCheck: Boolean = true,
 )(implicit ec: ExecutionContextExecutor)
     extends BaseAppConnection(loggerFactory)
     with FlagCloseableAsync
@@ -82,36 +79,6 @@ abstract class AppConnection(
     logger,
     s"$serviceName connection",
   )
-  if (enableVersionCompatCheck) {
-    runVersionCompatCheck()
-  }
-
-  private def runVersionCompatCheck() = {
-    val _ = for {
-      _ <- checkVersionCompatibility()
-    } yield {}
-  }
-
-  override def checkVersionCompatibility() = {
-    for {
-      versionInfo <- getAppVersionInfo()(TraceContext.empty)
-    } yield {
-      logger.debug(s"Found app version: ${versionInfo}")(TraceContext.empty)
-      val myVersion = BuildInfo.compiledVersion
-      if (versionInfo.version != myVersion) {
-        val myCommitTs = Instant.ofEpochSecond(BuildInfo.commitUnixTimestamp.toLong)
-        logger.error(
-          s"Version mismatch detected, please download the latest bundle. Your executable is from $myCommitTs, while the cloud applications you are connecting to are from ${versionInfo.commitTs}"
-        )(TraceContext.empty)
-      } else {
-        logger.debug(
-          s"Version verification passed for $serviceName, server is on the same version as mine: ${versionInfo}"
-        )(
-          TraceContext.empty
-        )
-      }
-    }
-  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
     SyncCloseable("channel", channel.close())
@@ -140,10 +107,6 @@ abstract class AppConnection(
     } yield result
   }
 
-  protected def getAppVersionInfo()(implicit
-      traceContext: TraceContext
-  ): Future[GrpcVersionClient.VersionInfo] =
-    runCmd(GrpcVersionClient.GetVersion())
 }
 
 /** Base class for connecting and calling the HTTP/Admin API exposed by a CN App.
@@ -190,7 +153,7 @@ abstract class HttpAppConnection(
       logger,
     )
 
-  override def checkVersionCompatibility(): Future[Unit] = {
+  def checkVersionCompatibility(): Future[Unit] = {
     for {
       versionInfo <- getHttpAppVersionInfo(config.url)
     } yield {

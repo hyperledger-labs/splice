@@ -21,7 +21,6 @@ images := \
 	docs \
 	external-proxy-full \
 	gcs-proxy \
-	envoy-proxy \
 	cometbft
 
 canton-image := cluster/images/canton

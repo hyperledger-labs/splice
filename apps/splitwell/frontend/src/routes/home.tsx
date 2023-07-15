@@ -1,11 +1,5 @@
 import { usePrimaryParty } from 'common-frontend';
 import { useGetSvcPartyId } from 'common-frontend/scan-api';
-import {
-  GetConnectedDomainsRequest,
-  ListSplitwellInstallsRequest,
-  SplitwellContext,
-} from 'common-protobuf/com/daml/network/splitwell/v0/splitwell_service_pb';
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useState, useEffect } from 'react';
 
 import { Container, Stack, Typography } from '@mui/material';
@@ -48,8 +42,8 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     const fetchProvider = async () => {
-      const provider = await splitwellClient.getProviderPartyId(new Empty(), undefined);
-      setProvider(provider.getPartyId());
+      const provider = await splitwellClient.getProviderPartyId();
+      setProvider(provider.providerPartyId);
     };
     fetchProvider();
   }, [splitwellClient]);
@@ -57,10 +51,10 @@ const Home: React.FC = () => {
   useEffect(() => {
     const querySplitwellDomain = async () => {
       console.debug('Querying backend for splitwell domain');
-      const domainsResponse = await splitwellClient.getSplitwellDomainIds(new Empty(), undefined);
+      const domainsResponse = await splitwellClient.getSplitwellDomainIds();
       const domains: SplitwellDomains = {
-        preferred: domainsResponse.getPreferredDomainId(),
-        others: domainsResponse.getOtherDomainIdsList(),
+        preferred: domainsResponse.preferred,
+        others: domainsResponse.otherDomainIds,
       };
       console.debug(`Splitwell domains from provider: ${JSON.stringify(domains)}`);
       setSplitwellDomainIds(domains);
@@ -72,10 +66,8 @@ const Home: React.FC = () => {
   useEffect(() => {
     const queryConnectedDomains = async (partyId: string) => {
       console.debug('Querying for connected domains');
-      const response = await splitwellClient.getConnectedDomains(
-        new GetConnectedDomainsRequest().setPartyId(partyId)
-      );
-      const domainIds = response.getDomainIdsList();
+      const response = await splitwellClient.getConnectedDomains(partyId);
+      const domainIds = response.domainIds;
       setConnectedDomainIds(domainIds);
       console.debug(`Connected domains: ${domainIds}`);
     };
@@ -89,14 +81,10 @@ const Home: React.FC = () => {
       user: string,
       domainId: string
     ): Promise<ContractId<SplitwellInstall> | undefined> => {
-      const installs = await splitwellClient.listSplitwellInstalls(
-        new ListSplitwellInstallsRequest().setContext(new SplitwellContext().setUserPartyId(user))
-      );
-      const install = installs
-        .getInstallsList()
-        .find(install => install.getDomainId() === domainId);
+      const response = await splitwellClient.listSplitwellInstalls(user);
+      const install = response.installs.find(install => install.domainId === domainId);
       if (install) {
-        return install.getContractId() as ContractId<SplitwellInstall>;
+        return install.contractId as ContractId<SplitwellInstall>;
       }
       return install;
     };

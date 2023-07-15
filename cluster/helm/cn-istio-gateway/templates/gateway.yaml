@@ -178,23 +178,6 @@ spec:
     hosts:
     - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
-  - port:
-      number: 5213
-      name: grpc-sw-api
-      protocol: GRPC
-    hosts:
-    - "{{ (.Values.cluster).hostname }}"
-    - "*.{{ (.Values.cluster).hostname }}"
-  - port:
-      number: 6213
-      name: sw-api-gw
-      protocol: HTTPS
-    tls:
-      mode: SIMPLE
-      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
-    hosts:
-    - "{{ (.Values.cluster).hostname }}"
-    - "*.{{ (.Values.cluster).hostname }}"
   {{- range $index, $value := .Values.cometbftPorts }}
   - port:
       number: {{ $value }}

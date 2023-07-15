@@ -176,9 +176,8 @@ The `LoadBalancer` is backed by a `Pod` running Nginx and named
 `external-proxy`. Each exposed service has an nginx conf file that
 redirects a specific port to a given Kubernetes `Service`. The
 `Service`s are then backed by `Pod`s that serve the actual API
-request. In instances where a gRPC API needs to be made available to a
-web client, we also run an `envoy-proxy` sidecar within the `Pod` that
-proxies from Web gRPC to gRPC.
+request. To make the ledger API available to web frontends, we
+enable the JSON API support in our Canton participants.
 
 ## Cluster Tooling
 
@@ -508,7 +507,6 @@ query can be useful to cull out noise from an overly verbose log stream.
 
 
 ```
--resource.labels.container_name="envoy-proxy"
 -resource.labels.container_name="gke-metrics-agent"
 -resource.labels.container_name="splitwell-wallet-web-ui"
 -resource.labels.container_name="docs"

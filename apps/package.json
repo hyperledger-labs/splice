@@ -1,13 +1,13 @@
 {
   "workspaces": [
     "common/frontend-typeface-termina",
-    "common/frontend-protobuf",
     "common/frontend",
     "directory/frontend",
     "directory/openapi-ts-client",
     "scan/frontend",
     "scan/openapi-ts-client",
     "splitwell/frontend",
+    "splitwell/openapi-ts-client",
     "sv/frontend",
     "sv/openapi-ts-client",
     "validator/openapi-ts-client",

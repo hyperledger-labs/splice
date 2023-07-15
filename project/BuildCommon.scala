@@ -80,20 +80,12 @@ object BuildCommon {
   lazy val sharedAppSettings: Seq[Def.Setting[_]] =
     sharedSettings ++ cantonWarts ++ protobufLintSettings ++ unusedImportsSetting ++
       Seq(
-        pbTsDirectory := baseDirectory.value / "../common/frontend-protobuf",
         Compile / PB.deleteTargetDirectory := false,
         // ^^ do not let protocGenerate delete the entire target directory, otherwise the different apps
         // are deleting each other's outputs. The downside is that for a file name change, or removing a file -
         // we will need to manually clean it first.
         Compile / PB.targets := Seq(
-          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf",
-          (
-            grpcWebGen,
-            Seq("mode=grpcwebtext", "import_style=commonjs+dts"),
-          ) -> pbTsDirectory.value,
-        ),
-        Compile / PB.protocOptions ++= Seq(
-          s"--js_out=import_style=commonjs:${pbTsDirectory.value}"
+          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
         ),
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
         scalacOptions ++= Seq(

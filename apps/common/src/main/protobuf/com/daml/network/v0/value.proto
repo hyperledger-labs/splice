@@ -1,8 +1,0 @@
-syntax = "proto3";
-package com.daml.network.v0;
-
-import "com/daml/ledger/api/v1/value.proto";
-
-message Value {
-  com.daml.ledger.api.v1.Value value = 2;
-}
