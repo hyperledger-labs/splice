@@ -36,9 +36,9 @@ final class NonSvNonDevNetPreflightIntegrationTestBase
           directoryClient,
           validator1Client,
           splitwellValidatorClient,
+          splitwellClient,
         )
       )(_.httpReady shouldBe true)
-      splitwellClient.health.status.isActive shouldBe Some(true)
     }
   }
 
