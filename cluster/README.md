@@ -227,8 +227,6 @@ infrastructure script.
      - See also the section on [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
 1. The Pulumi and Helm charts may now be edited and `cncluster apply`
    once again used to apply only the changes to the cluster.
-   - Set `export PULUMI_RETRY=1` to deal with the false-negatives on
-     [Pulumi deployment failures](https://github.com/DACH-NY/canton-network-node/issues/5881)
 1. Release the cluster lock `cncluster unlock`, which also resets the cluster.
 
 
