@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { DirectoryClientProvider, AuthProvider, UserProvider, theme } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
-import { RpcError, StatusCode } from 'grpc-web';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {
@@ -29,16 +28,12 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         refetchInterval: 500, // re-fetch all queries every 500ms by default
       },
       mutations: {
-        retry: (failureCount, error) => {
-          const rpcError = error as RpcError;
-          // We only retry certain grpc errors. Retrying everything is more confusing than helpful
-          // because tha then also retries on invalid user input.
-          return (
-            [StatusCode.FAILED_PRECONDITION, StatusCode.ABORTED, StatusCode.NOT_FOUND].includes(
-              rpcError.code
-            ) && failureCount < 10
-          );
-        },
+        retry: (failureCount, error) =>
+          // We only retry certain JSON API errors. Retrying everything is more confusing than helpful
+          // because that then also retries on invalid user input.
+          // The status field is defined as part of LedgerError in @daml/ledger which is thrown on JSON API errors.
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          [404, 409].includes((error as any).status) && failureCount < 10,
         retryDelay: 500,
       },
     },
