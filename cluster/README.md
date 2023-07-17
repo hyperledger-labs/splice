@@ -1024,10 +1024,10 @@ $REPO_ROOT/scripts/approve-sv.sh $SV_NAME $SV_PUBLIC_KEY
 
 Approval via the configs of our SV apps requires a restart of those SVs,
 but the approval is persisted across cluster redeploys.
-To approve a new SV identity on all SVs, it is sufficient to add the new identity to `approved-sv-identities` in `cluster/images/sv-app/app.conf`:
+To approve a new SV identity on all SVs, it is sufficient to add the new identity to the relevant `..ApprovedSvIdentities` lists in `cluster/pulumi/canton-network/src/installCluster.ts`:
 
 ```
-approved-sv-identities = [
+const devNetApprovedSvIdentities = [ // or other list
   ...
   { name = "SV name", public-key = "SV key" },
   ...
