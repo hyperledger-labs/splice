@@ -685,8 +685,6 @@ function _cluster_reset() {
     _info "Uninstalling Pulumi canton-network-gateway stack"
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
-    # TODO(#6473): Remove this line when we have the change from #6439 deployed to all clusters.
-    _pulumi --stack "canton-network-gateway.${GCP_CLUSTER_BASENAME}" down --skip-preview
 
     _info "Uninstalling Pulumi canton-network stack"
     _uses_pulumi_stack canton-network
