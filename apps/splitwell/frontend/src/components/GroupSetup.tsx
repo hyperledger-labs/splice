@@ -8,6 +8,7 @@ import { ContractId } from '@daml/types';
 
 import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
 import { useSplitwellClient } from '../contexts/SplitwellServiceContext';
+import { useRequestGroup } from '../hooks/mutations/useRequestGroup';
 import { SplitwellInstalls } from '../utils/installs';
 
 interface GroupSetupProps {
@@ -45,8 +46,9 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     failure: 'empty invite text field',
     originalText: '',
   });
+  const requestGroup = useRequestGroup(party, provider, svc, domainId, newGroupInstall);
   const onCreateGroup = async () => {
-    await ledgerApiClient.requestGroup(party, provider, svc, groupId, domainId, newGroupInstall);
+    await requestGroup.mutate(groupId);
   };
 
   const [groupInvites, setGroupInvites] = useState<ReadyContract<GroupInvite>[]>([]);

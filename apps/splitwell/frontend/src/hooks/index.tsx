@@ -2,6 +2,14 @@ import { useAddMember } from './mutations/useAddMember';
 import { useCreateInvite } from './mutations/useCreateInvite';
 import { useEnterPayment } from './mutations/useEnterPayment';
 import { useInitiateTransfer } from './mutations/useInitiateTransfer';
+import { useRequestGroup } from './mutations/useRequestGroup';
 import { useGroups } from './queries/useGroups';
 
-export { useCreateInvite, useInitiateTransfer, useEnterPayment, useGroups, useAddMember };
+export {
+  useCreateInvite,
+  useInitiateTransfer,
+  useEnterPayment,
+  useGroups,
+  useAddMember,
+  useRequestGroup,
+};
