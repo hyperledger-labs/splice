@@ -875,14 +875,20 @@ commands:
            while [ ${count} -lt 10 ]; do
 
              if cluster_version=$(curl -L http://${GCP_CLUSTER_BASENAME}.network.canton.global/version --connect-timeout 2); then
-               echo "Cluster version: ${cluster_version}"
-               success=0
-               break
+               if [[ -n $cluster_version ]]; then
+                 echo "Cluster version: ${cluster_version}"
+                 success=0
+                 break
+               else
+                 echo "Empty cluster version retrieved. Retry count $count"
+               fi
              else
                echo "Failed to retrieve cluster version. Retry count $count"
-               (( count++ ))
-               sleep 3
              fi
+
+             (( count++ ))
+             sleep 3
+
            done
 
            if [ ${success} -ne 0 ]; then
