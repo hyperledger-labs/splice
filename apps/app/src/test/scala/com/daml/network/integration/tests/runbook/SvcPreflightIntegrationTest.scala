@@ -33,7 +33,7 @@ class SvcPreflightIntegrationTest
       // hardcoded to save on four environment variables; we don't expect this to change often
       val svUsername = s"admin@sv$i-dev.com";
       // our current practice is to use the same password for all SVs
-      val svPassword = sys.env(s"SV_WEB_UI_PASSWORD")
+      val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
       val sv = env.svs.remote.find(sv => sv.name == s"sv$i").value
       val svInfo = sv.getSvcInfo()
 

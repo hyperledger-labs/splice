@@ -834,7 +834,7 @@ Be aware: these tokens allow the requester to perform any administrative action 
 #### Configure SV Web UI Password
 
 For testing that we can interact with the web UIs of our own SVs (sv1-4), the preflight check needs to know about the passwords for logging in to those UIs.
-At the moment all 4 SVs share the same password, which needs to be configured via the `SV_WEB_UI_PASSWORD` environment variable.
+At the moment all 4 SVs share the same password, which needs to be configured via the `SV_DEV_NET_WEB_UI_PASSWORD` environment variable.
 See [here](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#heading=h.h81kh9iplwtp) for the currently used password.
 
 #### Setting up `lnav` to Inspect Canton and CometBFT logs
