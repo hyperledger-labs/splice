@@ -18,7 +18,6 @@
     "@daml.js/wallet": "file:daml.js/wallet-0.1.0",
     "@daml.js/wallet-payments": "file:daml.js/wallet-payments-0.1.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
-    "@daml/ledger-api": "file:../../../nix/vendored/daml-ledger-api-0.0.0.tgz",
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
     "@js-temporal/polyfill": "^0.4.4",
     "@tanstack/react-query": "4.29.5",

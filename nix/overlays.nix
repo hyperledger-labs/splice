@@ -4,14 +4,7 @@
   lnav = super.callPackage ./lnav.nix {};
   canton = super.callPackage ./canton.nix {};
   cometbft_driver = super.callPackage ./cometbft-driver.nix {};
-  haskellPackages = super.haskellPackages.override {
-    overrides = hsSelf: hsSuper: {
-      data-diverse = super.haskell.lib.unmarkBroken (super.haskell.lib.dontCheck hsSuper.data-diverse);
-      daml2ts = super.haskell.lib.justStaticExecutables (hsSuper.callPackage ./daml2ts.nix {});
-      proto3-wire = super.haskell.lib.dontCheck hsSuper.proto3-wire;
-      proto3-suite = super.haskell.lib.dontCheck (super.haskell.lib.disableCabalFlag hsSuper.proto3-suite "swagger");
-    };
-  };
+  daml2js = super.callPackage ./daml2js.nix {};
   python3 = super.python3.override {
     packageOverrides = pySelf : pySuper : {
         sphinx-reredirects = pySelf.callPackage ./sphinx-reredirects.nix { };

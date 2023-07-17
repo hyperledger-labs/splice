@@ -1149,7 +1149,7 @@ object BuildCommon {
     val cache =
       FileFunction.cached(cacheDir) { _ =>
         damlTsCodegenDir.value.delete()
-        BuildUtil.runCommand("daml2ts" +: args, log)
+        BuildUtil.runCommand("daml2js" +: args, log)
         (baseDirectory.value / "daml.js" ** "*").get.toSet
       }
     cache(dars.toSet).toSeq

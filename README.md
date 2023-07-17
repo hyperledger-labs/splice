@@ -521,7 +521,6 @@ Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
    - Find the related change in the **closed source Canton repo** and use the change and its commit message to adjust our code.
    - We have some files that we added ourselves to the `canton/` directory, and the above steps happen to delete these.
      See the previous PR for a recent list, and add them back using `git restore -s main <path-to-file>`.
-   - If you encounter issues with daml2ts, you might need to [rebase our TS fork](nix/vendored/README.md).
    - In case you run into issues with missing classes, or you find that some code is using a different class to the one defined in the Canton OSS repo,
      then:
      - If the file defining the class exists in the OSS repo but not in our fork, copy it over manually. You should also fix `copy-canton.sh` to ensure it gets

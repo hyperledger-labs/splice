@@ -19,7 +19,6 @@
     "@daml.js/splitwell": "file:../../common/frontend/daml.js/splitwell-0.1.0",
     "@daml.js/wallet-payments": "file:../../common/frontend/daml.js/wallet-payments-0.1.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
-    "@daml/ledger-api": "file:../../../nix/vendored/daml-ledger-api-0.0.0.tgz",
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
     "@emotion/react": "^11.10.5",
     "@emotion/styled": "^11.10.5",
