@@ -138,19 +138,26 @@ max_retries=5
 counter=1
 while [[ $counter -le max_retries ]] ; do
   echo "Attempt $counter"
-  run
-  rc=$?
-  if [[ $rc -ne 0 ]]; then
-    echo "Failed with error code $rc. Retrying in 5 seconds..."
+
+  # We can't just use something like `if run; then ... ; else ... ; fi`
+  # because set -e gets disabled in the context of an if statement for Posix shells
+  # and there is no way to enable it once again.
+  #
+  # Therefore, this trick of executing the command in the background and then waiting for it immediately
+  # is required to obtain the correct exit code in the caller i.e. the exit code of the statement that failed
+  # and not that of the last statement in the function definition. (https://unix.stackexchange.com/a/254676)
+  run &
+  if wait $!; then
+    break
+  else
+    echo "Failed with error code $?. Retrying in 5 seconds..."
     echo
     sleep 5
     ((counter++))
-  else
-    break
   fi
 done
 
-if [[ $counter -eq $max_retries ]]; then
+if [[ $counter -gt $max_retries ]]; then
   echo "Failed after $max_retries attempts."
   exit 1
 fi
