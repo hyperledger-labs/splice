@@ -174,6 +174,13 @@ class SvApp(
       cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
         new CometBftNode(client, config, loggerFactory)
       )
+      trafficBalanceService = TrafficBalanceService(
+        _ => Future.successful(Some(config.domains.global.trafficReservedForTopups)),
+        participantAdminConnection,
+        clock,
+        config.domains.global.trafficBalanceCacheTimeToLive,
+      )
+      _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
       // Ensure SVC party, SvcRules, CoinRules, Mediator, and Sequencer nodes are setup
       // -------------------------------------------------------------------------------

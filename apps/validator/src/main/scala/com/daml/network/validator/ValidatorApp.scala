@@ -28,6 +28,7 @@ import com.daml.network.environment.{
   CNNode,
   CNNodeStatus,
   ParticipantAdminConnection,
+  TrafficBalanceService,
 }
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.validator.ValidatorResource
@@ -39,7 +40,7 @@ import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.util.{HasHealth, UploadablePackage}
+import com.daml.network.util.{CoinConfigSchedule, HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.{
   HttpValidatorAdminHandler,
   HttpValidatorHandler,
@@ -366,6 +367,22 @@ class ValidatorApp(
         retryProvider,
         loggerFactory,
       )
+      trafficBalanceService = TrafficBalanceService(
+        domainId =>
+          for {
+            coinRules <- scanConnection.getCoinRules()
+            coinConfig = CoinConfigSchedule(coinRules).getConfigAsOf(clock.now)
+            reservedTraffic = Option.when(
+              coinConfig.globalDomain.requiredDomains.map.containsKey(domainId.toProtoPrimitive)
+            )(
+              config.domains.global.trafficReservedForTopups
+            )
+          } yield reservedTraffic,
+        participantAdminConnection,
+        clock,
+        config.domains.global.trafficBalanceCacheTimeToLive,
+      )
+      _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
       svcParty <- scanConnection.getSvcPartyIdWithRetries()
       key = ValidatorStore.Key(
         validatorParty = validatorParty,

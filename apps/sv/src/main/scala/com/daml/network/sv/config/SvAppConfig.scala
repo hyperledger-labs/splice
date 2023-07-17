@@ -99,6 +99,13 @@ final case class SvGlobalDomainConfig(
       * Also an SV's validator must always be configured to do top-ups
       */
     trafficReservedForTopups: NonNegativeNumeric[Long] = NonNegativeNumeric.tryCreate(100_000L),
+
+    /** The SV's ledger client compares its remaining traffic balance against the reserved amount
+      * on every command submission. This setting controls how long the traffic balance is cached before
+      * being rehydrated by querying its participant.
+      */
+    trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(1),
 )
 
 final case class SvDomainConfig(

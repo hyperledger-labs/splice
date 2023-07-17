@@ -64,6 +64,7 @@ class CNLedgerConnection(
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
+    trafficBalanceServiceO: Option[TrafficBalanceService],
     completionOffsetCallback: String => Future[Unit],
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends NamedLogging {
@@ -119,6 +120,26 @@ class CNLedgerConnection(
 
   private def callCallbacksOnCompletionNoWaitForOffset[T](result: Future[T]): Future[T] =
     callCallbacksOnCompletion(result)(x => (None, x))
+
+  private def verifyEnoughExtraTrafficRemains(domainId: DomainId, commandPriority: CommandPriority)(
+      implicit tc: TraceContext
+  ): Future[Unit] = {
+    trafficBalanceServiceO.fold(Future.unit)(trafficBalanceService => {
+      trafficBalanceService.lookupReservedTraffic(domainId).flatMap {
+        case None => Future.unit
+        case Some(reservedTraffic) =>
+          trafficBalanceService.lookupAvailableTraffic(domainId).flatMap {
+            case None => Future.unit
+            case Some(availableTraffic) =>
+              if (availableTraffic < reservedTraffic && commandPriority == CommandPriority.Low)
+                throw Status.ABORTED
+                  .withDescription("Traffic balance below amount reserved for top-ups")
+                  .asRuntimeException()
+              else Future.unit
+          }
+      }
+    })
+  }
 
   // The participant ledger end as opposed to the per-domain ledger end.
   // We use this for synchronization in `UpdateIngestionService`.
@@ -192,22 +213,27 @@ class CNLedgerConnection(
       deduplicationOffset: String,
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
-  ): Future[Transaction] = {
-    callCallbacksOnCompletionAndWaitForOffset(
-      client
-        .submitAndWaitForTransaction(
-          workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = applicationId,
-          commandId = commandId.commandIdForSubmission,
-          deduplicationConfig = DedupOffset(
-            offset = deduplicationOffset
-          ),
-          actAs = actAs.map(_.toProtoPrimitive),
-          readAs = readAs.map(_.toProtoPrimitive),
-          commands = commands,
-          disclosedContracts = disclosedContracts assertOnDomain domainId,
-        )
-    )(tx => (tx.getOffset, tx))
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit tc: TraceContext): Future[Transaction] = {
+    for {
+      _ <- verifyEnoughExtraTrafficRemains(domainId, priority)
+      result <-
+        callCallbacksOnCompletionAndWaitForOffset(
+          client
+            .submitAndWaitForTransaction(
+              workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
+              applicationId = applicationId,
+              commandId = commandId.commandIdForSubmission,
+              deduplicationConfig = DedupOffset(
+                offset = deduplicationOffset
+              ),
+              actAs = actAs.map(_.toProtoPrimitive),
+              readAs = readAs.map(_.toProtoPrimitive),
+              commands = commands,
+              disclosedContracts = disclosedContracts assertOnDomain domainId,
+            )
+        )(tx => (tx.getOffset, tx))
+    } yield result
   }
 
   def submitWithResultNoDedup[T](
@@ -901,4 +927,10 @@ object CNLedgerConnection {
   }
 
   def uniqueId: String = UUID.randomUUID.toString
+}
+
+sealed trait CommandPriority { def name: String }
+object CommandPriority {
+  case object High extends CommandPriority { val name = "High" }
+  case object Low extends CommandPriority { val name = "Low" }
 }

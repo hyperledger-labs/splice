@@ -66,6 +66,13 @@ case class ValidatorGlobalDomainConfig(
       * i.e. the target throughput is set to zero (its default value).
       */
     trafficReservedForTopups: NonNegativeNumeric[Long] = NonNegativeNumeric.tryCreate(100_000L),
+
+    /** The validator's ledger client compares its remaining traffic balance against the reserved amount
+      * on every command submission. This setting controls how long the traffic balance is cached before
+      * being rehydrated by querying its participant.
+      */
+    trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(1),
 )
 
 // Validators are responsible for establishing connections to domains and so need more information than just a `DomainConfig`

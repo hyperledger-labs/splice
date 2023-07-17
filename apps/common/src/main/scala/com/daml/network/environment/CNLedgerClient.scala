@@ -60,6 +60,13 @@ class CNLedgerClient(
     callbacks.getAndUpdate(prev => prev :+ f)
   }: Unit
 
+  private val trafficBalanceService = new AtomicReference[Option[TrafficBalanceService]](None)
+
+  def registerTrafficBalanceService(service: TrafficBalanceService): Unit = {
+    // compareAndSet ensures the atomic reference is only set once
+    trafficBalanceService.compareAndSet(None, Some(service))
+  }: Unit
+
   def connection(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,
@@ -71,6 +78,7 @@ class CNLedgerClient(
       baseLoggerFactory.append("connClient", connectionClient),
       retryProvider,
       callbacks,
+      trafficBalanceService.get(),
       completionOffsetCallback,
     )
 
