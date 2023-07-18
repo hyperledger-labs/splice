@@ -28,7 +28,7 @@ import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 
 const VoteRequest: React.FC = () => {
   const [actionName, setActionName] = useState('SRARC_RemoveMember');
-  const [description, setDescription] = useState<string>('');
+  const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
   const svcInfosQuery = useSvcInfos();
 
@@ -50,7 +50,11 @@ const VoteRequest: React.FC = () => {
     mutationFn: async () => {
       const requester = svcInfosQuery.data?.svPartyId!;
       if (actionNameOptions.map(e => e.value).includes(actionName)) {
-        return await createVoteRequest(requester, action!, url, description);
+        return await createVoteRequest(requester, action!, url, summary)
+          .then(() => setUrl(''))
+          .then(() => setSummary(''))
+          .then(() => setActionName('SRARC_RemoveMember'))
+          .then(() => setAction(undefined));
       }
     },
 
@@ -100,11 +104,11 @@ const VoteRequest: React.FC = () => {
           <Stack direction="column" mb={4} spacing={1}>
             <Typography variant="h6">Summary</Typography>
             <TextField
-              id="create-reason-description"
+              id="create-reason-summary"
               rows={4}
               multiline
-              onChange={e => setDescription(e.target.value)}
-              value={description}
+              onChange={e => setSummary(e.target.value)}
+              value={summary}
             />
           </Stack>
 
@@ -127,6 +131,7 @@ const VoteRequest: React.FC = () => {
           <Button
             id="create-voterequest-submit-button"
             fullWidth
+            type={'submit'}
             size="large"
             onClick={() => {
               createVoteRequestMutation.mutate();

@@ -336,7 +336,7 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
-              inside(find(id("create-reason-description"))) { case Some(element) =>
+              inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
               }
 
@@ -560,7 +560,7 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
-              inside(find(id("create-reason-description"))) { case Some(element) =>
+              inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
               }
 
@@ -619,7 +619,7 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
-              inside(find(id("create-reason-description"))) { case Some(element) =>
+              inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
               }
 
@@ -668,7 +668,7 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
-              inside(find(id("create-reason-description"))) { case Some(element) =>
+              inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
               }
 
@@ -742,8 +742,8 @@ class SvFrontendIntegrationTest
                 find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
               }
 
-              clue("sv1 modifies description") {
-                find(id("create-reason-description")).value.underlying.sendKeys(requestReasonBody)
+              clue("sv1 modifies summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
               }
 
               click on "create-voterequest-submit-button"
