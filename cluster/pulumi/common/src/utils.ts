@@ -16,7 +16,7 @@ export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 
 // Refrence to upstream infrastructure stack.
-export const infraStack = new pulumi.StackReference(`infra.${CLUSTER_BASENAME}`);
+export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
 
 /// Kubernetes Namespace
 

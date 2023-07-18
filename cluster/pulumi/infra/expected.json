@@ -145,16 +145,6 @@
     "type": "gcp:compute/network:Network"
   },
   {
-    "custom": false,
-    "id": "infra.mock",
-    "inputs": {
-      "name": "infra.mock"
-    },
-    "name": "infra.mock",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
-  },
-  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -472,6 +462,16 @@
     "name": "nat-test-stack-gw",
     "provider": "",
     "type": "gcp:compute/routerNat:RouterNat"
+  },
+  {
+    "custom": false,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
   },
   {
     "custom": true,

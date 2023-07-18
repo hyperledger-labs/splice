@@ -4802,11 +4802,11 @@
   },
   {
     "custom": false,
-    "id": "infra.mock",
+    "id": "organization/infra/infra.mock",
     "inputs": {
-      "name": "infra.mock"
+      "name": "organization/infra/infra.mock"
     },
-    "name": "infra.mock",
+    "name": "organization/infra/infra.mock",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },
