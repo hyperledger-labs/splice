@@ -15,3 +15,18 @@ config:
       "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/dns01-solver%40da-gcp-canton-domain.iam.gserviceaccount.com",
       "universe_domain": "googleapis.com"
     }
+  infra:CLUSTER_BASENAME: staging
+  infra:DNS01_SA_KEY_JSON: |-
+    {
+      "type": "service_account",
+      "project_id": "da-gcp-canton-domain",
+      "private_key_id": "09be7d79964d169293dfc9926fe4409c02e5d8bd",
+      "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDBHmlldrBgZRHA\n6NNVtkexViB1UqmsddPRmWgvOug4m4TVoMNah8LnLluKOPmjlek5OUwoLlGxRr4E\nXo/dv09uQjriETn/nAxkEbcI+LtKW7FzLoAhdKTCS7fG98XU4n4aYTxOq48esTd2\npUhNSZLgkBt0xXkegvI335jXEi8TviYzSPJQsAF6bvr3NzC6a/44vUuRnc8gPDl3\nlkqLyRQu3WzcpWz/yVV+iAkeDNqwUgcQVJuyQd3EClmN0D7Comvtf1TF0wdy2W83\nFSm5VqPGOXiwyaG9dhNTKc/3CG4wkjb9O9owlf8UFSWDD+CPBoUGaItkg1r07q47\nv6vj7twHAgMBAAECggEAEeESafHkn3AMBjuoATn4hjsOkz4ddlmMTE3zHthJ0p/X\nWv3gyDtkeInKsM/YkOQarREYc2niZ1LA2d+1WxbQsEkScYadw4P7g7I+K2b31AkM\nMzk9ZJuLe2+OKq4a0zxK539UGYZ5oCJRG7tup7Ulk4PT/uofbgs6iKC7YkINOLsL\nPHo/WcRNmKPiJrZi+QPAEK/4NGeJRS2epmrQCb3e0DTNNyNgxAV1XYY/qzLBYjuC\nJGXMSTZiUxxvRz9DhKCvkxzLCHMCX8BCkPOvXnE67canhqUv8Tkumn9+uSegA11+\neuMWp/Zcy3NTwD2UWrojOjm3aKeFtSzx+lsFGX8LGQKBgQDwFzo5yGEa18VC/Kdt\nQWHRjeKq5q2fbI9+GM50e/3vf+oYdSTJcz0q+ikUd1nmg8rd0p7UKZx1c+wKIvaR\nciYwU7Lgd5EEZcWNBhJwSsSgxC5Uh1G1FY7++YPHEkfx7MzETGuRy1D0HDbgyZRd\nVSczZ1VIDjgj196XlEsdfhEjWQKBgQDN6mCJ00bj5TNbmGZ4i0HdU/VGwwpxiI8k\nNz+O0XVti7cgAR6hgcdzXL9wzaqjdg1WQ45irGAl0Y1y2dsO41NyGarHaem2JSnk\n95kKejYPSRzJLvHFcTIKeDvOmVcPxLWyIaHT2+8WPcvdPuv+E4UoDARyrpVfoW8O\nZJTAKabuXwKBgQDpmG/aUI/KIi2XY2My9e5KiRYE2bQL7QAf29rjktAa+gW2DiPg\nrPLSodreQtGBarEy6f4GxwWncUYzBpmIIdvuIUFlDHBYKvzunP3Lq7NsB/Rb4d0p\npvQeOH5ybeL6Cz+frgrrKzp0iA8M3pQvyu39IYjkNpGArkOwj2QWKdZa4QKBgDms\nj+WKm6xxIfVhtjHFL2mCfoyXTHGIQi9umgqyeCV6oIwCREYQR4D0VVqPAGBQTGQA\n//x7M2LkUq38fvKokVLABalc7Ozrc9SB1QeuOz4EyF9BGs6madGs43N2V4A/JHUE\nHoNscobUQClz2j2L0hvpYcWNSKFEYgqx+UfpYqwZAoGAPZid9oWrPwnLYEI6g3q9\n2Mjx/Hbvl/meMMoI/F5Ue/TV3vtJPvkYtNIVqzj0CQNlzwH0M+wQuKxUQvN8AAoC\nCm50tkBOdFOhg/w2t3RAvlARoloE8swvTvDRku9LTxfO8JUVHOos+OzdGx6qUplP\n2Cq2UPW1zxX02GrrV5Sxzl0=\n-----END PRIVATE KEY-----\n",
+      "client_email": "dns01-solver@da-gcp-canton-domain.iam.gserviceaccount.com",
+      "client_id": "111557570113518692244",
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+      "token_uri": "https://oauth2.googleapis.com/token",
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+      "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/dns01-solver%40da-gcp-canton-domain.iam.gserviceaccount.com",
+      "universe_domain": "googleapis.com"
+    }
