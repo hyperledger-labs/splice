@@ -19,6 +19,7 @@ import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.*
 import com.daml.network.util.{Contract, TemplateJsonDecoder, Trees}
 import com.digitalasset.canton.config.CantonRequireTypes.String256M
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -360,19 +361,22 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             Future.successful(0)
           }
       } yield {
-        logger.info(s"Store $storeDescriptor initialized with storeId $newStoreId")
-
-        state.getAndUpdate(
-          _.copy(
-            storeId = Some(newStoreId),
-            acsSize = acsSizeInDb,
-            offset = lastIngestedOffset,
-            offsetChanged = Promise(),
+        // Note: IngestionSink.initialize() may be called multiple times for the same store instance,
+        // if for example the ingestion loop restarts.
+        val oldState = state.getAndUpdate(
+          _.withInitialState(
+            storeId = newStoreId,
+            acsSizeInDb = acsSizeInDb,
+            lastIngestedOffset = lastIngestedOffset,
           )
         )
+        lastIngestedOffset.foreach(oldState.signalOffsetChanged)
 
         if (alreadyIngestedAcs) {
-          finishedAcsIngestion.success(())
+          logger.info(s"Store $storeDescriptor resumed with storeId $newStoreId")
+          finishedAcsIngestion.trySuccess(()).discard
+        } else {
+          logger.info(s"Store $storeDescriptor initialized with storeId $newStoreId")
         }
 
         lastIngestedOffset
@@ -696,21 +700,37 @@ object DbMultiDomainAcsStore {
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
   ) {
-    def withUpdate(newAcsSize: Int, newOffset: String): State =
-      if (!offset.contains(newOffset)) {
-        this.copy(
-          acsSize = newAcsSize,
-          offset = Some(newOffset),
-          offsetChanged = Promise(),
-          offsetIngestionsToSignal = offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
-            offsetToSignal > newOffset
-          },
-        )
-      } else {
-        this.copy(
-          acsSize = newAcsSize
-        )
-      }
+    def withInitialState(
+        storeId: Int,
+        acsSizeInDb: Int,
+        lastIngestedOffset: Option[String],
+    ): State = {
+      assert(
+        !offset.exists(inMemoryOffset =>
+          lastIngestedOffset.exists(dbOffset => inMemoryOffset > dbOffset)
+        ),
+        "Cached offset was newer than offset stored in the database",
+      )
+      val nextOffsetChanged = if (offset == lastIngestedOffset) offsetChanged else Promise[Unit]()
+      this.copy(
+        storeId = Some(storeId),
+        acsSize = acsSizeInDb,
+        offset = lastIngestedOffset,
+        offsetChanged = nextOffsetChanged,
+      )
+    }
+
+    def withUpdate(newAcsSize: Int, newOffset: String): State = {
+      val nextOffsetChanged = if (offset.contains(newOffset)) offsetChanged else Promise[Unit]()
+      this.copy(
+        acsSize = newAcsSize,
+        offset = Some(newOffset),
+        offsetChanged = nextOffsetChanged,
+        offsetIngestionsToSignal = offsetIngestionsToSignal.filter { case (offsetToSignal, _) =>
+          offsetToSignal > newOffset
+        },
+      )
+    }
 
     def signalOffsetChanged(newOffset: String): Unit = {
       if (!offset.contains(newOffset)) {

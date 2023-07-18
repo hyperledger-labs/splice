@@ -16,6 +16,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.google.protobuf
 import org.scalatest.Assertion
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
@@ -210,6 +211,16 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertTestState()
       } yield succeed
     }
+    "ingestion can be restarted at any time" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs(Seq((c(1), d1, 0L)))
+        _ <- store.ingestionSink.initialize()
+        _ <- d1.create(c(2))
+        _ <- store.ingestionSink.initialize()
+        _ <- assertList(c(1) -> Some(d1), c(2) -> Some(d1))
+      } yield succeed
+    }
     "respect the limit and log a warning for HardLimit" in {
       implicit val store = mkStore()
       for {
@@ -292,6 +303,44 @@ abstract class MultiDomainAcsStoreTest[
         _ <- signal_012
         // We can still register signals for already ingested offsets
         _ <- store.signalWhenIngestedOrShutdown("010")
+      } yield succeed
+    }
+    "stream ready contracts on single domain" in {
+      implicit val store = mkStore()
+      val readyContracts = new AtomicReference(Seq.empty[CReady])
+      val streamF = store
+        .streamReadyContracts(AppRewardCoupon.COMPANION)
+        .take(3)
+        .runForeach { readyContract => readyContracts.updateAndGet(_.appended(readyContract)) }
+      def r(round: Int) = ReadyContract(c(round), d1)
+      for {
+        _ <- acs(Seq((c(1), d1, 0L)))
+        _ = eventually()(readyContracts.get() shouldBe Seq(r(1)))
+        _ <- d1.create(c(2))
+        _ = eventually()(readyContracts.get() shouldBe Seq(r(1), r(2)))
+        _ <- d1.create(c(3))
+        _ = eventually()(readyContracts.get() shouldBe Seq(r(1), r(2), r(3)))
+        _ <- streamF
+      } yield succeed
+    }
+    "stream ready contracts after ingestion restart" in {
+      implicit val store = mkStore()
+      val readyContracts = new AtomicReference(Seq.empty[CReady])
+      val streamF = store
+        .streamReadyContracts(AppRewardCoupon.COMPANION)
+        .take(3)
+        .runForeach { readyContract => readyContracts.updateAndGet(_.appended(readyContract)) }
+      def r(round: Int) = ReadyContract(c(round), d1)
+      for {
+        _ <- acs(Seq((c(1), d1, 0L)))
+        _ = eventually()(readyContracts.get() shouldBe Seq(r(1)))
+        _ <- d1.create(c(2))
+        _ <- store.ingestionSink.initialize()
+        _ = eventually()(readyContracts.get() shouldBe Seq(r(1), r(2)))
+        _ <- store.ingestionSink.initialize()
+        _ <- d1.create(c(3))
+        _ = eventually()(readyContracts.get() shouldBe Seq(r(1), r(2), r(3)))
+        _ <- streamF
       } yield succeed
     }
   }

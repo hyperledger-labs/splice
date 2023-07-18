@@ -9,7 +9,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, TransferId}
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
 import com.daml.network.store.db.AcsTables.*
-import com.daml.network.store.{MultiDomainAcsStoreTest, PageLimit, StoreTest}
+import com.daml.network.store.{MultiDomainAcsStoreTest, StoreTest}
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
@@ -20,7 +20,6 @@ import org.scalatest.Assertion
 import slick.jdbc.JdbcProfile
 import slick.lifted.ProvenShape
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 
 class DbMultiDomainAcsStoreTest
@@ -35,30 +34,6 @@ class DbMultiDomainAcsStoreTest
   import storage.api.jdbcProfile.api.*
 
   "DbMultiDomainAcsStore" should {
-
-    "stream rows" in {
-      implicit val store = mkStore()
-      val coupons = (1 to 3).map(n => appRewardCoupon(n, svcParty))
-      val seenCoupons =
-        new AtomicReference(
-          Seq.empty[Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]]
-        )
-      val done = store
-        .streamReadyContracts(coinCodegen.AppRewardCoupon.COMPANION, pageSize = PageLimit(1))
-        .take(3)
-        .runForeach(coupon => seenCoupons.updateAndGet(x => x.appended(coupon.contract)))
-      for {
-        _ <- acs()
-        _ <- d1.create(coupons.head)
-        _ = eventually()(seenCoupons.get() should be(Seq(coupons.head)))
-        _ <- d1.create(coupons(1))
-        _ = eventually()(seenCoupons.get() should be(coupons.take(2)))
-        _ <- d1.create(coupons(2))
-        _ <- done
-      } yield {
-        seenCoupons.get() should be(coupons)
-      }
-    }
 
     "allow creating & deleting same contract id in different stores" in {
       val store1 = mkStore(id = 1)
