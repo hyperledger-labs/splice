@@ -266,9 +266,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       auth0Client,
       nodename: 'sv-3',
       onboardingName: 'Canton-Foundation-3',
-      validatorWalletUser: isDevNet
-        ? 'auth0|64afbc4431b562edb8995da6'
-        : 'auth0|64529bb10c1aee4f2c819218',
+      validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
       onboarding: joinViaSv1(sv1, SV3_KEY, postgresDB1),
       withDomainFees,
       approvedSvIdentities,
@@ -286,9 +284,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       auth0Client,
       nodename: 'sv-4',
       onboardingName: 'Canton-Foundation-4',
-      validatorWalletUser: isDevNet
-        ? 'auth0|64afbc720e20777e46fff490'
-        : 'auth0|64529bc58d30358eacae5611',
+      validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
       onboarding: joinViaSv1(sv1, SV4_KEY, postgresDB1),
       withDomainFees,
       approvedSvIdentities,
