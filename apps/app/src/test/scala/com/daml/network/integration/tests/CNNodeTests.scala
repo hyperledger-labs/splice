@@ -115,11 +115,12 @@ object CNNodeTests {
     ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))(env.actorSystem)
 
     override def perTestCaseName(name: String) = s"${name}_tc$testCaseId.unverified.cns"
+    def perTestCaseNameWithoutUnverified(name: String) = s"${name}_tc$testCaseId"
 
     private def extendLedgerApiUserWithCaseId(
         ref: WalletAppClientReference
     ): WalletAppClientReference = {
-      val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
+      val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
       new WalletAppClientReference(
         ref.cnNodeConsoleEnvironment,
         ref.name,
@@ -130,7 +131,7 @@ object CNNodeTests {
     private def extendLedgerApiUserWithCaseId(
         ref: DirectoryAppClientReference
     )(implicit actorSystem: ActorSystem): DirectoryAppClientReference = {
-      val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
+      val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.ledgerApi
         .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newLedgerApiUser))
       new DirectoryAppClientReference(
@@ -143,7 +144,7 @@ object CNNodeTests {
     private def extendLedgerApiUserWithCaseId(
         ref: SplitwellAppClientReference
     )(implicit actorSystem: ActorSystem): SplitwellAppClientReference = {
-      val newLedgerApiUser = perTestCaseName(ref.config.ledgerApiUser)
+      val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.participantClient.ledgerApi
         .copy(authConfig =
           updateUser(ref.config.participantClient.ledgerApi.authConfig, newLedgerApiUser)
