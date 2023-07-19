@@ -50,12 +50,11 @@ class SvcPartyHosting(
   ): Future[Either[String, Unit]] = {
     getSponsorSvConfig(onboardingConfig) match {
       case Some(sponsorSvConfig) =>
+        // At the moment, Canton accepts the transaction as soon as anyone submits it. Eventually,
+        // the transaction will have to be submitted by the candidate SV’s participant (as part of this flow likely)
+        // and by a consensus of SVs (probably as part of a reconciliation loop).
+        logger.info("Disconnecting from all domains")
         for {
-          _ <- participantAdminConnection.reconnectAllDomains()
-          // At the moment, Canton accepts the transaction as soon as anyone submits it. Eventually,
-          // the transaction will have to be submitted by the candidate SV’s participant (as part of this flow likely)
-          // and by a consensus of SVs (probably as part of a reconciliation loop).
-          _ = logger.info("Disconnecting from all domains")
           _ <- participantAdminConnection.disconnectFromAllDomains()
           _ = logger.info("candidate SV participant disconnected from global domain")
           response <- getAuthorizationAndAcsFromSponsor(
