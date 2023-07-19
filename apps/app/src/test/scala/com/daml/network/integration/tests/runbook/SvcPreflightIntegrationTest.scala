@@ -21,7 +21,9 @@ class SvcPreflightIntegrationTest
   "SVs 1-4 are online and reachable via their public HTTP API" in { implicit env =>
     env.svs.remote.foreach(sv =>
       clue(s"Checking SV at ${sv.httpClientConfig.url}") {
-        sv.getSvcInfo()
+        eventuallySucceeds() {
+          sv.getSvcInfo()
+        }
       }
     )
   }
@@ -35,9 +37,10 @@ class SvcPreflightIntegrationTest
       // our current practice is to use the same password for all SVs
       val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
       val sv = env.svs.remote.find(sv => sv.name == s"sv$i").value
-      val svInfo = sv.getSvcInfo()
+      val svInfo = eventuallySucceeds() { sv.getSvcInfo() }
 
-      val votedSvParties = env.svs.remote.filter(_ != sv).map(sv_ => sv_.getSvcInfo().svParty)
+      val votedSvParties =
+        env.svs.remote.filter(_ != sv).map(sv_ => eventuallySucceeds() { sv_.getSvcInfo().svParty })
 
       withFrontEnd("sv") { implicit webDriver =>
         testSvUi(
