@@ -689,12 +689,10 @@ function _cluster_reset() {
 
     _info "Uninstalling Pulumi canton-network stack"
     _uses_pulumi_stack canton-network
-    subcmd_pulumi canton-network refresh --yes --skip-preview
     subcmd_pulumi canton-network down --yes --skip-preview
 
     _info "Uninstalling Pulumi sv-runbook stack"
     _uses_pulumi_stack sv-runbook
-    subcmd_pulumi sv-runbook refresh --yes --skip-preview
     subcmd_pulumi sv-runbook down --yes --skip-preview
 
     _info "Cluster in reset/idle state."
