@@ -90,7 +90,7 @@ export function installCometBftNode(
   nodename: string,
   onboardingName: string
 ): Resource {
-  return installCNHelmChart(xns, nodename + '-cometbft', 'cn-cometbft', {
+  return installCNHelmChart(xns, 'cometbft', 'cn-cometbft', {
     nodeName: onboardingName,
     imageName: 'cometbft',
     founder: founder,

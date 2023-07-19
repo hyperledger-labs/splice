@@ -1,5 +1,5 @@
 ---
-{{- $fullName := include "prefix" (list .Values "cometbft") }}
+{{- $fullName := "cometbft" }}
 {{- $fullP2pHostName := include "prefix" (list .Values "cometbft-p2p") }}
 {{- $fullRpcHostName := include "prefix" (list .Values "cometbft-rpc") }}
 {{- with .Values.node }}

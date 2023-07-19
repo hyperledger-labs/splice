@@ -1,9 +1,9 @@
 ---
-{{- $fullName := include "prefix" (list .Values "cometbft") }}
+{{- $fullName := "cometbft" }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ $fullName }}
+  name: "cometbft-data"
   labels:
     app: {{ $fullName }}
 spec:
