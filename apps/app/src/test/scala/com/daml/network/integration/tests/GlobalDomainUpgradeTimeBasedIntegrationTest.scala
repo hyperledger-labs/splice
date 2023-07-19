@@ -6,11 +6,11 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion as TemplateCompanion,
   ContractId,
 }
-import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
+import com.daml.network.store.MultiDomainAcsStore.ContractState
 import ContractState.Assigned
 import com.daml.network.codegen.java.cn.svcrules as svcr
 import com.daml.network.codegen.java.cn.svonboarding as so
-import com.daml.network.util.{CoinConfigSchedule, ConfigScheduleUtil}
+import com.daml.network.util.{CoinConfigSchedule, ConfigScheduleUtil, ContractWithState}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.DomainAlias
 import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery

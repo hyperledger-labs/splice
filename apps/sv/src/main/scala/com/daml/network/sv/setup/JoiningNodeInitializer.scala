@@ -534,7 +534,7 @@ class JoiningNodeInitializer(
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()
   } yield svcRules.exists(
-    _.contract.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
+    _.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
   )
 
   private def withLocalDomainNode[A](

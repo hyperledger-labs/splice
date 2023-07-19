@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -50,7 +50,7 @@ class ExpireIssuingMiningRoundTrigger(
       domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       cmd = svcRules.contractId.exerciseSvcRules_MiningRound_Close(
         coinRules.contractId,
-        round.contract.contractId,
+        round.contractId,
       )
       cid <- svTaskContext.connection
         .submitWithResultNoDedup(Seq(store.key.svParty), Seq(store.key.svcParty), cmd, domainId)

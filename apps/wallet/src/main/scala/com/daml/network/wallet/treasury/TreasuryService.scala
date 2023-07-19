@@ -431,11 +431,11 @@ class TreasuryService(
       logger.debug("Using upgraded coinRules")
       for {
         rules <- scanConnection.getCoinRulesV1Test()
-      } yield (rules, rules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
+      } yield (rules, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
     } else {
       for {
         rules <- scanConnection.getCoinRules()
-      } yield (rules, rules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
+      } yield (rules, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
     }
 
   /** Select transfer inputs and transfer context to satisfy the coin operations.
@@ -467,13 +467,11 @@ class TreasuryService(
           scanConnection.approveTaps(userStore.key.validatorParty, numTapOperations)
         } else { Future.successful(true) }
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
-      configUsd = openRound.contract.payload.transferConfigUsd
+      configUsd = openRound.payload.transferConfigUsd
       maxNumInputs = configUsd.maxNumInputs.intValue()
-      openIssuingRounds = issuingMiningRounds.filter(c =>
-        c.contract.payload.opensAt.isBefore(now.toInstant)
-      )
+      openIssuingRounds = issuingMiningRounds.filter(c => c.payload.opensAt.isBefore(now.toInstant))
       issuingRoundsMap = openIssuingRounds.view.map { r =>
-        val imr = r.contract.payload
+        val imr = r.payload
         (imr.round, imr)
       }.toMap
       domainId <- walletManager.store.domains.waitForDomainConnection(
@@ -483,7 +481,7 @@ class TreasuryService(
         .listContractsOnDomain(coinCodegen.ValidatorRight.COMPANION, domainId)
       coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
         maxNumInputs,
-        openRound.contract.payload.round.number,
+        openRound.payload.round.number,
       )
       (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs) <-
         getValidatorRewardsAndQuantity(
@@ -523,15 +521,15 @@ class TreasuryService(
         val rewardInputRounds =
           appRewardInputs.map(_._1).toSet ++ validatorRewardInputs.map(_._1).toSet
         val transferContext = new TransferContext(
-          openRound.contract.contractId
+          openRound.contractId
             .toInterface(v1.round.OpenMiningRound.INTERFACE),
           openIssuingRounds.view
             // only provide rounds that are actually used in transfer context to avoid unnecessary fetching.
-            .filter(r => rewardInputRounds.contains(r.contract.payload.round))
+            .filter(r => rewardInputRounds.contains(r.payload.round))
             .map(r =>
               (
-                r.contract.payload.round,
-                r.contract.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE),
+                r.payload.round,
+                r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE),
               )
             )
             .toMap[roundApi.Round, roundApi.IssuingMiningRound.ContractId]

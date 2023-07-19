@@ -3,9 +3,10 @@ package com.daml.network.sv.store.memory
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.InMemoryCNNodeAppStoreWithoutHistory
-import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext

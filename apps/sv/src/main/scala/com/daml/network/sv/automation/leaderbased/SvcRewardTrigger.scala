@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -46,7 +46,7 @@ class SvcRewardTrigger(
       svcRules <- store.getSvcRules()
       cmd = svcRules.contractId
         .exerciseSvcRules_CollectSvcReward(
-          svcReward.contract.contractId
+          svcReward.contractId
         )
       _ <-
         svTaskContext.connection.submitWithResultNoDedup(
@@ -56,7 +56,7 @@ class SvcRewardTrigger(
           svcReward.domain,
         )
     } yield TaskSuccess(
-      s"collected `SvcReward` of round ${svcReward.contract.payload.round.number} and created `SvReward` for each SV"
+      s"collected `SvcReward` of round ${svcReward.payload.round.number} and created `SvReward` for each SV"
     )
   }
 }

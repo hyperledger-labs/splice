@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.da.set.types.{Set as DamlSet}
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.MultiDomainAcsStore.{ContractWithState, QueryResult}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
@@ -37,8 +37,8 @@ object CNNodeUtil {
   ): Ct = {
     import math.Ordering.Implicits.*
     openMiningRounds.view
-      .filter(c => c.contract.payload.opensAt <= now.toInstant)
-      .maxByOption(c => c.contract.payload.round.number)
+      .filter(c => c.payload.opensAt <= now.toInstant)
+      .maxByOption(c => c.payload.round.number)
       .getOrElse(
         throw new IllegalStateException(
           s"tried to select the latest open mining round from $openMiningRounds but none of the rounds are open. "
@@ -53,8 +53,8 @@ object CNNodeUtil {
   ): Ct = {
     import math.Ordering.Implicits.*
     openMiningRounds.view
-      .filter(c => c.contract.payload.opensAt <= now.toInstant)
-      .find(_.contract.payload.round == specifiedRound)
+      .filter(c => c.payload.opensAt <= now.toInstant)
+      .find(_.payload.round == specifiedRound)
       .getOrElse(
         throw new IllegalStateException(
           s"tried to select the specific open mining round $specifiedRound from $openMiningRounds but none of the rounds match the specified round. "

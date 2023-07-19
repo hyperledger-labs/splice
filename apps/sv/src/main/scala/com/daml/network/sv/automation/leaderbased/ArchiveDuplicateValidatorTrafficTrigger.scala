@@ -9,8 +9,8 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
+import com.daml.network.util.ReadyContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -39,8 +39,8 @@ class ArchiveDuplicateValidatorTrafficTrigger(
   override def completeTaskAsLeader(
       validatorTraffic: ReadyContract[ValidatorTraffic.ContractId, ValidatorTraffic]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val validatorParty = PartyId.tryFromProtoPrimitive(validatorTraffic.contract.payload.validator)
-    val domainId = DomainId.tryFromString(validatorTraffic.contract.payload.domainId)
+    val validatorParty = PartyId.tryFromProtoPrimitive(validatorTraffic.payload.validator)
+    val domainId = DomainId.tryFromString(validatorTraffic.payload.domainId)
     store
       .listDuplicateValidatorTrafficContracts(validatorParty, domainId, trafficContractsLimit)
       .flatMap(

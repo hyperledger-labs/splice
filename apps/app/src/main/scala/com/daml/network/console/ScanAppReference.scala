@@ -13,8 +13,7 @@ import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
-import com.daml.network.store.MultiDomainAcsStore.ContractWithState
-import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract}
+import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract, ContractWithState}
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
@@ -115,8 +114,8 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetSortedOpenAndIssuingMiningRounds(Seq(), Seq()))
     }
     (
-      result._1.sortBy(_.contract.payload.round.number),
-      result._2.sortBy(_.contract.payload.round.number),
+      result._1.sortBy(_.payload.round.number),
+      result._2.sortBy(_.payload.round.number),
     )
   }
 

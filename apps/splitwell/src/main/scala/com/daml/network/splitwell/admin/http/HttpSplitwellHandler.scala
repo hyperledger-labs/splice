@@ -5,8 +5,8 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient.SplitwellDomains
 import com.daml.network.http.v0.{definitions, splitwell as v0}
 import com.daml.network.splitwell.store.SplitwellStore
-import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
-import com.daml.network.util.Codec
+import com.daml.network.store.MultiDomainAcsStore.ContractState
+import com.daml.network.util.{Codec, ContractWithState}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -150,7 +150,7 @@ class HttpSplitwellHandler(
           }
 
         val balances: Map[String, BigDecimal] =
-          balanceUpdates.map(_.contract.payload).foldLeft(Map.empty[String, BigDecimal])(combine)
+          balanceUpdates.map(_.payload).foldLeft(Map.empty[String, BigDecimal])(combine)
         definitions.ListBalancesResponse(balances.map { case (k, v) => k -> Codec.encode(v) })
       }
     }
@@ -167,7 +167,7 @@ class HttpSplitwellHandler(
           installs
             .map(c =>
               definitions.SplitwellInstall(
-                Codec.encodeContractId(c.contract.contractId),
+                Codec.encodeContractId(c.contractId),
                 Codec.encode(c.domain),
               )
             )

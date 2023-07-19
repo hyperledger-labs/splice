@@ -5,10 +5,10 @@ import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
-import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.{SvStore, SvSvStore}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ReadyContract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext

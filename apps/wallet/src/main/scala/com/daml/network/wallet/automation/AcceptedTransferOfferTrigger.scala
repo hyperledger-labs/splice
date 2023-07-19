@@ -17,7 +17,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
 import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
@@ -51,7 +51,7 @@ class AcceptedTransferOfferTrigger(
     store.multiDomainAcsStore
       .streamReadyContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
       .filter(acceptedOffer =>
-        acceptedOffer.contract.payload.sender == store.key.endUserParty.toProtoPrimitive
+        acceptedOffer.payload.sender == store.key.endUserParty.toProtoPrimitive
       )
 
   override def completeTask(
@@ -60,7 +60,7 @@ class AcceptedTransferOfferTrigger(
         transferOffersCodegen.AcceptedTransferOffer,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contract.contractId)
+    val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contractId)
     treasury
       .enqueueCoinOperation(operation)
       .flatMap {
@@ -94,7 +94,7 @@ class AcceptedTransferOfferTrigger(
     for {
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
-        acceptedOffer.contract.contractId
+        acceptedOffer.contractId
       )
       _ <- connection
         .submitWithResultNoDedup(

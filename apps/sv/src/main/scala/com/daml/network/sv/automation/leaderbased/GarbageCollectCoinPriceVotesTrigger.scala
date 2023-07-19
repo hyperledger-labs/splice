@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -46,7 +46,7 @@ class GarbageCollectCoinPriceVotesTrigger(
     for {
       coinPriceVotes <- store.listAllCoinPriceVotes()
       (memberVotes, nonMemberVotes) = coinPriceVotes.partition(v =>
-        svcRules.contract.payload.members.asScala.contains(v.payload.sv)
+        svcRules.payload.members.asScala.contains(v.payload.sv)
       )
       nonMemberVoteCids = nonMemberVotes.map(_.contractId)
       memberDuplicatedVoteCids =
@@ -58,7 +58,7 @@ class GarbageCollectCoinPriceVotesTrigger(
           .toSeq
       _ <-
         if (nonMemberVoteCids.nonEmpty || memberDuplicatedVoteCids.nonEmpty) {
-          val cmd = svcRules.contract.contractId
+          val cmd = svcRules.contractId
             .exerciseSvcRules_GarbageCollectCoinPriceVotes(
               nonMemberVoteCids.asJava,
               memberDuplicatedVoteCids.asJava,

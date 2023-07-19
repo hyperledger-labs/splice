@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
@@ -38,7 +38,7 @@ class WalletAppInstallTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     Future {
-      val endUserName = install.contract.payload.endUserName
+      val endUserName = install.payload.endUserName
       walletManager.getOrCreateUserWallet(install.contract) match {
         case UnlessShutdown.AbortedDueToShutdown =>
           TaskSuccess(

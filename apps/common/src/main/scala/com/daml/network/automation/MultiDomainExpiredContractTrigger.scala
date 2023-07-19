@@ -2,14 +2,14 @@ package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ReadyContract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import MultiDomainAcsStore.{ContractState, ReadyContract}
+import MultiDomainAcsStore.ContractState
 
 /** A trigger for processing expired contracts whose expiry archives exactly them.
   *
@@ -39,7 +39,7 @@ abstract class MultiDomainExpiredContractTrigger[
       task: ScheduledTaskTrigger.ReadyTask[ReadyContract[TCid, T]]
   )(implicit tc: TraceContext): Future[Boolean] =
     store
-      .lookupContractById(companion)(task.work.contract.contractId: TCid)
+      .lookupContractById(companion)(task.work.contractId: TCid)
       .map(
         _.forall(_.state != ContractState.Assigned(task.work.domain))
       )

@@ -7,7 +7,7 @@ import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ReadyContract}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.PartyId
@@ -16,8 +16,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-
-import MultiDomainAcsStore.ReadyContract
 
 class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
     override protected val context: TriggerContext,

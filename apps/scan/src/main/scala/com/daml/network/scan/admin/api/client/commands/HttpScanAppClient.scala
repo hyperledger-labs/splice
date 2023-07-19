@@ -14,9 +14,8 @@ import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
 import com.daml.network.store.MultiDomainAcsStore
-import MultiDomainAcsStore.ContractWithState
 import com.daml.network.codegen.java.cc
-import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -71,8 +70,8 @@ object HttpScanAppClient {
     def toUnfeaturedAppTransferContext() = {
       val openMiningRound = latestOpenMiningRound
       new v1.coin.AppTransferContext(
-        coinRules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
-        openMiningRound.contract.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
+        coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+        openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
         None.toJava,
       )
     }
@@ -92,9 +91,9 @@ object HttpScanAppClient {
       ] {
 
     private val cachedOpenRoundsMap =
-      cachedOpenRounds.map(r => (r.contract.contractId.contractId, r)).toMap
+      cachedOpenRounds.map(r => (r.contractId.contractId, r)).toMap
     private val cachedIssuingRoundsMap =
-      cachedIssuingRounds.map(r => (r.contract.contractId.contractId, r)).toMap
+      cachedIssuingRounds.map(r => (r.contractId.contractId, r)).toMap
 
     override def submitRequest(
         client: Client,
@@ -105,8 +104,8 @@ object HttpScanAppClient {
     ], http.GetOpenAndIssuingMiningRoundsResponse] =
       client.getOpenAndIssuingMiningRounds(
         definitions.GetOpenAndIssuingMiningRoundsRequest(
-          cachedOpenRounds.map(_.contract.contractId.contractId).toVector,
-          cachedIssuingRounds.map(_.contract.contractId.contractId).toVector,
+          cachedOpenRounds.map(_.contractId.contractId).toVector,
+          cachedIssuingRounds.map(_.contractId.contractId).toVector,
         ),
         headers,
       )
@@ -129,8 +128,8 @@ object HttpScanAppClient {
               )
           }
         } yield (
-          openMiningRounds.sortBy(_.contract.payload.round.number),
-          issuingMiningRounds.sortBy(_.contract.payload.round.number),
+          openMiningRounds.sortBy(_.payload.round.number),
+          issuingMiningRounds.sortBy(_.payload.round.number),
           response.timeToLiveInMicroseconds,
         )
     }
@@ -150,7 +149,7 @@ object HttpScanAppClient {
       import MultiDomainAcsStore.ContractState.*
       client.getCoinRules(
         GetCoinRulesRequest(
-          cachedCoinRules.map(_.contract.contractId.contractId),
+          cachedCoinRules.map(_.contractId.contractId),
           cachedCoinRules.flatMap(_.state match {
             case Assigned(domain) => Some(domain.toProtoPrimitive)
             case InFlight => None
@@ -185,7 +184,7 @@ object HttpScanAppClient {
       import MultiDomainAcsStore.ContractState.*
       client.getCoinRulesV1Test(
         GetCoinRulesRequest(
-          cachedCoinRules.map(_.contract.contractId.contractId),
+          cachedCoinRules.map(_.contractId.contractId),
           cachedCoinRules.flatMap(_.state match {
             case Assigned(domain) => Some(domain.toProtoPrimitive)
             case InFlight => None

@@ -12,7 +12,7 @@ import com.daml.network.store.{
   MultiDomainAcsStoreTest,
 }
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ContractWithState, ReadyContract}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor

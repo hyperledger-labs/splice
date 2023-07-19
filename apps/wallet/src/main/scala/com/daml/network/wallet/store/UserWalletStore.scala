@@ -157,7 +157,7 @@ trait UserWalletStore
           subsCodegen.SubscriptionIdleState.COMPANION
         )
       } yield idleStates
-        .filter(s => isReadyForPayment(s.contract.payload))
+        .filter(s => isReadyForPayment(s.payload))
         .take(limit)
     }
 

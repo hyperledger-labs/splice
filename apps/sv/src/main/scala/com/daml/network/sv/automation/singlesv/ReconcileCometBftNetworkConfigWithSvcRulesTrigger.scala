@@ -25,8 +25,8 @@ class ReconcileCometBftNetworkConfigWithSvcRulesTrigger(
     OptionT(store.lookupSvcRules())
       .subflatMap { svcRules =>
         CometBftNode
-          .extractSvNodeMemberInfo(svcRules.contract.payload, store.key.svParty)
-          .map(svcRules.contract.payload -> _)
+          .extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
+          .map(svcRules.payload -> _)
       }
       // in all cases there is no more work left to do, and the trigger should just wait for another polling interval
       // before doing another reconciliation

@@ -13,8 +13,14 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.AcsStoreDump
-import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
-import com.daml.network.util.{CNNodeUtil, Contract, DisclosedContracts, TemplateJsonDecoder}
+import com.daml.network.store.MultiDomainAcsStore.ContractState
+import com.daml.network.util.{
+  CNNodeUtil,
+  Contract,
+  ContractWithState,
+  DisclosedContracts,
+  TemplateJsonDecoder,
+}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -59,7 +65,7 @@ final class ScanConnection private (
   private def signalPossiblyOutdatedCoinRulesCache(inactiveContract: String): Unit =
     coinRulesCache.get() match {
       case Some(CachedCoinRules(_, cachedContract))
-          if (cachedContract.contract.contractId.contractId: String) == inactiveContract =>
+          if (cachedContract.contractId.contractId: String) == inactiveContract =>
         logger.info(
           show"Invalidating the CoinRules cache with value ${PrettyContractId(cachedContract.contract)}"
         )(TraceContext.empty)
@@ -140,7 +146,7 @@ final class ScanConnection private (
           // otherwise, an inactive locked coinRules will failed interpretation in the local participant
           // and the cached coinRules contract will never be invalidated as other participant will not be able to validate if it is inactive.
           // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-          if (!coinRules.contract.payload.lock)
+          if (!coinRules.payload.lock)
             coinRulesCache.set(
               Some(
                 CachedCoinRules(
@@ -190,8 +196,8 @@ final class ScanConnection private (
       val rounds = cache.getRoundTuple
       logger.info(
         s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load following issuing rounds: ${rounds._1
-            .map(_.contract.payload.round.number)}, and following open rounds: ${rounds._2
-            .map(_.contract.payload.round.number)}."
+            .map(_.payload.round.number)}, and following open rounds: ${rounds._2
+            .map(_.payload.round.number)}."
       )
       Future.successful(rounds)
     } else {
@@ -263,8 +269,8 @@ final class ScanConnection private (
       val openMiningRound = context.latestOpenMiningRound
       (
         new coinCodegen.AppTransferContext(
-          coinRules.contract.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
-          openMiningRound.contract.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
+          coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
+          openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
           featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
         ),
         DisclosedContracts(coinRules, openMiningRound),
@@ -284,13 +290,13 @@ final class ScanConnection private (
       featured <- lookupFeaturedAppRight(providerPartyId)
     } yield {
       val coinRules = context.coinRules
-      context.openMiningRounds.find(_.contract.payload.round == round) match {
+      context.openMiningRounds.find(_.payload.round == round) match {
         case Some(openMiningRound) =>
           Right(
             (
               new coinCodegen.AppTransferContext(
-                coinRules.contract.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
-                openMiningRound.contract.contractId
+                coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
+                openMiningRound.contractId
                   .toInterface(roundCodegen.OpenMiningRound.INTERFACE),
                 featured
                   .map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE))

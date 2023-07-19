@@ -11,10 +11,9 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
-import com.daml.network.store.MultiDomainAcsStore.ContractWithState
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext

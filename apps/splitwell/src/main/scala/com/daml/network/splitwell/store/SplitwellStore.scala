@@ -13,7 +13,7 @@ import com.daml.network.store.{
   ConfiguredDefaultDomain,
   TxLogStore,
 }
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ContractWithState, ReadyContract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -21,10 +21,9 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-import MultiDomainAcsStore.ReadyContract
 
 trait SplitwellStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
-  import MultiDomainAcsStore.{ContractWithState, QueryResult}
+  import MultiDomainAcsStore.QueryResult
 
   def providerParty: PartyId
 

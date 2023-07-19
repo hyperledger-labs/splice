@@ -12,11 +12,11 @@ import com.daml.network.store.{
   MultiDomainAcsStore,
   PageLimit,
 }
-import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.memory.InMemorySvSvStore
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ReadyContract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}

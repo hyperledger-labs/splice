@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.{DeliveryOffer, DeliveryOfferView}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ContractWithState, ReadyContract}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.DomainId

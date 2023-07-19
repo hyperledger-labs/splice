@@ -8,8 +8,8 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.Vote
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.util.SvUtil
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -34,7 +34,7 @@ class ExecuteVoteRequestActionTrigger(
   override def completeTaskAsLeader(
       voteContract: ReadyContract[Vote.ContractId, Vote]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val voteRequestId = voteContract.contract.payload.requestCid
+    val voteRequestId = voteContract.payload.requestCid
     for {
       svcRulesVotes <- store.lookupVoteRequest(voteRequestId)
       isStale = svcRulesVotes.isEmpty

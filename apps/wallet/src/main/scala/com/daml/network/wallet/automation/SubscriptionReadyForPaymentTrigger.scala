@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   subscriptions as subsCodegen,
 }
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
@@ -47,7 +47,7 @@ class SubscriptionReadyForPaymentTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     import com.daml.network.util.PrettyInstances.*
 
-    val stateCid = task.work.contract.contractId
+    val stateCid = task.work.contractId
     val operation = new installCodegen.coinoperation.CO_SubscriptionMakePayment(stateCid)
     treasury
       .enqueueCoinOperation(operation)

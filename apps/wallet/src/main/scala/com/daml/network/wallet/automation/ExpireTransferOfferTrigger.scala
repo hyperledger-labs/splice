@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
@@ -47,7 +47,7 @@ class ExpireTransferOfferTrigger(
       _ <- user match {
         case task.work.contract.payload.sender =>
           val cmd = install.contractId.exerciseWalletAppInstall_TransferOffer_Withdraw(
-            task.work.contract.contractId
+            task.work.contractId
           )
           logger.debug("Withdrawing expired transfer offer as sender")
           connection.submitWithResultNoDedup(
@@ -58,7 +58,7 @@ class ExpireTransferOfferTrigger(
           )
         case task.work.contract.payload.receiver =>
           val cmd = install.contractId.exerciseWalletAppInstall_TransferOffer_Reject(
-            task.work.contract.contractId
+            task.work.contractId
           )
           logger.debug("Rejecting expired transfer offer as receiver")
           connection.submitWithResultNoDedup(

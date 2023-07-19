@@ -9,8 +9,8 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvStore
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -44,12 +44,12 @@ class ExpireValidatorOnboardingTrigger(
       .submitWithResultNoDedup(
         Seq(store.key.svParty),
         Seq.empty,
-        task.work.contract.contractId.exerciseValidatorOnboarding_Expire(),
+        task.work.contractId.exerciseValidatorOnboarding_Expire(),
         task.work.domain,
       )
       .map(_ =>
         TaskSuccess(
-          s"Archived expired ValidatorOnboarding ${task.work.contract.payload.candidateSecret}"
+          s"Archived expired ValidatorOnboarding ${task.work.payload.candidateSecret}"
         )
       )
   }

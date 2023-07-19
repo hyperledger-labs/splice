@@ -19,10 +19,9 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
 }
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.SvApp.{isDevNet, isSvcMemberName, isSvcMemberParty}
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ReadyContract}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -50,7 +49,7 @@ class ExecuteConfirmedActionTrigger(
   override def completeTaskAsLeader(
       confirmationContract: ReadyContract[Confirmation.ContractId, Confirmation]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val action = confirmationContract.contract.payload.action
+    val action = confirmationContract.payload.action
     isStaleAction(confirmationContract).flatMap { isStale =>
       if (isStale)
         Future.successful(
@@ -102,7 +101,7 @@ class ExecuteConfirmedActionTrigger(
       confirmation: ReadyContract[Confirmation.ContractId, Confirmation]
   )(implicit tc: TraceContext): Future[Boolean] = {
     // Add new cases as we port more triggers which require confirmation
-    confirmation.contract.payload.action match {
+    confirmation.payload.action match {
       case arcCoinRules: ARC_CoinRules =>
         arcCoinRules.coinRulesAction match {
           case startIssuingAction: CRARC_MiningRound_StartIssuing =>

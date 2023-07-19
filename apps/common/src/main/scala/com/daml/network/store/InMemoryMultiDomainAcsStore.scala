@@ -13,7 +13,7 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.*
-import com.daml.network.util.{Contract, Trees}
+import com.daml.network.util.{Contract, ContractWithState, ReadyContract, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.DomainId

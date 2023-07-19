@@ -9,9 +9,9 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.ExpiringLock
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -60,7 +60,7 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
         cc.globaldomain.ValidatorTraffic,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val validatorTraffic_ = validatorTraffic.contract.payload
+    val validatorTraffic_ = validatorTraffic.payload
     val domainId = DomainId.tryFromString(validatorTraffic_.domainId)
     val validatorPartyId = PartyId.tryFromProtoPrimitive(validatorTraffic_.validator)
     for {

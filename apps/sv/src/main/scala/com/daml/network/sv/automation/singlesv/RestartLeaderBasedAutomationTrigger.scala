@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 
 import com.daml.network.sv.automation.LeaderBasedAutomationService
 import com.daml.network.sv.automation.leaderbased.SvTaskBasedTrigger
@@ -76,7 +76,7 @@ class RestartLeaderBasedAutomationTrigger(
     blocking {
 
       synchronized {
-        val currentEpoch = svcRules.contract.payload.epoch
+        val currentEpoch = svcRules.payload.epoch
         val lastKnownEpoch = epochStateVar.map(_.epoch)
 
         epochStateVar match {
@@ -106,7 +106,7 @@ class RestartLeaderBasedAutomationTrigger(
       new SvTaskBasedTrigger.Context(
         store,
         connection,
-        PartyId.tryFromProtoPrimitive(svcRules.contract.payload.leader),
+        PartyId.tryFromProtoPrimitive(svcRules.payload.leader),
         epoch,
       )
 

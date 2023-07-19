@@ -23,7 +23,7 @@ import com.daml.network.util.CNNodeUtil.{
   defaultCoinConfigSchedule,
   defaultEnabledChoices,
 }
-import com.daml.network.util.{GcpBucket, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{GcpBucket, ReadyContract, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp

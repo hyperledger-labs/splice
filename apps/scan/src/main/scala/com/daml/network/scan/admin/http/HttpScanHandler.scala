@@ -163,8 +163,7 @@ class HttpScanHandler(
       } yield {
         val response = MaybeCachedContractWithState(
           body.cachedCoinRulesContractId match {
-            case Some(cachedContractId)
-                if cachedContractId == coinRules.contract.contractId.contractId =>
+            case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
               logger.debug(
                 show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
               )
@@ -202,8 +201,7 @@ class HttpScanHandler(
       } yield {
         val response = MaybeCachedContractWithState(
           body.cachedCoinRulesContractId match {
-            case Some(cachedContractId)
-                if cachedContractId == coinRules.contract.contractId.contractId =>
+            case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
               logger.debug(
                 show"Not sending ${PrettyContractId(ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
               )

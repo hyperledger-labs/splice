@@ -8,9 +8,8 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_ValidatorLicense
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.store.MultiDomainAcsStore.ContractWithState
 import com.daml.network.util.Contract.Companion
-import com.daml.network.util.{Contract, DisclosedContracts, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, DisclosedContracts, TemplateJsonDecoder}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -131,10 +130,10 @@ object AcsStoreDump {
             .submitCommandsNoDedup(
               actAs = Seq(party),
               readAs = useReadAs.toList,
-              commands = crate.contract.contractId
+              commands = crate.contractId
                 .exerciseImportCrate_Receive(
                   party.toProtoPrimitive,
-                  shipment.openRound.contract.contractId,
+                  shipment.openRound.contractId,
                 )
                 .commands()
                 .asScala

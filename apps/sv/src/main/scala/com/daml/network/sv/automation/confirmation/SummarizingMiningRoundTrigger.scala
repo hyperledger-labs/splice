@@ -15,9 +15,9 @@ import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ReadyContract}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -67,14 +67,14 @@ class SummarizingMiningRoundTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       rewards <- queryRewards(
-        summarizingRound.contract.payload.round.number,
+        summarizingRound.payload.round.number,
         summarizingRound.domain,
       )
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
       action = coinRulesStartIssuingAction(
         coinRules.contractId,
-        summarizingRound.contract.contractId,
+        summarizingRound.contractId,
         rewards.summary,
       )
       queryResult <- store.lookupConfirmationByActionWithOffset(svParty, action)
@@ -98,7 +98,7 @@ class SummarizingMiningRoundTrigger(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.createMiningRoundStartIssuingConfirmation",
                 Seq(svParty, svcParty),
-                summarizingRound.contract.contractId.contractId,
+                summarizingRound.contractId.contractId,
               ),
               deduplicationOffset = offset,
               domainId = summarizingRound.domain,

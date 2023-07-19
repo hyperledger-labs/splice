@@ -17,10 +17,10 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ReadyContract}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -68,9 +68,9 @@ class SvOnboardingRequestTrigger(
     for {
       approval <- SvApp
         .isApprovedSvIdentity(
-          svOnboarding.contract.payload.candidateName,
-          PartyId.tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty),
-          svOnboarding.contract.payload.token,
+          svOnboarding.payload.candidateName,
+          PartyId.tryFromProtoPrimitive(svOnboarding.payload.candidateParty),
+          svOnboarding.payload.token,
           svStore,
           logger,
         )
@@ -106,7 +106,7 @@ class SvOnboardingRequestTrigger(
               .asRuntimeException()
           )
         } else {
-          confirm(party, name, svOnboarding.contract.payload.token, svcRules, svOnboarding.domain)
+          confirm(party, name, svOnboarding.payload.token, svcRules, svOnboarding.domain)
         }
     } yield outcome
   }
@@ -121,13 +121,11 @@ class SvOnboardingRequestTrigger(
       svcRules <- svcStore.getSvcRules()
       isPartyOnboardingConfirmed <- svcStore
         .lookupSvOnboardingConfirmedByParty(
-          PartyId.tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty)
+          PartyId.tryFromProtoPrimitive(svOnboarding.payload.candidateParty)
         )
         .flatMap(optionalConfirmation => Future(optionalConfirmation.isDefined))
       outcome <-
-        if (
-          svParty == PartyId.tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty)
-        ) {
+        if (svParty == PartyId.tryFromProtoPrimitive(svOnboarding.payload.candidateParty)) {
           Future.successful(
             TaskSuccess(
               s"skipping as SV is the same as the one executing the trigger, with party ID $svParty"
@@ -137,7 +135,7 @@ class SvOnboardingRequestTrigger(
           Future.successful(
             TaskSuccess(
               s"skipping as onboarding is already confirmed for SV ${PartyId
-                  .tryFromProtoPrimitive(svOnboarding.contract.payload.candidateParty)}"
+                  .tryFromProtoPrimitive(svOnboarding.payload.candidateParty)}"
             )
           )
         } else {

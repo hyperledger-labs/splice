@@ -11,7 +11,8 @@ import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer

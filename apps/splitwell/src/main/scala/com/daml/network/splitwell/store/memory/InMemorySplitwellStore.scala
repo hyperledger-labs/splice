@@ -81,10 +81,10 @@ class InMemorySplitwellStore(
         leaderCompanion
       )
     } yield {
-      val leaderContractsById = leaderContracts.map(c => getLeaderId(c.contract.payload) -> c).toMap
+      val leaderContractsById = leaderContracts.map(c => getLeaderId(c.payload) -> c).toMap
       followerContracts.collect(Function.unlift { c =>
         leaderContractsById
-          .get(getFollowerId(c.contract.payload))
+          .get(getFollowerId(c.payload))
           .filter(_.domain != c.domain)
           .map(
             TransferFollowTrigger.Task(_, c)

@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -47,9 +47,9 @@ class CompletedSvOnboardingTrigger(
       svcRules: SvcRulesContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svOnboardings <- store.listSvOnboardingRequestsBySvcMembers(svcRules.contract)
+      svOnboardings <- store.listSvOnboardingRequestsBySvcMembers(svcRules)
       cmds = svOnboardings.map(co =>
-        svcRules.contract.contractId
+        svcRules.contractId
           .exerciseSvcRules_ArchiveSvOnboardingRequest(co.contractId)
       )
       _ <- Future.sequence(

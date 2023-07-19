@@ -10,7 +10,8 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.splitwell.store.SplitwellStore
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -40,21 +41,21 @@ class SplitwellInstallRequestTrigger(
         splitwellCodegen.SplitwellInstallRequest,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val user = PartyId.tryFromProtoPrimitive(req.contract.payload.user)
+    val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     for {
       queryResult <- store.lookupInstallWithOffset(req.domain, user)
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
           logger.info(s"Rejecting duplicate install request from user party $user")
-          val cmd = req.contract.contractId.exerciseSplitwellInstallRequest_Reject()
+          val cmd = req.contractId.exerciseSplitwellInstallRequest_Reject()
           connection
             .submitWithResultNoDedup(Seq(provider), Seq(), cmd, req.domain)
             .map(_ => TaskSuccess("rejected request for already existing installation."))
 
         case QueryResult(offset, None) =>
           val acceptCmd =
-            req.contract.contractId.exerciseSplitwellInstallRequest_Accept().commands.asScala.toSeq
+            req.contractId.exerciseSplitwellInstallRequest_Accept().commands.asScala.toSeq
           connection
             .submitCommands(
               actAs = Seq(provider),

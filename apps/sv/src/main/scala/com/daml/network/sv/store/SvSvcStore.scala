@@ -28,10 +28,8 @@ import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{
   ContractCompanion,
   ContractState,
-  ContractWithState,
   JsonAcsSnapshot,
   QueryResult,
-  ReadyContract,
 }
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvSvcStore.{
@@ -40,7 +38,7 @@ import com.daml.network.sv.store.SvSvcStore.{
 }
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{CNNodeUtil, Contract}
+import com.daml.network.util.{CNNodeUtil, Contract, ContractWithState, ReadyContract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -446,7 +444,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   }
 
   def listSvOnboardingRequestsBySvcMembers(
-      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]] =
@@ -800,7 +798,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       // Listing all crates is OK, as we assume the number of crates is small.
       allCrates <- multiDomainAcsStore.listContracts(cc.coinimport.ImportCrate.COMPANION)
       cratesForReceiver = allCrates.filter(crate =>
-        crate.contract.payload.receiver == receiver.toProtoPrimitive
+        crate.payload.receiver == receiver.toProtoPrimitive
       )
     } yield AcsStoreDump.ImportShipment(
       // It would be better if we received the ContractWithState directly from the underlying store.

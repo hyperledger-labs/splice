@@ -82,7 +82,7 @@ class HttpWalletHandler(
   ): Future[r0.ListResponse] = withNewTrace(workflowId) { implicit traceContext => _ =>
     for {
       userStore <- getUserStore(user)
-      currentRound <- scanConnection.getLatestOpenMiningRound().map(_.contract.payload.round.number)
+      currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
       coins <- userStore.multiDomainAcsStore.listContracts(
         coinCodegen.Coin.COMPANION
       )
@@ -282,7 +282,7 @@ class HttpWalletHandler(
           Future.successful(
             installCid
               .exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(
-                coinRules.contract.contractId
+                coinRules.contractId
               )
               .map(_.exerciseResult)
           )
@@ -483,19 +483,19 @@ class HttpWalletHandler(
         )
         currentRound <- scanConnection
           .getLatestOpenMiningRound()
-          .map(_.contract.payload.round.number)
+          .map(_.payload.round.number)
       } yield {
         val unlockedHoldingFees =
           coins.view
-            .map(c => BigDecimal(CNNodeUtil.holdingFee(c.contract.payload, currentRound)))
+            .map(c => BigDecimal(CNNodeUtil.holdingFee(c.payload, currentRound)))
             .sum
         val unlockedQty =
           coins.view
-            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.contract.payload, currentRound)))
+            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload, currentRound)))
             .sum
         val lockedQty =
           lockedCoins.view
-            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.contract.payload.coin, currentRound)))
+            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload.coin, currentRound)))
             .sum
 
         d0.GetBalanceResponse(

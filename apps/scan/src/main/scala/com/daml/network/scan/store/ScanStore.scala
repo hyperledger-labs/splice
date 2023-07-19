@@ -12,11 +12,10 @@ import com.daml.network.store.{
   ConfiguredDefaultDomain,
   MultiDomainAcsStore,
 }
-import MultiDomainAcsStore.ContractWithState
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.util.{CoinConfigSchedule, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{CoinConfigSchedule, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory

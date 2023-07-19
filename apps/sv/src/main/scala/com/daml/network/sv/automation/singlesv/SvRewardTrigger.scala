@@ -9,9 +9,8 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ReadyContract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -44,7 +43,7 @@ class SvRewardTrigger(
       openMiningRounds <- store.getOpenMiningRoundTriple()
       // find the newest mining round that we can still collect in, and collect if possible
       bestOpenMiningRound = openMiningRounds.toSeq
-        .filter(_.payload.round.number <= svReward.contract.payload.round.number + 10)
+        .filter(_.payload.round.number <= svReward.payload.round.number + 10)
         .maxByOption(_.payload.round.number)
       outcome <- bestOpenMiningRound
         .map(collectSvReward(svReward, _))
@@ -62,7 +61,7 @@ class SvRewardTrigger(
       cmd = svcRules.contractId
         .exerciseSvcRules_CollectSvReward(
           store.key.svParty.toProtoPrimitive,
-          svReward.contract.contractId,
+          svReward.contractId,
           coinRules.contractId,
           openMiningRound.contractId,
         )
@@ -74,7 +73,7 @@ class SvRewardTrigger(
           svReward.domain,
         )
     } yield TaskSuccess(
-      s"collected `SvReward` of round ${svReward.contract.payload.round.number} and create Coin for SV ${svReward.contract.payload.sv}"
+      s"collected `SvReward` of round ${svReward.payload.round.number} and create Coin for SV ${svReward.payload.sv}"
     )
   }
 
@@ -83,7 +82,7 @@ class SvRewardTrigger(
   ): Future[TaskOutcome] = {
     Future.successful(
       TaskSuccess(
-        s"ignored `SvReward` of round ${svReward.contract.payload.round.number} becase it's too old to be collected"
+        s"ignored `SvReward` of round ${svReward.payload.round.number} becase it's too old to be collected"
       )
     )
   }

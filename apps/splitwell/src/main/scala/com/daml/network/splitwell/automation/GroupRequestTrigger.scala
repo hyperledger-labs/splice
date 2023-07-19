@@ -10,7 +10,8 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.splitwell.store.SplitwellStore
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -41,8 +42,8 @@ class GroupRequestTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val provider = store.providerParty
-    val user = PartyId.tryFromProtoPrimitive(req.contract.payload.group.owner)
-    val groupId = req.contract.payload.group.id
+    val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
+    val groupId = req.payload.group.id
     for {
       queryResult <- store.lookupGroupWithOffset(user, groupId)
       taskOutcome <- queryResult match {
@@ -50,14 +51,14 @@ class GroupRequestTrigger(
           logger.info(
             s"Rejecting duplicate group request from user party $user for group id ${groupId.unpack}"
           )
-          val cmd = req.contract.contractId.exerciseGroupRequest_Reject()
+          val cmd = req.contractId.exerciseGroupRequest_Reject()
           connection
             .submitWithResultNoDedup(Seq(provider), Seq(), cmd, req.domain)
             .map(_ => TaskSuccess("rejected request for already existing group."))
 
         case QueryResult(offset, None) =>
           val acceptCmd =
-            req.contract.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
+            req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
           connection
             .submitCommands(
               actAs = Seq(provider),

@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.Confirmation
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -47,12 +47,12 @@ class ExpireStaleConfirmationsTrigger(
       svcRules <- store.getSvcRules()
       domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       cmd = svcRules.contractId.exerciseSvcRules_ExpireStaleConfirmation(
-        task.work.contract.contractId
+        task.work.contractId
       )
       _ <- svTaskContext.connection
         .submitWithResultNoDedup(Seq(store.key.svParty), Seq(store.key.svcParty), cmd, domainId)
     } yield TaskSuccess(
-      s"successfully expired the confirmation with cid ${task.work.contract.contractId}"
+      s"successfully expired the confirmation with cid ${task.work.contractId}"
     )
   }
 }

@@ -37,7 +37,7 @@ private[automation] final class SvcRulesTransferTrigger(
         if (activeDomain == svcRules.domain) OptionT.none[Future, Unit]
         else OptionT.pure[Future](())
     } yield TransferCommand.Out(
-      contractId = svcRules.contract.contractId,
+      contractId = svcRules.contractId,
       source = svcRules.domain,
       target = activeDomain,
     )
@@ -57,7 +57,7 @@ private[automation] final class SvcRulesTransferTrigger(
     for {
       svcRules <- store.lookupSvcRules()
     } yield svcRules.forall { rc =>
-      rc.contract.contractId != task.work.contractId || rc.domain != task.work.source
+      rc.contractId != task.work.contractId || rc.domain != task.work.source
     }
 }
 

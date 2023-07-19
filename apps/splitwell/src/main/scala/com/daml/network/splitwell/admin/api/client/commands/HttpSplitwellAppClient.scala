@@ -7,8 +7,8 @@ import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpComman
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.splitwell as http
-import com.daml.network.store.MultiDomainAcsStore.{ContractState, ContractWithState}
-import com.daml.network.util.{Contract, Codec, TemplateJsonDecoder}
+import com.daml.network.store.MultiDomainAcsStore.ContractState
+import com.daml.network.util.{Contract, ContractWithState, Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext

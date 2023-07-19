@@ -13,8 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
-import com.daml.network.util.DisclosedContracts
+import com.daml.network.util.{DisclosedContracts, ReadyContract}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -47,9 +46,9 @@ class AcceptedAppPaymentRequestsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val provider = store.providerParty
     val transferInProgressId = splitwellCodegen.TransferInProgress.ContractId.unsafeFromInterface(
-      payment.contract.payload.deliveryOffer
+      payment.payload.deliveryOffer
     )
-    val round = payment.contract.payload.round
+    val round = payment.payload.round
     def rejectPayment(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
@@ -57,7 +56,7 @@ class AcceptedAppPaymentRequestsTrigger(
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting accepted app payment: $reason")
-      val cmd = payment.contract.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
+      val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
       connection
         .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd, domainId, disclosedContracts)
         .map(_ => TaskSuccess(s"rejected accepted app payment: $reason"))
@@ -81,7 +80,7 @@ class AcceptedAppPaymentRequestsTrigger(
                 )
               )
             cmd = transferInProgress.contractId.exerciseTransferInProgress_CompleteTransfer(
-              payment.contract.contractId,
+              payment.contractId,
               transferContext,
             )
             _ <- connection.submitCommandsNoDedup(
@@ -97,7 +96,7 @@ class AcceptedAppPaymentRequestsTrigger(
             .getAppTransferContext(store.providerParty)
             .flatMap { case (transferContext, disclosedContracts) =>
               rejectPayment(
-                s"Round ${payment.contract.payload.round} is no longer active: $err",
+                s"Round ${payment.payload.round} is no longer active: $err",
                 transferContext,
                 payment.domain,
                 disclosedContracts,

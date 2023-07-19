@@ -12,12 +12,11 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
 import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
-import com.daml.network.store.{Limit, LimitHelpers, MultiDomainAcsStore}
-import MultiDomainAcsStore.ContractWithState
+import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -387,7 +386,7 @@ class DbScanStore(
 
   override def listImportCrates(receiverParty: PartyId)(implicit
       tc: TraceContext
-  ): Future[Seq[MultiDomainAcsStore.ContractWithState[ImportCrate.ContractId, ImportCrate]]] =
+  ): Future[Seq[ContractWithState[ImportCrate.ContractId, ImportCrate]]] =
     waitUntilAcsIngested {
       for {
         rows <- storage

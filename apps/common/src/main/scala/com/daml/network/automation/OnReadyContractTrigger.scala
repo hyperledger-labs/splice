@@ -5,13 +5,13 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ReadyContract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import MultiDomainAcsStore.{ContractState, ReadyContract}
+import MultiDomainAcsStore.ContractState
 
 /** A trigger for processing ready contracts. Note that the trigger
   * can get called multiple times for the same contract as it gets transferred betweend domains.
@@ -35,7 +35,7 @@ abstract class OnReadyContractTrigger[C, TCid <: ContractId[_], T](
       task: ReadyContract[TCid, T]
   )(implicit tc: TraceContext): Future[Boolean] =
     store.multiDomainAcsStore
-      .lookupContractById(companion)(task.contract.contractId: TCid)
+      .lookupContractById(companion)(task.contractId: TCid)
       .map(
         _.forall(_.state != ContractState.Assigned(task.domain))
       )

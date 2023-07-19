@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.MultiDomainAcsStore.ReadyContract
+import com.daml.network.util.ReadyContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -40,7 +40,7 @@ class ExpiredDirectoryEntryTrigger(
       ]]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val cmd =
-      co.work.contract.contractId
+      co.work.contractId
         .exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
     store.domains.waitForDomainConnection(store.defaultAcsDomain).flatMap { domainId =>
       connection

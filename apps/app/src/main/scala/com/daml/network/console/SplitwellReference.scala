@@ -12,8 +12,8 @@ import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
-import com.daml.network.store.MultiDomainAcsStore.{ContractWithState, ContractState, ReadyContract}
-import com.daml.network.util.Contract
+import com.daml.network.store.MultiDomainAcsStore.ContractState
+import com.daml.network.util.{Contract, ContractWithState, ReadyContract}
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
@@ -299,7 +299,7 @@ final class SplitwellAppClientReference(
       actAs = Seq(party),
       readAs = Seq.empty,
       install.exerciseSplitwellInstall_AcceptInvite(
-        groupInvite.contract.contractId
+        groupInvite.contractId
       ),
       disclosedContracts = Seq(groupInvite.contract.toDisclosedContract),
       domainId = Some(domain),

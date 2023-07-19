@@ -4,7 +4,8 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient
-import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
+import com.daml.network.store.CNNodeAppStore
+import com.daml.network.util.ReadyContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -14,7 +15,6 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-import MultiDomainAcsStore.ReadyContract
 import TransferFollowTrigger.LubTask
 
 /** Trigger that submits transfers to make contracts "follow" another contract, e.g.,
@@ -45,7 +45,7 @@ class TransferFollowTrigger(
       _ <- connection.submitTransferAndWaitNoDedup(
         submitter = partyId,
         command = LedgerClient.TransferCommand.Out(
-          contractId = task.follower.contract.contractId,
+          contractId = task.follower.contractId,
           source = task.follower.domain,
           target = task.leader.domain,
         ),
@@ -60,7 +60,7 @@ class TransferFollowTrigger(
   )(implicit tc: TraceContext): Future[Boolean] =
     isContractAbsentFromDomain(
       task.leader.domain,
-      task.leader.contract.contractId,
+      task.leader.contractId,
     )
       .flatMap { leaderAbsent =>
         if (leaderAbsent) {
@@ -68,7 +68,7 @@ class TransferFollowTrigger(
         } else {
           isContractAbsentFromDomain(
             task.follower.domain,
-            task.follower.contract.contractId,
+            task.follower.contractId,
           )
         }
       }

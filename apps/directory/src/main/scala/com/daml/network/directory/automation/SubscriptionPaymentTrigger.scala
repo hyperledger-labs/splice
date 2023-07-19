@@ -14,8 +14,8 @@ import com.daml.network.directory.DirectoryUtil
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ReadyContract}
-import com.daml.network.util.{Contract, DisclosedContracts}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.util.{Contract, DisclosedContracts, ReadyContract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
