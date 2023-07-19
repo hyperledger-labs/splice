@@ -305,7 +305,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Reap << parameters.cluster >> if lock older than 6 hours
@@ -498,7 +498,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview", "none"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview", "none"]
         default: "none"
       additional_nix_args:
         type: string
@@ -829,7 +829,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
@@ -864,7 +864,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - run:
           name: Checkout cluster version
@@ -947,7 +947,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - run_bash_command_in_nix:
           when: always
@@ -990,7 +990,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
       channel_notify:
         # This parameter allows selecting different notification channels, which can be handy when a subteam
         # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
@@ -1223,7 +1223,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
       use_published_artifacts:
         type: boolean
         default: false
@@ -1275,7 +1275,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
       restore_cluster:
         type: boolean
         default: false
@@ -1321,7 +1321,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
     steps:
       - checkout
       - record_job_start_time
@@ -1359,7 +1359,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
       channel_notify:
         type: string
         # #team-canton-network-internal-ci
@@ -1471,7 +1471,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg", "staging", "devnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet"]
       channel_notify:
         type: string
         # #team-canton-network-internal-ci
@@ -1553,7 +1553,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnetf", "scratchnetg"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg"]
       channel_notify:
         type: string
         # #team-canton-network-internal-ci
@@ -1615,6 +1615,8 @@ jobs:
           cluster: "scratchnetc"
       - cluster_lock_reaper:
           cluster: "scratchnetd"
+      - cluster_lock_reaper:
+          cluster: "scratchnete"
       - cluster_lock_reaper:
           cluster: "scratchnetf"
       - cluster_lock_reaper:
@@ -2233,6 +2235,81 @@ workflows:
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetd"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check
+
+  deploy_scratchnet_E:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnete"
           context:
             - canton-network-vpn
             - datadog
