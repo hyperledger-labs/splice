@@ -38,6 +38,8 @@ import {
   WalletBalance,
   SubscriptionRequestWithContext,
   AppPaymentRequest,
+  Unknown,
+  Notification,
 } from '../models/models';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
@@ -133,13 +135,8 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           }));
           const { date, transactionSubtype } = item;
 
-          if (!item.coinPrice) {
-            console.error('Transaction does not contain coinPrice.', item);
-            return [];
-          }
-          const coinPrice = new BigNumber(item.coinPrice);
-
           if (item.transactionType === 'balance_change') {
+            const coinPrice = new BigNumber(item.coinPrice!);
             const balanceChange: BalanceChange = {
               transactionType: 'balance_change',
               transactionSubtype,
@@ -150,6 +147,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             };
             return [balanceChange];
           } else if (item.transactionType === 'transfer') {
+            const coinPrice = new BigNumber(item.coinPrice!);
             const transfer: Transfer = {
               transactionType: 'transfer',
               transactionSubtype,
@@ -163,6 +161,23 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               coinPrice,
             };
             return [transfer];
+          } else if (item.transactionType === 'notification') {
+            const notification: Notification = {
+              transactionType: 'notification',
+              transactionSubtype,
+              id,
+              date,
+              details: item.details!,
+            };
+            return [notification];
+          } else if (item.transactionType === 'unknown') {
+            const unknown: Unknown = {
+              transactionType: 'unknown',
+              transactionSubtype,
+              id,
+              date,
+            };
+            return [unknown];
           } else {
             console.error('Unsupported transaction type.', item);
             return [];

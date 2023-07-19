@@ -27,7 +27,7 @@ class DirectoryUtilTest extends BaseTest with BaseTestWordSpec {
       }
 
       "be false for names with" should {
-        val validNames = Table(
+        val invalidNames = Table(
           ("statement", "name"),
           ("empty string", ""),
           ("empty string with suffix", ".unverified.cns"),
@@ -38,7 +38,7 @@ class DirectoryUtilTest extends BaseTest with BaseTestWordSpec {
           ("too many characters", "my_very_l0ng_cns_nam3_with_over_40_characters.unverified.cns"),
         )
 
-        forAll(validNames) { (statement, name) =>
+        forAll(invalidNames) { (statement, name) =>
           s"$statement" in {
             DirectoryUtil.isValidEntryName(name) shouldBe false
           }

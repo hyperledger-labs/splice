@@ -25,9 +25,11 @@ export interface WalletBalance {
 export interface TransactionSubtype {
   templateId: string;
   choice: string;
+  coinOperation?: string;
 }
 
-export type Transaction = Transfer | BalanceChange;
+export type Transaction = Transfer | BalanceChange | Notification | Unknown;
+
 export interface Transfer {
   id: string;
   transactionType: 'transfer';
@@ -39,6 +41,7 @@ export interface Transfer {
   date: Date;
   coinPrice: BigNumber;
 }
+
 export interface BalanceChange {
   id: string;
   transactionType: 'balance_change';
@@ -46,6 +49,21 @@ export interface BalanceChange {
   receivers: TransactionReceiver[];
   date: Date;
   coinPrice: BigNumber;
+}
+
+export interface Notification {
+  id: string;
+  transactionType: 'notification';
+  transactionSubtype: TransactionSubtype;
+  date: Date;
+  details: string;
+}
+
+export interface Unknown {
+  id: string;
+  transactionType: 'unknown';
+  transactionSubtype: TransactionSubtype;
+  date: Date;
 }
 
 export interface TransactionReceiver {

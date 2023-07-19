@@ -5,9 +5,14 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.config.CNNodeConfigTransforms
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import org.scalatest.Assertion
 
+import java.time.Duration
+import java.util.UUID
 import scala.collection.parallel.immutable.ParVector
 
 class WalletTransactionHistoryFrontendIntegrationTest
@@ -24,6 +29,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
+      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withCoinPrice(coinPrice)
 
   "A wallet transaction history UI" should {
@@ -250,6 +256,57 @@ class WalletTransactionHistoryFrontendIntegrationTest
           },
         )
 
+      }
+    }
+
+    "shows notification transactions" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
+
+      val (offerCid, _) =
+        actAndCheck(
+          "Alice creates transfer offer",
+          aliceWalletClient.createTransferOffer(
+            bobUserParty,
+            1000.0,
+            "direct transfer test",
+            CantonTimestamp.now().plus(Duration.ofMinutes(1)),
+            UUID.randomUUID.toString,
+          ),
+        )(
+          "Bob sees transfer offer",
+          _ => bobWalletClient.listTransferOffers() should have length 1,
+        )
+
+      clue("Bob accepts transfer offer") {
+        bobWalletClient.acceptTransferOffer(offerCid)
+        // At this point, Alice's automation fails to complete the accepted offer
+      }
+
+      checkTxHistory(
+        aliceWalletClient,
+        Seq({ case logEntry: walletLogEntry.Notification =>
+          logEntry.transactionSubtype shouldBe walletLogEntry.Notification.DirectTransferFailed
+          logEntry.details should startWith("ITR_InsufficientFunds")
+        }),
+      )
+
+      // Only Alice should see notification (note that aliceValidator is shared between tests)
+      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, 1000)
+      validatorTxLogBefore should be(validatorTxLogAfter)
+      checkTxHistory(bobWalletClient, Seq.empty)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceWalletClient.config.ledgerApiUser)
+        val notifications = find(className("tx-row-notification"))
+        notifications.fold(fail("Unable to find notifiation transaction row")) { notification =>
+          notification.childElement(className("tx-action")).text shouldBe "Notification"
+          notification
+            .childElement(className("tx-subtype"))
+            .text
+            .replaceAll("[()]", "") shouldBe "P2P Payment Failed"
+        }
       }
     }
   }

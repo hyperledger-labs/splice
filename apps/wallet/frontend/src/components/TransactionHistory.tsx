@@ -8,6 +8,8 @@ import {
   AccountBalanceWallet,
   ArrowCircleLeftOutlined,
   ArrowCircleRightOutlined,
+  ErrorOutlineOutlined,
+  InfoOutlined,
 } from '@mui/icons-material';
 import {
   Button,
@@ -103,7 +105,7 @@ const TransactionHistoryRow: React.FC<TransactionHistoryRowProps> = ({
   primaryPartyId,
 }) => {
   return (
-    <TableRow className="tx-row">
+    <TableRow className={`tx-row tx-row-${transaction.transactionType}`}>
       <TableCell>
         <TransactionIconAction transaction={transaction} primaryPartyId={primaryPartyId} />
       </TableCell>
@@ -145,6 +147,14 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
         text = 'Received';
       }
       break;
+    case 'notification':
+      icon = <InfoOutlined fontSize="small" />;
+      text = 'Notification';
+      break;
+    case 'unknown':
+      icon = <ErrorOutlineOutlined fontSize="small" />;
+      text = 'Unknown Event';
+      break;
   }
 
   return (
@@ -166,7 +176,21 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
   switch (subtype.choice) {
     case 'WalletAppInstall_ExecuteBatch':
       // WalletAutomation
-      text = 'Automation';
+      switch (subtype.coinOperation) {
+        case 'CO_CompleteAcceptedTransfer':
+          text = 'P2P Payment Failed';
+          break;
+        case 'CO_SubscriptionMakePayment':
+          text = 'Subscription Payment Failed';
+          break;
+        case undefined:
+        case null:
+          text = 'Automation';
+          break;
+        default:
+          console.warn('Unknown Transaction Coin Operation', subtype);
+          text = subtype.choice;
+      }
       break;
     case 'SubscriptionIdleState_MakePayment':
       // SubscriptionPaymentAccepted
@@ -274,11 +298,12 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
 const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transaction }) => {
   const primaryPartyId = usePrimaryParty();
 
-  if (transaction.transactionType === 'balance_change') {
+  if (transaction.transactionType !== 'transfer') {
     return <></>;
   }
 
   let senderOrReceiver;
+
   if (transaction.receivers.length === 0) {
     senderOrReceiver = (
       <Typography className="sender-or-receiver" data-selenium-text="Automation" variant="body1">
@@ -352,7 +377,12 @@ interface TransactionAmountProps {
   transaction: Transaction;
   primaryPartyId: Party;
 }
+
 const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, primaryPartyId }) => {
+  if (transaction.transactionType === 'notification' || transaction.transactionType === 'unknown') {
+    return <></>;
+  }
+
   let amountCC: BigNumber;
   switch (transaction.transactionType) {
     case 'transfer':
