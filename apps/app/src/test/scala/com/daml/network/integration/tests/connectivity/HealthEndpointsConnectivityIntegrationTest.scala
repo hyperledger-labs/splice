@@ -52,10 +52,9 @@ class HealthEndpointsConnectivityIntegrationTest extends CNNodeIntegrationTest {
       "sv1 app should report as active",
       _ => {
         sv1Backend.httpHealth.successOption.exists(_.active) shouldBe true
+        sv1Backend.httpLive shouldBe true
+        sv1Backend.httpReady shouldBe true
       },
     )
-
-    sv1Backend.httpLive shouldBe true
-    sv1Backend.httpReady shouldBe true
   }
 }
