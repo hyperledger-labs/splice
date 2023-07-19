@@ -1,6 +1,13 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
+import com.daml.network.codegen.java.cn.svcrules.{
+  ActionRequiringConfirmation,
+  SvcRulesConfig,
+  SvcRules_SetConfig,
+}
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
@@ -8,7 +15,7 @@ import scala.util.Random
 
 class SvTimeBasedOnboardingIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment {
-  "expire stale `SvOnboardingRequest`, `SvOnboardingConfirmed` and `ValidatorOnboarding` contracts" in {
+  "expire stale `SvOnboardingRequest`, `SvOnboardingConfirmed`,`ValidatorOnboarding` and `VoteRequest` contracts" in {
     implicit env =>
       clue("Initialize SVC with 3 SVs") {
         startAllSync(
@@ -138,6 +145,47 @@ class SvTimeBasedOnboardingIntegrationTest
             sv1Backend
               .listOngoingValidatorOnboardings()
               .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 0,
+        )
+      }
+
+      clue("archive expired `VoteRequest` contracts") {
+        actAndCheck(
+          "sv1 creates a new vote request", {
+            val newConfig = new SvcRulesConfig(
+              sv1Backend.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold,
+              sv1Backend.getSvcInfo().svcRules.payload.config.actionConfirmationTimeout,
+              sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingRequestTimeout,
+              sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingConfirmedTimeout,
+              sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+              sv1Backend.getSvcInfo().svcRules.payload.config.leaderInactiveTimeout,
+              sv1Backend.getSvcInfo().svcRules.payload.config.domainNodeConfigLimits,
+              sv1Backend.getSvcInfo().svcRules.payload.config.maxTextLength,
+              sv1Backend.getSvcInfo().svcRules.payload.config.initialTrafficGrant,
+              sv1Backend.getSvcInfo().svcRules.payload.config.globalDomain,
+            )
+
+            val action: ActionRequiringConfirmation =
+              new ARC_SvcRules(new SRARC_SetConfig(new SvcRules_SetConfig(newConfig)))
+
+            sv1Backend.createVoteRequest(
+              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+              action,
+              "url",
+              "description",
+            )
+          },
+        )(
+          "sv1 can see the new vote request",
+          _ => {
+            sv1Backend.listVoteRequests() should not be empty
+          },
+        )
+
+        actAndCheck("one week has passed", advanceTime(JavaDuration.ofDays(8)))(
+          "the vote request is not displayed anymore",
+          _ => {
+            sv1Backend.listVoteRequests() shouldBe empty
+          },
         )
       }
   }

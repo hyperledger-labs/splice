@@ -11,21 +11,22 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.ExecutionContext
 import com.daml.network.sv.automation.leaderbased.{
   AdvanceOpenMiningRoundTrigger,
+  ArchiveDuplicateValidatorTrafficTrigger,
   CompletedSvOnboardingTrigger,
-  SvTaskBasedTrigger,
   ExecuteConfirmedActionTrigger,
   ExecuteVoteRequestActionTrigger,
-  ArchiveDuplicateValidatorTrafficTrigger,
+  ExpireIssuingMiningRoundTrigger,
+  ExpireRewardCouponsTrigger,
+  ExpireStaleConfirmationsTrigger,
+  ExpireVoteRequestTrigger,
   ExpiredCoinTrigger,
   ExpiredLockedCoinTrigger,
-  ExpiredSvOnboardingRequestTrigger,
   ExpiredSvOnboardingConfirmedTrigger,
-  SvcRewardTrigger,
-  ExpireIssuingMiningRoundTrigger,
-  ExpireStaleConfirmationsTrigger,
+  ExpiredSvOnboardingRequestTrigger,
   GarbageCollectCoinPriceVotesTrigger,
   MergeUnclaimedRewardsTrigger,
-  ExpireRewardCouponsTrigger,
+  SvTaskBasedTrigger,
+  SvcRewardTrigger,
 }
 
 class LeaderBasedAutomationService(
@@ -56,6 +57,7 @@ class LeaderBasedAutomationService(
 
   registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
+  registerTrigger(new ExpireVoteRequestTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
   registerTrigger(new SvcRewardTrigger(triggerContext, svTaskContext))
   registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))

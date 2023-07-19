@@ -176,6 +176,32 @@ testRemoveMember = do
     nonMemberVoteCids = []
     duplicateVoteCids = [[sv3VoteCid, sv3VoteCid]]
 
+-- | vote request contract is archived if it has expired
+testVoteRequestExpire : Script ()
+testVoteRequestExpire = do
+  (_, svc, (sv1, _, _, _)) <- initMainNetCollective
+  provider <- allocateParty "provider"
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
+    requester = sv1
+    action = ARC_SvcRules with
+      svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
+        provider
+    reason = Reason with url = ""; body = "they are great!"
+
+  submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_VoteRequest_Expire with
+    cid=requestCid
+    choiceArg=VoteRequest_Expire
+
+  passTime(days 7)
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_VoteRequest_Expire with
+    cid=requestCid
+    choiceArg=VoteRequest_Expire
+
+  return ()
+
 
 -- Coin Prices
 --------------

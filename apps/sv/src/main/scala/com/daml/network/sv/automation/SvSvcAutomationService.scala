@@ -13,14 +13,7 @@ import com.daml.network.sv.automation.confirmation.{
   SummarizingMiningRoundTrigger,
   SvOnboardingRequestTrigger,
 }
-import com.daml.network.sv.automation.singlesv.{
-  PublishLocalCometBftNodeConfigTrigger,
-  ReconcileCometBftNetworkConfigWithSvcRulesTrigger,
-  ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger,
-  RestartLeaderBasedAutomationTrigger,
-  SvcRulesTransferTrigger,
-  SvRewardTrigger,
-}
+import com.daml.network.sv.automation.singlesv.*
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
@@ -30,7 +23,6 @@ import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.sv.automation.singlesv.PeriodicAcsStoreBackupTrigger
 
 class SvSvcAutomationService(
     clock: Clock,
@@ -140,4 +132,5 @@ class SvSvcAutomationService(
           ),
     )
   )
+
 }

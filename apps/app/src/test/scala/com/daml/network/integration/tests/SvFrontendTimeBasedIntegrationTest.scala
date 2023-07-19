@@ -6,7 +6,6 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-
 import org.openqa.selenium.WebDriver
 
 import java.time.Duration as JavaDuration

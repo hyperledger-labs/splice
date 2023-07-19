@@ -3,37 +3,28 @@ package com.daml.network.sv.store
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.Identifier
-import javab.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
-import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.codegen.java.cc.v1test as v1testcc
 import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive, UnclaimedReward}
-import com.daml.network.codegen.java.cn.svonboarding as so
-import com.daml.network.codegen.java.cc.validatorlicense as vl
+import com.daml.network.codegen.java.cc.{v1test as v1testcc, validatorlicense as vl}
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
-import com.daml.network.codegen.java.cn.svcrules.{
-  ActionRequiringConfirmation,
-  SvcRules_ConfirmSvOnboarding,
-  VoteRequest,
-}
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.cn.svcrules.{
+  ActionRequiringConfirmation,
+  SvcRules_ConfirmSvOnboarding,
+  VoteRequest,
+}
+import com.daml.network.codegen.java.cn.svonboarding as so
+import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{
-  AcsStoreDump,
-  CNNodeAppStoreWithoutHistory,
-  ConfiguredDefaultDomain,
-  InMemoryMultiDomainAcsStore,
-  MultiDomainAcsStore,
-  PageLimit,
-  TxLogStore,
-}
+import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{
   ContractCompanion,
   ContractState,
@@ -48,8 +39,8 @@ import com.daml.network.sv.store.SvSvcStore.{
   ignoredContractsForAcsDump,
 }
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
-import com.daml.network.util.{CNNodeUtil, Contract}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
+import com.daml.network.util.{CNNodeUtil, Contract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -194,6 +185,9 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   def listLockedExpiredCoins
       : ListExpiredContracts[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin] =
     listExpiredRoundBased(cc.coin.LockedCoin.COMPANION)(_.coin)
+
+  def listExpiredVoteRequests(): ListExpiredContracts[VoteRequest.ContractId, VoteRequest] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)(_.expiresAt)
 
   def listConfirmations(
       action: cn.svcrules.ActionRequiringConfirmation

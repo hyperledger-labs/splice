@@ -183,6 +183,14 @@ template VoteRequest
       view = ExpiringContractView with
         expiresAt
 
+    -- Archive if we are past the `expiresAt`.
+    choice VoteRequest_Expire : ()
+      controller svc
+      do
+        now <- getTime
+        require "Vote Request has expired" (now >= expiresAt)
+        pure ()
+
 -- | A `Vote` created by an SV operator in response to a specific `VoteRequest`.
 template Vote
   with
@@ -608,6 +616,15 @@ template SvcRules with
           executed = execute
           acceptedBy = map (.voter) $ filter (.accept) votes
           rejectedBy = map (.voter) $ filter (\vote -> not vote.accept) votes
+
+    nonconsuming choice SvcRules_VoteRequest_Expire : ()
+      with
+        cid : ContractId VoteRequest
+        choiceArg : VoteRequest_Expire
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cid choiceArg
 
 
     -- Voting on the coin price
