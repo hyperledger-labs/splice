@@ -54,6 +54,13 @@ If you can view this documentation, you already enabled the VPN successfully.
 Generating the CometBft node identity
 -------------------------------------
 
+.. note::
+  You need access to the canton `network docker repo <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_ to successfully generate the node identity.
+  You can access your username and get the API key for your Artifactory account through the UI, using the top right `Edit profile` option.
+
+  | This can be configured by running:
+  | :code:`docker login -u <your_artifactory_user> -p <your_artifactory_api_key> digitalasset-canton-network-docker.jfog.io`
+
 Every SV node also deploys a CometBft node. This node must be configured to join the existing Canton network BFT chain.
 To do that, you first must generate the keys that will identify the node.
 
