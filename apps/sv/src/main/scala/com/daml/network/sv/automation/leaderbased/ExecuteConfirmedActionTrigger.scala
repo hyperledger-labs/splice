@@ -18,10 +18,9 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
   CRARC_MiningRound_StartIssuing,
 }
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.sv.SvApp.{isDevNet, isSvcMemberName, isSvcMemberParty}
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.{Contract, ReadyContract}
+import com.daml.network.util.ReadyContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -131,12 +130,12 @@ class ExecuteConfirmedActionTrigger(
         arcSvcRules.svcAction match {
           case confirmSvAction: SRARC_ConfirmSvOnboarding =>
             for {
-              isSvOnboardingConfirmed <- store.multiDomainAcsStore
-                .findContractOnDomainWithOffset(SvOnboardingConfirmed.COMPANION)(
+              isSvOnboardingConfirmed <- store
+                .lookupSvOnboardingConfirmedByPartyOnDomain(
+                  PartyId.tryFromProtoPrimitive(
+                    confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberParty
+                  ),
                   confirmation.domain,
-                  (c: Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]) =>
-                    c.payload.svc == store.key.svcParty.toProtoPrimitive &&
-                      c.payload.svParty == confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberParty,
                 )
                 .map(_.value.nonEmpty)
               newMemberParty = PartyId.tryFromProtoPrimitive(

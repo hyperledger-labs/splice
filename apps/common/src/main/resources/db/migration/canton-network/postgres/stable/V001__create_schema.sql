@@ -267,3 +267,132 @@ create index sv_acs_store_sid_tid_vocs
 create index sv_acs_store_sid_tid_asicn
     on sv_acs_store (store_id, template_id, sv_candidate_name)
     where sv_candidate_name is not null;
+
+
+-- SVC store
+------------------
+
+create table svc_acs_store
+(
+    like acs_store_template including all,
+
+    -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
+    foreign key (store_id) references store_descriptors (id),
+
+    -- index columns
+    ----------------
+
+    -- In Coin/LockedCoin contracts, round_of_expiry = (created_at_round + (initial_amount / rate_per_round))
+    -- as defined in CNNodeUtil.coinExpiresAt
+    coin_round_of_expiry          bigint,
+
+    -- the round in which an AppReward or ValidatorReward was rewarded
+    reward_round                  bigint,
+
+    -- the app provider in an AppRewardCoupon OR the user in a ValidatorRewardCoupon
+    reward_party                  text,
+
+    -- the round in an Open/Close MiningRound contract
+    mining_round                  bigint,
+
+    -- The ActionRequiringConfirmation in contracts Confirmation and VoteRequest
+    -- we store as json because we don't expect to have that many contracts.
+    -- Ideally we would store a hash, but that fails with a HashingError.ForbiddenContractId
+    action_requiring_confirmation jsonb,
+
+    -- the confirmer party in a Confirmation contract
+    confirmer                     text,
+
+    -- the token in an SvOnboardingRequest
+    sv_onboarding_token           text,
+
+    -- The party and name of the candidate respectively, in an SvOnboardingRequest or SvOnboardingConfirmed
+    sv_candidate_party            text,
+    sv_candidate_name             text,
+
+    -- the validator party in a ValidatorLicense or ValidatorTraffic
+    validator                     text,
+
+    -- the traffic purchased in a ValidatorTraffic
+    total_traffic_purchased       bigint,
+
+    -- the SV in a CoinPriceVote contract, or the voter in a Vote contract
+    voter                         text,
+
+    -- the contract id of a VoteRequest in a Vote contract
+    vote_request_cid              text,
+
+    -- the requester in a VoteRequest or ElectionRequest contract
+    requester                     text,
+
+    -- the epoch in an ElectionRequest
+    election_request_epoch        bigint,
+
+    -- the receiver in an ImportCrate
+    import_crate_receiver         text
+);
+
+-- ordered mining rounds
+create index svc_acs_store_sid_tid_mr
+    on svc_acs_store (store_id, template_id, mining_round)
+    where mining_round is not null;
+
+-- list expired coins
+create index svc_acs_store_sid_tid_croe
+    on svc_acs_store (store_id, template_id, coin_round_of_expiry)
+    where coin_round_of_expiry is not null;
+
+-- list confirmations
+create index svc_acs_store_sid_tid_ah_c
+    on svc_acs_store (store_id, template_id, action_requiring_confirmation, confirmer)
+    where action_requiring_confirmation is not null;
+
+-- list rewards
+create index svc_acs_store_sid_tid_rr_rp
+    on svc_acs_store (store_id, template_id, reward_round, reward_party)
+    where reward_round is not null and reward_party is not null;
+
+-- lookup sv onboarding by token
+create index svc_acs_store_sid_tid_sot
+    on svc_acs_store (store_id, template_id, sv_onboarding_token)
+    where sv_onboarding_token is not null;
+
+-- lookup sv onboarding by party and/or name
+create index svc_acs_store_sid_tid_scp_scn
+    on svc_acs_store (store_id, template_id, sv_candidate_party, sv_candidate_name)
+    where sv_candidate_party is not null;
+
+-- lookup sv onboarding by name
+create index svc_acs_store_sid_tid_scn
+    on svc_acs_store (store_id, template_id, sv_candidate_name)
+    where sv_candidate_name is not null;
+
+-- list votes by voter & vote request contract id
+create index svc_acs_store_sid_tid_v_vrc
+    on svc_acs_store (store_id, template_id, voter, vote_request_cid)
+    where voter is not null;
+
+-- list votes by vote request contract id
+create index svc_acs_store_sid_tid_vrc
+    on svc_acs_store (store_id, template_id, vote_request_cid)
+    where vote_request_cid is not null;
+
+-- list by validator
+create index svc_acs_store_sid_tid_v_tp
+    on svc_acs_store (store_id, template_id, validator, total_traffic_purchased)
+    where validator is not null;
+
+-- list vote requests
+create index svc_acs_store_sid_tid_ah_r
+    on svc_acs_store (store_id, template_id, action_requiring_confirmation, requester)
+    where action_requiring_confirmation is not null;
+
+-- list election requests
+create index svc_acs_store_sid_tid_ere_r
+    on svc_acs_store (store_id, template_id, election_request_epoch, requester)
+    where election_request_epoch is not null and requester is not null;
+
+-- list import crates
+create index svc_acs_store_sid_tid_icr
+    on svc_acs_store (store_id, template_id, import_crate_receiver)
+    where import_crate_receiver is not null;

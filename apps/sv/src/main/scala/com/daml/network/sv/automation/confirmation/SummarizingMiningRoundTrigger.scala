@@ -15,6 +15,7 @@ import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.Limit
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.{Contract, ReadyContract}
@@ -144,19 +145,11 @@ class SummarizingMiningRoundTrigger(
       traceContext: TraceContext,
   ): Future[RoundRewards] = {
     for {
-      appRewardCoupons <- store.multiDomainAcsStore.filterContractsOnDomain(
-        cc.coin.AppRewardCoupon.COMPANION,
+      appRewardCoupons <- store.listAppRewardCouponsOnDomain(round, domain, Limit.DefaultLimit)
+      validatorRewardCoupons <- store.listValidatorRewardCouponsOnDomain(
+        round,
         domain,
-        (c: Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
-          c.payload.round.number == round,
-      )
-      validatorRewardCoupons <- store.multiDomainAcsStore.filterContractsOnDomain(
-        cc.coin.ValidatorRewardCoupon.COMPANION,
-        domain,
-        (c: Contract[
-          cc.coin.ValidatorRewardCoupon.ContractId,
-          cc.coin.ValidatorRewardCoupon,
-        ]) => c.payload.round.number == round,
+        Limit.DefaultLimit,
       )
     } yield {
       RoundRewards(
