@@ -123,11 +123,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       bucket: backupBucket,
     };
     const end = new Date(Date.parse(bootstrappingConfig.date));
-    // We search within an interval of 10 weeks. Given that we typically deploy
-    // the SV runbook against testnet-preview once per week, and so get backups once per week,
-    // this gives us a threshold to make sure each node has one backup in that interval
+    // We search within an interval of 2 hours. Given that we usually backups every 10min, this gives us
+    // more than enough of a threshold to make sure each node has one backup in that interval
     // while also having sufficiently few backups that the bucket query is fast.
-    const start = new Date(end.valueOf() - 10 * 7 * 24 * 60 * 60 * 1000);
+    const start = new Date(end.valueOf() - 2 * 60 * 60 * 1000);
     const bootstrappingDumpConfig = {
       bucket: backupBucket,
       cluster: bootstrappingConfig.cluster,
