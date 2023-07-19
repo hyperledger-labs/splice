@@ -37,6 +37,7 @@ parameters:
 notify-fail: &notify-fail
   context: slack-context
   post-steps:
+    - set-failed-parallel-run-url
     # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
     # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
     - slack/notify:
@@ -45,7 +46,7 @@ notify-fail: &notify-fail
         channel: C05DT77QF5M
         event: fail
         custom: |
-          { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST:-$CIRCLE_BUILD_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${CIRCLE_BUILD_URL}|CI Build>)" }
+          { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build>)" }
 
 main-branch-only: &main-branch-only
   filters:
@@ -932,6 +933,14 @@ commands:
           path: todo-out/todos
           destination: todos
 
+  set-failed-parallel-run-url:
+    steps:
+      - run:
+          name: Set FAILED_PARALLEL_RUN_URL
+          when: always
+          command: |
+            echo "export FAILED_PARALLEL_RUN_URL=\"https://app.circleci.com/pipelines/github/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/<< pipeline.number >>/workflows/${CIRCLE_WORKFLOW_ID}/jobs/${CIRCLE_BUILD_NUM}/parallel-runs/${CIRCLE_NODE_INDEX}\"" >> "$BASH_ENV"
+
   # Actually downloading the logs is too slow so we only print the command and ask people
   # to run it for the apps they really need.
   print_gcloud_logs_commands:
@@ -989,6 +998,7 @@ commands:
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
     steps:
+      - set-failed-parallel-run-url
       # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
       # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
       - slack/notify:
@@ -996,7 +1006,7 @@ commands:
           branch_pattern: main
           event: fail
           custom: |
-            { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST:-$CIRCLE_BUILD_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${CIRCLE_BUILD_URL}|CI Build>)" }
+            { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build>)" }
 
   docker_build:
     steps:
