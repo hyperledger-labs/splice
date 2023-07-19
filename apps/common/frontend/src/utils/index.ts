@@ -6,3 +6,4 @@ export * from './OpenAPILoggingMiddleware';
 export * from './logging';
 export * from './BaseApiMiddleware';
 export * from './temporal-fns';
+export * from './coinRules';

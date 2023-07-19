@@ -1,6 +1,11 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { ErrorDisplay, Loading, microsecondsToMinutes } from 'common-frontend';
+import {
+  ErrorDisplay,
+  getCoinConfigurationAsOfNow,
+  Loading,
+  microsecondsToMinutes,
+} from 'common-frontend';
 import { CoinConfig } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/CC/CoinConfig/module';
 import { SteppedRate } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/CC/Fees/module';
 import { useGetCoinRules } from 'common-frontend/scan-api';
@@ -17,8 +22,6 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-
-import { getLatestActiveCoinConfig, getNextCoinConfigUpdateTime } from '../utils';
 
 const NetworkInfo: React.FC = () => {
   const getCoinRulesQuery = useGetCoinRules();
@@ -44,7 +47,12 @@ const NetworkInfo: React.FC = () => {
                   Fees exist because of x and z. Here are important things you should know...
                 </Typography>
               </Stack>
-              <FeesTable coinConfig={getLatestActiveCoinConfig(getCoinRulesQuery.data)} />
+              <FeesTable
+                coinConfig={
+                  getCoinConfigurationAsOfNow(getCoinRulesQuery.data.payload.configSchedule)
+                    .initialValue
+                }
+              />
               <NextConfigUpdate />
             </Stack>
           </CardContent>
@@ -55,7 +63,11 @@ const NetworkInfo: React.FC = () => {
 
 const NextConfigUpdate: React.FC = () => {
   const { data: coinRules } = useGetCoinRules();
-  const configurationUpdate = coinRules && getNextCoinConfigUpdateTime(coinRules);
+
+  const futureValues =
+    coinRules && getCoinConfigurationAsOfNow(coinRules.payload.configSchedule).futureValues;
+  const configurationUpdate =
+    futureValues && futureValues.length > 0 && new Date(futureValues[0]._1);
 
   return (
     <Stack spacing={2}>

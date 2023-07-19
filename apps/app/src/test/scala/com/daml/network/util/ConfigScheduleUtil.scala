@@ -85,10 +85,6 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
     val coinRulesCid = sv1ScanBackend.getCoinRules().contract.contractId
     val sv1Party = sv1Backend.getSvcInfo().svParty
 
-    val formerConfigSchedule = clue("Get current coin config schedule") {
-      sv1ScanBackend.getCoinRules().contract.payload.configSchedule
-    }
-
     val voteRequestCid = clue("request vote for config schedule change") {
       val (_, voteRequestCid) = actAndCheck(
         "sv1 creates a vote request", {
@@ -144,16 +140,13 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
                   s"the ${sv.name} vote has been cast",
                   _ => {
                     sv.listVotes(Vector(voteRequestCid.contractId)) should have size voteCount
+                    sv.listVoteRequests() shouldBe empty
                   },
                 )
               }
             case _ =>
           }
         })
-      eventually() {
-        val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
-        currentConfigSchedule should not be formerConfigSchedule
-      }
     }
   }
 }

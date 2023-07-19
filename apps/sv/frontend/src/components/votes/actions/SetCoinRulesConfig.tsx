@@ -1,4 +1,4 @@
-import { Loading } from 'common-frontend';
+import { getCoinConfigurationAsOfNow, Loading } from 'common-frontend';
 import React from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';
@@ -8,7 +8,6 @@ import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../../../contexts/SvContext';
-import { getCoinConfigurationAsOfNow } from '../../../utils';
 import ConfigurationNavigator from '../../../utils/ConfigurationNavigator';
 
 const SetCoinConfig: React.FC<{

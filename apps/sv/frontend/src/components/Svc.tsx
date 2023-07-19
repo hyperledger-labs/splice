@@ -2,6 +2,7 @@ import { UseQueryResult } from '@tanstack/react-query';
 import {
   durationToInterval,
   ErrorDisplay,
+  getCoinConfigurationAsOfNow,
   Loading,
   PartyId,
   SvClientProvider,
@@ -22,7 +23,7 @@ import { useSvcInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';
 import { useMediatorStatus } from '../hooks/useMediatorStatus';
 import { useSequencerStatus } from '../hooks/useSequencerStatus';
-import { config, getCoinConfigurationAsOfNow } from '../utils';
+import { config } from '../utils';
 
 function getInfoTable(title: string, rows: { key: string; value: string; isParty: boolean }[]) {
   return (

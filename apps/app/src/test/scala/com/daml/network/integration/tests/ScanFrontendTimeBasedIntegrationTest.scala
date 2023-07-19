@@ -4,18 +4,11 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{
-  ConfigScheduleUtil,
-  FrontendLoginUtil,
-  TimeTestUtil,
-  WalletTestUtil,
-  DomainFeesTestUtil,
-}
+import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.daml.network.util.CNNodeUtil
 
-import scala.jdk.CollectionConverters.*
 import java.time.{Duration, Instant}
+import scala.jdk.CollectionConverters.*
 
 class ScanFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
@@ -112,7 +105,7 @@ class ScanFrontendTimeBasedIntegrationTest
       }
     }
 
-    "see expected current coin config" in { implicit env =>
+    "see expected current and future coin configurations" in { implicit env =>
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck("Go to Scan UI main page", go to "http://localhost:3006")(
           "Check the initial coin config matches the defaults",
@@ -148,52 +141,81 @@ class ScanFrontendTimeBasedIntegrationTest
 
       val newHoldingFee = 0.1
 
-      clue("schedule a config change, and advance time for it to take effect") {
-        val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+      // Note that the ledger time is in 1970. It will however not change anything because
+      // `sv1ScanBackend.getCoinRules().contract.payload.configSchedule`
+      // is a contract such as it was written when it got accepted (e.g. like in 1970).
+      // The values are not processed as of now, but the frontend does post-process
+      // the Coin Rules contract to get the actual coin configurations (see getCoinConfigurationAsOfNow()).
+      val ledgerNow = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+      val javaYesterday = Instant.now().minusSeconds(86400) // yesterday
+      val javaTomorrow = Instant.now().plusSeconds(86400) // tomorrow
 
-        val ledgerNow = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-        val javaTomorrow = Instant.now().plusSeconds(86400) // one day later in seconds
+      actAndCheck(
+        "schedule a coin configuration in which the last configuration's time was yesterday", {
+          val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
 
-        // Create two configs: the first scheduled one tick from now, so we can test changes to the coin config display itself
-        // The second is scheduled one day past real-time, so we can test the "Next update at..." display, since the TimeBased tests start at
-        // the beginning of the epoch, 1970, and thus wouldn't show up in the browser (which checks for future values relative to local time)
-        val configSchedule =
-          createConfigSchedule(
-            currentConfigSchedule,
-            (
-              defaultTickDuration.asJava,
-              mkUpdatedCoinConfig(
-                currentConfigSchedule,
-                tickDuration = defaultTickDuration,
-                holdingFee = newHoldingFee,
+          val configSchedule =
+            createConfigSchedule(
+              currentConfigSchedule,
+              (
+                Duration.between(ledgerNow.toInstant, javaYesterday),
+                mkUpdatedCoinConfig(
+                  currentConfigSchedule,
+                  tickDuration = defaultTickDuration,
+                  holdingFee = 2 * newHoldingFee,
+                ),
               ),
-            ),
-            (
-              Duration.between(ledgerNow.toInstant, javaTomorrow),
-              mkUpdatedCoinConfig(
-                currentConfigSchedule,
-                tickDuration = defaultTickDuration,
-                holdingFee = newHoldingFee,
+            )
+          setConfigSchedule(configSchedule)
+        },
+      )(
+        "check that the new config has changed in the UI",
+        _ => {
+          withFrontEnd("scan-ui") { implicit webDriver =>
+            find(id("holding-fee")).value.text should matchText(
+              s"${2 * newHoldingFee} CC/Round"
+            )
+
+            find(id("next-config-update")).value.text should equal(
+              "No currently scheduled configuration changes"
+            )
+          }
+        },
+      )
+
+      actAndCheck(
+        "schedule a coin configuration in which the configuration's time is tomorrow", {
+          val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+
+          val configSchedule =
+            createConfigSchedule(
+              currentConfigSchedule,
+              (
+                Duration.between(ledgerNow.toInstant, javaTomorrow),
+                mkUpdatedCoinConfig(
+                  currentConfigSchedule,
+                  tickDuration = defaultTickDuration,
+                  holdingFee = 3 * newHoldingFee,
+                ),
               ),
-            ),
-          )
-        setConfigSchedule(configSchedule)
-        advanceRoundsByOneTick
-        advanceRoundsByOneTick
-      }
+            )
+          setConfigSchedule(configSchedule)
+        },
+      )(
+        "check that the next change will be applied in 24 hours",
+        _ => {
+          withFrontEnd("scan-ui") { implicit webDriver =>
+            find(id("holding-fee")).value.text should matchText(
+              s"${sv1ScanBackend.getCoinRules().contract.payload.configSchedule.initialValue.transferConfig.holdingFee.rate} CC/Round"
+            )
 
-      clue("check new config change in the UI") {
-        withFrontEnd("scan-ui") { implicit webDriver =>
-          find(id("holding-fee")).value.text should matchText(
-            s"${newHoldingFee} CC/Round"
-          )
+            find(id("next-config-update")).value.text should equal("1 day").or(
+              equal("About 24 hours")
+            )
+          }
+        },
+      )
 
-          // depending on timing, we might dip below 23 hours, 59 mins, 30 seconds which results in this string from date-fns
-          find(id("next-config-update")).value.text should (equal("1 day") or equal(
-            "about 24 hours"
-          ))
-        }
-      }
     }
 
     "See expected domain fees leaderboard" in { implicit env =>
