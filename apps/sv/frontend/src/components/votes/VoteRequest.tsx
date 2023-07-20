@@ -24,6 +24,7 @@ import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import RemoveMember from './actions/RemoveMember';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetCoinRulesConfig from './actions/SetCoinRulesConfig';
+import SetCoinRulesEnabledChoices from './actions/SetCoinRulesEnabledChoices';
 import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 
 const VoteRequest: React.FC = () => {
@@ -38,6 +39,7 @@ const VoteRequest: React.FC = () => {
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
     { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
     { name: 'Set CoinRules Configuration', value: 'CRARC_SetConfigSchedule' },
+    { name: 'Set CoinRules Enabled Choices', value: 'CRARC_SetEnabledChoices' },
   ];
 
   const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
@@ -98,6 +100,9 @@ const VoteRequest: React.FC = () => {
           {actionName === 'SRARC_SetConfig' && <SetSvcRulesConfig chooseAction={chooseAction} />}
           {actionName === 'CRARC_SetConfigSchedule' && (
             <SetCoinRulesConfig chooseAction={chooseAction} />
+          )}
+          {actionName === 'CRARC_SetEnabledChoices' && (
+            <SetCoinRulesEnabledChoices chooseAction={chooseAction} />
           )}
           <Typography variant="h5">Reason</Typography>
 

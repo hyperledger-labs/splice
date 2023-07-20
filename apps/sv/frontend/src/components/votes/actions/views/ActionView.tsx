@@ -1,6 +1,6 @@
 import { PartyId } from 'common-frontend';
 import dayjs from 'dayjs';
-import React, { useState } from 'react';
+import React, { ReactElement, useState } from 'react';
 
 import {
   Chip,
@@ -17,12 +17,27 @@ import {
 import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
 import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
-import { SvcRulesConfig } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
-
-import { ActionRequiringConfirmation } from '../../../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
+import { EnabledChoices } from '@daml.js/canton-coin-api-0.1.0/lib/CC/API/V1/Coin';
+import {
+  ActionRequiringConfirmation,
+  SvcRulesConfig,
+} from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action }) => {
   const actionType = action.tag;
+
+  const trueElement = <Typography>True</Typography>;
+  const falseElement = <Typography>False</Typography>;
+
+  function convertEnabledChoices(booleanObject: EnabledChoices): {
+    [key: string]: ReactElement<JSX.Element>;
+  } {
+    return Object.keys(booleanObject).reduce((result, key) => {
+      // @ts-ignore
+      result[key] = booleanObject[key] ? trueElement : falseElement;
+      return result;
+    }, {});
+  }
 
   if (action.tag === 'ARC_SvcRules') {
     const svcAction = action.value.svcAction;
@@ -84,6 +99,15 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
           />
         );
       }
+      case 'CRARC_SetEnabledChoices': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={coinRulesAction.tag}
+            valuesMap={convertEnabledChoices(coinRulesAction.value.newEnabledChoices)}
+          />
+        );
+      }
     }
   }
   return <p>Not yet implemented for this action</p>;
@@ -122,7 +146,11 @@ const ActionValueTable: React.FC<{
                   <TableCell>
                     <Typography variant="h6">{key}</Typography>
                   </TableCell>
-                  <TableCell>{valuesMap[key]}</TableCell>
+                  <TableCell>
+                    {typeof valuesMap[key] == 'boolean'
+                      ? valuesMap[key].toString()
+                      : valuesMap[key]}
+                  </TableCell>
                 </TableRow>
               ))}
           </TableBody>

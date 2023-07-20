@@ -113,6 +113,9 @@ const ListVoteRequests: React.FC = () => {
         case 'CRARC_SetConfigSchedule': {
           return `${coinRulesAction.tag}`;
         }
+        case 'CRARC_SetEnabledChoices': {
+          return `${coinRulesAction.tag}`;
+        }
       }
     }
     return 'Action tag not defined.';

@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2023-07-23
+----------
+
+* Frontend updates:
+    * Enhanced the SetEnabledChoices Vote Request to modify the CoinRules Choices, providing increased configurability and control over the Coin.
+    * Various Frontend improvements.
+
 2023-07-16
 ----------
 

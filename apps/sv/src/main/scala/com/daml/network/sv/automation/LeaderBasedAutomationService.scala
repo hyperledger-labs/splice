@@ -3,31 +3,13 @@ package com.daml.network.sv.automation
 import akka.stream.Materializer
 import com.daml.network.automation.AutomationService
 import com.daml.network.environment.RetryProvider
+import com.daml.network.sv.automation.leaderbased.*
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
-import com.daml.network.sv.automation.leaderbased.{
-  AdvanceOpenMiningRoundTrigger,
-  ArchiveDuplicateValidatorTrafficTrigger,
-  CompletedSvOnboardingTrigger,
-  ExecuteConfirmedActionTrigger,
-  ExecuteVoteRequestActionTrigger,
-  ExpireIssuingMiningRoundTrigger,
-  ExpireRewardCouponsTrigger,
-  ExpireStaleConfirmationsTrigger,
-  ExpireVoteRequestTrigger,
-  ExpiredCoinTrigger,
-  ExpiredLockedCoinTrigger,
-  ExpiredSvOnboardingConfirmedTrigger,
-  ExpiredSvOnboardingRequestTrigger,
-  GarbageCollectCoinPriceVotesTrigger,
-  MergeUnclaimedRewardsTrigger,
-  SvTaskBasedTrigger,
-  SvcRewardTrigger,
-}
 
 class LeaderBasedAutomationService(
     clock: Clock,
