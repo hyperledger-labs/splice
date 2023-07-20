@@ -947,7 +947,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
     steps:
       - run_bash_command_in_nix:
           when: always
@@ -990,7 +990,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
       channel_notify:
         # This parameter allows selecting different notification channels, which can be handy when a subteam
         # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
@@ -1223,7 +1223,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
       use_published_artifacts:
         type: boolean
         default: false
@@ -1275,7 +1275,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
       restore_cluster:
         type: boolean
         default: false
@@ -1321,7 +1321,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
     steps:
       - checkout
       - record_job_start_time
@@ -1359,7 +1359,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
       channel_notify:
         type: string
         # #team-canton-network-internal-ci
@@ -1471,7 +1471,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet"]
       channel_notify:
         type: string
         # #team-canton-network-internal-ci
@@ -2535,6 +2535,84 @@ workflows:
         requires:
           - wait_for_previous_pipeline
 
+  deploy_cidaily:
+    when:
+      # equal: [ deploy-cidaily, << pipeline.parameters.run-job >> ]
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        <<: *main-branch-never
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - deployment_test:
+        <<: *notify-fail
+        <<: *main-branch-never
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-never
+        context:
+          - artifactory
+          - slack-context
+        workflow_names: "deploy_cidaily cidaily_health_check"
+    - deploy_cluster:
+        <<: *main-branch-never
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cidaily"
+        requires:
+           - deployment_test
+           - docker_images_push
+           - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: "cidaily"
+        <<: *main-branch-never
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - deployment_test
+          - docker_images_push
+          - deploy_cluster
+    - publish_public_release:
+        <<: *main-branch-never
+        requires:
+          - preflight_check
+        context:
+          - artifactory
+          - datadog
+    - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "cidaily"
+          use_published_artifacts: true
+          requires:
+            - deploy_cluster
+            - publish_public_release
+    - preflight_sv_check:
+        <<: *main-branch-never
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "cidaily"
+        requires:
+          - deploy_sv_runbook
+
   deploy_devnet:
     when:
       equal: [ deploy-devnet, << pipeline.parameters.run-job >> ]
@@ -2745,6 +2823,29 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: "devnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+             - wait_for_previous_pipeline
+
+  cidaily_health_check:
+    when:
+      equal: [ healthcheck-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_cidaily"
+      - preflight_check:
+          <<: *main-branch-only
+          cluster: "cidaily"
           context:
             - artifactory
             - canton-network-vpn
