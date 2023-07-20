@@ -371,32 +371,45 @@ class FoundingNodeInitializer(
               }
             }
             cmds = AcsStoreDump.extractImportCommands(svcParty)(jsonDump.contracts.toSeq)
-            _ = logger.debug(
-              show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
-            )
             _ <-
-              // Note: we assume that the Acs dump is small enough to be imported in a single transaction.
-              svcStoreWithIngestion.connection
-                .submitCommandsNoDedup(
-                  actAs = Seq(svcParty),
-                  readAs = Seq.empty,
-                  commands = cmds,
-                  domainId = domainId,
+              if (cmds.isEmpty) {
+                logger.debug(
+                  show"Extracted zero import commands; not going to submit any transaction."
                 )
-
+                Future.unit
+              } else {
+                logger.debug(
+                  show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
+                )
+                // Note: we assume that the Acs dump is small enough to be imported in a single transaction.
+                svcStoreWithIngestion.connection
+                  .submitCommandsNoDedup(
+                    actAs = Seq(svcParty),
+                    readAs = Seq.empty,
+                    commands = cmds,
+                    domainId = domainId,
+                  )
+              }
           } yield {
-            import com.daml.network.util.PrettyInstances.*
-
-            val openMiningRounds = AcsStoreDump.extractOpenMiningRounds(jsonDump.contracts)
-            if (!(openMiningRounds.size == 3))
-              logger.error(
-                show"Expected 3 open mining rounds, but found ${openMiningRounds.size} open mining rounds: ${openMiningRounds
-                    .map(_.toValue)}"
+            if (cmds.isEmpty) {
+              logger.debug(
+                "Skipping importing an ACS snapshot, as no ImportCommands are extracted from the acs dump."
               )
-            logger.info(
-              s"Completed importing ACS store dump by submitting ${cmds.size} commands in one transaction."
-            )
-            Some(openMiningRounds)
+              None
+            } else {
+              import com.daml.network.util.PrettyInstances.*
+
+              val openMiningRounds = AcsStoreDump.extractOpenMiningRounds(jsonDump.contracts)
+              if (!(openMiningRounds.size == 3))
+                logger.error(
+                  show"Expected 3 open mining rounds, but found ${openMiningRounds.size} open mining rounds: ${openMiningRounds
+                      .map(_.toValue)}"
+                )
+              logger.info(
+                s"Completed importing ACS store dump by submitting ${cmds.size} commands in one transaction."
+              )
+              Some(openMiningRounds)
+            }
           }
       }
 

@@ -8,6 +8,7 @@ import com.daml.network.config.CNNodeConfigTransforms.{
 }
 import com.daml.network.config.GcpBucketConfig
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.sv.config.SvBootstrapDumpConfig
 import com.daml.network.util.{GcpBucket, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
@@ -198,5 +199,57 @@ final class GcpAcsStoreDumpImportIntegrationTest
   override def bootstrapDumpConfig(name: String) = {
     initializeBucket(name)
     SvBootstrapDumpConfig.Gcp(GcpBucketConfig.inferForTesting, bucketPath(name))
+  }
+}
+
+final class FileEmptyAcsStoreDumpImportIntegrationTest extends CNNodeIntegrationTest {
+  final protected val emptyAcsDumpFilename =
+    AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpDir.resolve(
+      "acs-dump_empty.json"
+    )
+
+  def bootstrapDumpConfig() = {
+    val fileContent = File(emptyAcsDumpFilename).contentAsString
+    val fixedFileContent = fileContent
+    val fixedFile: File = Files.createTempFile("empty-acs-dump_fixed_test_suffixes", ".json")
+    fixedFile.overwrite(fixedFileContent)
+    SvBootstrapDumpConfig.File(fixedFile.path)
+  }
+
+  override def environmentDefinition: CNNodeEnvironmentDefinition =
+    CNNodeEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      .addConfigTransforms(
+        (_, config) =>
+          updateAllAutomationConfigs(c =>
+            c.copy(
+              // Need to disable these triggers so we can comfortably use checkWallet
+              enableAutomaticRewardsCollectionAndCoinMerging = false,
+              enableSvRewards = false,
+            )
+          )(config),
+        (_, config) =>
+          updateAllSvAppFoundCollectiveConfigs_ { c =>
+            c.copy(bootstrappingDump = Some(bootstrapDumpConfig()))
+          }(config),
+      )
+      .withManualStart
+
+  "sv1" should {
+    "not crash when loading a acs dump with no contracts" in { implicit env =>
+      clue("Start sv1 with empty acs dump configured")(
+        loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.DEBUG))(
+          startAllSync(sv1ScanBackend, sv1ValidatorBackend, sv1Backend),
+          logEntries => {
+            forAtLeast(1, logEntries)(logEntry => {
+              logEntry.loggerName should endWith("SV=sv1")
+              logEntry.message should startWith(
+                "Skipping importing an ACS snapshot, as no ImportCommands are extracted from the acs dump."
+              )
+            })
+          },
+        )
+      )
+    }
   }
 }
