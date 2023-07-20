@@ -23,7 +23,7 @@ parameters:
     default: "17"
   run-job:
     type: enum
-    enum: [build, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-cidaily, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   mark-for-testnet:
     type: boolean
@@ -498,7 +498,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview", "none"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview", "none"]
         default: "none"
       additional_nix_args:
         type: string
@@ -829,7 +829,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
     steps:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
@@ -864,7 +864,7 @@ commands:
     parameters:
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "devnet", "testnet", "testnet-preview"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
     steps:
       - run:
           name: Checkout cluster version
