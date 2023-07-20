@@ -93,7 +93,7 @@ const bucketPath = (cluster: string, xns: ExactNamespace): string => {
   return `${cluster}/${xns.logicalName}`;
 };
 
-async function getLatestParticipantIdentityDump(
+async function getLatestParticipantIdentitiesDump(
   bucket: Bucket,
   xns: ExactNamespace,
   cluster: string,
@@ -124,7 +124,7 @@ export function getLatestSvcAcsDumpFile(
   );
 }
 
-export function installParticipantIdentitySecret(
+export function installParticipantIdentitiesSecret(
   xns: ExactNamespace,
   secretName: string,
   content: pulumi.Input<string>
@@ -155,14 +155,14 @@ export function fetchAndInstallParticipantBootstrapDump(
   config: BootstrappingDumpConfig
 ): k8s.core.v1.Secret {
   const bucket = getGcpBucket(config.bucket.config, config.bucket.jsonCredentials);
-  const content = getLatestParticipantIdentityDump(
+  const content = getLatestParticipantIdentitiesDump(
     bucket,
     xns,
     config.cluster,
     config.start,
     config.end
   );
-  return installParticipantIdentitySecret(xns, participantBootstrapDumpSecretName, content);
+  return installParticipantIdentitiesSecret(xns, participantBootstrapDumpSecretName, content);
 }
 
 export async function readAndInstallParticipantBootstrapDump(
@@ -170,5 +170,5 @@ export async function readAndInstallParticipantBootstrapDump(
   file: string
 ): Promise<k8s.core.v1.Secret> {
   const content = await fs.readFile(file, { encoding: 'utf-8' });
-  return installParticipantIdentitySecret(xns, participantBootstrapDumpSecretName, content);
+  return installParticipantIdentitiesSecret(xns, participantBootstrapDumpSecretName, content);
 }

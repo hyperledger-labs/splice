@@ -45,7 +45,7 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
   : undefined;
 
-const participantIdentityFile = process.env.PARTICIPANT_IDENTITY_FILE;
+const participantIdentitiesFile = process.env.PARTICIPANT_IDENTITIES_FILE;
 
 const backupBucketConfig: GcpBucketConfig = {
   projectId: 'da-cn-devnet',
@@ -92,14 +92,14 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     special: true,
   }).result;
 
-  if (participantIdentityFile && bootstrappingConfig) {
+  if (participantIdentitiesFile && bootstrappingConfig) {
     console.error(
       `We can restore participant identities from *either* a file or from GCP,` +
-        `but both PARTICIPANT_IDENTITY_FILE and BOOTSTRAPPING_CONFIG have been set.`
+        `but both PARTICIPANT_IDENTITIES_FILE and BOOTSTRAPPING_CONFIG have been set.`
     );
     exit(1);
-  } else if (participantIdentityFile) {
-    console.error(`Bootstrapping participant identity from file ${participantIdentityFile}`);
+  } else if (participantIdentitiesFile) {
+    console.error(`Bootstrapping participant identity from file ${participantIdentitiesFile}`);
   } else if (bootstrappingConfig) {
     console.error(`Bootstrapping participant identity from cluster ${bootstrappingConfig.cluster}`);
   } else {
@@ -110,10 +110,10 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   let backupConfigSecret: pulumi.Resource | undefined;
   let backupConfig: BackupConfig | undefined;
 
-  if (participantIdentityFile) {
+  if (participantIdentitiesFile) {
     participantBootstrapDumpSecret = await readAndInstallParticipantBootstrapDump(
       svNamespace,
-      participantIdentityFile
+      participantIdentitiesFile
     );
   } else if (bootstrappingConfig) {
     const backupBucket = installGcpBucket(backupBucketConfig);

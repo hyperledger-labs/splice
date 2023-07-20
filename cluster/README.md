@@ -1163,7 +1163,7 @@ Both of the buckets used for data dumps are setup to prune data automatically:
 
 ### Bootstrapping from a Cluster Data Dump
 
-To bootstrap a fresh cluster from an ACS and participant identity data dump, set ``process.env.BOOTSTRAPPING_CONFIG`` to a JSON object specifying
+To bootstrap a fresh cluster from an ACS and participant identities data dump, set ``process.env.BOOTSTRAPPING_CONFIG`` to a JSON object specifying
 the cluster and the date the backup is from. The most recent backup before the specified date will be used to bootstrap from.
 
 ```

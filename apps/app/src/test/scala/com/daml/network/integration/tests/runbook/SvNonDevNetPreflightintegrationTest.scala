@@ -125,7 +125,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
     svClient.cometBftNodeStatus().catchingUp shouldBe false
   }
 
-  "Check that there is a recent participant identity backup on GCP" in { _ =>
+  "Check that there is a recent participant identities backup on GCP" in { _ =>
     testRecentParticipantIdentitiesDump(svNamespace)
   }
 

@@ -85,7 +85,7 @@ abstract class ValidatorAppReference(
     }
   }
 
-  @Help.Summary("Export participant identity")
+  @Help.Summary("Export participant identities")
   @Help.Description(
     "Exports participant ID, secret keys, and necessary topology transactions for cloning to a new participant"
   )

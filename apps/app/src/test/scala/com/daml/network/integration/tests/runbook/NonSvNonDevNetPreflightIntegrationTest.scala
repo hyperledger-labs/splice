@@ -42,11 +42,11 @@ final class NonSvNonDevNetPreflightIntegrationTestBase
     }
   }
 
-  "Check that there is a recent participant identity backup on GCP for validator1" in { _ =>
+  "Check that there is a recent participant identities backup on GCP for validator1" in { _ =>
     testRecentParticipantIdentitiesDump("validator1")
   }
 
-  "Check that there is a recent participant identity backup on GCP for splitwell validator" in {
+  "Check that there is a recent participant identities backup on GCP for splitwell validator" in {
     _ =>
       testRecentParticipantIdentitiesDump("splitwell")
   }
