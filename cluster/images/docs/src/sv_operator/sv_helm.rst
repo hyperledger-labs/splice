@@ -235,7 +235,7 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
 
    - In step b, use ``Directory web UI`` as the name of your application.
    - In steps c and d, use the URL for your SV's *directory* UI.
-     If you're using the ingress configuration of this runbook, that would be ``https://directory.sv.svc.YOUR_CLUSTER_URL``.
+     If you're using the ingress configuration of this runbook, that would be ``https://directory.sv.svc.YOUR_HOSTNAME``.
 
 8. (Optional) Similarly to the ledger API above, the default audience is set to ``https://canton.network.global``.
     If you want to configure a different audience to your APIs, you can do so by creating new Auth0 APIs with an identifier set to the audience of your choice. For example,
