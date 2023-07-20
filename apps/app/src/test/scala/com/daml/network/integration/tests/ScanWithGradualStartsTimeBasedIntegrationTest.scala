@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.codegen.java.cc
 
 import scala.util.Try
 
@@ -26,11 +27,26 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
   "initialize a scan app that joins late" in { implicit env =>
     startAllSync(sv1ScanBackend, sv1Backend, aliceValidatorBackend, bobValidatorBackend)
 
-    val (_, _) = onboardAliceAndBob()
+    val (aliceUserParty, _) = onboardAliceAndBob()
 
     clue("Tap some coin before sv2 scan app starts") {
       aliceWalletClient.tap(20)
       bobWalletClient.tap(3)
+    }
+
+    clue("Create an importCrate for alice with the same value as her existing coin") {
+      val aliceCoin = aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+        .awaitJava(cc.coin.Coin.COMPANION)(aliceUserParty)
+      sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
+        userId = sv1Backend.config.ledgerApiUser,
+        actAs = Seq(svcParty),
+        readAs = Seq.empty,
+        update = new cc.coinimport.ImportCrate(
+          svcParty.toProtoPrimitive,
+          aliceUserParty.toProtoPrimitive,
+          new cc.coinimport.importpayload.IP_Coin(aliceCoin.data),
+        ).create,
+      )
     }
 
     advanceRoundsByOneTick
@@ -58,10 +74,20 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     )
 
     clue("total coin balance on both scan apps should match") {
+      val expectedTotalsRanges = Seq(
+        (0.0, 0.0), // No coin in round 0
+        (
+          42.9,
+          43.0,
+        ), // Alice has 20 CC in Coin + 20 in ImportCrate, Bob has 3 CC, all minus holding fees
+        (45.9, 46.0),
+      ) // Alice has 23 CC in Coin + 20 in ImportCrate, Bob has 3 CC, all minus holding fees
       (0 to 2).foreach(i => {
-        sv1ScanBackend.getTotalCoinBalance(i.toLong) shouldBe sv2ScanBackend.getTotalCoinBalance(
-          i.toLong
-        )
+        val total1 = sv1ScanBackend.getTotalCoinBalance(i.toLong)
+        val total2 = sv2ScanBackend.getTotalCoinBalance(i.toLong)
+        total1 shouldBe total2
+        total1 should be >= BigDecimal(expectedTotalsRanges(i)._1)
+        total1 should be <= BigDecimal(expectedTotalsRanges(i)._2)
       })
     }
   }

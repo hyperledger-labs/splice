@@ -103,21 +103,13 @@ class ScanTxLogParser(
   ): Seq[(DomainId, ScanTxLogParser.TxLogEntry)] = acs.collect(ac =>
     ac.createdEvent match {
       case CoinCreate(c) =>
-        (ac.domainId, entryFromCoinContract(ac.createdEvent.getEventId, c))
+        (ac.domainId, entryFromCoin(None, ac.createdEvent.getEventId, c.payload.amount))
       case LockedCoinCreate(lc) =>
-        (ac.domainId, entryFromLockedCoinContract(ac.createdEvent.getEventId, lc))
+        (ac.domainId, entryFromCoin(None, ac.createdEvent.getEventId, lc.payload.coin.amount))
+      case CoinImportCrate(ic) =>
+        (ac.domainId, entryFromCoin(None, ac.createdEvent.getEventId, ic.amount))
     }
   )
-
-  def entryFromCoinContract(
-      eventId: String,
-      coin: CoinCreate.ContractType,
-  ): TxLogEntry = entryFromCoin(None, eventId, coin.payload.amount)
-
-  def entryFromLockedCoinContract(
-      eventId: String,
-      lc: LockedCoinCreate.ContractType,
-  ): TxLogEntry = entryFromCoin(None, eventId, lc.payload.coin.amount)
 
   override def tryParse(tx: TransactionTree)(implicit
       tc: TraceContext

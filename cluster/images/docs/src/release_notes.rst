@@ -7,8 +7,13 @@ Release Notes
 ----------
 
 * Frontend updates:
+
     * Enhanced the SetEnabledChoices Vote Request to modify the CoinRules Choices, providing increased configurability and control over the Coin.
     * Various Frontend improvements.
+
+* Bugfixes:
+
+    * Fixed issue where Scan app did not aggregate the total coin balance correctly when balance was migrated across network upgrades.
 
 2023-07-16
 ----------
