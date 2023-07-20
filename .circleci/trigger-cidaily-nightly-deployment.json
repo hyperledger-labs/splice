@@ -1,18 +1,18 @@
 {
-    "name": "DevNet Weekly RC Deployment",
-    "description": "Weekly DevNet Release Candidate Deployment",
+    "name": "CIDaily Nightly Re-deployment",
+    "description": "Nightly Re-deployment of CIDaily",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
-      "run-job": "deploy-devnet",
-      "mark-for-testnet": true
+      "run-job": "deploy-cidaily",
+      "mark-for-testnet": false
     },
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
         6
       ],
-      "days-of-week" : [ "THU" ],
+      "days-of-week" : [ "MON", "TUE", "WED", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],
       "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
     }

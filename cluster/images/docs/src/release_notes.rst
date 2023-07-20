@@ -13,6 +13,7 @@ Release Notes
 
 * Bugfixes:
 
+    * Fixed issue where Scan UI showed future coin config changes as if they are current.
     * Fixed issue where Scan app did not aggregate the total coin balance correctly when balance was migrated across network upgrades.
 
 2023-07-16
