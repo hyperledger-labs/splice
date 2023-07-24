@@ -3,6 +3,7 @@ package com.daml.network.environment
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -69,7 +70,9 @@ object TrafficBalanceService {
       trafficLookupService: AvailableTrafficLookupService,
       clock: Clock,
       trafficBalanceCacheTTL: NonNegativeFiniteDuration,
-  ) extends AvailableTrafficLookupService {
+      override protected val loggerFactory: NamedLoggerFactory,
+  ) extends AvailableTrafficLookupService
+      with NamedLogging {
 
     private case class CachedTrafficBalance(
         cacheValidUntil: CantonTimestamp,
@@ -106,11 +109,15 @@ object TrafficBalanceService {
       participantAdminConnection: ParticipantAdminConnection,
       clock: Clock,
       trafficBalanceCacheTTL: NonNegativeFiniteDuration,
+      loggerFactory: NamedLoggerFactory,
   ): TrafficBalanceService = {
     val trafficLookupService = new CachedTrafficLookupService(
-      new ParticipantAdminConnectionTrafficLookupService(participantAdminConnection),
+      new ParticipantAdminConnectionTrafficLookupService(
+        participantAdminConnection
+      ),
       clock,
       trafficBalanceCacheTTL,
+      loggerFactory,
     )
     new TrafficBalanceService {
       override def lookupReservedTraffic(domainId: DomainId): Future[Option[NonNegativeLong]] =

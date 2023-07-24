@@ -13,7 +13,11 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types as damlTypes
-import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection}
+import com.daml.network.environment.{
+  CNLedgerConnection,
+  CommandPriority,
+  ParticipantAdminConnection,
+}
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -217,6 +221,7 @@ class TopupValidatorTrafficBalanceTrigger(
                 ),
                 DedupOffset(dedupOffset),
                 activeDomainId,
+                priority = CommandPriority.High,
               )
               .map(ev =>
                 Left(new ValidatorTrafficCreationIntent.ContractId(ev.contractId.contractId))

@@ -22,7 +22,7 @@ import com.daml.network.codegen.java.cn.wallet.install.{
 }
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.environment.CNLedgerConnection.CommandId
 import com.daml.network.environment.ledger.api.{DedupConfig, DedupDuration}
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
@@ -309,7 +309,8 @@ class HttpWalletHandler(
             }
         )
       })(
-        user
+        user,
+        priority = CommandPriority.High,
       )
     }
 
@@ -734,6 +735,7 @@ class HttpWalletHandler(
       user: String,
       dedup: Option[(CommandId, DedupConfig)] = None,
       dislosedContracts: DisclosedContracts = DisclosedContracts(),
+      priority: CommandPriority = CommandPriority.Low,
   )(implicit tc: TraceContext): Future[Response] = {
     val userWallet = getUserWallet(user)
     val userStore = userWallet.store
@@ -753,6 +755,7 @@ class HttpWalletHandler(
             update,
             domainId,
             dislosedContracts assertOnDomain domainId,
+            priority = priority,
           )
         case Some((commandId, dedupConfig)) =>
           userWallet.connection
@@ -764,6 +767,7 @@ class HttpWalletHandler(
               dedupConfig,
               domainId,
               dislosedContracts assertOnDomain domainId,
+              priority = priority,
             )
       }
 

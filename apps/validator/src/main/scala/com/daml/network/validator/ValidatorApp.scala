@@ -60,6 +60,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -340,6 +341,32 @@ class ValidatorApp(
     participantAdminConnection.ensureDomainRegistered(domainConfig)
   }
 
+  private def newTrafficBalanceService(
+      participantAdminConnection: ParticipantAdminConnection,
+      scanConnection: ScanConnection,
+  ) = {
+    def lookupReservedTraffic(domainId: DomainId): Future[Option[NonNegativeLong]] = {
+      config.domains.global.trafficReservedForTopupsO
+        .fold(Future.successful(Option.empty[NonNegativeLong]))(trafficReservedForTopups => {
+          for {
+            coinRules <- scanConnection.getCoinRules()
+            coinConfig = CoinConfigSchedule(coinRules).getConfigAsOf(clock.now)
+            reservedTraffic = Option.when(
+              coinConfig.globalDomain.requiredDomains.map.containsKey(domainId.toProtoPrimitive)
+            )(trafficReservedForTopups)
+          } yield reservedTraffic
+        })
+    }
+
+    TrafficBalanceService(
+      lookupReservedTraffic,
+      participantAdminConnection,
+      clock,
+      config.domains.global.trafficBalanceCacheTimeToLive,
+      loggerFactory,
+    )
+  }
+
   override def initialize(
       ledgerClient: CNLedgerClient,
       validatorParty: PartyId,
@@ -367,22 +394,6 @@ class ValidatorApp(
         retryProvider,
         loggerFactory,
       )
-      trafficBalanceService = TrafficBalanceService(
-        domainId =>
-          for {
-            coinRules <- scanConnection.getCoinRules()
-            coinConfig = CoinConfigSchedule(coinRules).getConfigAsOf(clock.now)
-            reservedTraffic = Option.when(
-              coinConfig.globalDomain.requiredDomains.map.containsKey(domainId.toProtoPrimitive)
-            )(
-              config.domains.global.trafficReservedForTopups
-            )
-          } yield reservedTraffic,
-        participantAdminConnection,
-        clock,
-        config.domains.global.trafficBalanceCacheTimeToLive,
-      )
-      _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
       svcParty <- scanConnection.getSvcPartyIdWithRetries()
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
@@ -463,6 +474,12 @@ class ValidatorApp(
           logger,
         )
       )
+      // We're registering the trafficBalanceService on the LedgerClient after the validator's wallet
+      // has been installed because the top-up trigger relies on the validator's WalletAppInstall contract
+      // to submit the top-up transaction and we do not want the wallet installation to be throttled by the
+      // balance check.
+      trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)
+      _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
       _ <- ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
       verifier = config.auth match {

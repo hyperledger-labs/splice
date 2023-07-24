@@ -7,7 +7,7 @@ import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 
 import java.nio.file.Path
 
@@ -63,9 +63,9 @@ case class ValidatorGlobalDomainConfig(
     /** amount of extra traffic reserved for transactions required to do traffic topups
       *
       * Note that this will be ignored if the validator is not configured to do topups
-      * i.e. the target throughput is set to zero (its default value).
+      * i.e. the target throughput is set to zero (its default value). See: trafficReservedForTopupsO.
       */
-    trafficReservedForTopups: NonNegativeNumeric[Long] = NonNegativeNumeric.tryCreate(100_000L),
+    trafficReservedForTopups: NonNegativeLong = NonNegativeNumeric.tryCreate(100_000L),
 
     /** The validator's ledger client compares its remaining traffic balance against the reserved amount
       * on every command submission. This setting controls how long the traffic balance is cached before
@@ -73,7 +73,14 @@ case class ValidatorGlobalDomainConfig(
       */
     trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(1),
-)
+) {
+
+  /** Converts the trafficReservedForTopups into an Option that is set to None if the validator is not
+    * configured to do top-ups in the first place
+    */
+  lazy val trafficReservedForTopupsO: Option[NonNegativeLong] =
+    if (buyExtraTraffic.targetThroughput.value <= 0L) None else Some(trafficReservedForTopups)
+}
 
 // Validators are responsible for establishing connections to domains and so need more information than just a `DomainConfig`
 case class ValidatorExtraDomainConfig(

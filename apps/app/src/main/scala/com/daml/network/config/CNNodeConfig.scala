@@ -488,7 +488,7 @@ object CNNodeConfig {
       deriveReader[ValidatorGlobalDomainConfig].emap(config => {
         val trafficPurchasedOnEachTopup =
           config.buyExtraTraffic.targetThroughput.value * config.buyExtraTraffic.minTopupInterval.duration.toSeconds
-        val trafficReservedForTopups = config.trafficReservedForTopups.value
+        val trafficReservedForTopups = config.trafficReservedForTopupsO.fold(0L)(_.value)
         Either.cond(
           // config is valid if either the validator is not configured to do top-ups
           // or the reserved traffic is less than the traffic purchased per top-up

@@ -133,7 +133,9 @@ class CNLedgerConnection(
             case Some(availableTraffic) =>
               if (availableTraffic < reservedTraffic && commandPriority == CommandPriority.Low)
                 throw Status.ABORTED
-                  .withDescription("Traffic balance below amount reserved for top-ups")
+                  .withDescription(
+                    s"Traffic balance below amount reserved for top-ups ($availableTraffic < $reservedTraffic)"
+                  )
                   .asRuntimeException()
               else Future.unit
           }
@@ -159,20 +161,24 @@ class CNLedgerConnection(
       commands: Seq[HasCommands],
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
-  ): Future[Unit] = {
-    callCallbacksOnCompletionAndWaitForOffset(
-      client
-        .submitAndWait(
-          workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = applicationId,
-          actAs = actAs.map(_.toProtoPrimitive),
-          readAs = readAs.map(_.toProtoPrimitive),
-          commands = commands,
-          commandId = uniqueId,
-          deduplicationConfig = NoDedup,
-          disclosedContracts = disclosedContracts assertOnDomain domainId,
-        )
-    )(offset => (offset, ()))
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    for {
+      _ <- verifyEnoughExtraTrafficRemains(domainId, priority)
+      result <- callCallbacksOnCompletionAndWaitForOffset(
+        client
+          .submitAndWait(
+            workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
+            applicationId = applicationId,
+            actAs = actAs.map(_.toProtoPrimitive),
+            readAs = readAs.map(_.toProtoPrimitive),
+            commands = commands,
+            commandId = uniqueId,
+            deduplicationConfig = NoDedup,
+            disclosedContracts = disclosedContracts assertOnDomain domainId,
+          )
+      )(offset => (offset, ()))
+    } yield result
   }
 
   // When using submitAndWaitForTransaction with a command whose resulting transaction is
@@ -187,22 +193,26 @@ class CNLedgerConnection(
       deduplicationOffset: String,
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
-  ): Future[Unit] = {
-    callCallbacksOnCompletionAndWaitForOffset(
-      client
-        .submitAndWait(
-          workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-          applicationId = applicationId,
-          commandId = commandId.commandIdForSubmission,
-          deduplicationConfig = DedupOffset(
-            offset = deduplicationOffset
-          ),
-          actAs = actAs.map(_.toProtoPrimitive),
-          readAs = readAs.map(_.toProtoPrimitive),
-          commands = commands,
-          disclosedContracts = disclosedContracts assertOnDomain domainId,
-        )
-    )(offset => (offset, ()))
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    for {
+      _ <- verifyEnoughExtraTrafficRemains(domainId, priority)
+      result <- callCallbacksOnCompletionAndWaitForOffset(
+        client
+          .submitAndWait(
+            workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
+            applicationId = applicationId,
+            commandId = commandId.commandIdForSubmission,
+            deduplicationConfig = DedupOffset(
+              offset = deduplicationOffset
+            ),
+            actAs = actAs.map(_.toProtoPrimitive),
+            readAs = readAs.map(_.toProtoPrimitive),
+            commands = commands,
+            disclosedContracts = disclosedContracts assertOnDomain domainId,
+          )
+      )(offset => (offset, ()))
+    } yield result
   }
 
   def submitCommandsTransaction(
@@ -242,10 +252,12 @@ class CNLedgerConnection(
       update: Update[T],
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
-  ): Future[T] =
-    submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId, disclosedContracts).map(
-      _._2
-    )
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit tc: TraceContext): Future[T] =
+    submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId, disclosedContracts, priority)
+      .map(
+        _._2
+      )
 
   def submitWithResultAndOffsetNoDedup[T](
       actAs: Seq[PartyId],
@@ -253,7 +265,8 @@ class CNLedgerConnection(
       update: Update[T],
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
-  ): Future[(String, T)] =
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit tc: TraceContext): Future[(String, T)] =
     doSubmitWithResultAndOffset(
       actAs,
       readAs,
@@ -262,6 +275,7 @@ class CNLedgerConnection(
       NoDedup,
       domainId,
       disclosedContracts,
+      priority,
     )
 
   def submitWithResult[T](
@@ -272,7 +286,8 @@ class CNLedgerConnection(
       deduplicationConfig: DedupConfig,
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
-  ): Future[T] =
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit tc: TraceContext): Future[T] =
     doSubmitWithResultAndOffset(
       actAs,
       readAs,
@@ -281,6 +296,7 @@ class CNLedgerConnection(
       deduplicationConfig,
       domainId,
       disclosedContracts,
+      priority,
     )
       .map(_._2)
 
@@ -292,8 +308,10 @@ class CNLedgerConnection(
       dedup: DedupConfig,
       domainId: DomainId,
       disclosedContracts: DisclosedContracts,
-  ): Future[(String, T)] = {
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit tc: TraceContext): Future[(String, T)] = {
     for {
+      _ <- verifyEnoughExtraTrafficRemains(domainId, priority)
       tree <- callCallbacksOnCompletionAndWaitForOffset(
         client
           .submitAndWaitForTransactionTree(
