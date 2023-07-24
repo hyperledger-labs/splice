@@ -151,13 +151,21 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
   }
 
   var cIdCounter = 0
-  protected def directoryEntry(n: Int, name: String, cId: Int = cIdCounter) = {
+  protected def directoryEntry(
+      n: Int,
+      name: String,
+      cId: Int = cIdCounter,
+      entryUrl: String = "https://cns-entry-url.com",
+      entryDescription: String = "Sample fake description",
+  ) = {
     cIdCounter += 1
     val templateId = DirectoryEntry.TEMPLATE_ID
     val template = new DirectoryEntry(
       userParty(n).toProtoPrimitive,
       provider.toProtoPrimitive,
       name,
+      entryUrl,
+      entryDescription,
       Instant.now().plusSeconds(3600),
     )
     Contract(
@@ -169,13 +177,20 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def directoryEntryContext(n: Int, name: String) = {
+  private def directoryEntryContext(
+      n: Int,
+      name: String,
+      entryUrl: String = "https://cns-entry-url.com",
+      entryDescription: String = "Sample fake description",
+  ) = {
     val templateId = DirectoryEntryContext.TEMPLATE_ID
     val template = new DirectoryEntryContext(
       svcParty.toProtoPrimitive,
       provider.toProtoPrimitive,
       userParty(n).toProtoPrimitive,
       name,
+      entryUrl,
+      entryDescription,
     )
     Contract(
       identifier = templateId,

@@ -23,7 +23,11 @@ trait DirectoryTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
     val (_, reqId) = actAndCheck(
       show"Request directory entry ${userName.singleQuoted} for $userParty",
-      directory.requestDirectoryEntry(userName),
+      directory.requestDirectoryEntry(
+        userName,
+        "https://cns-dir-url.com",
+        "Sample CNS Directory Entry Description",
+      ),
     )(
       "There is exactly one subscription request",
       _ => {

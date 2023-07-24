@@ -48,6 +48,8 @@ println("Ensuring that directory entries are allocated correctly...")
 def ensureDirectoryEntry(
     user: PartyId,
     name: String,
+    url: String,
+    description: String,
     directory: DirectoryAppClientReference,
     wallet: WalletAppClientReference,
 ) {
@@ -61,7 +63,7 @@ def ensureDirectoryEntry(
   } catch {
     case e: CommandFailure => {
       println(s"Requesting CNS name \"$name\" for user \"$user\".")
-      directory.requestDirectoryEntry(name)
+      directory.requestDirectoryEntry(name, url, description)
       println("Waiting for wallet initialization to complete")
       wallet.waitForInitialization()
       println("Wallet initialization complete, tapping coin")
@@ -82,9 +84,9 @@ def ensureDirectoryEntry(
     }
   }
 }
-ensureDirectoryEntry(aliceUserParty, "alice.unverified.cns", aliceDirectory, aliceWallet)
-ensureDirectoryEntry(bobUserParty, "bob.unverified.cns", bobDirectory, bobWallet)
-ensureDirectoryEntry(charlieUserParty, "charlie.unverified.cns", charlieDirectory, charlieWallet)
+ensureDirectoryEntry(aliceUserParty, "alice.unverified.cns", "https://alice-url.cns.com", "", aliceDirectory, aliceWallet)
+ensureDirectoryEntry(bobUserParty, "bob.unverified.cns", "https://bob-url.cns.com", "", bobDirectory, bobWallet)
+ensureDirectoryEntry(charlieUserParty, "charlie.unverified.cns", "https://charlie-url.cns.com", "", charlieDirectory, charlieWallet)
 
 println("Waiting for splitwell initialization...")
 providerSplitwellBackend.waitForInitialization()

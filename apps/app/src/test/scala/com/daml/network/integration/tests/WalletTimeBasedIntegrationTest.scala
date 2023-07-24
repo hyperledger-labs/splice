@@ -27,6 +27,8 @@ class WalletTimeBasedIntegrationTest
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
   private val testEntryName = "mycoolentry.unverified.cns"
+  private val testEntryUrl = "https://cns-dir-url.com"
+  private val testEntryDescription = "Sample CNS Directory Entry Description"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -153,7 +155,9 @@ class WalletTimeBasedIntegrationTest
 
             val (_, requestId) = actAndCheck(
               "Request directory entry", {
-                aliceDirectoryClient.requestDirectoryEntry(name)._1
+                aliceDirectoryClient
+                  .requestDirectoryEntry(name, testEntryUrl, testEntryDescription)
+                  ._1
               },
             )(
               "the corresponding subscription request is created",
@@ -564,7 +568,11 @@ class WalletTimeBasedIntegrationTest
       }
 
       val (_, subReqId) = clue("Alice requests a directory entry") {
-        aliceDirectoryClient.requestDirectoryEntry(testEntryName)
+        aliceDirectoryClient.requestDirectoryEntry(
+          testEntryName,
+          testEntryUrl,
+          testEntryDescription,
+        )
       }
       bracket(
         clue("Alice obtains some coins and accepts the subscription") {

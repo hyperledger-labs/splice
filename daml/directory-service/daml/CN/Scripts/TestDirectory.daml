@@ -43,6 +43,8 @@ testWithSubscription = script do
   -- user’s participant.
   (entryContext, subscriptionRequest) <- submit alice.primaryParty $ exerciseCmd directoryInstall DirectoryInstall_RequestEntry with
     name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
 
   -- cc wallet selects a large enough coin
   -- how: cc wallet

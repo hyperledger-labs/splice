@@ -34,6 +34,8 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
   private val testEntryName = "mycoolentry.unverified.cns"
+  private val testEntryUrl = "https://cns-dir-url.com"
+  private val testEntryDescription = "Sample CNS Directory Entry Description"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -236,12 +238,17 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         )
     }
 
-    def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
+    def requestAndPayForEntry(
+        refs: DynamicUserRefs,
+        entryName: String,
+        entryUrl: String = "https://cns-dir-url.com",
+        entryDescription: String = "Sample CNS Directory Entry Description",
+    ) = {
       refs.wallet.tap(5.0)
 
       // Request entry and get some money to pay for it
       val (_, subscriptionRequest) =
-        refs.directory.requestDirectoryEntry(entryName)
+        refs.directory.requestDirectoryEntry(entryName, entryUrl, entryDescription)
 
       // Wait for subscription request to be ingested into store
       // and accept it.
@@ -308,6 +315,8 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
             winnerUserParty.toProtoPrimitive,
             providerParty.toProtoPrimitive,
             testEntryName,
+            entry.payload.url,
+            entry.payload.description,
             entry.payload.expiresAt,
           )
         entry.payload shouldBe entryPayload
@@ -332,6 +341,8 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
             dirParty.toProtoPrimitive,
             dirParty.toProtoPrimitive,
             testEntryName,
+            testEntryUrl,
+            testEntryDescription,
             Instant.now().plus(1, ChronoUnit.SECONDS),
           ).create.commands.asScala.toSeq,
           optTimeout = None,
@@ -384,7 +395,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
         StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWalletClient)
       val aliceRefs = setupUser(aliceStaticRefs)
 
-      clue("invalid entries are rejected") {
+      clue("invalid entries(bad names) are rejected") {
         val invalidNames =
           Seq("alice.company.unverified.cns", "alice$company.unverified.cns", "alice.cns")
         invalidNames.foreach { name =>
@@ -393,6 +404,43 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
               requestAndPayForEntry(aliceRefs, name)
             },
             _.warningMessage should include(s"entry name ($name) is not valid"),
+          )
+        }
+      }
+    }
+
+    "reject invalid entry urls" in { implicit env =>
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+
+      clue("invalid entries(bad urls) are rejected") {
+        val invalidUrls =
+          Seq("s3://alice.arn.cns", "http://asdklfjh%skldjfgh", s"https://${"alice-" * 50}.cns.com")
+        invalidUrls.foreach { url =>
+          loggerFactory.assertLogs(
+            {
+              requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryUrl = url)
+            },
+            _.warningMessage should include(s"entry url ($url) is not valid"),
+          )
+        }
+      }
+    }
+
+    "reject invalid entry descriptions" in { implicit env =>
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+
+      clue("invalid entries(bad descriptions) are rejected") {
+        val invalidDescriptions = Seq("Sample CNS Directory Entry Description -" * 50)
+        invalidDescriptions.foreach { desc =>
+          loggerFactory.assertLogs(
+            {
+              requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryDescription = desc)
+            },
+            _.warningMessage should include(s"entry description ($desc) is not valid"),
           )
         }
       }

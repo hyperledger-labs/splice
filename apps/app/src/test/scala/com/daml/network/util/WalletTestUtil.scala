@@ -420,6 +420,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       env: CNNodeTestConsoleEnvironment
   ): String = {
     val dirEntryName = "directory.cns"
+    val entryUrl = "https://cns-dir-url.com"
+    val entryDescription = "Sample CNS Directory Entry Description"
     val dirParty = directoryBackend.getProviderPartyId()
     directoryBackend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(dirParty),
@@ -427,6 +429,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         dirParty.toProtoPrimitive,
         dirParty.toProtoPrimitive,
         dirEntryName,
+        entryUrl,
+        entryDescription,
         Instant.now().plus(90, ChronoUnit.DAYS),
       ).create.commands.asScala.toSeq,
       optTimeout = None,
@@ -437,11 +441,13 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   protected def createDirectoryEntry(
       userParty: PartyId,
       directory: DirectoryAppClientReference,
-      dirEntry: String,
+      entryName: String,
       wallet: WalletAppClientReference,
       tapAmount: BigDecimal = 5.0,
+      entryUrl: String = "https://cns-dir-url.com",
+      entryDescription: String = "Sample CNS Directory Entry Description",
   ): SubscriptionInitialPayment.ContractId = {
-    requestDirectoryEntry(userParty, directory, dirEntry)
+    requestDirectoryEntry(userParty, directory, entryName, entryUrl, entryDescription)
     wallet.tap(tapAmount)
     eventually() {
       wallet.listSubscriptionRequests() should have length 1
@@ -454,7 +460,9 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   protected def requestDirectoryEntry(
       userParty: PartyId,
       directory: DirectoryAppClientReference,
-      dirEntry: String,
+      entryName: String,
+      entryUrl: String = "https://cns-dir-url.com",
+      entryDescription: String = "Sample CNS Directory Entry Description",
   ) = {
     // Whitelist the directory service on alice's validator
     directory.requestDirectoryInstall()
@@ -462,7 +470,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       directory.ledgerApi.ledger_api_extensions.acs
         .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
-    directory.requestDirectoryEntry(dirEntry)
+    directory.requestDirectoryEntry(entryName, entryUrl, entryDescription)
   }
 
   def createTestDeliveryOffer(

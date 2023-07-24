@@ -17,6 +17,8 @@ template DirectoryEntryContext
     provider : Party
     user : Party
     name : Text
+    url : Text
+    description : Text
   where
     signatory provider, user
 
@@ -62,7 +64,7 @@ template DirectoryEntryContext
         entry <- fetch entryCid
         -- sanity checks
         require "Current entry matches subscription context"
-          ((DirectoryEntryContext svc entry.provider entry.user entry.name) == context)
+          ((DirectoryEntryContext svc entry.provider entry.user entry.name entry.url entry.description) == context)
         require "Subscription entry renewal times are in sync"
           (payment.thisPaymentDueAt == entry.expiresAt)
         -- accept payment
@@ -82,6 +84,8 @@ template DirectoryEntry
     user : Party
     provider : Party
     name : Text
+    url : Text -- either empty or contains a valid http/https url
+    description : Text -- can be empty
     expiresAt : Time
   where
     signatory user, provider
@@ -125,6 +129,8 @@ template DirectoryInstall with
     nonconsuming choice DirectoryInstall_RequestEntry : (ContractId DirectoryEntryContext, ContractId SubscriptionRequest)
       with
         name : Text
+        url : Text
+        description : Text
       controller user
       do
         context <- create DirectoryEntryContext with ..

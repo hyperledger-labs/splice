@@ -148,7 +148,9 @@ class DirectoryAppClientReference(
 
   @Help.Summary("Request DirectoryEntry with the given name, financed via subscription payments")
   def requestDirectoryEntry(
-      name: String
+      name: String,
+      url: String,
+      description: String,
   ): (codegen.DirectoryEntryContext.ContractId, subsCodegen.SubscriptionRequest.ContractId) = {
     val userParty = ledgerApi.ledger_api_extensions.users.getPrimaryParty(config.ledgerApiUser)
     val damlTuple = ledgerApi.ledger_api_extensions.commands
@@ -158,7 +160,9 @@ class DirectoryAppClientReference(
         readAs = Seq.empty,
         update = getDirectoryInstall()
           .exerciseDirectoryInstall_RequestEntry(
-            name
+            name,
+            url,
+            description,
           ),
       )
       .exerciseResult

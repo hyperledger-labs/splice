@@ -46,5 +46,71 @@ class DirectoryUtilTest extends BaseTest with BaseTestWordSpec {
 
       }
     }
+
+    "isValidEntryUrl" should {
+      "be truthy for url with" should {
+        val validUrls = Table(
+          ("statement", "url"),
+          ("empty string", ""),
+          ("https urls", "https://alice.cns.test.com"),
+          ("http urls", "http://alice.cns.test.com"),
+          ("alpha numeric urls", "https://alice123.cns.test.com"),
+        )
+
+        forAll(validUrls) { (statement, url) =>
+          s"$statement" in {
+            DirectoryUtil.isValidEntryUrl(url) shouldBe true
+          }
+        }
+      }
+
+      "be falsy for url with" should {
+        val longUrl = s"https://${"alice-" * 60}entry.cns.com"
+        val invalidUrls = Table(
+          ("statement", "url"),
+          ("invalid URL format", "https://alice.cns domain%"),
+          ("wrong url scheme", "ftp://alice.cns.test.com"),
+          ("url with no scheme", "alice.cns"),
+          ("url longer than 255 characters", longUrl),
+        )
+
+        forAll(invalidUrls) { (statement, url) =>
+          s"$statement" in {
+            DirectoryUtil.isValidEntryUrl(url) shouldBe false
+          }
+        }
+      }
+    }
+
+    "isValidEntryDescription" should {
+      "be truthy for description with" should {
+        val validDescriptions = Table(
+          ("statement", "description"),
+          ("empty string", ""),
+          ("alpha numeric description", "alice 1 Sample CNS Directory Entry Description"),
+        )
+
+        forAll(validDescriptions) { (statement, desc) =>
+          s"$statement" in {
+            DirectoryUtil.isValidEntryDescription(desc) shouldBe true
+          }
+        }
+      }
+
+      "be falsy for description with" should {
+        val longDescription = s"${"Sample CNS Directory Entry Description" * 20}"
+        val invalidDescriptions = Table(
+          ("statement", "url"),
+          ("description longer than 140 characters", longDescription),
+        )
+
+        forAll(invalidDescriptions) { (statement, desc) =>
+          s"$statement" in {
+            DirectoryUtil.isValidEntryDescription(desc) shouldBe false
+          }
+        }
+      }
+    }
+
   }
 }

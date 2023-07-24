@@ -114,10 +114,24 @@ class SubscriptionInitialPaymentTrigger(
         case Right((transferContext, disclosedContracts)) =>
           // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
           val entryName = context.payload.name
+          val entryUrl = context.payload.url
+          val entryDescription = context.payload.description
 
           if (!DirectoryUtil.isValidEntryName(entryName)) {
             rejectPayment(
               s"entry name ($entryName) is not valid",
+              transferContext,
+              disclosedContracts,
+            )
+          } else if (!DirectoryUtil.isValidEntryUrl(entryUrl)) {
+            rejectPayment(
+              s"entry url ($entryUrl) is not valid",
+              transferContext,
+              disclosedContracts,
+            )
+          } else if (!DirectoryUtil.isValidEntryDescription(entryDescription)) {
+            rejectPayment(
+              s"entry description ($entryDescription) is not valid",
               transferContext,
               disclosedContracts,
             )

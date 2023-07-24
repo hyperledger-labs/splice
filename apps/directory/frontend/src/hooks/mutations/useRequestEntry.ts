@@ -33,7 +33,8 @@ const useRequestEntry = (): UseMutationResult<ContractId<SubscriptionRequest>, s
         [],
         DirectoryInstall.DirectoryInstall_RequestEntry,
         directoryInstall,
-        { name: entryName }
+        // TODO(#6862) pass this value from form data
+        { name: entryName, url: '', description: '' }
       );
 
       console.debug('Created SubscriptionRequest');

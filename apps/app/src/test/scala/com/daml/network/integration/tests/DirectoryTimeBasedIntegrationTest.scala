@@ -26,6 +26,8 @@ class DirectoryTimeBasedIntegrationTest
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
   private val testEntryName = "mycoolentry.unverified.cns"
+  private val testEntryUrl = "https://cns-dir-url.com"
+  private val testEntryDescription = "Sample CNS Directory Entry Description"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -53,6 +55,8 @@ class DirectoryTimeBasedIntegrationTest
             dirParty.toProtoPrimitive,
             dirParty.toProtoPrimitive,
             testEntryName,
+            testEntryUrl,
+            testEntryDescription,
             now.plus(Duration.ofDays(90)).toInstant,
           ).create.commands.asScala.toSeq,
           optTimeout = None,
@@ -81,7 +85,11 @@ class DirectoryTimeBasedIntegrationTest
         }
 
         val (_, subReqId) = clue("Alice requests a directory entry") {
-          aliceDirectoryClient.requestDirectoryEntry(testEntryName)
+          aliceDirectoryClient.requestDirectoryEntry(
+            testEntryName,
+            testEntryUrl,
+            testEntryDescription,
+          )
         }
         clue("Alice obtains some coins and accepts the subscription") {
           aliceWalletClient.tap(50.0)
@@ -97,6 +105,8 @@ class DirectoryTimeBasedIntegrationTest
             aliceUserParty.toProtoPrimitive,
             providerParty.toProtoPrimitive,
             testEntryName,
+            testEntryUrl,
+            testEntryDescription,
             entry.payload.expiresAt,
           )
           entry.payload shouldBe expectedPayload
@@ -121,6 +131,8 @@ class DirectoryTimeBasedIntegrationTest
             entry.payload.user,
             entry.payload.provider,
             entry.payload.name,
+            testEntryUrl,
+            testEntryDescription,
             entry.payload.expiresAt.plus(90, ChronoUnit.DAYS),
           )
           renewedEntry.payload shouldBe newEntry
@@ -136,7 +148,11 @@ class DirectoryTimeBasedIntegrationTest
       }
 
       val (_, subReqId) = clue("Alice requests a directory entry") {
-        aliceDirectoryClient.requestDirectoryEntry(testEntryName)
+        aliceDirectoryClient.requestDirectoryEntry(
+          testEntryName,
+          testEntryUrl,
+          testEntryDescription,
+        )
       }
       aliceWalletClient.tap(50.0)
       actAndCheck(
@@ -180,7 +196,11 @@ class DirectoryTimeBasedIntegrationTest
       }
 
       val (_, subReqId) = clue("Alice requests a directory entry") {
-        aliceDirectoryClient.requestDirectoryEntry(testEntryName)
+        aliceDirectoryClient.requestDirectoryEntry(
+          testEntryName,
+          testEntryUrl,
+          testEntryDescription,
+        )
       }
       // to avoid automation triggering before the round change
       bracket(directoryBackend.stop(), directoryBackend.startSync()) {
