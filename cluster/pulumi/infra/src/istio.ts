@@ -70,8 +70,12 @@ function configureGatewayService(
   ingressIp: pulumi.Output<string>,
   istiod: k8s.helm.v3.Release
 ) {
+  const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
   const networkSettings = loadJsonFromFile(
-    process.env.REPO_ROOT + '/cluster/network-settings.json'
+    process.env.REPO_ROOT +
+      (isDevNet
+        ? '/cluster/network-settings-devnet.json'
+        : '/cluster/network-settings-non-devnet.json')
   );
   const externalIPRanges = networkSettings.externalIPRanges;
   return new k8s.helm.v3.Release(

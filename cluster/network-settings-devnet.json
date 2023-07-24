@@ -1,0 +1,78 @@
+// The memory limit settings below control the pod memory request and limits.
+//
+// Hitting the Xms/Xmx memory limit in the JVM will be manifested as an
+// OOM by the JVM itself.  If the Pod is in an OOMKilled state, this
+// signals that an OS process running on the pod (maybe the JVM, maybe
+// something else) was unable to allocate OS memory past the Pod limit.
+
+// Note that for the Pulumi/Helm deployment, none of the memory or CPU
+// settings are currently wired to work. For that deployment, the
+// memory and CPU can be adjusted by passing updated values into the
+// Helm charts.
+
+
+{
+  "domainCpu": 1,
+  "domainMemoryMib": 4096,
+  "participantCpu": 1,
+  "participantMemoryMib": 32768,
+  "postgresCpu": 2,
+  "postgresMemoryMib": 8192,
+  "ledgerDatabaseGib": 40,
+  "numberOfSvNodes": 4,
+  "externalIPRanges": [
+    "35.194.81.56/32",
+    "35.198.147.95/32",
+    "35.189.40.124/32",
+    "34.132.91.75/32",
+    "18.210.210.130/32",
+
+    // DA Clusters
+    // da-cn-scratchnet gcp project
+    // scratchneta
+    "34.28.102.64/32",
+
+    // scratchnetb
+    "34.71.129.232/32",
+
+    // scratchnetc
+    "35.224.32.176/32",
+
+    // staging
+    "34.171.136.234/32",
+
+    // stagingb
+    "34.173.176.161/32",
+
+    // da-cn-devnet gcp project
+    // devnet
+    "104.198.172.213/32",
+
+    // Daml Finance CN Test App
+    "20.250.62.34/32",
+
+    // Daml Hub spike
+    "34.31.226.101/32",
+
+    // Daml Hub Dev
+    "34.27.176.33/32",
+
+    // Daml Hub Staging
+    "34.71.149.222/32",
+
+    // Daml Hub Prod
+    "34.173.27.241/32",
+
+    // SBI Dev
+    "35.76.230.119/32",
+
+    // DRW dev
+    "3.133.222.39/32",
+    "3.14.21.185/32",
+    "3.18.254.138/32"
+  ],
+  "tls": {
+    "issuerName": "letsencrypt-production",
+    "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+  }
+}

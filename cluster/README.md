@@ -776,8 +776,8 @@ Alternatively, you can also modify an installed chart, e.g. to change the values
 ### Memory Settings
 
 The most commonly used memory settings for the cluster (Postgres and the ledger)
-are stored in [`network-settings.json`](./network-settings.json) and
-may be adjusted there. There are also settings for the network whitelist.
+are stored in [`network-settings-devnet.json`](./network-settings-devnet.json) and [`network-settings-non-devnet.json`](./network-settings-non-devnet.json)
+These memory settings may be adjusted there. There are also settings for the network whitelist.
 
 ## TLS Certificate Provisioning
 
