@@ -29,6 +29,7 @@ abstract class PollingParallelTaskExecutionTrigger[T: Pretty]()(implicit
   protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[T]]
 
   /** Returns whether some useful work was done, i.e., at least one task completed. */
+  // TODO(#6856): Reconsider/adapt this logic w.r.t. SV task-based triggers that can busy-loop for followers.
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
       tasks <- retrieveTasks()

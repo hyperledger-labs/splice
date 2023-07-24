@@ -20,7 +20,7 @@ import scala.util.Random
 trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
   protected def svTaskContext: SvTaskBasedTrigger.Context
-  protected def enableLeaderMonitoring: Boolean = false
+  protected def enableLeaderVoting: Boolean = false
   private val store = svTaskContext.svcStore
 
   final protected override def completeTask(
@@ -34,16 +34,11 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
         if (sameEpoch) {
           if (isLeader) {
             completeTaskAsLeader(task)
-          } else if (!enableLeaderMonitoring) {
-            Future.successful(
-              TaskSuccess(
-                s"Skipping leader inactivity check"
-              )
-            )
           } else {
             monitorTaskAsFollower(task)
           }
         } else {
+          // TODO(#6856) Could this be busy-looping as well, if we are a polling trigger?
           Future.successful(
             TaskSuccess(
               s"Skipping because current epoch ${svcRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
@@ -160,7 +155,16 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
                 )
               )
             } else if (isLeaderInactive) {
-              voteForNewLeader(svcRules, monitoredLeader)
+              // TODO(#6856) Resolve the busy loop in a more elegant way.
+              if (enableLeaderVoting) {
+                voteForNewLeader(svcRules, monitoredLeader)
+              } else {
+                Future.successful(
+                  TaskSuccess(
+                    s"skipping vote to replace leader $monitoredLeader because this trigger is configured to not trigger votes"
+                  )
+                )
+              }
             } else {
               Future.successful(
                 TaskSuccess(

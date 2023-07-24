@@ -57,7 +57,8 @@ class SvcElectionTimeBasedIntegrationTest
             advanceTime(tickDurationWithBuffer)
           },
           entries => {
-            forExactly(3, entries) { line =>
+            // TODO(#6856) Consider reverting this to a `forExactly`
+            forAtLeast(3, entries) { line =>
               line.message should include(
                 "Starting check for leader inactivity"
               )
