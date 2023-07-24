@@ -60,6 +60,11 @@ main-branch-never: &main-branch-never
       ignore:
          - main
 
+cluster-parameter: &cluster-parameter
+  cluster:
+    type: enum
+    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+
 commands:
   setup_nix:
     description: Set up Nix
@@ -303,9 +308,7 @@ commands:
 
   cluster_lock_reaper:
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg"]
+      <<: *cluster-parameter
     steps:
       - run_bash_command_in_nix:
           cmd_name: Reap << parameters.cluster >> if lock older than 6 hours
@@ -827,9 +830,7 @@ commands:
   # nix for this to work
   setup_vpn_routes:
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+      <<: *cluster-parameter
     steps:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
@@ -862,9 +863,7 @@ commands:
 
   checkout_cluster_version:
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+      <<: *cluster-parameter
     steps:
       - run:
           name: Checkout cluster version
@@ -945,9 +944,7 @@ commands:
   # to run it for the apps they really need.
   print_gcloud_logs_commands:
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+      <<: *cluster-parameter
     steps:
       - run_bash_command_in_nix:
           when: always
@@ -988,9 +985,7 @@ commands:
   # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+      <<: *cluster-parameter
       channel_notify:
         # This parameter allows selecting different notification channels, which can be handy when a subteam
         # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
@@ -1221,9 +1216,7 @@ jobs:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+      <<: *cluster-parameter
       use_published_artifacts:
         type: boolean
         default: false
@@ -1273,9 +1266,7 @@ jobs:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+      <<: *cluster-parameter
       restore_cluster:
         type: boolean
         default: false
@@ -1319,9 +1310,7 @@ jobs:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+      <<: *cluster-parameter
     steps:
       - checkout
       - record_job_start_time
@@ -1357,9 +1346,7 @@ jobs:
 
   preflight_check:
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+      <<: *cluster-parameter
       channel_notify:
         type: string
         # #team-canton-network-internal-ci
@@ -1469,9 +1456,7 @@ jobs:
 
   preflight_sv_check:
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet"]
+      <<: *cluster-parameter
       channel_notify:
         type: string
         # #team-canton-network-internal-ci
@@ -1551,9 +1536,7 @@ jobs:
 
   reset_cluster:
     parameters:
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg"]
+      <<: *cluster-parameter
       channel_notify:
         type: string
         # #team-canton-network-internal-ci
