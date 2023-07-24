@@ -19,9 +19,9 @@ import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, ContractState, QueryResult}
 import com.daml.network.store.*
-import com.daml.network.sv.config.SvAppBackendConfig
+import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, ContractState, QueryResult}
+import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
 import com.daml.network.sv.store.{ExpiredRewardCouponsBatch, SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
@@ -35,7 +35,8 @@ import scala.jdk.CollectionConverters.*
 
 class InMemorySvSvcStore(
     override val key: SvStore.Key,
-    override protected[this] val appConfig: SvAppBackendConfig,
+    override protected[this] val domainConfig: SvDomainConfig,
+    override protected[this] val enableCoinRulesUpgrade: Boolean,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
 )(implicit

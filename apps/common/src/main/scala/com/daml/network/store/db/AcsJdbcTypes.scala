@@ -1,11 +1,11 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data
-import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.ledger.javaapi.data.{CreatedEvent, Value}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref.*
 import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.value.Value
+import com.daml.lf.value.Value as LfValue
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
@@ -177,16 +177,23 @@ trait AcsJdbcTypes {
     (jsValue: JsValue, pp: PositionedParameters) =>
       pp.setObject(jsValue.compactPrint, java.sql.Types.OTHER)
 
+  protected implicit lazy val jsValueSetParameterOption: SetParameter[Option[JsValue]] =
+    (jsValueOpt: Option[JsValue], pp: PositionedParameters) =>
+      jsValueOpt match {
+        case Some(jsValue) => jsValueSetParameter(jsValue, pp)
+        case None => pp.setNull(java.sql.Types.OTHER)
+      }
+
   private val contractCodec = {
     // copied from JsonContractIdFormat
-    implicit val ContractIdFormat: JsonFormat[Value.ContractId] =
-      new JsonFormat[Value.ContractId] {
-        override def write(obj: Value.ContractId): JsValue =
+    implicit val ContractIdFormat: JsonFormat[LfValue.ContractId] =
+      new JsonFormat[LfValue.ContractId] {
+        override def write(obj: LfValue.ContractId): JsValue =
           JsString(obj.coid)
 
-        override def read(json: JsValue): Value.ContractId = json match {
+        override def read(json: JsValue): LfValue.ContractId = json match {
           case JsString(s) =>
-            Value.ContractId.fromString(s).fold(deserializationError(_), identity)
+            LfValue.ContractId.fromString(s).fold(deserializationError(_), identity)
           case _ => deserializationError("ContractId must be a string")
         }
       }
@@ -201,9 +208,13 @@ trait AcsJdbcTypes {
   }
 
   protected def payloadJsonFromContract(
-      payload: DamlRecord[_]
+      payload: DamlRecord[?]
   )(implicit elc: ErrorLoggingContext): JsValue = {
-    contractCodec.apiValueToJsValue(Contract.javaValueToLfValue(payload.toValue))
+    payloadJsonFromValue(payload.toValue)
+  }
+
+  protected def payloadJsonFromValue(value: Value)(implicit elc: ErrorLoggingContext): JsValue = {
+    contractCodec.apiValueToJsValue(Contract.javaValueToLfValue(value))
   }
 
   /** The DB may truncate strings of unbounded length, so it's advised to use a LengthLimitedString instead.

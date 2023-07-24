@@ -21,7 +21,7 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, JsonAcsSnapshot, QueryResult}
 import com.daml.network.store.*
-import com.daml.network.sv.config.SvAppBackendConfig
+import com.daml.network.sv.config.{SvAppBackendConfig, SvDomainConfig}
 import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
@@ -47,13 +47,14 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
     outerLoggerFactory.append("store", "svcParty")
 
   override lazy val acsContractFilter =
-    SvSvcStore.contractFilter(key.svcParty, key.svParty, appConfig)
+    SvSvcStore.contractFilter(key.svcParty, key.svParty, enableCoinRulesUpgrade)
 
   def key: SvStore.Key
 
-  protected[this] def appConfig: SvAppBackendConfig
+  protected[this] def domainConfig: SvDomainConfig
+  protected[this] def enableCoinRulesUpgrade: Boolean
 
-  override final def defaultAcsDomain = appConfig.domains.global.alias
+  override final def defaultAcsDomain = domainConfig.global.alias
 
   def lookupSvcRulesWithOffset(
   ): Future[
@@ -510,7 +511,8 @@ object SvSvcStore {
       case _: MemoryStorage =>
         new InMemorySvSvcStore(
           key,
-          config,
+          config.domains,
+          config.enableCoinRulesUpgrade,
           loggerFactory,
           retryProvider,
         )
@@ -518,7 +520,8 @@ object SvSvcStore {
         new DbSvSvcStore(
           key,
           db,
-          config,
+          config.domains,
+          config.enableCoinRulesUpgrade,
           loggerFactory,
           retryProvider,
         )
@@ -536,7 +539,7 @@ object SvSvcStore {
   def contractFilter(
       svcParty: PartyId,
       svParty: PartyId,
-      appConfig: SvAppBackendConfig,
+      enableCoinRulesUpgrade: Boolean,
   ): MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
@@ -571,7 +574,7 @@ object SvSvcStore {
         mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc),
         mkFilter(cc.globaldomain.ValidatorTraffic.COMPANION)(vt => vt.payload.svc == svc),
       ) ++
-        (if (appConfig.enableCoinRulesUpgrade)
+        (if (enableCoinRulesUpgrade)
            Map(mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))
          else Map.empty) ++
         DirectoryStore.directoryTemplateFilters(svcParty),
