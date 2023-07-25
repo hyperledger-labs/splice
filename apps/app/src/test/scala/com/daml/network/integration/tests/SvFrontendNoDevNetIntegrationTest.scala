@@ -11,7 +11,7 @@ class SvFrontendNoDevNetIntegrationTest extends SvFrontendCommonIntegrationTest 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
 
 }
