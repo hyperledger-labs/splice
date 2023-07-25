@@ -1,7 +1,13 @@
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider, DirectoryClientProvider, theme, UserProvider } from 'common-frontend';
+import {
+  AuthProvider,
+  DirectoryClientProvider,
+  cnReplaceEqualDeep,
+  theme,
+  UserProvider,
+} from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import ReactDOM from 'react-dom/client';
 import {
@@ -33,6 +39,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     defaultOptions: {
       queries: {
         refetchInterval: 500, // re-fetch all queries every 500ms by default
+        structuralSharing: cnReplaceEqualDeep,
       },
     },
     logger: {

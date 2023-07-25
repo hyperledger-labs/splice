@@ -1,6 +1,12 @@
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, theme, ErrorBoundary, UserProvider } from 'common-frontend';
+import {
+  AuthProvider,
+  theme,
+  ErrorBoundary,
+  UserProvider,
+  cnReplaceEqualDeep,
+} from 'common-frontend';
 import ReactDOM from 'react-dom/client';
 import {
   createBrowserRouter,
@@ -29,6 +35,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     defaultOptions: {
       queries: {
         refetchInterval: 500, // re-fetch all queries every 500ms by default
+        structuralSharing: cnReplaceEqualDeep,
       },
     },
     logger: {

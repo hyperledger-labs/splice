@@ -6,6 +6,7 @@ import {
   LedgerApiClientProvider,
   theme,
   UserProvider,
+  cnReplaceEqualDeep,
 } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -29,6 +30,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     defaultOptions: {
       queries: {
         refetchInterval: 500, // re-fetch all queries every 500ms by default
+        structuralSharing: cnReplaceEqualDeep,
       },
     },
   });

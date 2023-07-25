@@ -31,8 +31,6 @@ const useCoinPrice = (): UseQueryResult<BigNumber> => {
         return new BigNumber(0);
       }
     },
-    // BigNumber is not a plain object so default structural sharing fails.
-    structuralSharing: (oldData, newData) => (oldData && oldData.eq(newData) ? oldData : newData),
   });
 };
 
