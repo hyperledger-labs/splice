@@ -57,6 +57,7 @@ const SetEnabledChoices: React.FC<{
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
         <SwitchGroupComponent
           data={svcInfosQuery.data.coinRules.payload.enabledChoices}
+          isDevNet={svcInfosQuery.data?.coinRules.payload.isDevNet}
           onChange={setEnabledChoicesAction}
         />
       </FormControl>
