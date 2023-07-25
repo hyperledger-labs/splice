@@ -59,6 +59,9 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     directory: { url: "http://localhost:5110" },
     scan: { url: "http://localhost:5012" },
   },
+  splitwell: {
+    validator: { url: "http://localhost:5403" },
+  },
   preflight: {
     jsonApiBackend: { url: "http://localhost:7575" },
     jsonApi: { url: "http://localhost:" + port + "/api/json-api/" },

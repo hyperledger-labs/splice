@@ -73,6 +73,7 @@ function usage() {
   echo "  -p   run the frontends needed for the preflight self-hosted directory UI test"
   echo "  -e   run frontends with dedicated validator for users"
   echo "  -s   run frontends with multiple super validators for Sv*IntegrationTest in CI"
+  echo "  -m   run frontends with app manager frontends"
 }
 
 # default values
@@ -81,8 +82,9 @@ enable_test_auth="true"
 use_preflight_frontends=0
 dedicated_validator_for_users=0
 multiple_svs=0
+app_manager=0
 
-while getopts "hdapes" arg; do
+while getopts "hdapesm" arg; do
   case ${arg} in
     h)
       usage
@@ -102,6 +104,9 @@ while getopts "hdapes" arg; do
       ;;
     s)
       multiple_svs=1
+      ;;
+    m)
+      app_manager=1
       ;;
     ?)
       usage
@@ -152,6 +157,10 @@ function start_local_frontends() {
   start_frontend   sv        3010 sv1     "sv1"                $enable_test_auth
   start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth
   start_frontend   scan      3006 scan    "scan"               "false"           "none"
+  if [ $app_manager -eq 1 ]; then
+    start_frontend   app-manager 3100 alice     "alice"              $enable_test_auth
+    start_frontend   app-manager 3102 splitwell "splitwell"          $enable_test_auth
+  fi
 
   if [ $multiple_svs -eq 1 ]; then
     start_frontend sv 3012 sv2 "sv2" $enable_test_auth

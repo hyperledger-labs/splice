@@ -1021,6 +1021,7 @@ printTests := {
     name.contains("PreflightSvIntegrationTest")
   def isDomainFeesTest(name: String): Boolean = name.contains(".DF")
   def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
+  def isAppManagerTest(name: String): Boolean = name contains "AppManager"
 
   val allTestNames =
     definedTests
@@ -1076,7 +1077,12 @@ printTests := {
     (
       "frontend tests with wall clock time",
       "test-full-class-names-frontend.log",
-      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t),
+      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t) && !isAppManagerTest(t),
+    ),
+    (
+      "frontend tests with app manager",
+      "test-full-class-names-frontend-app-manager.log",
+      (t: String) => !isTimeBasedTest(t) && isFrontEndTest(t) && isAppManagerTest(t),
     ),
     (
       "frontend tests with simulated time",

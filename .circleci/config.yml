@@ -1872,6 +1872,19 @@ workflows:
           - artifactory
           - datadog
           - slack-context
+        name: "scala_test frontend app manager"
+        test_names_file: "test-full-class-names-frontend-app-manager.log"
+        start_canton_options: "-d -p external -w"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s -m"
+        extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        resource_class: "2xlarge+"
+        parallelism: 1
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
         name: "scala_test domain fees wall clock time"
         test_names_file: "test-full-class-names-domain-fees.log"
         start_canton_options: "-d -p external -w -t"
