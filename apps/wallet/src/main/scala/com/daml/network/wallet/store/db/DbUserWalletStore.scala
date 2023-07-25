@@ -100,12 +100,16 @@ class DbUserWalletStore(
     .fromIndexRecord(record)
     .map {
       case UserWalletTxLogStoreRowData(
-            eventId
+            eventId,
+            optOffset,
+            domainId,
+            acsContractId,
           ) =>
         val safeEventId = lengthLimited(eventId)
+        val safeOffset = optOffset.map(lengthLimited)
         sqlu"""
-              insert into user_wallet_txlog_store(store_id, event_id)
-              values ($storeId, $safeEventId)
+              insert into user_wallet_txlog_store(store_id, event_id, "offset", domain_id, acs_contract_id)
+              values ($storeId, $safeEventId, $safeOffset, $domainId, $acsContractId)
               on conflict do nothing
             """
     }
@@ -187,8 +191,10 @@ class DbUserWalletStore(
     waitUntilAcsIngested {
       for {
         _ <- defaultAcsDomainIdF
-        eventIds <- multiDomainAcsStore.getTxLogEventIdsInReverseOrder(beginAfterEventIdO, limit)
-        entries <- Future.traverse(eventIds)(i => txLogReader.loadTxLogEntry(i))
+        events <- multiDomainAcsStore.getTxLogEventsInReverseOrder(beginAfterEventIdO, limit)
+        entries <- Future.traverse(events)(e =>
+          txLogReader.loadTxLogEntry(e.eventId, e.domainId, e.acsContractId)
+        )
       } yield entries
     }
   }

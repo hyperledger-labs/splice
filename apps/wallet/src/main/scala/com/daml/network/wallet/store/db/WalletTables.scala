@@ -17,6 +17,7 @@ import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.topology.DomainId
 import io.circe.Json
 import shapeless.HNil
 
@@ -195,19 +196,31 @@ object WalletTables extends AcsTables {
       storeId: Int,
       entryNumber: Long,
       eventId: String,
+      offset: Option[String],
+      domainId: DomainId,
   )
 
   // Note: currently the index record is empty, but this is likely to change once we want to support more advanced
   // filtering/sorting of the transaction history.
   case class UserWalletTxLogStoreRowData(
-      eventId: String
+      eventId: String,
+      optOffset: Option[String],
+      domainId: DomainId,
+      acsContractId: Option[ContractId[?]],
   )
 
   object UserWalletTxLogStoreRowData {
     def fromIndexRecord(
         indexRecord: UserWalletTxLogParser.TxLogIndexRecord
     ): Either[String, UserWalletTxLogStoreRowData] =
-      Right(UserWalletTxLogStoreRowData(indexRecord.eventId))
+      Right(
+        UserWalletTxLogStoreRowData(
+          indexRecord.eventId,
+          indexRecord.optOffset,
+          indexRecord.domainId,
+          indexRecord.acsContractId,
+        )
+      )
   }
 
   class UserWalletTxLogStore(_tableTag: Tag)

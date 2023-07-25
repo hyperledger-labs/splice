@@ -7,6 +7,7 @@ import com.daml.network.wallet.store.db.WalletTables
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.DomainId
 import io.circe.Json
 import org.scalatest.wordspec.AsyncWordSpec
 import slick.jdbc.JdbcProfile
@@ -80,6 +81,8 @@ class WalletPersistenceTest
           storeId = fetchedDescRow.id,
           entryNumber = 0,
           eventId = "someEventId",
+          Some("010203"),
+          DomainId.tryFromString("dummy::domain"),
         )
         _ <- storage.queryAndUpdate(
           insertRowIfNotExists(TxLogTable)(

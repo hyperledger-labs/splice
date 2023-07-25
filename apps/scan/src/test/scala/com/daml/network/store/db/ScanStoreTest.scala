@@ -292,7 +292,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           eventually() {
             val logEntry = store.getCoinConfigForRound(round = 2).futureValue
             logEntry.indexRecord match {
-              case TxLogIndexRecord.OpenMiningRoundIndexRecord(_, _, round) =>
+              case TxLogIndexRecord.OpenMiningRoundIndexRecord(_, _, _, round) =>
                 round should be(wanted.payload.round.number)
               case x =>
                 fail(s"Index record was not an OpenMiningRoundIndexRecord but a $x")

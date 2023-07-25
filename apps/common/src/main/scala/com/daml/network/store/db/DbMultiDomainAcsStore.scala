@@ -446,7 +446,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         traceContext: TraceContext
     ): Future[Unit] = {
       for {
-        (todo, txEntries) <- getIngestionWork(transfer)
+        (todo, txEntries) <- getIngestionWork(domain, transfer)
         workDone <- ingestWork(todo, txEntries)
       } yield {
         state
@@ -464,7 +464,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     }
 
     private def getIngestionWork(
-        transfer: TreeUpdate
+        domainId: DomainId,
+        transfer: TreeUpdate,
     )(implicit tc: TraceContext): Future[(WorkTodo, Seq[TXE])] = {
       transfer match {
         case TransferUpdate(_) =>
@@ -503,7 +504,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             )
             (
               workTodo,
-              txLogParser.parse(tree, logger),
+              txLogParser.parse(tree, domainId, logger),
             )
           }
       }
@@ -649,25 +650,25 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       ContractState.Assigned(domainId)
     }
 
-  /* Returns the event ids of the first `limit` TxLog entries that were inserted after the entry
+  /* Returns the first `limit` TxLog entries that were inserted after the entry
      with the given event id, in reverse insertion order (newest first). */
-  def getTxLogEventIdsInReverseOrder(
+  def getTxLogEventsInReverseOrder(
       beginAfterEventIdO: Option[String],
       limit: Int,
-  )(implicit lc: TraceContext): Future[Seq[String]] = {
+  )(implicit lc: TraceContext): Future[Seq[TxLogEvent]] = {
     for {
       eventIds <- storage
         .query(
           beginAfterEventIdO.fold(
             sql"""
-                select event_id
+                select event_id, domain_id, acs_contract_id
                 from #${txLogTableName}
                 where store_id = $storeId
                 order by entry_number desc
                 limit $limit
-              """.as[String]
+              """.as[(String, DomainId, Option[ContractId[Any]])]
           )(beginAfterEventId => sql"""
-                select event_id
+                select event_id, domain_id, acs_contract_id
                 from #${txLogTableName}
                 where store_id = $storeId
                 and entry_number < (
@@ -678,10 +679,10 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                 )
                 order by entry_number desc
                 limit $limit
-              """.as[String]),
+              """.as[(String, DomainId, Option[ContractId[Any]])]),
           "getTxLogEventIdsInReverseOrder",
         )
-    } yield eventIds
+    } yield eventIds.map((TxLogEvent.apply _).tupled)
   }
 
   override def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot] =
@@ -779,4 +780,6 @@ object DbMultiDomainAcsStore {
       offsetIngestionsToSignal = SortedMap.empty,
     )
   }
+
+  case class TxLogEvent(eventId: String, domainId: DomainId, acsContractId: Option[ContractId[?]])
 }

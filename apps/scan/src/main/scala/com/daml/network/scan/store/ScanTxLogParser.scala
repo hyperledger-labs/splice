@@ -34,7 +34,7 @@ class ScanTxLogParser(
 
   import ScanTxLogParser.*
 
-  private def parseTree(tree: TransactionTree, root: TreeEvent)(implicit
+  private def parseTree(tree: TransactionTree, domainId: DomainId, root: TreeEvent)(implicit
       tc: TraceContext
   ): State = {
     // TODO(#2930) add more checks on the nodes, at least that the svc party is correct
@@ -42,17 +42,17 @@ class ScanTxLogParser(
       case exercised: ExercisedEvent =>
         exercised match {
           case Transfer(node) =>
-            State.fromTransfer(tree, root, node)
+            State.fromTransfer(tree, root, domainId, node)
           case Mint(node) =>
-            State.fromCoinCreateSummary(tree, exercised, node.result.value)
+            State.fromCoinCreateSummary(tree, exercised, domainId, node.result.value)
           case ImportCrate_Receive(_) =>
             State.empty
           case CoinRules_BuyExtraTraffic(node) =>
-            State.fromBuyExtraTraffic(tree, exercised, node)
+            State.fromBuyExtraTraffic(tree, exercised, domainId, node)
           case CoinExpire(node) =>
-            State.fromCoinExpireSummary(tree, exercised, node.result.value)
+            State.fromCoinExpireSummary(tree, exercised, domainId, node.result.value)
           case LockedCoinExpireCoin(node) =>
-            State.fromCoinExpireSummary(tree, exercised, node.result.value)
+            State.fromCoinExpireSummary(tree, exercised, domainId, node.result.value)
           case LockedCoinUnlock(_) =>
             State.empty
           case CoinArchive(_) =>
@@ -61,17 +61,17 @@ class ScanTxLogParser(
               s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
             )
             State.empty
-          case _ => parseTrees(tree, exercised.getChildEventIds.asScala.toList)
+          case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
       case created: CreatedEvent =>
         created match {
           case CoinImportCrate(coin) =>
-            State.fromCoinImportCrate(tree, root, coin)
+            State.fromCoinImportCrate(tree, root, domainId, coin)
           case OpenMiningRoundCreate(round) =>
-            State.fromOpenMiningRoundCreate(tree, root, round)
+            State.fromOpenMiningRoundCreate(tree, root, domainId, round)
           case ClosedMiningRoundCreate(round) =>
-            State.fromClosedMiningRoundCreate(tree, root, round)
+            State.fromClosedMiningRoundCreate(tree, root, domainId, round)
           case CoinCreate(coin) =>
             // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
             logger.error(
@@ -86,11 +86,11 @@ class ScanTxLogParser(
     }
   }
 
-  private def parseTrees(tree: TransactionTree, rootsEventIds: List[String])(implicit
-      tc: TraceContext
+  private def parseTrees(tree: TransactionTree, domainId: DomainId, rootsEventIds: List[String])(
+      implicit tc: TraceContext
   ): State = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
-    roots.foldMap(parseTree(tree, _))
+    roots.foldMap(parseTree(tree, domainId, _))
   }
 
   // TODO(#4906): handle in-flight contracts when we tackle global domain migration
@@ -103,30 +103,38 @@ class ScanTxLogParser(
   ): Seq[(DomainId, ScanTxLogParser.TxLogEntry)] = acs.collect(ac =>
     ac.createdEvent match {
       case CoinCreate(c) =>
-        (ac.domainId, entryFromCoin(None, ac.createdEvent.getEventId, c.payload.amount))
+        (
+          ac.domainId,
+          entryFromCoin(None, ac.createdEvent.getEventId, ac.domainId, c.payload.amount),
+        )
       case LockedCoinCreate(lc) =>
-        (ac.domainId, entryFromCoin(None, ac.createdEvent.getEventId, lc.payload.coin.amount))
+        (
+          ac.domainId,
+          entryFromCoin(None, ac.createdEvent.getEventId, ac.domainId, lc.payload.coin.amount),
+        )
       case CoinImportCrate(ic) =>
-        (ac.domainId, entryFromCoin(None, ac.createdEvent.getEventId, ic.amount))
+        (ac.domainId, entryFromCoin(None, ac.createdEvent.getEventId, ac.domainId, ic.amount))
     }
   )
 
-  override def tryParse(tx: TransactionTree)(implicit
+  override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
       tc: TraceContext
   ): Seq[ScanTxLogParser.TxLogEntry] = {
-    val ret = parseTrees(tx, tx.getRootEventIds.asScala.toList).entries
+    val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries
     logger.debug(s"Extracted log entries: ${ret}")
     ret
   }
 
-  override def error(offset: String, eventId: String): Option[TxLogEntry] = Some(
-    TxLogEntry.ErrorTxLogEntry(
-      indexRecord = TxLogIndexRecord.ErrorIndexRecord(
-        offset,
-        eventId,
+  override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
+    Some(
+      TxLogEntry.ErrorTxLogEntry(
+        indexRecord = TxLogIndexRecord.ErrorIndexRecord(
+          offset,
+          eventId,
+          domainId,
+        )
       )
     )
-  )
 
 }
 
@@ -147,8 +155,11 @@ object ScanTxLogParser {
     final case class ErrorIndexRecord(
         offset: String,
         eventId: String,
+        domainId: DomainId,
     ) extends TxLogIndexRecord {
       override def optOffset = Some(offset)
+
+      override def acsContractId: Option[codegen.ContractId[_]] = None
 
       override val companion: TxLogIndexRecordCompanion = ErrorIndexRecord
     }
@@ -160,9 +171,12 @@ object ScanTxLogParser {
     final case class OpenMiningRoundIndexRecord(
         offset: String,
         eventId: String,
+        domainId: DomainId,
         round: Long,
     ) extends TxLogIndexRecord {
       override def optOffset = Some(offset)
+
+      override def acsContractId: Option[codegen.ContractId[_]] = None
 
       override val companion: TxLogIndexRecordCompanion = OpenMiningRoundIndexRecord
     }
@@ -174,10 +188,13 @@ object ScanTxLogParser {
     final case class ClosedMiningRoundIndexRecord(
         offset: String,
         eventId: String,
+        domainId: DomainId,
         round: Long,
         effectiveAt: Instant,
     ) extends TxLogIndexRecord {
       override def optOffset = Some(offset)
+
+      override def acsContractId: Option[codegen.ContractId[_]] = None
 
       override val companion: TxLogIndexRecordCompanion = ClosedMiningRoundIndexRecord
     }
@@ -195,11 +212,14 @@ object ScanTxLogParser {
     final case class AppRewardIndexRecord(
         offset: String,
         eventId: String,
+        domainId: DomainId,
         round: Long,
         party: PartyId,
         amount: BigDecimal,
     ) extends RewardIndexRecord {
       override def optOffset = Some(offset)
+
+      override def acsContractId: Option[codegen.ContractId[_]] = None
 
       override val companion: TxLogIndexRecordCompanion = AppRewardIndexRecord
     }
@@ -211,11 +231,14 @@ object ScanTxLogParser {
     final case class ValidatorRewardIndexRecord(
         offset: String,
         eventId: String,
+        domainId: DomainId,
         round: Long,
         party: PartyId,
         amount: BigDecimal,
     ) extends RewardIndexRecord {
       override def optOffset = Some(offset)
+
+      override def acsContractId: Option[codegen.ContractId[_]] = None
 
       override val companion: TxLogIndexRecordCompanion = ValidatorRewardIndexRecord
     }
@@ -227,12 +250,15 @@ object ScanTxLogParser {
     final case class ExtraTrafficPurchaseIndexRecord(
         offset: String,
         eventId: String,
+        domainId: DomainId,
         round: Long,
         validator: PartyId,
         trafficPurchased: Long,
         ccSpent: BigDecimal,
     ) extends TxLogIndexRecord {
       override def optOffset = Some(offset)
+
+      override def acsContractId: Option[codegen.ContractId[_]] = None
 
       override val companion: TxLogIndexRecordCompanion = ExtraTrafficPurchaseIndexRecord
     }
@@ -244,11 +270,13 @@ object ScanTxLogParser {
     final case class BalanceChangeIndexRecord(
         optOffset: Option[String],
         eventId: String,
+        domainId: DomainId,
         round: Long,
         changeToInitialAmountAsOfRoundZero: BigDecimal,
         changeToHoldingFeesRate: BigDecimal,
     ) extends TxLogIndexRecord {
       override val companion: TxLogIndexRecordCompanion = BalanceChangeIndexRecord
+      override def acsContractId: Option[codegen.ContractId[_]] = None
     }
 
     object BalanceChangeIndexRecord extends TxLogIndexRecordCompanion {
@@ -304,6 +332,7 @@ object ScanTxLogParser {
     def fromCoinImportCrate(
         tx: TransactionTree,
         event: TreeEvent,
+        domainId: DomainId,
         coin: cc.coin.Coin,
     ): State =
       State(
@@ -312,6 +341,7 @@ object ScanTxLogParser {
             indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
               optOffset = Some(tx.getOffset()),
               eventId = event.getEventId(),
+              domainId = domainId,
               round = coin.amount.createdAt.number,
               changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
               changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
@@ -323,6 +353,7 @@ object ScanTxLogParser {
     def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,
         event: TreeEvent,
+        domainId: DomainId,
         ccsum: CoinCreateSummary[T],
     ): State = {
       val coinCid = ccsum.coin.contractId
@@ -344,6 +375,7 @@ object ScanTxLogParser {
           ScanTxLogParser.entryFromCoin(
             Some(tx.getOffset()),
             event.getEventId(),
+            domainId,
             coin.amount,
           )
         )
@@ -353,6 +385,7 @@ object ScanTxLogParser {
     def fromTransfer(
         tx: TransactionTree,
         event: TreeEvent,
+        domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         rootEventId: Option[String] = None,
     ): State = {
@@ -374,6 +407,7 @@ object ScanTxLogParser {
               indexRecord = TxLogIndexRecord.AppRewardIndexRecord(
                 offset = tx.getOffset(),
                 eventId = rootEventId.getOrElse(event.getEventId()),
+                domainId = domainId,
                 round = round.number,
                 party = party,
                 amount = appRewards,
@@ -391,6 +425,7 @@ object ScanTxLogParser {
               indexRecord = TxLogIndexRecord.ValidatorRewardIndexRecord(
                 offset = tx.getOffset(),
                 eventId = rootEventId.getOrElse(event.getEventId()),
+                domainId = domainId,
                 round = round.number,
                 party = party,
                 amount = validatorRewards,
@@ -407,6 +442,7 @@ object ScanTxLogParser {
             indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
               optOffset = Some(tx.getOffset()),
               eventId = rootEventId.getOrElse(event.getEventId()),
+              domainId = domainId,
               round = round.number,
               changeToInitialAmountAsOfRoundZero =
                 node.result.value.summary.changeToInitialAmountAsOfRoundZero,
@@ -425,6 +461,7 @@ object ScanTxLogParser {
     def fromCoinExpireSummary(
         tx: TransactionTree,
         event: TreeEvent,
+        domainId: DomainId,
         cxsum: CoinExpireSummary,
     ): State = {
       State(
@@ -433,6 +470,7 @@ object ScanTxLogParser {
             indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
               optOffset = Some(tx.getOffset()),
               eventId = event.getEventId(),
+              domainId = domainId,
               round = cxsum.round.number,
               changeToInitialAmountAsOfRoundZero = cxsum.changeToInitialAmountAsOfRoundZero,
               changeToHoldingFeesRate = cxsum.changeToHoldingFeesRate,
@@ -445,6 +483,7 @@ object ScanTxLogParser {
     def fromBuyExtraTraffic(
         tx: TransactionTree,
         event: ExercisedEvent,
+        domainId: DomainId,
         node: ExerciseNode[CoinRules_BuyExtraTraffic.Arg, CoinRules_BuyExtraTraffic.Res],
     )(implicit lc: ErrorLoggingContext): State = {
 
@@ -472,6 +511,7 @@ object ScanTxLogParser {
         indexRecord = TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
           offset = tx.getOffset(),
           eventId = event.getEventId(),
+          domainId = domainId,
           round = round.number,
           validator = validatorParty,
           trafficPurchased = trafficPurchased,
@@ -481,13 +521,16 @@ object ScanTxLogParser {
 
       State(immutable.Queue(buyExtraTrafficEntry))
         // append the entries for rewards
-        .appended(State.fromTransfer(tx, transferEvent, transferNode, Some(event.getEventId())))
+        .appended(
+          State.fromTransfer(tx, transferEvent, domainId, transferNode, Some(event.getEventId()))
+        )
 
     }
 
     def fromOpenMiningRoundCreate(
         tx: TransactionTree,
         event: TreeEvent,
+        domainId: DomainId,
         round: OpenMiningRoundCreate.ContractType,
     ): State = {
       val config = round.payload.transferConfigUsd
@@ -496,6 +539,7 @@ object ScanTxLogParser {
         indexRecord = TxLogIndexRecord.OpenMiningRoundIndexRecord(
           offset = tx.getOffset(),
           eventId = event.getEventId(),
+          domainId = domainId,
           round = round.payload.round.number,
         ),
         coinCreateFee = dollarsToCC(config.createFee.fee, coinPrice),
@@ -515,12 +559,14 @@ object ScanTxLogParser {
     def fromClosedMiningRoundCreate(
         tx: TransactionTree,
         event: TreeEvent,
+        domainId: DomainId,
         round: ClosedMiningRoundCreate.ContractType,
     ): State = {
       val newEntry = TxLogEntry.EmptyTxLogEntry(
         indexRecord = TxLogIndexRecord.ClosedMiningRoundIndexRecord(
           offset = tx.getOffset,
           eventId = event.getEventId(),
+          domainId = domainId,
           round = round.payload.round.number,
           effectiveAt = tx.getEffectiveAt,
         )
@@ -536,12 +582,14 @@ object ScanTxLogParser {
   private def entryFromCoin(
       optOffset: Option[String],
       eventId: String,
+      domainId: DomainId,
       amount: ExpiringAmount,
   ): TxLogEntry = {
     TxLogEntry.EmptyTxLogEntry(
       indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
         optOffset = optOffset,
         eventId = eventId,
+        domainId = domainId,
         round = amount.createdAt.number,
         changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(amount),
         changeToHoldingFeesRate = amount.ratePerRound.rate,

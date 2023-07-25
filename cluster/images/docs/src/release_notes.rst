@@ -3,7 +3,7 @@
 Release Notes
 =============
 
-2023-07-23
+2023-07-31
 ----------
 
 * Frontend updates:
@@ -15,6 +15,7 @@ Release Notes
 
     * Fixed issue where Scan UI showed future coin config changes as if they are current.
     * Fixed issue where Scan app did not aggregate the total coin balance correctly when balance was migrated across network upgrades.
+    * Fixed issue where coin migrations were not appearing in the wallet transaction log.
 
 2023-07-16
 ----------

@@ -106,6 +106,8 @@ class InMemoryUserWalletStore(
       )(
         txLog.getTxLogIndicesAfterEventId(domain, _, limit)
       )
-      entries <- Future.traverse(indices)(i => txLogReader.loadTxLogEntry(i.eventId))
+      entries <- Future.traverse(indices)(i =>
+        txLogReader.loadTxLogEntry(i.eventId, i.domainId, i.acsContractId)
+      )
     } yield entries
 }

@@ -449,7 +449,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     */
 
   def getTxLogIndicesByOffset(offset: Int, limit: Int): Seq[TXI] =
-    stateVar.txLog.slice(offset, offset + limit).map(_.payload)
+    stateVar.txLog.slice(offset, offset + limit)
 
   def getTxLogIndicesAfterEventId(
       domainId: DomainId,
@@ -457,8 +457,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       limit: Int,
   ): Seq[TXI] =
     stateVar.txLog.view
-      .filter(_.domain == domainId)
-      .map(_.payload)
+      .filter(_.domainId == domainId)
       .dropWhile(_.eventId != beginAfterEventId)
       .slice(1, 1 + limit)
       .toSeq
@@ -470,7 +469,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
     Future {
       stateVar.txLog
-        .foldM[Either[A, *], Z](init) { case (z, t) => p(z, t.payload) }
+        .foldM[Either[A, *], Z](init) { case (z, t) => p(z, t) }
         .fold(
           identity,
           _ => throw txLogNotFound(),
@@ -483,13 +482,12 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   ): Future[TXI] =
     Future {
       stateVar.txLog.view
-        .map(_.payload)
         .find(query)
         .getOrElse(throw txLogNotFound())
     }
 
   def getTxLogIndicesByFilter(filter: TXI => Boolean): Future[Seq[TXI]] =
-    Future.successful(stateVar.txLog.view.map(_.payload).filter(filter).toSeq)
+    Future.successful(stateVar.txLog.view.filter(filter).toSeq)
 
   private def offsetAndStateAfterIngestingAcs()
       : Future[(String, InMemoryMultiDomainAcsStore.State[TXI, TXE])] =
@@ -569,11 +567,6 @@ object InMemoryMultiDomainAcsStore {
 
   import MultiDomainAcsStore.{ContractStateEvent, StoreContractState, TransferId}
 
-  private case class IndexRecordWithDomain[+TXI](
-      domain: DomainId,
-      payload: TXI,
-  )
-
   /** General assumption: We're connected to both source and target domain.
     * Trivially given for non-multi hosted parties. For multi-hosted parties
     * still a given provided all participants hosting a party are connected
@@ -614,7 +607,7 @@ object InMemoryMultiDomainAcsStore {
       incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]],
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
-      txLog: Queue[IndexRecordWithDomain[TXI]],
+      txLog: Queue[TXI],
   ) {
 
     private def removeOffsetSignalsBefore(
@@ -664,14 +657,15 @@ object InMemoryMultiDomainAcsStore {
           offset = Some(acsOffset),
           offsetChanged = Promise(),
           txLog = parsedTxLogEntries.reverse
-            .map({ case (domain, entry) =>
-              IndexRecordWithDomain(domain, entry.indexRecord)
+            .map({ case (_, entry) =>
+              entry.indexRecord
             })
             .to(collection.immutable.Queue),
         ),
         (
           summaryTransferIn.copy(
-            newAcsSize = stFinal.createEvents.size
+            newAcsSize = stFinal.createEvents.size,
+            ingestedTxLogEntries = parsedTxLogEntries.map(_._2),
           ),
           offsetChanged,
           offsetsToRemove.values,
@@ -722,7 +716,7 @@ object InMemoryMultiDomainAcsStore {
         },
       )
 
-      val ingestedTxLogEntries = txLogParser.parse(tx, logger)
+      val ingestedTxLogEntries = txLogParser.parse(tx, domain, logger)
 
       val newOffset = tx.getOffset
 
@@ -741,9 +735,7 @@ object InMemoryMultiDomainAcsStore {
           offset = Some(newOffset),
           offsetChanged = Promise(),
           txLog = stNew.txLog.prependedAll(
-            ingestedTxLogEntries.reverse.map(entry =>
-              IndexRecordWithDomain(domain, entry.indexRecord)
-            )
+            ingestedTxLogEntries.reverse.map(entry => entry.indexRecord)
           ),
         ),
         (newSummary, offsetChanged, offsetsToRemove.values),

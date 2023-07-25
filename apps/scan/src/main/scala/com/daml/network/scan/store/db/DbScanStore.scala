@@ -101,6 +101,9 @@ class DbScanStore(
   ): Either[String, DBIO[_]] = {
     val ScanTxLogRowData(
       eventId,
+      offset,
+      domainId,
+      acsContractId,
       indexRecordType,
       round,
       rewardAmount,
@@ -112,11 +115,14 @@ class DbScanStore(
       extraTrafficPurchaseCcSpent,
     ) = ScanTxLogRowData.fromTxLogIndexRecord(record)
     val safeEventId = lengthLimited(eventId)
+    val safeOffset = offset.map(lengthLimited)
     Right(sqlu"""
-          insert into scan_txlog_store(store_id, event_id, index_record_type, round, reward_amount, rewarded_party,
+          insert into scan_txlog_store(store_id, event_id, index_record_type, "offset", domain_id, acs_contract_id,
+          round, reward_amount, rewarded_party,
           balance_change_change_to_initial_amount_as_of_round_zero, balance_change_change_to_holding_fees_rate,
           extra_traffic_validator, extra_traffic_purchase_traffic_purchased, extra_traffic_purchase_cc_spent)
-          values ($storeId, $safeEventId, $indexRecordType, $round, $rewardAmount, $rewardedParty,
+          values ($storeId, $safeEventId, $indexRecordType, $safeOffset, $domainId, $acsContractId,
+                  $round, $rewardAmount, $rewardedParty,
                   $balanceChangeToInitialAmountAsOfRoundZero, $balanceChangeChangeToHoldingFeesRate,
                   $extraTrafficValidator, $extraTrafficPurchaseTrafficPurchase, $extraTrafficPurchaseCcSpent)
           on conflict do nothing
@@ -252,21 +258,23 @@ class DbScanStore(
       tc: TraceContext
   ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] = waitUntilAcsIngested {
     for {
-      eventId <- storage
+      row <- storage
         .querySingle(
           sql"""
-                select event_id
+                select event_id, domain_id, acs_contract_id
                 from scan_txlog_store
                 where store_id = $storeId
                   and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType}
                   and round = $round
                 order by entry_number desc
                 limit 1;
-               """.as[String].headOption,
+               """.as[(String, DomainId, Option[ContractId[Any]])].headOption,
           "getCoinConfigForRound",
         )
         .value
-      entry <- eventId.traverse(txLogReader.loadTxLogEntry)
+      entry <- row.traverse { case (eventId, domainId, acsContractId) =>
+        txLogReader.loadTxLogEntry(eventId, domainId, acsContractId)
+      }
       result <- entry match {
         case Some(omr: ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry) =>
           Future.successful(omr)
@@ -284,13 +292,13 @@ class DbScanStore(
         latestClosedRound <- storage
           .querySingle(
             sql"""
-               select closed.event_id, closed.round
+               select closed.event_id, closed.acs_contract_id, closed.domain_id, closed.round
                from scan_txlog_store closed
                where closed.store_id = $storeId
                 and closed.index_record_type = ${ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord.dbType}
                order by closed.round desc
                limit 1;
-             """.as[(String, Long)].headOption,
+             """.as[(String, Option[ContractId[Any]], DomainId, Long)].headOption,
             "getRoundOfLatestData.latestClosedRound",
           )
           .value
@@ -306,8 +314,15 @@ class DbScanStore(
           )
           .value
         entry <- (latestClosedRound, earliestOpenRound) match {
-          case (Some((closedEventId, closedRound)), Some(openRound)) if openRound <= closedRound =>
-            txLogReader.loadTxLogEntry(closedEventId)
+          case (
+                Some((closedEventId, closedAcsContractId, closedDomainId, closedRound)),
+                Some(openRound),
+              ) if openRound <= closedRound =>
+            txLogReader.loadTxLogEntry(
+              closedEventId,
+              closedDomainId,
+              closedAcsContractId,
+            )
           case _ =>
             Future.failed(txLogNotFound())
         }

@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.topology.DomainId
 import io.circe.Json
 import shapeless.HNil
 import slick.jdbc.{GetResult, PostgresProfile}
@@ -117,10 +118,16 @@ object AcsTables extends AcsTables {
 
     val eventId: Rep[String] = column[String]("event_id")
 
+    val offset: Rep[Option[String]] = column[Option[String]]("offset")
+
+    val domainId: Rep[DomainId] = column[DomainId]("domain_id")
+
     protected def templateColumns =
       storeId ::
         entryNumber ::
         eventId ::
+        offset ::
+        domainId ::
         HNil
   }
 }

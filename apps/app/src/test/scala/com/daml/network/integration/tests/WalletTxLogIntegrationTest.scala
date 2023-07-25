@@ -10,6 +10,7 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransactionSubtype
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
@@ -1301,6 +1302,44 @@ class WalletTxLogIntegrationTest
           },
         ),
         entries => forAll(entries)(_.errorMessage should include("Failed to parse transaction")),
+      )
+    }
+
+    "handle initial ACS" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+
+      clue("Tap to get some coins") {
+        aliceWalletClient.tap(11.0)
+        aliceWalletClient.tap(12.0)
+      }
+
+      clue("Simulate network restart") {
+        assert(
+          !aliceValidatorBackend.config.storage.isInstanceOf[DbConfig],
+          "This test only makes sense if the validator node doesn't remember anything between restarts",
+        )
+        aliceValidatorBackend.stop()
+        aliceValidatorBackend.start()
+        aliceValidatorBackend.waitForInitialization()
+      }
+
+      // Arbitrary coin price assigned by the user wallet tx log parser
+      val unknownCoinPrice = BigDecimal(1)
+
+      checkTxHistory(
+        aliceWalletClient,
+        Seq(
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Mint
+            logEntry.amount shouldBe 12.0
+            logEntry.coinPrice shouldBe unknownCoinPrice
+          },
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Mint
+            logEntry.amount shouldBe 11.0
+            logEntry.coinPrice shouldBe unknownCoinPrice
+          },
+        ),
       )
     }
   }

@@ -216,7 +216,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       childEventIds = childEventIds.asJava,
     )
 
-  protected val dummyDomain = DomainId.tryFromString("dummy::domain")
+  protected val dummyDomain = StoreTest.dummyDomain
 
   protected val dummy2Domain = DomainId.tryFromString("dummy2::domain")
 
@@ -558,10 +558,16 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 }
 
 object StoreTest {
+
+  val dummyDomain = DomainId.tryFromString("dummy::domain")
+
   case class TestTxLogIndexRecord(
       optOffset: Option[String],
       eventId: String,
-  ) extends TxLogStore.IndexRecord
+      domainId: DomainId,
+  ) extends TxLogStore.IndexRecord {
+    override def acsContractId: Option[ContractId[_]] = None
+  }
 
   case class TestTxLogEntry(
       indexRecord: TestTxLogIndexRecord,
@@ -577,13 +583,18 @@ object StoreTest {
         tc: TraceContext
     ): Seq[(DomainId, TestTxLogEntry)] = Seq.empty
 
-    override def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TestTxLogEntry] = {
+    override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+        tc: TraceContext
+    ): Seq[TestTxLogEntry] = {
       Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(
         onCreate = (res, event, _) => {
           res :+
             TestTxLogEntry(
-              indexRecord =
-                TestTxLogIndexRecord(optOffset = Some(tx.getOffset), eventId = event.getEventId),
+              indexRecord = TestTxLogIndexRecord(
+                optOffset = Some(tx.getOffset),
+                eventId = event.getEventId,
+                domainId = dummyDomain,
+              ),
               payload = event.getEventId,
             )
         },
@@ -591,6 +602,10 @@ object StoreTest {
       )
     }
 
-    override def error(offset: String, eventId: String): Option[TestTxLogEntry] = None
+    override def error(
+        offset: String,
+        eventId: String,
+        domainId: DomainId,
+    ): Option[TestTxLogEntry] = None
   }
 }

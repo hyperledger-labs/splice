@@ -1,6 +1,7 @@
 package com.daml.network.store
 
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.{CreatedEvent, TransactionTree}
 import com.daml.network.environment.CNLedgerConnection
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
@@ -50,7 +51,13 @@ object TxLogStore {
   /** Identifies the transaction tree event that an tx log entry is associated with */
   trait EntryEvent {
     def optOffset: Option[String]
+
+    /** Iff an entry comes from the ACS, it should have a contract id.
+      * TODO (#6882): this should not be needed.
+      */
+    def acsContractId: Option[ContractId[?]]
     def eventId: String
+    def domainId: DomainId
   }
 
   /** Extracts tx log entries from transaction tree events */
@@ -66,21 +73,21 @@ object TxLogStore {
     ): Seq[(DomainId, TXE)]
 
     /** Extract application-specific TxLog entries from the given daml transaction */
-    def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE]
+    def tryParse(tx: TransactionTree, domain: DomainId)(implicit tc: TraceContext): Seq[TXE]
 
     /** Returns a TxLog entry to be stored in case this parser failed to parse the given daml transaction.
       * Must not throw an error.
       */
-    def error(offset: String, eventId: String): Option[TXE]
+    def error(offset: String, eventId: String, domainId: DomainId): Option[TXE]
 
-    final def parse(tx: TransactionTree, logger: TracedLogger)(implicit
+    final def parse(tx: TransactionTree, domain: DomainId, logger: TracedLogger)(implicit
         tc: TraceContext
     ): Seq[TXE] =
-      Try(tryParse(tx))
+      Try(tryParse(tx, domain))
         .recoverWith { case e: Throwable =>
           logger.error(s"Failed to parse transaction: ${e.getMessage}", e)
           val firstRootEventId = tx.getRootEventIds.asScala.headOption.getOrElse("")
-          Try(error(tx.getOffset, firstRootEventId).toList)
+          Try(error(tx.getOffset, firstRootEventId, domain).toList)
         }
         .fold(
           e => {
@@ -101,8 +108,10 @@ object TxLogStore {
       )(implicit
           tc: TraceContext
       ): Seq[(DomainId, TXE)] = Seq.empty
-      override def tryParse(tx: TransactionTree)(implicit tc: TraceContext): Seq[TXE] = Seq.empty
-      override def error(offset: String, eventId: String): Option[TXE] = None
+      override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+          tc: TraceContext
+      ): Seq[TXE] = Seq.empty
+      override def error(offset: String, eventId: String, domainId: DomainId): Option[TXE] = None
     }
   }
 
@@ -160,19 +169,35 @@ object TxLogStore {
       override val loggerFactory: NamedLoggerFactory,
   ) extends NamedLogging {
 
-    def loadTxLogEntry(eventId: String)(implicit
+    def loadTxLogEntry(
+        eventId: String,
+        domainId: DomainId,
+        acsContractId: Option[ContractId[?]],
+    )(implicit
         ec: ExecutionContext,
         tc: TraceContext,
-    ): Future[TXE] = for {
+    ): Future[TXE] =
       // Load original transaction tree from the ledger
       // TODO(#2455) handle the case when the transaction has been pruned from the ledger
-      tx <- transactionTreeSource.getTransactionTreeByEventId(eventId)
+      transactionTreeSource
+        .getTransactionTreeByEventId(eventId)
+        .map(tx =>
+          acsContractId match {
+            case Some(contractId) =>
+              loadTxLogEntryFromAcs(contractId, tx, domainId)
+            case None =>
+              loadTxLogEntryFromTree(eventId, tx, domainId)
+          }
+        )
 
+    private def loadTxLogEntryFromTree(eventId: String, tx: TransactionTree, domainId: DomainId)(
+        implicit tc: TraceContext
+    ): TXE = {
       // Extract application-specific data from the tree
-      entries = txLogStore.txLogParser.parse(tx, logger)
+      val entries = txLogStore.txLogParser.parse(tx, domainId, logger)
 
       // Find original TxLog entry
-      entry = entries
+      entries
         .find(_.indexRecord.eventId == eventId)
         .getOrElse(
           sys.error(
@@ -182,7 +207,45 @@ object TxLogStore {
               + "or the transaction tree was loaded using different reader parties than those used during ingestion."
           )
         )
-    } yield entry
+    }
+
+    private def loadTxLogEntryFromAcs(
+        contractId: ContractId[?],
+        tx: TransactionTree,
+        domainId: DomainId,
+    )(implicit
+        tc: TraceContext
+    ): TXE = {
+      // Find original create event
+      // TODO (#6882): remove this workaround once the ledger API returns correct EventIDs
+      val createdEvent = tx.getEventsById.asScala
+        .collectFirst {
+          case (_, c: CreatedEvent) if c.getContractId == contractId.contractId =>
+            c
+        }
+        .getOrElse(
+          throw new IllegalStateException(
+            s"Could not find contract ${contractId.contractId} in transaction from ACS."
+          )
+        )
+
+      val activeContract = ActiveContract(
+        domainId = domainId,
+        createdEvent = createdEvent,
+        transferCounter = 0L,
+      )
+
+      // Extract application-specific data from a simulated ACS containing the above contract
+      txLogStore.txLogParser
+        .parseAcs(Seq(activeContract), Seq.empty, Seq.empty)
+        .headOption
+        .getOrElse(
+          sys.error(
+            s"Parser did not return any entry for active contract ${createdEvent.getContractId}."
+          )
+        )
+        ._2
+    }
   }
 
 }

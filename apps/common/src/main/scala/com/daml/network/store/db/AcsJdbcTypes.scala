@@ -60,6 +60,9 @@ trait AcsJdbcTypes {
   protected implicit def contractIdGetResult[T]: GetResult[ContractId[T]] =
     GetResult.GetString.andThen(new ContractId[T](_))
 
+  protected implicit def contractIdGetResultOption[T]: GetResult[Option[ContractId[T]]] =
+    GetResult.GetStringOption.andThen(_.map(new ContractId[T](_)))
+
   protected implicit lazy val offsetJdbcType: JdbcType[Offset] =
     MappedColumnType.base[Offset, String](
       _.toHexString,

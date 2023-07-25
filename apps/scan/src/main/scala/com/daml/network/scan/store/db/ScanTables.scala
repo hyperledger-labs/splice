@@ -1,11 +1,12 @@
 package com.daml.network.scan.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.Contract
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanTxLogParser
@@ -176,6 +177,9 @@ object ScanTables extends AcsTables {
 
   case class ScanTxLogRowData(
       eventId: String,
+      offset: Option[String],
+      domainId: DomainId,
+      acsContractId: Option[ContractId[?]],
       indexRecordType: String3,
       round: Option[Long],
       rewardAmount: Option[BigDecimal],
@@ -191,9 +195,12 @@ object ScanTables extends AcsTables {
 
     def fromTxLogIndexRecord(record: ScanTxLogParser.TxLogIndexRecord): ScanTxLogRowData = {
       record match {
-        case err @ ScanTxLogParser.TxLogIndexRecord.ErrorIndexRecord(_, eventId) =>
+        case err @ ScanTxLogParser.TxLogIndexRecord.ErrorIndexRecord(offset, eventId, domainId) =>
           ScanTxLogRowData(
             eventId = eventId,
+            offset = Some(offset),
+            domainId = domainId,
+            acsContractId = None,
             indexRecordType = err.companion.dbType,
             round = None,
             rewardAmount = None,
@@ -204,10 +211,18 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
-        case omr @ ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord(_, eventId, round) =>
+        case omr @ ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord(
+              offset,
+              eventId,
+              domainId,
+              round,
+            ) =>
           ScanTxLogRowData(
             eventId = eventId,
             indexRecordType = omr.companion.dbType,
+            domainId = domainId,
+            acsContractId = None,
+            offset = Some(offset),
             round = Some(round),
             rewardAmount = None,
             rewardedParty = None,
@@ -218,14 +233,18 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseCcSpent = None,
           )
         case cmr @ ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord(
-              _,
+              offset,
               eventId,
+              domainId,
               round,
               _,
             ) =>
           ScanTxLogRowData(
             eventId = eventId,
             indexRecordType = cmr.companion.dbType,
+            offset = Some(offset),
+            domainId = domainId,
+            acsContractId = None,
             round = Some(round),
             rewardAmount = None,
             rewardedParty = None,
@@ -235,10 +254,20 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
-        case are @ TxLogIndexRecord.AppRewardIndexRecord(_, eventId, round, party, amount) =>
+        case are @ TxLogIndexRecord.AppRewardIndexRecord(
+              offset,
+              eventId,
+              domainId,
+              round,
+              party,
+              amount,
+            ) =>
           ScanTxLogRowData(
             eventId = eventId,
             indexRecordType = are.companion.dbType,
+            domainId = domainId,
+            offset = Some(offset),
+            acsContractId = None,
             round = Some(round),
             rewardAmount = Some(amount),
             rewardedParty = Some(party),
@@ -248,10 +277,20 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
-        case vre @ TxLogIndexRecord.ValidatorRewardIndexRecord(_, eventId, round, party, amount) =>
+        case vre @ TxLogIndexRecord.ValidatorRewardIndexRecord(
+              offset,
+              eventId,
+              domainId,
+              round,
+              party,
+              amount,
+            ) =>
           ScanTxLogRowData(
             eventId = eventId,
             indexRecordType = vre.companion.dbType,
+            offset = Some(offset),
+            domainId = domainId,
+            acsContractId = None,
             round = Some(round),
             rewardAmount = Some(amount),
             rewardedParty = Some(party),
@@ -262,8 +301,9 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseCcSpent = None,
           )
         case etp @ ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
-              _,
+              offset,
               eventId,
+              domainId,
               round,
               validator,
               trafficPurchased,
@@ -272,6 +312,9 @@ object ScanTables extends AcsTables {
           ScanTxLogRowData(
             eventId = eventId,
             indexRecordType = etp.companion.dbType,
+            offset = Some(offset),
+            domainId = domainId,
+            acsContractId = None,
             round = Some(round),
             rewardAmount = None,
             rewardedParty = None,
@@ -282,8 +325,9 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseCcSpent = Some(ccSpent),
           )
         case bac @ ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord(
-              _,
+              offset,
               eventId,
+              domainId,
               round,
               changeToInitialAmountAsOfRoundZero,
               changeToHoldingFeesRate,
@@ -291,6 +335,9 @@ object ScanTables extends AcsTables {
           ScanTxLogRowData(
             eventId = eventId,
             indexRecordType = bac.companion.dbType,
+            offset = offset,
+            domainId = domainId,
+            acsContractId = None,
             round = Some(round),
             rewardAmount = None,
             rewardedParty = None,

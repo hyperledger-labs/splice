@@ -83,7 +83,11 @@ class InMemoryScanStore(
           roundConfig.round == round
         case _ => false
       }
-      roundConfig <- txLogReader.loadTxLogEntry(indexRecord.eventId)
+      roundConfig <- txLogReader.loadTxLogEntry(
+        indexRecord.eventId,
+        indexRecord.domainId,
+        indexRecord.acsContractId,
+      )
     } yield {
       roundConfig match {
         case r: ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry => r
