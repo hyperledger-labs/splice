@@ -142,6 +142,39 @@ abstract class ValidatorAppReference(
         HttpAppManagerAppClient.ListInstalledApps
       )
     }
+
+  def authorize(redirectUri: String, state: String, userId: String): String =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.Authorize(redirectUri, state, userId)
+      )
+    }
+
+  def oauth2Jwks(): definitions.JwksResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.Oauth2Jwks
+      )
+    }
+
+  def oauth2OpenIdConfiguration(): definitions.OpenIdConfigurationResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.Oauth2OpenIdConfiguration
+      )
+    }
+
+  def oauth2Token(
+      grantType: String,
+      code: String,
+      redirectUri: String,
+      clientId: String,
+  ): definitions.TokenResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.Oauth2Token(grantType, code, redirectUri, clientId)
+      )
+    }
 }
 
 final class ValidatorAppBackendReference(

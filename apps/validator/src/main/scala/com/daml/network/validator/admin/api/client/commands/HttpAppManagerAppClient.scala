@@ -120,4 +120,70 @@ object HttpAppManagerAppClient {
     }
   }
 
+  final case class Authorize(redirectUri: String, state: String, userId: String)
+      extends BaseCommand[http.AuthorizeResponse, String] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.AuthorizeResponse] =
+      client.authorize(redirectUri, state, userId, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.AuthorizeResponse.OK(response) =>
+      Right(response.redirectUri)
+    }
+  }
+
+  final case object Oauth2Jwks
+      extends BaseCommand[http.Oauth2JwksResponse, definitions.JwksResponse] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.Oauth2JwksResponse] =
+      client.oauth2Jwks(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.Oauth2JwksResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  final case object Oauth2OpenIdConfiguration
+      extends BaseCommand[
+        http.Oauth2OpenIdConfigurationResponse,
+        definitions.OpenIdConfigurationResponse,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.Oauth2OpenIdConfigurationResponse] =
+      client.oauth2OpenIdConfiguration(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.Oauth2OpenIdConfigurationResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
+  final case class Oauth2Token(
+      grantType: String,
+      code: String,
+      redirectUri: String,
+      clientId: String,
+  ) extends BaseCommand[http.Oauth2TokenResponse, definitions.TokenResponse] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.Oauth2TokenResponse] =
+      client.oauth2Token(grantType, code, redirectUri, clientId, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.Oauth2TokenResponse.OK(response) =>
+      Right(response)
+    }
+  }
 }

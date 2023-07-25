@@ -100,6 +100,94 @@ paths:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ParticipantIdentitiesDump"
 
+  /app-manager/authorize:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "authorize"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                redirect_uri:
+                  type: string
+                state:
+                  type: string
+                user_id:
+                  type: string
+              required:
+                - redirect_uri
+                - state
+                - user_id
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AuthorizeResponse"
+  /app-manager/oauth2/.well-known/openid-configuration:
+    get:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "oauth2OpenIDConfiguration"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OpenIDConfigurationResponse"
+  /app-manager/oauth2/.well-known/jwks.json:
+    get:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "oauth2Jwks"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/JwksResponse"
+  /app-manager/oauth2/token:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "oauth2Token"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type:
+                  type: string
+                code:
+                  type: string
+                redirect_uri:
+                  type: string
+                client_id:
+                  type: string
+              required:
+                - grant_type
+                - code
+                - redirect_uri
+                - client_id
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+
   /app-manager/apps/installed:
     get:
       tags: [appManager]
@@ -204,6 +292,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/409"
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+
 components:
   schemas:
     OnboardUserRequest:
@@ -257,6 +346,76 @@ components:
           type: array
           items:
             type: string
+
+    AuthorizeResponse:
+      type: object
+      required:
+        - redirect_uri
+      properties:
+        redirect_uri:
+          type: string
+
+    OpenIDConfigurationResponse:
+      type: object
+      required:
+        - issuer
+        - authorization_endpoint
+        - token_endpoint
+        - jwks_uri
+      properties:
+        issuer:
+          type: string
+        authorization_endpoint:
+          type: string
+        token_endpoint:
+          type: string
+        jwks_uri:
+          type: string
+
+    JwksResponse:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Jwk"
+      required:
+        - keys
+
+    Jwk:
+      type: object
+      properties:
+        kid:
+          type: string
+        kty:
+          type: string
+        alg:
+          type: string
+        use:
+          type: string
+        n:
+          type: string
+        e:
+          type: string
+      required:
+        - kid
+        - kty
+        - alg
+        - use
+        - n
+        - e
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+        # TODO(#6839): consider adding expires_in, refresh_token, scope
+      required:
+        - access_token
+        - token_type
 
     ListInstalledAppsResponse:
       type: object

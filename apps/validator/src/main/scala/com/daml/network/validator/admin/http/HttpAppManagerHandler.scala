@@ -1,10 +1,19 @@
 package com.daml.network.validator.admin.http
 
 import akka.stream.Materializer
-import akka.http.scaladsl.model.{ContentType, ContentTypes, HttpRequest, HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{
+  ContentType,
+  ContentTypes,
+  HttpRequest,
+  HttpResponse,
+  Uri,
+  StatusCodes,
+}
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import com.daml.lf.archive.DarParser
 import com.daml.network.environment.{BaseAppConnection, ParticipantAdminConnection}
 import com.daml.network.http.v0.{appManager as v0, definitions}
@@ -31,19 +40,15 @@ import java.io.{
   File,
   FileInputStream,
 }
-import java.util.Base64
+import java.security.KeyPairGenerator
+import java.security.interfaces.{RSAPublicKey, RSAPrivateKey}
+import java.util.{Base64, UUID}
 import java.util.stream.Collectors
 import java.util.zip.ZipInputStream
 
 final case class RegisteredApp(
     bundle: ByteString,
     manifest: definitions.Manifest,
-)
-
-final case class AuthorizeResponse(
-    userId: String,
-    code: String,
-    state: String,
 )
 
 // TODO(#6839) Add auth to all endpoints
@@ -61,6 +66,18 @@ class HttpAppManagerHandler(
     with Spanning
     with NamedLogging {
 
+  // TODO(#6839) Consider persisting this so that a restart does not require a token refresh.
+  private val keyId = UUID.randomUUID.toString
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  private def generateKey() = {
+    val keyGen = KeyPairGenerator.getInstance("RSA")
+    val keyPair = keyGen.generateKeyPair()
+    (keyPair.getPublic.asInstanceOf[RSAPublicKey], keyPair.getPrivate.asInstanceOf[RSAPrivateKey])
+  }
+
+  private val (publicKey, privateKey) = generateKey()
+
   private val workflowId = this.getClass.getSimpleName
 
   // TODO(#6839) Revisit storage of registered apps
@@ -71,11 +88,109 @@ class HttpAppManagerHandler(
   private val installedApps: collection.concurrent.Map[String, definitions.Manifest] =
     collection.concurrent.TrieMap.empty
 
+  // Map from authorization code to user id
+  private val codes: collection.concurrent.Map[String, String] =
+    collection.concurrent.TrieMap.empty
+
   private def appBundleUrl(app: String) =
     config.appManagerApiUrl
       .withPath(
         config.appManagerApiUrl.path / "app-manager" / "apps" / "registered" / app / "bundle.tar.gz"
       )
+
+  // This is the endpoint that the app manager frontend calls after the user got redirected to /authorize
+  // and logged in and confirmed that they want to authorize the app.
+  def authorize(
+      respond: v0.AppManagerResource.AuthorizeResponse.type
+  )(redirectUri: String, state: String, userId: String)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.AuthorizeResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      val authorizationCode = UUID.randomUUID.toString
+      codes += authorizationCode -> userId
+      Future.successful(
+        // TODO(#6839) Consider just letting the frontend compute this instead of returning it here.
+        definitions.AuthorizeResponse(
+          Uri(redirectUri)
+            .withQuery(Uri.Query("code" -> authorizationCode, "state" -> state))
+            .toString
+        )
+      )
+    }
+
+  def oauth2Jwks(
+      respond: v0.AppManagerResource.Oauth2JwksResponse.type
+  )()(extracted: Unit): scala.concurrent.Future[v0.AppManagerResource.Oauth2JwksResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      Future.successful(
+        definitions.JwksResponse(
+          Vector(
+            definitions.Jwk(
+              kid = keyId,
+              kty = "RSA",
+              use = "sig",
+              alg = "RS256",
+              // Somewhat annoyingly the Auth0 library only does JWKS decoding but not encoding
+              // so we somewhat handroll it here.
+              n = Base64.getUrlEncoder().encodeToString(publicKey.getModulus.toByteArray),
+              e = Base64.getUrlEncoder().encodeToString(publicKey.getPublicExponent.toByteArray),
+            )
+          )
+        )
+      )
+    }
+  def oauth2OpenIdConfiguration(
+      respond: v0.AppManagerResource.Oauth2OpenIdConfigurationResponse.type
+  )()(extracted: Unit): Future[v0.AppManagerResource.Oauth2OpenIdConfigurationResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      Future.successful(
+        definitions.OpenIdConfigurationResponse(
+          issuer = config.issuerUrl.toString,
+          authorizationEndpoint =
+            config.appManagerUiUrl.withPath(config.appManagerUiUrl.path / "authorize").toString,
+          tokenEndpoint = config.appManagerApiUrl
+            .withPath(config.appManagerApiUrl.path / "app-manager" / "oauth2" / "token")
+            .toString,
+          jwksUri = config.appManagerApiUrl
+            .withPath(config.appManagerApiUrl.path / "app-manager" / ".well-known" / "jwks.json")
+            .toString,
+        )
+      )
+    }
+  def oauth2Token(
+      respond: v0.AppManagerResource.Oauth2TokenResponse.type
+  )(grantType: String, code: String, redirectUri: String, clientId: String)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.Oauth2TokenResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      codes.remove(code) match {
+        case None =>
+          Future.successful(
+            v0.AppManagerResource.Oauth2TokenResponse.BadRequest(
+              definitions.ErrorResponse("invalid_grant")
+            )
+          )
+        case Some(userId) =>
+          // TODO(#6839) Properly validate client_id, redirect_uri, ...
+          val jwt = JWT
+            .create()
+            .withSubject(userId)
+            .withAudience(config.audience)
+            // Needed so the JSON API parses the token properly
+            .withClaim("scope", "daml_ledger_api")
+            .withIssuer(config.issuerUrl.toString)
+            .withKeyId(keyId)
+            .sign(Algorithm.RSA256(publicKey, privateKey))
+          Future.successful(
+            v0.AppManagerResource.Oauth2TokenResponse.OK(
+              definitions.TokenResponse(
+                accessToken = jwt,
+                tokenType = "bearer",
+              )
+            )
+          )
+      }
+    }
 
   def listInstalledApps(
       respond: v0.AppManagerResource.ListInstalledAppsResponse.type
