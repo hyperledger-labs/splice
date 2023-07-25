@@ -174,8 +174,6 @@ class SvApp(
       cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
         new CometBftNode(client, config, loggerFactory)
       )
-      trafficBalanceService = newTrafficBalanceService(participantAdminConnection)
-      _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
       // Ensure SVC party, SvcRules, CoinRules, Mediator, and Sequencer nodes are setup
       // -------------------------------------------------------------------------------
@@ -289,6 +287,11 @@ class SvApp(
         .getOrElse(Future.unit)
 
       _ <- waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
+
+      // We're registering the trafficBalanceService on the LedgerClient after all the SV onboarding steps
+      // because we do not want the onboarding to be throttled by the balance check.
+      trafficBalanceService = newTrafficBalanceService(participantAdminConnection)
+      _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)

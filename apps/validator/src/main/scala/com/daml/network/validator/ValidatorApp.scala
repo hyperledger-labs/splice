@@ -476,14 +476,15 @@ class ValidatorApp(
           logger,
         )
       )
-      // We're registering the trafficBalanceService on the LedgerClient after the validator's wallet
-      // has been installed because the top-up trigger relies on the validator's WalletAppInstall contract
-      // to submit the top-up transaction and we do not want the wallet installation to be throttled by the
-      // balance check.
+      _ <- ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
+
+      // We're registering the trafficBalanceService on the LedgerClient after the validator has been onboarded
+      // (in particular after the validator's wallet has been installed) because the top-up trigger relies on
+      // the validator's WalletAppInstall contract to submit the top-up transaction and we do not want the wallet
+      // installation or other validator onboarding steps to be throttled by the balance check.
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)
       _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
-      _ <- ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
