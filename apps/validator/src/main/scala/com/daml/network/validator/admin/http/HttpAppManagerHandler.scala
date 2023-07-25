@@ -10,11 +10,13 @@ import akka.http.scaladsl.model.{
   StatusCodes,
 }
 import akka.http.scaladsl.unmarshalling.Unmarshal
+import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.lf.archive.DarParser
+import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.environment.{BaseAppConnection, ParticipantAdminConnection}
 import com.daml.network.http.v0.{appManager as v0, definitions}
 import com.daml.network.validator.config.AppManagerConfig
@@ -24,12 +26,14 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.util.EitherTUtil
 import io.opentelemetry.api.trace.Tracer
 
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.{CompressorStreamFactory}
 import scala.concurrent.{ExecutionContext, Future}
 import com.google.protobuf.ByteString
+import io.circe.Json
 import io.circe.parser.decode
 import java.io.{
   ByteArrayInputStream,
@@ -393,4 +397,61 @@ class HttpAppManagerHandler(
         case _ => Future.failed(new BaseAppConnection.UnexpectedHttpResponse(response))
       }
     } yield decoded
+
+  // Reverse proxy for JSON API to add CORS headers.
+  val jsonApiClient = v0.AppManagerClient.httpClient(
+    HttpClientBuilder().buildClient,
+    config.jsonApiUrl.toString,
+  )
+
+  def handleResponse[R](response: EitherT[Future, Either[Throwable, HttpResponse], R]): Future[R] =
+    EitherTUtil.toFuture(response.leftMap[Throwable] {
+      case Left(throwable) => throwable
+      case Right(response) => new BaseAppConnection.UnexpectedHttpResponse(response)
+    })
+
+  def jsonApiCreate(
+      respond: v0.AppManagerResource.JsonApiCreateResponse.type
+  )(body: Json, authorization: String)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.JsonApiCreateResponse] =
+    handleResponse(
+      jsonApiClient.jsonApiCreate(
+        body,
+        authorization,
+      )
+    ).map(_.fold(v0.AppManagerResource.JsonApiCreateResponse.OK(_)))
+  def jsonApiExercise(
+      respond: v0.AppManagerResource.JsonApiExerciseResponse.type
+  )(body: Json, authorization: String)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.JsonApiExerciseResponse] =
+    handleResponse(
+      jsonApiClient.jsonApiExercise(
+        body,
+        authorization,
+      )
+    ).map(_.fold(v0.AppManagerResource.JsonApiExerciseResponse.OK(_)))
+  def jsonApiQuery(
+      respond: v0.AppManagerResource.JsonApiQueryResponse.type
+  )(body: Json, authorization: String)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.JsonApiQueryResponse] =
+    handleResponse(
+      jsonApiClient.jsonApiQuery(
+        body,
+        authorization,
+      )
+    ).map(_.fold(v0.AppManagerResource.JsonApiQueryResponse.OK(_)))
+  def jsonApiUser(
+      respond: v0.AppManagerResource.JsonApiUserResponse.type
+  )(body: Json, authorization: String)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.JsonApiUserResponse] =
+    handleResponse(
+      jsonApiClient.jsonApiUser(
+        body,
+        authorization,
+      )
+    ).map(_.fold(v0.AppManagerResource.JsonApiUserResponse.OK(_)))
 }

@@ -293,6 +293,106 @@ paths:
         "400":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
 
+  # We proxy the JSON API here to set CORS headers.
+  # TODO(#6839) Consider exposing these as /app-manager/v1 instead.This would make it a bit
+  # harder to build the proxy because we need to do a URL rewrite.
+  /v1/user:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "jsonApiUser"
+      parameters:
+        - in: header
+          name: authorization
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/query:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "jsonApiQuery"
+      parameters:
+        - in: header
+          name: authorization
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/create:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "jsonApiCreate"
+      parameters:
+        - in: header
+          name: authorization
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+  /v1/exercise:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "jsonApiExercise"
+      parameters:
+        - in: header
+          name: authorization
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+
 components:
   schemas:
     OnboardUserRequest:

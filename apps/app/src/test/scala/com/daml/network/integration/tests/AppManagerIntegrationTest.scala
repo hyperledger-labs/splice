@@ -1,6 +1,12 @@
 package com.daml.network.integration.tests
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Uri}
+import akka.Done
+import akka.actor.CoordinatedShutdown
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.client.RequestBuilding.{Options, Post}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, StatusCodes, Uri}
+import akka.http.scaladsl.model.headers
+import akka.http.scaladsl.unmarshalling.Unmarshal
 import com.auth0.jwk.UrlJwkProvider
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
@@ -18,6 +24,7 @@ import com.google.protobuf.ByteString
 
 import java.io.{File, FileInputStream}
 import java.security.interfaces.RSAPublicKey
+import scala.util.Success
 
 class AppManagerIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -98,6 +105,73 @@ class AppManagerIntegrationTest
       val verifier = JWT.require(algorithm).build()
       val decodedJwt = verifier.verify(token)
       decodedJwt.getSubject() shouldBe userId
+    }
+
+    "json api proxy sets CORS headers" in { implicit env =>
+      implicit val sys = env.actorSystem
+      implicit val ec = env.executionContext
+      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+        () =>
+          Http().shutdownAllConnectionPools().map(_ => Done)
+      }
+      val preflight =
+        Options(s"${aliceValidatorBackend.config.appManager.value.appManagerApiUrl}/v1/user")
+          .withHeaders(
+            headers.Origin("http://example.com"),
+            headers.`Access-Control-Request-Method`(HttpMethods.POST),
+            headers.`Access-Control-Request-Headers`("origin", "authorization"),
+          )
+
+      val response = Http()
+        .singleRequest(preflight)
+        .futureValue
+      inside(response) {
+        case _ if response.status == StatusCodes.OK =>
+          response.headers should contain(
+            headers.`Access-Control-Allow-Methods`(
+              HttpMethods.DELETE,
+              HttpMethods.GET,
+              HttpMethods.POST,
+              HttpMethods.HEAD,
+              HttpMethods.OPTIONS,
+            )
+          )
+      }
+    }
+    "json api proxy is setup correctly" in { implicit env =>
+      implicit val sys = env.actorSystem
+      implicit val ec = env.executionContext
+      // We don't expose the full proxy through the ValidatorReference since it just adds a bunch of boilerplate
+      // with little benefit so instead we just make the one request for testing manually here.
+      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+        () =>
+          Http().shutdownAllConnectionPools().map(_ => Done)
+      }
+      val getUser =
+        Post(s"${aliceValidatorBackend.config.appManager.value.appManagerApiUrl}/v1/user")
+          .withEntity(
+            HttpEntity(
+              ContentTypes.`application/json`,
+              s"""{"userId": "${aliceValidatorBackend.config.ledgerApiUser}"}""",
+            )
+          )
+          .withHeaders(
+            headers.Authorization(headers.OAuth2BearerToken(aliceValidatorBackend.token.value))
+          )
+
+      val response = Http()
+        .singleRequest(
+          getUser
+        )
+        .futureValue
+      inside(response) {
+        case _ if response.status == StatusCodes.OK =>
+          inside(Unmarshal(response.entity).to[String].value.value) { case Success(response) =>
+            response shouldBe s"""{"result":{"primaryParty":"${aliceValidatorBackend
+                .getValidatorPartyId()
+                .toProtoPrimitive}","userId":"${aliceValidatorBackend.config.ledgerApiUser}"},"status":200}"""
+          }
+      }
     }
   }
 }
