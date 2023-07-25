@@ -100,6 +100,81 @@ paths:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ParticipantIdentitiesDump"
 
+  /app-manager/apps/registered:
+    get:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "listRegisteredApps"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListRegisteredAppsResponse"
+  /app-manager/apps/registered/{app}/manifest.json:
+    get:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "getAppManifest"
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Manifest"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+  /app-manager/apps/registered/{app}/bundle.tar.gz:
+    get:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "getAppBundle"
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAppBundleResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+  /app-manager/apps/register:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "registerApp"
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                app_bundle:
+                  type: string
+                  format: binary
+              required:
+                - app_bundle
+      responses:
+        "201":
+          description: ok
+        "409":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/409"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
 components:
   schemas:
     OnboardUserRequest:
@@ -153,3 +228,75 @@ components:
           type: array
           items:
             type: string
+
+
+    ListRegisteredAppsResponse:
+      type: object
+      required:
+        - apps
+      properties:
+        apps:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RegisteredApp"
+
+    RegisteredApp:
+      type: object
+      required:
+        - name
+        - manifest_url
+      properties:
+        name:
+          type: string
+        manifest_url:
+          type: string
+
+    Manifest:
+      type: object
+      required:
+        - name
+        - version
+        - bundle
+        - ui_url
+        - domains
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        bundle:
+          type: string
+        ui_url:
+          type: string
+        domains:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Domain"
+
+    Domain:
+      type: object
+      required:
+        - alias
+        - url
+      properties:
+        alias:
+          type: string
+        url:
+          type: string
+
+    GetAppBundleResponse:
+      type: object
+      required:
+        - base64_bundle
+      properties:
+        # base64 because guardrail doesn't support generating binary files on the client side
+        base64_bundle:
+          type: string
+
+    InstallAppRequest:
+      type: object
+      required:
+        - manifest_url
+      properties:
+        manifest_url:
+          type: string

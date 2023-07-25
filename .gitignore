@@ -57,3 +57,4 @@ openapi-ts-client
 .direnv
 rust_mozprofile*
 openapi-cache-key.txt
+apps/splitwell/src/test/resources/splitwell-bundle.tar.gz

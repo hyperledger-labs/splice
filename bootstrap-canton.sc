@@ -54,6 +54,7 @@ println(s"Allocating users for local testing...")
 Seq(
   (sv1Participant, "sv1"),
   (aliceParticipant, "alice_validator_user"),
+  (bobParticipant, "bob_validator_user"),
   (splitwellParticipant, "splitwell_validator_user"),
 ).foreach { case (participant, user) =>
   participant.ledger_api.users.create(

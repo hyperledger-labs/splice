@@ -343,7 +343,7 @@ lazy val `apps-validator` =
       `canton-coin-v1test-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(akka_http_cors),
+      libraryDependencies ++= Seq(akka_http_cors, commons_compress, jaxb_abi),
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "validator-openapi",
@@ -729,6 +729,25 @@ lazy val `apps-splitwell` =
             framework = "akka-http",
           ),
         ),
+      Compile / resourceGenerators += Def.task {
+        val log = streams.value.log
+        val splitwellOutput = (`splitwell-daml` / Compile / damlBuild).value
+        val splitwellDar = ((`splitwell-daml` / Compile / damlBuild).value).head.toString
+        val manifest = baseDirectory.value / "manifest.json"
+        val output = baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle.tar.gz"
+        val cacheDir = streams.value.cacheDirectory
+        val cache = FileFunction.cached(cacheDir) { _ =>
+          runCommand(
+            Seq("./scripts/create-bundle.sh", splitwellDar, manifest.toString, output.toString),
+            log,
+            None,
+            None,
+          )
+          Set(output)
+
+        }
+        cache((manifest +: splitwellOutput).toSet).toSeq
+      }.taskValue,
     )
 
 lazy val pulumi =

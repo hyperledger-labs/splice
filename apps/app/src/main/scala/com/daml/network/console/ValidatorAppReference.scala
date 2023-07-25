@@ -1,11 +1,14 @@
 package com.daml.network.console
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.BodyPartEntity
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.http.v0.definitions
 import com.daml.network.util.ParticipantIdentitiesDump
 import com.daml.network.validator.admin.api.client.commands.{
+  HttpAppManagerAppClient,
   HttpValidatorAdminAppClient,
   HttpValidatorAppClient,
   HttpValidatorPublicAppClient,
@@ -15,6 +18,7 @@ import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAp
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
+import com.google.protobuf.ByteString
 
 /** Console commands that can be executed either through client or backend reference.
   */
@@ -96,6 +100,34 @@ abstract class ValidatorAppReference(
       )
     }
   }
+
+  def registerApp(appBundle: BodyPartEntity): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.RegisterApp(appBundle)
+      )
+    }
+
+  def listRegisteredApps(): Seq[definitions.RegisteredApp] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.ListRegisteredApps
+      )
+    }
+
+  def getAppManifest(app: String): definitions.Manifest =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.GetAppManifest(app)
+      )
+    }
+
+  def getAppBundle(app: String): ByteString =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.GetAppBundle(app)
+      )
+    }
 }
 
 final class ValidatorAppBackendReference(

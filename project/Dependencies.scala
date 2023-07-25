@@ -61,4 +61,7 @@ object Dependencies {
   lazy val google_cloud_storage =
     "com.google.cloud" % "google-cloud-storage" % "2.23.0"
 
+  lazy val jaxb_abi = "javax.xml.bind" % "jaxb-api" % "2.3.1"
+
+  lazy val commons_compress = "org.apache.commons" % "commons-compress" % "1.23.0"
 }

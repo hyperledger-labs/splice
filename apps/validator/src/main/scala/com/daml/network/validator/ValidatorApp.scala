@@ -30,6 +30,7 @@ import com.daml.network.environment.{
   ParticipantAdminConnection,
   TrafficBalanceService,
 }
+import com.daml.network.http.v0.appManager.AppManagerResource
 import com.daml.network.http.v0.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
@@ -42,6 +43,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{CoinConfigSchedule, HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.{
+  HttpAppManagerHandler,
   HttpValidatorAdminHandler,
   HttpValidatorHandler,
   HttpValidatorPublicHandler,
@@ -537,6 +539,14 @@ class ValidatorApp(
         loggerFactory,
       )
 
+      appManagerHandlerO =
+        config.appManager.map(
+          new HttpAppManagerHandler(
+            _,
+            loggerFactory,
+          )
+        )
+
       routes = cors(
         CorsSettings(ac).withAllowedMethods(
           List(
@@ -552,49 +562,59 @@ class ValidatorApp(
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
-                ValidatorResource.routes(
-                  handler,
-                  operationId =>
-                    (operationId match {
-                      // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
-                      case "register" => withRequestTimeout(60.seconds)
-                      case _ => pass
-                    }).tflatMap(_ =>
-                      AuthExtractor(verifier, loggerFactory, "canton network validator realm")(
-                        operationId
+                (Seq(
+                  ValidatorResource.routes(
+                    handler,
+                    operationId =>
+                      (operationId match {
+                        // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
+                        case "register" => withRequestTimeout(60.seconds)
+                        case _ => pass
+                      }).tflatMap(_ =>
+                        AuthExtractor(verifier, loggerFactory, "canton network validator realm")(
+                          operationId
+                        )
+                      ),
+                  ),
+                  WalletResource.routes(
+                    walletHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+                  ),
+                  ValidatorAdminResource.routes(
+                    adminHandler,
+                    operationId =>
+                      (operationId match {
+                        // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
+                        case "onboardUser" => withRequestTimeout(60.seconds)
+                        case _ => pass
+                      }).tflatMap(_ =>
+                        if (config.enableAdminAuth) {
+                          AdminAuthExtractor(
+                            verifier,
+                            validatorParty,
+                            automation.connection,
+                            loggerFactory,
+                            "canton network validator operator realm",
+                          )(operationId).tflatMap(_ => provide(()))
+                        } else {
+                          provide(())
+                        }
+                      ),
+                  ),
+                  ValidatorPublicResource.routes(
+                    publicHandler,
+                    _ => provide(()),
+                  ),
+                  CommonAdminResource.routes(commonAdminHandler, _ => provide(())),
+                ) ++
+                  appManagerHandlerO
+                    .map(
+                      AppManagerResource.routes(
+                        _,
+                        _ => provide(()),
                       )
-                    ),
-                ),
-                WalletResource.routes(
-                  walletHandler,
-                  AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
-                ),
-                ValidatorAdminResource.routes(
-                  adminHandler,
-                  operationId =>
-                    (operationId match {
-                      // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
-                      case "onboardUser" => withRequestTimeout(60.seconds)
-                      case _ => pass
-                    }).tflatMap(_ =>
-                      if (config.enableAdminAuth) {
-                        AdminAuthExtractor(
-                          verifier,
-                          validatorParty,
-                          automation.connection,
-                          loggerFactory,
-                          "canton network validator operator realm",
-                        )(operationId).tflatMap(_ => provide(()))
-                      } else {
-                        provide(())
-                      }
-                    ),
-                ),
-                ValidatorPublicResource.routes(
-                  publicHandler,
-                  _ => provide(()),
-                ),
-                CommonAdminResource.routes(commonAdminHandler, _ => provide(())),
+                    )
+                    .toList): _*
               )
             }
           }

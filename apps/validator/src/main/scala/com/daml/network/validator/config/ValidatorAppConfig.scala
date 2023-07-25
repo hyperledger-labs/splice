@@ -1,5 +1,6 @@
 package com.daml.network.validator.config
 
+import akka.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.*
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -32,6 +33,14 @@ object ValidatorOnboardingConfig {
     config.copy(secret = hidden)
   }
 }
+
+final case class AppManagerConfig(
+    issuerUrl: Uri,
+    appManagerUiUrl: Uri,
+    appManagerApiUrl: Uri,
+    jsonApiUrl: Uri,
+    audience: String,
+)
 
 final case class BuyExtraTrafficConfig(
     /** target throughput in bytes per second
@@ -121,6 +130,7 @@ case class ValidatorAppBackendConfig(
     // TODO(#6247) Remove the option to disable this
     enableAdminAuth: Boolean = true,
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
+    appManager: Option[AppManagerConfig] = None,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
