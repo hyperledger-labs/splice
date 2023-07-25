@@ -1622,24 +1622,6 @@ jobs:
            . .envrc.vars
            .circleci/setup-pipeline.sh
 
-  docs:
-    docker:
-    - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_nix
-      - run_bash_command_in_nix:
-         cmd_name: Build docs
-         cmd: |
-           make cluster/images/docs/html
-           tar -zcf cluster/images/docs/docs.tar.gz --exclude-vcs  cluster/images/docs/target
-      - store_artifacts:
-         name: Storing archive of generated documentation
-         path: cluster/images/docs/docs.tar.gz
-         destination: docs.tar.gz
-
   docker_images_push:
     machine:
       image: ubuntu-2004:2023.04.2
@@ -1797,12 +1779,6 @@ workflows:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
-    # Documentation
-    - docs:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - slack-context
     # Linting and formatting
     - static_tests:
         <<: *notify-fail
