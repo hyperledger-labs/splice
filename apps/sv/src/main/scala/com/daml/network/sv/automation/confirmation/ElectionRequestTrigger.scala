@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.confirmation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cn.svcrules.ElectionRequest
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -29,13 +29,13 @@ class ElectionRequestTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[ElectionRequest.ContractId, ElectionRequest](
+) extends OnAssignedContractTrigger.Template[ElectionRequest.ContractId, ElectionRequest](
       store,
       ElectionRequest.COMPANION,
     ) {
 
   override protected def completeTask(
-      task: ReadyContract[
+      task: AssignedContract[
         ElectionRequest.ContractId,
         ElectionRequest,
       ]

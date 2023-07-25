@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.singlesv
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.{Contract, ReadyContract}
+import com.daml.network.util.{Contract, AssignedContract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -24,14 +24,14 @@ class SvRewardTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       cn.svcrules.SvReward.ContractId,
       cn.svcrules.SvReward,
     ](
       store,
       cn.svcrules.SvReward.COMPANION,
     ) {
-  type SvRewardContract = ReadyContract[
+  type SvRewardContract = AssignedContract[
     cn.svcrules.SvReward.ContractId,
     cn.svcrules.SvReward,
   ]

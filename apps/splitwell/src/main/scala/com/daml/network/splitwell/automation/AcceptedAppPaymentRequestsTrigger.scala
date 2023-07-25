@@ -4,7 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.automation.{
   TaskOutcome,
   TriggerContext,
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskSuccess,
 }
 import com.daml.network.codegen.java.cc.api.v1
@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
-import com.daml.network.util.{DisclosedContracts, ReadyContract}
+import com.daml.network.util.{DisclosedContracts, AssignedContract}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -30,7 +30,7 @@ class AcceptedAppPaymentRequestsTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       walletCodegen.AcceptedAppPayment.ContractId,
       walletCodegen.AcceptedAppPayment,
     ](
@@ -39,7 +39,7 @@ class AcceptedAppPaymentRequestsTrigger(
     ) {
 
   override def completeTask(
-      payment: ReadyContract[
+      payment: AssignedContract[
         walletCodegen.AcceptedAppPayment.ContractId,
         walletCodegen.AcceptedAppPayment,
       ]

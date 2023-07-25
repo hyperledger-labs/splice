@@ -8,12 +8,12 @@ import PrettyInstances.*
 /** A contract that is ready to be acted upon
   * on the given domain.
   */
-final case class ReadyContract[TCid, T](
+final case class AssignedContract[TCid, T](
     contract: Contract[TCid, T],
     domain: DomainId,
 ) extends PrettyPrinting
     with Contract.Has[TCid, T] {
-  override def pretty = prettyOfClass[ReadyContract[TCid, T]](
+  override def pretty = prettyOfClass[AssignedContract[TCid, T]](
     param("contract", _.contract),
     param("domain", _.domain),
   )

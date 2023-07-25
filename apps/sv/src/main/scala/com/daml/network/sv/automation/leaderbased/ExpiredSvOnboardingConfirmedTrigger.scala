@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -23,12 +23,12 @@ class ExpiredSvOnboardingConfirmedTrigger(
       svTaskContext.svcStore.listExpiredSvOnboardingConfirmed,
       cn.svonboarding.SvOnboardingConfirmed.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
       cn.svonboarding.SvOnboardingConfirmed.ContractId,
       cn.svonboarding.SvOnboardingConfirmed,
     ]]] {
   type Task = ScheduledTaskTrigger.ReadyTask[
-    ReadyContract[
+    AssignedContract[
       cn.svonboarding.SvOnboardingConfirmed.ContractId,
       cn.svonboarding.SvOnboardingConfirmed,
     ]

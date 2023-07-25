@@ -12,7 +12,7 @@ import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithout
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
 import com.daml.network.sv.store.{SvStore, SvSvStore}
-import com.daml.network.util.{Contract, ReadyContract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, AssignedContract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -154,13 +154,13 @@ class DbSvSvStore(
 
   // TODO (#5314): this depends on contracts being in domains, which we don't currently track in the DB
   // also: consider moving it to MultiDomainAcsStore (not SvSvStore), as this is generic
-  protected[this] override def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
+  protected[this] override def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
       c: C,
   )(implicit
       tc: TraceContext,
       companion: ContractCompanion[C, I, P],
-  ): Future[Seq[ReadyContract[I, P]]] = ???
+  ): Future[Seq[AssignedContract[I, P]]] = ???
 }
 
 object DbSvSvStore {

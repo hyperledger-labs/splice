@@ -23,7 +23,7 @@ import com.daml.network.util.CNNodeUtil.{
   defaultCoinConfigSchedule,
   defaultEnabledChoices,
 }
-import com.daml.network.util.{GcpBucket, ReadyContract, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{GcpBucket, AssignedContract, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -338,7 +338,7 @@ class FoundingNodeInitializer(
         case Some(config) =>
           logger.debug(s"Attempting to import ACS snapshot from ${config.description}")
           for {
-            existingCrates <- svcStore.multiDomainAcsStore.listReadyContracts(
+            existingCrates <- svcStore.multiDomainAcsStore.listAssignedContracts(
               cc.coinimport.ImportCrate.COMPANION,
               PageLimit(10),
             )
@@ -496,7 +496,7 @@ class FoundingNodeInitializer(
                 } yield ()
             }
           }
-          case QueryResult(_, Some(ReadyContract(svcRules, _))) =>
+          case QueryResult(_, Some(AssignedContract(svcRules, _))) =>
             coinRules match {
               case Some(coinRules) => {
                 if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {

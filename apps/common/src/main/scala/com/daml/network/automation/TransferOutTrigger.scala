@@ -7,7 +7,7 @@ import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
-import com.daml.network.util.{Contract, ReadyContract}
+import com.daml.network.util.{Contract, AssignedContract}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.PartyId
@@ -29,13 +29,13 @@ class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Cont
     mat: Materializer,
     tracer: Tracer,
     companionClass: MultiDomainAcsStore.ContractCompanion[C, TCid, T],
-) extends OnReadyContractTrigger[C, TCid, T](
+) extends OnAssignedContractTrigger[C, TCid, T](
       store,
       companion,
     ) {
 
   override protected def completeTask(
-      task: ReadyContract[
+      task: AssignedContract[
         TCid,
         T,
       ]

@@ -25,7 +25,7 @@ import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
 import com.daml.network.sv.store.{ExpiredRewardCouponsBatch, SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{CNNodeUtil, Contract, ContractWithState, ReadyContract}
+import com.daml.network.util.{CNNodeUtil, Contract, ContractWithState, AssignedContract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -45,28 +45,28 @@ class InMemorySvSvcStore(
 ) extends InMemoryCNNodeAppStoreWithoutHistory
     with SvSvcStore {
 
-  protected[this] override def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
+  protected[this] override def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
       c: C,
   )(implicit
       tc: TraceContext,
       companion: ContractCompanion[C, I, P],
-  ): Future[Seq[ReadyContract[I, P]]] =
+  ): Future[Seq[AssignedContract[I, P]]] =
     multiDomainAcsStore
-      .listReadyContracts(c)
+      .listAssignedContracts(c)
       .map(_.filterNot(_.domain == excludedDomain))
 
   override def lookupSvcRulesWithOffset(): Future[
-    MultiDomainAcsStore.QueryResult[Option[ReadyContract[SvcRules.ContractId, SvcRules]]]
+    MultiDomainAcsStore.QueryResult[Option[AssignedContract[SvcRules.ContractId, SvcRules]]]
   ] = for {
     c <- multiDomainAcsStore.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)()
-  } yield c.map(_ flatMap (_.toReadyContract))
+  } yield c.map(_ flatMap (_.toAssignedContract))
 
   override protected def lookupCoinRulesWithOffset()
-      : Future[QueryResult[Option[ReadyContract[CoinRules.ContractId, CoinRules]]]] = for {
+      : Future[QueryResult[Option[AssignedContract[CoinRules.ContractId, CoinRules]]]] = for {
     result <- multiDomainAcsStore
       .findContractWithOffset(cc.coin.CoinRules.COMPANION)((_: Any) => true)
-  } yield result map (_ flatMap (_.toReadyContract))
+  } yield result map (_ flatMap (_.toAssignedContract))
 
   override def lookupCoinRulesV1TestWithOffset()(implicit
       tc: TraceContext
@@ -86,7 +86,7 @@ class InMemorySvSvcStore(
       for {
         maybeLatestOpenMiningRound <- lookupLatestActiveOpenMiningRound()
         result <- maybeLatestOpenMiningRound.fold(
-          Future.successful(Seq.empty[ReadyContract[Id, T]])
+          Future.successful(Seq.empty[AssignedContract[Id, T]])
         ) { latest =>
           for {
             domainId <- defaultAcsDomainIdF
@@ -99,7 +99,7 @@ class InMemorySvSvcStore(
                     .coinExpiresAt(coin(e.payload))
                     .number <= latest.payload.round.number - 2,
               )
-          } yield allExpired.view.take(limit).map(ReadyContract(_, domainId)).toSeq
+          } yield allExpired.view.take(limit).map(AssignedContract(_, domainId)).toSeq
         }
       } yield result
 
@@ -544,10 +544,10 @@ class InMemorySvSvcStore(
 
   private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
       tc: TraceContext
-  ): Future[Seq[ReadyContract[?, ?]]] = {
+  ): Future[Seq[AssignedContract[?, ?]]] = {
     import com.daml.network.codegen.java.cn.svcrules as svcr
     def c[C, I <: ContractId[?], P](c: C)(implicit companion: ContractCompanion[C, I, P]) =
-      listReadyContractsNotOnDomain(targetDomain, c)
+      listAssignedContractsNotOnDomain(targetDomain, c)
 
     for {
       coinRulesO <- lookupCoinRules()

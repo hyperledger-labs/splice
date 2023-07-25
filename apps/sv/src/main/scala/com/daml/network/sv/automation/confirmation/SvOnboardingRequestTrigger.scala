@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.confirmation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -20,7 +20,7 @@ import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.util.{Contract, ReadyContract}
+import com.daml.network.util.{Contract, AssignedContract}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -37,7 +37,7 @@ class SvOnboardingRequestTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       SvOnboardingRequest.ContractId,
       SvOnboardingRequest,
     ](
@@ -60,7 +60,7 @@ class SvOnboardingRequestTrigger(
 
   private def attemptConfirmation(
       svcRules: Contract[SvcRules.ContractId, SvcRules],
-      svOnboarding: ReadyContract[
+      svOnboarding: AssignedContract[
         SvOnboardingRequest.ContractId,
         SvOnboardingRequest,
       ],
@@ -112,7 +112,7 @@ class SvOnboardingRequestTrigger(
   }
 
   override def completeTask(
-      svOnboarding: ReadyContract[
+      svOnboarding: AssignedContract[
         SvOnboardingRequest.ContractId,
         SvOnboardingRequest,
       ]

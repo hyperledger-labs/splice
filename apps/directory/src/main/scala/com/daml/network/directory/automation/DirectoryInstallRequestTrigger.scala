@@ -2,7 +2,7 @@ package com.daml.network.directory.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -28,7 +28,7 @@ class DirectoryInstallRequestTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       directoryCodegen.DirectoryInstallRequest.ContractId,
       directoryCodegen.DirectoryInstallRequest,
     ](
@@ -47,12 +47,12 @@ class DirectoryInstallRequestTrigger(
   )
 
   override def completeTask(
-      reqReady: ReadyContract[
+      reqReady: AssignedContract[
         directoryCodegen.DirectoryInstallRequest.ContractId,
         directoryCodegen.DirectoryInstallRequest,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val ReadyContract(req, domainId) = reqReady
+    val AssignedContract(req, domainId) = reqReady
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     for {

@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.leaderbased
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskStale,
   TaskSuccess,
@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,17 +27,17 @@ class ArchiveDuplicateValidatorTrafficTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[ValidatorTraffic.ContractId, ValidatorTraffic](
+) extends OnAssignedContractTrigger.Template[ValidatorTraffic.ContractId, ValidatorTraffic](
       svTaskContext.svcStore,
       ValidatorTraffic.COMPANION,
     )
-    with SvTaskBasedTrigger[ReadyContract[ValidatorTraffic.ContractId, ValidatorTraffic]] {
+    with SvTaskBasedTrigger[AssignedContract[ValidatorTraffic.ContractId, ValidatorTraffic]] {
 
   private val store = svTaskContext.svcStore
   private val trafficContractsLimit = 100
 
   override def completeTaskAsLeader(
-      validatorTraffic: ReadyContract[ValidatorTraffic.ContractId, ValidatorTraffic]
+      validatorTraffic: AssignedContract[ValidatorTraffic.ContractId, ValidatorTraffic]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validatorParty = PartyId.tryFromProtoPrimitive(validatorTraffic.payload.validator)
     val domainId = DomainId.tryFromString(validatorTraffic.payload.domainId)

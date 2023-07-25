@@ -2,13 +2,13 @@ package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +23,7 @@ class WalletAppInstallTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       installCodegen.WalletAppInstall.ContractId,
       installCodegen.WalletAppInstall,
     ](
@@ -32,7 +32,7 @@ class WalletAppInstallTrigger(
     ) {
 
   override def completeTask(
-      install: ReadyContract[
+      install: AssignedContract[
         installCodegen.WalletAppInstall.ContractId,
         installCodegen.WalletAppInstall,
       ]

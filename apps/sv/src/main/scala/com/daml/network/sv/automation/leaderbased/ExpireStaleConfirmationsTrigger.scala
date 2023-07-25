@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.Confirmation
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -28,12 +28,12 @@ class ExpireStaleConfirmationsTrigger(
       svTaskContext.svcStore.listStaleConfirmations,
       Confirmation.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
       Confirmation.ContractId,
       Confirmation,
     ]]] {
 
-  type Task = ScheduledTaskTrigger.ReadyTask[ReadyContract[
+  type Task = ScheduledTaskTrigger.ReadyTask[AssignedContract[
     Confirmation.ContractId,
     Confirmation,
   ]]

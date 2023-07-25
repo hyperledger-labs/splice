@@ -26,7 +26,7 @@ import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{CNNodeUtil, Contract, ReadyContract, TemplateJsonDecoder}
+import com.daml.network.util.{CNNodeUtil, Contract, AssignedContract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -59,12 +59,12 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   def lookupSvcRulesWithOffset(
   ): Future[
     QueryResult[Option[
-      ReadyContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+      AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
     ]]
   ]
 
   def lookupSvcRules()
-      : Future[Option[ReadyContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
+      : Future[Option[AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     lookupSvcRulesWithOffset().map(_.value)
 
   def getSvcRules(
@@ -82,7 +82,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
 
   protected def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[
-      ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
+      AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
     ]]
   ]
 
@@ -94,7 +94,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   ]
 
   def lookupCoinRules()
-      : Future[Option[ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
+      : Future[Option[AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     lookupCoinRulesWithOffset().map(_.value)
 
   def getCoinRules(): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
@@ -482,13 +482,13 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       receiver: PartyId
   )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment]
 
-  protected[this] def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
+  protected[this] def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
       c: C,
   )(implicit
       tc: TraceContext,
       companion: ContractCompanion[C, I, P],
-  ): Future[Seq[ReadyContract[I, P]]]
+  ): Future[Seq[AssignedContract[I, P]]]
 
   def listSvcRulesTransferFollowers()(implicit
       tc: TraceContext

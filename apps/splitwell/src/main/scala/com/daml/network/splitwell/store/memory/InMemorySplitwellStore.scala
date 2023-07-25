@@ -74,10 +74,10 @@ class InMemorySplitwellStore(
       traceContext: TraceContext,
   ) =
     for {
-      followerContracts <- multiDomainAcsStore.listReadyContracts(
+      followerContracts <- multiDomainAcsStore.listAssignedContracts(
         followerCompanion
       )
-      leaderContracts <- multiDomainAcsStore.listReadyContracts(
+      leaderContracts <- multiDomainAcsStore.listAssignedContracts(
         leaderCompanion
       )
     } yield {

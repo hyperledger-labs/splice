@@ -20,7 +20,7 @@ import com.daml.network.store.*
 import com.daml.network.util.{
   Contract,
   ContractWithState,
-  ReadyContract,
+  AssignedContract,
   TemplateJsonDecoder,
   Trees,
 }
@@ -172,15 +172,15 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     } yield withState
   }
 
-  override def listReadyContracts[C, TCid <: ContractId[_], T](
+  override def listAssignedContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Future[Seq[ReadyContract[TCid, T]]] = waitUntilAcsIngested {
-    // TODO (#5314): do a query instead of in-memory filtering via toReadyContract
-    listContracts(companion, limit).map(_.flatMap(_.toReadyContract))
+  ): Future[Seq[AssignedContract[TCid, T]]] = waitUntilAcsIngested {
+    // TODO (#5314): do a query instead of in-memory filtering via toAssignedContract
+    listContracts(companion, limit).map(_.flatMap(_.toAssignedContract))
   }
 
   // TODO (#3822) `expiresAt` is unused here, but necessary for the in-memory version to work.
@@ -208,8 +208,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         )
       limited = applyLimit(limit, result)
       withState <- limited.traverse(contractWithStateFromRow(companion)(_))
-      // TODO (#5314): adjust the query instead of in-memory filtering via toReadyContract
-    } yield withState.flatMap(_.toReadyContract)
+      // TODO (#5314): adjust the query instead of in-memory filtering via toAssignedContract
+    } yield withState.flatMap(_.toAssignedContract)
   }
 
   override def listContractsOnDomain[C, TCid <: ContractId[_], T](
@@ -236,20 +236,20 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     }
   }
 
-  override def streamReadyContracts[C, TCid <: ContractId[_], T](companion: C)(implicit
+  override def streamAssignedContracts[C, TCid <: ContractId[_], T](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Source[ReadyContract[TCid, T], NotUsed] = {
-    streamReadyContracts(companion, PageLimit(100L))
+  ): Source[AssignedContract[TCid, T], NotUsed] = {
+    streamAssignedContracts(companion, PageLimit(100L))
   }
 
-  def streamReadyContracts[C, TCid <: ContractId[_], T](
+  def streamAssignedContracts[C, TCid <: ContractId[_], T](
       companion: C,
       pageSize: PageLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Source[ReadyContract[TCid, T], NotUsed] = {
+  ): Source[AssignedContract[TCid, T], NotUsed] = {
     val templateId = companionClass.typeId(companion)
     Source
       .future(
@@ -272,7 +272,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                     order by event_number
                     limit ${sqlLimit(pageSize)}
                      """).toActionBuilder.as[AcsStoreRowTemplate],
-                "streamReadyContracts",
+                "streamAssignedContracts",
               )
               .flatMap { rows =>
                 rows.lastOption.map(_.eventNumber) match {
@@ -280,7 +280,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                     Future.successful(
                       (
                         lastEventNumber + 1,
-                        rows.map(row => ReadyContract(contractFromRow(companion)(row), domainId)),
+                        rows
+                          .map(row => AssignedContract(contractFromRow(companion)(row), domainId)),
                       )
                     )
                   case None =>

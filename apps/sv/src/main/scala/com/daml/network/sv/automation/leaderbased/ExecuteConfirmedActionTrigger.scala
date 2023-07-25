@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.leaderbased
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.sv.SvApp.{isDevNet, isSvcMemberName, isSvcMemberParty}
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -37,16 +37,16 @@ class ExecuteConfirmedActionTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[Confirmation.ContractId, Confirmation](
+) extends OnAssignedContractTrigger.Template[Confirmation.ContractId, Confirmation](
       svTaskContext.svcStore,
       Confirmation.COMPANION,
     )
-    with SvTaskBasedTrigger[ReadyContract[Confirmation.ContractId, Confirmation]] {
+    with SvTaskBasedTrigger[AssignedContract[Confirmation.ContractId, Confirmation]] {
 
   private val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(
-      confirmationContract: ReadyContract[Confirmation.ContractId, Confirmation]
+      confirmationContract: AssignedContract[Confirmation.ContractId, Confirmation]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val action = confirmationContract.payload.action
     isStaleAction(confirmationContract).flatMap { isStale =>
@@ -97,7 +97,7 @@ class ExecuteConfirmedActionTrigger(
   }
 
   private def isStaleAction(
-      confirmation: ReadyContract[Confirmation.ContractId, Confirmation]
+      confirmation: AssignedContract[Confirmation.ContractId, Confirmation]
   )(implicit tc: TraceContext): Future[Boolean] = {
     // Add new cases as we port more triggers which require confirmation
     confirmation.payload.action match {

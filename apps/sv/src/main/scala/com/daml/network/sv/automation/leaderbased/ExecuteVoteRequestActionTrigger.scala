@@ -2,14 +2,14 @@ package com.daml.network.sv.automation.leaderbased
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.Vote
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -23,16 +23,16 @@ class ExecuteVoteRequestActionTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[Vote.ContractId, Vote](
+) extends OnAssignedContractTrigger.Template[Vote.ContractId, Vote](
       svTaskContext.svcStore,
       Vote.COMPANION,
     )
-    with SvTaskBasedTrigger[ReadyContract[Vote.ContractId, Vote]] {
+    with SvTaskBasedTrigger[AssignedContract[Vote.ContractId, Vote]] {
 
   private val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(
-      voteContract: ReadyContract[Vote.ContractId, Vote]
+      voteContract: AssignedContract[Vote.ContractId, Vote]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val voteRequestId = voteContract.payload.requestCid
     for {

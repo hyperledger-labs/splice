@@ -19,7 +19,7 @@ import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.{ExpiredRewardCouponsBatch, SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template
-import com.daml.network.util.{Contract, ReadyContract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, AssignedContract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -114,11 +114,11 @@ class DbSvSvcStore(
   }
 
   override def lookupSvcRulesWithOffset(): Future[MultiDomainAcsStore.QueryResult[
-    Option[ReadyContract[SvcRules.ContractId, SvcRules]]
+    Option[AssignedContract[SvcRules.ContractId, SvcRules]]
   ]] = ???
 
   override protected def lookupCoinRulesWithOffset(): Future[MultiDomainAcsStore.QueryResult[
-    Option[ReadyContract[CoinRules.ContractId, CoinRules]]
+    Option[AssignedContract[CoinRules.ContractId, CoinRules]]
   ]] = ???
 
   override def lookupSvOnboardingConfirmedByPartyOnDomain(svParty: PartyId, domainId: DomainId)(
@@ -266,13 +266,13 @@ class DbSvSvcStore(
       tc: TraceContext
   ): Future[AcsStoreDump.ImportShipment] = ???
 
-  override protected[this] def listReadyContractsNotOnDomain[C, I <: ContractId[_], P](
+  override protected[this] def listAssignedContractsNotOnDomain[C, I <: ContractId[_], P](
       excludedDomain: DomainId,
       c: C,
   )(implicit
       tc: TraceContext,
       companion: MultiDomainAcsStore.ContractCompanion[C, I, P],
-  ): Future[Seq[ReadyContract[I, P]]] = ???
+  ): Future[Seq[AssignedContract[I, P]]] = ???
 
   override def listSvcRulesTransferFollowers()(implicit
       tc: TraceContext

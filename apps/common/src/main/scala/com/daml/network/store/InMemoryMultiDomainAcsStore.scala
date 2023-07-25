@@ -13,7 +13,7 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.*
-import com.daml.network.util.{Contract, ContractWithState, ReadyContract, Trees}
+import com.daml.network.util.{Contract, ContractWithState, AssignedContract, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.DomainId
@@ -208,27 +208,27 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       }
     }
 
-  override def listReadyContracts[C, TCid <: ContractId[_], T](
+  override def listAssignedContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Future[Seq[ReadyContract[TCid, T]]] = {
-    filterReadyContracts(companion, _ => true, limit)
+  ): Future[Seq[AssignedContract[TCid, T]]] = {
+    filterAssignedContracts(companion, _ => true, limit)
   }
 
-  def filterReadyContracts[C, TCid <: ContractId[_], T](
+  def filterAssignedContracts[C, TCid <: ContractId[_], T](
       companion: C,
       filter: Contract[TCid, T] => Boolean,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Future[Seq[ReadyContract[TCid, T]]] =
+  ): Future[Seq[AssignedContract[TCid, T]]] =
     for {
       contracts <- filterContracts(companion, filter, limit)
-    } yield contracts.view.collect(Function.unlift(_.toReadyContract)).toSeq
+    } yield contracts.view.collect(Function.unlift(_.toAssignedContract)).toSeq
 
   override private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[
     T
@@ -237,7 +237,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   )(implicit companionClass: ContractCompanion[C, TCid, T]): ListExpiredContracts[TCid, T] =
     (now, limit) =>
       implicit traceContext =>
-        filterReadyContracts(
+        filterAssignedContracts(
           companion = companion,
           filter = co => now.toInstant isAfter expiresAt(co.payload),
           limit = PageLimit( // this is called until the result size is 0, effectively paginating
@@ -401,7 +401,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       }
     }
 
-  private def nextReadyContract[T](
+  private def nextAssignedContract[T](
       fromCreated: CreatedEvent => Option[T],
       startingFromIncl: Long,
   ): Future[(Long, (T, DomainId))] = {
@@ -419,29 +419,29 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     optEntry match {
       case None =>
         st.offsetChanged.future.flatMap(_ =>
-          nextReadyContract(fromCreated, st.nextContractStateEventNumber)
+          nextAssignedContract(fromCreated, st.nextContractStateEventNumber)
         )
       case Some((eventNumber, co)) => Future((eventNumber + 1, co))
     }
   }
 
-  private def streamReadyContracts[T](
+  private def streamAssignedContracts[T](
       fromCreatedEvent: CreatedEvent => Option[T]
   ): Source[(T, DomainId), NotUsed] = {
     Source.unfoldAsync(0: Long)(eventNumber =>
-      nextReadyContract(fromCreatedEvent, eventNumber).map(Some(_))
+      nextAssignedContract(fromCreatedEvent, eventNumber).map(Some(_))
     )
   }
 
-  override def streamReadyContracts[C, TCid <: ContractId[_], T](
+  override def streamAssignedContracts[C, TCid <: ContractId[_], T](
       companion: C
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Source[ReadyContract[TCid, T], NotUsed] = {
+  ): Source[AssignedContract[TCid, T], NotUsed] = {
     requireInScope(companion)
-    streamReadyContracts(companionClass.fromCreatedEvent(companion)(contractFilter, _)).map {
-      case (contract, domain) => ReadyContract(contract, domain)
+    streamAssignedContracts(companionClass.fromCreatedEvent(companion)(contractFilter, _)).map {
+      case (contract, domain) => AssignedContract(contract, domain)
     }
   }
 

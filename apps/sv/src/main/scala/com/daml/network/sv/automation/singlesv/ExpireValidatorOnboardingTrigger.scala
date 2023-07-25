@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvStore
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -34,7 +34,7 @@ class ExpireValidatorOnboardingTrigger(
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        ReadyContract[
+        AssignedContract[
           ValidatorOnboarding.ContractId,
           ValidatorOnboarding,
         ]

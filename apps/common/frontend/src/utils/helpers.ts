@@ -1,4 +1,4 @@
-import { Contract, ReadyContract } from './interfaces';
+import { Contract, AssignedContract } from './interfaces';
 
 function equalWith<T>(a: T[], b: T[], p: (a: T, b: T) => boolean) {
   if (a.length !== b.length) {
@@ -16,7 +16,10 @@ export const sameContracts = <T>(a: Contract<T>[], b: Contract<T>[]): boolean =>
   return equalWith(a, b, (l, r) => l.contractId === r.contractId);
 };
 
-export function sameReadyContracts<T>(a: ReadyContract<T>[], b: ReadyContract<T>[]): boolean {
+export function sameAssignedContracts<T>(
+  a: AssignedContract<T>[],
+  b: AssignedContract<T>[]
+): boolean {
   return equalWith(
     a,
     b,

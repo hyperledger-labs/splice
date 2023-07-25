@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -30,7 +30,7 @@ class ExpireIssuingMiningRoundTrigger(
       cc.round.IssuingMiningRound.COMPANION,
     )
     with SvTaskBasedTrigger[
-      ScheduledTaskTrigger.ReadyTask[ReadyContract[
+      ScheduledTaskTrigger.ReadyTask[AssignedContract[
         cc.round.IssuingMiningRound.ContractId,
         cc.round.IssuingMiningRound,
       ]]
@@ -40,7 +40,7 @@ class ExpireIssuingMiningRoundTrigger(
 
   override protected def completeTaskAsLeader(
       task: ScheduledTaskTrigger.ReadyTask[
-        ReadyContract[IssuingMiningRound.ContractId, IssuingMiningRound]
+        AssignedContract[IssuingMiningRound.ContractId, IssuingMiningRound]
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work

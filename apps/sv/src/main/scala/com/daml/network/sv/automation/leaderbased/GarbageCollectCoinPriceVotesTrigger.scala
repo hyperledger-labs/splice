@@ -2,13 +2,13 @@ package com.daml.network.sv.automation.leaderbased
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -22,18 +22,18 @@ class GarbageCollectCoinPriceVotesTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       SvcRules.ContractId,
       SvcRules,
     ](
       svTaskContext.svcStore,
       SvcRules.COMPANION,
     )
-    with SvTaskBasedTrigger[ReadyContract[
+    with SvTaskBasedTrigger[AssignedContract[
       SvcRules.ContractId,
       SvcRules,
     ]] {
-  type SvcRulesContract = ReadyContract[
+  type SvcRulesContract = AssignedContract[
     SvcRules.ContractId,
     SvcRules,
   ]

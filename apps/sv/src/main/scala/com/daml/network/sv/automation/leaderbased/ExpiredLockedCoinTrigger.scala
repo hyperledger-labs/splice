@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cc
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -23,12 +23,14 @@ class ExpiredLockedCoinTrigger(
       svTaskContext.svcStore.listLockedExpiredCoins,
       cc.coin.LockedCoin.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
       cc.coin.LockedCoin.ContractId,
       cc.coin.LockedCoin,
     ]]] {
   type Task =
-    ScheduledTaskTrigger.ReadyTask[ReadyContract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]]
+    ScheduledTaskTrigger.ReadyTask[
+      AssignedContract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]
+    ]
 
   private val store = svTaskContext.svcStore
 

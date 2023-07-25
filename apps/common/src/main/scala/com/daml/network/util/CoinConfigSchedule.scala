@@ -27,7 +27,7 @@ object CoinConfigSchedule {
 
   /** Convenience constructor to get a CoinRules' config schedule. */
   def apply(
-      cr: ReadyContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
+      cr: AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
   ): CoinConfigSchedule =
     CoinConfigSchedule(cr.payload.configSchedule)
 

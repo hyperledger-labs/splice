@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.{DeliveryOffer, DeliveryOfferView}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
-import com.daml.network.util.{Contract, ContractWithState, ReadyContract}
+import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.DomainId
@@ -76,7 +76,7 @@ abstract class MultiDomainAcsStoreTest[
 
   protected type Store = S
   protected type C = Contract[AppRewardCoupon.ContractId, AppRewardCoupon]
-  protected type CReady = ReadyContract[AppRewardCoupon.ContractId, AppRewardCoupon]
+  protected type CReady = AssignedContract[AppRewardCoupon.ContractId, AppRewardCoupon]
 
   protected def assertTestState(
       contractStateEventsById: Map[ContractId[_], ContractStateEvent] = Map.empty,
@@ -307,39 +307,43 @@ abstract class MultiDomainAcsStoreTest[
     }
     "stream ready contracts on single domain" in {
       implicit val store = mkStore()
-      val readyContracts = new AtomicReference(Seq.empty[CReady])
+      val assignedContracts = new AtomicReference(Seq.empty[CReady])
       val streamF = store
-        .streamReadyContracts(AppRewardCoupon.COMPANION)
+        .streamAssignedContracts(AppRewardCoupon.COMPANION)
         .take(3)
-        .runForeach { readyContract => readyContracts.updateAndGet(_.appended(readyContract)) }
-      def r(round: Int) = ReadyContract(c(round), d1)
+        .runForeach { assignedContract =>
+          assignedContracts.updateAndGet(_.appended(assignedContract))
+        }
+      def r(round: Int) = AssignedContract(c(round), d1)
       for {
         _ <- acs(Seq((c(1), d1, 0L)))
-        _ = eventually()(readyContracts.get() shouldBe Seq(r(1)))
+        _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
-        _ = eventually()(readyContracts.get() shouldBe Seq(r(1), r(2)))
+        _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2)))
         _ <- d1.create(c(3))
-        _ = eventually()(readyContracts.get() shouldBe Seq(r(1), r(2), r(3)))
+        _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2), r(3)))
         _ <- streamF
       } yield succeed
     }
     "stream ready contracts after ingestion restart" in {
       implicit val store = mkStore()
-      val readyContracts = new AtomicReference(Seq.empty[CReady])
+      val assignedContracts = new AtomicReference(Seq.empty[CReady])
       val streamF = store
-        .streamReadyContracts(AppRewardCoupon.COMPANION)
+        .streamAssignedContracts(AppRewardCoupon.COMPANION)
         .take(3)
-        .runForeach { readyContract => readyContracts.updateAndGet(_.appended(readyContract)) }
-      def r(round: Int) = ReadyContract(c(round), d1)
+        .runForeach { assignedContract =>
+          assignedContracts.updateAndGet(_.appended(assignedContract))
+        }
+      def r(round: Int) = AssignedContract(c(round), d1)
       for {
         _ <- acs(Seq((c(1), d1, 0L)))
-        _ = eventually()(readyContracts.get() shouldBe Seq(r(1)))
+        _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
-        _ = eventually()(readyContracts.get() shouldBe Seq(r(1), r(2)))
+        _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2)))
         _ <- store.ingestionSink.initialize()
         _ <- d1.create(c(3))
-        _ = eventually()(readyContracts.get() shouldBe Seq(r(1), r(2), r(3)))
+        _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2), r(3)))
         _ <- streamF
       } yield succeed
     }

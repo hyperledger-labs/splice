@@ -13,7 +13,7 @@ import com.daml.network.store.{
   ConfiguredDefaultDomain,
   TxLogStore,
 }
-import com.daml.network.util.{Contract, ContractWithState, ReadyContract}
+import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -115,9 +115,12 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
   ): Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]]
 
   def listSplitwellInstalls(user: PartyId)(implicit traceContext: TraceContext): Future[Seq[
-    ReadyContract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
+    AssignedContract[
+      splitwellCodegen.SplitwellInstall.ContractId,
+      splitwellCodegen.SplitwellInstall,
+    ]
   ]] =
-    multiDomainAcsStore.filterReadyContracts(
+    multiDomainAcsStore.filterAssignedContracts(
       splitwellCodegen.SplitwellInstall.COMPANION,
       c => c.payload.user == user.toProtoPrimitive,
     )

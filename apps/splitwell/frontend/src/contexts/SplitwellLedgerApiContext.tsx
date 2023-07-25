@@ -1,7 +1,7 @@
 import {
   LedgerApiClient,
   Contract,
-  ReadyContract,
+  AssignedContract,
   LedgerApiProps,
   useUserState,
   LedgerApiClientProvider,
@@ -22,7 +22,7 @@ import { ContractId } from '@daml/types';
 class SplitwellLedgerApiClient extends LedgerApiClient {
   acceptDuration: string = (5 * 60 * 1000000).toString();
 
-  private getGroup(id: GroupId, groups: ReadyContract<Group>[]): ReadyContract<Group> {
+  private getGroup(id: GroupId, groups: AssignedContract<Group>[]): AssignedContract<Group> {
     console.log(JSON.stringify(groups));
     const group = groups.find(c => c.contract.payload.id.unpack === id.unpack);
     if (!group) {
@@ -62,7 +62,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
     user: string,
     provider: string,
     groupId: GroupId,
-    groups: ReadyContract<Group>[],
+    groups: AssignedContract<Group>[],
     domainId: string,
     install: ContractId<SplitwellInstall>
   ) {
@@ -103,7 +103,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
     user: string,
     provider: string,
     groupId: GroupId,
-    groups: ReadyContract<Group>[],
+    groups: AssignedContract<Group>[],
     inviteContractId: ContractId<AcceptedGroupInvite>,
     domainId: string,
     install: ContractId<SplitwellInstall>
@@ -126,7 +126,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
     user: string,
     provider: string,
     groupId: GroupId,
-    groups: ReadyContract<Group>[],
+    groups: AssignedContract<Group>[],
     amount: string,
     description: string,
     domainId: string,
@@ -151,7 +151,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
     sender: string,
     provider: string,
     groupId: GroupId,
-    groups: ReadyContract<Group>[],
+    groups: AssignedContract<Group>[],
     receiverAmounts: ReceiverCCAmount[],
     domainId: string,
     install: ContractId<SplitwellInstall>

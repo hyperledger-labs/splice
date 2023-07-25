@@ -1,5 +1,5 @@
 import { QueryClient, UseQueryResult, useQuery } from '@tanstack/react-query';
-import { ReadyContract } from 'common-frontend';
+import { AssignedContract } from 'common-frontend';
 
 import { Group } from '@daml.js/splitwell/lib/CN/Splitwell';
 
@@ -9,10 +9,10 @@ const groupsQueryKey = (party: string) => ['splitwell-api', 'groups', party];
 
 // We read groups directly from the client within mutation function. That ensures
 // that on a retry we get a potentially more recent version with an updated contract id.
-export const getGroups = (party: string, queryClient: QueryClient): ReadyContract<Group>[] =>
-  queryClient.getQueryData(groupsQueryKey(party)) as ReadyContract<Group>[];
+export const getGroups = (party: string, queryClient: QueryClient): AssignedContract<Group>[] =>
+  queryClient.getQueryData(groupsQueryKey(party)) as AssignedContract<Group>[];
 
-export const useGroups = (party: string): UseQueryResult<ReadyContract<Group>[]> => {
+export const useGroups = (party: string): UseQueryResult<AssignedContract<Group>[]> => {
   const splitwellClient = useSplitwellClient();
   return useQuery({
     queryKey: groupsQueryKey(party),
@@ -20,7 +20,7 @@ export const useGroups = (party: string): UseQueryResult<ReadyContract<Group>[]>
       const newGroups = (await splitwellClient.listGroups(party)).groups;
       return newGroups.flatMap(g => {
         // don't display groups in-flight from one domain to another
-        const d = ReadyContract.decodeContractWithState(g, Group);
+        const d = AssignedContract.decodeContractWithState(g, Group);
         return d === undefined ? [] : [d];
       });
     },

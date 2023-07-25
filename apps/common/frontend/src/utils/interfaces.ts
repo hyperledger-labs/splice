@@ -20,7 +20,7 @@ export interface Contract<T> {
   metadata: ContractMetadata;
 }
 
-export interface ReadyContract<T> {
+export interface AssignedContract<T> {
   contract: Contract<T>;
   domainId: string;
 }
@@ -51,12 +51,12 @@ export const Contract = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ReadyContract = {
+export const AssignedContract = {
   // undefined if c is in-flight between domains
   decodeContractWithState<T extends object, K>(
     cws: OpenAPIContractWithState,
     tmpl: Template<T, K>
-  ): ReadyContract<T> | undefined {
+  ): AssignedContract<T> | undefined {
     const c = cws.contract;
     const domainId = cws.domainId;
     return c && domainId ? { contract: Contract.decodeOpenAPI(c, tmpl), domainId } : undefined;

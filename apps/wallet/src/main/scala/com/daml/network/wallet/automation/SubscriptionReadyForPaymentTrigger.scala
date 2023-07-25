@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   subscriptions as subsCodegen,
 }
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
@@ -39,7 +39,7 @@ class SubscriptionReadyForPaymentTrigger(
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
-        ReadyContract[
+        AssignedContract[
           subsCodegen.SubscriptionIdleState.ContractId,
           subsCodegen.SubscriptionIdleState,
         ]

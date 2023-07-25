@@ -2,14 +2,14 @@ package com.daml.network.sv.automation.singlesv
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 
 import com.daml.network.sv.automation.LeaderBasedAutomationService
 import com.daml.network.sv.automation.leaderbased.SvTaskBasedTrigger
@@ -39,14 +39,14 @@ class RestartLeaderBasedAutomationTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       cn.svcrules.SvcRules.ContractId,
       cn.svcrules.SvcRules,
     ](
       store,
       cn.svcrules.SvcRules.COMPANION,
     ) {
-  type SvcRulesContract = ReadyContract[
+  type SvcRulesContract = AssignedContract[
     cn.svcrules.SvcRules.ContractId,
     cn.svcrules.SvcRules,
   ]

@@ -653,7 +653,7 @@ template SvcRules with
 
     -- | Garbage-collect CoinPriceVotes from removed members and duplicate ones that might
     -- happen due to a too quick removal and re-addition of a member.
-    -- We expect this to be run as an OnReadyContractTrigger for the SvcRules contract.
+    -- We expect this to be run as an OnAssignedContractTrigger for the SvcRules contract.
     --
     -- Note: we do not archive the CoinPriceVote of a member on its removal from the collective,
     -- as that would allow that member to block the removal via updating its CoinPriceVote at the right time.

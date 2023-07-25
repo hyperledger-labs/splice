@@ -5,7 +5,7 @@ import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.store.CNNodeAppStore
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -90,8 +90,8 @@ object TransferFollowTrigger {
   type LubTask = Task[?, ?, ?, ?]
 
   final case class Task[LeaderTCid, LeaderT, FollowerTCid, FollowerT](
-      leader: ReadyContract[LeaderTCid, LeaderT],
-      follower: ReadyContract[FollowerTCid, FollowerT],
+      leader: AssignedContract[LeaderTCid, LeaderT],
+      follower: AssignedContract[FollowerTCid, FollowerT],
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
       prettyOfClass(

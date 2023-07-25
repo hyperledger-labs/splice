@@ -8,7 +8,7 @@ import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, MultiDomain
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.{SvStore, SvSvStore}
-import com.daml.network.util.{Contract, ReadyContract}
+import com.daml.network.util.{Contract, AssignedContract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -58,14 +58,14 @@ class InMemorySvSvStore(
     )
   )
 
-  protected[this] override def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
+  protected[this] override def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
       c: C,
   )(implicit
       tc: TraceContext,
       companion: ContractCompanion[C, I, P],
-  ): Future[Seq[ReadyContract[I, P]]] =
+  ): Future[Seq[AssignedContract[I, P]]] =
     multiDomainAcsStore
-      .listReadyContracts(c)
+      .listAssignedContracts(c)
       .map(_.filterNot(_.domain == excludedDomain))
 }

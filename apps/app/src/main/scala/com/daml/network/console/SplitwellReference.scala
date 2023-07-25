@@ -13,14 +13,14 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
 import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{Contract, ContractWithState, ReadyContract}
+import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
   Help,
   LedgerApiCommandRunner,
 }
-import com.digitalasset.canton.console.commands.{BaseLedgerApiAdministration}
+import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
@@ -242,11 +242,11 @@ final class SplitwellAppClientReference(
   )
   def createGroupInvite(
       id: String
-  ): ReadyContract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite] = {
+  ): AssignedContract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite] = {
     val party = getUserPrimaryParty()
     val (domain, group) = getGroup(HttpSplitwellAppClient.GroupKey(id, party))
     val install = getSplitwellInstall(domain)
-    ReadyContract(
+    AssignedContract(
       ledgerApi.ledger_api_extensions.commands.submitWithCreate(
         splitwellCodegen.GroupInvite.COMPANION
       )(
@@ -287,7 +287,7 @@ final class SplitwellAppClientReference(
 
   @Help.Summary("Accept the group invite")
   def acceptInvite(
-      groupInvite: ReadyContract[
+      groupInvite: AssignedContract[
         splitwellCodegen.GroupInvite.ContractId,
         splitwellCodegen.GroupInvite,
       ]

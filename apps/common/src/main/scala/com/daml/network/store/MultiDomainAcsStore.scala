@@ -29,7 +29,7 @@ import com.daml.network.environment.ledger.api.{
 }
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.Contract.Companion.Interface
-import com.daml.network.util.{Contract, ContractWithState, ReadyContract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, AssignedContract, TemplateJsonDecoder}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.api.client.data.TemplateId
@@ -137,13 +137,13 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]]
 
-  def listReadyContracts[C, TCid <: ContractId[_], T](
+  def listAssignedContracts[C, TCid <: ContractId[_], T](
       companion: C,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Future[Seq[ReadyContract[TCid, T]]]
+  ): Future[Seq[AssignedContract[TCid, T]]]
 
   /** Only contracts with state ContractState.Assigned(domain) are considered
     * so contracts are omitted if they have been transferred or are in-flight.
@@ -172,12 +172,12 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
     * Note that the same contract can be returned multiple
     * times as it moves across domains.
     */
-  def streamReadyContracts[C, TCid <: ContractId[_], T](
+  def streamAssignedContracts[C, TCid <: ContractId[_], T](
       companion: C
   )(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
-  ): Source[ReadyContract[TCid, T], NotUsed]
+  ): Source[AssignedContract[TCid, T], NotUsed]
 
   /** Stream all transfer out events that are ready for transfer in.
     * The only guarantee provided is that a transfer out that does not get transferred in

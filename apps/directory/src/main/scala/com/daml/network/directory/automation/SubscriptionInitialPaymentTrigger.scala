@@ -2,7 +2,7 @@ package com.daml.network.directory.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -15,7 +15,7 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.{DisclosedContracts, ReadyContract}
+import com.daml.network.util.{DisclosedContracts, AssignedContract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -31,7 +31,7 @@ class SubscriptionInitialPaymentTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       subsCodegen.SubscriptionInitialPayment.ContractId,
       subsCodegen.SubscriptionInitialPayment,
     ](
@@ -40,12 +40,12 @@ class SubscriptionInitialPaymentTrigger(
     ) {
 
   override def completeTask(
-      readyPayment: ReadyContract[
+      readyPayment: AssignedContract[
         subsCodegen.SubscriptionInitialPayment.ContractId,
         subsCodegen.SubscriptionInitialPayment,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val ReadyContract(payment, domainId) = readyPayment
+    val AssignedContract(payment, domainId) = readyPayment
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )

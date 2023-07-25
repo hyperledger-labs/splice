@@ -1,4 +1,4 @@
-import { Contract, ReadyContract, sameReadyContracts, useInterval } from 'common-frontend';
+import { Contract, AssignedContract, sameAssignedContracts, useInterval } from 'common-frontend';
 import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
@@ -23,7 +23,7 @@ interface GroupSetupProps {
 type GroupInviteInput = { originalText: string } & (
   | {
       type: 'good';
-      inviteContract: ReadyContract<GroupInvite>;
+      inviteContract: AssignedContract<GroupInvite>;
       install: ContractId<SplitwellInstall>;
     }
   | { type: 'noparse'; failure: string }
@@ -51,15 +51,15 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     await requestGroup.mutate(groupId);
   };
 
-  const [groupInvites, setGroupInvites] = useState<ReadyContract<GroupInvite>[]>([]);
+  const [groupInvites, setGroupInvites] = useState<AssignedContract<GroupInvite>[]>([]);
 
   const fetchInvites = useCallback(async () => {
     const groupInvites = (await splitwellClient.listGroupInvites(party)).groupInvites;
     const decoded = groupInvites.flatMap(c => {
-      const d = ReadyContract.decodeContractWithState(c, GroupInvite);
+      const d = AssignedContract.decodeContractWithState(c, GroupInvite);
       return d === undefined ? [] : [d];
     });
-    setGroupInvites(prev => (sameReadyContracts(prev, decoded) ? prev : decoded));
+    setGroupInvites(prev => (sameAssignedContracts(prev, decoded) ? prev : decoded));
   }, [splitwellClient, party]);
 
   useInterval(fetchInvites);

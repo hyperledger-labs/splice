@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.singlesv
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.ExpiringLock
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -29,7 +29,7 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       cc.globaldomain.ValidatorTraffic.ContractId,
       cc.globaldomain.ValidatorTraffic,
     ](
@@ -55,7 +55,7 @@ class ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
   }
 
   override def completeTask(
-      validatorTraffic: ReadyContract[
+      validatorTraffic: AssignedContract[
         cc.globaldomain.ValidatorTraffic.ContractId,
         cc.globaldomain.ValidatorTraffic,
       ]

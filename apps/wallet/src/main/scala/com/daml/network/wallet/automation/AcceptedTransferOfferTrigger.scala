@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -17,7 +17,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
 import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.tracing.TraceContext
@@ -35,7 +35,7 @@ class AcceptedTransferOfferTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
       transferOffersCodegen.AcceptedTransferOffer,
     ](
@@ -44,18 +44,18 @@ class AcceptedTransferOfferTrigger(
     ) {
 
   // Override the default source, as we can only auto-complete accepted offers if we are the sender
-  override protected def source(implicit traceContext: TraceContext): Source[ReadyContract[
+  override protected def source(implicit traceContext: TraceContext): Source[AssignedContract[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ], NotUsed] =
     store.multiDomainAcsStore
-      .streamReadyContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
+      .streamAssignedContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
       .filter(acceptedOffer =>
         acceptedOffer.payload.sender == store.key.endUserParty.toProtoPrimitive
       )
 
   override def completeTask(
-      acceptedOffer: ReadyContract[
+      acceptedOffer: AssignedContract[
         transferOffersCodegen.AcceptedTransferOffer.ContractId,
         transferOffersCodegen.AcceptedTransferOffer,
       ]
@@ -88,7 +88,7 @@ class AcceptedTransferOfferTrigger(
   }
 
   private def abortAcceptedTransferOffer(
-      acceptedOffer: ReadyContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
+      acceptedOffer: AssignedContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
       reason: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {

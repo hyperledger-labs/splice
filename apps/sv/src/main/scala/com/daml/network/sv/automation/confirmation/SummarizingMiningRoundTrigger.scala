@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.confirmation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
-  OnReadyContractTrigger,
+  OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -18,7 +18,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.Limit
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.{Contract, ReadyContract}
+import com.daml.network.util.{Contract, AssignedContract}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -34,7 +34,7 @@ class SummarizingMiningRoundTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyContractTrigger.Template[
+) extends OnAssignedContractTrigger.Template[
       cc.round.SummarizingMiningRound.ContractId,
       cc.round.SummarizingMiningRound,
     ](
@@ -61,7 +61,7 @@ class SummarizingMiningRoundTrigger(
     )
 
   override def completeTask(
-      summarizingRound: ReadyContract[
+      summarizingRound: AssignedContract[
         cc.round.SummarizingMiningRound.ContractId,
         cc.round.SummarizingMiningRound,
       ]

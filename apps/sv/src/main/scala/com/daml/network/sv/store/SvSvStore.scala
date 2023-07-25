@@ -16,7 +16,7 @@ import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResul
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.memory.InMemorySvSvStore
-import com.daml.network.util.{Contract, ReadyContract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, AssignedContract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -101,20 +101,20 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomai
       .map(_.headOption)
   )
 
-  protected[this] def listReadyContractsNotOnDomain[C, I <: ContractId[?], P](
+  protected[this] def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
       c: C,
   )(implicit
       tc: TraceContext,
       companion: ContractCompanion[C, I, P],
-  ): Future[Seq[ReadyContract[I, P]]]
+  ): Future[Seq[AssignedContract[I, P]]]
 
   private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
       tc: TraceContext
-  ): Future[Seq[ReadyContract[?, ?]]] =
-    listReadyContractsNotOnDomain(targetDomain, so.ApprovedSvIdentity.COMPANION)
+  ): Future[Seq[AssignedContract[?, ?]]] =
+    listAssignedContractsNotOnDomain(targetDomain, so.ApprovedSvIdentity.COMPANION)
 
-  final def listSvcRulesTransferFollowers[SrCid, Sr](svcRules: ReadyContract[SrCid, Sr])(implicit
+  final def listSvcRulesTransferFollowers[SrCid, Sr](svcRules: AssignedContract[SrCid, Sr])(implicit
       tc: TraceContext
   ): Future[Seq[FollowTask[SrCid, Sr, ?, ?]]] =
     listLaggingSvcRulesFollowers(svcRules.domain)

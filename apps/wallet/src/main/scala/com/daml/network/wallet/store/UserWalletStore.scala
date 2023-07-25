@@ -153,7 +153,7 @@ trait UserWalletStore
         )
 
       for {
-        idleStates <- multiDomainAcsStore.listReadyContracts(
+        idleStates <- multiDomainAcsStore.listAssignedContracts(
           subsCodegen.SubscriptionIdleState.COMPANION
         )
       } yield idleStates

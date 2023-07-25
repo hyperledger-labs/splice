@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -34,7 +34,7 @@ class ExpiredDirectoryEntryTrigger(
     ) {
 
   override protected def completeTask(
-      co: ScheduledTaskTrigger.ReadyTask[ReadyContract[
+      co: ScheduledTaskTrigger.ReadyTask[AssignedContract[
         directoryCodegen.DirectoryEntry.ContractId,
         directoryCodegen.DirectoryEntry,
       ]]

@@ -2,7 +2,7 @@ package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.util.{Contract, ReadyContract}
+import com.daml.network.util.{Contract, AssignedContract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -28,15 +28,15 @@ abstract class MultiDomainExpiredContractTrigger[
     ec: ExecutionContext,
     tracer: Tracer,
     companionClass: MultiDomainAcsStore.ContractCompanion[C, TCid, T],
-) extends ScheduledTaskTrigger[ReadyContract[TCid, T]] {
+) extends ScheduledTaskTrigger[AssignedContract[TCid, T]] {
 
   override final protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[ReadyContract[TCid, T]]] =
+  ): Future[Seq[AssignedContract[TCid, T]]] =
     listExpiredContracts(now, limit)(tc)
 
   override final protected def isStaleTask(
-      task: ScheduledTaskTrigger.ReadyTask[ReadyContract[TCid, T]]
+      task: ScheduledTaskTrigger.ReadyTask[AssignedContract[TCid, T]]
   )(implicit tc: TraceContext): Future[Boolean] =
     store
       .lookupContractById(companion)(task.work.contractId: TCid)
@@ -49,5 +49,5 @@ object MultiDomainExpiredContractTrigger {
   type Template[TCid <: ContractId[_], T] =
     MultiDomainExpiredContractTrigger[Contract.Companion.Template[TCid, T], TCid, T]
   type ListExpiredContracts[TCid <: ContractId[_], T] =
-    (CantonTimestamp, Int) => TraceContext => Future[Seq[ReadyContract[TCid, T]]]
+    (CantonTimestamp, Int) => TraceContext => Future[Seq[AssignedContract[TCid, T]]]
 }

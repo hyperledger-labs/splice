@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn.svcrules.{VoteRequest, VoteRequest_Expire}
-import com.daml.network.util.ReadyContract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -22,11 +22,11 @@ class ExpireVoteRequestTrigger(
       svTaskContext.svcStore.listExpiredVoteRequests(),
       VoteRequest.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[ReadyContract[
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
       VoteRequest.ContractId,
       VoteRequest,
     ]]] {
-  type Task = ScheduledTaskTrigger.ReadyTask[ReadyContract[VoteRequest.ContractId, VoteRequest]]
+  type Task = ScheduledTaskTrigger.ReadyTask[AssignedContract[VoteRequest.ContractId, VoteRequest]]
 
   override def completeTaskAsLeader(task: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {

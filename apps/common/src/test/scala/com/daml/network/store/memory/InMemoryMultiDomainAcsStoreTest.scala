@@ -12,7 +12,7 @@ import com.daml.network.store.{
   MultiDomainAcsStoreTest,
 }
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
-import com.daml.network.util.{Contract, ContractWithState, ReadyContract}
+import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -362,11 +362,13 @@ class InMemoryMultiDomainAcsStoreTest
     }
     "stream ready contracts" in {
       implicit val store = mkStore()
-      val readyContracts = new AtomicReference(Seq.empty[CReady])
+      val assignedContracts = new AtomicReference(Seq.empty[CReady])
       val streamF = store
-        .streamReadyContracts(AppRewardCoupon.COMPANION)
+        .streamAssignedContracts(AppRewardCoupon.COMPANION)
         .take(5)
-        .runForeach { readyContract => readyContracts.updateAndGet(_.appended(readyContract)) }
+        .runForeach { assignedContract =>
+          assignedContracts.updateAndGet(_.appended(assignedContract))
+        }
       val tf0 = nextTransferId
       val tf1 = nextTransferId
       val tf2 = nextTransferId
@@ -375,28 +377,28 @@ class InMemoryMultiDomainAcsStoreTest
           acs = Seq((c(1), d1, 0L)),
           incompleteOut = Seq((c(2), d1, d2, tf2, 3L)),
         )
-        _ = eventually()(readyContracts.get() should have size 1)
+        _ = eventually()(assignedContracts.get() should have size 1)
         // transfer out before transfer in
         _ <- d1.transferOut(c(1) -> d2, tf0, 1)
         _ <- d2.transferIn(c(1) -> d1, tf0, 1)
-        _ = eventually()(readyContracts.get() should have size 2)
+        _ = eventually()(assignedContracts.get() should have size 2)
         // transfer in before transfer out
         _ <- d1.transferIn(c(1) -> d2, tf1, 2)
         _ <- d2.transferOut(c(1) -> d1, tf1, 2)
-        _ = eventually()(readyContracts.get() should have size 3)
+        _ = eventually()(assignedContracts.get() should have size 3)
         // Complete transfer in of incomplete transfer out.
         _ <- d2.transferIn(c(2) -> d1, tf2, 3)
-        _ = eventually()(readyContracts.get() should have size 4)
+        _ = eventually()(assignedContracts.get() should have size 4)
         _ <- d2.create(c(3))
-        _ = eventually()(readyContracts.get() should have size 5)
+        _ = eventually()(assignedContracts.get() should have size 5)
         _ <- streamF
       } yield {
-        readyContracts.get() shouldBe Seq(
-          ReadyContract(c(1), d1),
-          ReadyContract(c(1), d2),
-          ReadyContract(c(1), d1),
-          ReadyContract(c(2), d2),
-          ReadyContract(c(3), d2),
+        assignedContracts.get() shouldBe Seq(
+          AssignedContract(c(1), d1),
+          AssignedContract(c(1), d2),
+          AssignedContract(c(1), d1),
+          AssignedContract(c(2), d2),
+          AssignedContract(c(3), d2),
         )
       }
     }

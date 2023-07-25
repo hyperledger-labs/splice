@@ -135,7 +135,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
     val tickDuration: RelTime = CoinConfigSchedule(
       svScanClient
         .getCoinRules()
-        .toReadyContract
+        .toAssignedContract
         .getOrElse(fail("coinRules is currently in-flight"))
     ).getConfigAsOf(env.environment.clock.now).tickDuration
     (env.environment.clock.now - CantonTimestamp.assertFromInstant(

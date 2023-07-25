@@ -12,9 +12,9 @@ final case class ContractWithState[TCid, T](
     contract: Contract[TCid, T],
     state: ContractState,
 ) extends Contract.Has[TCid, T] {
-  def toReadyContract: Option[ReadyContract[TCid, T]] =
+  def toAssignedContract: Option[AssignedContract[TCid, T]] =
     state match {
-      case ContractState.Assigned(domain) => Some(ReadyContract(contract, domain))
+      case ContractState.Assigned(domain) => Some(AssignedContract(contract, domain))
       case ContractState.InFlight => None
     }
 }
