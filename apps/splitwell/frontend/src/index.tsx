@@ -25,7 +25,7 @@ import './index.css';
 import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
 import Root from './routes/root';
-import { config } from './utils/config';
+import { useConfig } from './utils/config';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
@@ -46,11 +46,12 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     },
   });
 
+  const config = useConfig();
+
   return (
     <AuthProvider authConf={config.auth}>
       <QueryClientProvider client={queryClient}>
         <ReactQueryDevtools initialIsOpen={false} />
-
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
           <SplitwellClientProvider url={config.services.splitwell.url}>
             <DirectoryClientProvider url={config.services.directory.url}>
@@ -67,12 +68,17 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
+const SplitwellAuthCheck: React.FC = () => {
+  const config = useConfig();
+  return <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />;
+};
+
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route
       element={
         <Providers>
-          <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
+          <SplitwellAuthCheck />
         </Providers>
       }
     >

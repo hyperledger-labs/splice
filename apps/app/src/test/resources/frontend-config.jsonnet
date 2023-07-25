@@ -61,6 +61,12 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
   },
   splitwell: {
     validator: { url: "http://localhost:5403" },
+    // We need to set this to make the app manager happy but don't actually use it
+    // and spinning up a new frontend for this just adds even more resources.
+    wallet: { uiUrl: "http://unused.com" },
+    splitwell: { url: "http://localhost:5113" },
+    directory: { url: "http://localhost:5110" },
+    scan: { url: "http://localhost:5012" },
   },
   preflight: {
     jsonApiBackend: { url: "http://localhost:7575" },

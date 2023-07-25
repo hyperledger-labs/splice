@@ -150,10 +150,14 @@ function start_local_frontends() {
   # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
   start_frontend   wallet    3000 alice   "alice"              $enable_test_auth
   start_frontend   wallet    3001 bob     $validator_for_bob   $enable_test_auth
-  start_frontend   splitwell 3002 alice   "alice"              $enable_test_auth
-  start_frontend   splitwell 3003 bob     $validator_for_bob   $enable_test_auth
+  if [ $app_manager -eq 1 ]; then
+      start_frontend   splitwell 3002 splitwell "splitwell"        $enable_test_auth
+  else
+      start_frontend   splitwell 3002 alice   "alice"              $enable_test_auth
+      start_frontend   splitwell 3003 bob     $validator_for_bob   $enable_test_auth
+      start_frontend   splitwell 3005 charlie "alice"              $enable_test_auth
+  fi
   start_frontend   directory 3004 alice   "alice"              $enable_test_auth
-  start_frontend   splitwell 3005 charlie "alice"              $enable_test_auth
   start_frontend   sv        3010 sv1     "sv1"                $enable_test_auth
   start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth
   start_frontend   scan      3006 scan    "scan"               "false"           "none"

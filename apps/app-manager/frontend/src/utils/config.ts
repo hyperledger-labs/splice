@@ -1,4 +1,10 @@
-import { ConfigReader, authSchema, testAuthSchema, serviceSchema } from 'common-frontend';
+import {
+  ConfigReader,
+  authSchema,
+  testAuthSchema,
+  serviceSchema,
+  walletSchema,
+} from 'common-frontend';
 import { z } from 'zod';
 
 const reader = new ConfigReader(
@@ -7,6 +13,7 @@ const reader = new ConfigReader(
     testAuth: testAuthSchema.optional(),
     services: z.object({
       validator: serviceSchema,
+      wallet: walletSchema,
     }),
   })
 );

@@ -28,9 +28,11 @@ HMAC256 JWT Validator is NOT recommended for production environments
 # Users are allocated by the validator app, and all apps are starting concurrently.
 PERMISSION_DENIED.*Could not resolve is_deactivated status for user
 
+# TODO(#6839) Try to set things up in a way that doesn't produce this errors.
 # Using multiple auth configs for the long-running Canton instances produces the following warning
 # when authenticating using an auth config that is not the first in the list.
 Could not verify JWT token: The provided Algorithm doesn't match the one defined in the JWT's Header.
+Could not verify JWT token: com.auth0.jwk.SigningKeyNotFoundException: No key found in https://canton-network-test.us.auth0.com/.well-known/jwks.json
 
 # Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
 GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)

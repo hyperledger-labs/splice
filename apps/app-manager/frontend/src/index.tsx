@@ -15,6 +15,7 @@ import { CssBaseline, ThemeProvider } from '@mui/material';
 
 import { AppManagerClientProvider } from './contexts/AppManagerServiceContext';
 import Apps from './routes/Apps';
+import Authorize from './routes/Authorize';
 import AuthCheck from './routes/authCheck';
 import Root from './routes/root';
 import { config } from './utils/config';
@@ -59,6 +60,7 @@ const router = createBrowserRouter(
     >
       <Route path="/" element={<Root />}>
         <Route index element={<Apps />} />
+        <Route path="authorize" element={<Authorize />} />
       </Route>
     </Route>
   )

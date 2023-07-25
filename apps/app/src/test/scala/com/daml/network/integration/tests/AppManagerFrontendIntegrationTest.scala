@@ -26,7 +26,7 @@ class AppManagerFrontendIntegrationTest
 
   "app manager" should {
 
-    "support app registration and installation" in { implicit env =>
+    "register, install and launch splitwell" in { implicit env =>
       val installLink = withFrontEnd("splitwell") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session
         login(3102, splitwellValidatorBackend.config.ledgerApiUser)
@@ -51,7 +51,21 @@ class AppManagerFrontendIntegrationTest
           _ =>
             inside(findAll(className("installed-app")).toSeq) { case Seq(splitwell) =>
               splitwell.childElement(className("installed-app-name")).text shouldBe "splitwell"
+              click on splitwell.childElement(className("installed-app-link"))
             },
+        )
+        waitForQuery(id("oidc-login-button"))
+        clickOn(id("oidc-login-button"))
+        actAndCheck(
+          "Login to app manager",
+          loginOnCurrentPage(3100, aliceValidatorBackend.config.ledgerApiUser),
+        )("authorize button appears", _ => find(id("authorize-button")) should not be empty)
+        actAndCheck("Authorize app and get redirected", click on ("authorize-button"))(
+          "splitwell UI shows up",
+          _ =>
+            // This also implies the install contract has been created
+            // which means we can properly do writes through the user’s participant.
+            find(id("create-group-button")) should not be empty,
         )
       }
     }

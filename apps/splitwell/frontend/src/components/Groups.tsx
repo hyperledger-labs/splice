@@ -45,7 +45,7 @@ import {
   useGroups,
   useInitiateTransfer,
 } from '../hooks';
-import { config } from '../utils/config';
+import { useConfig } from '../utils/config';
 import { SplitwellInstalls } from '../utils/installs';
 
 interface BalancesProps {
@@ -70,6 +70,7 @@ const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean =
 };
 
 const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, install }) => {
+  const config = useConfig();
   const splitwellClient = useSplitwellClient();
   const [balances, setBalances] = useState<Map<string, string>>(new Map());
   const fetchBalances = useCallback(async () => {
@@ -201,6 +202,7 @@ interface EntryProps {
 }
 
 const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId, install }) => {
+  const config = useConfig();
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentDescription, setPaymentDescription] = useState<string>('');
   const enterPayment = useEnterPayment(party, provider, domainId, install);

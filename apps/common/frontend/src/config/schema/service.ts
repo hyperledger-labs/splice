@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
-const serviceSchema = z.object({
+export const serviceSchema = z.object({
   url: z.string().url(),
 });
 
-export { serviceSchema };
+export const walletSchema = z.object({
+  uiUrl: z.string().url(),
+});

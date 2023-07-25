@@ -1,4 +1,4 @@
-import { ErrorDisplay, Loading } from 'common-frontend';
+import { ErrorDisplay, Loading, appLaunchUrl } from 'common-frontend';
 import React, { useState } from 'react';
 import { InstalledApp as OpenAPIApp } from 'validator-openapi';
 
@@ -16,26 +16,24 @@ import {
 import { useInstallApp, useInstalledApps } from '../hooks';
 import { config } from '../utils/config';
 
-const addAppManagerContext = (url: URL): URL => {
-  // Copy to avoid mutation
-  const result = new URL(url);
-  result.searchParams.set(
-    'oidc_authority_url',
-    `${config.services.validator.url}/app-manager/oauth2/`
-  );
-  result.searchParams.set('json_api_url', `${config.services.validator.url}/`);
-  return result;
-};
-
 const InstalledApp: React.FC<{ app: OpenAPIApp }> = ({ app }) => {
-  const redirectUri = addAppManagerContext(new URL(app.url));
+  const redirectUri = appLaunchUrl(
+    {
+      oidcAuthority: `${config.services.validator.url}/app-manager/oauth2/`,
+      jsonApi: `${config.services.validator.url}/`,
+      wallet: config.services.wallet.uiUrl,
+    },
+    app.url
+  );
   return (
     <Card className="installed-app" variant="outlined">
       <CardContent>
         <Typography className="installed-app-name">{app.name}</Typography>
       </CardContent>
       <CardActions>
-        <Link href={redirectUri.toString()}>Launch</Link>
+        <Link className="installed-app-link" href={redirectUri.toString()}>
+          Launch
+        </Link>
       </CardActions>
     </Card>
   );
