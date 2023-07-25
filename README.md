@@ -52,6 +52,7 @@
     1. [NPM Lock file issues](#npm-lock-file-issues)
 1. [Auth0 Configuration](#auth0-configuration)
     1. [Tenant & Application Layout](#tenant-application-layout)
+1. [CircleCI Configuration](#circleci-configuration)
 1. [CircleCI Tokens](#circleci-tokens)
     1. [Auth0 Tokens](#auth0-tokens)
         1. [Step 1: rotate all secrets that can be used to gain new access tokens](#step-1-rotate-all-secrets-that-can-be-used-to-gain-new-access-tokens)
@@ -963,6 +964,23 @@ Currently we maintain two tenants with some application clients in them:
 If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default).
 
 We also have a few username-password combinations in use in our clusters, who are maintained as users in the `canton-network-dev` tenant. Their details are in [this Google doc](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#).
+
+## CircleCI Configuration
+
+The runtime CircleCI configuration for Canton Network is assembled from
+component pieces using [Dynamic Configuration](https://circleci.com/docs/dynamic-config/).
+
+The entry point for the configuration build process is in
+[`build-config.sh`](/.circleci/build-config.sh). This shell
+script composes configuration fragments stored in
+[`.circleci/config`](/.circleci/config) to an output build
+configuration file analogous to `.circleci/config.yml` in
+a more traditional CircleCI setup. This is done to both make the
+configuration more logically structured as well as to abstract out
+the deployment workflows common to the numerous scratchnet environments.
+
+If you change the number or names of the scratchnet enviroments,
+`build-config.sh` will need to be modified to reflect that change.
 
 ## CircleCI Tokens
 
