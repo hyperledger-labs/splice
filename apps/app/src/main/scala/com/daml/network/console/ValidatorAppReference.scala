@@ -128,6 +128,20 @@ abstract class ValidatorAppReference(
         HttpAppManagerAppClient.GetAppBundle(app)
       )
     }
+
+  def installApp(manifestUrl: String): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.InstallApp(manifestUrl)
+      )
+    }
+
+  def listInstalledApps(): Seq[definitions.InstalledApp] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.ListInstalledApps
+      )
+    }
 }
 
 final class ValidatorAppBackendReference(

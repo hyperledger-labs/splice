@@ -486,6 +486,16 @@ object CNNodeConfigTransforms {
       )
     )
 
+  // Disable default domain connections to splitwell to test that the one established by the app manager works
+  def disableSplitwellUserDomainConnections: CNNodeConfigTransform =
+    updateAllValidatorConfigs(
+      { case (name, config) =>
+        if (Seq("aliceValidator", "bobValidator").contains(name))
+          config.focus(_.domains.extra).replace(Seq.empty)
+        else config
+      }
+    )
+
   /** Canton has a built in authorizer that accepts "canton admin tokens",
     * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]
     * These are 128 character random strings (not JWTs), generated independently for each local participant node at canton startup.

@@ -100,6 +100,35 @@ paths:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ParticipantIdentitiesDump"
 
+  /app-manager/apps/installed:
+    get:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "listInstalledApps"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListInstalledAppsResponse"
+  /app-manager/apps/install:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "installApp"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/InstallAppRequest"
+      responses:
+        "201":
+          description: ok
+        "409":
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/409"
+
   /app-manager/apps/registered:
     get:
       tags: [appManager]
@@ -229,6 +258,15 @@ components:
           items:
             type: string
 
+    ListInstalledAppsResponse:
+      type: object
+      required:
+        - apps
+      properties:
+        apps:
+          type: array
+          items:
+            "$ref": "#/components/schemas/InstalledApp"
 
     ListRegisteredAppsResponse:
       type: object
@@ -239,6 +277,17 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/RegisteredApp"
+
+    InstalledApp:
+      type: object
+      required:
+        - name
+        - url
+      properties:
+        name:
+          type: string
+        url:
+          type: string
 
     RegisteredApp:
       type: object

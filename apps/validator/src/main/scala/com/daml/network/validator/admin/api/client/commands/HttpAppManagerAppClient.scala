@@ -90,4 +90,34 @@ object HttpAppManagerAppClient {
     }
   }
 
+  final case class InstallApp(manifestUrl: String)
+      extends BaseCommand[http.InstallAppResponse, Unit] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.InstallAppResponse] =
+      client.installApp(definitions.InstallAppRequest(manifestUrl), headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.InstallAppResponse.Created =>
+      Right(())
+    }
+  }
+
+  final case object ListInstalledApps
+      extends BaseCommand[http.ListInstalledAppsResponse, Seq[definitions.InstalledApp]] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListInstalledAppsResponse] =
+      client.listInstalledApps(headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListInstalledAppsResponse.OK(response) =>
+      Right(response.apps)
+    }
+  }
+
 }

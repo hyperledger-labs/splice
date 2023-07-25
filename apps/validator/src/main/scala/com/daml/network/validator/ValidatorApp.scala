@@ -539,13 +539,18 @@ class ValidatorApp(
         loggerFactory,
       )
 
-      appManagerHandlerO =
-        config.appManager.map(
-          new HttpAppManagerHandler(
-            _,
-            loggerFactory,
+      appManagerHandlerO <- withGlobalLock[Unit, Option[HttpAppManagerHandler]](lock =>
+        Future.successful(
+          config.appManager.map(
+            new HttpAppManagerHandler(
+              _,
+              participantAdminConnection,
+              lock,
+              loggerFactory,
+            )
           )
         )
+      )
 
       routes = cors(
         CorsSettings(ac).withAllowedMethods(
