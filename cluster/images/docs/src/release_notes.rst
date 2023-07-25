@@ -16,6 +16,7 @@ Release Notes
     * Fixed issue where Scan UI showed future coin config changes as if they are current.
     * Fixed issue where Scan app did not aggregate the total coin balance correctly when balance was migrated across network upgrades.
     * Fixed issue where coin migrations were not appearing in the wallet transaction log.
+    * Fixed issue where automation in SV app gets into a busy loop and the app becomes irresponsive.
 
 2023-07-16
 ----------
