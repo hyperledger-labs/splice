@@ -1,3 +1,9 @@
+# GENERATED FILE, DO NOT EDIT
+# If you need to change the CircleCI configuration, edit the
+# relevant fragment in the .circleci/config directory. and
+# Run .circleci/build-config.sh to update this file.
+#
+
 # Scala CircleCI 2.0 configuration file
 #
 # Check https://circleci.com/docs/2.0/sample-config/ for more details
@@ -47,18 +53,6 @@ notify-fail: &notify-fail
         event: fail
         custom: |
           { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
-
-main-branch-only: &main-branch-only
-  filters:
-    branches:
-      only:
-         - main
-
-main-branch-never: &main-branch-never
-  filters:
-    branches:
-      ignore:
-         - main
 
 cluster-parameter: &cluster-parameter
   cluster:
@@ -1052,7 +1046,6 @@ commands:
           cmd: |
             docker pull ${COMETBFT_DOCKER_IMAGE}
             docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
-
 jobs:
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
@@ -1064,6 +1057,11 @@ jobs:
     steps:
       - checkout
       - record_job_start_time
+      - run:
+          name: Verify config.yml is up to date with source.
+          command: |
+            source .envrc.vars
+            .circleci/build-config.sh --check
       - setup_sbt_test_job
       # Surprisingly, running "Test/compile" before speeds up the "scalafixCheck", is a lot faster than just running "scalafixCheck"
       - execute_sbt_command:
@@ -1760,6 +1758,19 @@ jobs:
             set -eou pipefail
             .circleci/wait_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
 
+main-branch-only: &main-branch-only
+  filters:
+    branches:
+      only:
+         - main
+
+main-branch-never: &main-branch-never
+  filters:
+    branches:
+      ignore:
+         - main
+
+
 workflows:
   version: 2
 
@@ -1918,531 +1929,6 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-
-  deploy_scratchnet_A:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - deployment_test
-            - docker_images_push
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchneta"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchneta"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          context:
-            - canton-network-vpn
-            - datadog
-          requires:
-            - preflight_check
-            - preflight_sv_check
-
-  deploy_scratchnet_B:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - deployment_test
-            - docker_images_push
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetb"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetb"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          context:
-            - canton-network-vpn
-            - datadog
-          requires:
-            - preflight_check
-            - preflight_sv_check
-
-  deploy_scratchnet_C:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - deployment_test
-            - docker_images_push
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetc"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetc"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          context:
-            - canton-network-vpn
-            - datadog
-          requires:
-            - preflight_check
-            - preflight_sv_check
-
-  deploy_scratchnet_D:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - deployment_test
-            - docker_images_push
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetd"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetd"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          context:
-            - canton-network-vpn
-            - datadog
-          requires:
-            - preflight_check
-            - preflight_sv_check
-
-  deploy_scratchnet_E:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - deployment_test
-            - docker_images_push
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnete"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnete"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          context:
-            - canton-network-vpn
-            - datadog
-          requires:
-            - preflight_check
-            - preflight_sv_check
-
-  deploy_scratchnet_F:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      # Deployment
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetf"
-          requires:
-            - deployment_test
-            - docker_images_push
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetf"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetf"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetf"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetf"
-          context:
-            - canton-network-vpn
-            - datadog
-          requires:
-            - preflight_check
-            - preflight_sv_check
-
-  deploy_scratchnet_G:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetg"
-          requires:
-            - hold
-            - deployment_test
-            - docker_images_push
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - datadog
-            - slack-context
-          cluster: "scratchnetg"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetg"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          cluster: "scratchnetg"
-          sync_with_cluster_version: false
-          requires:
-            - hold
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetg"
-          context:
-            - canton-network-vpn
-            - datadog
-          requires:
-            - preflight_check
-            - preflight_sv_check
 
   deploy_staging:
     when:
@@ -2869,3 +2355,528 @@ workflows:
             context:
               - canton-network-vpn
               - slack-context
+
+  deploy_scratchneta:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchneta"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchneta"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchneta"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check
+
+  deploy_scratchnetb:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetb"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetb"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetb"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check
+
+  deploy_scratchnetc:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetc"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetc"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetc"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check
+
+  deploy_scratchnetd:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetd"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check
+
+  deploy_scratchnete:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnete"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check
+
+  deploy_scratchnetf:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetf"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetf"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetf"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetf"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetf"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check
+
+  deploy_scratchnetg:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetg"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetg"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetg"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetg"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetg"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check

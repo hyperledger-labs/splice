@@ -52,6 +52,7 @@
     1. [NPM Lock file issues](#npm-lock-file-issues)
 1. [Auth0 Configuration](#auth0-configuration)
     1. [Tenant & Application Layout](#tenant-application-layout)
+1. [CircleCI Configuration](#circleci-configuration)
 1. [CircleCI Tokens](#circleci-tokens)
     1. [Auth0 Tokens](#auth0-tokens)
         1. [Step 1: rotate all secrets that can be used to gain new access tokens](#step-1-rotate-all-secrets-that-can-be-used-to-gain-new-access-tokens)
@@ -963,6 +964,20 @@ Currently we maintain two tenants with some application clients in them:
 If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default).
 
 We also have a few username-password combinations in use in our clusters, who are maintained as users in the `canton-network-dev` tenant. Their details are in [this Google doc](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#).
+
+## CircleCI Configuration
+
+The runtime CircleCI configuration for Canton Network is assembled from
+component pieces using using a shell script in
+[`build-config.sh`](/.circleci/build-config.sh). This script
+composes configuration fragments stored in [`.circleci/config`](/.circleci/config)
+to the final output file `.circleci/config.yml`, which is checked
+in to git and processed as usual by CircleCI.
+
+To change the CircleCI configuration, you need to edit the appropriate
+fragment or fragments in [`.circleci/config`](/.circleci/config) and
+re-run `build-config.sh` to apply those changes to the actual
+configuration.
 
 ## CircleCI Tokens
 

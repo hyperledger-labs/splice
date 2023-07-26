@@ -1,0 +1,55 @@
+# Scala CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/sample-config/ for more details
+#
+version: 2.1
+orbs:
+  slack: circleci/slack@4.9.3
+
+env: &env
+  TERM: dumb
+  CI: "true"
+  USER: circleci
+
+non_devnet_preflight_params: &non_devnet_preflight_params
+  parallelism: 1
+  test_names_file: "test-full-class-names-preflight-non-devnet.log"
+
+parameters:
+  # Bump this when you change the definition of what is being cached to make sure
+  # old files don’t pollute your build.
+  cache-version:
+    type: string
+    default: "17"
+  run-job:
+    type: enum
+    enum: [build, deploy-cidaily, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    default: build
+  mark-for-testnet:
+    type: boolean
+    default: false
+  # Overwrite the bootstrapping config for a cluster. If not set,
+  # the cluster will be bootstrapped from the preceeding version of the cluster.
+  bootstrapping-config:
+    type: string
+    default: ""
+
+notify-fail: &notify-fail
+  context: slack-context
+  post-steps:
+    - set-failed-parallel-run-url
+    # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
+    # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
+    - slack/notify:
+        branch_pattern: main
+        # #team-canton-network-internal-ci
+        channel: C05DT77QF5M
+        event: fail
+        custom: |
+          { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
+
+cluster-parameter: &cluster-parameter
+  cluster:
+    type: enum
+    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "staging", "cidaily", "devnet", "testnet", "testnet-preview"]
+

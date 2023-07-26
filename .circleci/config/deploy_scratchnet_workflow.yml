@@ -1,0 +1,75 @@
+
+  deploy__CLUSTERNAME_:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold:
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          requires:
+            - hold
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - deployment_test
+            - docker_images_push
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          sync_with_cluster_version: false
+          requires:
+            - hold
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          context:
+            - canton-network-vpn
+            - datadog
+          requires:
+            - preflight_check
+            - preflight_sv_check

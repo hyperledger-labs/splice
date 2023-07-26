@@ -1,0 +1,712 @@
+jobs:
+
+  # Inspired by Canton, we put the lint-like checks into their own CI job
+  static_tests:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - run:
+          name: Verify config.yml is up to date with source.
+          command: |
+            source .envrc.vars
+            .circleci/build-config.sh --check
+      - setup_sbt_test_job
+      # Surprisingly, running "Test/compile" before speeds up the "scalafixCheck", is a lot faster than just running "scalafixCheck"
+      - execute_sbt_command:
+          cmd: "Test/compile"
+          cmd_retry_count: 2
+      - execute_sbt_command:
+          cmd: "lint"
+      - run_todo_script
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  # We put our Daml tests in their own job for more parallelization
+  daml_test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "damlTest"
+          timeout: "10m"
+          extra_env_vars: DAML_DEBUG=1
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
+  # work on anything but the Scala tests is duplicated across all parallel runs of this job
+  scala_test:
+    docker:
+      - image: cimg/base:2021.04
+      - image: postgres:11
+        command: postgres -c max_connections=4000
+        environment:
+          POSTGRES_INITDB_ARGS: -A scram-sha-256
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+    parameters:
+      test_names_file:
+        type: string
+      start_canton_options:
+        type: string
+      extra_pre_sbt_cmd:
+        type: string
+        default: ""
+      extra_post_sbt_cmd:
+        type: string
+        default: ""
+      parallelism:
+        type: integer
+      resource_class:
+        type: string
+      cmd_retry_count:
+        description: Number of times to retry the command
+        type: integer
+        default: 0
+    resource_class: << parameters.resource_class >>
+    environment:
+      <<: *env
+      POSTGRES_HOST: localhost
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    parallelism: << parameters.parallelism >>
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      # Used to pull docker images for cometbft
+      - docker_login_artifactory
+      # Used to start cometbft docker containers
+      - setup_remote_docker:
+          version: 20.10.14
+      - docker_pull_test_images
+      - execute_sbt_command:
+          cmd: "Test/compile"
+          cmd_retry_count: 2
+      - split_tests_for_parallel_run:
+          test_names_file: << parameters.test_names_file >>
+      - run_splitted_scala_tests:
+          # run in detached mode, with external postgres and only start either wall clock or sim time instance
+          start_canton_options: << parameters.start_canton_options >>
+          extra_pre_sbt_cmd: << parameters.extra_pre_sbt_cmd >>
+          extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
+          cmd_retry_count: << parameters.cmd_retry_count >>
+      - cleanup_sbt_test_job
+      - collect_failing_test_data_and_send_to_datadog
+      - collect_test_timings_and_send_to_datadog
+
+  bundle:
+    docker:
+      - image: cimg/base:2021.04
+    resource_class: 2xlarge+
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "bundle"
+          cmd_retry_count: 5
+      - run:
+          name: Copy bundle
+          command: |
+            set -eou pipefail
+            mkdir -p /tmp/artifacts
+            cp apps/app/target/release/*.tar.gz /tmp/artifacts
+      - run:
+          name: Copy OpenAPI specs
+          command: |
+            set -eou pipefail
+            .circleci/copy-openapi.sh
+      - store_artifacts:
+          path: /tmp/artifacts
+          destination: release-artifacts
+      - run_bash_command_in_nix:
+         cmd_name: Publish release bundles
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           export GOOGLE_CLOUD_PROJECT=da-cn-images
+           VERSION=$(get-snapshot-version)
+           (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
+           # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
+           # which would lead to an error due to a misisng `delete` permission
+           gsutil cp -n /tmp/artifacts/*.tar.gz gs://release-bundles
+         # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  deployment_test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - run_bash_command_in_nix:
+         cmd_name: Deployment Test
+         cmd: make cluster/pulumi/test
+      - run_bash_command_in_nix:
+         cmd_name: Check Pulumi deployment
+         cmd: make --keep-going cluster/pulumi/test
+      - collect_test_timings_and_send_to_datadog
+
+  deploy_sv_runbook:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      use_published_artifacts:
+        type: boolean
+        default: false
+      restore_cluster:
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Apply SV-runbook Kubernetes manifest to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            cncluster ci_apply_sv $VERSION
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  deploy_cluster:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      restore_cluster:
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Apply Pulumi configuration to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            cncluster ci_apply
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  deploy_cluster_testnet_release:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Checkout testnet-next commit
+          cmd: git checkout testnet-next
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Deploy Pulumi/Helm configuration to cluster.
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          gce_authenticate: true
+          cmd: |
+            export RESTORE_CLUSTER=1
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            cncluster ci_apply
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  preflight_check:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
+      test_names_file:
+        type: string
+        default: "test-full-class-names-preflight.log"
+      parallelism:
+        type: integer
+        default: 3
+      # If sync_with_cluster_version is true, then before building the tests, we will wait for the cluster to be up
+      # and checkout the corresponding git commit
+      sync_with_cluster_version:
+        type: boolean
+        default: true
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parallelism: << parameters.parallelism >>
+    steps:
+      - checkout
+      - record_job_start_time
+      - run:
+          # necessary for npm/webpack dev server launched in start-frontends.sh later
+          # https://webpack.js.org/configuration/watch/#not-enough-watchers
+          name: Set inotify fs watch
+          command: |
+            echo "Checking watch info..."
+            sysctl fs.inotify
+            echo "Setting max_user_watches..."
+            echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+      - setup_vpn
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Activate cluster (configure kubectl)
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: cncluster activate
+          cmd_retry_count: 5
+      - when:
+          condition: << parameters.sync_with_cluster_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: wait for cluster to be ready
+                cluster: << parameters.cluster >>
+                gce_authenticate: true
+                cmd: cncluster wait
+                cmd_retry_count: 5
+            - checkout_cluster_version:
+                cluster: <<parameters.cluster>>
+      # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
+      # sucks at cache invalidation
+      - restore_sbt_cache
+      - restore_precompiled_classes
+      - execute_sbt_command:
+          cmd: "Test/compile"
+          cmd_retry_count: 2
+          # TODO(#6153): we bumped this up to allow nix to rebuild everything if needed.
+          # Instead, we should fetch the correct nix cache and avoid those rebuilds
+          no_output_timeout: "20m"
+      - split_tests_for_parallel_run:
+          test_names_file: << parameters.test_names_file >>
+      - when:
+          condition:
+            not: << parameters.sync_with_cluster_version >>
+          steps:
+            # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
+            - run_bash_command_in_nix:
+                cmd_name: wait for deployment to finish
+                cluster: << parameters.cluster >>
+                cmd: |
+                  VERSION=$(get-snapshot-version)
+                  cncluster wait_version $VERSION
+                  cncluster wait validator1 validator-app
+                  cncluster wait splitwell validator-app
+                  cncluster wait sv-1 validator-app
+                  cncluster wait sv-2 validator-app
+                  cncluster wait sv-3 validator-app
+                  cncluster wait sv-4 validator-app
+      - execute_sbt_command:
+          pre_sbt_cmd: |
+            set -eou pipefail
+            # needed for SV bootstrapping preflight check
+            # TODO(#3560) remove the `|| true` once all clusters have this script
+            scripts/start-postgres-for-preflight.sh || true
+            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -p
+          cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
+          post_sbt_cmd: ./stop-frontends.sh
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
+          extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
+          extra_parameters: -DAUTH0_TENANT=dev
+          timeout: "15m"
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - cleanup_sbt_test_job
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
+      - collect_test_timings_and_send_to_datadog
+
+  preflight_sv_check:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
+      # If sync_with_cluster_version is true, then before building the tests, we will wait for the cluster to be up
+      # and checkout the corresponding git commit
+      sync_with_cluster_version:
+        type: boolean
+        default: true
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_vpn
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Activate cluster (configure kubectl)
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: cncluster activate
+          cmd_retry_count: 5
+      - when:
+          condition: << parameters.sync_with_cluster_version >>
+          steps:
+          - run_bash_command_in_nix:
+              cmd_name: wait for cluster to be ready
+              cluster: << parameters.cluster >>
+              gce_authenticate: true
+              cmd: cncluster wait
+              cmd_retry_count: 5
+          - checkout_cluster_version:
+              cluster: <<parameters.cluster>>
+      # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
+      # sucks at cache invalidation
+      - restore_sbt_cache
+      - restore_precompiled_classes
+      - execute_sbt_command:
+          cmd: "Test/compile"
+          cmd_retry_count: 2
+      - when:
+          condition:
+            not: << parameters.sync_with_cluster_version >>
+          steps:
+          # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
+          - run_bash_command_in_nix:
+              cmd_name: wait for sv-runbook deployment to finish
+              cluster: << parameters.cluster >>
+              cmd: |
+                VERSION=$(get-snapshot-version)
+                cncluster wait_version $VERSION
+                cncluster wait sv validator-app
+      - run_bash_command_in_nix:
+          cmd_name: Run SV preflight tests
+          additional_nix_args: "--keep SV_DEV_NET_WEB_UI_PASSWORD \
+            --keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD \
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          cluster: << parameters.cluster >>
+          cmd: |
+            cncluster preflight_sv
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - cleanup_sbt_test_job
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
+      - collect_test_timings_and_send_to_datadog
+
+  reset_cluster:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_vpn
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Reset Cluster and Free Lock (if on scratch*)
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster ci_reset_unlock
+      - collect_test_timings_and_send_to_datadog
+
+  auth0_user_cleanup:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - restore_precompiled_classes
+      - restore_sbt_cache
+      - execute_sbt_command:
+          cmd: "\"tools/run\""
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET"
+      - save_sbt_cache
+      - save_compiled_classes
+
+  cluster_lock_reaper:
+    circleci_ip_ranges: true
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - cluster_lock_reaper:
+          cluster: "scratchneta"
+      - cluster_lock_reaper:
+          cluster: "scratchnetb"
+      - cluster_lock_reaper:
+          cluster: "scratchnetc"
+      - cluster_lock_reaper:
+          cluster: "scratchnetd"
+      - cluster_lock_reaper:
+          cluster: "scratchnete"
+      - cluster_lock_reaper:
+          cluster: "scratchnetf"
+      - cluster_lock_reaper:
+          cluster: "scratchnetg"
+
+  update_pipeline_schedule:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+         cmd_name: Update CircleCI pipeline configuration (incl. schedule triggers)
+         additional_nix_args: --keep CIRCLECI_TOKEN
+         cmd: |
+           set -euo pipefail
+
+           . .envrc.vars
+           .circleci/setup-pipeline.sh
+
+  docker_images_push:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - restore_frontend_builds
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+         cmd_name: Build app
+         cmd: make build -j
+         cmd_retry_count: 5 # Retry in case of dependency download errors
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
+      - docker_login_artifactory
+      - docker_build
+      - run_bash_command_in_nix:
+         cmd_name: Push Docker images
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+           make docker-push -j
+         cmd_retry_count: 5
+      - save_frontend_builds
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  publish_public_release:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - docker_login_artifactory
+      - run_bash_command_in_nix:
+         cmd_name: Promote images to Artifactory
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+
+           make docker-promote
+         cmd_retry_count: 5 # Retry in case of connectivity issues
+      - run_bash_command_in_nix:
+         cmd_name: Push Helm charts and tag git accordingly
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD \
+           --keep GITHUB_TOKEN"
+         cmd: |
+           publish () {
+             source=$1
+             full_path=$2
+             echo "Publishing ${source} to ${full_path}"
+             curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
+           }
+
+           make cluster/helm/build -j
+
+           for chart in cluster/helm/target/*.tgz; do
+              artifactory_url="https://digitalasset.jfrog.io/artifactory"
+              publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
+           done
+
+           git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+           RELEASE_TAG=$(get-snapshot-version)
+           git tag "${RELEASE_TAG}"
+           git push origin "${RELEASE_TAG}"
+
+           if [[ << pipeline.parameters.mark-for-testnet >> == true ]]; then
+              # This is a mutating tag pointing to the most recent
+              # valid build for TestNet, and therefore the next build
+              # to go to TestNet.
+              git tag --force testnet-next
+              git push --force origin testnet-next
+           fi
+      - collect_test_timings_and_send_to_datadog
+
+  docker_images_build:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    resource_class: xlarge
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - restore_frontend_builds
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+         cmd_name: Build app
+         cmd: make build -j
+         cmd_retry_count: 5 # Retry in case of dependency download errors
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
+      - docker_login_artifactory
+      - docker_build
+      - save_frontend_builds
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  wait_for_previous_pipeline:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to wait for.
+      workflow_names:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: "Wait for previous pipeline"
+          command: |
+            set -eou pipefail
+            .circleci/wait_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
+

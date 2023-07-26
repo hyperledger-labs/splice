@@ -1,0 +1,597 @@
+main-branch-only: &main-branch-only
+  filters:
+    branches:
+      only:
+         - main
+
+main-branch-never: &main-branch-never
+  filters:
+    branches:
+      ignore:
+         - main
+
+
+workflows:
+  version: 2
+
+  publish_public_artifacts:
+    when:
+      equal: [ publish-public-artifacts, << pipeline.parameters.run-job >> ]
+    jobs:
+      - docker_images_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+      - publish_public_release:
+          context:
+            - artifactory
+            - datadog
+          requires:
+            - docker_images_push
+
+  build:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+    # Linting and formatting
+    - static_tests:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    # Daml
+    - daml_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    # Scala
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test wall clock time"
+        test_names_file: "test-full-class-names.log"
+        start_canton_options: "-d -p external -w"
+        resource_class: "xlarge"
+        parallelism: 6
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test sim time"
+        test_names_file: "test-full-class-names-sim-time.log"
+        start_canton_options: "-d -p external -s"
+        resource_class: "xlarge"
+        parallelism: 6
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test frontend wall clock time"
+        test_names_file: "test-full-class-names-frontend.log"
+        start_canton_options: "-d -p external -w"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
+        extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        resource_class: "2xlarge+"
+        parallelism: 4
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test frontend sim time"
+        test_names_file: "test-full-class-names-frontend-sim-time.log"
+        start_canton_options: "-d -p external -s"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
+        extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        resource_class: "2xlarge+"
+        parallelism: 1
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test frontend app manager"
+        test_names_file: "test-full-class-names-frontend-app-manager.log"
+        start_canton_options: "-d -p external -w"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s -m"
+        extra_post_sbt_cmd: "&& ./stop-frontends.sh"
+        resource_class: "2xlarge+"
+        parallelism: 1
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test domain fees wall clock time"
+        test_names_file: "test-full-class-names-domain-fees.log"
+        start_canton_options: "-d -p external -w -t"
+        resource_class: "xlarge"
+        parallelism: 1
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test global upgrade sim time"
+        test_names_file: "test-full-class-names-global-upgrade-sim-time.log"
+        start_canton_options: "-d -p external -s -g"
+        resource_class: "xlarge"
+        parallelism: 1
+    - scala_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        name: "scala_test cometbft smoke test"
+        test_names_file: "test-full-class-names-cometbft-single-node-smoke.log"
+        start_canton_options: "-d -p external -w -f"
+        resource_class: "xlarge"
+        parallelism: 1
+    - bundle:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    # Ops
+    - update_pipeline_schedule:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+    - deployment_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - docker_images_build:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+
+  deploy_staging:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - deployment_test:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+        workflow_names: "deploy_staging"
+    - deploy_cluster:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "staging"
+        requires:
+           - deployment_test
+           - docker_images_push
+           - wait_for_previous_pipeline
+    - deploy_sv_runbook:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "staging"
+        requires:
+          - deploy_cluster
+    - preflight_check:
+        cluster: "staging"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        sync_with_cluster_version: false
+        requires:
+          - wait_for_previous_pipeline
+    - preflight_sv_check:
+        <<: *main-branch-only
+        cluster: "staging"
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        sync_with_cluster_version: false
+        requires:
+          - wait_for_previous_pipeline
+
+  deploy_cidaily:
+    when:
+      equal: [ deploy-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - deployment_test:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+        workflow_names: "deploy_cidaily cidaily_health_check"
+    - deploy_cluster:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cidaily"
+        requires:
+           - deployment_test
+           - docker_images_push
+           - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: "cidaily"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - deployment_test
+          - docker_images_push
+          - deploy_cluster
+    - publish_public_release:
+        <<: *main-branch-only
+        requires:
+          - preflight_check
+        context:
+          - artifactory
+          - datadog
+    - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "cidaily"
+          use_published_artifacts: true
+          requires:
+            - deploy_cluster
+            - publish_public_release
+    - preflight_sv_check:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "cidaily"
+        requires:
+          - deploy_sv_runbook
+
+  deploy_devnet:
+    when:
+      equal: [ deploy-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - deployment_test:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+        workflow_names: "deploy_devnet devnet_health_check"
+    - deploy_cluster:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "devnet"
+        requires:
+           - deployment_test
+           - docker_images_push
+           - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: "devnet"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - deployment_test
+          - docker_images_push
+          - deploy_cluster
+    - publish_public_release:
+        <<: *main-branch-only
+        requires:
+          - preflight_check
+        context:
+          - artifactory
+          - datadog
+    - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "devnet"
+          use_published_artifacts: true
+          requires:
+            - deploy_cluster
+            - publish_public_release
+    - preflight_sv_check:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "devnet"
+        requires:
+          - deploy_sv_runbook
+
+
+  deploy_testnet:
+    when:
+      equal: [ deploy-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        workflow_names: "deploy_testnet testnet_health_check"
+    - deploy_cluster_testnet_release:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "testnet"
+        requires:
+           - wait_for_previous_pipeline
+    - preflight_check:
+        <<: *main-branch-only
+        <<: *non_devnet_preflight_params
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "testnet"
+        requires:
+          - deploy_cluster_testnet_release
+
+  deploy_testnet_preview:
+    when:
+      equal: [ deploy-testnet-preview, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        workflow_names: "deploy_testnet_preview testnet_preview_health_check"
+    - deployment_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - deploy_cluster:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "testnet-preview"
+        restore_cluster: true
+        requires:
+           - deployment_test
+           - docker_images_push
+           - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: "testnet-preview"
+        <<: *non_devnet_preflight_params
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - deployment_test
+          - docker_images_push
+          - deploy_cluster
+    - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "testnet-preview"
+          restore_cluster: true
+          requires:
+            - deploy_cluster
+
+  testnet_health_check:
+    when:
+      equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_testnet"
+      - preflight_check:
+          <<: *main-branch-only
+          <<: *non_devnet_preflight_params
+          cluster: "testnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+             - wait_for_previous_pipeline
+
+  devnet_health_check:
+    when:
+      equal: [ healthcheck-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_devnet"
+      - preflight_check:
+          <<: *main-branch-only
+          cluster: "devnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+             - wait_for_previous_pipeline
+
+  cidaily_health_check:
+    when:
+      equal: [ healthcheck-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_cidaily"
+      - preflight_check:
+          <<: *main-branch-only
+          cluster: "cidaily"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+             - wait_for_previous_pipeline
+
+  testnet_preview_health_check:
+    when:
+      equal: [ healthcheck-testnet-preview, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_testnet_preview"
+      - preflight_check:
+          <<: *main-branch-only
+          cluster: "testnet-preview"
+          <<: *non_devnet_preflight_params
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+             - wait_for_previous_pipeline
+
+  auth0_user_cleanup:
+    when:
+      equal: [ auth0-user-cleanup, << pipeline.parameters.run-job >> ]
+    jobs:
+      - auth0_user_cleanup
+
+  cluster_lock_reaper:
+    when:
+      equal: [ cluster-lock-reaper, << pipeline.parameters.run-job >> ]
+    jobs:
+       - cluster_lock_reaper:
+            <<: *main-branch-only
+            context:
+              - canton-network-vpn
+              - slack-context
