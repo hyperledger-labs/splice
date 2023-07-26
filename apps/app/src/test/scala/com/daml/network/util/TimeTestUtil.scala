@@ -278,43 +278,42 @@ trait TimeTestUtil extends CNNodeTestCommon {
     // not exactly 150s because of the skew parameter.
     actAndCheck("advancing time", advanceTime(duration))(
       s"waiting for open and issuing round automation (should create OpenMiningRound ${highestOpen + 1}, should advance IssuingMiningRounds $previousIssuingRounds",
-      _ =>
-        eventually() {
+      _ => {
 
-          val (newOpenRounds, newIssuingRounds) =
-            sv1ScanBackend.getOpenAndIssuingMiningRounds()
+        val (newOpenRounds, newIssuingRounds) =
+          sv1ScanBackend.getOpenAndIssuingMiningRounds()
 
-          val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) =
-            newOpenRounds.map(_.contract.payload.round.number)
+        val Seq(newLowestOpen, newMiddleOpen, newHighestOpen) =
+          newOpenRounds.map(_.contract.payload.round.number)
 
-          (
-            newLowestOpen,
-            newLowestOpen,
-            newMiddleOpen,
-            newHighestOpen,
-          ) shouldBe (lowestOpen + 1, middleOpen, highestOpen, highestOpen + 1)
+        (
+          newLowestOpen,
+          newLowestOpen,
+          newMiddleOpen,
+          newHighestOpen,
+        ) shouldBe (lowestOpen + 1, middleOpen, highestOpen, highestOpen + 1)
 
-          if (newIssuingRounds.size < 3 || previousIssuingRounds.size < 3) {
-            // This can happen both at the beginning when we start out with fewer issuing rounds
-            // or if we advance for more than one tick which will result in potentially
-            // all old issuing rounds being archived and only one new round being created
-            // for the open round that we just archived.
-            forExactly(1, newIssuingRounds)(round =>
-              round.contract.payload.round.number shouldBe lowestOpen
-            )
-          } else {
-            val Seq(lowestIssuing, middleIssuing, highestIssuing) =
-              previousIssuingRounds.map(_.contract.payload.round.number)
-            newIssuingRounds should have size 3
-            val Seq(newLowestIssuing, newMiddleIssuing, newHighestIssuing) =
-              newIssuingRounds.map(_.contract.payload.round.number)
+        if (newIssuingRounds.size < 3 || previousIssuingRounds.size < 3) {
+          // This can happen both at the beginning when we start out with fewer issuing rounds
+          // or if we advance for more than one tick which will result in potentially
+          // all old issuing rounds being archived and only one new round being created
+          // for the open round that we just archived.
+          forExactly(1, newIssuingRounds)(round =>
+            round.contract.payload.round.number shouldBe lowestOpen
+          )
+        } else {
+          val Seq(lowestIssuing, middleIssuing, highestIssuing) =
+            previousIssuingRounds.map(_.contract.payload.round.number)
+          newIssuingRounds should have size 3
+          val Seq(newLowestIssuing, newMiddleIssuing, newHighestIssuing) =
+            newIssuingRounds.map(_.contract.payload.round.number)
 
-            newLowestIssuing shouldBe lowestIssuing + 1
-            newLowestIssuing shouldBe middleIssuing
-            newMiddleIssuing shouldBe highestIssuing
-            newHighestIssuing shouldBe highestIssuing + 1
-          }
-        },
+          newLowestIssuing shouldBe lowestIssuing + 1
+          newLowestIssuing shouldBe middleIssuing
+          newMiddleIssuing shouldBe highestIssuing
+          newHighestIssuing shouldBe highestIssuing + 1
+        }
+      },
     )
   }
 
