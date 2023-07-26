@@ -1173,6 +1173,11 @@ jobs:
             set -eou pipefail
             mkdir -p /tmp/artifacts
             cp apps/app/target/release/*.tar.gz /tmp/artifacts
+      - run:
+          name: Copy OpenAPI specs
+          command: |
+            set -eou pipefail
+            .circleci/copy-openapi.sh
       - store_artifacts:
           path: /tmp/artifacts
           destination: release-artifacts

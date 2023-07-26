@@ -21,3 +21,4 @@ API Reference
    api/cc/index
    api/wallet/index
    api/directory-service/index
+   openapi/index

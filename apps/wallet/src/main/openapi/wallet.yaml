@@ -3,6 +3,7 @@ info:
   title: Wallet API
   version: 0.0.1
 tags:
+  - name: external
   - name: wallet
 paths:
   /wallet/user-status:
@@ -338,7 +339,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
   /wallet/transfer-offers:
     post:
-      tags: [wallet]
+      tags: [wallet, external]
       x-jvm-package: wallet
       operationId: "createTransferOffer"
       requestBody:
@@ -361,7 +362,7 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
     get:
-      tags: [wallet]
+      tags: [wallet, external]
       x-jvm-package: wallet
       operationId: "listTransferOffers"
       responses:
