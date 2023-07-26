@@ -18,6 +18,8 @@ Release Notes
     * Fixed issue where coin migrations were not appearing in the wallet transaction log.
     * Fixed issue where automation in SV app gets into a busy loop and the app becomes irresponsive.
 
+* SV and validator apps will now exit with an error if the version of their node software mismatches the version on the cluster they are connecting to.
+
 * Documentation:
 
     * Added a section :ref:`Renaming an SV <helm-rename-sv>` in the page "Kubernetes-Based Deployment of a Super Validator node" for step-by-step guide of renaming an SV.
