@@ -82,17 +82,15 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val svcRules = sv1Backend.getSvcInfo().svcRules
-    val coinRulesCid = sv1ScanBackend.getCoinRules().contract.contractId
     val sv1Party = sv1Backend.getSvcInfo().svParty
 
     val voteRequestCid = clue("request vote for config schedule change") {
       val (_, voteRequestCid) = actAndCheck(
         "sv1 creates a vote request", {
           val action: ActionRequiringConfirmation = new ARC_CoinRules(
-            coinRulesCid,
             new CRARC_SetConfigSchedule(
               new CoinRules_SetConfigSchedule(configSchedule)
-            ),
+            )
           )
           sv1Backend.createVoteRequest(
             sv1Party.toProtoPrimitive,

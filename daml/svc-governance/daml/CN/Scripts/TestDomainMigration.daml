@@ -80,7 +80,7 @@ testDomainMigration = do
   -- TODO(#4894): create domain connectivity proof contracts
 
 
-  -- Once the SV's are confident enough that the switch is not leaving too many users behind they 
+  -- Once the SV's are confident enough that the switch is not leaving too many users behind they
   -- can change the switching date.
 
 
@@ -107,10 +107,9 @@ executeCoinConfigChange
   : CCApp -> (Schedule Time (CoinConfig USD) -> Schedule Time (CoinConfig USD)) -> Script ()
 executeCoinConfigChange app updateConfig = do
   [(_, svcRules)] <- query @SvcRules app.svc
-  [(coinRulesCid, coinRules)] <- query @CoinRules app.svc
+  [(_, coinRules)] <- query @CoinRules app.svc
   let newConfigSchedule = updateConfig coinRules.configSchedule
   initateAndAcceptVote app (Map.keys svcRules.members) $
     ARC_CoinRules with
-      coinRulesCid
       coinRulesAction = CRARC_SetConfigSchedule CoinRules_SetConfigSchedule with
         newConfigSchedule

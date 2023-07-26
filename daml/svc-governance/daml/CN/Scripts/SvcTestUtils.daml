@@ -218,7 +218,6 @@ runNextIssuanceD app coinPrice = do
 confirmAWC_MiningRound_Archive : CCApp -> Script ()
 confirmAWC_MiningRound_Archive app = do
   -- get rules contracts
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
   [(svcRulesCid, rules)] <- query @SvcRules app.svc
   -- query closed mining rounds and collective members
   rounds <- query @ClosedMiningRound app.svc
@@ -231,7 +230,6 @@ confirmAWC_MiningRound_Archive app = do
         -- TODO(M3-46): skip if there already exists a confirmation
         submitMulti [member] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
           action = ARC_CoinRules with
-            coinRulesCid
             coinRulesAction = CRARC_MiningRound_Archive $
               CoinRules_MiningRound_Archive with
                 closedRoundCid = round._1
@@ -241,6 +239,7 @@ confirmAWC_MiningRound_Archive app = do
 executeAllConfirmedActions : CCApp -> Script ()
 executeAllConfirmedActions app = do
   -- get rules and collective summary
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
   [(svcRulesCid, rules)] <- query @SvcRules app.svc
   let s = summarizeCollective rules
   -- query all confirmations visible to svc
@@ -252,11 +251,13 @@ executeAllConfirmedActions app = do
   forA_ executableConfirmations $ \cs -> do
     submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteConfirmedAction with
       action = (head cs)._2.action
+      coinRulesCid = Some coinRulesCid
       confirmationCids = map fst cs
 
 executeAllDefinitiveVotes : CCApp -> Script ()
 executeAllDefinitiveVotes app = do
   -- get rules and collective summary
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
   [(svcRulesCid, rules)] <- query @SvcRules app.svc
   let s = summarizeCollective rules
   -- query all voting requests visible to svc
@@ -267,6 +268,7 @@ executeAllDefinitiveVotes app = do
     when (length votes >= s.requiredNumVotes) $
       void $ submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteDefiniteVote with
         requestCid
+        coinRulesCid = Some coinRulesCid
         voteCids = map fst votes
 
 initateAndAcceptVote : CCApp -> [Party] -> ActionRequiringConfirmation -> Script ()

@@ -16,7 +16,6 @@ abstract class SvFrontendCommonIntegrationTest
     val requestReasonUrl = "This is a request reason url."
     val requestReasonBody = "This is a request reason."
 
-    // TODO(#6868): set enable_CoinRules_DevNet_Tap to false once these params are false by default
     val newEnabledChoices = new EnabledChoices(
       false, false, false, false, false, true, false, false,
     )

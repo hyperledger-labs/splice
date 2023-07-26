@@ -295,8 +295,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
         val action: ActionRequiringConfirmation =
           new ARC_CoinRules(
-            sv1Backend.getSvcInfo().coinRules.contractId,
-            new CRARC_SetConfigSchedule(new CoinRules_SetConfigSchedule(newConfig)),
+            new CRARC_SetConfigSchedule(new CoinRules_SetConfigSchedule(newConfig))
           )
 
         sv1Backend.createVoteRequest(

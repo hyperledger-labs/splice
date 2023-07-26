@@ -65,26 +65,30 @@ class ExecuteConfirmedActionTrigger(
           uniqueConfirmations = confirmations.distinctBy(_.payload.confirmer)
           taskOutcome <-
             if (uniqueConfirmations.size >= requiredNumConfirmations) {
-              val cmd = svcRules.contractId.exerciseSvcRules_ExecuteConfirmedAction(
-                action,
-                uniqueConfirmations
-                  .map(_.contractId)
-                  .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
-              )
-              svTaskContext.connection
-                .submitWithResultNoDedup(
-                  Seq(store.key.svParty),
-                  Seq(store.key.svcParty),
-                  cmd,
-                  domainId,
+              store.getCoinRules().flatMap { coinRules =>
+                val coinRulesId = coinRules.contractId
+                val cmd = svcRules.contractId.exerciseSvcRules_ExecuteConfirmedAction(
+                  action,
+                  java.util.Optional.of(coinRulesId),
+                  uniqueConfirmations
+                    .map(_.contractId)
+                    .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
                 )
-                .map(_ =>
-                  TaskSuccess(
-                    show"executed an action $action as there are ${uniqueConfirmations.size} confirmation(s) which is >=" +
-                      show" the required $requiredNumConfirmations confirmations."
+                svTaskContext.connection
+                  .submitWithResultNoDedup(
+                    Seq(store.key.svParty),
+                    Seq(store.key.svcParty),
+                    cmd,
+                    domainId,
                   )
-                )
-            } else
+                  .map(_ =>
+                    TaskSuccess(
+                      show"executed an action $action as there are ${uniqueConfirmations.size} confirmation(s) which is >=" +
+                        show" the required $requiredNumConfirmations confirmations."
+                    )
+                  )
+              }
+            } else {
               Future.successful(
                 TaskSuccess(
                   show"not yet executing $action," +
@@ -92,6 +96,7 @@ class ExecuteConfirmedActionTrigger(
                     show" the required $requiredNumConfirmations confirmations."
                 )
               )
+            }
         } yield taskOutcome
     }
   }

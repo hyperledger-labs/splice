@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.{CoinRules, CoinRules_MiningRound_Archive}
+import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_Archive
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
@@ -38,27 +38,23 @@ class ArchiveClosedMiningRoundsTrigger(
   private val svcParty = store.key.svcParty
 
   private def coinRulesArchiveMiningRoundAction(
-      coinRulesCid: CoinRules.ContractId,
-      closedRoundCid: ClosedMiningRound.ContractId,
+      closedRoundCid: ClosedMiningRound.ContractId
   ): ActionRequiringConfirmation =
     new ARC_CoinRules(
-      coinRulesCid,
       new CRARC_MiningRound_Archive(
         new CoinRules_MiningRound_Archive(
           closedRoundCid
         )
-      ),
+      )
     )
 
   private def existsClosedRoundArchivalConfirmation(
       closedRoundId: ClosedMiningRound.ContractId
   )(implicit tc: TraceContext): Future[Boolean] = {
+    val action = coinRulesArchiveMiningRoundAction(
+      closedRoundId
+    )
     for {
-      coinRules <- store.getCoinRules()
-      action = coinRulesArchiveMiningRoundAction(
-        coinRules.contractId,
-        closedRoundId,
-      )
       confirmationExists <- store
         .lookupConfirmationByActionWithOffset(svParty, action)
         .map(_.value.isDefined)
@@ -77,11 +73,9 @@ class ArchiveClosedMiningRoundsTrigger(
     for {
       domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
-      coinRules <- store.getCoinRules()
       closedRound = task.value
       action = coinRulesArchiveMiningRoundAction(
-        coinRules.contractId,
-        closedRound.contractId,
+        closedRound.contractId
       )
       update = svcRules.contractId
         .exerciseSvcRules_ConfirmAction(

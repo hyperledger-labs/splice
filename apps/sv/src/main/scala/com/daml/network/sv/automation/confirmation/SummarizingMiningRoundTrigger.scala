@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.{CoinRules, CoinRules_MiningRound_StartIssuing}
+import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_StartIssuing
 import com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary
 import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
@@ -46,18 +46,16 @@ class SummarizingMiningRoundTrigger(
   private val svcParty = store.key.svcParty
 
   private def coinRulesStartIssuingAction(
-      coinRulesCid: CoinRules.ContractId,
       miningRoundCid: SummarizingMiningRound.ContractId,
       summary: OpenMiningRoundSummary,
   ): ActionRequiringConfirmation =
     new ARC_CoinRules(
-      coinRulesCid,
       new CRARC_MiningRound_StartIssuing(
         new CoinRules_MiningRound_StartIssuing(
           miningRoundCid,
           summary,
         )
-      ),
+      )
     )
 
   override def completeTask(
@@ -74,7 +72,6 @@ class SummarizingMiningRoundTrigger(
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
       action = coinRulesStartIssuingAction(
-        coinRules.contractId,
         summarizingRound.contractId,
         rewards.summary,
       )

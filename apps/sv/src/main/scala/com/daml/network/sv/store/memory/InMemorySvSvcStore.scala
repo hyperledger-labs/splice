@@ -246,14 +246,12 @@ class InMemorySvSvcStore(
             domain,
             PageLimit(1L),
           )
-          coinRules <- getCoinRules()
           action = new ARC_CoinRules(
-            coinRules.contractId,
             new CRARC_MiningRound_Archive(
               new CoinRules_MiningRound_Archive(
                 round.contractId
               )
-            ),
+            )
           )
           confirmationQueryResult <- lookupConfirmationByActionWithOffset(key.svParty, action)
         } yield {

@@ -60,7 +60,6 @@ data ActionRequiringConfirmation
   = ARC_SvcRules with
       svcAction : SvcRules_ActionRequiringConfirmation
   | ARC_CoinRules with
-      coinRulesCid : ContractId CoinRules
       coinRulesAction : CoinRules_ActionRequiringConfirmation
   deriving (Eq, Show)
 
@@ -474,6 +473,7 @@ template SvcRules with
     nonconsuming choice SvcRules_ExecuteConfirmedAction : ()
       with
         action : ActionRequiringConfirmation
+        coinRulesCid : Optional( ContractId CoinRules )
         confirmationCids : [ContractId Confirmation]
       controller leader
       do
@@ -488,7 +488,7 @@ template SvcRules with
           require "Confirmed action matches" (confirmation.action == action)
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
-        executeActionRequiringConfirmation self action
+        executeActionRequiringConfirmation self coinRulesCid action
 
 
     -- Voting as part of on-ledger governance
@@ -580,6 +580,7 @@ template SvcRules with
     nonconsuming choice SvcRules_ExecuteDefiniteVote : VoteResult
       with
         requestCid : ContractId VoteRequest
+        coinRulesCid : Optional( ContractId CoinRules )
         voteCids : [ContractId Vote]
       controller leader
       do
@@ -608,7 +609,7 @@ template SvcRules with
         let numYays = length $ filter (.accept) votes
         let execute = numYays > numVotes - numYays
         when execute $
-          executeActionRequiringConfirmation self request.action
+          executeActionRequiringConfirmation self coinRulesCid request.action
         -- store the result of this vote on the return value of the choice
         -- for display in a transaction history
         pure $ VoteResult with
@@ -1025,14 +1026,17 @@ summarizeCollective svcRules = CollectiveSummary with
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
-executeActionRequiringConfirmation: ContractId SvcRules -> ActionRequiringConfirmation -> Update ()
-executeActionRequiringConfirmation svcRulesCid act = case act of
+executeActionRequiringConfirmation: ContractId SvcRules -> Optional( ContractId CoinRules ) -> ActionRequiringConfirmation -> Update ()
+executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
   ARC_CoinRules with .. ->
-    case coinRulesAction of
-      CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise coinRulesCid choiceArg
-      CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg
-      CRARC_SetEnabledChoices choiceArg -> void $ exercise coinRulesCid choiceArg
-      CRARC_SetConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
+    case coinRulesCid of
+      None -> error "coinRulesCid was not defined."
+      Some coinRulesCid -> do
+        case coinRulesAction of
+          CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_SetEnabledChoices choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_SetConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
   ARC_SvcRules with .. ->
     case svcAction of
       SRARC_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg

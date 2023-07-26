@@ -43,7 +43,6 @@ const SetCoinConfig: React.FC<{
     chooseAction({
       tag: 'ARC_CoinRules',
       value: {
-        coinRulesCid: svcInfosQuery.data.coinRules.contractId,
         coinRulesAction: {
           tag: 'CRARC_SetConfigSchedule',
           value: { newConfigSchedule: config },

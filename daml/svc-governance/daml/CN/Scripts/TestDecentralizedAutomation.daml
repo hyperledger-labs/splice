@@ -130,6 +130,7 @@ testRequiredNumOfConfirmationInDevNet = do
     phamtonSv <- allocateParty $ svName
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName (Round 3) domainId
 
+  [(coinRulesCid, _)] <- query @CoinRules svc
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
   Map.size svcRules.members === 7
@@ -156,6 +157,7 @@ testRequiredNumOfConfirmationInDevNet = do
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
     SvcRules_ExecuteConfirmedAction with
       action
+      coinRulesCid = Some coinRulesCid
       confirmationCids
 
   -- check that the `action` was executed
