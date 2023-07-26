@@ -615,6 +615,20 @@ function subcmd_infra_down() {
 
 ###
 
+subcommand_whitelist[observability_up]='Apply the observability Pulumi stack.'
+
+function subcmd_observability_up() {
+    _info "Activating observability Pulumi stack"
+
+    _uses_pulumi_stack observability
+
+    subcmd_pulumi observability config set CLUSTER_BASENAME "${GCP_CLUSTER_BASENAME}"
+
+    subcmd_pulumi observability up --yes --skip-preview
+}
+
+###
+
 subcommand_whitelist[create]='Create a cluster from scratch.'
 
 function subcmd_create() {

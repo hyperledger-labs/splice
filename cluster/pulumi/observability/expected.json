@@ -1,0 +1,154 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "kube-prometheus-stack",
+      "compat": "true",
+      "name": "prometheus-grafana-monitoring",
+      "namespace": "observability",
+      "repositoryOpts": {
+        "repo": "https://prometheus-community.github.io/helm-charts"
+      },
+      "values": {
+        "alertmanager": {
+          "enabled": false
+        },
+        "commonLabels": {
+          "digitalasset.com/component": "prometheus-stack",
+          "digitalasset.com/scope": "ci"
+        },
+        "defaultRules": {
+          "create": true
+        },
+        "fullnameOverride": "prometheus",
+        "grafana": {
+          "fullnameOverride": "grafana",
+          "ingress": {
+            "enabled": false
+          },
+          "sidecar": {
+            "dashboards": {
+              "folderAnnotation": "folder",
+              "provider": {
+                "allowUiUpdates": true,
+                "foldersFromFilesStructure": true
+              }
+            }
+          }
+        },
+        "kube-state-metrics": {
+          "fullnameOverride": "ksm"
+        },
+        "kubeControllerManager": {
+          "enabled": false
+        },
+        "kubeEtcd": {
+          "enabled": false
+        },
+        "kubeProxy": {
+          "enabled": false
+        },
+        "kubeScheduler": {
+          "enabled": false
+        },
+        "prometheus": {
+          "prometheusSpec": {
+            "enableFeatures": [
+              "native-histograms"
+            ],
+            "enableRemoteWriteReceiver": true,
+            "podMonitorSelectorNilUsesHelmValues": false,
+            "retention": "1y",
+            "retentionSize": "100GB",
+            "serviceMonitorSelectorNilUsesHelmValues": false
+          }
+        },
+        "prometheus-node-exporter": {
+          "fullnameOverride": "node-exporter"
+        },
+        "prometheusOperator": {
+          "admissionWebhooks": {
+            "enabled": false
+          },
+          "tls": {
+            "enabled": false
+          }
+        }
+      },
+      "version": "48.2.0"
+    },
+    "name": "observability-metrics",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "observability"
+      }
+    },
+    "name": "observabilty",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": false,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "prometheus-api",
+        "namespace": "observability"
+      },
+      "spec": {
+        "gateways": [
+          "cluster-ingress/cn-http-gateway"
+        ],
+        "hosts": [
+          "prometheus.mock.network.canton.global"
+        ],
+        "http": [
+          {
+            "match": [
+              {
+                "port": 443
+              },
+              {
+                "port": 80
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "prometheus-prometheus.observability.svc.cluster.local",
+                  "port": {
+                    "number": 9090
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "name": "prometheus-virtual-service",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  }
+]

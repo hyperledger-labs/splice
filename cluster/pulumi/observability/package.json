@@ -1,0 +1,16 @@
+{
+  "name": "observability",
+  "main": "index.ts",
+  "dependencies": {
+    "cn-pulumi-common": "1.0.0"
+  },
+  "scripts": {
+    "fix": "npm run format:fix && npm run lint:fix",
+    "check": "npm run format:check && npm run lint:check",
+    "format:fix": "prettier --write -- *.ts",
+    "format:check": "prettier --check -- *.ts",
+    "lint:fix": "eslint --fix --max-warnings=0 -- *.ts",
+    "lint:check": "eslint --max-warnings=0 -- *.ts",
+    "dump-config": "env -u KUBECONFIG -u GCP_CLUSTER_BASENAME ts-node ./dump-config.ts"
+  }
+}

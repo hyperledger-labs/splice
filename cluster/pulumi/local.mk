@@ -15,7 +15,7 @@ $(dir)/clean:
 $(dir)/format: $(dir)/.build
 	cd $(@D) && npm run format:fix
 
-pulumi_projects ::= infra canton-network sv-runbook
+pulumi_projects ::= infra canton-network sv-runbook observability
 
 .PHONY: $(dir)/test $(dir)/update-expected
 $(dir)/test: $(foreach project,$(pulumi_projects),$(dir)/$(project)/test)
