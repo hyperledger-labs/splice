@@ -29,8 +29,10 @@ class LeaderBasedAutomationService(
 
   registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
   registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExecuteVoteRequestActionTrigger(triggerContext, svTaskContext))
+  if (config.automation.enableSvcGovernance) {
+    registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExecuteVoteRequestActionTrigger(triggerContext, svTaskContext))
+  }
   registerTrigger(new ArchiveDuplicateValidatorTrafficTrigger(triggerContext, svTaskContext))
 
   if (config.automation.enableExpireCoin) {

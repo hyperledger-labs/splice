@@ -114,8 +114,7 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
 
 abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+  override def environmentDefinition: CNNodeEnvironmentDefinition =
     baseEnvironmentDefinition.withoutLeaderReplacement
 }
 

@@ -28,4 +28,7 @@ case class AutomationConfig(
     /** Only intended for testing. Allows disabling leader elections based on inactivity detection for simtime tests so elections are not triggered unexpectedly.
       */
     enableLeaderReplacement: Boolean = true,
+    /** Only intended for testing. Allows disabling governance automation.
+      */
+    enableSvcGovernance: Boolean = true,
 ) {}
