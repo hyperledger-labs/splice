@@ -12,6 +12,7 @@ import akka.http.scaladsl.model.StatusCodes.InternalServerError
 import akka.http.scaladsl.server.{Directive0, ExceptionHandler, StandardRoute}
 import akka.http.scaladsl.server.Directives.{
   complete,
+  extractRequestTimeout,
   extractUri,
   handleExceptions,
   withRequestTimeoutResponse,
@@ -163,23 +164,26 @@ final class HttpErrorHandler(
   }
 
   def timeoutDirective(implicit traceContext: TraceContext): Directive0 = {
-    withRequestTimeoutResponse(request => {
-      logger.warn(s"Request to ${request.uri} resulted in a timeout.")
-      val contentType = MediaTypes.`application/json`
-      val errorResponse =
-        d0.ErrorResponse(
-          s"The server is taking too long to respond to the request at ${request.uri}"
+    extractRequestTimeout.flatMap { timeout =>
+      withRequestTimeoutResponse(request => {
+        logger.warn(s"Request to ${request.uri} resulted in a timeout after $timeout.")
+        val contentType = MediaTypes.`application/json`
+        val errorResponse =
+          d0.ErrorResponse(
+            s"The server is taking too long to respond to the request at ${request.uri}"
+          )
+        val responseEntity = HttpEntity(
+          contentType = contentType,
+          ByteString(
+            Printer.noSpaces
+              .printToByteBuffer(errorResponse.asJson, contentType.charset.nioCharset())
+          ),
         )
-      val responseEntity = HttpEntity(
-        contentType = contentType,
-        ByteString(
-          Printer.noSpaces.printToByteBuffer(errorResponse.asJson, contentType.charset.nioCharset())
-        ),
-      )
-      HttpResponse(
-        StatusCodes.ServiceUnavailable,
-        entity = responseEntity,
-      )
-    })
+        HttpResponse(
+          StatusCodes.ServiceUnavailable,
+          entity = responseEntity,
+        )
+      })
+    }
   }
 }

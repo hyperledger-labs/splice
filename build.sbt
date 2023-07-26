@@ -1036,7 +1036,8 @@ printTests := {
       "cometbft single node smoke tests",
       "test-full-class-names-cometbft-single-node-smoke.log",
       (t: String) => {
-        t.contains("SvOnboardingIntegrationTest")
+        t.contains("SvOnboardingIntegrationTest") ||
+        t.contains("DistributedDomainIntegrationTest")
       },
     ),
     (

@@ -33,7 +33,11 @@ function docker_start() {
     --hostname "sv${container_sv_index}" \
     "$COMETBFT_DOCKER_IMAGE" start --home /cometbft
   local cometbft_config_path="$REPO_ROOT/apps/sv/src/test/resources/cometbft"
-  docker cp "${cometbft_config_path}/sv1/config/genesis.json" "$current_container_name:/cometbft/config/genesis.json"
+  # The network must be started with all the nodes as validators to ensure stability
+  # This is done to ensure it's an actual BFT network
+  # We don't ensure this by enabling the reconciliation loops because it would destabilize the network
+  # by adding/removing nodes from the validator set depending on what SV apps we start
+  docker cp "${cometbft_config_path}/genesis-multi-validator.json" "$current_container_name:/cometbft/config/genesis.json"
   docker cp "${cometbft_config_path}/sv${container_sv_index}/config" "$current_container_name:/cometbft/"
   docker cp "${cometbft_config_path}/sv${container_sv_index}/data" "$current_container_name:/cometbft/"
   docker start "$current_container_name"
@@ -66,10 +70,16 @@ case "$1" in
         fi;
         create_docker_network
         docker_start 1
+        docker_start 2
+        docker_start 3
+        docker_start 4
         docker ps -a
     ;;
     stop)
         docker_stop 1
+        docker_stop 2
+        docker_stop 3
+        docker_stop 4
         delete_docker_network
     ;;
     *)

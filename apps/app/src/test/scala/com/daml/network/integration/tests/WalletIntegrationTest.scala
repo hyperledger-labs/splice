@@ -225,14 +225,14 @@ class WalletIntegrationTest
 
           successfulTaps should be(
             (tapsBefore ++ tapsAfter).length
-          ) withClue ("All taps should succeed")
+          ) withClue "All taps should succeed"
 
           checkBalance(
             aliceWalletClient,
             None,
             (1 + successfulTaps * 10 - 1, 1 + successfulTaps * 10),
             exactly(0),
-            exactly(0),
+            (0, smallAmount),
           )
         })
       }

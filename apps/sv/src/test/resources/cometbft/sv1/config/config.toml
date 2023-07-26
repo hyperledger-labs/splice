@@ -237,7 +237,7 @@ unconditional_peer_ids = ""
 persistent_peers_max_dial_period = "0s"
 
 # Time to wait before flushing messages out on the connection
-flush_throttle_timeout = "100ms"
+flush_throttle_timeout = "10ms" # we're running in a private network so we can use a lower flush https://docs.tendermint.com/v0.34/tendermint-core/running-in-production.html#configuration-parameters
 
 # Maximum size of a message packet payload, in bytes
 max_packet_msg_payload_size = 100000
@@ -411,7 +411,7 @@ create_empty_blocks = false
 create_empty_blocks_interval = "0"
 
 # Reactor sleep duration parameters
-peer_gossip_sleep_duration = "100ms"
+peer_gossip_sleep_duration = "10ms" #lower to reduce latency
 peer_query_maj23_sleep_duration = "2s"
 
 #######################################################

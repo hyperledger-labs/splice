@@ -89,7 +89,7 @@ class CometBftContainer(testIdentifier: String, nodeType: ContainerType = Single
           // Share the genesis file
           .withCopyFileToContainer(
             MountableFile.forClasspathResource(
-              s"cometbft/sv1/config/genesis.json"
+              s"cometbft/genesis-single-validator.json"
             ),
             "/testconfig/config/genesis.json",
           )

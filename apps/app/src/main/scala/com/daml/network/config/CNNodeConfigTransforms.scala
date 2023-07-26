@@ -11,10 +11,10 @@ import com.daml.network.splitwell.config.{
 }
 import com.daml.network.sv.config.{
   SvAppBackendConfig,
+  SvDomainNodeConfig,
   SvMediatorConfig,
   SvOnboardingConfig,
   SvSequencerConfig,
-  SvDomainNodeConfig,
 }
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
@@ -533,4 +533,5 @@ object CNNodeConfigTransforms {
     }
     token
   }
+
 }

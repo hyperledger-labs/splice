@@ -1883,7 +1883,7 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-        name: "scala_test cometbft single node smoke test"
+        name: "scala_test cometbft smoke test"
         test_names_file: "test-full-class-names-cometbft-single-node-smoke.log"
         start_canton_options: "-d -p external -w -f"
         resource_class: "xlarge"
