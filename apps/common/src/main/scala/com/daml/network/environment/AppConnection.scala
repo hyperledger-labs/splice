@@ -161,9 +161,12 @@ abstract class HttpAppConnection(
       val myVersion = BuildInfo.compiledVersion
       if (versionInfo.version != myVersion) {
         val myCommitTs = Instant.ofEpochSecond(BuildInfo.commitUnixTimestamp.toLong)
-        logger.error(
-          s"Version mismatch detected, please download the latest bundle. Your executable is from $myCommitTs, while the cloud applications you are connecting to are from ${versionInfo.commitTs}"
-        )(TraceContext.empty)
+        val errorMsg = s"Version mismatch detected, please download the latest bundle. " +
+          s"Your executable is from $myCommitTs, while the cloud applications you are connecting to are from ${versionInfo.commitTs}"
+        if (config.failOnVersionMismatch)
+          sys.error(errorMsg)
+        else
+          logger.error(errorMsg)(TraceContext.empty)
       } else {
         logger.debug(
           s"Version verification passed for $serviceName, server is on the same version as mine: ${versionInfo}"

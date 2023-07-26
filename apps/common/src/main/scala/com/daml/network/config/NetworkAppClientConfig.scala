@@ -10,6 +10,8 @@ case class NetworkAppClientConfig(
     url: Uri,
     tls: Option[TlsClientConfig] = None,
     keepAliveClient: Option[KeepAliveClientConfig] = Some(KeepAliveClientConfig()),
+    // whether to fail hard (on the client side) or just log when the app versions of the client and server do not match
+    failOnVersionMismatch: Boolean = true,
 )
 
 trait NetworkAppNodeConfig {
