@@ -46,6 +46,10 @@
       - [Approving via SV API](#approving-via-sv-api)
       - [Approving via SV config](#approving-via-sv-config)
   - [Configuring a New GCP Project](#configuring-a-new-gcp-project)
+  - [Cluster Data Dumps](#cluster-data-dumps)
+      - [Test and CircleCI setup](#test-and-circleci-setup)
+      - [Pruning Data Dumps](#pruning-data-dumps)
+      - [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump)
   - [Appendix: Kubernetes Resources](#appendix-kubernetes-resources)
     - [Manifests](#manifests)
 
@@ -351,7 +355,9 @@ Given approval, a manual deployment of `main` can be done as follows:
 3. Add a parameter named `run-job`, with one of the following values:
    * `deploy-devnet` - Reset the state of `DevNet` and deploy a new code set.
    * `deploy-testnet` - Reset the state of `TestNet` and deploy a new code set.
-4. Observe progress of the job via the CI console.
+   * `deploy-testnet-preview` - Reset the state of `TestNet Preview` and deploy a new code set.
+4. When deploying a network that bootstraps from ACS and participant identities dumps (such as `TestNet` and `TestNet Preview`), you might need to override the default bootstrapping config using an additional `bootstrapping-config` parameter. See [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump).
+5. Observe progress of the job via the CI console.
 
 #### Confirming the Deployment
 
@@ -1169,6 +1175,8 @@ the cluster and the date the backup is from. The most recent backup before the s
 ```
 export BOOTSTRAPPING_CONFIG='{"cluster": "test-preview", "date": "2023-07-05T12:00:00.000Z"}'
 ```
+
+When [deploying via CI](#manually-deploying-via-ci), you can use the `bootstrapping-config` parameter (in addition to `run-job`) to set the bootstrapping config (same format as above).
 
 ## Appendix: Kubernetes and Other Deployment Resources
 

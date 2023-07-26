@@ -30,7 +30,7 @@ parameters:
     default: false
   # Overwrite the bootstrapping config for a cluster. If not set,
   # the cluster will be bootstrapped from the preceeding version of the cluster.
-  bootstrapping_config:
+  bootstrapping-config:
     type: string
     default: ""
 
@@ -1246,8 +1246,8 @@ jobs:
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
-            if [[ -n '<< pipeline.parameters.bootstrapping_config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping_config >>'
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
                 echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
                 exit 1
@@ -1294,8 +1294,8 @@ jobs:
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
-            if [[ -n '<< pipeline.parameters.bootstrapping_config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping_config >>'
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
                 echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
                 exit 1
@@ -1336,8 +1336,8 @@ jobs:
           gce_authenticate: true
           cmd: |
             export RESTORE_CLUSTER=1
-            if [[ -n '<< pipeline.parameters.bootstrapping_config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping_config >>'
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
                 echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
                 exit 1
