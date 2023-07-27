@@ -1,5 +1,5 @@
 {
-    "name" : "TestNet Hourly Preflight",
+    "name" : "TestNet Preflight",
     "description" : "10-min Preflight of TestNet",
     "attribution-actor": "system",
     "parameters" : {
