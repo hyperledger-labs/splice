@@ -115,7 +115,7 @@ export function installCometBftNode(
         };
       }),
     genesis: {
-      chainId: `${CLUSTER_BASENAME}.canton`,
+      chainId: `${CLUSTER_BASENAME}`,
     },
   });
 }

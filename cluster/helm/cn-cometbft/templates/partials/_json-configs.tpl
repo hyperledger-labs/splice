@@ -1,8 +1,9 @@
 # Note: the genesis file as a whole needs to be the same for all nodes joining the same network.
+# chain id is limited to 50 chars
 {{- define "genesisJson" }}
 {
   "genesis_time": "2023-02-27T13:07:44.448442974488Z",
-  "chain_id": "{{ $.Values.genesis.chainId }}",
+  "chain_id": "{{ printf "%s-%s" $.Values.genesis.chainId $.Chart.Version | trunc 50 }}",
   "initial_height": "0",
   "consensus_params": {
     "block": {

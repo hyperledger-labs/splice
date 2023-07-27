@@ -10,4 +10,4 @@ node:
   keysSecret: "cometbft-keys"
 
 genesis:
-  chainId: "TARGET_CLUSTER.canton"
+  chainId: "TARGET_CLUSTER"

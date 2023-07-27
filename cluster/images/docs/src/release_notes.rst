@@ -17,6 +17,8 @@ Release Notes
     * Fixed issue where Scan app did not aggregate the total coin balance correctly when balance was migrated across network upgrades.
     * Fixed issue where coin migrations were not appearing in the wallet transaction log.
     * Fixed issue where automation in SV app gets into a busy loop and the app becomes irresponsive.
+    * Fixed issue where existing CometBFT nodes were breaking the creation of a new network. Nodes running an old version will not be able to join new networks until they are upgraded.
+      Note that the CometBFT Helm chart now includes the version in the genesis chain ID in order to support that.
 
 * SV and validator apps will now exit with an error if the version of their node software mismatches the version on the cluster they are connecting to.
 
