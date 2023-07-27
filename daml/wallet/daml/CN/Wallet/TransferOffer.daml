@@ -23,7 +23,6 @@ template TransferOffer
     observer receiver
     ensure (DA.Text.length description < 280)
 
-    -- TODO(#3822): implement trigger to expire TransferOffers
     interface instance ExpiringContract for TransferOffer where
       view = ExpiringContractView with
         expiresAt

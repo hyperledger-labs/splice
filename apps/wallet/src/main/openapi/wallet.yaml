@@ -753,9 +753,21 @@ components:
         description:
           type: string
         expires_at:
+          description: |
+            Expiry time of the transfer offer as unix timestamp in microseconds. After this time, the offer can no longer be accepted
+            and automation in the wallet will eventually expire the tranfer offer.
+            Note that this time is compared against the ledger effective time of the Daml transaction accepting or expiring an offer, and can skew from the wall clock
+            time measured on the caller's machine. See https://docs.daml.com/concepts/time.html
+            for how ledger effective time is bound to the record time of a transaction on a domain.
           type: integer
           format: int64
         idempotency_key:
+          description: |
+            Idempotency key to support exactly once submission. Once submitted, all succeessive calls with the same idempotency key
+            will get rejected with a 409 CONFLICT status code for 24h unless the command fails and the offer did not get created.
+            Clients should create a fresh idempotency when they try to create a new transfer offer. If that command submission fails
+            with a retryable error or the application crashed and got restarted, successive command submissions must reuse the same
+            idempotency key to ensure they don't create the same offer multiple times.
           type: string
 
     CreateTransferOfferResponse:

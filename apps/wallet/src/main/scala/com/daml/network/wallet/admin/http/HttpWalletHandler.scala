@@ -546,6 +546,7 @@ class HttpWalletHandler(
             DedupDuration(
               Duration.newBuilder().setSeconds(60 * 60 * 24).build()
             ), // 24 hours, similar to Stripe's API, documented at https://stripe.com/docs/api/idempotent_requests
+            // If you change this, make sure to update the documentation in the OpenAPI specs.
           )
         ),
       ).transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
