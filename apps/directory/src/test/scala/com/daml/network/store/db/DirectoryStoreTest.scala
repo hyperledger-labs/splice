@@ -127,6 +127,26 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
+    "lookupEntryByParty" should {
+
+      "return the first lexicographical entry of the user" in {
+        for {
+          store <- mkStore()
+          unwantedContract = directoryEntry(1, "unwanted")
+          bContract = directoryEntry(2, "b")
+          aContract = directoryEntry(2, "a")
+          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(bContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
+        } yield {
+          eventually() {
+            store.lookupEntryByParty(userParty(2)).futureValue should be(Some(aContract))
+          }
+        }
+      }
+
+    }
+
   }
 
   val provider = providerParty(0)
@@ -264,27 +284,6 @@ class DbDirectoryStoreTest
     with CNPostgresTest
     with AcsJdbcTypes
     with AcsTables {
-
-  // TODO (#4835): when "then the first one lexicographically is returned" works for in-mem, move to the parent test
-  "lookupEntryByParty" should {
-
-    "return the first lexicographical entry of the user" in {
-      for {
-        store <- mkStore()
-        unwantedContract = directoryEntry(1, "unwanted")
-        bContract = directoryEntry(2, "b")
-        aContract = directoryEntry(2, "a")
-        _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
-        _ <- dummyDomain.create(bContract)(store.multiDomainAcsStore)
-        _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
-      } yield {
-        eventually() {
-          store.lookupEntryByParty(userParty(2)).futureValue should be(Some(aContract))
-        }
-      }
-    }
-
-  }
 
   override protected def mkStore(): Future[DbDirectoryStore] = {
     val packageSignatures =

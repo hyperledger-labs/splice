@@ -52,13 +52,18 @@ class InMemoryDirectoryStore(
   override def lookupEntryByParty(partyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[Contract[DirectoryEntry.ContractId, DirectoryEntry]]] = {
-    // TODO (#4835): "then the first one lexicographically is returned" is not respected
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomain(directoryCodegen.DirectoryEntry.COMPANION)(
-        _,
-        co => co.payload.user == partyId.toProtoPrimitive,
+    for {
+      domainId <- defaultAcsDomainIdF
+      entryContracts <- multiDomainAcsStore.filterContractsOnDomain(
+        directoryCodegen.DirectoryEntry.COMPANION,
+        domainId,
+        (entry: Contract[
+          directoryCodegen.DirectoryEntry.ContractId,
+          directoryCodegen.DirectoryEntry,
+        ]) => entry.payload.user == partyId.toProtoPrimitive,
       )
-    )
+      res = entryContracts.sortBy(_.payload.name).headOption
+    } yield res
   }
 
   override def listEntries(namePrefix: String, pageSize: Int)(implicit
