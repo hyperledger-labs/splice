@@ -47,6 +47,7 @@ class WalletFrontendIntegrationTest
             "User is logged in and onboarded",
             _ => {
               userIsLoggedIn()
+              waitForQuery(className("party-id"))
             },
           )
 

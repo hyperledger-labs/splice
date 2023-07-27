@@ -1,5 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
 import { useDirectoryClient } from 'common-frontend';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 import { Party } from '@daml/types';
 
@@ -19,19 +20,19 @@ export const CurrentUserProvider: React.FC<React.PropsWithChildren> = ({ childre
 
   const [currentUser, setCurrentUser] = useState<CurrentUser>({ state: 'not_onboarded' });
 
-  useEffect(() => {
-    const fetchEntry = async () => {
-      if (primaryPartyId) {
-        const directoryEntry = await lookupEntryByParty(primaryPartyId!);
-        setCurrentUser({
-          state: 'onboarded',
-          directoryEntry: directoryEntry?.name,
-          primaryParty: primaryPartyId,
-        });
-      }
-    };
-    fetchEntry();
-  }, [primaryPartyId, lookupEntryByParty]);
+  useQuery({
+    queryKey: ['lookupEntryByParty', primaryPartyId],
+    queryFn: async () => {
+      const directoryEntry = await lookupEntryByParty(primaryPartyId!);
+      setCurrentUser({
+        state: 'onboarded',
+        directoryEntry: directoryEntry?.name,
+        primaryParty: primaryPartyId!,
+      });
+      return directoryEntry;
+    },
+    enabled: !!primaryPartyId,
+  });
 
   return <CurrentUserContext.Provider value={currentUser}>{children}</CurrentUserContext.Provider>;
 };
