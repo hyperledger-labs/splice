@@ -481,7 +481,7 @@ commands:
         type: string
       cmd_name:
         type: string
-        default: "Executing bash command << parameters.cmd >> in the nix shell"
+        default: Executing bash command << parameters.cmd >> in the nix shell
       cmd_retry_count:
         description: Number of times to retry the command
         type: integer
@@ -507,11 +507,15 @@ commands:
         type: enum
         enum: ["on_success", "always", "on_fail"]
         default: "on_success"
+      background:
+        type: boolean
+        default: false
     steps:
       - run:
           name: << parameters.cmd_name >>
           when: << parameters.when >>
           no_output_timeout: << parameters.no_output_timeout >>
+          background: << parameters.background >>
           command: |
             set -euo pipefail
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
@@ -707,11 +711,23 @@ commands:
           path: tests
           destination: _tests # the _ is so this appears on top in the artifacts list
 
-  run_splitted_scala_tests:
-    description: run splitted scala tests
+  start_canton_in_background:
+    description: Start canton in the background
     parameters:
       start_canton_options:
         type: string
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: "Start canton"
+          cmd: |
+            mkdir -p log
+            top -b -o %MEM -c -w 256 > log/memory &
+            ./start-canton.sh << parameters.start_canton_options >> -b
+          background: true
+
+  run_splitted_scala_tests:
+    description: run splitted scala tests
+    parameters:
       extra_pre_sbt_cmd:
         type: string
         default: ""
@@ -726,8 +742,6 @@ commands:
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: |
-            top -b -o %MEM -c -w 256 > log/memory &
-            ./start-canton.sh << parameters.start_canton_options >>
             << parameters.extra_pre_sbt_cmd >>
           extra_env_vars: POSTGRES_DB=postgres
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
@@ -1137,14 +1151,17 @@ jobs:
       - setup_remote_docker:
           version: 20.10.14
       - docker_pull_test_images
+      # Start canton before compiling, as it takes a long time to start
+      # This ensure the compile time is not really wasted
+      # The time to compile is 2-3x more than the average time needed to start canton
+      - start_canton_in_background:
+          start_canton_options: << parameters.start_canton_options >>
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_splitted_scala_tests:
-          # run in detached mode, with external postgres and only start either wall clock or sim time instance
-          start_canton_options: << parameters.start_canton_options >>
           extra_pre_sbt_cmd: << parameters.extra_pre_sbt_cmd >>
           extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
           cmd_retry_count: << parameters.cmd_retry_count >>
@@ -1757,7 +1774,6 @@ jobs:
           command: |
             set -eou pipefail
             .circleci/wait_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
-
 main-branch-only: &main-branch-only
   filters:
     branches:
@@ -1818,7 +1834,7 @@ workflows:
           - slack-context
         name: "scala_test wall clock time"
         test_names_file: "test-full-class-names.log"
-        start_canton_options: "-d -p external -w"
+        start_canton_options: "-p external -w"
         resource_class: "xlarge"
         parallelism: 6
     - scala_test:
@@ -1829,7 +1845,7 @@ workflows:
           - slack-context
         name: "scala_test sim time"
         test_names_file: "test-full-class-names-sim-time.log"
-        start_canton_options: "-d -p external -s"
+        start_canton_options: "-p external -s"
         resource_class: "xlarge"
         parallelism: 6
     - scala_test:
@@ -1840,7 +1856,7 @@ workflows:
           - slack-context
         name: "scala_test frontend wall clock time"
         test_names_file: "test-full-class-names-frontend.log"
-        start_canton_options: "-d -p external -w"
+        start_canton_options: "-p external -w"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
@@ -1853,7 +1869,7 @@ workflows:
           - slack-context
         name: "scala_test frontend sim time"
         test_names_file: "test-full-class-names-frontend-sim-time.log"
-        start_canton_options: "-d -p external -s"
+        start_canton_options: "-p external -s"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
@@ -1866,7 +1882,7 @@ workflows:
           - slack-context
         name: "scala_test frontend app manager"
         test_names_file: "test-full-class-names-frontend-app-manager.log"
-        start_canton_options: "-d -p external -w"
+        start_canton_options: "-p external -w"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s -m"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
@@ -1879,7 +1895,7 @@ workflows:
           - slack-context
         name: "scala_test domain fees wall clock time"
         test_names_file: "test-full-class-names-domain-fees.log"
-        start_canton_options: "-d -p external -w -t"
+        start_canton_options: "-p external -w -t"
         resource_class: "xlarge"
         parallelism: 1
     - scala_test:
@@ -1890,7 +1906,7 @@ workflows:
           - slack-context
         name: "scala_test global upgrade sim time"
         test_names_file: "test-full-class-names-global-upgrade-sim-time.log"
-        start_canton_options: "-d -p external -s -g"
+        start_canton_options: "-p external -s -g"
         resource_class: "xlarge"
         parallelism: 1
     - scala_test:
@@ -1901,7 +1917,7 @@ workflows:
           - slack-context
         name: "scala_test cometbft smoke test"
         test_names_file: "test-full-class-names-cometbft-single-node-smoke.log"
-        start_canton_options: "-d -p external -w -f"
+        start_canton_options: "-p external -w -f"
         resource_class: "xlarge"
         parallelism: 1
     - bundle:

@@ -58,7 +58,7 @@ workflows:
           - slack-context
         name: "scala_test wall clock time"
         test_names_file: "test-full-class-names.log"
-        start_canton_options: "-d -p external -w"
+        start_canton_options: "-p external -w"
         resource_class: "xlarge"
         parallelism: 6
     - scala_test:
@@ -69,7 +69,7 @@ workflows:
           - slack-context
         name: "scala_test sim time"
         test_names_file: "test-full-class-names-sim-time.log"
-        start_canton_options: "-d -p external -s"
+        start_canton_options: "-p external -s"
         resource_class: "xlarge"
         parallelism: 6
     - scala_test:
@@ -80,7 +80,7 @@ workflows:
           - slack-context
         name: "scala_test frontend wall clock time"
         test_names_file: "test-full-class-names-frontend.log"
-        start_canton_options: "-d -p external -w"
+        start_canton_options: "-p external -w"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
@@ -93,7 +93,7 @@ workflows:
           - slack-context
         name: "scala_test frontend sim time"
         test_names_file: "test-full-class-names-frontend-sim-time.log"
-        start_canton_options: "-d -p external -s"
+        start_canton_options: "-p external -s"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
@@ -106,7 +106,7 @@ workflows:
           - slack-context
         name: "scala_test frontend app manager"
         test_names_file: "test-full-class-names-frontend-app-manager.log"
-        start_canton_options: "-d -p external -w"
+        start_canton_options: "-p external -w"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s -m"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
@@ -119,7 +119,7 @@ workflows:
           - slack-context
         name: "scala_test domain fees wall clock time"
         test_names_file: "test-full-class-names-domain-fees.log"
-        start_canton_options: "-d -p external -w -t"
+        start_canton_options: "-p external -w -t"
         resource_class: "xlarge"
         parallelism: 1
     - scala_test:
@@ -130,7 +130,7 @@ workflows:
           - slack-context
         name: "scala_test global upgrade sim time"
         test_names_file: "test-full-class-names-global-upgrade-sim-time.log"
-        start_canton_options: "-d -p external -s -g"
+        start_canton_options: "-p external -s -g"
         resource_class: "xlarge"
         parallelism: 1
     - scala_test:
@@ -141,7 +141,7 @@ workflows:
           - slack-context
         name: "scala_test cometbft smoke test"
         test_names_file: "test-full-class-names-cometbft-single-node-smoke.log"
-        start_canton_options: "-d -p external -w -f"
+        start_canton_options: "-p external -w -f"
         resource_class: "xlarge"
         parallelism: 1
     - bundle:

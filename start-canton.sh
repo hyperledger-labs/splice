@@ -32,6 +32,9 @@ while getopts "hdap:c:wsbtfg" arg; do
       usage
       exit 0
       ;;
+    b)
+      daemon=2
+      ;;
     d)
       daemon=1
       ;;
@@ -232,6 +235,11 @@ tmux_cmd toxiproxy toxiproxy-server > log/toxi.log 2>&1
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}
+elif [ $daemon -eq 2 ]; then
+  echo ""
+  echo ""
+  echo "-b specified, sleeping forever keeping the process alive."
+  sleep infinity
 else
   echo ""
   echo ""

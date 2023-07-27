@@ -89,14 +89,17 @@ jobs:
       - setup_remote_docker:
           version: 20.10.14
       - docker_pull_test_images
+      # Start canton before compiling, as it takes a long time to start
+      # This ensure the compile time is not really wasted
+      # The time to compile is 2-3x more than the average time needed to start canton
+      - start_canton_in_background:
+          start_canton_options: << parameters.start_canton_options >>
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_splitted_scala_tests:
-          # run in detached mode, with external postgres and only start either wall clock or sim time instance
-          start_canton_options: << parameters.start_canton_options >>
           extra_pre_sbt_cmd: << parameters.extra_pre_sbt_cmd >>
           extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
           cmd_retry_count: << parameters.cmd_retry_count >>
@@ -709,4 +712,3 @@ jobs:
           command: |
             set -eou pipefail
             .circleci/wait_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
-
