@@ -665,6 +665,40 @@ template CoinRules
           require "Next change is scheduled in the future" (now < t)
         create this with configSchedule = newConfigSchedule
 
+    -- This inserts a new CoinConfig Schedule into the future Schedules
+    choice CoinRules_AddFutureCoinConfigSchedule: ContractId CoinRules
+      with
+        newScheduleItem : (Time, CoinConfig USD)
+      controller svc
+      do
+        requireUnlocked lock
+        now <- getTime
+        require "The insertion is scheduled in the future" (now < newScheduleItem._1)
+        create this with configSchedule = insertInSchedule newScheduleItem this.configSchedule now
+
+    -- This removes a CoinConfig Schedule defined in the future Schedules
+    choice CoinRules_RemoveFutureCoinConfigSchedule: ContractId CoinRules
+      with
+        scheduleTime: Time
+      controller svc
+      do
+        requireUnlocked lock
+        now <- getTime
+        require "The removal is scheduled in the future" (now < scheduleTime)
+        create this with configSchedule = removeInSchedule scheduleTime this.configSchedule now
+
+    -- This updates a CoinConfig Schedule defined in the future Schedules
+    choice CoinRules_UpdateFutureCoinConfigSchedule: ContractId CoinRules
+      with
+        scheduleItem: (Time, CoinConfig USD)
+      controller svc
+      do
+        requireUnlocked lock
+        now <- getTime
+        require "The update is scheduled in the future" (now < scheduleItem._1)
+        create this with configSchedule = updateInSchedule scheduleItem this.configSchedule now
+
+
 
     -- Lock or Unlock Choices that could be observed by SVC
     -------------------------------------------------------

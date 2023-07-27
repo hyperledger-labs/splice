@@ -43,3 +43,59 @@ nextChangeScheduledAt : Schedule t a -> Optional t
 nextChangeScheduledAt schedule
   | null schedule.futureValues = None
   | otherwise = Some (fst(head schedule.futureValues))
+
+prune : Ord t => [(t, a)] -> t -> [(t, a)]
+prune futureValues now =
+  case futureValues of
+    [] -> []
+    (time, a) :: rest ->
+      if (time < now)
+      then prune rest now
+      else (time, a) :: rest
+
+insertFutureValue : Ord t => (t, a) -> [(t, a)] -> [(t, a)]
+insertFutureValue item futureValues =
+  case futureValues of
+    [] -> item :: futureValues
+    (time, a) :: rest ->
+      if (item._1 == time)
+      then error "FutureValue cannot be inserted at an already defined time."
+      else if (item._1 < time)
+           then item :: futureValues
+           else (time, a) :: insertFutureValue item rest
+
+insertInSchedule : Ord t => (t, a) -> Schedule t a -> t -> Schedule t a
+insertInSchedule item schedule now =
+  Schedule with
+    initialValue = getValueAsOf now schedule
+    futureValues = insertFutureValue item (prune schedule.futureValues now)
+
+removeFutureValue : Ord t => t -> [(t, a)] -> [(t, a)]
+removeFutureValue scheduleTime futureValues =
+  case futureValues of
+    [] -> error "FutureValue to remove could not be found."
+    (time, a) :: rest ->
+      if (scheduleTime == time)
+      then rest
+      else (time, a) :: removeFutureValue scheduleTime rest
+
+removeInSchedule : Ord t => t -> Schedule t a -> t -> Schedule t a
+removeInSchedule time schedule now =
+  Schedule with
+    initialValue = getValueAsOf now schedule
+    futureValues = removeFutureValue time (prune schedule.futureValues now)
+
+updateFutureValue : Ord t => (t, a) -> [(t, a)] -> [(t, a)]
+updateFutureValue item futureValues =
+  case futureValues of
+    [] -> error "FutureValue could not be found at the given time."
+    (time, a) :: rest ->
+      if (item._1 == time)
+      then (time, item._2) :: rest
+      else (time, a) :: updateFutureValue item rest
+
+updateInSchedule : Ord t => (t, a) -> Schedule t a -> t -> Schedule t a
+updateInSchedule item schedule now =
+  Schedule with
+    initialValue = getValueAsOf now schedule
+    futureValues = updateFutureValue item (prune schedule.futureValues now)

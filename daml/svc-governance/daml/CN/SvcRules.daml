@@ -72,6 +72,12 @@ data CoinRules_ActionRequiringConfirmation
     -- ^ Voted action to change the choices that are enabled in the CC contracts.
   | CRARC_SetConfigSchedule CoinRules_SetConfigSchedule
     -- ^ Voted action to change the config schedule for the `CoinRules`.
+  | CRARC_AddFutureCoinConfigSchedule CoinRules_AddFutureCoinConfigSchedule
+    -- ^ Voted action to add a config schedule to the `CoinRules`.
+  | CRARC_RemoveFutureCoinConfigSchedule CoinRules_RemoveFutureCoinConfigSchedule
+    -- ^ Voted action to remove a config schedule from the `CoinRules`.
+  | CRARC_UpdateFutureCoinConfigSchedule CoinRules_UpdateFutureCoinConfigSchedule
+    -- ^ Voted action to update a config schedule in the `CoinRules`.
   deriving (Eq, Show)
 
 data SvcRules_ActionRequiringConfirmation
@@ -1037,6 +1043,9 @@ executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
           CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg
           CRARC_SetEnabledChoices choiceArg -> void $ exercise coinRulesCid choiceArg
           CRARC_SetConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_AddFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_RemoveFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_UpdateFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
   ARC_SvcRules with .. ->
     case svcAction of
       SRARC_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg
