@@ -1321,6 +1321,7 @@ class WalletTxLogIntegrationTest
         aliceValidatorBackend.stop()
         aliceValidatorBackend.start()
         aliceValidatorBackend.waitForInitialization()
+        waitForWalletUser(aliceWalletClient)
       }
 
       // Arbitrary coin price assigned by the user wallet tx log parser
