@@ -627,6 +627,13 @@ class HttpWalletHandler(
       } yield result
     }
 
+  override def createBuyTrafficRequest(respond: r0.CreateBuyTrafficRequestResponse.type)(
+      body: d0.RequestBuyTrafficRequest
+  )(cted: String): Future[r0.CreateBuyTrafficRequestResponse] = ???
+  override def getBuyTrafficRequestStatus(
+      respond: r0.GetBuyTrafficRequestStatusResponse.type
+  )(trackingId: String)(extracted: String): Future[r0.GetBuyTrafficRequestStatusResponse] = ???
+
   private def coinToCoinPosition(
       coin: Contract[Coin.ContractId, Coin],
       round: Long,

@@ -553,6 +553,62 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+  /wallet/buy-traffic-requests:
+    post:
+      description:
+        Create a request to buy traffic. Note that this only creates the request
+        to do so. Refer to the status endpoint to check if the request succeeded.
+      tags: [wallet, external]
+      x-jvm-package: wallet
+      operationId: "createBuyTrafficRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RequestBuyTrafficRequest"
+      responses:
+        "200":
+          description: Request to buy  traffic got created
+        "400":
+          description: Request was invalid, adjust parameters
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+        "409":
+          description:
+            A request to buy traffic with the same tracking id has been created. Check the
+            status endpoint for the current status.
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/409"
+        "429":
+          description:
+            A request to buy traffic with the same tracking id is currently being processed.
+            Check the status endpoint and resubmit if it returns 404.
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/429"
+        "500":
+          description:
+            Internal server error that requires operator investigation.
+            Retrying for a small number of times with exponential back-off MAY work.
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+  /wallet/buy-traffic-requests/{tracking_id}/status:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "getBuyTrafficRequestStatus"
+      parameters:
+        - in: path
+          name: tracking_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A request to buy traffic with this tracking id has been submitted before, check the response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetBuyTrafficRequestStatusResponse"
+        "404":
+          description: No request with this tracking id was found.
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
 components:
   schemas:
     UserStatusResponse:
@@ -1011,3 +1067,85 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListTransactionsResponseItem"
+
+    RequestBuyTrafficRequest:
+      type: object
+      required:
+        - member_id
+        - domain_id
+        - traffic_amount
+        - tracking_id
+        - expires_at
+      properties:
+        member_id:
+          description: |
+            The member id for which the traffic should be purchased, e.g., a participant id.
+          type: string
+        domain_id:
+          description: |
+            The domain to purchase traffic for.
+          type: string
+        traffic_amount:
+          description: |
+            traffic to purchase in bytes.
+          type: integer
+          format: int64
+        tracking_id:
+          description: |
+            Tracking id to support exactly once submission. Once submitted, all succeessive calls with the same tracking id
+            will get rejected with a 409 or 429 status code unless the command fails and the traffic did not get purchased.
+            Clients should create a fresh tracking id when they try to send a new request to buy traffic. If that command submission fails
+            with a retryable error or the application crashed and got restarted, successive command submissions must reuse the same
+            tracking id to ensure they don't purchase traffic multiple times.
+          type: string
+        expires_at:
+          description: |
+            Expiry time of the request to buy traffic as unix timestamp in microseconds. If the request does not
+            succeed before this time, the wallet automation will reject and expire it.
+            Note that this time is compared against the ledger effective time of the Daml transaction accepting or expiring an offer, and can skew from the wall clock
+            time measured on the caller's machine. See https://docs.daml.com/concepts/time.html
+            for how ledger effective time is bound to the record time of a transaction on a domain.
+          type: integer
+          format: int64
+
+    GetBuyTrafficRequestStatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          description: |
+            The status of the traffic request
+            created:
+              The request to buy traffic has been created and is waiting for
+              the wallet automation to pick it up.
+            completed:
+              The traffic has been purchased.
+              transaction_id points to the transaction that purchased traffic.
+            failed:
+              The request to buy traffic has failed permanently and no CC has been transferred. Refer to
+              failure_reason for details. Use a new tracking_id if you want to retry buying traffic.
+          type: string
+          enum:
+            - created
+            - completed
+            - failed
+        transaction_id:
+          type: string
+          description: |
+            Set for status=completed and points to the transaction that purchased traffic.
+        failure_reason:
+          type: string
+          description: |
+            The reason for the failure of the request to buy traffic.
+            expired:
+              The wallet automation did not process the request in time.
+            rejected:
+              The wallet automation rejected the request, e.g., due to insufficient funds or operational reasons.
+          enum:
+            - expired
+            - rejected
+        rejection_reason:
+          description: |
+            Human readable description of the rejection reason.
+          type: string
