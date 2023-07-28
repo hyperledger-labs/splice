@@ -152,7 +152,7 @@ commands:
       - run:
           name:
           command: |
-            find . -wholename '*/openapi/*.yaml' | xargs sha256sum > openapi-cache-key.txt
+            find . -wholename '*/openapi/*.yaml' | LANG=C sort | xargs sha256sum > openapi-cache-key.txt
       - restore_cache:
           name: Downloading archive with compiled classes from cache
           keys:
