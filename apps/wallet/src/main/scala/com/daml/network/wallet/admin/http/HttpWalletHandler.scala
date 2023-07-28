@@ -115,6 +115,10 @@ class HttpWalletHandler(
       d0.ListAcceptedTransferOffersResponse(_),
     )
 
+  def getTransferOfferStatus(respond: v0.WalletResource.GetTransferOfferStatusResponse.type)(
+      trackingId: String
+  )(extracted: String): Future[v0.WalletResource.GetTransferOfferStatusResponse] = ???
+
   override def getAppPaymentRequest(respond: r0.GetAppPaymentRequestResponse.type)(
       contractId: String
   )(user: String): Future[r0.GetAppPaymentRequestResponse] = {
@@ -541,7 +545,7 @@ class HttpWalletHandler(
                 sender,
                 Codec.tryDecode(Codec.Party)(request.receiverPartyId),
               ),
-              request.idempotencyKey,
+              request.trackingId,
             ),
             DedupDuration(
               Duration.newBuilder().setSeconds(60 * 60 * 24).build()

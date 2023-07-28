@@ -65,7 +65,7 @@ export interface WalletClient {
     amount: BigNumber,
     description: string,
     expiresAt: Date,
-    idempotencyKey: string
+    trackingId: string
   ) => Promise<void>;
   acceptTransferOffer: (offerContractId: string) => Promise<void>;
   withdrawTransferOffer: (offerContractId: string) => Promise<void>;
@@ -184,19 +184,13 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           }
         });
       },
-      createTransferOffer: async (
-        receiverPartyId,
-        amount,
-        description,
-        expiresAt,
-        idempotencyKey
-      ) => {
+      createTransferOffer: async (receiverPartyId, amount, description, expiresAt, trackingId) => {
         const request = {
           receiverPartyId: receiverPartyId,
           amount: amount.isInteger() ? amount.toFixed(1) : amount.toString(),
           description: description,
           expiresAt: expiresAt.getTime() * 1000,
-          idempotencyKey: idempotencyKey,
+          trackingId: trackingId,
         };
         await walletClient.createTransferOffer(request);
       },

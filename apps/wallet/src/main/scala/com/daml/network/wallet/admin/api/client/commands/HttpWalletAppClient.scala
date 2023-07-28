@@ -562,7 +562,7 @@ object HttpWalletAppClient {
       amount: BigDecimal,
       description: String,
       expiresAt: CantonTimestamp,
-      idempotencyKey: String,
+      trackingId: String,
   ) extends BaseCommand[
         http.CreateTransferOfferResponse,
         transferOfferCodegen.TransferOffer.ContractId,
@@ -576,7 +576,7 @@ object HttpWalletAppClient {
         Codec.encode(amount),
         description,
         Codec.encode(expiresAt),
-        idempotencyKey,
+        trackingId,
       )
 
       client.createTransferOffer(request, headers = headers)

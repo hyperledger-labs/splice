@@ -193,7 +193,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         amount,
         "test transfer",
         expiration,
-        idempotencyKey = UUID.randomUUID.toString,
+        trackingId = UUID.randomUUID.toString,
       )
     eventually() {
       forExactly(1, receiverWallet.listTransferOffers())(offer =>

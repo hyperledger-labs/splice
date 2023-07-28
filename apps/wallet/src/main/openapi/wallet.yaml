@@ -350,15 +350,30 @@ paths:
               "$ref": "#/components/schemas/CreateTransferOfferRequest"
       responses:
         "200":
-          description: ok
+          description: The transfer offer has been created.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreateTransferOfferResponse"
+        "400":
+          description: |
+            Invalid request, check the error response for details.
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
         "404":
+          description: |
+            The submitter’s wallet could not be found.
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "409":
+          description:
+            A transfer offer with the same tracking id has been created. Check the
+            status endpoint for the current status.
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/409"
+        "429":
+          description:
+            A transfer offer with the same tracking id is currently being processed,
+            which may or may not succeed. Retry submitting the request with exponential
+            back-off.
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/429"
         "500":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
     get:
@@ -376,6 +391,30 @@ paths:
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+  /wallet/transfer-offers/{tracking_id}/status:
+    post:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "getTransferOfferStatus"
+      parameters:
+        - in: path
+          name: tracking_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: An offer with this tracking id is known. Check the response for its status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetTransferOfferStatusResponse"
+        "404":
+          description: |
+            No offer with this tracking id is known.
+            Perhaps it has not yet been submitted or processed; or it has been submitted
+            in the past before the current beginning of the wallet transaction log.
+          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
   /wallet/transfer-offers/{contract_id}/reject:
     post:
       tags: [wallet]
@@ -744,7 +783,7 @@ components:
         - amount
         - description
         - expires_at
-        - idempotency_key
+        - tracking_id
       properties:
         receiver_party_id:
           type: string
@@ -761,14 +800,70 @@ components:
             for how ledger effective time is bound to the record time of a transaction on a domain.
           type: integer
           format: int64
-        idempotency_key:
+        tracking_id:
           description: |
-            Idempotency key to support exactly once submission. Once submitted, all succeessive calls with the same idempotency key
-            will get rejected with a 409 CONFLICT status code for 24h unless the command fails and the offer did not get created.
-            Clients should create a fresh idempotency when they try to create a new transfer offer. If that command submission fails
+            tracking id to support exactly once submission. Once submitted, all succeessive calls with the same tracking id
+            will get rejected with a 409 or 429 status code unless the command fails and the offer did not get created.
+            Clients should create a fresh tracking id when they try to create a new transfer offer. If that command submission fails
             with a retryable error or the application crashed and got restarted, successive command submissions must reuse the same
-            idempotency key to ensure they don't create the same offer multiple times.
+            tracking id to ensure they don't create the same offer multiple times.
           type: string
+
+    GetTransferOfferStatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          description: |
+            The status of the transfer offer.
+            created:
+              The offer has been created and is waiting for the receiver to accept it.
+              contract_id points to the contract_id of the offer and transaction_id to the transaction that created it.
+            accepted:
+              The offer has been accepted by the receiver and is waiting for the wallet automation
+              to complete it by delivering the offered CC.
+              contract_id points to the contract id of the accepted offer and transaction_id to the transaction that accepted it
+            completed:
+              The transfer has been completed and the CC amount has been transferred to the receiver.
+              contract_id points to the contract id of the created coin and transaction_id to the transaction of the transfer.
+            failed:
+              The transfer has failed permanently and no CC has been transferred. Refer to
+              failure_reason for details. A new transfer offer can be created with a different tracking_id.
+          type: string
+          enum:
+            - created
+            - accepted
+            - completed
+            - failed
+        transaction_id:
+          type: string
+          description: |
+            Set for created, accepted and completed but not for failed. Refer to the description of status
+            for the transaction this references.
+        contract_id:
+          type: string
+          description: |
+            Set for created, accepted and completed but not for failed. Refer to the description of status
+            for the contract id this references.
+        failure_kind:
+          type: string
+          description: |
+            The reason for the failure of the transfer offer.
+            expired:
+              The transfer offer or the accepted transfer offer expired before it could be completed.
+            rejected:
+              The receiver rejected the transfer offer or withdraw their accepted offer.
+            withdrawn:
+              The sender withdraw their offer, e.g., due to insufficient funds or operational reasons.
+          enum:
+            - expired
+            - rejected
+            - withdrawn
+        withdrawn_reason:
+          type: string
+          description: |
+            Human readable description of the reason for the sender withdrawing their offer.
 
     CreateTransferOfferResponse:
       type: object

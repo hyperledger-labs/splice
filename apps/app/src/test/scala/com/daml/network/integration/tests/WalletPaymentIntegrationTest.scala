@@ -229,14 +229,14 @@ class WalletPaymentIntegrationTest
 
       val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(5))
 
-      val idempotencyKey = "dummy-key"
+      val trackingId = "dummy-key"
 
       val offerId = aliceWalletClient.createTransferOffer(
         bobUserParty,
         1.0,
         "direct transfer test",
         expiration,
-        idempotencyKey,
+        trackingId,
       )
 
       assertThrows[CommandFailure](
@@ -246,7 +246,7 @@ class WalletPaymentIntegrationTest
             1.0,
             "direct transfer test - resubmitting",
             expiration,
-            idempotencyKey,
+            trackingId,
           ),
           _.errorMessage should include("Command submission already exists"),
         )

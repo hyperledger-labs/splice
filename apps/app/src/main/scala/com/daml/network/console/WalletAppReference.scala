@@ -228,12 +228,12 @@ abstract class WalletAppReference(
       amount: BigDecimal,
       description: String,
       expiresAt: CantonTimestamp,
-      idempotencyKey: String,
+      trackingId: String,
   ): transferOfferCodegen.TransferOffer.ContractId =
     consoleEnvironment.run {
       httpCommand(
         HttpWalletAppClient
-          .CreateTransferOffer(receiver, amount, description, expiresAt, idempotencyKey)
+          .CreateTransferOffer(receiver, amount, description, expiresAt, trackingId)
       )
     }
 
