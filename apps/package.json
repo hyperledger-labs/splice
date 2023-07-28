@@ -13,6 +13,7 @@
     "validator/openapi-ts-client",
     "wallet/frontend",
     "wallet/openapi-ts-client",
+    "wallet/external-openapi-ts-client",
     "app-manager/frontend"
   ]
 }

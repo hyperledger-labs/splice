@@ -6,13 +6,13 @@ tags:
   - name: scan
 paths:
   /readyz:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1readyz"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
   /livez:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1livez"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
   /status:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
   /version:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1version"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
   /svc-party-id:
     get:
       tags: [scan]
@@ -160,7 +160,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetCoinConfigForRoundResponse"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /get-round-of-latest-data:
     get:
       tags: [scan]
@@ -174,7 +174,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /get-rewards-collected:
     get:
       tags: [scan]
@@ -195,7 +195,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/GetRewardsCollectedResponse"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /top-providers-by-app-rewards:
     get:
       tags: [scan]
@@ -222,9 +222,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetTopProvidersByAppRewardsResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /top-validators-by-validator-rewards:
     get:
       tags: [scan]
@@ -251,9 +251,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetTopValidatorsByValidatorRewardsResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /top-validators-by-purchased-traffic:
     get:
       tags: [scan]
@@ -280,9 +280,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetTopValidatorsByPurchasedTrafficResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /get-validator-traffic-balance:
     get:
       tags: [scan]
@@ -302,7 +302,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetValidatorTrafficBalanceResponse"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /check-and-update-validator-traffic-balance:
     get:
       tags: [scan]
@@ -322,7 +322,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/CheckAndUpdateValidatorTrafficBalanceResponse"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /bootstrap/import-crates:
     get:
       tags: [scan]
@@ -357,7 +357,7 @@ components:
         rounds:
           type: array
           items:
-            "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     GetOpenAndIssuingMiningRoundsRequest:
       type: object
       required:
@@ -369,11 +369,11 @@ components:
         cached_open_mining_round_contract_ids:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractId"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         cached_issuing_round_contract_ids:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractId"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
     GetOpenAndIssuingMiningRoundsResponse:
       type: object
       required:
@@ -386,21 +386,21 @@ components:
         time_to_live_in_microseconds:
           type: integer
         open_mining_rounds:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractWithStateMap"
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
         issuing_mining_rounds:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractWithStateMap"
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
     GetCoinRulesRequest:
       type: object
       properties:
         cached_coin_rules_contract_id:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractId"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         cached_coin_rules_domain_id:
           type: string
     GetCoinRulesResponse:
       type: object
       properties:
         coin_rules_update:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractWithState"
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
       required: ["coin_rules_update"]
     ListFeaturedAppRightsResponse:
       type: object
@@ -409,12 +409,12 @@ components:
         featured_apps:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     LookupFeaturedAppRightResponse:
       type: object
       properties:
         featured_app_right:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     GetTotalCoinBalanceResponse:
       type: object
       required: ["total_balance"]
@@ -541,4 +541,4 @@ components:
           type: array
           items:
             # TODO(#6073): consider using a more precise type; i.e., no 'MaybeCached'
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/MaybeCachedContractWithState"
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"

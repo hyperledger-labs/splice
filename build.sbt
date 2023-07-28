@@ -316,19 +316,21 @@ lazy val `apps-common` =
       buildInfoPackage := "com.daml.network.environment",
       buildInfoObject := "BuildInfo",
       Compile / guardrailTasks :=
-        List(
-          ScalaServer(
-            new File("apps/common/src/main/openapi/common.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
-            customExtraction = true,
-          ),
-          ScalaClient(
-            new File("apps/common/src/main/openapi/common.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
-          ),
-        ),
+        List("external", "internal").flatMap { scope =>
+          List(
+            ScalaServer(
+              new File(s"apps/common/src/main/openapi/common-$scope.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "akka-http",
+              customExtraction = true,
+            ),
+            ScalaClient(
+              new File(s"apps/common/src/main/openapi/common-$scope.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "akka-http",
+            ),
+          )
+        },
     )
 
 lazy val `apps-validator` =
@@ -347,18 +349,18 @@ lazy val `apps-validator` =
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "validator-openapi",
-        openApiSpec = "validator.yaml",
+        openApiSpec = "validator-internal.yaml",
       ),
       Compile / guardrailTasks :=
         List(
           ScalaServer(
-            new File("apps/validator/src/main/openapi/validator.yaml"),
+            new File("apps/validator/src/main/openapi/validator-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
             customExtraction = true,
           ),
           ScalaClient(
-            new File("apps/validator/src/main/openapi/validator.yaml"),
+            new File("apps/validator/src/main/openapi/validator-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
           ),
@@ -385,18 +387,18 @@ lazy val `apps-sv` =
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "sv-openapi",
-        openApiSpec = "sv.yaml",
+        openApiSpec = "sv-internal.yaml",
       ),
       Compile / guardrailTasks :=
         List(
           ScalaServer(
-            new File("apps/sv/src/main/openapi/sv.yaml"),
+            new File("apps/sv/src/main/openapi/sv-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
             customExtraction = true,
           ),
           ScalaClient(
-            new File("apps/sv/src/main/openapi/sv.yaml"),
+            new File("apps/sv/src/main/openapi/sv-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
           ),
@@ -412,18 +414,18 @@ lazy val `apps-scan` =
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
         npmName = "scan-openapi",
-        openApiSpec = "scan.yaml",
+        openApiSpec = "scan-internal.yaml",
       ),
       Compile / guardrailTasks :=
         List(
           ScalaServer(
-            new File("apps/scan/src/main/openapi/scan.yaml"),
+            new File("apps/scan/src/main/openapi/scan-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
             customExtraction = true,
           ),
           ScalaClient(
-            new File("apps/scan/src/main/openapi/scan.yaml"),
+            new File("apps/scan/src/main/openapi/scan-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
           ),
@@ -459,22 +461,27 @@ lazy val `apps-common-frontend` = {
           (
             (`apps-validator` / Compile / compile).value,
             (`apps-validator` / Compile / baseDirectory).value,
+            false,
           ),
           (
             (`apps-directory` / Compile / compile).value,
             (`apps-directory` / Compile / baseDirectory).value,
+            false,
           ),
           (
             (`apps-sv` / Compile / compile).value,
             (`apps-sv` / Compile / baseDirectory).value,
+            false,
           ),
           (
             (`apps-wallet` / Compile / compile).value,
             (`apps-wallet` / Compile / baseDirectory).value,
+            true,
           ),
           (
             (`apps-splitwell` / Compile / compile).value,
             (`apps-splitwell` / Compile / baseDirectory).value,
+            false,
           ),
         ),
       npmInstall := BuildCommon.npmInstallTask.value,
@@ -518,6 +525,11 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runBuildCommand(
               npmRootDir.value,
               "wallet/openapi-ts-client",
+              log,
+            )
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "wallet/external-openapi-ts-client",
               log,
             )
             BuildCommon.TS.runBuildCommand(
@@ -649,23 +661,30 @@ lazy val `apps-wallet` =
     .settings(
       BuildCommon.sharedAppSettings,
       BuildCommon.TS.openApiSettings(
+        npmName = "wallet-external-openapi",
+        openApiSpec = "wallet-external.yaml",
+        directory = "external-openapi-ts-client",
+      ),
+      BuildCommon.TS.openApiSettings(
         npmName = "wallet-openapi",
-        openApiSpec = "wallet.yaml",
+        openApiSpec = "wallet-internal.yaml",
       ),
       Compile / guardrailTasks :=
-        List(
-          ScalaServer(
-            new File("apps/wallet/src/main/openapi/wallet.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
-            customExtraction = true,
-          ),
-          ScalaClient(
-            new File("apps/wallet/src/main/openapi/wallet.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
-          ),
-        ),
+        List("external", "internal").flatMap { scope =>
+          List(
+            ScalaServer(
+              new File(s"apps/wallet/src/main/openapi/wallet-$scope.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "akka-http",
+              customExtraction = true,
+            ),
+            ScalaClient(
+              new File(s"apps/wallet/src/main/openapi/wallet-$scope.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "akka-http",
+            ),
+          )
+        },
     )
 
 lazy val `apps-directory` =
@@ -681,19 +700,19 @@ lazy val `apps-directory` =
       libraryDependencies ++= Seq(akka_http_cors),
       BuildCommon.TS.openApiSettings(
         npmName = "directory-openapi",
-        openApiSpec = "directory.yaml",
+        openApiSpec = "directory-internal.yaml",
       ),
       BuildCommon.sharedAppSettings,
       Compile / guardrailTasks :=
         List(
           ScalaServer(
-            new File("apps/directory/src/main/openapi/directory.yaml"),
+            new File("apps/directory/src/main/openapi/directory-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
             customExtraction = true,
           ),
           ScalaClient(
-            new File("apps/directory/src/main/openapi/directory.yaml"),
+            new File("apps/directory/src/main/openapi/directory-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
           ),
@@ -712,19 +731,19 @@ lazy val `apps-splitwell` =
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.TS.openApiSettings(
         npmName = "splitwell-openapi",
-        openApiSpec = "splitwell.yaml",
+        openApiSpec = "splitwell-internal.yaml",
       ),
       BuildCommon.sharedAppSettings,
       Compile / guardrailTasks :=
         List(
           ScalaServer(
-            new File("apps/splitwell/src/main/openapi/splitwell.yaml"),
+            new File("apps/splitwell/src/main/openapi/splitwell-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
             customExtraction = true,
           ),
           ScalaClient(
-            new File("apps/splitwell/src/main/openapi/splitwell.yaml"),
+            new File("apps/splitwell/src/main/openapi/splitwell-internal.yaml"),
             pkg = "com.daml.network.http.v0",
             framework = "akka-http",
           ),

@@ -10,7 +10,7 @@ import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
-import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.admin.http.HttpScanHandler
 import com.daml.network.scan.automation.ScanAutomationService

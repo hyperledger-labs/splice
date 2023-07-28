@@ -6,13 +6,13 @@ tags:
   - name: splitwell
 paths:
   /readyz:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1readyz"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
   /livez:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1livez"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
   /status:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
   /version:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1version"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
   /splitwell-installs:
     get:
       tags: [splitwell]
@@ -213,7 +213,7 @@ components:
         groups:
           type: array
           items:
-            "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractWithState"
+            "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
     ListGroupInvitesResponse:
       type: object
       required: ["group_invites"]
@@ -221,7 +221,7 @@ components:
         group_invites:
           type: array
           items:
-            "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ContractWithState"
+            "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
     ListAcceptedGroupInvitesResponse:
       type: object
       required: ["accepted_group_invites"]
@@ -229,7 +229,7 @@ components:
         accepted_group_invites:
           type: array
           items:
-            "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     ListBalanceUpdatesResponse:
       type: object
       required: ["balance_updates"]
@@ -237,7 +237,7 @@ components:
         balance_updates:
           type: array
           items:
-            "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     ListBalancesResponse:
       type: object
       required: ["balances"]

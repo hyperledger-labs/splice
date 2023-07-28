@@ -6,9 +6,9 @@ tags:
   - name: validator
 paths:
   /readyz:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1readyz"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
   /livez:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1livez"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
   /validator-user:
     get:
       tags: [validatorPublic]
@@ -85,7 +85,7 @@ paths:
         "200":
           description: ok
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
   /admin/participant/identities:
     get:
@@ -98,7 +98,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/ParticipantIdentitiesDump"
+                "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantIdentitiesDump"
 
   /app-manager/authorize:
     post:
@@ -186,7 +186,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/TokenResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
 
   /app-manager/apps/installed:
     get:
@@ -215,7 +215,7 @@ paths:
         "201":
           description: ok
         "409":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/409"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
 
   /app-manager/apps/registered:
     get:
@@ -248,7 +248,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/Manifest"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /app-manager/apps/registered/{app}/bundle.tar.gz:
     get:
       tags: [appManager]
@@ -268,7 +268,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetAppBundleResponse"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /app-manager/apps/register:
     post:
       tags: [appManager]
@@ -289,9 +289,9 @@ paths:
         "201":
           description: ok
         "409":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/409"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
 
   # We proxy the JSON API here to set CORS headers.
   # TODO(#6839) Consider exposing these as /app-manager/v1 instead.This would make it a bit

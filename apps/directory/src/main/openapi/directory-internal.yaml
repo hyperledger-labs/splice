@@ -6,13 +6,13 @@ tags:
   - name: directory
 paths:
   /readyz:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1readyz"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
   /livez:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1livez"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
   /status:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1status"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
   /version:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1version"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
   /entries:
     get:
       tags: [directory]
@@ -55,7 +55,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/LookupEntryByPartyResponse"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /entries/by-name/{name}:
     get:
       tags: [directory]
@@ -75,7 +75,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/LookupEntryByNameResponse"
         "404":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/404"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /provider-party-id:
     get:
       tags: [directory]
@@ -100,19 +100,19 @@ components:
           # https://github.com/guardrail-dev/guardrail/issues/216
           # https://github.com/guardrail-dev/guardrail/issues/701
           items:
-            "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     LookupEntryByPartyResponse:
       type: object
       required: ["entry"]
       properties:
         entry:
-          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     LookupEntryByNameResponse:
       type: object
       required: ["entry"]
       properties:
         entry:
-          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     GetProviderPartyIdResponse:
       type: object
       required: ["provider_party_id"]

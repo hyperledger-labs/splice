@@ -53,6 +53,7 @@ canton.patch
 *.tokens
 canton-classpath
 openapi-ts-client
+external-openapi-ts-client
 /cluster/manifest/test-results/actual.json
 .direnv
 rust_mozprofile*

@@ -22,12 +22,14 @@ The APIs are documented using `OpenAPI specifications <https://www.openapis.org/
 API Stability
 -------------
 
-Endpoints that are tagged with ``external`` are intended for external
+Endpoints in the files named ``APP-external`` are intended for external
 consumption and are intended to stay backwards compatible across
 releases. At this point, there might be some cases where backwards
 compatibility is broken as we are still in early stages of
 development. Any breaking changes in ``external`` APIs will be
 documented in the :ref:`release notes <release_notes>`.
+
+Endpoints in the files named ``APP-internal`` do not have any backwards compatibility guarantees.
 
 Contract Payload Encoding
 -------------------------

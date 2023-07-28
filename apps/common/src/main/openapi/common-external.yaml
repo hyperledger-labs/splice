@@ -6,7 +6,7 @@ paths:
   /status:
     get:
       tags: [common]
-      x-jvm-package: commonAdmin
+      x-jvm-package: external.commonAdmin
       operationId: "getHealthStatus"
       responses:
         "200":
@@ -18,7 +18,7 @@ paths:
   /version:
     get:
       tags: [common]
-      x-jvm-package: commonAdmin
+      x-jvm-package: external.commonAdmin
       operationId: "getVersion"
       responses:
         "200":
@@ -30,7 +30,7 @@ paths:
   /readyz:
     get:
       tags: [common]
-      x-jvm-package: commonAdmin
+      x-jvm-package: external.commonAdmin
       operationId: "isReady"
       responses:
         "200":
@@ -40,7 +40,7 @@ paths:
   /livez:
     get:
       tags: [common]
-      x-jvm-package: commonAdmin
+      x-jvm-package: external.commonAdmin
       operationId: "isLive"
       responses:
         "200":
@@ -104,6 +104,9 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
   schemas:
+    ContractId:
+      type: string
+
     ContractMetadata:
       type: object
       required: ["createdAt", "driverMetadata", "contractKeyHash"]
@@ -136,52 +139,15 @@ components:
           "metadata",
           "create_arguments_blob",
         ]
-    ContractWithState:
+
+    ErrorResponse:
       type: object
-      properties:
-        contract:
-          $ref: "#/components/schemas/Contract"
-        domain_id:
-          type: string
       required:
-        [ "contract" ]
-    ContractId:
-      type: string
-    # Represents a contract that is maybe already cached by the client. If the client sends along a contract-id that
-    # matches the contract the server would respond with, the server responds with an empty contract property to indicate
-    # that the client's cache is correct.
-    MaybeCachedContract:
-      type: object
+        - error
       properties:
-        contract:
-          $ref: "#/components/schemas/Contract"
-    # As with MaybeCachedContract, but additionally with a "state", which is either
-    # a domain indicating the contract is on that domain or nothing for an in-flight
-    # contract.  With an unmatching contract-id, this response will include both a
-    # contract and a state.  However, the domain will always reflect the contract's
-    # current state, even if the contract-id matches; either the domain echoed back if
-    # it has not changed, or missing if it is in-flight.
-    MaybeCachedContractWithState:
-      type: object
-      properties:
-        contract:
-          $ref: "#/components/schemas/Contract"
-        domain_id:
+        error:
           type: string
-    # A map from 'active-contract-id' -> 'MaybeCachedContract'.
-    # At the moment this type is used to let clients know which mining rounds they already have cached,
-    # which mining rounds they should add to their cache and which they should remove from their cache
-    # (those mining rounds who aren't included in the map at all).
-    MaybeCachedContractMap:
-      type: object
-      additionalProperties:
-        $ref: "#/components/schemas/MaybeCachedContract"
-    # As with 'MaybeCachedContractMap', but include the current domain state for every
-    # mining round that shouldn't be removed, whether cached or not.
-    MaybeCachedContractWithStateMap:
-      type: object
-      additionalProperties:
-        $ref: "#/components/schemas/MaybeCachedContractWithState"
+
     # Status definition for health endpoint
     Status:
       type: object
@@ -208,10 +174,11 @@ components:
     # NotInitialized definition for health endpoint
     NotInitialized:
       type: object
-      required: ["active"]
+      required: [ "active" ]
       properties:
         active:
           type: boolean
+
     NodeStatus:
       type: object
       properties:
@@ -221,63 +188,10 @@ components:
           $ref: "#/components/schemas/Status"
     Version:
       type: object
-      required: ["version", "commit_ts"]
+      required: [ "version", "commit_ts" ]
       properties:
         version:
           type: string
         commit_ts:
           type: string
           format: date-time
-    ErrorResponse:
-      type: object
-      required:
-        - error
-      properties:
-        error:
-          type: string
-
-    # IMPORTANT: only modify this message in a backwards compatible fashion. It is used to read old dumps.
-    ParticipantIdentitiesDump:
-      type: object
-      required:
-        - id
-        - keys
-        - bootstrapTxs
-        - users
-      properties:
-        id:
-          type: string
-        keys:
-          type: array
-          items:
-            $ref: "#/components/schemas/ParticipantKey"
-        bootstrapTxs:
-          type: array
-          items:
-            type: string
-        users:
-          type: array
-          items:
-            $ref: "#/components/schemas/ParticipantUser"
-        version:
-          type: string
-
-    ParticipantKey:
-      type: object
-      required:
-        - keyPair
-      properties:
-        keyPair:
-          type: string
-        name:
-          type: string
-
-    ParticipantUser:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: string
-        primaryParty:
-          type: string

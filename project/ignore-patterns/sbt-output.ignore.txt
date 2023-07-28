@@ -61,7 +61,9 @@ protoc-jar: caught exception, retrying: java\.io\.IOException: Cannot run progra
 # False positive from openapi-generator https://github.com/OpenAPITools/openapi-generator/issues/9008
 .*The value \(generator's option\) must be either boolean or string. Default to `false`\..*
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/apis/exception.ts
+.*o.o.codegen.TemplateManager - writing file .*/apps/.*/external-openapi-ts-client/apis/exception.ts
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/models/ErrorResponse.ts
+.*o.o.codegen.TemplateManager - writing file .*/apps/.*/external-openapi-ts-client/models/ErrorResponse.ts
 
 # Output by guardrail if the yaml file changes because we cache the previous generated code
 ^.\[31mWarning:.\[0m$

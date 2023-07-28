@@ -31,11 +31,12 @@ import com.daml.network.environment.{
   TrafficBalanceService,
 }
 import com.daml.network.http.v0.appManager.AppManagerResource
-import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
 import com.daml.network.http.v0.validatorPublic.ValidatorPublicResource
-import com.daml.network.http.v0.wallet.WalletResource
+import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
+import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
@@ -57,7 +58,7 @@ import com.daml.network.validator.config.{
 import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.wallet.UserWalletManager
-import com.daml.network.wallet.admin.http.HttpWalletHandler
+import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -527,12 +528,14 @@ class ValidatorApp(
         loggerFactory,
       )
 
-      walletHandler = new HttpWalletHandler(
+      walletInternalHandler = new HttpWalletHandler(
         walletManager,
         scanConnection,
         loggerFactory,
         retryProvider,
       )
+
+      walletExternalHandler = new HttpExternalWalletHandler(walletManager, loggerFactory)
 
       publicHandler = new HttpValidatorPublicHandler(
         automation.store,
@@ -582,8 +585,12 @@ class ValidatorApp(
                         )
                       ),
                   ),
-                  WalletResource.routes(
-                    walletHandler,
+                  InternalWalletResource.routes(
+                    walletInternalHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+                  ),
+                  ExternalWalletResource.routes(
+                    walletExternalHandler,
                     AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
                   ),
                   ValidatorAdminResource.routes(

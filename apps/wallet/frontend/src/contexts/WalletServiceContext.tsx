@@ -1,3 +1,4 @@
+import * as external from 'wallet-external-openapi';
 import BigNumber from 'bignumber.js';
 import {
   BaseApiMiddleware,
@@ -90,6 +91,10 @@ class ApiMiddleware
   extends BaseApiMiddleware<RequestContext, ResponseContext>
   implements Middleware {}
 
+class ExternalApiMiddleware
+  extends BaseApiMiddleware<external.RequestContext, external.ResponseContext>
+  implements external.Middleware {}
+
 export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>> = ({
   url,
   children,
@@ -107,7 +112,16 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       ],
     });
 
+    const externalConfiguration = external.createConfiguration({
+      baseServer: new external.ServerConfiguration(url, {}),
+      promiseMiddleware: [
+        new ExternalApiMiddleware(userAccessToken),
+        new OpenAPILoggingMiddleware('wallet'),
+      ],
+    });
+
     const walletClient = new WalletApi(configuration);
+    const externalWalletClient = new external.WalletApi(externalConfiguration);
 
     return {
       list: async (): Promise<ListResponse> => {
@@ -192,10 +206,10 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           expiresAt: expiresAt.getTime() * 1000,
           trackingId: trackingId,
         };
-        await walletClient.createTransferOffer(request);
+        await externalWalletClient.createTransferOffer(request);
       },
       listTransferOffers: async (): Promise<ListTransferOffersResponse> => {
-        const res = await walletClient.listTransferOffers();
+        const res = await externalWalletClient.listTransferOffers();
         return {
           offersList: res.offers.map(c => Contract.decodeOpenAPI(c, TransferOffer)),
         };

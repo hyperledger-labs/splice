@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOfferCodegen,
 }
 import com.daml.network.http.v0.{definitions, wallet as http}
+import com.daml.network.http.v0.external.{wallet as externalHttp}
 import com.daml.network.http.v0.wallet.{
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,
@@ -27,7 +28,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpWalletAppClient {
-  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+
+  abstract class InternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.WalletClient
 
     def createClient(host: String)(implicit
@@ -37,6 +39,18 @@ object HttpWalletAppClient {
         mat: Materializer,
     ): Client =
       http.WalletClient.httpClient(HttpClientBuilder().buildClient, host)
+  }
+
+  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = externalHttp.WalletClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      externalHttp.WalletClient.httpClient(HttpClientBuilder().buildClient, host)
   }
 
   final case class CoinPosition(
@@ -172,7 +186,7 @@ object HttpWalletAppClient {
   }
 
   case object ListPositions
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListResponse,
         ListResponse,
       ] {
@@ -230,7 +244,7 @@ object HttpWalletAppClient {
   }
 
   case class Tap(amount: BigDecimal)
-      extends BaseCommand[http.TapResponse, coinCodegen.Coin.ContractId] {
+      extends InternalBaseCommand[http.TapResponse, coinCodegen.Coin.ContractId] {
 
     def submitRequest(
         client: Client,
@@ -246,7 +260,7 @@ object HttpWalletAppClient {
   }
 
   case object SelfGrantFeaturedAppRight
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.SelfGrantFeatureAppRightResponse,
         coinCodegen.FeaturedAppRight.ContractId,
       ] {
@@ -264,7 +278,7 @@ object HttpWalletAppClient {
   }
 
   case object GetBalance
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.GetBalanceResponse,
         Balance,
       ] {
@@ -293,7 +307,7 @@ object HttpWalletAppClient {
   }
 
   case object ListAppPaymentRequests
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListAppPaymentRequestsResponse,
         Seq[AppPaymentRequest],
       ] {
@@ -313,7 +327,7 @@ object HttpWalletAppClient {
 
   case class GetAppPaymentRequest(
       contractId: walletCodegen.AppPaymentRequest.ContractId
-  ) extends BaseCommand[http.GetAppPaymentRequestResponse, AppPaymentRequest] {
+  ) extends InternalBaseCommand[http.GetAppPaymentRequestResponse, AppPaymentRequest] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
@@ -329,7 +343,7 @@ object HttpWalletAppClient {
 
   case class AcceptAppPaymentRequest(
       requestId: walletCodegen.AppPaymentRequest.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.AcceptAppPaymentRequestResponse,
         walletCodegen.AcceptedAppPayment.ContractId,
       ] {
@@ -350,7 +364,7 @@ object HttpWalletAppClient {
 
   case class RejectAppPaymentRequest(
       requestId: walletCodegen.AppPaymentRequest.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.RejectAppPaymentRequestResponse,
         Unit,
       ] {
@@ -368,7 +382,7 @@ object HttpWalletAppClient {
   }
 
   case object ListAcceptedAppPayments
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListAcceptedAppPaymentsResponse,
         Seq[
           Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment]
@@ -390,7 +404,7 @@ object HttpWalletAppClient {
   }
 
   case object ListSubscriptionRequests
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListSubscriptionRequestsResponse,
         Seq[SubscriptionRequest],
       ] {
@@ -408,7 +422,7 @@ object HttpWalletAppClient {
   }
 
   case object ListSubscriptionInitialPayments
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListSubscriptionInitialPaymentsResponse,
         Seq[
           Contract[
@@ -436,7 +450,7 @@ object HttpWalletAppClient {
   }
 
   case object ListSubscriptions
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListSubscriptionsResponse,
         Seq[Subscription],
       ] {
@@ -481,7 +495,7 @@ object HttpWalletAppClient {
 
   case class GetSubscriptionRequest(
       contractId: subsCodegen.SubscriptionRequest.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.GetSubscriptionRequestResponse,
         SubscriptionRequest,
       ] {
@@ -500,7 +514,7 @@ object HttpWalletAppClient {
 
   case class AcceptSubscriptionRequest(
       requestId: subsCodegen.SubscriptionRequest.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.AcceptSubscriptionRequestResponse,
         subsCodegen.SubscriptionInitialPayment.ContractId,
       ] {
@@ -521,7 +535,7 @@ object HttpWalletAppClient {
 
   case class RejectSubscriptionRequest(
       requestId: subsCodegen.SubscriptionRequest.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.RejectSubscriptionRequestResponse,
         Unit,
       ] {
@@ -540,7 +554,7 @@ object HttpWalletAppClient {
 
   case class CancelSubscription(
       stateId: subsCodegen.SubscriptionIdleState.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.CancelSubscriptionRequestResponse,
         Unit,
       ] {
@@ -563,14 +577,18 @@ object HttpWalletAppClient {
       description: String,
       expiresAt: CantonTimestamp,
       trackingId: String,
-  ) extends BaseCommand[
-        http.CreateTransferOfferResponse,
+  ) extends ExternalBaseCommand[
+        externalHttp.CreateTransferOfferResponse,
         transferOfferCodegen.TransferOffer.ContractId,
       ] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.CreateTransferOfferResponse] = {
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      externalHttp.CreateTransferOfferResponse,
+    ] = {
       val request = definitions.CreateTransferOfferRequest(
         Codec.encode(receiver),
         Codec.encode(amount),
@@ -584,7 +602,7 @@ object HttpWalletAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.CreateTransferOfferResponse.OK(response) =>
+    ) = { case externalHttp.CreateTransferOfferResponse.OK(response) =>
       Codec.decodeJavaContractId(transferOfferCodegen.TransferOffer.COMPANION)(
         response.offerContractId
       )
@@ -592,8 +610,8 @@ object HttpWalletAppClient {
   }
 
   case object ListTransferOffers
-      extends BaseCommand[
-        http.ListTransferOffersResponse,
+      extends ExternalBaseCommand[
+        externalHttp.ListTransferOffersResponse,
         Seq[Contract[
           transferOfferCodegen.TransferOffer.ContractId,
           transferOfferCodegen.TransferOffer,
@@ -602,12 +620,12 @@ object HttpWalletAppClient {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListTransferOffersResponse] =
+    ): EitherT[Future, Either[Throwable, HttpResponse], externalHttp.ListTransferOffersResponse] =
       client.listTransferOffers(headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.ListTransferOffersResponse.OK(response) =>
+    ) = { case externalHttp.ListTransferOffersResponse.OK(response) =>
       response.offers
         .traverse(req => Contract.fromJson(transferOfferCodegen.TransferOffer.COMPANION)(req))
         .leftMap(_.toString)
@@ -616,7 +634,7 @@ object HttpWalletAppClient {
 
   case class AcceptTransferOffer(
       requestId: transferOfferCodegen.TransferOffer.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.AcceptTransferOfferResponse,
         transferOfferCodegen.AcceptedTransferOffer.ContractId,
       ] {
@@ -636,7 +654,7 @@ object HttpWalletAppClient {
   }
 
   case object ListAcceptedTransferOffers
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListAcceptedTransferOffersResponse,
         Seq[Contract[
           transferOfferCodegen.AcceptedTransferOffer.ContractId,
@@ -662,7 +680,7 @@ object HttpWalletAppClient {
 
   case class RejectTransferOffer(
       requestId: transferOfferCodegen.TransferOffer.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.RejectTransferOfferResponse,
         Unit,
       ] {
@@ -681,7 +699,7 @@ object HttpWalletAppClient {
 
   case class WithdrawTransferOffer(
       requestId: transferOfferCodegen.TransferOffer.ContractId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.WithdrawTransferOfferResponse,
         Unit,
       ] {
@@ -699,7 +717,7 @@ object HttpWalletAppClient {
   }
 
   case object ListAppRewardCoupons
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListAppRewardCouponsResponse,
         Seq[
           Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]
@@ -721,7 +739,7 @@ object HttpWalletAppClient {
   }
 
   case object ListValidatorRewardCoupons
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListValidatorRewardCouponsResponse,
         Seq[
           Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
@@ -741,7 +759,7 @@ object HttpWalletAppClient {
         .leftMap(_.toString)
     }
   }
-  case object UserStatus extends BaseCommand[http.UserStatusResponse, UserStatusData] {
+  case object UserStatus extends InternalBaseCommand[http.UserStatusResponse, UserStatusData] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
@@ -762,7 +780,7 @@ object HttpWalletAppClient {
   }
 
   case object CancelFeaturedAppRight
-      extends BaseCommand[http.CancelFeaturedAppRightsResponse, Unit] {
+      extends InternalBaseCommand[http.CancelFeaturedAppRightsResponse, Unit] {
 
     override def submitRequest(
         client: Client,
@@ -778,7 +796,9 @@ object HttpWalletAppClient {
   case class ListTransactions(
       beginAfterId: Option[String],
       pageSize: Int,
-  ) extends BaseCommand[http.ListTransactionsResponse, Seq[UserWalletTxLogParser.TxLogEntry]] {
+  ) extends InternalBaseCommand[http.ListTransactionsResponse, Seq[
+        UserWalletTxLogParser.TxLogEntry
+      ]] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],

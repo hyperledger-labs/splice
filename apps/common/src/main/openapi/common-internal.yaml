@@ -1,0 +1,97 @@
+openapi: 3.0.0
+info:
+  title: Common schemas for CN API definitions
+  version: 0.0.1
+paths: {}
+components:
+  schemas:
+    ContractWithState:
+      type: object
+      properties:
+        contract:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+        domain_id:
+          type: string
+      required:
+        [ "contract" ]
+    # Represents a contract that is maybe already cached by the client. If the client sends along a contract-id that
+    # matches the contract the server would respond with, the server responds with an empty contract property to indicate
+    # that the client's cache is correct.
+    MaybeCachedContract:
+      type: object
+      properties:
+        contract:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+    # As with MaybeCachedContract, but additionally with a "state", which is either
+    # a domain indicating the contract is on that domain or nothing for an in-flight
+    # contract.  With an unmatching contract-id, this response will include both a
+    # contract and a state.  However, the domain will always reflect the contract's
+    # current state, even if the contract-id matches; either the domain echoed back if
+    # it has not changed, or missing if it is in-flight.
+    MaybeCachedContractWithState:
+      type: object
+      properties:
+        contract:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+        domain_id:
+          type: string
+    # A map from 'active-contract-id' -> 'MaybeCachedContract'.
+    # At the moment this type is used to let clients know which mining rounds they already have cached,
+    # which mining rounds they should add to their cache and which they should remove from their cache
+    # (those mining rounds who aren't included in the map at all).
+    MaybeCachedContractMap:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/MaybeCachedContract"
+    # As with 'MaybeCachedContractMap', but include the current domain state for every
+    # mining round that shouldn't be removed, whether cached or not.
+    MaybeCachedContractWithStateMap:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/MaybeCachedContractWithState"
+
+    # IMPORTANT: only modify this message in a backwards compatible fashion. It is used to read old dumps.
+    ParticipantIdentitiesDump:
+      type: object
+      required:
+        - id
+        - keys
+        - bootstrapTxs
+        - users
+      properties:
+        id:
+          type: string
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantKey"
+        bootstrapTxs:
+          type: array
+          items:
+            type: string
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantUser"
+        version:
+          type: string
+
+    ParticipantKey:
+      type: object
+      required:
+        - keyPair
+      properties:
+        keyPair:
+          type: string
+        name:
+          type: string
+
+    ParticipantUser:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        primaryParty:
+          type: string

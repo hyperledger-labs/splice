@@ -26,7 +26,7 @@ parameters:
   # old files don’t pollute your build.
   cache-version:
     type: string
-    default: "18"
+    default: "19"
   run-job:
     type: enum
     enum: [build, deploy-cidaily, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]

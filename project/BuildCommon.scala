@@ -24,8 +24,11 @@ object BuildCommon {
     lazy val damlTsCodegenSources = taskKey[Seq[File]]("dars to generate ts code from")
 
     lazy val npmInstallDeps = taskKey[Seq[File]]("Dependencies for npm install task")
+    type HasExternalOpenAPISpec = Boolean
     lazy val npmInstallOpenApiDeps =
-      taskKey[Seq[(CompileAnalysis, File)]]("Dependencies for npm install task")
+      taskKey[Seq[(CompileAnalysis, File, HasExternalOpenAPISpec)]](
+        "Dependencies for npm install task"
+      )
     lazy val npmRootDir = settingKey[File]("npm workspaces root directory")
     lazy val npmInstall = taskKey[Seq[File]]("install npm dependencies")
     lazy val npmLint =
@@ -1175,8 +1178,11 @@ object BuildCommon {
         )
         Set(npmRootDir.value / "node_modules")
       }
-    val openApiPackageJsons = openApiPkgs.map { case (_, baseDir) =>
-      baseDir / "openapi-ts-client" / "package.json"
+    val openApiPackageJsons = openApiPkgs.flatMap { case (_, baseDir, hasExternalSpec) =>
+      Seq(baseDir / "external-openapi-ts-client" / "package.json").filter(_ => hasExternalSpec) ++
+        Seq(
+          baseDir / "openapi-ts-client" / "package.json"
+        )
     }
     cache(pkgs.toSet ++ openApiPackageJsons).toSeq
   }
@@ -1226,17 +1232,25 @@ object BuildCommon {
       None,
       Some(workingDir),
     )
-    def openApiSettings(npmName: String, openApiSpec: String): Seq[Setting[_]] = Seq(
+    def openApiSettings(
+        npmName: String,
+        openApiSpec: String,
+        directory: String = "openapi-ts-client",
+    ): Seq[Setting[_]] = Seq(
       Compile / sourceGenerators +=
         Def.taskDyn {
-          val commonOpenApiFile = baseDirectory.value / ".." / "common/src/main/openapi/common.yaml"
+          val commonInternalOpenApiFile =
+            baseDirectory.value / ".." / "common/src/main/openapi/common-internal.yaml"
+          val commonExternalOpenApiFile =
+            baseDirectory.value / ".." / "common/src/main/openapi/common-external.yaml"
 
           generateOpenApiClient(
             npmName = npmName,
             npmModuleName = npmName,
             npmProjectName = npmName,
             openApiSpec = openApiSpec,
-            cacheFileDependencies = Set(commonOpenApiFile),
+            cacheFileDependencies = Set(commonInternalOpenApiFile, commonExternalOpenApiFile),
+            directory = directory,
           )
         }
     )
@@ -1247,13 +1261,14 @@ object BuildCommon {
         npmProjectName: String,
         openApiSpec: String,
         cacheFileDependencies: Set[File] = Set.empty[File],
+        directory: String,
     ): Def.Initialize[Task[Seq[File]]] = Def.task {
       import better.files._
       import _root_.io.circe._
       import _root_.io.circe.parser._
 
       val log = streams.value.log
-      val cacheDir = streams.value.cacheDirectory
+      val cacheDir = streams.value.cacheDirectory / directory
 
       val openApiSpecFile = baseDirectory.value / "src/main/openapi/" / openApiSpec
       val cache = FileFunction.cached(cacheDir) { _ =>
@@ -1274,20 +1289,20 @@ object BuildCommon {
             "-i",
             openApiSpecFile.toString,
             "-o",
-            (baseDirectory.value / "openapi-ts-client").getAbsolutePath,
+            (baseDirectory.value / directory).getAbsolutePath,
           ),
           log,
         )
 
         // Add empty check task to make npm happy
         val packageJson =
-          File((baseDirectory.value / "openapi-ts-client" / "package.json").toString)
+          File((baseDirectory.value / directory / "package.json").toString)
 
         val packageJsonContent = packageJson.contentAsString
         val doc: Json =
           parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
 
-        ((baseDirectory.value ** "*") --- ((baseDirectory.value / "target" +++ baseDirectory.value / "dist") ** "*")).get.toSet
+        (baseDirectory.value / directory ** "*").get.toSet
       }
 
       cache(Set(openApiSpecFile) ++ cacheFileDependencies)

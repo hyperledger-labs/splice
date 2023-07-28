@@ -6,9 +6,9 @@ tags:
   - name: sv
 paths:
   /readyz:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1readyz"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
   /livez:
-    $ref: "../../../../common/src/main/openapi/common.yaml#/paths/~1livez"
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
   /admin/validator/onboarding/ongoing:
     get:
       tags: [sv]
@@ -40,7 +40,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
         "500":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /admin/validator/licenses:
     get:
       tags: [sv]
@@ -71,9 +71,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "500":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /admin/domain/cometbft/debug:
     get:
       tags: [sv]
@@ -91,9 +91,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "500":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /admin/domain/sequencer/status:
     get:
       tags: [sv]
@@ -105,13 +105,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/NodeStatus"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/NodeStatus"
         "404":
           description: "Sequencer is not configured for this app."
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
   /admin/domain/mediator/status:
     get:
       tags: [sv]
@@ -123,13 +123,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/NodeStatus"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/NodeStatus"
         "404":
           description: "Mediator is not configured for this app."
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
   /admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -145,7 +145,7 @@ paths:
         "200":
           description: ok
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /admin/sv/voterequests:
     get:
       tags: [sv]
@@ -175,7 +175,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "200":
           description: ok
           content:
@@ -197,7 +197,7 @@ paths:
         "201":
           description: Created
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
     put:
       tags: [sv]
       x-jvm-package: svAdmin
@@ -212,13 +212,13 @@ paths:
         "200":
           description: ok
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           description: "VoteRequest contract not found."
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
   /admin/sv/votes-by-request-ids:
     post:
       tags: [sv]
@@ -252,7 +252,7 @@ paths:
         "200":
           description: ok
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /admin/sv/coin-price/votes:
     get:
       tags: [sv]
@@ -292,7 +292,7 @@ paths:
         "200":
           description: ok
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /svc/trigger-acs-store-dump:
     post:
       tags: [ sv ]
@@ -306,7 +306,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/TriggerAcsDumpResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /svc/get-acs-store-dump:
     get:
       tags: [ sv ]
@@ -320,7 +320,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetAcsStoreDumpResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /admin/authorization:
     get:
       tags: [sv]
@@ -330,7 +330,7 @@ paths:
         "200":
           description: ok
         "403":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/403"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
   /onboard/validator:
     post:
       tags: [sv]
@@ -346,9 +346,9 @@ paths:
         "200":
           description: ok
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "401":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
   /onboard/sv/start:
     post:
       tags: [sv]
@@ -364,9 +364,9 @@ paths:
         "200":
           description: ok
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "401":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
   /onboard/sv/status/{candidate_party_id_or_name}:
     get:
       tags: [sv]
@@ -386,9 +386,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/GetSvOnboardingStatusResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "500":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /onboard/sv/party-migration/authorize:
     post:
       tags: [sv]
@@ -408,9 +408,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "401":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/401"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
   /onboard/sv/sequencer:
     post:
       tags: [sv]
@@ -430,7 +430,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/OnboardSvSequencerResponse"
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /onboard/sv/mediator:
     post:
       tags: [sv]
@@ -446,7 +446,7 @@ paths:
         "200":
           description: ok
         "400":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/400"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /global-topology-lock/lock:
     post:
       tags: [sv]
@@ -462,7 +462,7 @@ paths:
         "200":
           description: ok
         "503":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/503"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
   /global-topology-lock/unlock:
     post:
       tags: [sv]
@@ -491,9 +491,9 @@ paths:
               schema:
                 type: string
         "500":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/500"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
         "501":
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/responses/501"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
   /svc:
     get:
       tags: [sv]
@@ -516,7 +516,7 @@ components:
         ongoing_validator_onboardings:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     ListValidatorLicensesResponse:
       type: object
@@ -526,7 +526,7 @@ components:
         validator_licenses:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     PrepareValidatorOnboardingRequest:
       type: object
@@ -561,7 +561,7 @@ components:
       type: object
       properties:
         error:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         response:
           $ref: "#/components/schemas/CometBftNodeStatusResponse"
 
@@ -587,7 +587,7 @@ components:
       type: object
       properties:
         error:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/ErrorResponse"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         response:
           $ref: "#/components/schemas/CometBftNodeDumpResponse"
 
@@ -644,7 +644,7 @@ components:
         svc_rules_votes:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     ListSvcRulesVoteRequestsResponse:
       type: object
@@ -654,7 +654,7 @@ components:
         svc_rules_vote_requests:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     LookupSvcRulesVoteRequestResponse:
       type: object
@@ -662,7 +662,7 @@ components:
         - svc_rules_vote_request
       properties:
         svc_rules_vote_request:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     CastVoteRequest:
       type: object
@@ -706,7 +706,7 @@ components:
         coin_price_votes:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     ListOpenMiningRoundsResponse:
       type: object
@@ -716,7 +716,7 @@ components:
         open_mining_rounds:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     UpdateCoinPriceVoteRequest:
       type: object
@@ -845,13 +845,13 @@ components:
           type: string
         # Contract ID of the OpenMiningRound contract of the latest Mining Round
         latest_mining_round:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         # Contract ID of the CoinRules contract associated with the SVC
         coin_rules:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules:
-          $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     AcquireGlobalLockRequest:
       type: object
@@ -906,6 +906,6 @@ components:
         contracts:
           type: array
           items:
-            $ref: "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         version:
           type: string

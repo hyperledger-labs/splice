@@ -16,7 +16,7 @@ import com.daml.network.environment.{
   CNNodeStatus,
   ParticipantAdminConnection,
 }
-import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.splitwell.SplitwellResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient.SplitwellDomains

@@ -21,7 +21,7 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
-import com.daml.network.http.v0.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.setup.ParticipantInitializer

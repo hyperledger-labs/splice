@@ -1,60 +1,39 @@
 package com.daml.network.wallet.admin.http
 
 import akka.stream.Materializer
-import cats.implicits.showInterpolator
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
-import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{ContractId, Update}
-import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
+import com.daml.network.codegen.java.cn.wallet.install.{
+  CoinOperationOutcome,
+  coinoperation,
+  coinoperationoutcome,
+}
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.codegen.java.cn.wallet.install.{
-  CoinOperationOutcome,
-  coinoperation,
-  coinoperationoutcome,
-}
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
-import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
-import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
-import com.daml.network.environment.CNLedgerConnection.CommandId
-import com.daml.network.environment.ledger.api.{DedupConfig, DedupDuration}
-import com.daml.network.http.v0.{definitions as d0, wallet as v0}
+import com.daml.network.environment.{CommandPriority, RetryProvider}
 import com.daml.network.http.v0.wallet.WalletResource as r0
+import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
-import com.daml.network.wallet.{UserWalletManager, UserWalletService}
+import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
-import com.digitalasset.canton.logging.{
-  ErrorLoggingContext,
-  NamedLoggerFactory,
-  NamedLogging,
-  TracedLogger,
-}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.protocol.messages.LocalReject
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.util.ShowUtil.ShowStringSyntax
-import com.digitalasset.canton.util.retry.RetryUtil.{
-  ErrorKind,
-  ExceptionRetryable,
-  FatalErrorKind,
-  NoErrorKind,
-  TransientErrorKind,
-}
-import com.google.protobuf.Duration
+import com.digitalasset.canton.util.retry.RetryUtil.*
 import io.circe.Json
-import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.protobuf.StatusProto
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -62,7 +41,7 @@ import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 class HttpWalletHandler(
-    walletManager: UserWalletManager,
+    override protected val walletManager: UserWalletManager,
     scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
@@ -71,11 +50,9 @@ class HttpWalletHandler(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends v0.WalletHandler[String]
-    with Spanning
-    with NamedLogging {
-  private val workflowId = this.getClass.getSimpleName
-  private val store = walletManager.store
-  private val validatorParty: PartyId = store.walletKey.validatorParty
+    with HttpWalletHandlerUtil {
+
+  protected val workflowId = this.getClass.getSimpleName
 
   override def list(respond: r0.ListResponse.type)()(
       user: String
@@ -114,10 +91,6 @@ class HttpWalletHandler(
       user,
       d0.ListAcceptedTransferOffersResponse(_),
     )
-
-  def getTransferOfferStatus(respond: v0.WalletResource.GetTransferOfferStatusResponse.type)(
-      trackingId: String
-  )(extracted: String): Future[v0.WalletResource.GetTransferOfferStatusResponse] = ???
 
   override def getAppPaymentRequest(respond: r0.GetAppPaymentRequestResponse.type)(
       contractId: String
@@ -216,16 +189,6 @@ class HttpWalletHandler(
       }
   }
 
-  override def listTransferOffers(respond: v0.WalletResource.ListTransferOffersResponse.type)()(
-      user: String
-  ): Future[v0.WalletResource.ListTransferOffersResponse] = {
-    listContracts(
-      transferOffersCodegen.TransferOffer.COMPANION,
-      user,
-      d0.ListTransferOffersResponse(_),
-    )
-  }
-
   override def listValidatorRewardCoupons(
       respond: v0.WalletResource.ListValidatorRewardCouponsResponse.type
   )()(user: String): Future[v0.WalletResource.ListValidatorRewardCouponsResponse] =
@@ -258,20 +221,6 @@ class HttpWalletHandler(
           items = transactions.map(_.toResponseItem).toVector
         )
       )
-    }
-
-  private def listContracts[TCid <: ContractId[T], T <: Template, ResponseT](
-      templateCompanion: Contract.Companion.Template[TCid, T],
-      user: String,
-      mkResponse: Vector[d0.Contract] => ResponseT,
-  ): Future[ResponseT] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      for {
-        userStore <- getUserStore(user)
-        contracts <- userStore.multiDomainAcsStore.listContracts(
-          templateCompanion
-        )
-      } yield mkResponse(contracts.map(_.contract.toJson).toVector)
     }
 
   override def selfGrantFeatureAppRight(
@@ -512,50 +461,6 @@ class HttpWalletHandler(
       }
     }
 
-  override def createTransferOffer(respond: r0.CreateTransferOfferResponse.type)(
-      request: d0.CreateTransferOfferRequest
-  )(user: String): Future[r0.CreateTransferOfferResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      val sender = getUserWallet(user).store.key.endUserParty
-      exerciseWalletAction((installCid, _) => {
-        val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
-        val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
-        val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
-        Future.successful(
-          installCid
-            .exerciseWalletAppInstall_CreateTransferOffer(
-              receiver.toProtoPrimitive,
-              new PaymentAmount(amount, Currency.CC),
-              request.description,
-              expiresAt.toInstant,
-            )
-            .map { cid =>
-              r0.CreateTransferOfferResponse.OK(
-                d0.CreateTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult))
-              )
-            }
-        )
-      })(
-        user,
-        dedup = Some(
-          (
-            CNLedgerConnection.CommandId(
-              "com.daml.network.wallet.createTransferOffer",
-              Seq(
-                sender,
-                Codec.tryDecode(Codec.Party)(request.receiverPartyId),
-              ),
-              request.trackingId,
-            ),
-            DedupDuration(
-              Duration.newBuilder().setSeconds(60 * 60 * 24).build()
-            ), // 24 hours, similar to Stripe's API, documented at https://stripe.com/docs/api/idempotent_requests
-            // If you change this, make sure to update the documentation in the OpenAPI specs.
-          )
-        ),
-      ).transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
-    }
-
   override def tap(respond: r0.TapResponse.type)(request: d0.TapRequest)(
       user: String
   ): Future[r0.TapResponse] = withNewTrace(workflowId) { implicit traceContext => _ =>
@@ -627,13 +532,6 @@ class HttpWalletHandler(
       } yield result
     }
 
-  override def createBuyTrafficRequest(respond: r0.CreateBuyTrafficRequestResponse.type)(
-      body: d0.RequestBuyTrafficRequest
-  )(cted: String): Future[r0.CreateBuyTrafficRequestResponse] = ???
-  override def getBuyTrafficRequestStatus(
-      respond: r0.GetBuyTrafficRequestStatusResponse.type
-  )(trackingId: String)(extracted: String): Future[r0.GetBuyTrafficRequestStatusResponse] = ???
-
   private def coinToCoinPosition(
       coin: Contract[Coin.ContractId, Coin],
       round: Long,
@@ -656,18 +554,6 @@ class HttpWalletHandler(
       Codec.encode(CNNodeUtil.holdingFee(lockedCoin.payload.coin, round)),
       Codec.encode(CNNodeUtil.currentAmount(lockedCoin.payload.coin, round)),
     )
-
-  private[this] def getUserWallet(user: String): UserWalletService =
-    walletManager
-      .lookupUserWallet(user)
-      .getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription(show"User ${user.singleQuoted}")
-        )
-      )
-
-  private[this] def getUserStore(user: String): Future[UserWalletStore] =
-    Future.successful(getUserWallet(user).store)
 
   private[this] def getUserTreasury(user: String): Future[TreasuryService] =
     Future.successful(getUserWallet(user).treasury)
@@ -726,64 +612,6 @@ class HttpWalletHandler(
           s"expected to receive a coin operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"
         )
     }
-  }
-
-  /** Executes a wallet action by calling a choice on the WalletInstall contract for the given user.
-    *
-    * The choice is always executed with the validator party as the submitter, and the
-    * wallet user party as a readAs party.
-    *
-    * Additionally, the validator service party is also a readAs party (workaround for lack
-    * of explicit disclosure for CoinRules).
-    *
-    * Note: curried syntax helps with type inference
-    */
-  private def exerciseWalletAction[Response](
-      getUpdate: (
-          installCodegen.WalletAppInstall.ContractId,
-          UserWalletStore,
-      ) => Future[Update[Response]]
-  )(
-      user: String,
-      dedup: Option[(CommandId, DedupConfig)] = None,
-      dislosedContracts: DisclosedContracts = DisclosedContracts(),
-      priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[Response] = {
-    val userWallet = getUserWallet(user)
-    val userStore = userWallet.store
-    val userParty = userStore.key.endUserParty
-    for {
-      // TODO (#4906) pick install based on disclosed contracts' domain IDs
-      install <- userStore.getInstall()
-      update <- getUpdate(install.contractId, userStore)
-      domainId <- dislosedContracts
-        .inferDomain(None)
-        .fold { store.domains.getDomainId(walletManager.globalDomain) }(Future.successful)
-      result <- dedup match {
-        case None =>
-          getUserWallet(user).connection.submitWithResultNoDedup(
-            Seq(validatorParty),
-            Seq(userParty),
-            update,
-            domainId,
-            dislosedContracts assertOnDomain domainId,
-            priority = priority,
-          )
-        case Some((commandId, dedupConfig)) =>
-          userWallet.connection
-            .submitWithResult(
-              Seq(validatorParty),
-              Seq(userParty),
-              update,
-              commandId,
-              dedupConfig,
-              domainId,
-              dislosedContracts assertOnDomain domainId,
-              priority = priority,
-            )
-      }
-
-    } yield result
   }
 }
 
