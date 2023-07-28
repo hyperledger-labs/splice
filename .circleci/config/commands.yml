@@ -75,7 +75,7 @@ commands:
           # - dependencies: to prevent re-usage of classes with mismatching libraries (this can lead to subtle errors)
           # - rev: to allow for updating the cache when sources have changed
           # - openapi: guardrail does not track dependencies for schema changes properly so we disable the cache if the imported schema changes, see #2747
-          key: &compiled_classes_key classes-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} openapi={{ checksum "openapi-cache-key.txt" }} rev:{{ .Revision }}
+          key: &compiled_classes_key classes-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} openapi={{ checksum "openapi-cache-key.txt" }} rev:{{ .Revision }}
           paths:
             - /tmp/classes
 
@@ -99,10 +99,10 @@ commands:
             - *compiled_classes_key
             # Then, try to download the latest class files produced for the same branch.
             # Make sure that library versions still match.
-            - classes-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} openapi={{ checksum "openapi-cache-key.txt" }}
+            - classes-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} openapi={{ checksum "openapi-cache-key.txt" }}
             # Then, try to download the latest class files produced for the main branch.
             # Make sure that library versions still match.
-            - classes-<< pipeline.parameters.cache-version >> branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} openapi={{ checksum "openapi-cache-key.txt" }}
+            - classes-<< pipeline.parameters.cache-version >> branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} openapi={{ checksum "openapi-cache-key.txt" }}
       - run:
           name: Extracting precompiled classes
           command: |
@@ -212,7 +212,7 @@ commands:
           # - Keyword "frontend-builds" for uniqueness
           # - The branch name
           # - rev: to allow for updating the cache when sources have changed
-          key: &frontend_builds_key frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} rev:{{ .Revision }}
+          key: &frontend_builds_key frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} daml:{{ checksum "daml/dars.lock" }} package-lock:{{ checksum "apps/package-lock.json" }} rev:{{ .Revision }}
           paths:
             - ./apps/common/frontend/target
             - ./apps/directory/frontend/build
@@ -234,9 +234,9 @@ commands:
             # Try to download a cache with an exact match
             - *frontend_builds_key
             # Then, try to download a cache from the same branch
-            - frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }}
+            - frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} daml:{{ checksum "daml/dars.lock" }}
             # Then, try to download a cache from main branch
-            - frontend-builds-<< pipeline.parameters.cache-version >> branch:main
+            - frontend-builds-<< pipeline.parameters.cache-version >> branch:main daml:{{ checksum "daml/dars.lock" }}
 
 
   cluster_lock_reaper:
