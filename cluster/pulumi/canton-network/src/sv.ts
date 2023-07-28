@@ -266,6 +266,7 @@ export function installSvNode(config: SvConfig): {
     xns,
     validatorWalletUser: config.validatorWalletUser,
     participant,
+    disableAllocateLedgerApiUserParty: true,
     auth0AppName: config.auth0ValidatorAppName,
     backupConfig:
       backupConfig && backupConfigSecret

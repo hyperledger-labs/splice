@@ -245,6 +245,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       SV_WALLET_USER_ID: SV_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
     participantIdentitiesBackup: backupConfig,
   };
 

@@ -3,6 +3,16 @@
 Release Notes
 =============
 
+2023-08-07
+----------
+
+* Deployment updates:
+
+    * Introduced a new value, ``disableAllocateLedgerApiUserParty``, for
+      validator Helm charts, which should be set to ``true`` for SV nodes. This
+      prevents clashes between the Validator and SV apps. The runbook includes
+      this value in a newly-introduced ``sv-validator-values.yaml`` file.
+
 2023-07-31
 ----------
 

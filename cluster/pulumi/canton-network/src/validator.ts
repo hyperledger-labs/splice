@@ -37,6 +37,7 @@ export type ValidatorConfig = {
   onboarding?: ValidatorOnboarding;
   withDomainFees: boolean;
   validatorWalletUser?: string;
+  disableAllocateLedgerApiUserParty?: boolean;
   participant: pulumi.Resource;
   backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: pulumi.Resource[];
@@ -115,6 +116,7 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
           }
         : {},
       disableAdminAuth: config.disableAdminAuth,
+      disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
       participantIdentitiesBackup: backupConfig,
       additionalConfig: config.additionalConfig,
       participantBootstrappingDump: config.participantBootstrapDump

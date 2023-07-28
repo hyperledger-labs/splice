@@ -82,6 +82,10 @@ spec:
         - name: CN_APP_VALIDATOR_AUTH_JWKS_URL
           value: {{ .Values.auth.jwksUrl | quote }}
         {{ end }}
+        {{ if .Values.disableAllocateLedgerApiUserParty }}
+        - name: CN_APP_VALIDATOR_ALLOCATE_LEDGER_API_USER_PARTY
+          value: "false"
+        {{ end }}
         - name: CN_APP_VALIDATOR_GLOBAL_DOMAIN_URL
           value: {{ .Values.globalDomainUrl | quote }}
         {{- range $ii, $domain := .Values.extraDomains }}

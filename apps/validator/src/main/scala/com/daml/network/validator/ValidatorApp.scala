@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.Directives.*
 import akka.http.scaladsl.server.directives.BasicDirectives
-import cats.implicits.*
+import cats.implicits.{catsSyntaxApplicativeByValue as _, *}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -150,7 +150,7 @@ class ValidatorApp(
                   participantAdminConnection,
                   // We have an outer lock around both here so we don't need to lock here.
                   noLock,
-                )
+                ) whenA config.allocateLedgerApiUserParty
               } yield ()
             },
         )
