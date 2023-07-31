@@ -181,13 +181,6 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-    - deployment_test:
-        <<: *notify-fail
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - datadog
-          - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
         <<: *main-branch-only
@@ -203,7 +196,6 @@ workflows:
           - slack-context
         cluster: "staging"
         requires:
-           - deployment_test
            - docker_images_push
            - wait_for_previous_pipeline
     - deploy_sv_runbook:
@@ -249,13 +241,6 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-    - deployment_test:
-        <<: *notify-fail
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - datadog
-          - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
         <<: *main-branch-only
@@ -271,7 +256,6 @@ workflows:
           - slack-context
         cluster: "cidaily"
         requires:
-           - deployment_test
            - docker_images_push
            - wait_for_previous_pipeline
     - preflight_check:
@@ -283,7 +267,6 @@ workflows:
           - datadog
           - slack-context
         requires:
-          - deployment_test
           - docker_images_push
           - deploy_cluster
     - publish_public_release:
@@ -326,13 +309,6 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-    - deployment_test:
-        <<: *notify-fail
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - datadog
-          - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
         <<: *main-branch-only
@@ -348,7 +324,6 @@ workflows:
           - slack-context
         cluster: "devnet"
         requires:
-           - deployment_test
            - docker_images_push
            - wait_for_previous_pipeline
     - preflight_check:
@@ -360,7 +335,6 @@ workflows:
           - datadog
           - slack-context
         requires:
-          - deployment_test
           - docker_images_push
           - deploy_cluster
     - publish_public_release:
@@ -444,12 +418,6 @@ workflows:
           - datadog
           - slack-context
         workflow_names: "deploy_testnet_preview testnet_preview_health_check"
-    - deployment_test:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - datadog
-          - slack-context
     - deploy_cluster:
         <<: *main-branch-only
         context:
@@ -459,7 +427,6 @@ workflows:
         cluster: "testnet-preview"
         restore_cluster: true
         requires:
-           - deployment_test
            - docker_images_push
            - wait_for_previous_pipeline
     - preflight_check:
@@ -472,7 +439,6 @@ workflows:
           - datadog
           - slack-context
         requires:
-          - deployment_test
           - docker_images_push
           - deploy_cluster
     - deploy_sv_runbook:
