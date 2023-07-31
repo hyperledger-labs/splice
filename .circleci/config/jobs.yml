@@ -159,6 +159,7 @@ jobs:
       - setup_nix
       - run_bash_command_in_nix:
          cmd_name: Deployment Test
+         cmd_retry_count: 5 # Retry in case of dependency download errors
          cmd: make cluster/pulumi/test
       - run_bash_command_in_nix:
          cmd_name: Check Pulumi deployment
