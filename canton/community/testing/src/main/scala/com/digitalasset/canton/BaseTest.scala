@@ -352,7 +352,7 @@ object BaseTest {
       s"The timeout must not be negative, but is $timeUntilSuccess",
     )
     val deadline = timeUntilSuccess.fromNow
-    var sleepMs = 10L
+    var sleepMs = 10L min (maxPollInterval.toMillis / 10L)
     while (deadline.hasTimeLeft()) {
       try {
         return testCode
