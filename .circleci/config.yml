@@ -1723,9 +1723,13 @@ jobs:
 
            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
            RELEASE_TAG=$(get-snapshot-version)
-           git tag "${RELEASE_TAG}"
-           git push origin "${RELEASE_TAG}"
-
+           git fetch origin
+           if [ $(git tag -l "${RELEASE_TAG}") ]; then
+             echo "tag ${RELEASE_TAG} already exists. not tagging"
+           else
+             git tag "${RELEASE_TAG}"
+             git push origin "${RELEASE_TAG}"
+           fi
            if [[ << pipeline.parameters.mark-for-testnet >> == true ]]; then
               # This is a mutating tag pointing to the most recent
               # valid build for TestNet, and therefore the next build
