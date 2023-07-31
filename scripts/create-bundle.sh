@@ -5,19 +5,17 @@
 
 set -eou pipefail
 
-if [ "$#" -ne 3 ]
+if [ "$#" -ne 4 ]
 then
    >&2 echo "Expected 3 arguments but got $#"
-   >&2 echo "Usage: \$REPO_ROOT/scripts/create-bundle.sh.sh path/to/dar path/to/manifest output.tar.gz"
+   >&2 echo "Usage: \$REPO_ROOT/scripts/create-bundle.sh.sh path/to/dar path/to/release output.tar.gz"
    exit 1
 fi
 
 DAR="$1"
-MANIFEST="$2"
-OUTPUT="$3"
-
-NAME="$(jq -r '.name' < "$MANIFEST")"
-VERSION="$(jq -r '.version' < "$MANIFEST")"
+NAME="$2"
+VERSION="$3"
+OUTPUT="$4"
 
 DIR="$NAME-$VERSION"
 
@@ -26,7 +24,11 @@ trap 'rm -rf "$BUILD_DIR"' EXIT
 mkdir -p "$BUILD_DIR/$DIR/dars"
 
 cp "$DAR" "$BUILD_DIR/$DIR/dars"
-cp "$MANIFEST" "$BUILD_DIR/$DIR/manifest.json"
+cat <<EOF > "$BUILD_DIR/$DIR/release.json"
+{
+  "version": "$VERSION"
+}
+EOF
 
 mkdir -p "$(dirname "$OUTPUT")"
 

@@ -229,13 +229,13 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListRegisteredAppsResponse"
-  /app-manager/apps/registered/{app}/manifest.json:
+  /app-manager/apps/registered/{provider}/configuration/latest/configuration.json:
     get:
       tags: [appManager]
       x-jvm-package: appManager
-      operationId: "getAppManifest"
+      operationId: "getLatestAppConfiguration"
       parameters:
-        - name: app
+        - name: provider
           in: path
           required: true
           schema:
@@ -246,16 +246,16 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/Manifest"
+                "$ref": "#/components/schemas/AppConfiguration"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /app-manager/apps/registered/{app}/bundle.tar.gz:
+  /app-manager/apps/registered/{provider}/release/latest/release.json:
     get:
       tags: [appManager]
       x-jvm-package: appManager
-      operationId: "getAppBundle"
+      operationId: "getLatestAppRelease"
       parameters:
-        - name: app
+        - name: provider
           in: path
           required: true
           schema:
@@ -266,7 +266,27 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetAppBundleResponse"
+                "$ref": "#/components/schemas/AppRelease"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /app-manager/dars/{dar_hash}:
+    get:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "getDarFile"
+      parameters:
+        - name: dar_hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/DarFile"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /app-manager/apps/register:
@@ -279,12 +299,27 @@ paths:
           multipart/form-data:
             schema:
               type: object
+              required:
+                - provider_user_id
+                - name
+                - ui_url
+                - domains
+                - release
               properties:
-                app_bundle:
+                # TODO(#6839) Read this from the token once we have auth.
+                provider_user_id:
+                  type: string
+                name:
+                  type: string
+                ui_url:
+                  type: string
+                # Guardrail generates garbage when
+                # trying to use an object here so we pass a JSON encoded string.
+                domains:
+                  type: string
+                release:
                   type: string
                   format: binary
-              required:
-                - app_bundle
       responses:
         "201":
           description: ok
@@ -540,9 +575,12 @@ components:
     InstalledApp:
       type: object
       required:
+        - provider
         - name
         - url
       properties:
+        provider:
+          type: string
         name:
           type: string
         url:
@@ -551,35 +589,62 @@ components:
     RegisteredApp:
       type: object
       required:
+        - provider
         - name
-        - manifest_url
+        - app_url
       properties:
+        provider:
+          type: string
         name:
           type: string
-        manifest_url:
+        app_url:
           type: string
 
-    Manifest:
+    AppConfiguration:
       type: object
       required:
-        - name
         - version
-        - bundle
+        - name
         - ui_url
         - domains
       properties:
-        name:
-          type: string
         version:
-          type: string
-        bundle:
+          type: integer
+          format: int32
+        name:
           type: string
         ui_url:
           type: string
         domains:
           type: array
           items:
-            "$ref": "#/components/schemas/Domain"
+            $ref: "#/components/schemas/Domain"
+
+    AppRelease:
+      type: object
+      required:
+        - version
+        - dar_hashes
+      properties:
+        version:
+          type: string
+        dar_hashes:
+          type: array
+          items:
+            type: string
+
+    # The file used in the bundle on upload
+    # TODO(#6839) Consider using AppRelease instead and compute
+    # hashes as part of bundling. Note that this is non-trivial
+    # since it's not just a sha256sum of the DAR file itself. It includes
+    # the purpose which isn't easy to replicate in bash.
+    AppReleaseUpload:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: string
 
     Domain:
       type: object
@@ -592,19 +657,19 @@ components:
         url:
           type: string
 
-    GetAppBundleResponse:
+    DarFile:
       type: object
       required:
-        - base64_bundle
+        - base64_dar
       properties:
         # base64 because guardrail doesn't support generating binary files on the client side
-        base64_bundle:
+        base64_dar:
           type: string
 
     InstallAppRequest:
       type: object
       required:
-        - manifest_url
+        - app_url
       properties:
-        manifest_url:
+        app_url:
           type: string

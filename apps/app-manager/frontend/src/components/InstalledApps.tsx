@@ -1,6 +1,6 @@
-import { ErrorDisplay, Loading, appLaunchUrl } from 'common-frontend';
+import * as openapi from 'validator-openapi';
+import { DirectoryEntry, ErrorDisplay, Loading, appLaunchUrl } from 'common-frontend';
 import React, { useState } from 'react';
-import { InstalledApp as OpenAPIApp } from 'validator-openapi';
 
 import {
   Button,
@@ -16,7 +16,7 @@ import {
 import { useInstallApp, useInstalledApps } from '../hooks';
 import { config } from '../utils/config';
 
-const InstalledApp: React.FC<{ app: OpenAPIApp }> = ({ app }) => {
+const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
   const redirectUri = appLaunchUrl(
     {
       oidcAuthority: `${config.services.validator.url}/app-manager/oauth2/`,
@@ -29,6 +29,7 @@ const InstalledApp: React.FC<{ app: OpenAPIApp }> = ({ app }) => {
     <Card className="installed-app" variant="outlined">
       <CardContent>
         <Typography className="installed-app-name">{app.name}</Typography>
+        <DirectoryEntry partyId={app.provider} />
       </CardContent>
       <CardActions>
         <Link className="installed-app-link" href={redirectUri.toString()}>
@@ -42,7 +43,7 @@ const InstalledApp: React.FC<{ app: OpenAPIApp }> = ({ app }) => {
 const InstalledApps: React.FC = () => {
   const { data, error, isLoading, isError } = useInstalledApps();
 
-  const [manifestUrl, setManifestUrl] = useState<string>('');
+  const [appUrl, setAppUrl] = useState<string>('');
 
   const installAppMutation = useInstallApp();
 
@@ -55,10 +56,10 @@ const InstalledApps: React.FC = () => {
         <Input
           id="install-app-input"
           type="text"
-          value={manifestUrl}
-          onChange={ev => setManifestUrl(ev.target.value)}
+          value={appUrl}
+          onChange={ev => setAppUrl(ev.target.value)}
         />
-        <Button id="install-app-button" onClick={() => installAppMutation.mutate(manifestUrl)}>
+        <Button id="install-app-button" onClick={() => installAppMutation.mutate(appUrl)}>
           Install app
         </Button>
       </Stack>
@@ -68,7 +69,7 @@ const InstalledApps: React.FC = () => {
       ) : isError ? (
         <ErrorDisplay message={`Failed to fetch installed apps: ${JSON.stringify(error)}`} />
       ) : (
-        data.map(app => <InstalledApp app={app} key={app.name} />)
+        data.map(app => <InstalledApp app={app} key={app.provider} />)
       )}
     </Stack>
   );

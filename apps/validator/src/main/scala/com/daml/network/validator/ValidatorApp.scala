@@ -548,6 +548,7 @@ class ValidatorApp(
           config.appManager.map(
             new HttpAppManagerHandler(
               _,
+              automation.connection,
               participantAdminConnection,
               lock,
               loggerFactory,

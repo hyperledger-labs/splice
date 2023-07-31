@@ -1,7 +1,0 @@
-{
-  "name": "splitwell",
-  "version": "1.0.0",
-  "bundle": "http://localhost:5403/app-manager/apps/registered/splitwell/bundle.tar.gz",
-  "ui_url": "http://localhost:3002",
-  "domains": [{"alias": "splitwell", "url": "http://localhost:5108"}]
-}

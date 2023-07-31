@@ -30,8 +30,14 @@ class AppManagerFrontendIntegrationTest
       val installLink = withFrontEnd("splitwell") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session
         login(3102, splitwellValidatorBackend.config.ledgerApiUser)
-        find(className("app-bundle-input")).value.underlying
+        textField("register-app-name-input").underlying.sendKeys("splitwell")
+        textField("register-app-ui-url-input").underlying.sendKeys("http://localhost:3002")
+        find(className("register-app-release-bundle-input")).value.underlying
           .sendKeys(splitwellBundle.getAbsolutePath)
+        click on id("register-app-add-domain-button")
+        textField(className("register-app-domain-alias-input")).underlying.sendKeys("splitwell")
+        textField(className("register-app-domain-url-input")).underlying
+          .sendKeys("http://localhost:5108")
         val (_, link) =
           actAndCheck("Click on register app button", click on id("register-app-button"))(
             "App appears in listed apps",

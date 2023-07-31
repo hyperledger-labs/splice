@@ -1,14 +1,16 @@
 package com.daml.network.validator.admin.api.client.commands
 
-import akka.http.scaladsl.model.{BodyPartEntity, HttpHeader, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{BodyPartEntity, HttpHeader, HttpRequest, HttpResponse, Uri}
 import akka.stream.Materializer
 import cats.data.EitherT
-import com.google.protobuf.ByteString
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.appManager as http
 import com.daml.network.http.v0.definitions
 import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
+import io.circe.syntax.*
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
@@ -30,13 +32,25 @@ object HttpAppManagerAppClient {
       )
   }
 
-  final case class RegisterApp(appBundle: BodyPartEntity)
-      extends BaseCommand[http.RegisterAppResponse, Unit] {
+  final case class RegisterApp(
+      providerUserId: String,
+      name: String,
+      uiUrl: Uri,
+      domains: Seq[definitions.Domain],
+      release: BodyPartEntity,
+  ) extends BaseCommand[http.RegisterAppResponse, Unit] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RegisterAppResponse] =
-      client.registerApp(appBundle, headers)
+      client.registerApp(
+        providerUserId,
+        name,
+        uiUrl.toString,
+        domains.asJson.noSpaces,
+        release,
+        headers,
+      )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
@@ -60,43 +74,57 @@ object HttpAppManagerAppClient {
     }
   }
 
-  final case class GetAppManifest(app: String)
-      extends BaseCommand[http.GetAppManifestResponse, definitions.Manifest] {
+  final case class GetLatestAppConfiguration(provider: PartyId)
+      extends BaseCommand[http.GetLatestAppConfigurationResponse, definitions.AppConfiguration] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAppManifestResponse] =
-      client.getAppManifest(app, headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetLatestAppConfigurationResponse] =
+      client.getLatestAppConfiguration(provider.toProtoPrimitive, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetAppManifestResponse.OK(response) =>
+    ) = { case http.GetLatestAppConfigurationResponse.OK(response) =>
       Right(response)
     }
   }
 
-  final case class GetAppBundle(app: String)
-      extends BaseCommand[http.GetAppBundleResponse, ByteString] {
+  final case class GetLatestAppRelease(provider: PartyId)
+      extends BaseCommand[http.GetLatestAppReleaseResponse, definitions.AppRelease] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAppBundleResponse] =
-      client.getAppBundle(app, headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetLatestAppReleaseResponse] =
+      client.getLatestAppRelease(provider.toProtoPrimitive, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetAppBundleResponse.OK(response) =>
-      Right(ByteString.copyFrom(Base64.getDecoder().decode(response.base64Bundle)))
+    ) = { case http.GetLatestAppReleaseResponse.OK(response) =>
+      Right(response)
     }
   }
 
-  final case class InstallApp(manifestUrl: String)
-      extends BaseCommand[http.InstallAppResponse, Unit] {
+  final case class GetDarFile(darHash: String)
+      extends BaseCommand[http.GetDarFileResponse, ByteString] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDarFileResponse] =
+      client.getDarFile(darHash, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetDarFileResponse.OK(response) =>
+      Right(ByteString.copyFrom(Base64.getDecoder().decode(response.base64Dar)))
+    }
+  }
+
+  final case class InstallApp(appUrl: String) extends BaseCommand[http.InstallAppResponse, Unit] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.InstallAppResponse] =
-      client.installApp(definitions.InstallAppRequest(manifestUrl), headers)
+      client.installApp(definitions.InstallAppRequest(appUrl), headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder

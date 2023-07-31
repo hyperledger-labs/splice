@@ -12,7 +12,7 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.http.v0.definitions.{InstalledApp, RegisteredApp}
+import com.daml.network.http.v0.definitions.{Domain, InstalledApp, RegisteredApp}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
@@ -47,35 +47,55 @@ class AppManagerIntegrationTest
         CNNodeConfigTransforms.onlySv1,
         (_, config) => CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config),
       )
-      .withAdditionalSetup(implicit env =>
+      .withAdditionalSetup { implicit env =>
         // Shared integration test so we upload here rather than within the tests.
         splitwellValidatorBackend.registerApp(
-          splitwellBundleEntity
+          splitwellBackend.config.providerUser,
+          "splitwell",
+          "http://localhost:3002",
+          Seq(
+            Domain(
+              "splitwell",
+              "http://localhost:5108",
+            )
+          ),
+          splitwellBundleEntity,
         )
-      )
+      }
 
   "app manager" should {
     "support app registration" in { implicit env =>
+      val provider = splitwellBackend.getProviderPartyId()
       splitwellValidatorBackend.listRegisteredApps() shouldBe Seq(
         RegisteredApp(
+          provider.toProtoPrimitive,
           "splitwell",
           splitwellValidatorBackend.config.appManager.value.appManagerApiUrl
             .withPath(
-              Uri.Path("/app-manager/apps/registered/splitwell/manifest.json")
+              Uri.Path(s"/app-manager/apps/registered/${provider.toProtoPrimitive}")
             )
             .toString,
         )
       )
-      splitwellValidatorBackend.getAppManifest("splitwell").name shouldBe "splitwell"
-      val uploadedBundle = ByteString.readFrom(new FileInputStream(splitwellBundle))
-      val downloadedBundle = splitwellValidatorBackend.getAppBundle("splitwell")
-      uploadedBundle shouldBe downloadedBundle
+      val configuration = splitwellValidatorBackend.getLatestAppConfiguration(provider)
+      configuration.name shouldBe "splitwell"
+      configuration.domains.loneElement shouldBe Domain("splitwell", "http://localhost:5108")
+      val darHash = splitwellValidatorBackend
+        .getLatestAppRelease(provider)
+        .darHashes
+        .loneElement
+
+      val uploadedDar =
+        ByteString.readFrom(new FileInputStream("daml/splitwell/.daml/dist/splitwell-0.1.0.dar"))
+      val downloadedDar = splitwellValidatorBackend.getDarFile(darHash)
+      uploadedDar shouldBe downloadedDar
     }
     "support app installation" in { implicit env =>
       val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
-      aliceValidatorBackend.installApp(splitwell.manifestUrl)
+      aliceValidatorBackend.installApp(splitwell.appUrl)
       aliceValidatorBackend.listInstalledApps() shouldBe Seq(
         InstalledApp(
+          splitwell.provider,
           "splitwell",
           "http://localhost:3002",
         )

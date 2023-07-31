@@ -1,7 +1,13 @@
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider, cnReplaceEqualDeep, theme, UserProvider } from 'common-frontend';
+import {
+  AuthProvider,
+  cnReplaceEqualDeep,
+  DirectoryClientProvider,
+  theme,
+  UserProvider,
+} from 'common-frontend';
 import ReactDOM from 'react-dom/client';
 import {
   createBrowserRouter,
@@ -40,9 +46,11 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
       <QueryClientProvider client={queryClient}>
         <ReactQueryDevtools initialIsOpen={false} />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-          <AppManagerClientProvider url={config.services.validator.url}>
-            {children}
-          </AppManagerClientProvider>
+          <DirectoryClientProvider url={config.services.directory.url}>
+            <AppManagerClientProvider url={config.services.validator.url}>
+              {children}
+            </AppManagerClientProvider>
+          </DirectoryClientProvider>
         </UserProvider>
       </QueryClientProvider>
     </AuthProvider>

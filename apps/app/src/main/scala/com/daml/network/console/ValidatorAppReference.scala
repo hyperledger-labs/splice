@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.BodyPartEntity
+import akka.http.scaladsl.model.{BodyPartEntity, Uri}
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -101,10 +101,16 @@ abstract class ValidatorAppReference(
     }
   }
 
-  def registerApp(appBundle: BodyPartEntity): Unit =
+  def registerApp(
+      providerUserId: String,
+      name: String,
+      uiUrl: Uri,
+      domains: Seq[definitions.Domain],
+      release: BodyPartEntity,
+  ): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.RegisterApp(appBundle)
+        HttpAppManagerAppClient.RegisterApp(providerUserId, name, uiUrl, domains, release)
       )
     }
 
@@ -115,17 +121,24 @@ abstract class ValidatorAppReference(
       )
     }
 
-  def getAppManifest(app: String): definitions.Manifest =
+  def getLatestAppConfiguration(provider: PartyId): definitions.AppConfiguration =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.GetAppManifest(app)
+        HttpAppManagerAppClient.GetLatestAppConfiguration(provider)
       )
     }
 
-  def getAppBundle(app: String): ByteString =
+  def getLatestAppRelease(provider: PartyId): definitions.AppRelease =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.GetAppBundle(app)
+        HttpAppManagerAppClient.GetLatestAppRelease(provider)
+      )
+    }
+
+  def getDarFile(darHash: String): ByteString =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.GetDarFile(darHash)
       )
     }
 
