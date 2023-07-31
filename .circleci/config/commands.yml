@@ -240,6 +240,12 @@ commands:
 
   save_frontend_node_modules:
     steps:
+      - run:
+          name: Creating archive of npm dependencies
+          command: |
+            mkdir -p /tmp/npm_install
+            find apps/ \( -path '*/node_modules' -a -not -path '*/node_modules/*/node_modules' -a -not -path '*openapi-ts-client/*' \)  | tar --use-compress-program=pigz -cf /tmp/npm_install/node_modules.tar.gz --exclude-vcs -T -
+            find apps/ \( -path '*openapi-ts-client/*' \)  | tar --use-compress-program=pigz -cf /tmp/npm_install/openapi-ts-client.tar.gz --exclude-vcs -T -
       - save_cache:
           name: Uploading node_modules cache
           # Components of the cache key:
@@ -250,7 +256,7 @@ commands:
           # - rev: to allow for updating the cache when sources have changed
           key: &frontend_npm_install_key frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} rev:{{ .Revision }}
           paths:
-            - ./apps/node_modules
+            - /tmp/npm_install
 
   restore_frontend_node_modules:
     steps:
@@ -267,6 +273,19 @@ commands:
             - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }}
             # Then, try to download a cache from main branch
             - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }}
+      - run:
+          name: Extracting archive of npm dependencies
+          command: |
+            if [[ -e /tmp/npm_install ]]; then
+              tar --use-compress-program=pigz -xf /tmp/npm_install/node_modules.tar.gz
+              tar --use-compress-program=pigz -xf /tmp/npm_install/openapi-ts-client.tar.gz
+            else
+              echo "No npm install cache found. Skipping..."
+
+              # TODO(#6992): remove this once the cache on main is correct
+              echo "Removing artifacts from wrong partial cache"
+              rm -rf ./apps/node_modules
+            fi
 
   cluster_lock_reaper:
     parameters:
@@ -617,6 +636,7 @@ commands:
       - setup_nix
       - restore_sbt_cache
       - restore_precompiled_classes
+      - restore_frontend_node_modules
 
   # Adapted from Canton's CI definition
   split_tests_for_parallel_run:

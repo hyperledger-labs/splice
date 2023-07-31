@@ -1271,7 +1271,7 @@ object BuildCommon {
       val cacheDir = streams.value.cacheDirectory / directory
 
       val openApiSpecFile = baseDirectory.value / "src/main/openapi/" / openApiSpec
-      val cache = FileFunction.cached(cacheDir) { _ =>
+      val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         runCommand(
           Seq(
             "openapi-generator-cli",
