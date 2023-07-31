@@ -238,6 +238,35 @@ commands:
             # Then, try to download a cache from main branch
             - frontend-builds-<< pipeline.parameters.cache-version >> branch:main daml:{{ checksum "daml/dars.lock" }}
 
+  save_frontend_node_modules:
+    steps:
+      - save_cache:
+          name: Uploading node_modules cache
+          # Components of the cache key:
+          # - Keyword "frontend-npm-install" for uniqueness
+          # - The branch name
+          # - The NPM package lock file
+          # - OpenAPI definitions, since we do not currently version them, so cannot rely on their version number in package-lock
+          # - rev: to allow for updating the cache when sources have changed
+          key: &frontend_npm_install_key frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} rev:{{ .Revision }}
+          paths:
+            - ./apps/node_modules
+
+  restore_frontend_node_modules:
+    steps:
+      - run:
+          name: Compute openapi cache key
+          command: |
+            find . -wholename '*/openapi/*.yaml' | LANG=C sort | xargs sha256sum > openapi-cache-key.txt
+      - restore_cache:
+          name: Restore npm install cache
+          keys:
+            # Try to download a cache with an exact match
+            - *frontend_npm_install_key
+            # Then, try to download a cache from the same branch
+            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }}
+            # Then, try to download a cache from main branch
+            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }}
 
   cluster_lock_reaper:
     parameters:
@@ -546,6 +575,7 @@ commands:
       - upload_test_reports
       - save_sbt_cache
       - save_compiled_classes
+      - save_frontend_node_modules
       - run:
           name: Convert time stamps in browser logs
           when: always

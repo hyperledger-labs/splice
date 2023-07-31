@@ -1167,9 +1167,9 @@ object BuildCommon {
     val openApiPkgs = npmInstallOpenApiDeps.value
     val log = streams.value.log
     val npmInstallScript = npmRootDir.value / "../build-tools/npm-install.sh"
-    val cacheDir = streams.value.cacheDirectory
+    val cacheDir = streams.value.cacheDirectory / "npmInstall"
     val cache =
-      FileFunction.cached(cacheDir) { _ =>
+      FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         BuildUtil.runCommandWithRetries(
           Seq(npmInstallScript.getAbsolutePath),
           log,
