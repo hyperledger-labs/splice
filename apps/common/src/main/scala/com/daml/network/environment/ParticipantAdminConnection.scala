@@ -13,7 +13,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.crypto.{Fingerprint, Hash, HashAlgorithm, HashOps, HashPurpose}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -48,6 +48,10 @@ class ParticipantAdminConnection(
       clock,
     ) {
   override val serviceName = "Canton Participant Admin API"
+
+  private val hashOps = new HashOps {
+    override def defaultHashAlgorithm = HashAlgorithm.Sha256
+  }
 
   private def listConnectedDomains()(implicit
       traceContext: TraceContext
@@ -246,29 +250,43 @@ class ParticipantAdminConnection(
     )
   }
 
+  def lookupDar(hash: Hash)(implicit traceContext: TraceContext): Future[Option[ByteString]] =
+    runCmd(
+      ParticipantAdminConnection.LookupDarByteString(hash)
+    )
+
   private def uploadDarFileInternal(
       packageId: String,
       path: String,
       darFile: => ByteString,
   )(implicit
       traceContext: TraceContext
-  ): Future[Unit] =
-    retryProvider
-      .ensureThatB(
-        s"DAR file $path with package-id $packageId has been uploaded.",
-        // TODO(#5141) and TODO(#5755): consider if we still need a check here
+  ): Future[Unit] = {
+    val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
+    for {
+      _ <- retryProvider
+        .ensureThatO(
+          s"DAR file $path with hash $darHash has been uploaded.",
+          // TODO(#5141) and TODO(#5755): consider if we still need a check here
+          lookupDar(darHash).map(_.map(_ => ())),
+          runCmd(
+            ParticipantAdminCommands.Package
+              .UploadDar(Some(path), true, true, logger, Some(darFile))
+          ).map(_ => ()),
+          logger,
+        )
+      _ <- retryProvider.waitUntil(
+        s"Package $packageId is vetted",
         packageIsVetted(packageId),
-        runCmd(
-          ParticipantAdminCommands.Package.UploadDar(Some(path), true, true, logger, Some(darFile))
-          // the DAR hashes used by the admin API are different from package IDs, so we ignore them
-        ).map(_ => ()),
         logger,
       )
+    } yield ()
+  }
 
   // TODO(tech-debt) consider removing this clunky code once Canton actually blocks on vetting (Canton issue #11255)
   private def packageIsVetted(
       packageId: String
-  )(implicit traceContext: TraceContext): Future[Boolean] = for {
+  )(implicit traceContext: TraceContext): Future[Unit] = for {
     participantId <- getParticipantId()
     domains <- listConnectedDomains()
     vettedPackagesResults <-
@@ -285,12 +303,18 @@ class ParticipantAdminConnection(
         domains.traverse(domain => listVettedPackages(participantId, domain.domainId))
       }
   } yield {
-    vettedPackagesResults.forall(
-      // there really should be just one result per domain, but let's not make too many assumptions about Canton
-      _.exists(vr =>
-        vr.mapping.participantId == participantId && vr.mapping.packageIds.contains(packageId)
+    if (
+      !vettedPackagesResults.forall(
+        // there really should be just one result per domain, but let's not make too many assumptions about Canton
+        _.exists(vr =>
+          vr.mapping.participantId == participantId && vr.mapping.packageIds.contains(packageId)
+        )
       )
-    )
+    ) {
+      throw Status.FAILED_PRECONDITION
+        .withDescription(s"Package $packageId is not vetted")
+        .asRuntimeException()
+    }
   }
 
   def ensureInitialPartyToParticipant(
@@ -340,5 +364,43 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name))
+  }
+}
+
+object ParticipantAdminConnection {
+  import com.digitalasset.canton.participant.admin.v0.*
+  import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+  import com.digitalasset.canton.participant.admin.v0.PackageServiceGrpc.PackageServiceStub
+  import io.grpc.ManagedChannel
+
+  // The Canton APIs insist on writing the bytestring to a file so we define
+  // our own variant.
+  final case class LookupDarByteString(
+      darHash: Hash
+  ) extends GrpcAdminCommand[GetDarRequest, GetDarResponse, Option[ByteString]] {
+    override type Svc = PackageServiceStub
+
+    override def createService(channel: ManagedChannel): PackageServiceStub =
+      PackageServiceGrpc.stub(channel)
+
+    override def createRequest(): Either[String, GetDarRequest] =
+      Right(GetDarRequest(darHash.toHexString))
+
+    override def submitRequest(
+        service: PackageServiceStub,
+        request: GetDarRequest,
+    ): Future[GetDarResponse] =
+      service.getDar(request)
+
+    override def handleResponse(response: GetDarResponse): Either[String, Option[ByteString]] =
+      // For some reason the API does not throw a NOT_FOUND but instead returns
+      // a successful response with data set to an empty bytestring.
+      // To make things extra fun, this is inconsistent. Other APIs on the package service
+      // do return NOT_FOUND.
+      Right(Option.when(!response.data.isEmpty)(response.data))
+
+    // might be a big file to download
+    override def timeoutType = GrpcAdminCommand.DefaultUnboundedTimeout
+
   }
 }

@@ -34,6 +34,7 @@ import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerCon
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.canton.util.EitherTUtil
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
@@ -110,9 +111,6 @@ class HttpAppManagerHandler(
 
   // TODO(#6839) Revisit storage of installed apps
   private val installedApps: collection.concurrent.Map[PartyId, InstalledApp] =
-    collection.concurrent.TrieMap.empty
-
-  private val storedDars: collection.concurrent.Map[Hash, ByteString] =
     collection.concurrent.TrieMap.empty
 
   // Map from authorization code to user id
@@ -279,16 +277,16 @@ class HttpAppManagerHandler(
   )(darHashStr: String)(
       extracted: Unit
   ): Future[v0.AppManagerResource.GetDarFileResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      Future {
-        val darHash = Hash.tryFromHexString(darHashStr)
-        storedDars
-          .get(darHash)
-          .fold(
+    withNewTrace(workflowId) { implicit tc => _ =>
+      val darHash = Hash.tryFromHexString(darHashStr)
+      participantAdminConnection
+        .lookupDar(darHash)
+        .map { darO =>
+          darO.fold(
             v0.AppManagerResource.GetDarFileResponse
-              .NotFound(definitions.ErrorResponse(s"DAR with hash $darHash was not found"))
-          ) { dar => definitions.DarFile(Base64.getEncoder().encodeToString(dar.toByteArray)) }
-      }
+              .NotFound(definitions.ErrorResponse(show"DAR with hash $darHash does not exist"))
+          )(dar => definitions.DarFile(Base64.getEncoder().encodeToString(dar.toByteArray)))
+        }
     }
 
   def getLatestAppConfiguration(
@@ -344,33 +342,35 @@ class HttpAppManagerHandler(
       domains: String,
       release: (java.io.File, Option[String], ContentType),
   )(extracted: Unit): Future[v0.AppManagerResource.RegisterAppResponse] =
-    for {
-      providerPartyId <- ledgerConnection.getPrimaryParty(providerUserId)
-    } yield {
-      val decodedDomains = decode[Vector[definitions.Domain]](domains).valueOr(err =>
-        throw new IllegalArgumentException(s"Invalid domains: $err")
-      )
-      val releaseManifest = readAppRelease(release._1)
-      val dars = readDars(new FileInputStream(release._1))
-      val darMap = dars.view.map { case (_, hash, bytes) =>
-        (hash, bytes)
-      }.toMap
-      val app = RegisteredApp(
-        darMap.keySet,
-        name,
-        uiUrl,
-        decodedDomains,
-        releaseManifest.version,
-      )
-      storedDars ++= darMap
-      val previous =
-        registeredApps.putIfAbsent(providerPartyId, app)
-      // TODO(#6839) Relax this to support upgrading.
-      previous.fold(v0.AppManagerResource.RegisterAppResponse.Created)(_ =>
-        v0.AppManagerResource.RegisterAppResponse.Conflict(
-          definitions.ErrorResponse(s"App ${providerPartyId} has already been registered")
+    withNewTrace(workflowId) { implicit tc => _ =>
+      for {
+        providerPartyId <- ledgerConnection.getPrimaryParty(providerUserId)
+        decodedDomains = decode[Vector[definitions.Domain]](domains).valueOr(err =>
+          throw new IllegalArgumentException(s"Invalid domains: $err")
         )
-      )
+        releaseManifest = readAppRelease(release._1)
+        dars = readDars(new FileInputStream(release._1))
+        _ <- participantAdminConnection.uploadDarFiles(
+          dars.map(_._1),
+          lock,
+        )
+        app = RegisteredApp(
+          dars.map(_._2).toSet,
+          name,
+          uiUrl,
+          decodedDomains,
+          releaseManifest.version,
+        )
+      } yield {
+        val previous =
+          registeredApps.putIfAbsent(providerPartyId, app)
+        // TODO(#6839) Relax this to support upgrading.
+        previous.fold(v0.AppManagerResource.RegisterAppResponse.Created)(_ =>
+          v0.AppManagerResource.RegisterAppResponse.Conflict(
+            definitions.ErrorResponse(s"App ${providerPartyId} has already been registered")
+          )
+        )
+      }
     }
 
   def registerAppMapFileField(
