@@ -572,11 +572,13 @@ commands:
                     # of what happens if we just call parameters.cmd directly.
                     # We enforce set -euo pipefail by including it in all the commands. Even if the command has already set it, then it will have no effect
                     # but this way we ensure all the commands will fail on error and no lead to confusing behaviour
-                    cat \<<'EOF2' > cmd.sh
+                    # append random string to the cmd.sh file to avoid parallel steps writing and executing the same cmd.sh files
+                    CMD_FILE=$(mktemp cmd-XXXXXX.sh)
+                    cat \<<'EOF2' > $CMD_FILE
                     set -euo pipefail
                     << parameters.cmd >>
             EOF2
-                    bash cmd.sh
+                    bash $CMD_FILE
                   }
                   cmd_wrapper && break
                   n=$[$n+1]
@@ -709,7 +711,6 @@ commands:
       - run_bash_command_in_nix:
           cmd_name: "Start canton"
           cmd: |
-            set -eoux pipefail
             mkdir -p log
             top -b -o %MEM -c -w 256 > log/memory &
             ./start-canton.sh << parameters.start_canton_options >> -b
