@@ -170,7 +170,7 @@ workflows:
           - datadog
           - slack-context
 
-  deploy_staging:
+  deploy_cimain:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
@@ -187,14 +187,14 @@ workflows:
         context:
           - artifactory
           - slack-context
-        workflow_names: "deploy_staging"
+        workflow_names: "deploy_cimain"
     - deploy_cluster:
         <<: *main-branch-only
         context:
           - artifactory
           - datadog
           - slack-context
-        cluster: "staging"
+        cluster: "cimain"
         requires:
            - docker_images_push
            - wait_for_previous_pipeline
@@ -204,11 +204,11 @@ workflows:
           - artifactory
           - datadog
           - slack-context
-        cluster: "staging"
+        cluster: "cimain"
         requires:
           - deploy_cluster
     - preflight_check:
-        cluster: "staging"
+        cluster: "cimain"
         <<: *main-branch-only
         context:
           - artifactory
@@ -220,7 +220,7 @@ workflows:
           - wait_for_previous_pipeline
     - preflight_sv_check:
         <<: *main-branch-only
-        cluster: "staging"
+        cluster: "cimain"
         context:
           - artifactory
           - canton-network-vpn
