@@ -363,9 +363,11 @@ jobs:
                 cluster: <<parameters.cluster>>
       # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
       # sucks at cache invalidation
+      # TODO(#6630): bundle all these restores into a command, consider merging with setup_sbt_test_job
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
+      - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
@@ -461,6 +463,7 @@ jobs:
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
+      - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
           cmd_retry_count: 2
@@ -533,6 +536,7 @@ jobs:
     steps:
       - checkout
       - setup_nix
+      # TODO(#6630): look into these caches
       - restore_precompiled_classes
       - restore_sbt_cache
       - execute_sbt_command:

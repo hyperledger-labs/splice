@@ -146,20 +146,21 @@ object DamlPlugin extends AutoPlugin {
         val log = streams.value.log
 
         val cache =
-          FileFunction.cached(cacheDir) { _ => // ignoring the cache as we don't know the dependency
+          FileFunction.cached(cacheDir, FileInfo.hash) {
+            _ => // ignoring the cache as we don't know the dependency
 
-            // build the daml files in a sorted way, using the build order definition
-            val projectFiles = damlProjectFiles.get.toList.sortWith(buildOrder)
-            projectFiles.flatMap { projectFile =>
-              buildDamlProject(
-                log,
-                sourceDirectory,
-                outputDirectory,
-                sourceDirectory.toPath.relativize(projectFile.toPath).toFile,
-                damlCompilerVersion.value,
-                damlLanguageVersions.value,
-              )
-            }.toSet
+              // build the daml files in a sorted way, using the build order definition
+              val projectFiles = damlProjectFiles.get.toList.sortWith(buildOrder)
+              projectFiles.flatMap { projectFile =>
+                buildDamlProject(
+                  log,
+                  sourceDirectory,
+                  outputDirectory,
+                  sourceDirectory.toPath.relativize(projectFile.toPath).toFile,
+                  damlCompilerVersion.value,
+                  damlLanguageVersions.value,
+                )
+              }.toSet
           }
 
         cache(allDamlFiles.get.toSet ++ damlProjectFiles.get.toSet ++ dependencies).toSeq

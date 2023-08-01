@@ -287,6 +287,42 @@ commands:
               rm -rf ./apps/node_modules
             fi
 
+  save_daml_artifacts:
+    steps:
+      - run:
+          name: Create archive of Daml compilation artifacts
+          command: |
+            mkdir -p /tmp/daml
+            find daml/ -type d -name ".daml" | tar --use-compress-program=pigz -cf /tmp/daml/daml.tar.gz -T -
+      - save_cache:
+          name: Uploading artifacts generated from daml code
+          # Components of the cache key:
+          # - Keyword "daml-artifacts" for uniqueness
+          # - The branch name
+          # - The build configuration (build.properties, BuildCommon.scala, DamlPlugin.scala, build.sbt)
+          # - The daml lock file
+          # - rev: to allow for updating the cache when sources have changed
+          key: &daml_artifacts daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} rev:{{ .Revision }}
+          paths:
+            - /tmp/daml
+
+  restore_daml_artifacts:
+    steps:
+      - restore_cache:
+          name: Downloading archive of Daml compilation artifacts
+          keys:
+            - *daml_artifacts
+            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }}
+            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }}
+      - run:
+          name: Extracting Daml compilation artifacts
+          command: |
+            if [[ -e /tmp/daml/daml.tar.gz ]]; then
+              tar --use-compress-program=pigz -xf /tmp/daml/daml.tar.gz
+            else
+              echo "No cached daml artifacts files found. Skipping..."
+            fi
+
   cluster_lock_reaper:
     parameters:
       <<: *cluster-parameter
@@ -597,6 +633,7 @@ commands:
       - save_sbt_cache
       - save_compiled_classes
       - save_frontend_node_modules
+      - save_daml_artifacts
       - run:
           name: Convert time stamps in browser logs
           when: always
@@ -639,6 +676,7 @@ commands:
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
+      - restore_daml_artifacts
 
   # Adapted from Canton's CI definition
   split_tests_for_parallel_run:
