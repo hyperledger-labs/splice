@@ -27,6 +27,7 @@ class Auth0Util(
     val email = s"$username@canton-network-test.com"
     user.setPassword(password.toCharArray)
     user.setEmail(email)
+    user.setVerifyEmail(false) // avoid auth0 trying to send mails
     user.setConnection("Username-Password-Authentication")
     val id = api.users().create(user).execute().getId
     new Auth0User(id, email, password, this)
