@@ -709,6 +709,7 @@ commands:
       - run_bash_command_in_nix:
           cmd_name: "Start canton"
           cmd: |
+            set -eoux pipefail
             mkdir -p log
             top -b -o %MEM -c -w 256 > log/memory &
             ./start-canton.sh << parameters.start_canton_options >> -b
