@@ -26,6 +26,7 @@
         - [Check for Autoscaler Activity](#check-for-autoscaler-activity)
       - [Canton Ledger Prometheus Metrics](#canton-ledger-prometheus-metrics)
     - [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
+    - [Managing GKE Kubernetes Versions](#managing-gke-kubernetes-versions)
   - [Interacting with a Canton Network Cluster](#interacting-with-a-canton-network-cluster)
     - [Gaining Access to a Cluster](#gaining-access-to-a-cluster)
       - [Fixing Connection Issues in kubectl](#fixing-connection-issues-in-kubectl)
@@ -628,6 +629,82 @@ may be requested through `kubectl describe pod ${POD_NAME}`. This will
 show, among many other details, a log of recent events related to the
 `Pod`'s deployment within Kubernetes. You can also describe `Node`s to
 get details on capacities with `kubectl describe node ${NODE_NAME}`.
+
+### Managing GKE Kubernetes Versions
+
+Each Canton Network cluster is running a specific version of the
+Google Kubernetes Engine software. The current versions for all
+clusters in a Google Cloud project can be inspected by running the
+following command in a cluster deployment directory:
+
+```
+ ~/work/canton-network-node/cluster/deployment/scratchneta (main|✚2…) $ gcloud container clusters list
+NAME            LOCATION     MASTER_VERSION   MASTER_IP        MACHINE_TYPE    NODE_VERSION     NUM_NODES  STATUS
+cn-scratchanet  us-central1  1.27.2-gke.1200  104.154.141.251  e2-standard-16  1.27.2-gke.1200  4          RUNNING
+cn-scratchbnet  us-central1  1.27.2-gke.1200  104.198.193.216  e2-standard-16  1.27.2-gke.1200  4          RUNNING
+cn-scratchcnet  us-central1  1.27.2-gke.1200  34.133.202.82    e2-standard-16  1.27.2-gke.1200  4          RUNNING
+cn-scratchdnet  us-central1  1.27.2-gke.1200  34.31.85.189     e2-standard-16  1.27.2-gke.1200  3          RUNNING
+cn-scratchenet  us-central1  1.27.2-gke.1200  34.28.246.100    e2-standard-16  1.27.2-gke.1200  3          RUNNING
+```
+
+This command shows the status of all clusters in the current cluster's
+project. The `MASTER_VERSION` and `NODE_VERSION` column shows the
+master and node versions, respectively.  These columns will displayed
+with one or more asterisks (`*`) if there is an upgrade available.
+
+The current cluster may be upgraded to the latest version with the
+`cncluster upgrade` subcommand. This command will upgrade first the
+cluster `master` version, followed by the `node` version. Note that
+this operation will result in downtime and can take up to 20-30
+minutes depending on the number of nodes to upgrade.
+
+`cncluster upgrade` will not upgrade either the master or node
+versions through more than a single minor revision. An upgrade from
+`1.25` to `1.27` must be manually stepped from `1.25` to `1.26` and
+then to `1.27`. Clusters should not get this far out of date, so
+`cncluster upgrade` does not automatically support this
+scenario. Remediation of a cluster in this state must be done through
+manual invocations of `gcloud container clusters upgrade`, specfiying
+`--cluster-version` explicitly.
+
+#### Automatic GKE Cluster Upgrades
+
+Google Kubernetes Engine will occasionally automatically upgrade
+clusters running old versions. This will result in cluster downtime
+that can be difficult to explain. There are a few tools that can be
+used to identify this scenario.  The first is to interrogate the
+cluster node ages:
+
+```
+$ kubectl get nodes
+NAME                                            STATUS   ROLES    AGE     VERSION
+gke-cn-scratchfnet-default-pool-cbb2910f-cpck   Ready    <none>   3h8m    v1.27.2-gke.1200
+gke-cn-scratchfnet-default-pool-cbb2910f-kok9   Ready    <none>   3h16m   v1.27.2-gke.1200
+gke-cn-scratchfnet-default-pool-cbb2910f-y29z   Ready    <none>   3h12m   v1.27.2-gke.1200
+gke-cn-scratchfnet-default-pool-cbb2910f-zunr   Ready    <none>   3h10m   v1.27.2-gke.1200
+```
+
+Node version upgrades tend to replace all the nodes at the same
+time. This will result in node ages that are lower than expected for
+the life of the cluster, and likely uniformly about the same across
+the node pool. (There can be deviation in node ages over time as nodes
+are created and deleted by the autoscaler.)
+
+The other and more direct way of identifying a cluster upgrade is
+through the Google Cloud operations list. This is an example log
+showing a series of recent upgrades in some of the scratch clusters:
+
+```
+$ gcloud container operations list|grep UPGRADE_
+operation-1690830948095-cac0f69e-9c0b-4292-9216-ef6c25a1b765  UPGRADE_MASTER  us-central1  cn-scratchgnet                  DONE    2023-07-31T19:15:48.095147203Z  2023-07-31T19:38:36.486744452Z
+operation-1690835857405-1b29a13a-ddb6-4ae1-ab9c-60ee9d8da138  UPGRADE_NODES   us-central1  default-pool                    DONE    2023-07-31T20:37:37.405054101Z  2023-07-31T21:47:55.486570429Z
+operation-1690885493095-908d0c29-1f7d-41c3-83fc-3810bc78643a  UPGRADE_MASTER  us-central1  cn-scratchfnet                  DONE    2023-08-01T10:24:53.095303259Z  2023-08-01T10:46:23.959101752Z
+operation-1690885504217-abbe13e1-3e1b-447d-b59d-2113969b85fa  UPGRADE_MASTER  us-central1  cn-scratchgnet                  DONE    2023-08-01T10:25:04.217070453Z  2023-08-01T10:47:42.387391399Z
+operation-1690887287480-fed64b27-241c-4f3f-a492-7d3f9d53eca5  UPGRADE_NODES   us-central1  default-pool                    DONE    2023-08-01T10:54:47.480812409Z  2023-08-01T12:05:15.994131281Z
+operation-1690887294973-34a6ec25-6d29-49ce-b771-574603637883  UPGRADE_NODES   us-central1  default-pool                    DONE    2023-08-01T10:54:54.973619067Z  2023-08-01T12:05:15.728995605Z
+operation-1690891915658-4ab66047-30f9-40cf-adeb-24f3b8c2d951  UPGRADE_NODES   us-central1  default-pool                    DONE    2023-08-01T12:11:55.65858791Z   2023-08-01T12:12:08.946926319Z
+operation-1690891925062-1cedc8ed-a575-479c-b68f-288e7365ad01  UPGRADE_NODES   us-central1  default-pool                    DONE    2023-08-01T12:12:05.062283706Z  2023-08-01T12:12:15.930049195Z
+```
 
 ## Interacting with a Canton Network Cluster
 

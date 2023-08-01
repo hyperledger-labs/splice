@@ -472,6 +472,21 @@ function subcmd_set_machine_type() {
 
 ###
 
+subcommand_whitelist[upgrade]='Upgrades the cluster to the latest GKE version'
+
+function subcmd_upgrade() {
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _info "Upgrading cluster master..."
+    gcloud container clusters upgrade "cn-${GCP_CLUSTER_BASENAME}net" --master --quiet
+
+    _info "Upgrading cluster nodes..."
+    gcloud container clusters upgrade "cn-${GCP_CLUSTER_BASENAME}net" --quiet
+}
+
+###
+
 function _get_gcloud_secret() {
   local -r secret_name="$1"
   gcloud secrets versions access 1 --secret="$secret_name"
