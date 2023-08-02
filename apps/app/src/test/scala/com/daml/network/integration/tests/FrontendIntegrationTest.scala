@@ -25,7 +25,7 @@ import org.openqa.selenium.{
 import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
 import org.openqa.selenium.support.ui.{ExpectedCondition, WebDriverWait}
-import org.scalatest.BeforeAndAfterEach
+import org.scalatest.ParallelTestExecution
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
 
@@ -102,7 +102,7 @@ trait CustomMatchers {
 abstract class FrontendIntegrationTest(override val frontendNames: String*)
     extends CNNodeIntegrationTest
     with FrontendTestCommon
-    with BeforeAndAfterEach {
+    with ParallelTestExecution {
 
   override def provideEnvironment = {
     val env = super.provideEnvironment

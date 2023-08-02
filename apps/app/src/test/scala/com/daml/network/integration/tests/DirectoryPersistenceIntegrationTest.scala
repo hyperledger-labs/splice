@@ -5,13 +5,13 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UsePostgres
 import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
+  CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 // This is just a placeholder until Directory has, and uses, persistent storage
-trait DirectoryPersistenceIntegrationTest extends CNNodeIntegrationTest {
+trait DirectoryPersistenceIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

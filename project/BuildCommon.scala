@@ -74,8 +74,10 @@ object BuildCommon {
       sys.env("ARTIFACTORY_USER"),
       sys.env("ARTIFACTORY_PASSWORD"),
     ),
-    // Enable logging of begin and end of test cases, test suites, and test runs.
-    Test / testOptions += Tests.Argument("-C", "com.digitalasset.canton.LogReporter"),
+    Test / testOptions ++= Seq(
+      // Enable logging of begin and end of test cases, test suites, and test runs.
+      Tests.Argument("-C", "com.digitalasset.canton.LogReporter")
+    ),
   )
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")

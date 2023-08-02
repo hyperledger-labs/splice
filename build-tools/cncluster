@@ -642,6 +642,19 @@ function subcmd_observability_up() {
     subcmd_pulumi observability up --yes --skip-preview
 }
 
+subcommand_whitelist[observability_down]='Take the current Pulumi observability stack down.'
+
+function subcmd_observability_down() {
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _info "Deactivating observability Pulumi stack"
+
+    _uses_pulumi_stack observability
+    subcmd_pulumi observability down --yes --skip-preview
+}
+
+
 ###
 
 subcommand_whitelist[create]='Create a cluster from scratch.'

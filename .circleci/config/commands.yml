@@ -518,7 +518,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "devnet", "testnet", "testnet-preview", "none"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "devnet", "testnet", "testnet-preview", "none", "observability"]
         default: "none"
       additional_nix_args:
         type: string
@@ -751,8 +751,9 @@ commands:
           cmd: |
             mkdir -p log
             top -b -o %MEM -c -w 256 > log/memory &
-            ./start-canton.sh << parameters.start_canton_options >> -b
+            ./start-canton.sh << parameters.start_canton_options >> -b -m
           background: true
+          additional_nix_args: "--keep CIRCLE_USERNAME --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_NUM --keep CIRCLE_JOB --keep CIRCLE_NODE_INDEX"
 
   run_splitted_scala_tests:
     description: run splitted scala tests
@@ -1089,3 +1090,4 @@ commands:
           cmd: |
             docker pull ${COMETBFT_DOCKER_IMAGE}
             docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
+            docker pull ${OTEL_COLLECTOR_IMAGE}

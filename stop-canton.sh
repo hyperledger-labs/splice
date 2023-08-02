@@ -25,3 +25,5 @@ echo "Stopping cometbft"
 
 echo "Stopping postgres"
 ./scripts/postgres.sh "$POSTGRES_MODE" stop
+
+docker compose -f "$REPO_ROOT"/build-tools/observability/opentelemetry-collector.yml down

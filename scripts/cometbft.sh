@@ -29,6 +29,7 @@ function docker_start() {
     --expose 26656 \
     --expose 26657 \
     -p "266${1}7:26657" \
+    -p "266${1}0:26660" \
     --network $DOCKER_COMEBFT_NETWORK_NAME \
     --hostname "sv${container_sv_index}" \
     "$COMETBFT_DOCKER_IMAGE" start --home /cometbft

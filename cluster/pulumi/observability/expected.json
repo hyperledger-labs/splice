@@ -22,24 +22,6 @@
           "create": true
         },
         "fullnameOverride": "prometheus",
-        "grafana": {
-          "fullnameOverride": "grafana",
-          "ingress": {
-            "enabled": false
-          },
-          "sidecar": {
-            "dashboards": {
-              "folderAnnotation": "folder",
-              "provider": {
-                "allowUiUpdates": true,
-                "foldersFromFilesStructure": true
-              }
-            }
-          }
-        },
-        "kube-state-metrics": {
-          "fullnameOverride": "ksm"
-        },
         "kubeControllerManager": {
           "enabled": false
         },
@@ -53,19 +35,62 @@
           "enabled": false
         },
         "prometheus": {
+          "grafana": {
+            "fullnameOverride": "grafana",
+            "ingress": {
+              "enabled": false
+            },
+            "sidecar": {
+              "dashboards": {
+                "folderAnnotation": "folder",
+                "provider": {
+                  "allowUiUpdates": true,
+                  "foldersFromFilesStructure": true
+                }
+              }
+            }
+          },
+          "kube-state-metrics": {
+            "fullnameOverride": "ksm"
+          },
+          "prometheus-node-exporter": {
+            "fullnameOverride": "node-exporter"
+          },
           "prometheusSpec": {
             "enableFeatures": [
               "native-histograms"
             ],
             "enableRemoteWriteReceiver": true,
             "podMonitorSelectorNilUsesHelmValues": false,
+            "resources": {
+              "limits": {
+                "cpu": "4",
+                "memory": "12Gi"
+              },
+              "requests": {
+                "cpu": "2",
+                "memory": "8Gi"
+              }
+            },
             "retention": "1y",
             "retentionSize": "100GB",
-            "serviceMonitorSelectorNilUsesHelmValues": false
+            "serviceMonitorSelectorNilUsesHelmValues": false,
+            "storageSpec": {
+              "volumeClaimTemplate": {
+                "spec": {
+                  "accessModes": [
+                    "ReadWriteOnce"
+                  ],
+                  "resources": {
+                    "requests": {
+                      "storage": "200Gi"
+                    }
+                  },
+                  "storageClassName": "premium-rwo"
+                }
+              }
+            }
           }
-        },
-        "prometheus-node-exporter": {
-          "fullnameOverride": "node-exporter"
         },
         "prometheusOperator": {
           "admissionWebhooks": {

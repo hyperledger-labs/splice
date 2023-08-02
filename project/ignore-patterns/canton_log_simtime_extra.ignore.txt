@@ -11,4 +11,9 @@ Sequencing result message timed out
 Late processing.*of batch
 The payload to event time bound.*has been been exceeded by payload time
 
+# Remove once https://github.com/digital-asset/daml/pull/17181 is merged
+Instrument daml.cache.size has recorded multiple values for the same attributes.
+Instrument daml.cache.weight has recorded multiple values for the same attributes.
+Too many log messages detected. Will only log once per minute from now on.","logger_name":"i.o.s.m.i.s.AsynchronousMetricStorage"
+
 # Make sure to have a trailing newline

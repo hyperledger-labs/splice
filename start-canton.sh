@@ -12,6 +12,7 @@ function usage() {
   echo "  -f               start canton using the CometBFT driver for the global sequencers"
   echo "  -t               start canton with traffic control enabled"
   echo "  -g               start extra global upgrade domain"
+  echo "  -m               collect metrics and send them to our CI prometheus instance"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
 }
 
@@ -25,8 +26,9 @@ trafficQoS=0
 globalUpgradeDomain=0
 bootstrapScriptPath=bootstrap-canton.sc
 global_cometbft=0
+collect_metrics=0
 
-while getopts "hdap:c:wsbtfg" arg; do
+while getopts "hdap:c:wsbtfgm" arg; do
   case ${arg} in
     h)
       usage
@@ -64,6 +66,9 @@ while getopts "hdap:c:wsbtfg" arg; do
     g)
       globalUpgradeDomain=1
       echo "start extra global upgrade domain"
+      ;;
+    m)
+      collect_metrics=1
       ;;
     ?)
       usage
@@ -149,9 +154,9 @@ printf '%s\n' "${db_names[@]}" | xargs -P 64 -I {} ./scripts/postgres.sh "$POSTG
 
 # Tmux session setup
 function tmux_cmd() {
-  local title=$1
-  local cmd=$2
-  local t=${tmux_session}:${tmux_window}
+  title=$1
+  cmd=$2
+  t=${tmux_session}:${tmux_window}
 
   if [[ ${tmux_window} -eq 0 ]]; then
     tmux rename-window -t "$t" "$title"
@@ -166,7 +171,7 @@ tmux new-session -d -s "${tmux_session}"
 
 # Numbers chosen such that we don't run out of memory and CI runs are not measurably slower.
 # Feel free to bump if you encounter issues but make sure the nodes don't run out of memory.
-JAVA_TOOL_OPTIONS="-Xms4g -Xmx4g -Dlogback.configurationFile=./scripts/canton-logback.xml"
+JAVA_TOOL_OPTIONS="-Xms6g -Xmx6g -Dlogback.configurationFile=./scripts/canton-logback.xml"
 
 config_overrides=""
 config_overrides_simtime=""
@@ -186,7 +191,7 @@ if [ $globalUpgradeDomain -eq 1 ]; then
 fi
 
 tmux_cmd_canton() {
-  local windowName="$1" tokensFile="$2" baseConfig="$3" confOverrides="$4" logFile="$5"
+  windowName="$1" tokensFile="$2" baseConfig="$3" confOverrides="$4" logFile="$5"
   tmux_cmd "$windowName" \
     "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
      COMETBFT_DOCKER_IP=${COMETBFT_DOCKER_IP-} \
@@ -210,6 +215,9 @@ if [ $simtime -eq 1 ]; then
      "$config_overrides $config_overrides_simtime" log/canton-simtime.clog
 fi
 
+if [[ $collect_metrics -eq 1 ]]; then
+  ./scripts/start-opentelemetry-collector.sh
+fi
 
 # Wait for canton instance(s) to start within 5 minutes
 timeout=300

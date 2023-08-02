@@ -1,38 +1,30 @@
 package com.daml.network.integration.tests
 
 import akka.actor.ActorSystem
-import com.digitalasset.canton.protocol.LfContractId
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.auth0.exception.Auth0Exception
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
-import com.daml.network.console.{
-  CNNodeAppBackendReference,
-  DirectoryAppClientReference,
-  LedgerApiExtensions,
-  SplitwellAppClientReference,
-  WalletAppClientReference,
-}
+import com.daml.network.console.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.plugins.WaitForPorts
 import com.daml.network.sv.config.SvOnboardingConfig
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.*
-import org.scalatest.BeforeAndAfterEach
+import com.digitalasset.canton.protocol.LfContractId
 import org.scalatest.exceptions.TestFailedException
+import org.scalatest.matchers.{MatchResult, Matcher}
+import org.scalatest.{AppendedClues, BeforeAndAfterEach}
 
 import scala.annotation.nowarn
-import scala.language.implicitConversions
 import scala.concurrent.duration.*
+import scala.language.implicitConversions
+import scala.math.BigDecimal.RoundingMode
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
-import com.daml.network.integration.plugins.WaitForPorts
-import org.scalatest.matchers.{MatchResult, Matcher}
-import org.scalatest.AppendedClues
-
-import scala.math.BigDecimal.RoundingMode
 
 /** Analogue to Canton's CommunityTests */
 object CNNodeTests {

@@ -51,5 +51,4 @@ notify-fail: &notify-fail
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum
-    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "devnet", "testnet", "testnet-preview"]
-
+    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "devnet", "testnet", "testnet-preview", "observability"]

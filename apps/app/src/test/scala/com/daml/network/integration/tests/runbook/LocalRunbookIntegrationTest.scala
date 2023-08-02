@@ -32,17 +32,17 @@ class LocalRunbookIntegrationTest
   val svAppPath: File = svNodePath / "sv-app"
   val scanAppPath: File = svNodePath / "scan-app"
 
+  // We usually set this through an env var but you cannot easily set env vars in Java so instead we opt for a system property.
+  // Note that system properties can only be used in tests at this point.
+  System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
+  System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
+
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
     ("ParticipantLedgerApi", 7001),
     ("ParticipantAdminApi", 7002),
   )
 
   var cantonProcess: Option[Process] = None
-
-  // We usually set this through an env var but you cannot easily set env vars in Java so instead we opt for a system property.
-  // Note that system properties can only be used in tests at this point.
-  System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
-  System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
 
   private def setupAndStartCanton() = {
     // Note: the Canton process started here uses ports that do not collide with ports 5xxx used
@@ -80,7 +80,7 @@ class LocalRunbookIntegrationTest
   }
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
     CNNodeEnvironmentDefinition
       .fromFiles(
         this.getClass.getSimpleName,
@@ -111,6 +111,7 @@ class LocalRunbookIntegrationTest
         env.fullSvcApps.local.foreach(_.start())
         env.fullSvcApps.local.foreach(_.waitForInitialization())
       })
+  }
 
   "run through runbook against local SVC" in { implicit env =>
     runScript(validatorPath / "validator.sc")(env.environment)

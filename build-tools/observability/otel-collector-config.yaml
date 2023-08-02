@@ -1,0 +1,43 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'cometbft'
+          scrape_interval: 5s
+          static_configs:
+            - targets: [ 'localhost:26610', 'localhost:26620', 'localhost:26630', 'localhost:26640']
+        - job_name: 'canton'
+          scrape_interval: 5s
+          static_configs:
+            - targets: [ 'localhost:12340' ]
+        - job_name: 'canton_sim'
+          scrape_interval: 5s
+          static_configs:
+            - targets: [ 'localhost:12341' ]
+
+exporters:
+  prometheusremotewrite:
+    endpoint: "https://prometheus.observability.network.canton.global/api/v1/write"
+    tls:
+      insecure: false
+    external_labels:
+      env: ${env:ENVIRONMENT}
+      user: ${env:BUILD_USER}
+      branch: ${env:BUILD_BRANCH}
+      build_num: ${env:BUILD_NUM}
+      build_job: ${env:BUILD_JOB}
+
+processors:
+  batch:
+
+service:
+  pipelines:
+    metrics:
+      receivers: [ otlp, prometheus ]
+      processors: [ batch ]
+      exporters: [ prometheusremotewrite ]
