@@ -135,9 +135,6 @@ class ParticipantInitializer(
   private def getDump(config: ParticipantBootstrapDumpConfig): Future[ParticipantIdentitiesDump] =
     config match {
       case ParticipantBootstrapDumpConfig.File(file) => getDumpFromFile(file)
-      case _: ParticipantBootstrapDumpConfig.Gcp =>
-        // TODO(#6421)
-        sys.error("GCP import not implemented yet!")
     }
 
   private def getDumpFromFile(file: Path): Future[ParticipantIdentitiesDump] = {

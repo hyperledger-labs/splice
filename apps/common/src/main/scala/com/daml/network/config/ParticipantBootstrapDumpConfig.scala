@@ -10,10 +10,5 @@ object ParticipantBootstrapDumpConfig {
   final case class File(file: Path) extends ParticipantBootstrapDumpConfig {
     override val description = s"Local file $file"
   }
-  final case class Gcp(
-      bucket: GcpBucketConfig,
-      path: String,
-  ) extends ParticipantBootstrapDumpConfig {
-    override val description = s"Path $path in ${bucket.description}"
-  }
+  // We don't plan to support additional sources in the short term, but who knows.
 }

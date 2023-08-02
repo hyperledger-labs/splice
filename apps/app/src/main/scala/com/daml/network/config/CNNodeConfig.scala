@@ -415,9 +415,6 @@ object CNNodeConfig {
     implicit val participantBootstrapDumpConfigFileReader
         : ConfigReader[ParticipantBootstrapDumpConfig.File] =
       deriveReader[ParticipantBootstrapDumpConfig.File]
-    implicit val participantBootstrapDumpConfigGcpReader
-        : ConfigReader[ParticipantBootstrapDumpConfig.Gcp] =
-      deriveReader[ParticipantBootstrapDumpConfig.Gcp]
     implicit val participantBootstrapDumpConfigReader
         : ConfigReader[ParticipantBootstrapDumpConfig] =
       deriveReader[ParticipantBootstrapDumpConfig]
@@ -617,9 +614,6 @@ object CNNodeConfig {
     implicit val participantBootstrapDumpConfigFileWriter
         : ConfigWriter[ParticipantBootstrapDumpConfig.File] =
       deriveWriter[ParticipantBootstrapDumpConfig.File]
-    implicit val participantBootstrapDumpConfigGcpWriter
-        : ConfigWriter[ParticipantBootstrapDumpConfig.Gcp] =
-      deriveWriter[ParticipantBootstrapDumpConfig.Gcp]
     implicit val participantBootstrapDumpConfigWriter
         : ConfigWriter[ParticipantBootstrapDumpConfig] =
       deriveWriter[ParticipantBootstrapDumpConfig]
