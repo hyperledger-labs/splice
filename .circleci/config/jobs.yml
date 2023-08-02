@@ -560,10 +560,6 @@ jobs:
           cluster: "scratchnetd"
       - cluster_lock_reaper:
           cluster: "scratchnete"
-      - cluster_lock_reaper:
-          cluster: "scratchnetf"
-      - cluster_lock_reaper:
-          cluster: "scratchnetg"
 
   update_pipeline_schedule:
     docker:
