@@ -115,3 +115,78 @@ the specific flake, there are a few common things to look out for:
    external services). In those cases, add the `infrequent/no repro`
    label. It the issue does not occur within the next 2 weeks it can
    be closed.
+
+## Investigating Canton-related errors
+
+We are using development versions of Canton and are frequently among the first users of new Canton features.
+This means that we are very likely to encounter Canton bugs as well, not just bugs in our own code.
+
+### How critical is this error?
+
+Some Canton bugs can leave nodes irreparably broken, forcing a network reset, or stuck in a state where they manually need to be restarted.
+If the error you are investigating caused an already bootstrapped Canton node to become irreparably faulty,
+investigating this issue should have very high priority.
+
+Even if the effects of this bug are not catastrophic,
+keep in mind that we are the first users of many new Canton features and do relatively extensive testing.
+This means:
+
+1. If we don't report the bug, chances of it getting discovered elsewhere and getting fixed are relatively low.
+2. Even if the bug is already known it might not be prioritized. Because we are also the *only* users for some features, prioritization is pretty much directly driven by our requests.
+
+So it is always in our interest to report Canton bugs quickly.
+
+### What could be the root cause?
+
+Debugging Canton problems can be very hard.
+Here are few guiding questions for narrowing down possible root causes:
+
+- What is the earliest error we are seeing?
+- Does something relevant show up when we search for the errors in past [issues](https://github.com/DACH-NY/canton-network-node/issues?q=)?
+- Did our (app) code do anything particular around the time of the error(s)?
+  SV onboarding is a notorious source of errors, for example.
+- Which Canton nodes might have been relevant to the operation that failed?
+  Make sure you are also looking at *their* logs.
+  (Recall that the `1220de7c...` of party IDs like `alice::1220de7c...` is the participant namespace,
+  shared by the participant ID and all other parties on that participant.)
+- By whom was the action (e.g., transaction) that caused the error initiated? Was this expected?
+- Do the timestamps on the action that failed make sense? (Frequent source of errors.)
+- Which contracts might have been involved in the action that failed?
+  This can give you a hint about the context in which the failure happened,
+  as well as the parties (and hence participants) that are relevant here as informees.
+- Does searching for error message(s) you observe in the [Canton codebase](https://github.com/DACH-NY/canton) provide any clues?
+
+### Best practices for escalating to Canton
+
+Once you stop making significant progress in your analysis and/or have
+high confidence that the error is not caused by us "using it wrongly"
+(also after consulting with another CN team member for a second opinion),
+it is prudent to escalate to the Canton team for
+A. debugging help and
+B. finding a solution or at least workaround for the issue.
+
+In order to use their time effectively, create an GitHub issue for your problem and make sure it
+(or a comment on it) contains:
+
+- [ ] All logs that are potentially relevant to analyzing the problem (e.g., as a zip file).
+- [ ] A *concise* summary of your analysis and your best hypotheses about what the root cause might be.
+- [ ] The context in which the error happened; e.g.:
+  - Which nodes (participants, sequencer nodes, mediator nodes) are involved?
+  - Any exotic features that we are using that might be relevant here
+    (unionspace for the SVC party, party migrations, distributed domain...)?
+  - What our app code was trying to do when the error happened
+     - in Canton terms; ledger API submissions, topology transactions, ...
+     - pay attention to concurrent operations that might trigger the bug
+     - especially when the logs don't display full transactions (often the case for logs from our clusters): describe the shape of relevant transaction trees
+- [ ] The Canton version (commit height) we were using.
+      Have a look at `version` in `nix/canton-sources.json` - the `9d36b99f`
+      in `2.7.0-snapshot.20230726.10871.0.v9d36b99f` is what the Canton team is typically interested in.
+
+Contact the Canton team via the `#team-canton` Slack channel.
+
+- Reference your GH issue.
+- Note the severity of the issue for us.
+- Tag someone from the Canton team.
+  Unless you already know who a good candidate might be (based on what is failing, Git blame, ...),
+  you can tag the person that is currently on support rotation.
+  The person is typically pinned at the top of the Slack channel.
