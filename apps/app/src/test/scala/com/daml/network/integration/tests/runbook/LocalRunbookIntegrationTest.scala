@@ -12,6 +12,7 @@ import com.daml.network.sv.config.ExpectedValidatorOnboardingConfig
 import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
+import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
 
 /** Runs through runbook but does so while spinning up a local SVC. */
@@ -81,6 +82,11 @@ class LocalRunbookIntegrationTest
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
+    // We have set the system properties of NETWORK_APPS_ADDRESS and NETWORK_APPS_ADDRESS_PROTOCOL in the initializer of `LocalRunbookIntegrationTest`
+    // It is possible that `ConfigFactory.load()` was invoked before the above 2 system properties were set.
+    // If it is the case, the `ConfigFactory.load()` in `fromFiles()` will return a cached config object with old snapshot of system properties.
+    // We will have to call `invalidateCaches()` to make sure we will get the config object from `ConfigFactory.load()` with updated system properties.
+    ConfigFactory.invalidateCaches()
     CNNodeEnvironmentDefinition
       .fromFiles(
         this.getClass.getSimpleName,
