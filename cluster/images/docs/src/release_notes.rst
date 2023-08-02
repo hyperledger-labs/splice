@@ -12,6 +12,8 @@ Release Notes
       validator Helm charts, which should be set to ``true`` for SV nodes. This
       prevents clashes between the Validator and SV apps. The runbook includes
       this value in a newly-introduced ``sv-validator-values.yaml`` file.
+    * The SV name for the node operated by IEU on behalf of LCV has been updated.
+      Note the updated SV name in ``sv-values.yaml``: `Liberty-City-Ventures`.
 
 * Bugfixes:
 
