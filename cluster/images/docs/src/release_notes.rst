@@ -13,6 +13,10 @@ Release Notes
       prevents clashes between the Validator and SV apps. The runbook includes
       this value in a newly-introduced ``sv-validator-values.yaml`` file.
 
+* Bugfixes:
+
+    * Fix an issue where after a token refresh, ledger ingestion would not get restarted.
+
 2023-07-31
 ----------
 

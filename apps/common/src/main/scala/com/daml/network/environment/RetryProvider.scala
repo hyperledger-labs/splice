@@ -483,6 +483,8 @@ object RetryProvider {
       Status.Code.DEADLINE_EXCEEDED,
       Status.Code.ABORTED,
       Status.Code.UNAUTHENTICATED,
+      // We can get permission denied if the token expired.
+      Status.Code.PERMISSION_DENIED,
     ) ++ additionalCodes
 
     private val retryableHttpStatusCodes: Set[StatusCode] = Set(
