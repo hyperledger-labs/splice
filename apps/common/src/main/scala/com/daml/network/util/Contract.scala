@@ -12,6 +12,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   DamlRecord,
   InterfaceCompanion,
   Contract as CodegenContract,
+  Update,
 }
 import com.daml.lf.value as lf
 import com.daml.lf.data.Ref.Identifier as LfIdentifier
@@ -106,7 +107,12 @@ object Contract {
     def contract: Contract[TCid, T]
     def contractId: TCid & ContractId[?] = contract.contractId
     def payload: T & DamlRecord[?] = contract.payload
+
+    final def exercise[Z](f: (TCid & ContractId[?]) => Update[Z]): Exercising[this.type, Z] =
+      Exercising(this, f(this.contractId))
   }
+
+  final case class Exercising[+Origin, Z](origin: Origin, update: Update[Z])
 
   def javaValueToLfValue(v: Value)(implicit elc: ErrorLoggingContext): lf.Value =
     // Disabling logging and instead logging the result

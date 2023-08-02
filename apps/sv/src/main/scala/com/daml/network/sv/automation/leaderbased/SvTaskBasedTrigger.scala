@@ -6,7 +6,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.Contract
+import com.daml.network.util.AssignedContract
 
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
@@ -51,7 +51,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   /** Handle leader failure by voting for a new leader
     */
   final protected def voteForNewLeader(
-      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      svcRules: AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
       currentLeader: String,
   )(implicit
       tc: TraceContext

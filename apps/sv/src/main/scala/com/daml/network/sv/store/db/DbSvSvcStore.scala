@@ -252,8 +252,8 @@ class DbSvSvcStore(
     Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]
   ]] = ???
 
-  override def listElectionRequests(svcRules: Contract[SvcRules.ContractId, SvcRules])(implicit
-      tc: TraceContext
+  override def listElectionRequests(svcRules: AssignedContract[SvcRules.ContractId, SvcRules])(
+      implicit tc: TraceContext
   ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = ???
 
   override def lookupElectionRequestByRequesterWithOffset(requester: PartyId, epoch: Long)(implicit

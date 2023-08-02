@@ -301,7 +301,7 @@ class HttpSvHandler(
         svcPartyId = svcParty.toProtoPrimitive,
         latestMiningRound = latestOpenMiningRound.toJson,
         coinRules = coinRules.toJson,
-        svcRules = svcRules.toJson,
+        svcRules = svcRules.contract.toJson,
       )
     }
 
@@ -686,7 +686,7 @@ class HttpSvHandler(
 
   private def isCompleted(
       svParty: PartyId,
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
   ): Option[definitions.GetSvOnboardingStatusResponse] = {
     Option.when(SvApp.isSvcMemberParty(svParty, svcRules))(
       definitions.GetSvOnboardingStatusResponse(
@@ -699,7 +699,7 @@ class HttpSvHandler(
 
   private def isCompleted(
       svParty: String,
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
   ): Option[definitions.GetSvOnboardingStatusResponse] = {
     Option.when(SvApp.isSvcMemberName(svParty, svcRules))(
       definitions.GetSvOnboardingStatusResponse(
@@ -712,7 +712,7 @@ class HttpSvHandler(
 
   private def isRequested(
       svParty: PartyId,
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
   )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     for {
       svOnboardingRequest <- OptionT(svcStore.lookupSvOnboardingRequestByCandidateParty(svParty))
@@ -722,7 +722,7 @@ class HttpSvHandler(
 
   private def isRequested(
       svParty: String,
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
   )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     for {
       svOnboardingRequest <- OptionT(svcStore.lookupSvOnboardingRequestByCandidateName(svParty))
@@ -732,7 +732,7 @@ class HttpSvHandler(
 
   private def getOnboardedStatus(
       svOnboardingRequest: Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest],
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
   )(implicit tc: TraceContext) = {
     for {
       confirmations <- OptionT.liftF(svcStore.listSvOnboardingConfirmations(svOnboardingRequest))

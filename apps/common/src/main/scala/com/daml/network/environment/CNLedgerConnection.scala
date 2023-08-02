@@ -27,7 +27,7 @@ import com.daml.network.environment.ledger.api.{
   NoDedup,
 }
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
-import com.daml.network.util.DisclosedContracts
+import com.daml.network.util.{AssignedContract, Contract, DisclosedContracts}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.error.CantonErrorResource
 import com.digitalasset.canton.lifecycle.{
@@ -52,11 +52,13 @@ import io.grpc.{Status, StatusRuntimeException}
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
+import scala.annotation.implicitNotFound
 import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
+import shapeless.<:!<
 
 class CNLedgerConnection(
     client: LedgerClient,
@@ -162,28 +164,223 @@ class CNLedgerConnection(
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[Unit] = {
-    for {
-      _ <- verifyEnoughExtraTrafficRemains(domainId, priority)
-      result <- callCallbacksOnCompletionAndWaitForOffset(
-        client
-          .submitAndWait(
-            workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-            applicationId = applicationId,
-            actAs = actAs.map(_.toProtoPrimitive),
-            readAs = readAs.map(_.toProtoPrimitive),
-            commands = commands,
-            commandId = uniqueId,
-            deduplicationConfig = NoDedup,
-            disclosedContracts = disclosedContracts assertOnDomain domainId,
-          )
-      )(offset => (offset, ()))
-    } yield result
-  }
+  )(implicit tc: TraceContext): Future[Unit] =
+    submit(actAs, readAs, commands, priority)
+      .withDomainId(domainId, disclosedContracts)
+      .noDedup
+      .yieldUnit()
 
   // When using submitAndWaitForTransaction with a command whose resulting transaction is
   // not visible to the submitting parties, one receives `TRANSACTION_NOT_FOUND`. In case, you run into this consider using
   // one of the other methods in this class that rely on submitAndWaitForTransactionTree instead.
+
+  /** Produce a builder for a command submission.
+    *
+    * `update` can be one of three things:
+    *
+    *  1. an ordinary [[Command]] or [[Seq]] thereof,
+    *  2. an [[Update]], or
+    *  3. the result of [[Contract.Has#exercise]].
+    *
+    * Supply extra arguments to the builder with the `with*` and `no*` methods.
+    * At minimum, you must supply a deduplication strategy with
+    * [[submit#withDedup]] or [[submit#noDedup]]; that and other required steps
+    * result in compiler errors to the `yield*` methods if they are missing.
+    *
+    * Finalize the builder with one of the `yield*` methods to actually perform
+    * the command submission.  Different calls will compile depending on what
+    * `update` you supplied; for example, [[submit#yieldResult]] cannot be used
+    * with a plain `Command`, but works with the other two options.
+    * [[submit#yieldUnit]] and [[submit#yieldTransaction]] can always be used.
+    *
+    * {{{
+    *  submit(Seq(actor), Seq.empty,
+    *         someContract.exercise(_.exerciseFoo(42)))
+    *    .withDedup(CommandId(...), task.offset)
+    *    .yieldResult(): Future[Exercised[FooResult]]
+    * }}}
+    */
+  def submit[C, DomId](
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: C,
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit assignment: UpdateAssignment[C, DomId]): submit[C, Any, DomId] =
+    new submit(actAs, readAs, update, (), assignment.run(update), DisclosedContracts(), priority)
+
+  final class submit[C, CmdId, DomId] private[CNLedgerConnection] (
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: C,
+      commandIdDeduplicationOffset: CmdId,
+      domainId: DomId,
+      disclosedContracts: DisclosedContracts,
+      priority: CommandPriority,
+  ) {
+    private type DedupNotSpecifiedYet = CmdId =:= Any
+    private type DomainIdRequired = DomId <:< DomainId
+    private type DomainIdDisallowed = DomId <:< Unit
+
+    private[this] def copy[CmdId0, DomId0](
+        commandIdDeduplicationOffset: CmdId0 = this.commandIdDeduplicationOffset,
+        domainId: DomId0 = this.domainId,
+        disclosedContracts: DisclosedContracts = this.disclosedContracts,
+    ): submit[C, CmdId0, DomId0] =
+      new submit(
+        actAs,
+        readAs,
+        update,
+        commandIdDeduplicationOffset,
+        domainId,
+        disclosedContracts,
+        priority,
+      )
+
+    def withDedup(commandId: CommandId, deduplicationOffset: String)(implicit
+        cid: DedupNotSpecifiedYet
+    ): submit[C, (CommandId, String), DomId] =
+      copy(
+        commandIdDeduplicationOffset = (commandId, deduplicationOffset)
+      )
+
+    def withDedup(commandId: CommandId, deduplicationConfig: DedupConfig)(implicit
+        cid: DedupNotSpecifiedYet
+    ): submit[C, (CommandId, DedupConfig), DomId] =
+      copy(
+        commandIdDeduplicationOffset = (commandId, deduplicationConfig)
+      )
+
+    def noDedup(implicit cid: DedupNotSpecifiedYet): submit[C, Unit, DomId] =
+      copy(commandIdDeduplicationOffset = ())
+
+    @annotation.nowarn("cat=unused&msg=notNE")
+    def withDomainId(
+        domainId: DomainId,
+        disclosedContracts: DisclosedContracts = DisclosedContracts(),
+    )(implicit
+        noDomIdYet: DomainIdDisallowed,
+        // if you statically know you have NE, use withDisclosedContracts instead
+        notNE: disclosedContracts.type <:!< DisclosedContracts.NE,
+    ): submit[C, CmdId, DomainId] =
+      copy(
+        domainId = domainId,
+        disclosedContracts = disclosedContracts assertOnDomain domainId,
+      )
+
+    def withDisclosedContracts(disclosedContracts: DisclosedContracts)(implicit
+        dcAllowed: WithDisclosedContracts[C, DomId, disclosedContracts.type]
+    ): submit[C, CmdId, DomainId] =
+      copy(
+        domainId = dcAllowed.inferDomain(update, domainId, disclosedContracts),
+        disclosedContracts = disclosedContracts,
+      )
+
+    def yieldUnit()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+    ): Future[Unit] = go()
+
+    def yieldTransaction()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+    ): Future[Transaction] = go()
+
+    @annotation.nowarn("cat=unused&msg=pickT")
+    def yieldResult[Z]()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+        pickT: YieldResult[C, Z],
+        result: SubmitResult[C, Z],
+    ): Future[Z] = go()
+
+    @annotation.nowarn("cat=unused&msg=pickT")
+    def yieldResultAndOffset[Z]()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+        pickT: YieldResult[C, Z],
+        result: SubmitResult[C, (String, Z)],
+    ): Future[(String, Z)] =
+      go()
+
+    private[this] def go[Z]()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+        result: SubmitResult[C, Z],
+    ): Future[Z] = {
+      verifyEnoughExtraTrafficRemains(domainId, priority).flatMap { _ =>
+        import SubmitResult.*
+        val workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId)
+        val (commandId, deduplicationConfig) = dedup.split(commandIdDeduplicationOffset)
+        val commands = commandOut.run(update)
+
+        @annotation.tailrec
+        def interpretResult[C0, Z0](update: C0, result: SubmitResult[C0, Z0]): Future[Z0] =
+          result match {
+            case _: Ignored =>
+              callCallbacksOnCompletionAndWaitForOffset(
+                client
+                  .submitAndWait(
+                    workflowId = workflowId,
+                    applicationId = applicationId,
+                    commandId = commandId,
+                    deduplicationConfig = deduplicationConfig,
+                    actAs = actAs.map(_.toProtoPrimitive),
+                    readAs = readAs.map(_.toProtoPrimitive),
+                    commands = commands,
+                    disclosedContracts = disclosedContracts assertOnDomain domainId,
+                  )
+              )(offset => (offset, (): Z0))
+            case _: JustTransaction =>
+              callCallbacksOnCompletionAndWaitForOffset(
+                client
+                  .submitAndWaitForTransaction(
+                    workflowId = workflowId,
+                    applicationId = applicationId,
+                    commandId = commandId,
+                    deduplicationConfig = deduplicationConfig,
+                    actAs = actAs.map(_.toProtoPrimitive),
+                    readAs = readAs.map(_.toProtoPrimitive),
+                    commands = commands,
+                    disclosedContracts = disclosedContracts assertOnDomain domainId,
+                  )
+              )(tx => (tx.getOffset, tx))
+            case k: ResultAndOffset[t, Z0] =>
+              for {
+                tree <- callCallbacksOnCompletionAndWaitForOffset(
+                  client
+                    .submitAndWaitForTransactionTree(
+                      workflowId = workflowId,
+                      applicationId = applicationId,
+                      commandId = commandId,
+                      actAs = actAs.map(_.toProtoPrimitive),
+                      readAs = readAs.map(_.toProtoPrimitive),
+                      commands = commands,
+                      deduplicationConfig = deduplicationConfig,
+                      disclosedContracts = disclosedContracts assertOnDomain domainId,
+                    )
+                )(tx => (tx.getOffset, tx))
+              } yield k.continue(
+                tree.getOffset,
+                decodeExerciseResult(update, tree),
+              )
+            case wrapper: Contramap[C0, u, Z0] =>
+              interpretResult(wrapper.g(update), wrapper.rec)
+          }
+
+        interpretResult(update, result)
+      }
+    }
+  }
 
   def submitCommands(
       actAs: Seq[PartyId],
@@ -194,26 +391,11 @@ class CNLedgerConnection(
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[Unit] = {
-    for {
-      _ <- verifyEnoughExtraTrafficRemains(domainId, priority)
-      result <- callCallbacksOnCompletionAndWaitForOffset(
-        client
-          .submitAndWait(
-            workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-            applicationId = applicationId,
-            commandId = commandId.commandIdForSubmission,
-            deduplicationConfig = DedupOffset(
-              offset = deduplicationOffset
-            ),
-            actAs = actAs.map(_.toProtoPrimitive),
-            readAs = readAs.map(_.toProtoPrimitive),
-            commands = commands,
-            disclosedContracts = disclosedContracts assertOnDomain domainId,
-          )
-      )(offset => (offset, ()))
-    } yield result
-  }
+  )(implicit tc: TraceContext): Future[Unit] =
+    submit(actAs, readAs, commands, priority)
+      .withDedup(commandId, deduplicationOffset)
+      .withDomainId(domainId, disclosedContracts)
+      .yieldUnit()
 
   def submitCommandsTransaction(
       actAs: Seq[PartyId],
@@ -224,27 +406,11 @@ class CNLedgerConnection(
       domainId: DomainId,
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[Transaction] = {
-    for {
-      _ <- verifyEnoughExtraTrafficRemains(domainId, priority)
-      result <-
-        callCallbacksOnCompletionAndWaitForOffset(
-          client
-            .submitAndWaitForTransaction(
-              workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-              applicationId = applicationId,
-              commandId = commandId.commandIdForSubmission,
-              deduplicationConfig = DedupOffset(
-                offset = deduplicationOffset
-              ),
-              actAs = actAs.map(_.toProtoPrimitive),
-              readAs = readAs.map(_.toProtoPrimitive),
-              commands = commands,
-              disclosedContracts = disclosedContracts assertOnDomain domainId,
-            )
-        )(tx => (tx.getOffset, tx))
-    } yield result
-  }
+  )(implicit tc: TraceContext): Future[Transaction] =
+    submit(actAs, readAs, commands, priority)
+      .withDedup(commandId, deduplicationOffset)
+      .withDomainId(domainId, disclosedContracts)
+      .yieldTransaction()
 
   def submitWithResultNoDedup[T](
       actAs: Seq[PartyId],
@@ -254,10 +420,10 @@ class CNLedgerConnection(
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
   )(implicit tc: TraceContext): Future[T] =
-    submitWithResultAndOffsetNoDedup(actAs, readAs, update, domainId, disclosedContracts, priority)
-      .map(
-        _._2
-      )
+    submit(actAs, readAs, update, priority)
+      .withDomainId(domainId, disclosedContracts)
+      .noDedup
+      .yieldResult()
 
   def submitWithResultAndOffsetNoDedup[T](
       actAs: Seq[PartyId],
@@ -267,16 +433,10 @@ class CNLedgerConnection(
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
   )(implicit tc: TraceContext): Future[(String, T)] =
-    doSubmitWithResultAndOffset(
-      actAs,
-      readAs,
-      update,
-      uniqueId,
-      NoDedup,
-      domainId,
-      disclosedContracts,
-      priority,
-    )
+    submit(actAs, readAs, update, priority)
+      .withDomainId(domainId, disclosedContracts)
+      .noDedup
+      .yieldResultAndOffset()
 
   def submitWithResult[T](
       actAs: Seq[PartyId],
@@ -288,51 +448,10 @@ class CNLedgerConnection(
       disclosedContracts: DisclosedContracts = DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
   )(implicit tc: TraceContext): Future[T] =
-    doSubmitWithResultAndOffset(
-      actAs,
-      readAs,
-      update,
-      commandId.commandIdForSubmission,
-      deduplicationConfig,
-      domainId,
-      disclosedContracts,
-      priority,
-    )
-      .map(_._2)
-
-  protected def doSubmitWithResultAndOffset[T](
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      update: Update[T],
-      commandIdForSubmission: String,
-      dedup: DedupConfig,
-      domainId: DomainId,
-      disclosedContracts: DisclosedContracts,
-      priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[(String, T)] = {
-    for {
-      _ <- verifyEnoughExtraTrafficRemains(domainId, priority)
-      tree <- callCallbacksOnCompletionAndWaitForOffset(
-        client
-          .submitAndWaitForTransactionTree(
-            workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-            applicationId = applicationId,
-            commandId = commandIdForSubmission,
-            actAs = actAs.map(_.toProtoPrimitive),
-            readAs = readAs.map(_.toProtoPrimitive),
-            commands = update.commands.asScala.toSeq,
-            deduplicationConfig = dedup,
-            disclosedContracts = disclosedContracts assertOnDomain domainId,
-          )
-      )(tx => (tx.getOffset, tx))
-    } yield (
-      tree.getOffset,
-      decodeExerciseResult(
-        update,
-        tree,
-      ),
-    )
-  }
+    submit(actAs, readAs, update, priority)
+      .withDomainId(domainId, disclosedContracts)
+      .withDedup(commandId, deduplicationConfig)
+      .yieldResult()
 
   def activeContracts(
       filter: IngestionFilter,
@@ -945,6 +1064,102 @@ object CNLedgerConnection {
   }
 
   def uniqueId: String = UUID.randomUUID.toString
+
+  @implicitNotFound(
+    "${CmdId} isn't a deduplication configuration or Unit. Did you call withDedup or noDedup?"
+  )
+  final case class SubmitDedup[-CmdId](
+      private[CNLedgerConnection] val split: CmdId => (String, DedupConfig)
+  )
+  object SubmitDedup {
+    implicit val dedupOffset: SubmitDedup[(CommandId, String)] = SubmitDedup { case (cid, offset) =>
+      (cid.commandIdForSubmission, DedupOffset(offset))
+    }
+    implicit val dedupConfig: SubmitDedup[(CommandId, DedupConfig)] = SubmitDedup {
+      case (cid, dc) =>
+        (cid.commandIdForSubmission, dc)
+    }
+    implicit val noDedup: SubmitDedup[Unit] = SubmitDedup(_ => (uniqueId, NoDedup))
+  }
+
+  /** Some `update`s can determine the domain ID immediately; this typeclass
+    * determines when this has happened.
+    */
+  final case class UpdateAssignment[-C, +DomId](private[CNLedgerConnection] val run: C => DomId)
+  object UpdateAssignment extends UpdateAssignmentLow {
+    implicit val assigned
+        : UpdateAssignment[Contract.Exercising[AssignedContract[?, ?], ?], DomainId] =
+      UpdateAssignment(_.origin.domain)
+  }
+  sealed abstract class UpdateAssignmentLow {
+    implicit val noInfo: UpdateAssignment[Any, Unit] = UpdateAssignment(Function const (()))
+  }
+
+  @implicitNotFound(
+    "withDisclosedContracts can only be used when ${C} is .exercise on an AssignedContract, or ${DomId} is Unit and ${Arg} is statically non-empty"
+  )
+  final case class WithDisclosedContracts[-C, -DomId, -Arg](
+      private[CNLedgerConnection] val inferDomain: (C, DomId, Arg) => DomainId
+  )
+  object WithDisclosedContracts {
+    @annotation.nowarn("cat=unused&msg=C")
+    implicit def exercised[C](implicit
+        C: UpdateAssignment[C, DomainId] // proves that DomainId derives directly from C
+    ): WithDisclosedContracts[C, DomainId, DisclosedContracts] =
+      WithDisclosedContracts((_, domainId, _) => domainId)
+    implicit val nonEmpty: WithDisclosedContracts[Any, Unit, DisclosedContracts.NE] =
+      WithDisclosedContracts((_, _, dc) => dc.assignedDomain)
+  }
+
+  /** A type-determining typeclass for [[CNLedgerConnection#submit#yieldResult]].
+    * That method requires an effective functional dependency `C -> Z`, but
+    * [[SubmitCommands]] cannot supply that.  The fundep is supplied by this
+    * typeclass instead.
+    */
+  @implicitNotFound("${C} doesn't contain an Update that can yield a result")
+  sealed abstract class YieldResult[-C, +Z]
+  object YieldResult {
+    private[this] object OnlyInstance extends YieldResult[Any, Nothing]
+    implicit def update[T]: YieldResult[Update[T], T] = OnlyInstance
+    implicit def exercising[T]: YieldResult[Contract.Exercising[Any, Update[T]], T] =
+      OnlyInstance
+  }
+
+  /** Just a folder for the commands in an `update` supplied to `#submit`. */
+  @implicitNotFound(
+    "${C} isn't a single update, contract exercise or list of commands. The update argument to submit must be one of these"
+  )
+  final case class SubmitCommands[-C](private[CNLedgerConnection] val run: C => Seq[Command])
+  object SubmitCommands {
+    implicit val single: SubmitCommands[HasCommands] = SubmitCommands(_.commands().asScala.toSeq)
+    implicit val multiple: SubmitCommands[Seq[HasCommands]] =
+      SubmitCommands(cs => HasCommands.toCommands(cs.asJava).asScala.toSeq)
+    implicit val exercise: SubmitCommands[Contract.Exercising[Any, ?]] =
+      SubmitCommands(e => single.run(e.update))
+  }
+
+  @implicitNotFound("${C} can't be interpreted to produce ${Z} from the command service")
+  sealed abstract class SubmitResult[-C, +Z]
+  object SubmitResult {
+    private[CNLedgerConnection] final class Ignored extends SubmitResult[Any, Unit]
+    implicit val Ignored: SubmitResult[Any, Unit] = new Ignored
+    private[CNLedgerConnection] final class JustTransaction extends SubmitResult[Any, Transaction]
+    implicit val JustTransaction: SubmitResult[Any, Transaction] = new JustTransaction
+    implicit def resultAndOffset[T]: SubmitResult[Update[T], (String, T)] = new ResultAndOffset()
+    implicit def onlyResult[T]: SubmitResult[Update[T], T] = new ResultAndOffset((_, t) => t)
+    implicit def exercising[T, Z](implicit
+        rec: SubmitResult[Update[T], Z]
+    ): SubmitResult[Contract.Exercising[Any, T], Z] = new Contramap(_.update, rec)
+
+    private[CNLedgerConnection] final class ResultAndOffset[T, +Z](
+        val continue: (String, T) => Z = (_: String, _: T)
+    ) extends SubmitResult[Update[T], Z]
+
+    private[CNLedgerConnection] final class Contramap[-C, U, +Z](
+        val g: C => U,
+        val rec: SubmitResult[U, Z],
+    ) extends SubmitResult[C, Z]
+  }
 }
 
 sealed trait CommandPriority { def name: String }

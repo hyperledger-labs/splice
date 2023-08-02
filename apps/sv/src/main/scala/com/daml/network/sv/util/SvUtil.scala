@@ -172,7 +172,7 @@ object SvUtil {
     }
   }
 
-  def requiredNumVotes(svcRules: Contract[SvcRules.ContractId, SvcRules]): Int = {
+  def requiredNumVotes(svcRules: Contract.Has[SvcRules.ContractId, SvcRules]): Int = {
     val memberNum = svcRules.payload.members.size
     // as per `SvcRules` / `summarizeCollective`
     val f = (memberNum - 1) / 3

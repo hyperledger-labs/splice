@@ -68,9 +68,9 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
     lookupSvcRulesWithOffset().map(_.value)
 
   def getSvcRules(
-  ): Future[Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
+  ): Future[AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
     lookupSvcRules().map(
-      _.map(_.contract).getOrElse(
+      _.getOrElse(
         throw new StatusRuntimeException(
           Status.NOT_FOUND.withDescription("No active SvcRules contract")
         )
@@ -461,7 +461,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   ]
 
   def listElectionRequests(
-      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+      svcRules: AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   )(implicit tc: TraceContext): Future[
     Seq[Contract[cn.svcrules.ElectionRequest.ContractId, cn.svcrules.ElectionRequest]]
   ]

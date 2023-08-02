@@ -482,35 +482,30 @@ class InMemorySvSvcStore(
     )
   )
 
-  override def listElectionRequests(svcRules: Contract[SvcRules.ContractId, SvcRules])(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = defaultAcsDomainIdF
-    .flatMap(
-      multiDomainAcsStore.filterContractsOnDomain(
+  override def listElectionRequests(svcRules: AssignedContract[SvcRules.ContractId, SvcRules])(
+      implicit tc: TraceContext
+  ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] =
+    multiDomainAcsStore
+      .filterContractsOnDomain(
         cn.svcrules.ElectionRequest.COMPANION,
-        _,
-        {
-          c: Contract[
-            cn.svcrules.ElectionRequest.ContractId,
-            cn.svcrules.ElectionRequest,
-          ] =>
-            svcRules.payload.members.keySet
-              .contains(c.payload.requester) && c.payload.epoch == svcRules.payload.epoch
+        svcRules.domain,
+        { c: Contract[?, cn.svcrules.ElectionRequest] =>
+          svcRules.payload.members.keySet
+            .contains(c.payload.requester) && c.payload.epoch == svcRules.payload.epoch
         },
       )
-    )
-    .map(
-      _.foldLeft(
-        Map[String, Contract[
-          cn.svcrules.ElectionRequest.ContractId,
-          cn.svcrules.ElectionRequest,
-        ]]()
-      ) { (acc, contract) =>
-        if (acc.contains(contract.payload.requester)) acc
-        else acc + (contract.payload.requester -> contract)
-      }
-    )
-    .map(dict => dict.values.toSeq)
+      .map(
+        _.foldLeft(
+          Map[String, Contract[
+            cn.svcrules.ElectionRequest.ContractId,
+            cn.svcrules.ElectionRequest,
+          ]]()
+        ) { (acc, contract) =>
+          if (acc.contains(contract.payload.requester)) acc
+          else acc + (contract.payload.requester -> contract)
+        }
+      )
+      .map(dict => dict.values.toSeq)
 
   override def lookupElectionRequestByRequesterWithOffset(requester: PartyId, epoch: Long)(implicit
       tc: TraceContext

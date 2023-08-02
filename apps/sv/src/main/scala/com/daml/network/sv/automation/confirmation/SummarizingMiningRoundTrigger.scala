@@ -24,7 +24,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class SummarizingMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -76,9 +75,11 @@ class SummarizingMiningRoundTrigger(
         rewards.summary,
       )
       queryResult <- store.lookupConfirmationByActionWithOffset(svParty, action)
-      cmd = svcRules.contractId.exerciseSvcRules_ConfirmAction(
-        svParty.toProtoPrimitive,
-        action,
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_ConfirmAction(
+          svParty.toProtoPrimitive,
+          action,
+        )
       )
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
@@ -89,18 +90,20 @@ class SummarizingMiningRoundTrigger(
           )
         case QueryResult(offset, None) =>
           connection
-            .submitCommands(
+            .submit(
               actAs = Seq(svParty),
               readAs = Seq(svcParty),
-              commands = cmd.commands.asScala.toSeq,
+              update = cmd,
+            )
+            .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.createMiningRoundStartIssuingConfirmation",
                 Seq(svParty, svcParty),
                 summarizingRound.contractId.contractId,
               ),
               deduplicationOffset = offset,
-              domainId = summarizingRound.domain,
             )
+            .yieldUnit()
             .map { _ =>
               TaskSuccess(
                 s"created confirmation for summarizing mining round with ${rewards.summary}"

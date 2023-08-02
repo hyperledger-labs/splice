@@ -71,30 +71,32 @@ class ArchiveClosedMiningRoundsTrigger(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
       closedRound = task.value
       action = coinRulesArchiveMiningRoundAction(
         closedRound.contractId
       )
-      update = svcRules.contractId
-        .exerciseSvcRules_ConfirmAction(
+      update = svcRules.exercise(
+        _.exerciseSvcRules_ConfirmAction(
           svParty.toProtoPrimitive,
           action,
         )
+      )
       _ <- connection
-        .submitWithResult(
+        .submit(
           actAs = Seq(svParty),
           readAs = Seq(svcParty),
           update = update,
+        )
+        .withDedup(
           commandId = CNLedgerConnection.CommandId(
             "com.daml.network.sv.createMiningRoundArchiveConfirmation",
             Seq(svParty, svcParty),
             closedRound.contractId.contractId,
           ),
           deduplicationConfig = DedupOffset(task.offset),
-          domainId = domainId,
         )
+        .yieldUnit()
     } yield {
       TaskSuccess(
         s"Successfully created a confirmation for archiving closed mining round ${closedRound.payload.round.number}"

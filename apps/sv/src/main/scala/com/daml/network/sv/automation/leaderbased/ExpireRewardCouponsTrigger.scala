@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc.coin.{CoinRules, CoinRules_ClaimExpiredRewards}
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.sv.store.ExpiredRewardCouponsBatch
-import com.daml.network.util.Contract
+import com.daml.network.util.{AssignedContract, Contract}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -64,7 +64,7 @@ class ExpireRewardCouponsTrigger(
 
   private def expireRewardCouponsForRound(
       expiredRewardsTask: ExpiredRewardCouponsBatch,
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
       coinRules: Contract[CoinRules.ContractId, CoinRules],
   )(implicit
       tc: TraceContext

@@ -970,7 +970,7 @@ object SvApp {
   private[sv] def isSvcMember(
       name: String,
       party: PartyId,
-      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
   ): Boolean =
     svcRules.payload.members.asScala
       .get(party.toProtoPrimitive)
@@ -979,16 +979,16 @@ object SvApp {
 
   private[sv] def isSvcMemberParty(
       party: PartyId,
-      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
   ): Boolean = svcRules.payload.members.containsKey(party.toProtoPrimitive)
 
   private[sv] def isSvcMemberName(
       name: String,
-      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
   ): Boolean = svcRules.payload.members.values.asScala.exists(_.name == name)
 
   private[sv] def isDevNet(
-      svcRules: Contract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   ): Boolean = svcRules.payload.isDevNet
 
   private def initializeValidator(

@@ -20,7 +20,7 @@ import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.util.{Contract, AssignedContract}
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -59,7 +59,7 @@ class SvOnboardingRequestTrigger(
   )
 
   private def attemptConfirmation(
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
       svOnboarding: AssignedContract[
         SvOnboardingRequest.ContractId,
         SvOnboardingRequest,
@@ -148,7 +148,7 @@ class SvOnboardingRequestTrigger(
       party: PartyId,
       name: String,
       reason: String,
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
       domainId: DomainId,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val action = svcRulesConfirmSvOnboardingAction(party, name, reason)
