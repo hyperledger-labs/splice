@@ -32,12 +32,13 @@ testTransferOffers = script do
     svcParty = app.svc
     validatorParty = bobValidator.primaryParty
 
-  let createOffer amount description curTime = submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall
+  let createOffer amount description curTime trackingId = submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall
         WalletAppInstall_CreateTransferOffer with
           receiver = bob.primaryParty
           amount = PaymentAmount amount CC
           description = description
           expiresAt = curTime `addRelTime` minutes 5
+          trackingId = trackingId
 
 -- TODO(#2957): remove read-as SVC.
   let completeTransfer accepted coin transferContext = submitMulti [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.svc] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
@@ -45,34 +46,34 @@ testTransferOffers = script do
         operations = [CO_CompleteAcceptedTransfer accepted]
         context = transferContext
 
-  offer <- createOffer 2.0 " transfer test" t
+  offer <- createOffer 2.0 " transfer test" t "transfer_test"
   accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
   [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 2.5)
   transferContext <- getPaymentTransferContext app alice
   _ <- completeTransfer accepted coin transferContext
 
-  offer <- createOffer 3.0 "to be rejected" t
+  offer <- createOffer 3.0 "to be rejected" t "to_be_rejected"
   submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall WalletAppInstall_TransferOffer_Reject with cid = offer
 
-  offer <- createOffer 4.0 "to be withdrawn" t
+  offer <- createOffer 4.0 "to be withdrawn" t "to_be_withdrawn"
   submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall WalletAppInstall_TransferOffer_Withdraw with cid = offer
 
-  offer <- createOffer 7.0 "To expire" t
+  offer <- createOffer 7.0 "To expire" t "to_expire"
   passTime (minutes 6)
   [_] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 7.5)
   submitMultiMustFail [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
 
   t <- getTime
-  offer <- createOffer 8.0 "To abort post-acceptance" t
+  offer <- createOffer 8.0 "To abort post-acceptance" t "to_abort"
   accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
   submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall
         WalletAppInstall_AcceptedTransferOffer_Abort with
           cid = accepted
 
-  offer <- createOffer 8.5 "To withdraw acceptance" t
+  offer <- createOffer 8.5 "To withdraw acceptance" t "to_withdraw_acceptance"
   accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
   submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
@@ -80,7 +81,7 @@ testTransferOffers = script do
           cid = accepted
 
   t <- getTime
-  offer <- createOffer 100.0 "Insufficient funds" t
+  offer <- createOffer 100.0 "Insufficient funds" t "insufficient_funds"
   accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
   transferContext <- getPaymentTransferContext app alice

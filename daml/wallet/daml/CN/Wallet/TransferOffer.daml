@@ -18,6 +18,7 @@ template TransferOffer
     amount : PaymentAmount
     description : Text
     expiresAt : Time
+    trackingId : Text -- used to deduplicate requests and query for the status
   where
     signatory sender
     observer receiver
@@ -54,6 +55,7 @@ template AcceptedTransferOffer
     svc : Party
     amount : PaymentAmount
     expiresAt : Time
+    trackingId : Text
   where
     signatory sender, receiver
 

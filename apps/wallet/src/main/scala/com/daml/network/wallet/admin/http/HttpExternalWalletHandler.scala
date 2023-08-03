@@ -42,6 +42,7 @@ class HttpExternalWalletHandler(
               new PaymentAmount(amount, Currency.CC),
               request.description,
               expiresAt.toInstant,
+              request.trackingId,
             )
             .map { cid =>
               r0.CreateTransferOfferResponse.OK(

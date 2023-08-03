@@ -212,6 +212,7 @@ template WalletAppInstall
         amount : PaymentAmount
         description : Text
         expiresAt: Time
+        trackingId : Text
       controller validatorParty
       do
         create TransferOffer with

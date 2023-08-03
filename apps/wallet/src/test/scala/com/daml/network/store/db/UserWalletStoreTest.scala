@@ -35,6 +35,7 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 import com.google.protobuf
 import org.scalatest.{Assertion, Succeeded}
 
+import java.util.UUID
 import scala.concurrent.Future
 
 abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
@@ -683,6 +684,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       amount: Double,
       currency: paymentCodegen.Currency,
       expiresAt: CantonTimestamp,
+      trackingId: String = UUID.randomUUID().toString,
   ) = {
     val templateId = transferOffersCodegen.TransferOffer.TEMPLATE_ID
     val template = new transferOffersCodegen.TransferOffer(
@@ -692,6 +694,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), currency),
       s"Payment from $sender to $receiver for $amount $currency, expiring at $expiresAt",
       expiresAt.toInstant,
+      trackingId,
     )
     Contract(
       identifier = templateId,
@@ -708,6 +711,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       amount: Double,
       currency: paymentCodegen.Currency,
       expiresAt: CantonTimestamp,
+      trackingId: String = UUID.randomUUID().toString,
   ) = {
     val templateId = transferOffersCodegen.AcceptedTransferOffer.TEMPLATE_ID
     val template = new transferOffersCodegen.AcceptedTransferOffer(
@@ -716,6 +720,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       svcParty.toProtoPrimitive,
       new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), currency),
       expiresAt.toInstant,
+      trackingId,
     )
     Contract(
       identifier = templateId,
