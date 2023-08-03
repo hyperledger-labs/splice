@@ -1,6 +1,6 @@
 {
-    "name": "DevNet Nightly Re-deployment",
-    "description": "Nightly Re-deployment of DevNet",
+    "name": "DevNet Weekly Re-deployment",
+    "description": "Weekly Re-deployment of DevNet",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
