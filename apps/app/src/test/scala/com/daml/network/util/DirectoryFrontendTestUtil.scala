@@ -1,15 +1,14 @@
 package com.daml.network.util
 
+import com.daml.network.directory.DirectoryUtil
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
-
-import scala.concurrent.duration.*
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.scalatest.compatible.Assertion
 
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.time.{Duration, LocalDateTime}
-import com.daml.network.directory.DirectoryUtil
+import scala.concurrent.duration.*
 
 trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
@@ -47,6 +46,7 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ): Assertion = {
 
     clue(s"Reserving directory name: ${expectedName}") {
+      val timeBeforeAllocate = LocalDateTime.now()
       allocateDirectoryEntry(directoryUiLogin, expectedName)
 
       // user is redirected to their wallet...
@@ -62,6 +62,8 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
       val goToDirectoryEntriesButton = eventually() {
         find(id("directory-entries-button")).valueOrFail("The success page did not load.")
       }
+      val timeAfterAllocate = LocalDateTime.now()
+
       click on goToDirectoryEntriesButton
 
       eventually() {
@@ -82,14 +84,11 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
         currency should be(expectedCurrency)
         interval should be(expectedInterval)
 
-        // only compare date and not time to avoid test flakes when running the test right when the hour changes
-        // We accept the flake when running this test right at the change of the date.
-        val expiry = LocalDateTime.now().plus(Duration.ofDays(90))
-        val expectedExpiry =
-          DateTimeFormatter
-            .ofPattern("MM/dd/yyyy")
-            .format(expiry)
-        expiresAt should startWith(expectedExpiry)
+        val expiryAfter = timeBeforeAllocate.minusMinutes(1).plusDays(90)
+        val expiryBefore = timeAfterAllocate.plusMinutes(1).plusDays(90)
+        val parsedExpiresAt =
+          LocalDateTime.from(DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm").parse(expiresAt))
+        parsedExpiresAt should (be >= expiryAfter).and(be <= expiryBefore)
       }
     }
   }
