@@ -8,6 +8,7 @@ tmux_session="canton"
 
 if tmux has-session -t $tmux_session 2>/dev/null; then
   # kill-session seems to send a SIGHUP which does not seem to be quite enough
+  echo "Killing canton tmux session"
   # to tear down the processes promptly so we manually kill them.
   # parents will usually be some shell process.
   readarray -t TMUX_PARENT_PIDS < <(tmux list-panes -s -F "#{pane_pid}" -t $tmux_session)
