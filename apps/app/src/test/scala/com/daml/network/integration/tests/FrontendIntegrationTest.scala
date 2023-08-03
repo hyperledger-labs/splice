@@ -281,16 +281,16 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     logger.info("Cleared web drivers")
   }
 
-  def withFrontEnd[A](driverName: String)(implicit f: WebDriverType => A): A =
-    f(
-      webDrivers
-        .get(driverName)
-        .getOrElse(
-          sys.error(
-            s"No such webDriver : $driverName. Did you forget to pass it to FrontendIntegrationTest?"
-          )
+  def withFrontEnd[A](driverName: String)(implicit f: WebDriverType => A): A = {
+    val webDriver = webDrivers
+      .get(driverName)
+      .getOrElse(
+        sys.error(
+          s"No such webDriver : $driverName. Did you forget to pass it to FrontendIntegrationTest?"
         )
-    )
+      )
+    dumpDebugInfoOnFailure(f(webDriver))(webDriver)
+  }
 
   /** The `<TextInput>` in ts code is converted by react into a deep tree. This returns the input field. */
   protected def reactTextInput(textField: Element): TextField = new TextField(
