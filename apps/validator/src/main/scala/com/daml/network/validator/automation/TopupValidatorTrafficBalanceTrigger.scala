@@ -82,13 +82,11 @@ class TopupValidatorTrafficBalanceTrigger(
       activeDomainId: DomainId,
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      validatorTreasury <- getValidatorTreasury()
       intentCidOrTraffic <- getOrCreateIntentCidOrTraffic(activeDomainId)
       currentTrafficState <- participantAdminConnection.getParticipantTrafficState(activeDomainId)
       result <-
         if (shouldTopup(currentTrafficState, intentCidOrTraffic.toOption, topupParameters))
           topUpValidatorTraffic(
-            validatorTreasury,
             intentCidOrTraffic,
             topupParameters,
           )
@@ -126,7 +124,6 @@ class TopupValidatorTrafficBalanceTrigger(
   }
 
   private def topUpValidatorTraffic(
-      validatorTreasury: TreasuryService,
       intentOrTraffic: Either[
         ValidatorTrafficCreationIntent.ContractId,
         Contract[ValidatorTraffic.ContractId, ValidatorTraffic],
@@ -143,9 +140,10 @@ class TopupValidatorTrafficBalanceTrigger(
       new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
     )
     for {
+      validatorTreasury <- getValidatorTreasury()
       taskOutcome <-
         validatorTreasury
-          .enqueueCoinOperation(coBuyExtraTraffic)
+          .enqueueCoinOperation(coBuyExtraTraffic, CommandPriority.High)
           .map {
             case outcome: COO_BuyExtraTraffic =>
               logger.info(

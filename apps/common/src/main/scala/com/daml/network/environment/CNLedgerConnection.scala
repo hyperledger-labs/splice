@@ -66,7 +66,7 @@ class CNLedgerConnection(
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
-    trafficBalanceServiceO: Option[TrafficBalanceService],
+    trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
     completionOffsetCallback: String => Future[Unit],
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends NamedLogging {
@@ -126,23 +126,25 @@ class CNLedgerConnection(
   private def verifyEnoughExtraTrafficRemains(domainId: DomainId, commandPriority: CommandPriority)(
       implicit tc: TraceContext
   ): Future[Unit] = {
-    trafficBalanceServiceO.fold(Future.unit)(trafficBalanceService => {
-      trafficBalanceService.lookupReservedTraffic(domainId).flatMap {
-        case None => Future.unit
-        case Some(reservedTraffic) =>
-          trafficBalanceService.lookupAvailableTraffic(domainId).flatMap {
-            case None => Future.unit
-            case Some(availableTraffic) =>
-              if (availableTraffic < reservedTraffic && commandPriority == CommandPriority.Low)
-                throw Status.ABORTED
-                  .withDescription(
-                    s"Traffic balance below amount reserved for top-ups ($availableTraffic < $reservedTraffic)"
-                  )
-                  .asRuntimeException()
-              else Future.unit
-          }
-      }
-    })
+    trafficBalanceServiceO
+      .get()
+      .fold(Future.unit)(trafficBalanceService => {
+        trafficBalanceService.lookupReservedTraffic(domainId).flatMap {
+          case None => Future.unit
+          case Some(reservedTraffic) =>
+            trafficBalanceService.lookupAvailableTraffic(domainId).flatMap {
+              case None => Future.unit
+              case Some(availableTraffic) =>
+                if (availableTraffic <= reservedTraffic && commandPriority == CommandPriority.Low)
+                  throw Status.ABORTED
+                    .withDescription(
+                      s"Traffic balance below amount reserved for top-ups ($availableTraffic < $reservedTraffic)"
+                    )
+                    .asRuntimeException()
+                else Future.unit
+            }
+        }
+      })
   }
 
   // The participant ledger end as opposed to the per-domain ledger end.

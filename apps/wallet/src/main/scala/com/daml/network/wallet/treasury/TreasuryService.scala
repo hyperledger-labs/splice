@@ -27,12 +27,12 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.codegen.java.cn.wallet.install.{
-  coinoperation,
   ExecuteBatchResult,
   WalletAppInstall,
+  coinoperation,
 }
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{CNNodeUtil, Contract, DisclosedContracts, HasHealth}
 import com.daml.network.util.PrettyInstances.*
@@ -95,9 +95,13 @@ class TreasuryService(
   private val queue: BoundedSourceQueue[EnqueuedCoinOperation] = {
     val queue = Source
       .queue[EnqueuedCoinOperation](treasuryConfig.queueSize)
-      .batch(treasuryConfig.batchSize.toLong, operation => CoinOperationBatch(operation))(
-        (batch, operation) => batch.addCOToBatch(operation)
-      )
+      .batchWeighted(
+        treasuryConfig.batchSize.toLong,
+        operation =>
+          if (operation.priority == CommandPriority.High) treasuryConfig.batchSize.toLong + 1L
+          else 1L,
+        operation => CoinOperationBatch(operation),
+      )((batch, operation) => batch.addCOToBatch(operation))
       // Execute the batches sequentially to avoid contention
       .mapAsync(1)(filterAndExecuteBatch)
       .toMat(
@@ -147,13 +151,14 @@ class TreasuryService(
     * The [[TreasuryService]] will schedule the operation and then complete the returned with its result.
     */
   def enqueueCoinOperation[T](
-      operation: installCodegen.CoinOperation
+      operation: installCodegen.CoinOperation,
+      priority: CommandPriority = CommandPriority.Low,
   )(implicit tc: TraceContext): Future[installCodegen.CoinOperationOutcome] = {
     val p = Promise[installCodegen.CoinOperationOutcome]()
     logger.debug(
       show"Received operation (queue size before adding this: ${queue.size()}): $operation"
     )
-    queue.offer(EnqueuedCoinOperation(operation, p, tc)) match {
+    queue.offer(EnqueuedCoinOperation(operation, p, tc, priority)) match {
       case Enqueued =>
         logger.debug(show"Operation $operation enqueued successfully")
         p.future
@@ -372,6 +377,7 @@ class TreasuryService(
           cmd,
           disclosedContracts.assignedDomain,
           disclosedContracts,
+          priority = batch.priority,
         )
 
       // wait for store to ingest the new coin holdings, then return all outcomes to the callers
@@ -706,18 +712,29 @@ object TreasuryService {
 
     def isMergeOnly: Boolean = mergeOperationOpt.isDefined && nonMergeOperations.isEmpty
 
+    def priority: CommandPriority = {
+      if (
+        mergeOperationOpt.isEmpty && nonMergeOperations.forall(_.priority == CommandPriority.High)
+      ) CommandPriority.High
+      else CommandPriority.Low
+    }
+
     def addCOToBatch(operation: EnqueuedCoinOperation): CoinOperationBatch = {
-      val isMergeOp = operation.isCO_MergeTransferInputs
-      mergeOperationOpt match {
-        case None if isMergeOp => CoinOperationBatch(Some(operation), nonMergeOperations)
-        case Some(_) if isMergeOp =>
-          // if we already have a merge operation in this batch; complete the new one immediately and
-          // don't add it to the batch
-          operation.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
-          this
-        case _ =>
-          CoinOperationBatch(mergeOperationOpt, nonMergeOperations :+ operation)
-      }
+      if (
+        (mergeOperationOpt.isEmpty && nonMergeOperations.isEmpty) || priority == operation.priority
+      ) {
+        val isMergeOp = operation.isCO_MergeTransferInputs
+        mergeOperationOpt match {
+          case None if isMergeOp => CoinOperationBatch(Some(operation), nonMergeOperations)
+          case Some(_) if isMergeOp =>
+            // if we already have a merge operation in this batch; complete the new one immediately and
+            // don't add it to the batch
+            operation.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
+            this
+          case _ =>
+            CoinOperationBatch(mergeOperationOpt, nonMergeOperations :+ operation)
+        }
+      } else sys.error("Cannot mix operations of different priorities in batch")
     }
 
     def computeExecuteBatchCmd(
@@ -758,6 +775,7 @@ object TreasuryService {
       operation: installCodegen.CoinOperation,
       outcomePromise: Promise[installCodegen.CoinOperationOutcome],
       submittedFrom: TraceContext,
+      priority: CommandPriority = CommandPriority.Low,
   ) extends PrettyPrinting {
     override def pretty: Pretty[EnqueuedCoinOperation.this.type] =
       prettyNode(

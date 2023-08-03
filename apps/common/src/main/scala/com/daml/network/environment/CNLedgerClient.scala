@@ -78,7 +78,7 @@ class CNLedgerClient(
       baseLoggerFactory.append("connClient", connectionClient),
       retryProvider,
       callbacks,
-      trafficBalanceService.get(),
+      trafficBalanceService,
       completionOffsetCallback,
     )
 

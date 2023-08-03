@@ -1090,6 +1090,11 @@ printTests := {
       (t: String) => !isTimeBasedTest(t) && isDomainFeesTest(t),
     ),
     (
+      "domain fees enabled tests with sim time",
+      "test-full-class-names-domain-fees-sim-time.log",
+      (t: String) => isTimeBasedTest(t) && isDomainFeesTest(t),
+    ),
+    (
       "global domain upgrade test",
       "test-full-class-names-global-upgrade-sim-time.log",
       (t: String) => isTimeBasedTest(t) && isGlobalUpgradeTest(t),

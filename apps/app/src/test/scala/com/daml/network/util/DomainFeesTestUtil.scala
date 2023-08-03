@@ -19,6 +19,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.CoinPosition
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.sequencing.protocol.SequencedEventTrafficState
 import com.digitalasset.canton.topology.DomainId
 
 import scala.jdk.CollectionConverters.*
@@ -81,6 +82,16 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     }
   }
 
+  def getValidatorTraffic(
+      validatorApp: ValidatorAppBackendReference,
+      domainId: DomainId,
+  ): ValidatorTraffic.Contract = {
+    listValidatorContracts(ValidatorTraffic.COMPANION)(
+      validatorApp,
+      _.data.domainId == domainId.toProtoPrimitive,
+    ).loneElement
+  }
+
   /** Buy extra traffic for a given validator with the provided coins.
     */
   def buyExtraTraffic(
@@ -140,8 +151,8 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
         .outcomes
         .asScala
         .toSeq
-    ) { case Seq(_: COO_BuyExtraTraffic) =>
-      ()
+    ) { case Seq(coo: COO_BuyExtraTraffic) =>
+      coo.contractIdValue
     }
   }
 
@@ -164,4 +175,14 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     val totalCostCc = totalCostUsd / coinPrice
     (totalCostUsd, totalCostCc)
   }
+
+  def getTrafficState(
+      validatorApp: ValidatorAppBackendReference,
+      domainId: DomainId,
+  ): SequencedEventTrafficState = {
+    validatorApp.participantClientWithAdminToken.traffic_control
+      .traffic_state(domainId)
+      .trafficState
+  }
+
 }
