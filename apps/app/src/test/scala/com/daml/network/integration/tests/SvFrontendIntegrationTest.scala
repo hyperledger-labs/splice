@@ -1100,8 +1100,10 @@ class SvFrontendIntegrationTest
       )(
         s"the number of accept votes increased to ${numberAccepts}",
         _ => {
-          inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-            element.text should matchText(numberAccepts)
+          inside(find(id("vote-request-modal-accepted-count"))) {
+            case Some(element) => element.text should matchText(numberAccepts)
+            case None =>
+              finalVote shouldBe true // the vote request might already have been archived at this point
           }
           if (finalVote) {
             webDriver.findElement(By.tagName("body")).sendKeys(Keys.ESCAPE)
