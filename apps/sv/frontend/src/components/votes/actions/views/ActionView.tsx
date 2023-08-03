@@ -1,4 +1,4 @@
-import { PartyId } from 'common-frontend';
+import { Loading, PartyId } from 'common-frontend';
 import dayjs from 'dayjs';
 import React, { ReactElement, useState } from 'react';
 
@@ -23,7 +23,23 @@ import {
   SvcRulesConfig,
 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
+import { useSvcInfos } from '../../../../contexts/SvContext';
+
 const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action }) => {
+  const svcInfosQuery = useSvcInfos();
+
+  if (svcInfosQuery.isLoading) {
+    return <Loading />;
+  }
+
+  if (svcInfosQuery.isError) {
+    return <p>Not yet implemented.</p>;
+  }
+
+  if (!svcInfosQuery.data) {
+    return <p>no VoteRequest contractId is specified</p>;
+  }
+
   const actionType = action.tag;
 
   const trueElement = <Typography>True</Typography>;
@@ -108,6 +124,66 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
           />
         );
       }
+      case 'CRARC_AddFutureCoinConfigSchedule': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={coinRulesAction.tag}
+            valuesMap={{
+              Time: (
+                <PrettyJsonPrint
+                  data={dayjs(coinRulesAction.value.newScheduleItem._1)
+                    .toString()
+                    .replace('GMT', 'UTC')}
+                />
+              ),
+              NewScheduleItem: <PrettyJsonPrint data={coinRulesAction.value.newScheduleItem._2} />,
+            }}
+          />
+        );
+      }
+      case 'CRARC_RemoveFutureCoinConfigSchedule': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={coinRulesAction.tag}
+            valuesMap={{
+              Time: (
+                <PrettyJsonPrint
+                  data={dayjs(coinRulesAction.value.scheduleTime).toString().replace('GMT', 'UTC')}
+                />
+              ),
+              ScheduleItem: (
+                <PrettyJsonPrint
+                  data={
+                    svcInfosQuery.data?.coinRules.payload.configSchedule.futureValues.find(
+                      e => e._1 === coinRulesAction.value.scheduleTime
+                    )!._2
+                  }
+                />
+              ),
+            }}
+          />
+        );
+      }
+      case 'CRARC_UpdateFutureCoinConfigSchedule': {
+        return (
+          <ActionValueTable
+            actionType={actionType}
+            actionName={coinRulesAction.tag}
+            valuesMap={{
+              Time: (
+                <PrettyJsonPrint
+                  data={dayjs(coinRulesAction.value.scheduleItem._1)
+                    .toString()
+                    .replace('GMT', 'UTC')}
+                />
+              ),
+              ScheduleItem: <PrettyJsonPrint data={coinRulesAction.value.scheduleItem._2} />,
+            }}
+          />
+        );
+      }
     }
   }
   return <p>Not yet implemented for this action</p>;
@@ -142,7 +218,7 @@ const ActionValueTable: React.FC<{
             </TableRow>
             {valuesMap &&
               Object.keys(valuesMap).map(key => (
-                <TableRow key={key}>
+                <TableRow key={key} id={key}>
                   <TableCell>
                     <Typography variant="h6">{key}</Typography>
                   </TableCell>
@@ -177,6 +253,7 @@ const PrettyJsonPrint: React.FC<{
   );
 };
 
+//TODO(#6930): remove it when retire setconfigschedule
 const DropdownSchedules: React.FC<{
   initialValue: CoinConfig<USD>;
   futureValues: Tuple2<string, CoinConfig<USD>>[];

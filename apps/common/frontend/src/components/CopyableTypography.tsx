@@ -6,10 +6,11 @@ import IconButton from '@mui/material/IconButton';
 
 export type CopyableTypographyProps = {
   text: string;
+  maxWidth?: string;
 } & TypographyProps;
 
 const CopyableTypography: React.FC<CopyableTypographyProps> = props => {
-  const { text, ...typographyProps } = props;
+  const { text, maxWidth, ...typographyProps } = props;
   const handleClick = () => navigator.clipboard.writeText(text);
 
   return (
@@ -17,7 +18,7 @@ const CopyableTypography: React.FC<CopyableTypographyProps> = props => {
       <div
         style={{
           display: 'inline-flex',
-          maxWidth: '200px',
+          maxWidth: maxWidth || '200px',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           fontWeight: 'lighter',

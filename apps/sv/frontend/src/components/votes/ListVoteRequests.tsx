@@ -110,10 +110,7 @@ const ListVoteRequests: React.FC = () => {
     } else if (action.tag === 'ARC_CoinRules') {
       const coinRulesAction = action.value.coinRulesAction;
       switch (coinRulesAction.tag) {
-        case 'CRARC_SetConfigSchedule': {
-          return `${coinRulesAction.tag}`;
-        }
-        case 'CRARC_SetEnabledChoices': {
+        default: {
           return `${coinRulesAction.tag}`;
         }
       }
@@ -223,7 +220,7 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
           </IconButton>
         </TableCell>
         <TableCell className="vote-row-action">
-          <CopyableTypography text={action} />
+          <CopyableTypography text={action} maxWidth={'300px'} />
         </TableCell>
         <TableCell className="vote-row-requester">{requester}</TableCell>
         <TableCell className="vote-row-vote-status" color="default">

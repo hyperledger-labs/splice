@@ -20,12 +20,15 @@ import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useSvcInfos } from '../../contexts/SvContext';
 import { config } from '../../utils';
 import ListVoteRequests from './ListVoteRequests';
+import AddFutureCoinConfigSchedule from './actions/AddFutureCoinConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
+import RemoveFutureCoinConfigSchedule from './actions/RemoveFutureCoinConfigSchedule';
 import RemoveMember from './actions/RemoveMember';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetCoinRulesConfig from './actions/SetCoinRulesConfig';
 import SetCoinRulesEnabledChoices from './actions/SetCoinRulesEnabledChoices';
 import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
+import UpdateFutureCoinConfigSchedule from './actions/UpdateFutureCoinConfigSchedule';
 
 const VoteRequest: React.FC = () => {
   const [actionName, setActionName] = useState('SRARC_RemoveMember');
@@ -40,6 +43,9 @@ const VoteRequest: React.FC = () => {
     { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
     { name: 'Set CoinRules Configuration', value: 'CRARC_SetConfigSchedule' },
     { name: 'Set CoinRules Enabled Choices', value: 'CRARC_SetEnabledChoices' },
+    { name: 'Add Coin Configuration Schedule', value: 'CRARC_AddFutureCoinConfigSchedule' },
+    { name: 'Remove Coin Configuration Schedule', value: 'CRARC_RemoveFutureCoinConfigSchedule' },
+    { name: 'Update Coin Configuration Schedule', value: 'CRARC_UpdateFutureCoinConfigSchedule' },
   ];
 
   const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
@@ -103,6 +109,15 @@ const VoteRequest: React.FC = () => {
           )}
           {actionName === 'CRARC_SetEnabledChoices' && (
             <SetCoinRulesEnabledChoices chooseAction={chooseAction} />
+          )}
+          {actionName === 'CRARC_AddFutureCoinConfigSchedule' && (
+            <AddFutureCoinConfigSchedule chooseAction={chooseAction} />
+          )}
+          {actionName === 'CRARC_RemoveFutureCoinConfigSchedule' && (
+            <RemoveFutureCoinConfigSchedule chooseAction={chooseAction} />
+          )}
+          {actionName === 'CRARC_UpdateFutureCoinConfigSchedule' && (
+            <UpdateFutureCoinConfigSchedule chooseAction={chooseAction} />
           )}
           <Typography variant="h5">Reason</Typography>
 

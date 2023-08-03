@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.svcrules.VoteRequest
+import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -837,17 +838,7 @@ class SvFrontendIntegrationTest
           },
         )
 
-        actAndCheck(
-          "sv3 accepts the request",
-          sv3Backend.castVote(new VoteRequest.ContractId(requestId), true, "", ""),
-        )(
-          "the number of accept votes increased to 2",
-          _ => {
-            inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
-              element.text should matchText("2")
-            }
-          },
-        )
+        vote(sv3Backend, requestId, true, "2", false)
       }
 
       withFrontEnd("sv2") { implicit webDriver =>
@@ -891,6 +882,232 @@ class SvFrontendIntegrationTest
           }
         }
       }
+    }
+
+    "can create a CRARC_AddFutureCoinConfigSchedule vote request, update it via a CRARC_UpdateFutureCoinConfigSchedule vote request," +
+      " and remove it via a CRARC_RemoveFutureCoinConfigSchedule vote request" in { implicit env =>
+        val requestNewTransferConfigFeeValue = "42"
+        val requestReasonUrl = "This is a request reason url."
+        val requestReasonBody = "This is a request reason."
+
+        withFrontEnd("sv1") { implicit webDriver =>
+          actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1Port/votes"
+              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+            },
+          )(
+            "sv1 can see the create vote request button",
+            _ => {
+              find(id("create-voterequest-submit-button")) should not be empty
+            },
+          )
+
+          val (_, requestIdAdd) = actAndCheck(
+            "sv1 operator can create a request to add a new coin config schedule", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
+              val inputElement = webDriver.findElement(By.id("datetime-picker-coin-configuration"))
+
+              Seq(("07/12/2030 12:12 AM", 1)).foreach(e => {
+                eventually() {
+                  clue(s"sv1 select a date $e") {
+                    inputElement.clear()
+                    inputElement.click()
+                    inputElement.sendKeys(e._1)
+                    inputElement.sendKeys(Keys.RETURN)
+                  }
+                }
+
+                clue("sv1 modifies one value") {
+                  find(id("transferConfig.createFee.fee-value")).value.underlying
+                    .sendKeys(requestNewTransferConfigFeeValue)
+                }
+
+              })
+
+              clue("sv1 modifies the url") {
+                find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
+              }
+
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+              clue("sv1 creates the vote request") {
+                click on "create-voterequest-submit-button"
+              }
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              rows.head
+                .childElement(className("vote-row-action"))
+                .text shouldBe "CRARC_AddFutureCoinConfigSchedule"
+
+              val reviewButton = rows.head
+                .childElement(className("vote-row-review"))
+                .childElement(className("vote-row-review-button"))
+              reviewButton.text should matchText("REVIEW")
+              reviewButton.underlying.click()
+
+              val requestId =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
+                }
+              requestId
+
+            },
+          )
+
+          vote(sv2Backend, requestIdAdd, true, "2", false)
+          vote(sv3Backend, requestIdAdd, true, "3", true)
+
+          eventually() {
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            val tb = tbody.value
+            val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+            rows should have size 0
+          }
+
+          val (_, requestIdUpdate) = actAndCheck(
+            "sv1 operator can create a request to update a coin config schedule", {
+
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_UpdateFutureCoinConfigSchedule")
+
+              val dropDownCoinConfigDate =
+                new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
+              dropDownCoinConfigDate.selectByIndex(1)
+
+              clue("sv1 modifies one value") {
+                find(id("transferConfig.createFee.fee-value")).value.underlying
+                  .sendKeys(requestNewTransferConfigFeeValue)
+              }
+
+              clue("sv1 modifies the url") {
+                find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
+              }
+
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
+              click on "create-voterequest-submit-button"
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              rows.head
+                .childElement(className("vote-row-action"))
+                .text shouldBe "CRARC_UpdateFutureCoinConfigSchedule"
+
+              val reviewButton = rows.head
+                .childElement(className("vote-row-review"))
+                .childElement(className("vote-row-review-button"))
+              reviewButton.text should matchText("REVIEW")
+              reviewButton.underlying.click()
+
+              val requestId =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
+                }
+              requestId
+
+            },
+          )
+
+          vote(sv2Backend, requestIdUpdate, true, "2", false)
+          vote(sv3Backend, requestIdUpdate, true, "3", true)
+
+          eventually() {
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            val tb = tbody.value
+            val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+            rows should have size 0
+          }
+
+          val (_, requestIdRemove) = actAndCheck(
+            "sv1 operator can create a request to remove a coin config schedule", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_RemoveFutureCoinConfigSchedule")
+
+              val dropDownCoinConfigDate =
+                new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
+              dropDownCoinConfigDate.selectByIndex(1)
+
+              clue("sv1 modifies the url") {
+                find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
+              }
+
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
+              clue("sv1 creates the vote request") {
+                click on "create-voterequest-submit-button"
+              }
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              rows should have size 1
+              rows.head
+                .childElement(className("vote-row-action"))
+                .text shouldBe "CRARC_RemoveFutureCoinConfigSchedule"
+
+              val reviewButton = rows.head
+                .childElement(className("vote-row-review"))
+                .childElement(className("vote-row-review-button"))
+              reviewButton.text should matchText("REVIEW")
+              reviewButton.underlying.click()
+
+              val requestId =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
+                }
+              requestId
+
+            },
+          )
+
+          vote(sv2Backend, requestIdRemove, true, "2", false)
+          vote(sv3Backend, requestIdRemove, true, "3", true)
+
+        }
+      }
+
+    def vote(
+        backend: SvAppBackendReference,
+        requestId: String,
+        isAccept: Boolean,
+        numberAccepts: String,
+        finalVote: Boolean,
+    )(implicit webDriver: WebDriverType) = {
+      actAndCheck(
+        s"${backend.config.ledgerApiUser} accepts the request",
+        backend.castVote(new VoteRequest.ContractId(requestId), isAccept, "", ""),
+      )(
+        s"the number of accept votes increased to ${numberAccepts}",
+        _ => {
+          inside(find(id("vote-request-modal-accepted-count"))) { case Some(element) =>
+            element.text should matchText(numberAccepts)
+          }
+          if (finalVote) {
+            webDriver.findElement(By.tagName("body")).sendKeys(Keys.ESCAPE)
+          }
+        },
+      )
     }
 
   }
