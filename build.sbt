@@ -67,6 +67,7 @@ lazy val root = (project in file("."))
     `svc-governance-daml`,
     `svc-governance-v1test-daml`,
     `validator-lifecycle-daml`,
+    `app-manager-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
     `canton-community-common`,
@@ -273,6 +274,14 @@ lazy val `splitwell-daml` =
       Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
     )
 
+lazy val `app-manager-daml` =
+  project
+    .in(file("daml/app-manager"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings
+    )
+
 lazy val `apps-common` =
   project
     .in(file("apps/common"))
@@ -343,6 +352,7 @@ lazy val `apps-validator` =
       `wallet-daml`,
       `apps-wallet`,
       `canton-coin-v1test-daml`,
+      `app-manager-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(akka_http_cors, commons_compress, jaxb_abi),

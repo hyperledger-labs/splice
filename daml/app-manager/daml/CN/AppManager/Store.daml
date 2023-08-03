@@ -1,0 +1,71 @@
+-- | Table-like contracts for storing the mutable state of the app-provider using
+-- contracts signed by the validator-operator party.
+module CN.AppManager.Store where
+
+-- | The configuration of a registered app which defines the
+-- release versions that need to be
+-- installed as well as the domains that users need to
+-- be connected to.
+-- The latest version is the active one.
+template AppConfiguration
+  with
+    validatorOperator : Party
+    provider : Party
+    version : Int
+    json : Text
+    -- ^ The JSON manifest for the given configuration.
+  where
+    signatory validatorOperator
+
+-- | A release of a registered app, which associate a concise name,
+-- the 'version', to a transitively closed set of .dars and their metadata
+-- required to configure and install them on a user's validator node.
+-- which defines the DARs that are part of this release.
+template AppRelease
+  with
+    validatorOperator : Party
+    provider : Party
+    version : Text
+    json : Text
+    -- ^ The JSON manifest for the given release.
+  where
+    signatory validatorOperator
+
+-- | A registered application.
+template RegisteredApp
+  with
+    validatorOperator : Party
+    provider : Party
+    latestConfigurationVersion : Int
+ where
+   signatory validatorOperator
+
+   choice UpdateConfiguration : (ContractId AppConfiguration, ContractId RegisteredApp)
+     with
+       newConfiguration : Text
+     controller validatorOperator
+     do -- Old versions are not archived. We preserve all history.
+        appConfigCid <- create AppConfiguration with
+          json = newConfiguration
+          version = latestConfigurationVersion + 1
+          provider
+          validatorOperator
+        registeredAppCid <- create RegisteredApp with
+          latestConfigurationVersion = latestConfigurationVersion + 1
+          ..
+        pure (appConfigCid, registeredAppCid)
+
+
+-- | An installed application. The version specifies
+-- the configuration that is currently installed.
+-- TODO(#6839) Add a discriminator to support the same app being installed
+-- multiple times.
+template InstalledApp
+  with
+    validatorOperator : Party
+    provider : Party
+    configurationVersion : Int
+    configurationJson : Text
+    releaseJson : Text
+  where
+    signatory validatorOperator
