@@ -167,11 +167,15 @@ class JoiningNodeInitializer(
             "Onboarding of sequencer",
             exclusive = false,
             () =>
-              localDomainNode.onboardLocalSequencerIfRequired(
-                config.domains.global.alias,
-                globalDomain,
-                participantAdminConnection,
-                svConnection,
+              // TODO(#7048) this lock is a band-aid to reduce flakiness while waiting for the upstream fix; remove me
+              // We always call withAcquiredGlobalLock(...) and svcRulesLock.lock() in that order, to prevent deadlocks.
+              svcRulesLock.withLock("sequencer onboarding")(
+                localDomainNode.onboardLocalSequencerIfRequired(
+                  config.domains.global.alias,
+                  globalDomain,
+                  participantAdminConnection,
+                  svConnection,
+                )
               ),
           )
           _ <- svConnection.withGlobalLock(

@@ -7,7 +7,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class SvcRulesLock(
     globalDomain: DomainId,
@@ -52,4 +52,13 @@ class SvcRulesLock(
       } yield res,
       logger,
     )
+
+  def withLock[T](reason: String)(f: => Future[T])(implicit tc: TraceContext): Future[T] = {
+    logger.info(s"locked SvcRules and CoinRules contracts before $reason")
+    lock().flatMap(_ =>
+      f.andThen(_ => {
+        unlock().map(_ => logger.info(s"unlocked SvcRules and CoinRules contracts after $reason"))
+      })
+    )
+  }
 }

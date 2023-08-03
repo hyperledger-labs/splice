@@ -463,16 +463,12 @@ class HttpSvHandler(
       // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
       // We need both locks here to prevent topology transactions and Daml transactions.
-      // This is the only place that calls svcRulesLock.lock() so there is no chance of a deadlock.
+      // We always call withAcquiredGlobalLock(...) and svcRulesLock.lock() in that order, to prevent deadlocks.
       acsBytes <- withAcquiredGlobalLock(
         s"Authorizing SVC party to participant $participantId",
-        exclusive = false, {
+        exclusive = false,
+        svcRulesLock.withLock(s"authorizing SVC party to participant $participantId")(
           for {
-            _ <- svcRulesLock.lock()
-            _ = logger.info(
-              s"locked SvcRules and CoinRules contracts before sponsor SV authorizing svc party to participant $participantId"
-            )
-
             // this will wait until the PartyToParticipant state change completed
             authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
               globalDomain,
@@ -532,10 +528,6 @@ class HttpSvHandler(
               .info(
                 s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
               )
-            _ <- svcRulesLock.unlock()
-            _ = logger.info(
-              s"svc party to participant authorization completed, unlocked SvcRules and CoinRules contracts"
-            )
             ourParticipant <- participantAdminConnection.getParticipantId()
             _ = logger.info("Adding candidate SV to unionspace")
             _ <- participantAdminConnection.ensureUnionspaceDefinition(
@@ -545,7 +537,7 @@ class HttpSvHandler(
               ourParticipant.uid.namespace.fingerprint,
             )
           } yield acsBytes
-        },
+        ),
       )
       // TODO(M3-57) consider if a more space-efficient encoding is necessary
       encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
