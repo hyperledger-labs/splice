@@ -64,12 +64,12 @@
             "podMonitorSelectorNilUsesHelmValues": false,
             "resources": {
               "limits": {
-                "cpu": "4",
-                "memory": "12Gi"
+                "cpu": "6",
+                "memory": "28Gi"
               },
               "requests": {
-                "cpu": "2",
-                "memory": "8Gi"
+                "cpu": "4",
+                "memory": "12Gi"
               }
             },
             "retention": "1y",

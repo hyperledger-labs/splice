@@ -60,12 +60,12 @@ new k8s.helm.v3.Release('observability-metrics', {
                 retentionSize: '100GB',
                 resources: {
                     requests: {
-                        memory: "8Gi",
-                        cpu: "2"
-                    },
-                    limits: {
                         memory: "12Gi",
                         cpu: "4"
+                    },
+                    limits: {
+                        memory: "28Gi",
+                        cpu: "6"
                     },
                 },
                 storageSpec: {
