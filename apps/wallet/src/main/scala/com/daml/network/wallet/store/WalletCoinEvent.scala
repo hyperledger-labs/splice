@@ -34,9 +34,12 @@ object WalletAppInstall_ExecuteBatch extends ExerciseNodeCompanion {
 object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
   override type Tpl = transferCodegen.AcceptedTransferOffer
   override type Arg = transferCodegen.AcceptedTransferOffer_Complete
-  override type Res = daTypes.Tuple2[ccApiCodegen.coin.TransferResult, java.util.Optional[
-    ccApiCodegen.coin.Coin.ContractId
-  ]]
+  override type Res = daTypes.Tuple2[
+    daTypes.Tuple2[ccApiCodegen.coin.TransferResult, transferCodegen.TransferOfferTrackingInfo],
+    java.util.Optional[
+      ccApiCodegen.coin.Coin.ContractId
+    ],
+  ]
 
   override val templateOrInterface = Left(transferCodegen.AcceptedTransferOffer.COMPANION)
   override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Complete
@@ -45,14 +48,18 @@ object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder = daTypes.Tuple2.valueDecoder(
-    ccApiCodegen.coin.TransferResult.valueDecoder(),
+    daTypes.Tuple2.valueDecoder(
+      ccApiCodegen.coin.TransferResult.valueDecoder(),
+      transferCodegen.TransferOfferTrackingInfo.valueDecoder(),
+    ),
     x =>
       x.asOptional()
         .get
         .getValue
         .map(cid => new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get.getValue)),
   )
-  override def resToValue(res: Res) = res.toValue(_.toValue, x => DamlOptional.of(x.map(_.toValue)))
+  override def resToValue(res: Res) =
+    res.toValue(_.toValue(_.toValue, _.toValue), x => DamlOptional.of(x.map(_.toValue)))
 }
 
 object AppPaymentRequest_Accept extends ExerciseNodeCompanion {

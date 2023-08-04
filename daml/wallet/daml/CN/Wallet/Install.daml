@@ -143,7 +143,7 @@ data CoinOperation
 -- Enum of the possible outcomes of operating on a Canton coin through the wallet.
 data CoinOperationOutcome
   = COO_AcceptedAppPayment (ContractId AcceptedAppPayment)
-  | COO_CompleteAcceptedTransfer API.TransferResult
+  | COO_CompleteAcceptedTransfer (API.TransferResult, TransferOfferTrackingInfo)
   | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)
   | COO_SubscriptionPayment (ContractId SubscriptionPayment)
   -- Using `Optional` here as the wallet reuses that type for returning a result,
@@ -226,25 +226,25 @@ template WalletAppInstall
       controller validatorParty
       do exercise cid TransferOffer_Accept
 
-    nonconsuming choice WalletAppInstall_TransferOffer_Reject : ()
+    nonconsuming choice WalletAppInstall_TransferOffer_Reject : TransferOfferTrackingInfo
       with
         cid : ContractId TransferOffer
       controller validatorParty
       do exercise cid TransferOffer_Reject
 
-    nonconsuming choice WalletAppInstall_TransferOffer_Withdraw : ()
+    nonconsuming choice WalletAppInstall_TransferOffer_Withdraw : TransferOfferTrackingInfo
       with
         cid : ContractId TransferOffer
       controller validatorParty
       do exercise cid TransferOffer_Withdraw
 
-    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Abort : ()
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Abort : TransferOfferTrackingInfo
       with
         cid : ContractId AcceptedTransferOffer
       controller validatorParty
       do exercise cid $ AcceptedTransferOffer_Abort
 
-    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : ()
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : TransferOfferTrackingInfo
       with
         cid : ContractId AcceptedTransferOffer
       controller validatorParty

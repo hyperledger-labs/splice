@@ -6,7 +6,6 @@ import qualified CC.API.V1.Coin as API
 import CC.API.V1.Round
 
 import CN.Util.Assert
-import CN.Util.ExpiringContract
 import CN.Wallet.Payment
 
 
@@ -24,10 +23,6 @@ template TransferOffer
     observer receiver
     ensure (DA.Text.length description < 280)
 
-    interface instance ExpiringContract for TransferOffer where
-      view = ExpiringContractView with
-        expiresAt
-
     choice TransferOffer_Accept : ContractId AcceptedTransferOffer
       with
         controller receiver
@@ -36,17 +31,35 @@ template TransferOffer
         require "Offer has not expired" (now < expiresAt)
         create AcceptedTransferOffer with ..
 
-    choice TransferOffer_Reject : ()
+    choice TransferOffer_Reject : TransferOfferTrackingInfo
       with
         controller receiver
       do
-        pure ()
+        pure TransferOfferTrackingInfo { .. }
 
-    choice TransferOffer_Withdraw : ()
+    choice TransferOffer_Withdraw : TransferOfferTrackingInfo
       with
         controller sender
       do
-        pure ()
+        pure TransferOfferTrackingInfo { .. }
+
+    -- we're not using the ExpiringContract interface because that one returns (), and we need the TrackingInfo
+    choice TransferOffer_Expire : TransferOfferTrackingInfo
+      with
+        actor : Party
+      controller actor
+      do
+        now <- getTime
+        require "Contract has expired" (this.expiresAt <= now)
+        require "Actor is a stakeholder" (actor `elem` stakeholder this)
+        pure TransferOfferTrackingInfo { .. }
+
+-- all the fields here are needed for the UserWalletTxLogParser
+data TransferOfferTrackingInfo = TransferOfferTrackingInfo {
+  trackingId : Text; -- used to deduplicate requests and query for the status
+  sender : Party; -- used in UserWalletTxLogParser's filterByParty
+  receiver : Party -- used in UserWalletTxLogParser's filterByParty
+} deriving (Eq, Show)
 
 template AcceptedTransferOffer
   with
@@ -59,13 +72,8 @@ template AcceptedTransferOffer
   where
     signatory sender, receiver
 
-    -- TODO(#3822): implement trigger to expire AcceptedTransferOffers
-    interface instance ExpiringContract for AcceptedTransferOffer where
-      view = ExpiringContractView with
-        expiresAt
-
     nonconsuming choice AcceptedTransferOffer_Complete
-      : (API.TransferResult, Optional (ContractId API.Coin))
+      : ((API.TransferResult, TransferOfferTrackingInfo), Optional (ContractId API.Coin))
       with
         inputs : [API.TransferInput]
         transferContext : API.PaymentTransferContext
@@ -91,14 +99,26 @@ template AcceptedTransferOffer
               ]
         result <- API.exercisePaymentTransfer transferContext transfer
         archive self
-        pure (result, result.senderChangeCoin)
+        pure ((result, TransferOfferTrackingInfo { .. }), result.senderChangeCoin)
 
-    choice AcceptedTransferOffer_Withdraw : ()
+    choice AcceptedTransferOffer_Withdraw : TransferOfferTrackingInfo
       controller receiver
       do
-        pure()
+        pure TransferOfferTrackingInfo { .. }
 
-    choice AcceptedTransferOffer_Abort : ()
+    choice AcceptedTransferOffer_Abort : TransferOfferTrackingInfo
       controller sender
       do
-        pure()
+        pure TransferOfferTrackingInfo { .. }
+
+    -- TODO(#3822): implement trigger to expire AcceptedTransferOffers
+    -- we're not using the ExpiringContract interface because that one returns (), and we need the TrackingInfo
+    choice AcceptedTransferOffer_Expire : TransferOfferTrackingInfo
+      with
+        actor : Party
+      controller actor
+      do
+        now <- getTime
+        require "Contract has expired" (this.expiresAt <= now)
+        require "Actor is a stakeholder" (actor `elem` stakeholder this)
+        pure TransferOfferTrackingInfo { .. }
