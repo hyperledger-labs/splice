@@ -39,6 +39,7 @@ class ValidatorAutomationService(
       ledgerClient,
       retryProvider,
     ) {
+
   registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
   registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
   registerTrigger(
@@ -62,5 +63,4 @@ class ValidatorAutomationService(
       )
     )
   )
-
 }

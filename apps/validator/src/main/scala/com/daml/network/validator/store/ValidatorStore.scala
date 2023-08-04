@@ -1,5 +1,6 @@
 package com.daml.network.validator.store
 
+import cats.syntax.traverseFilter.*
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
@@ -8,6 +9,7 @@ import com.daml.network.codegen.java.cc.globaldomain.{
   ValidatorTraffic,
   ValidatorTrafficCreationIntent,
 }
+import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
@@ -17,7 +19,7 @@ import com.daml.network.store.{
   TxLogStore,
 }
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ContractWithState}
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.daml.network.wallet.store.WalletStore
@@ -115,9 +117,118 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       )
     } yield installs.map(i => i.payload.endUserName)
   }
+
+  def lookupLatestAppConfiguration(
+      provider: PartyId
+  )(implicit tc: TraceContext): Future[Option[ContractWithState[
+    appManagerCodegen.AppConfiguration.ContractId,
+    appManagerCodegen.AppConfiguration,
+  ]]] =
+    multiDomainAcsStore
+      .filterContracts(
+        appManagerCodegen.AppConfiguration.COMPANION,
+        (c: Contract[_, appManagerCodegen.AppConfiguration]) =>
+          c.payload.provider == provider.toProtoPrimitive,
+      )
+      .map {
+        _.maxByOption(c => c.contract.payload.version)
+      }
+
+  def lookupAppConfiguration(
+      provider: PartyId,
+      version: Long,
+  ): Future[QueryResult[Option[ContractWithState[
+    appManagerCodegen.AppConfiguration.ContractId,
+    appManagerCodegen.AppConfiguration,
+  ]]]] =
+    multiDomainAcsStore
+      .findContractWithOffset(appManagerCodegen.AppConfiguration.COMPANION)(
+        (c: Contract[
+          appManagerCodegen.AppConfiguration.ContractId,
+          appManagerCodegen.AppConfiguration,
+        ]) => c.payload.provider == provider.toProtoPrimitive && c.payload.version == version
+      )
+
+  def lookupAppRelease(
+      provider: PartyId,
+      version: String,
+  ): Future[QueryResult[
+    Option[ContractWithState[appManagerCodegen.AppRelease.ContractId, appManagerCodegen.AppRelease]]
+  ]] =
+    multiDomainAcsStore
+      .findContractWithOffset(appManagerCodegen.AppRelease.COMPANION)(
+        (c: Contract[appManagerCodegen.AppRelease.ContractId, appManagerCodegen.AppRelease]) =>
+          c.payload.provider == provider.toProtoPrimitive && c.payload.version == version
+      )
+
+  def lookupRegisteredApp(
+      provider: PartyId
+  ): Future[QueryResult[
+    Option[
+      ContractWithState[appManagerCodegen.RegisteredApp.ContractId, appManagerCodegen.RegisteredApp]
+    ]
+  ]] =
+    multiDomainAcsStore
+      .findContractWithOffset(appManagerCodegen.RegisteredApp.COMPANION)(
+        (c: Contract[
+          appManagerCodegen.RegisteredApp.ContractId,
+          appManagerCodegen.RegisteredApp,
+        ]) => c.payload.provider == provider.toProtoPrimitive
+      )
+
+  def lookupInstalledApp(
+      provider: PartyId
+  ): Future[QueryResult[
+    Option[
+      ContractWithState[appManagerCodegen.InstalledApp.ContractId, appManagerCodegen.InstalledApp]
+    ]
+  ]] =
+    multiDomainAcsStore
+      .findContractWithOffset(appManagerCodegen.InstalledApp.COMPANION)(
+        (c: Contract[appManagerCodegen.InstalledApp.ContractId, appManagerCodegen.InstalledApp]) =>
+          c.payload.provider == provider.toProtoPrimitive
+      )
+
+  def listRegisteredApps()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[ValidatorStore.RegisteredApp]] =
+    multiDomainAcsStore.listContracts(appManagerCodegen.RegisteredApp.COMPANION).flatMap { apps =>
+      apps.toList.traverseFilter { app =>
+        lookupAppConfiguration(
+          PartyId.tryFromProtoPrimitive(app.contract.payload.provider),
+          app.contract.payload.latestConfigurationVersion,
+        ).map(config =>
+          config.value.map(
+            ValidatorStore.RegisteredApp(
+              app,
+              _,
+            )
+          )
+        )
+      }
+    }
+
+  def listInstalledApps()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[
+    ContractWithState[appManagerCodegen.InstalledApp.ContractId, appManagerCodegen.InstalledApp]
+  ]] =
+    multiDomainAcsStore.listContracts(appManagerCodegen.InstalledApp.COMPANION)
 }
 
 object ValidatorStore {
+
+  final case class RegisteredApp(
+      registered: ContractWithState[
+        appManagerCodegen.RegisteredApp.ContractId,
+        appManagerCodegen.RegisteredApp,
+      ],
+      configuration: ContractWithState[
+        appManagerCodegen.AppConfiguration.ContractId,
+        appManagerCodegen.AppConfiguration,
+      ],
+  )
+
   def apply(
       key: Key,
       storage: Storage,
@@ -175,6 +286,22 @@ object ValidatorStore {
         mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == validator
+        ),
+        mkFilter(coinCodegen.Coin.COMPANION)(co =>
+          co.payload.svc == svc &&
+            co.payload.owner == validator
+        ),
+        mkFilter(appManagerCodegen.AppConfiguration.COMPANION)(co =>
+          co.payload.validatorOperator == validator
+        ),
+        mkFilter(appManagerCodegen.AppRelease.COMPANION)(co =>
+          co.payload.validatorOperator == validator
+        ),
+        mkFilter(appManagerCodegen.RegisteredApp.COMPANION)(co =>
+          co.payload.validatorOperator == validator
+        ),
+        mkFilter(appManagerCodegen.InstalledApp.COMPANION)(co =>
+          co.payload.validatorOperator == validator
         ),
       ),
     )

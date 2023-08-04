@@ -20,6 +20,7 @@ import com.daml.network.auth.{
   RSAVerifier,
 }
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
+import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.{
@@ -55,7 +56,11 @@ import com.daml.network.validator.config.{
   ValidatorAppBackendConfig,
   ValidatorOnboardingConfig,
 }
-import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
+import com.daml.network.validator.store.{
+  AppManagerStore,
+  ParticipantIdentitiesStore,
+  ValidatorStore,
+}
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
@@ -544,17 +549,27 @@ class ValidatorApp(
       )
 
       appManagerHandlerO <- withGlobalLock[Unit, Option[HttpAppManagerHandler]](lock =>
-        Future.successful(
-          config.appManager.map(
-            new HttpAppManagerHandler(
-              _,
-              automation.connection,
-              participantAdminConnection,
-              lock,
+        config.appManager.traverse { config =>
+          val dar = new UploadablePackage {
+            lazy val packageId: String = appManagerCodegen.RegisteredApp.TEMPLATE_ID.getPackageId
+            lazy val resourcePath: String = "dar/app-manager-0.1.0.dar"
+          }
+          for {
+            _ <- participantAdminConnection.uploadDarFiles(Seq(dar), lock)
+          } yield new HttpAppManagerHandler(
+            config,
+            automation.connection,
+            participantAdminConnection,
+            new AppManagerStore(
+              automation,
+              retryProvider,
               loggerFactory,
-            )
+            ),
+            lock,
+            retryProvider,
+            loggerFactory,
           )
-        )
+        }
       )
 
       routes = cors(

@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import akka.http.scaladsl.model.Uri
 import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -172,6 +173,9 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
       ).treeOf(absolute)
     case offset => sys.error(s"Invalid java offset: $offset")
   }
+
+  implicit def prettyUri: Pretty[Uri] =
+    prettyOfString(_.toString)
 }
 
 object PrettyInstances extends PrettyInstances {

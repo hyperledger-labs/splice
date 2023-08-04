@@ -128,10 +128,10 @@ abstract class ValidatorAppReference(
       )
     }
 
-  def getLatestAppRelease(provider: PartyId): definitions.AppRelease =
+  def getAppRelease(provider: PartyId, version: String): definitions.AppRelease =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.GetLatestAppRelease(provider)
+        HttpAppManagerAppClient.GetAppRelease(provider, version)
       )
     }
 

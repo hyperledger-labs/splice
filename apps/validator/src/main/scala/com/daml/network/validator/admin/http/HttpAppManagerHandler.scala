@@ -1,38 +1,31 @@
 package com.daml.network.validator.admin.http
 
 import akka.stream.Materializer
-import akka.http.scaladsl.model.{
-  ContentType,
-  ContentTypes,
-  HttpRequest,
-  HttpResponse,
-  Uri,
-  StatusCodes,
-}
-import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.http.scaladsl.model.{ContentType, HttpRequest, HttpResponse, Uri}
 import cats.data.EitherT
-import cats.syntax.either.*
 import cats.syntax.foldable.*
-import cats.syntax.traverse.*
+import cats.syntax.either.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import com.daml.lf.archive.DarParser
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.environment.{
   BaseAppConnection,
   CNLedgerConnection,
   ParticipantAdminConnection,
+  RetryProvider,
 }
 import com.daml.network.http.v0.{appManager as v0, definitions}
 import com.daml.network.validator.config.AppManagerConfig
+import com.daml.network.validator.store.AppManagerStore
+import com.daml.network.validator.util.{DarUtil, HttpUtil}
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashOps, HashPurpose}
+import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -56,27 +49,15 @@ import java.security.KeyPairGenerator
 import java.security.interfaces.{RSAPublicKey, RSAPrivateKey}
 import java.util.{Base64, UUID}
 import java.util.stream.Collectors
-import java.util.zip.ZipInputStream
-
-final case class RegisteredApp(
-    dars: Set[Hash],
-    name: String,
-    uiUrl: Uri,
-    domains: Vector[definitions.Domain],
-    version: String,
-)
-
-final case class InstalledApp(
-    name: String,
-    uiUrl: Uri,
-)
 
 // TODO(#6839) Add auth to all endpoints
 class HttpAppManagerHandler(
     config: AppManagerConfig,
     ledgerConnection: CNLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
+    store: AppManagerStore,
     lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
+    retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -86,10 +67,6 @@ class HttpAppManagerHandler(
 ) extends v0.AppManagerHandler[Unit]
     with Spanning
     with NamedLogging {
-
-  private val hashOps = new HashOps {
-    override def defaultHashAlgorithm = HashAlgorithm.Sha256
-  }
 
   // TODO(#6839) Consider persisting this so that a restart does not require a token refresh.
   private val keyId = UUID.randomUUID.toString
@@ -105,36 +82,9 @@ class HttpAppManagerHandler(
 
   private val workflowId = this.getClass.getSimpleName
 
-  // TODO(#6839) Revisit storage of registered apps
-  private val registeredApps: collection.concurrent.Map[PartyId, RegisteredApp] =
-    collection.concurrent.TrieMap.empty
-
-  // TODO(#6839) Revisit storage of installed apps
-  private val installedApps: collection.concurrent.Map[PartyId, InstalledApp] =
-    collection.concurrent.TrieMap.empty
-
   // Map from authorization code to user id
   private val codes: collection.concurrent.Map[String, String] =
     collection.concurrent.TrieMap.empty
-
-  case class AppUrl(appUrl: Uri) {
-    private val appUriPathRegex: scala.util.matching.Regex = raw"(.*)/apps/registered/(.*)".r
-    val (provider: PartyId, appManagerUri: Uri) =
-      appUrl.path.toString match {
-        case appUriPathRegex(prefix, provider) =>
-          (PartyId.tryFromProtoPrimitive(provider), appUrl.withPath(Uri.Path(prefix)))
-        case _ =>
-          throw new IllegalArgumentException(
-            s"App URL $appUrl does not match the format of a valid app URL"
-          )
-      }
-    lazy val latestAppConfiguration: Uri =
-      appUrl.withPath(appUrl.path / "configuration" / "latest" / "configuration.json")
-    lazy val latestAppRelease: Uri =
-      appUrl.withPath(appUrl.path / "release" / "latest" / "release.json")
-    def darUrl(hash: String): Uri =
-      appManagerUri.withPath(appManagerUri.path / "dars" / hash)
-  }
 
   // This is the endpoint that the app manager frontend calls after the user got redirected to /authorize
   // and logged in and confirmed that they want to authorize the app.
@@ -235,18 +185,10 @@ class HttpAppManagerHandler(
   )()(extracted: Unit): Future[
     v0.AppManagerResource.ListInstalledAppsResponse
   ] =
-    withNewTrace(workflowId) { _ => _ =>
-      Future.successful(
-        definitions.ListInstalledAppsResponse(
-          installedApps.toVector.map { case (provider, app) =>
-            definitions.InstalledApp(
-              provider.toProtoPrimitive,
-              app.name,
-              app.uiUrl.toString,
-            )
-          }
-        )
-      )
+    withNewTrace(workflowId) { implicit tc => _ =>
+      store
+        .listInstalledApps()
+        .map(apps => definitions.ListInstalledAppsResponse(apps.map(_.toJson).toVector))
     }
 
   def listRegisteredApps(
@@ -254,22 +196,14 @@ class HttpAppManagerHandler(
   )()(extracted: Unit): Future[
     v0.AppManagerResource.ListRegisteredAppsResponse
   ] =
-    withNewTrace(workflowId) { _ => _ =>
-      Future.successful(
-        definitions.ListRegisteredAppsResponse(
-          registeredApps.toVector.map { case (provider, app) =>
-            definitions.RegisteredApp(
-              provider.toProtoPrimitive,
-              app.name,
-              config.appManagerApiUrl
-                .withPath(
-                  config.appManagerApiUrl.path / "app-manager" / "apps" / "registered" / provider.toProtoPrimitive
-                )
-                .toString,
-            )
-          }
+    withNewTrace(workflowId) { implicit tc => _ =>
+      store
+        .listRegisteredApps()
+        .map(apps =>
+          definitions.ListRegisteredAppsResponse(
+            apps.map(_.toJson(config.appManagerApiUrl)).toVector
+          )
         )
-      )
     }
 
   def getDarFile(
@@ -294,45 +228,16 @@ class HttpAppManagerHandler(
   )(provider: String)(
       extracted: Unit
   ): Future[v0.AppManagerResource.GetLatestAppConfigurationResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      Future {
-        val providerPartyId = PartyId.tryFromProtoPrimitive(provider)
-        registeredApps
-          .get(providerPartyId)
-          .fold(
-            v0.AppManagerResource.GetLatestAppConfigurationResponse
-              .NotFound(definitions.ErrorResponse(s"App $provider is not registered"))
-          ) { app =>
-            definitions.AppConfiguration(
-              // TODO(#6839) Support updating the configuration and bump version
-              // on each update.
-              version = 1,
-              name = app.name,
-              uiUrl = app.uiUrl.toString,
-              domains = app.domains,
-            )
-          }
-      }
+    withNewTrace(workflowId) { implicit tc => _ =>
+      store.getLatestAppConfiguration(PartyId.tryFromProtoPrimitive(provider)).map(_.toJson)
     }
 
-  def getLatestAppRelease(respond: v0.AppManagerResource.GetLatestAppReleaseResponse.type)(
-      provider: String
-  )(extracted: Unit): Future[v0.AppManagerResource.GetLatestAppReleaseResponse] =
+  def getAppRelease(respond: v0.AppManagerResource.GetAppReleaseResponse.type)(
+      provider: String,
+      version: String,
+  )(extracted: Unit): Future[v0.AppManagerResource.GetAppReleaseResponse] =
     withNewTrace(workflowId) { _ => _ =>
-      Future {
-        val providerPartyId = PartyId.tryFromProtoPrimitive(provider)
-        registeredApps
-          .get(providerPartyId)
-          .fold(
-            v0.AppManagerResource.GetLatestAppReleaseResponse
-              .NotFound(definitions.ErrorResponse(s"App $provider is not registered"))
-          )(app =>
-            definitions.AppRelease(
-              app.version,
-              app.dars.map(_.toHexString).toVector,
-            )
-          )
-      }
+      store.getAppRelease(PartyId.tryFromProtoPrimitive(provider), version).map(_.toJson)
     }
 
   def registerApp(respond: v0.AppManagerResource.RegisterAppResponse.type)(
@@ -354,23 +259,38 @@ class HttpAppManagerHandler(
           dars.map(_._1),
           lock,
         )
-        app = RegisteredApp(
-          dars.map(_._2).toSet,
-          name,
-          uiUrl,
-          decodedDomains,
-          releaseManifest.version,
-        )
-      } yield {
-        val previous =
-          registeredApps.putIfAbsent(providerPartyId, app)
-        // TODO(#6839) Relax this to support upgrading.
-        previous.fold(v0.AppManagerResource.RegisterAppResponse.Created)(_ =>
-          v0.AppManagerResource.RegisterAppResponse.Conflict(
-            definitions.ErrorResponse(s"App ${providerPartyId} has already been registered")
+        _ <- store.storeAppRelease(
+          AppManagerStore.AppRelease(
+            providerPartyId,
+            definitions.AppRelease(
+              releaseManifest.version,
+              dars.map(_._2.toHexString).toVector,
+            ),
           )
         )
-      }
+        // TODO(#6839) Support updating the configuration and bump version
+        // on each update.
+        configurationVersion = 1L
+        _ <- store.storeAppConfiguration(
+          AppManagerStore.AppConfiguration(
+            providerPartyId,
+            definitions.AppConfiguration(
+              version = configurationVersion,
+              name = name,
+              uiUrl = uiUrl,
+              domains = decodedDomains,
+              releaseVersion = releaseManifest.version,
+            ),
+          )
+        )
+        _ <- store.storeRegisteredApp(
+          AppManagerStore.RegisteredApp(
+            providerPartyId,
+            name,
+            configurationVersion,
+          )
+        )
+      } yield v0.AppManagerResource.RegisterAppResponse.Created
     }
 
   def registerAppMapFileField(
@@ -385,47 +305,51 @@ class HttpAppManagerHandler(
       body: definitions.InstallAppRequest
   )(extracted: Unit): Future[v0.AppManagerResource.InstallAppResponse] =
     withNewTrace(workflowId) { implicit tc => _ =>
-      val appUrl = AppUrl(body.appUrl)
+      val appUrl = AppManagerStore.AppUrl(body.appUrl)
       for {
-        configuration <- getHttpJson[definitions.AppConfiguration](appUrl.latestAppConfiguration)
-        release <- getHttpJson[definitions.AppRelease](appUrl.latestAppRelease)
+        configuration <- HttpUtil.getHttpJson[definitions.AppConfiguration](
+          appUrl.latestAppConfiguration
+        )
+        release <- HttpUtil.getHttpJson[definitions.AppRelease](
+          appUrl.appRelease(configuration.releaseVersion)
+        )
         _ <- configuration.domains.traverse_ { domain =>
           participantAdminConnection.ensureDomainRegistered(
             DomainConnectionConfig(
-              // TODO(#6839) Fix the alias here, we can't assume that app providers use distinct aliases. Maybe
-              // Namespace through interned app provider
+              // TODO(#6839) Fix the alias here, we can't assume that app providers use distinct aliases.
               DomainAlias.tryCreate(domain.alias),
               SequencerConnections.single(GrpcSequencerConnection.tryCreate(domain.url)),
             )
           )
         }
-        darFiles <- release.darHashes.traverse { hash =>
-          for {
-            darResponse <- getHttpJson[definitions.DarFile](appUrl.darUrl(hash))
-          } yield readDar(
-            hash.toString,
+        _ <- release.darHashes.traverse_(ensureDar(appUrl, _))
+        _ <- store.storeInstalledApp(
+          AppManagerStore.InstalledApp(appUrl.provider, appUrl, configuration, release)
+        )
+      } yield v0.AppManagerResource.InstallAppResponse.Created
+    }
+
+  private def ensureDar(appUrl: AppManagerStore.AppUrl, darHash: String)(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    retryProvider.ensureThatO(
+      show"DAR $darHash is uploaded",
+      participantAdminConnection.lookupDar(Hash.tryFromHexString(darHash)).map(_.map(_ => ())),
+      for {
+        darResponse <- HttpUtil.getHttpJson[definitions.DarFile](appUrl.darUrl(darHash))
+        dar = DarUtil
+          .readDar(
+            darHash.toString,
             new ByteArrayInputStream(Base64.getDecoder().decode(darResponse.base64Dar)),
-          )._1
-        }
+          )
+          ._1
         _ <- participantAdminConnection.uploadDarFiles(
-          darFiles,
+          Seq(dar),
           lock,
         )
-      } yield {
-        val providerPartyId = appUrl.provider
-        val app = InstalledApp(
-          configuration.name,
-          configuration.uiUrl,
-        )
-        val previous = installedApps.putIfAbsent(providerPartyId, app)
-        // TODO(#6839) Relax this to support upgrading.
-        previous.fold(v0.AppManagerResource.InstallAppResponse.Created)(_ =>
-          v0.AppManagerResource.InstallAppResponse.Conflict(
-            definitions.ErrorResponse(s"App ${providerPartyId} has already been installed")
-          )
-        )
-      }
-    }
+      } yield (),
+      logger,
+    )
 
   private def readTarGz(file: File): TarArchiveInputStream =
     readTarGz(new FileInputStream(file))
@@ -453,28 +377,6 @@ class HttpAppManagerHandler(
     )
   }
 
-  private def readDar(
-      name: String,
-      inputStream: InputStream,
-  ): (UploadablePackage, Hash, ByteString) = {
-    val darFile = ByteString.readFrom(inputStream)
-    val pkgId = DarParser
-      .readArchive(name, new ZipInputStream(darFile.newInput))
-      .valueOr(err => throw new IllegalArgumentException(s"Failed to decode dar: $err"))
-      .main
-      .getHash
-    val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
-    (
-      new UploadablePackage {
-        override def packageId = pkgId
-        override def resourcePath = name
-        override def inputStream() = darFile.newInput
-      },
-      darHash,
-      darFile,
-    )
-  }
-
   private def readDars(file: InputStream): Seq[(UploadablePackage, Hash, ByteString)] = {
     val archiveInputStream = readTarGz(file)
     LazyList
@@ -482,24 +384,9 @@ class HttpAppManagerHandler(
       .takeWhile(_ != null)
       .filter(entry => entry.getName.dropWhile(x => x != '/').startsWith("/dars/") && entry.isFile)
       .map { entry =>
-        readDar(new File(entry.getName).getName, archiveInputStream)
+        DarUtil.readDar(new File(entry.getName).getName, archiveInputStream)
       }
   }
-
-  private def getHttpJson[T](uri: Uri)(implicit decoder: io.circe.Decoder[T]): Future[T] =
-    for {
-      response <- httpClient(HttpRequest(uri = uri))
-      decoded <- response.status match {
-        case StatusCodes.OK if (response.entity.contentType == ContentTypes.`application/json`) =>
-          Unmarshal(response.entity).to[String].map { json =>
-            decode[T](json).valueOr(err =>
-              throw new IllegalArgumentException(s"Failed to decode manifest: $err")
-            )
-          }
-        case _ => Future.failed(new BaseAppConnection.UnexpectedHttpResponse(response))
-      }
-    } yield decoded
-
   // Reverse proxy for JSON API to add CORS headers.
   val jsonApiClient = v0.AppManagerClient.httpClient(
     HttpClientBuilder().buildClient,

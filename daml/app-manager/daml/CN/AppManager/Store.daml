@@ -64,6 +64,7 @@ template InstalledApp
   with
     validatorOperator : Party
     provider : Party
+    appUrl: Text
     configurationVersion : Int
     configurationJson : Text
     releaseJson : Text

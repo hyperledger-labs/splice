@@ -89,17 +89,17 @@ object HttpAppManagerAppClient {
     }
   }
 
-  final case class GetLatestAppRelease(provider: PartyId)
-      extends BaseCommand[http.GetLatestAppReleaseResponse, definitions.AppRelease] {
+  final case class GetAppRelease(provider: PartyId, version: String)
+      extends BaseCommand[http.GetAppReleaseResponse, definitions.AppRelease] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetLatestAppReleaseResponse] =
-      client.getLatestAppRelease(provider.toProtoPrimitive, headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAppReleaseResponse] =
+      client.getAppRelease(provider.toProtoPrimitive, version, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetLatestAppReleaseResponse.OK(response) =>
+    ) = { case http.GetAppReleaseResponse.OK(response) =>
       Right(response)
     }
   }

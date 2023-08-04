@@ -249,13 +249,18 @@ paths:
                 "$ref": "#/components/schemas/AppConfiguration"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /app-manager/apps/registered/{provider}/release/latest/release.json:
+  /app-manager/apps/registered/{provider}/release/{version}/release.json:
     get:
       tags: [appManager]
       x-jvm-package: appManager
-      operationId: "getLatestAppRelease"
+      operationId: "getAppRelease"
       parameters:
         - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
           in: path
           required: true
           schema:
@@ -607,10 +612,11 @@ components:
         - name
         - ui_url
         - domains
+        - release_version
       properties:
         version:
           type: integer
-          format: int32
+          format: int64
         name:
           type: string
         ui_url:
@@ -619,6 +625,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Domain"
+        release_version:
+          type: string
 
     AppRelease:
       type: object
