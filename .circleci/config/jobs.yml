@@ -98,6 +98,7 @@ jobs:
           extra_pre_sbt_cmd: << parameters.extra_pre_sbt_cmd >>
           extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
           cmd_retry_count: << parameters.cmd_retry_count >>
+          start_canton_options: << parameters.start_canton_options >>
       - cleanup_sbt_test_job
       - collect_failing_test_data_and_send_to_datadog
       - collect_test_timings_and_send_to_datadog

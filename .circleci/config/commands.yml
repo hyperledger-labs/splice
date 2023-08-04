@@ -767,7 +767,13 @@ commands:
         description: Number of times to retry the command
         type: integer
         default: 0
+      start_canton_options:
+        type: string
     steps:
+      - run_bash_command_in_nix:
+          cmd_name: "Wait for canton to be ready before running tests"
+          cmd: |
+            ./wait-for-canton.sh << parameters.start_canton_options >>
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: |

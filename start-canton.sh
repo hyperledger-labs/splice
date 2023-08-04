@@ -6,6 +6,7 @@ function usage() {
   echo "Flags:"
   echo "  -h               display this help message"
   echo "  -d               start in detached mode"
+  echo "  -b               start in the background"
   echo "  -p postgres_mode postgres mode used in scripts/postgres.sh, default 'docker'"
   echo "  -w               only start canton instance with wall clock time"
   echo "  -s               only start canton instance with simulated time"
@@ -219,23 +220,12 @@ if [[ $collect_metrics -eq 1 ]]; then
   ./scripts/start-opentelemetry-collector.sh
 fi
 
-# Wait for canton instance(s) to start within 5 minutes
-timeout=300
-start_time=$(date +%s)
-while (( $(date +%s) - start_time < timeout )); do
-    if { [ $wallclocktime -eq 1 ] && [ ! -f canton.tokens ]; } || { [ $simtime -eq 1 ] && [ ! -f canton-simtime.tokens ]; }; then
-        remaining_time=$((timeout - ($(date +%s) - start_time)))
-        echo "Waiting for Canton instance(s) to start (${remaining_time} seconds left)"
-        sleep 1
-    else
-        echo "Canton instance(s) started"
-        break
-    fi
-done
-
-if (( $(date +%s) - start_time >= timeout )); then
-    echo "Timeout: Canton instance(s) failed to start within $timeout seconds"
-    exit 1
+if [ $wallclocktime -eq 0 ]; then
+  ./wait-for-canton.sh -s
+elif [ $simtime -eq 0 ]; then
+  ./wait-for-canton.sh -w
+else
+  ./wait-for-canton.sh
 fi
 
 
