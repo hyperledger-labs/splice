@@ -3,6 +3,16 @@
 Release Notes
 =============
 
+2023-08-14
+----------
+
+* Documentation:
+
+    * The list of approved SV members has been moved from the ``sv-values.yaml`` file into
+      a separate config file. Two versions thereof exist now - one for TestNet-approved
+      identities and the other for DevNet-approved ones. The instructions for deploying the
+      ``cn-sv-node`` Helm chart have been updated to use this separate values file.
+
 2023-08-07
 ----------
 

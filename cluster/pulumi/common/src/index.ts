@@ -1,4 +1,3 @@
-export * from './approvedSvIdentities';
 export * from './auth0';
 export * from './auth0types';
 export * from './infra';

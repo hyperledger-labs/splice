@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0Client } from 'cn-pulumi-common';
+import { Auth0Client, loadYamlFromFile, requireEnv } from 'cn-pulumi-common';
 import {
   BackupConfig,
   installGcpBucket,
@@ -7,8 +7,6 @@ import {
   BootstrappingDumpConfig,
   infraStack,
   InfrastructureOutputs,
-  devNetApprovedSvIdentities,
-  nonDevNetApprovedSvIdentities,
 } from 'cn-pulumi-common';
 import { exit } from 'process';
 
@@ -21,6 +19,8 @@ import { installSvNode, SvOnboarding } from './sv';
 import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
+
+const REPO_ROOT = requireEnv('REPO_ROOT', 'root directory of the repo');
 
 const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
 if (!isDevNet) {
@@ -95,17 +95,15 @@ const sv34ApprovedSvIdentities = [
   },
 ];
 
-const svRunbookApprovedSvIdentities = [
-  {
-    name: 'DA-Helm-Test-Node',
-    publicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==',
-  },
-];
-
-const approvedSvIdentities = (isDevNet ? devNetApprovedSvIdentities : nonDevNetApprovedSvIdentities)
-  .concat(isDevNet || approveSvRunbook ? svRunbookApprovedSvIdentities : [])
-  .concat(doubleSv ? [] : sv34ApprovedSvIdentities);
+const approvedSvIdentities = (
+  isDevNet
+    ? loadYamlFromFile(
+        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
+      )
+    : loadYamlFromFile(
+        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
+      )
+).approvedSvIdentities.concat(doubleSv ? [] : sv34ApprovedSvIdentities);
 
 function joinViaSv1(
   sv1: pulumi.Resource,

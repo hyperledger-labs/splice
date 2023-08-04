@@ -14,8 +14,6 @@ import {
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
   readAndInstallParticipantBootstrapDump,
-  devNetApprovedSvIdentities,
-  nonDevNetApprovedSvIdentities,
 } from 'cn-pulumi-common';
 import { exit } from 'process';
 
@@ -187,6 +185,14 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       .concat(loopback !== null ? loopback : [])
   );
 
+  const approvedSvIds = isDevNet
+    ? loadYamlFromFile(
+        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
+      )
+    : loadYamlFromFile(
+        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
+      );
+
   const svValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
@@ -197,7 +203,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     participantBootstrappingDump: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
-    approvedSvIdentities: isDevNet ? devNetApprovedSvIdentities : nonDevNetApprovedSvIdentities,
+    ...approvedSvIds,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {

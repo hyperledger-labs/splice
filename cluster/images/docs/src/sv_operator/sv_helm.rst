@@ -467,7 +467,14 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
-- Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
+- Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
+
+Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVC members. The bundled artifacts consist of the lists of recommended values as follows:
+
+- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-test.yaml`` - the list of currently SVC-approved identities for TestNet
+- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-dev.yaml`` - the list of partners currently experimenting with onboarding SV nodes on DevNet. Note that this is a less strict list at the moment, and includes identities for e.g. Digital-Asset support employees.
+
+Please identify the file out of the above corresponding to the network to which you are connecting, and after reviewing the file, set its path in an environment variable ``SV-IDENTITIES-FILE`` to be used below.
 
 .. _sv-participant-identities-restore:
 
@@ -506,7 +513,7 @@ reaches a stable state prior to moving on to the next step.
     helm repo update
     helm install postgres canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml --wait
     helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
-    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml --wait
+    helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV-IDENTITIES-FILE} --wait
     helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml --wait
     helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} --wait
     helm install cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
