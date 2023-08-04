@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {CLUSTER_DNS_NAME} from 'cn-pulumi-common';
+import {createGrafanaDashboards} from "./grafana-dashboards";
 
 const namespace = new k8s.core.v1.Namespace('observabilty', {
     metadata: {
@@ -63,10 +64,6 @@ new k8s.helm.v3.Release('observability-metrics', {
                         memory: "12Gi",
                         cpu: "4"
                     },
-                    limits: {
-                        memory: "28Gi",
-                        cpu: "6"
-                    },
                 },
                 storageSpec: {
                     volumeClaimTemplate: {
@@ -82,37 +79,45 @@ new k8s.helm.v3.Release('observability-metrics', {
                     }
                 },
             },
-            grafana: {
-                fullnameOverride: 'grafana',
-                ingress: {
-                    enabled: false,
+        },
+        grafana: {
+            fullnameOverride: 'grafana',
+            ingress: {
+                enabled: false,
+            },
+            sidecar: {
+                dashboards: {
+                    folderAnnotation: 'folder',
+                    provider: {foldersFromFilesStructure: true, allowUiUpdates: true},
                 },
-                sidecar: {
-                    dashboards: {
-                        folderAnnotation: 'folder',
-                        provider: {foldersFromFilesStructure: true, allowUiUpdates: true},
-                    },
-                },
             },
-            'kube-state-metrics': {
-                fullnameOverride: 'ksm',
-            },
-            'prometheus-node-exporter': {
-                fullnameOverride: 'node-exporter',
-            },
+            adminUser: "cn-admin",
+            adminPassword: "canton_network_!password"
+        },
+        'kube-state-metrics': {
+            fullnameOverride: 'ksm',
+        },
+        'prometheus-node-exporter': {
+            fullnameOverride: 'node-exporter',
         },
     }
 });
 
 istioVirtualService(
-    'prometheus-api',
     "prometheus",
     "prometheus-prometheus",
     9090
 )
 
-function istioVirtualService(name: string, dns: string, serviceName: string, servicePort: number) {
-    new k8s.apiextensions.CustomResource('prometheus-virtual-service', {
+
+istioVirtualService(
+    "grafana",
+    "grafana",
+    80
+)
+
+function istioVirtualService(name: string, serviceName: string, servicePort: number) {
+    new k8s.apiextensions.CustomResource(`${name}-virtual-service`, {
         apiVersion: 'networking.istio.io/v1alpha3',
         kind: 'VirtualService',
         metadata: {
@@ -120,7 +125,7 @@ function istioVirtualService(name: string, dns: string, serviceName: string, ser
             namespace: namespaceName,
         },
         spec: {
-            hosts: [`${dns}.${CLUSTER_DNS_NAME}`],
+            hosts: [`${name}.${CLUSTER_DNS_NAME}`],
             gateways: ['cluster-ingress/cn-http-gateway'],
             http: [
                 {
@@ -138,5 +143,7 @@ function istioVirtualService(name: string, dns: string, serviceName: string, ser
                 },
             ],
         },
-    });
+    }, {deleteBeforeReplace: true});
 }
+
+createGrafanaDashboards(namespaceName)

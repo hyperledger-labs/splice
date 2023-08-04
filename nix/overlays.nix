@@ -4,6 +4,7 @@
   lnav = super.callPackage ./lnav.nix {};
   canton = super.callPackage ./canton.nix {};
   cometbft_driver = super.callPackage ./cometbft-driver.nix {};
+  da_grafana_dashboards = super.callPackage ./grafana-dashboards.nix {};
   daml2js = super.callPackage ./daml2js.nix {};
   python3 = super.python3.override {
     packageOverrides = pySelf : pySuper : {

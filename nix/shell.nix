@@ -70,4 +70,5 @@ in pkgs.mkShell {
   SDK_VERSION = "${sources.daml_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
+  GRAFANA_DASHBOARDS = "${pkgs.da_grafana_dashboards}";
 }
