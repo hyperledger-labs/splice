@@ -158,7 +158,7 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
                   data={
                     svcInfosQuery.data?.coinRules.payload.configSchedule.futureValues.find(
                       e => e._1 === coinRulesAction.value.scheduleTime
-                    )!._2
+                    )?._2
                   }
                 />
               ),
@@ -243,12 +243,11 @@ const ActionValueTable: React.FC<{
 };
 
 const PrettyJsonPrint: React.FC<{
-  data: SvcRulesConfig | CoinConfig<USD> | string;
+  data?: SvcRulesConfig | CoinConfig<USD> | string;
 }> = ({ data }) => {
   return (
     <pre style={{ whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-      {typeof data !== 'string' && JSON.stringify(data, null, 2)}
-      {typeof data === 'string' && data}
+      {typeof data !== 'string' ? JSON.stringify(data, null, 2) : data}
     </pre>
   );
 };
