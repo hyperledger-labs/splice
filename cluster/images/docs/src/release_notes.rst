@@ -6,6 +6,11 @@ Release Notes
 2023-08-07
 ----------
 
+* Frontend updates:
+
+    * Introduced new governance actions to add/remove/modify individual scheduled coin config changes.
+      The existing UI for replacing the entire schedule will be deprecated in a coming release.
+
 * Deployment updates:
 
     * Introduced a new value, ``disableAllocateLedgerApiUserParty``, for
@@ -14,6 +19,9 @@ Release Notes
       this value in a newly-introduced ``sv-validator-values.yaml`` file.
     * The SV name for the node operated by IEU on behalf of LCV has been updated.
       Note the updated SV name in ``sv-values.yaml``: `Liberty-City-Ventures`.
+    * Cumberland's name and public key have also been added in ``sv-values.yaml``,
+      to be included in the sv-app's configuration as another identity that should be
+      approved to join the SVC on TestNet.
 
 * Bugfixes:
 

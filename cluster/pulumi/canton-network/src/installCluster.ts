@@ -131,6 +131,11 @@ const nonDevNetApprovedSvIdentities = [
     publicKey:
       'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==',
   },
+  {
+    name: 'Cumberland',
+    publicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUqL9Y0mFB8xQXGAAJk+7q5/E/SyrwM20pKWB4ZhwGGmyR7L7ss5hr56dwcCURLUGnIlKssuV89XFUwFfwhz3AA==',
+  },
 ];
 
 const sv34ApprovedSvIdentities = [
