@@ -14,6 +14,8 @@ import {
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
   readAndInstallParticipantBootstrapDump,
+  devNetApprovedSvIdentities,
+  nonDevNetApprovedSvIdentities,
 } from 'cn-pulumi-common';
 import { exit } from 'process';
 
@@ -195,6 +197,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     participantBootstrappingDump: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
+    approvedSvIdentities: isDevNet ? devNetApprovedSvIdentities : nonDevNetApprovedSvIdentities,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
