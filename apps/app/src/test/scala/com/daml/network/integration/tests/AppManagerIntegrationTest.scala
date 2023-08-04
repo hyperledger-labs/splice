@@ -79,9 +79,12 @@ class AppManagerIntegrationTest
       )
       val configuration = splitwellValidatorBackend.getLatestAppConfiguration(provider)
       configuration.name shouldBe "splitwell"
-      configuration.domains.loneElement shouldBe Domain("splitwell", "http://localhost:5108")
+      configuration.releaseConfigurations.loneElement.domains.loneElement shouldBe Domain(
+        "splitwell",
+        "http://localhost:5108",
+      )
       val darHash = splitwellValidatorBackend
-        .getAppRelease(provider, configuration.releaseVersion)
+        .getAppRelease(provider, configuration.releaseConfigurations.loneElement.releaseVersion)
         .darHashes
         .loneElement
 

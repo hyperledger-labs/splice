@@ -612,7 +612,7 @@ components:
         - name
         - ui_url
         - domains
-        - release_version
+        - release_configurations
       properties:
         version:
           type: integer
@@ -621,12 +621,37 @@ components:
           type: string
         ui_url:
           type: string
+        release_configurations:
+          description: "Multiple release configurations are used to support rolling upgrades."
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseConfiguration"
+
+    ReleaseConfiguration:
+      type: object
+      required:
+        - domains
+        - release_version
+        - required_for
+      properties:
         domains:
           type: array
           items:
             $ref: "#/components/schemas/Domain"
         release_version:
           type: string
+        required_for:
+          $ref: "#/components/schemas/Timespan"
+
+    Timespan:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
 
     AppRelease:
       type: object

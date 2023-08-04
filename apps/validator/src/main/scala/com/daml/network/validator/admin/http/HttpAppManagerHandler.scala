@@ -3,8 +3,9 @@ package com.daml.network.validator.admin.http
 import akka.stream.Materializer
 import akka.http.scaladsl.model.{ContentType, HttpRequest, HttpResponse, Uri}
 import cats.data.EitherT
-import cats.syntax.foldable.*
 import cats.syntax.either.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
@@ -278,8 +279,13 @@ class HttpAppManagerHandler(
               version = configurationVersion,
               name = name,
               uiUrl = uiUrl,
-              domains = decodedDomains,
-              releaseVersion = releaseManifest.version,
+              releaseConfigurations = Vector(
+                definitions.ReleaseConfiguration(
+                  domains = decodedDomains,
+                  releaseVersion = releaseManifest.version,
+                  requiredFor = definitions.Timespan(),
+                )
+              ),
             ),
           )
         )
@@ -310,10 +316,13 @@ class HttpAppManagerHandler(
         configuration <- HttpUtil.getHttpJson[definitions.AppConfiguration](
           appUrl.latestAppConfiguration
         )
-        release <- HttpUtil.getHttpJson[definitions.AppRelease](
-          appUrl.appRelease(configuration.releaseVersion)
-        )
-        _ <- configuration.domains.traverse_ { domain =>
+        // TODO(#7089) Add a review step to install and only add changes for approved releases
+        releases <- configuration.releaseConfigurations.traverse { releaseConfig =>
+          HttpUtil.getHttpJson[definitions.AppRelease](
+            appUrl.appRelease(releaseConfig.releaseVersion)
+          )
+        }
+        _ <- configuration.releaseConfigurations.flatMap(_.domains).traverse_ { domain =>
           participantAdminConnection.ensureDomainRegistered(
             DomainConnectionConfig(
               // TODO(#6839) Fix the alias here, we can't assume that app providers use distinct aliases.
@@ -322,9 +331,14 @@ class HttpAppManagerHandler(
             )
           )
         }
-        _ <- release.darHashes.traverse_(ensureDar(appUrl, _))
+        _ <- releases.flatMap(_.darHashes).traverse_(ensureDar(appUrl, _))
         _ <- store.storeInstalledApp(
-          AppManagerStore.InstalledApp(appUrl.provider, appUrl, configuration, release)
+          AppManagerStore.InstalledApp(
+            appUrl.provider,
+            appUrl,
+            configuration,
+            releases.map(release => release.version -> release).toMap,
+          )
         )
       } yield v0.AppManagerResource.InstallAppResponse.Created
     }

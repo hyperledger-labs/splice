@@ -2,6 +2,8 @@
 -- contracts signed by the validator-operator party.
 module CN.AppManager.Store where
 
+import DA.Map (Map)
+
 -- | The configuration of a registered app which defines the
 -- release versions that need to be
 -- installed as well as the domains that users need to
@@ -67,6 +69,8 @@ template InstalledApp
     appUrl: Text
     configurationVersion : Int
     configurationJson : Text
-    releaseJson : Text
+    releasesJson: Map Text Text
+      -- ^ Map from release version to JSON encoded release definition.
+      -- This contains all releases referenced from release configurations in configurationJson.
   where
     signatory validatorOperator

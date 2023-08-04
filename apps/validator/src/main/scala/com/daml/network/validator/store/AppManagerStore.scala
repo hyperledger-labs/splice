@@ -8,6 +8,7 @@ import com.daml.network.http.v0.definitions
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.ContractWithState
+import com.daml.network.util.PrettyInstances
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -21,6 +22,7 @@ import io.circe.syntax.*
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 /** A validator-local store for the data required by the app manager.
   * This is internally contract-based but the APIs are deliberately do not expose contracts
@@ -106,7 +108,7 @@ final class AppManagerStore(
         installed.appUrl.appUrl.toString,
         installed.configuration.version,
         installed.configuration.asJson.noSpaces,
-        installed.release.asJson.noSpaces,
+        installed.releases.view.mapValues(_.asJson.noSpaces).toMap.asJava,
       ),
     )
 
@@ -185,7 +187,9 @@ final class AppManagerStore(
       PartyId.tryFromProtoPrimitive(c.contract.payload.provider),
       AppUrl(c.contract.payload.appUrl),
       decodeOrThrow[definitions.AppConfiguration](c.contract.payload.configurationJson),
-      decodeOrThrow[definitions.AppRelease](c.contract.payload.releaseJson),
+      c.contract.payload.releasesJson.asScala.view
+        .mapValues(decodeOrThrow[definitions.AppRelease](_))
+        .toMap,
     )
 
   def lookupInstalledApp(provider: PartyId): Future[Option[InstalledApp]] =
@@ -226,6 +230,10 @@ object AppManagerStore {
     PrettyUtil.adHocPrettyInstance
   private implicit val prettyRelease: Pretty[definitions.AppRelease] =
     PrettyUtil.adHocPrettyInstance
+  private implicit val prettyReleaseMap: Pretty[Map[String, definitions.AppRelease]] = {
+    implicit val prettyVersion: Pretty[String] = PrettyInstances.prettyString
+    PrettyInstances.prettyMap
+  }
 
   final case class AppRelease(provider: PartyId, release: definitions.AppRelease) {
     def toJson: definitions.AppRelease = release
@@ -259,7 +267,7 @@ object AppManagerStore {
       provider: PartyId,
       appUrl: AppUrl,
       configuration: definitions.AppConfiguration,
-      release: definitions.AppRelease,
+      releases: Map[String, definitions.AppRelease],
   ) extends PrettyPrinting {
     def toJson: definitions.InstalledApp = definitions.InstalledApp(
       provider = provider.toProtoPrimitive,
@@ -272,7 +280,7 @@ object AppManagerStore {
         param("provider", _.provider),
         param("appUrl", _.appUrl.appUrl),
         param("configuration", _.configuration),
-        param("release", _.release),
+        param("releases", _.releases),
       )
   }
 
