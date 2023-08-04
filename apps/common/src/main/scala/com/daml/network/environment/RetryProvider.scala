@@ -610,8 +610,10 @@ object RetryProvider {
       // The exception type is akka.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
       // but akka-http does not expose that so we match on the message instead.
       case Failure(ex: RuntimeException)
-          if ex.getMessage.contains(
-            "The http server closed the connection unexpectedly before delivering responses"
+          if Option(ex.getMessage).exists(
+            _.contains(
+              "The http server closed the connection unexpectedly before delivering responses"
+            )
           ) =>
         val msg =
           s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
