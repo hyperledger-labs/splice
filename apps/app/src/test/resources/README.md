@@ -44,8 +44,8 @@ all network indices must be odd numbers.
 
 - `5`: Default for integration tests
   - See `simple-topology.conf`, `simple-topology-canton.conf`.
-- `5`: Self-hosted validator and SV for preflight check
-  - See `validator.conf`, `validator-participant.conf`, `sv.conf`, `sv-participant.conf`
+- `5`: Self-hosted validator for preflight check
+  - See `validator.conf`, `validator-participant.conf`
 - `7`: Local runbook integration test, self-hosted validator
   - See `LocalRunbookIntegrationTest.scala`
 - `9`: Local runbook integration test and participant identities dump test, `sv1Local`, `aliceValidatorLocal`

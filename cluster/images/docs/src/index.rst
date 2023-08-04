@@ -39,7 +39,6 @@ Canton Network Documentation
    :maxdepth: 2
    :caption: Supervalidator Operators
 
-   sv_operator/onboarding.rst
    sv_operator/sv_helm.rst
    sv_operator/sv_operations.rst
 

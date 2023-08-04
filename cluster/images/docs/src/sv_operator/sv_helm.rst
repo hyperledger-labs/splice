@@ -29,27 +29,58 @@ Requirements
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-4) You should have the CometBft node keys generated.
-See instructions in the :ref:`Generating the CometBft node identity <cometbft-identity>`.
-
-5) You should have an SV key pair generated and approved by Digital Asset.
-See instructions in the :ref:`Generating an SV identity section <sv-identity>`.
-
-6) You should have completed the self hosted validator setup,
+4) You should have completed the self hosted validator setup,
    including Auth0 setup. Dedicated instructions can be found in the :ref:`Self-Hosted Validator section <self_hosted_validator>`
 
-7) Your cluster either needs to be connected to the GCP DA Canton
+5) Your cluster either needs to be connected to the GCP DA Canton
    DevNet VPN or you need a static egress IP. In the latter case,
    please provide that IP address to your contact at Digital Asset to
    add it to the firewall rules.
 
-8) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
+6) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
 .. parsed-literal::
 
   tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
 
+.. _sv-identity:
 
+Generating an SV identity
+-------------------------
+
+SV operators are identified by a human-readable name and an EC public key.
+This identification is stable across deployments of the Canton network.
+You are, for example, expected to reuse your SV name and public key between (test-)network resets.
+
+Use the following shell commands to generate a keypair in the format expected by the SV node software: ::
+
+  # Generate the keypair
+  openssl ecparam -name prime256v1 -genkey -noout -out sv-keys.pem
+
+  # Encode the keys
+  public_key_base64=$(openssl ec -in sv-keys.pem -pubout -outform DER 2>/dev/null | base64 | tr -d "\n")
+  private_key_base64=$(openssl pkcs8 -topk8 -nocrypt -in sv-keys.pem -outform DER 2>/dev/null | base64 | tr -d "\n")
+
+  # Output the keys
+  echo "public-key = \"$public_key_base64\""
+  echo "private-key = \"$private_key_base64\""
+
+  # Clean up
+  rm sv-keys.pem
+
+..
+  Based on `scripts/generate-sv-keys.sh`
+
+These commands should result in an output similar to ::
+
+  public-key = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw=="
+  private-key = "MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCBsFuFa7Eumkdg4dcf/vxIXgAje2ULVz+qTKP3s/tHqKw=="
+
+Store both keys in a safe location.
+You will be using them every time you want to deploy a new SV node, i.e., also when deploying an SV node to a different deployment of the Canton Network and for redeploying an SV node after a (test-)network reset.
+
+The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
+For DevNet and the current early version of TestNet, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
 
 Preparing a Cluster for Installation
 ------------------------------------
@@ -269,21 +300,6 @@ DIRECTORY_UI_CLIENT_ID             The client id of the Auth0 app for the direct
 The ``AUTH0_TENANT_NAME`` is the name of your Auth0 tenant as shown at the top left of your Auth0 project.
 You can obtain the client ID and secret of each Auth0 app from the settings pages of that app.
 
-.. _helm-cometbft-secrets-config:
-
-Configuring your CometBft node keys
-+++++++++++++++++++++++++++++++++++
-
-The CometBft node is configured with a secret, based on the output from :ref:`Generating the CometBft node identity <cometbft-identity>`
-The secret is created as follows, with the `node_key.json` and `priv_validator_key.json` files representing the files generated as part of the node identity:
-
-.. code-block:: bash
-
-    kubectl create --namespace sv secret generic cometbft-keys \
-        "--from-file=node_key.json=node_key.json" \
-        "--from-file=priv_validator_key.json=priv_validator_key.json"
-
-
 .. _helm-sv-auth-secrets-config:
 
 Configuring Authentication on your SV Node
@@ -329,6 +345,60 @@ To setup the wallet and SV UI, create the following two secrets.
     kubectl create --namespace sv secret generic cn-app-directory-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${DIRECTORY_UI_CLIENT_ID}"
+
+Configuring your CometBft node
+------------------------------
+
+Every SV node also deploys a CometBft node. This node must be configured to join the existing Canton network BFT chain.
+To do that, you first must generate the keys that will identify the node.
+
+.. note::
+  You need access to the canton `network docker repo <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_ to successfully generate the node identity.
+  You can access your username and get the API key for your Artifactory account through the UI, using the top right `Edit profile` option.
+
+  | This can be configured by running:
+  | :code:`docker login -u <your_artifactory_user> -p <your_artifactory_api_key> digitalasset-canton-network-docker.jfog.io`
+
+.. _cometbft-identity:
+
+Generating your CometBft node keys
+++++++++++++++++++++++++++++++++++
+To generate the node config you must have access to the CometBft docker image provided through the Canton Network artifacotry (digitalasset-canton-network-docker.jfrog.io).
+
+Use the following shell commands to generate the proper keys:
+
+.. parsed-literal::
+
+  # Create a folder to store the config
+  mkdir cometbft
+  cd cometbft
+  # Init the node
+  docker run --rm -v $(pwd):/init digitalasset-canton-network-docker.jfrog.io/digitalasset/cometbft:|version| init --home /init
+  # Read the node id and keep a note of it for the deployment
+  docker run --rm -v $(pwd):/init digitalasset-canton-network-docker.jfrog.io/digitalasset/cometbft:|version| show-node-id --home /init
+
+Please keep a note of the node ID printed out above.
+
+In addition, please retain some of the configuration files generated, as follows (you might need to change the permissions/ownership for them as they are accessible only by the root user): ::
+
+  cometbft/config/node_key.json
+  cometbft/config/priv_validator_key.json
+
+Any other files can be ignored.
+
+.. _helm-cometbft-secrets-config:
+
+Configuring your CometBft node keys
++++++++++++++++++++++++++++++++++++
+
+The CometBft node is configured with a secret, based on the output from :ref:`Generating the CometBft node identity <cometbft-identity>`
+The secret is created as follows, with the `node_key.json` and `priv_validator_key.json` files representing the files generated as part of the node identity:
+
+.. code-block:: bash
+
+    kubectl create --namespace sv secret generic cometbft-keys \
+        "--from-file=node_key.json=node_key.json" \
+        "--from-file=priv_validator_key.json=priv_validator_key.json"
 
 .. _helm-sv-install:
 

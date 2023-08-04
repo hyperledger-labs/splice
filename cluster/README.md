@@ -1044,9 +1044,15 @@ gcloud and local helm charts.
    everything else. This cluster needs to run a compatible
    version. Often you can use staging or devnet for this. If that does
    not work, you may need to lock another scratchnet and go through
-   the usual `cncluster apply` flow.  Use the SV name, private and
-   public key from `apps/src/pack/examples/sv/sv-onboarding.conf` in
-   `sv-values.yaml`.  Use either of the user ids from
+   the usual `cncluster apply` flow.  Use the following SV name, private and
+   public key in `sv-values.yaml`:
+   ```
+   # SV identity for manual tests
+   name = "DA-Test-Node"
+   public-key = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA=="
+   private-key = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgdRTS3iLr8rPFaLUBbVcu8qYxklmMzQo/4UXcULYESm2hRANCAATu7P7NbVhw8kiX5Mqpe/r91/FzH7chJUWA/qbaxp5DSXqvaU1b5Yt+r4dQxzJzFf23ptQnmTIR5tjJ+T0lbXwo"
+   ```
+   Use either of the user ids from
    [our list of passwords](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit?ouid=103930368588823687273&usp=docs_home&ths=true)
    as the `validator_wallet_user` in `validator-values.yaml` Use
    `https://canton.network.global` as the audience and

@@ -23,6 +23,12 @@ Release Notes
       to be included in the sv-app's configuration as another identity that should be
       approved to join the SVC on TestNet.
 
+* Documentation:
+
+  * Removed obsolete section on manually "Onboarding a SV".
+    The subsections on generating SV and CometBFT identities have been moved into the
+    :ref:`Helm-based deployment section <sv-helm>`.
+
 * Bugfixes:
 
     * Fix an issue where after a token refresh, ledger ingestion would not get restarted.
@@ -288,8 +294,8 @@ Release Notes
 ----------
 
 * Add wallet UI for SV user to SV runbook. Instructions exist for
-  :ref:`deployment using Helm <helm-sv-wallet-ui>` and :ref:`local
-  deployment <local-sv-wallet-ui>`. This allows the SV operator to
+  :ref:`deployment using Helm <helm-sv-wallet-ui>` and local
+  deployment (deprecated). This allows the SV operator to
   login to their wallet and e.g. observe SV rewards accumulating.
 
 * Various simplifications and extensions of :ref:`SV Helm-based runbook <sv-helm>`:

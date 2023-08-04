@@ -50,7 +50,8 @@ extensions = [
 
 ## -- Redirects -----------------------------------------------------------
 redirects = {
-    "sv_operator/bootstrap": "onboarding.html"
+    "sv_operator/bootstrap": "sv_helm.html",
+    "sv_operator/onboarding": "sv_helm.html"
 }
 
 
