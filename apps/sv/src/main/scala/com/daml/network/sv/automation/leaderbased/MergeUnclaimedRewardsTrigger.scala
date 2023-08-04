@@ -48,12 +48,9 @@ class MergeUnclaimedRewardsTrigger(
 
   protected def isStaleTask(
       unclaimedRewardsTask: MergeUnclaimedRewardsTask
-  )(implicit tc: TraceContext): Future[Boolean] =
-    for {
-      unclaimedRewardsExist <- store.multiDomainAcsStore.allKnownAndNotArchived(
-        unclaimedRewardsTask.contracts.map(_.contractId)
-      )
-    } yield !unclaimedRewardsExist
+  )(implicit tc: TraceContext): Future[Boolean] = store.multiDomainAcsStore.hasArchived(
+    unclaimedRewardsTask.contracts.map(_.contractId)
+  )
 
   override def completeTaskAsLeader(
       unclaimedRewardsTask: MergeUnclaimedRewardsTask

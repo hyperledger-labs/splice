@@ -475,6 +475,13 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
     ]]
   ]
 
+  def listExpiredElectionRequests(
+      epoch: Long
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    cn.svcrules.ElectionRequest.ContractId,
+    cn.svcrules.ElectionRequest,
+  ]]]
+
   def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
     multiDomainAcsStore.getJsonAcsSnapshot(ignoredContractsForAcsDump)
 

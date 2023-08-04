@@ -52,4 +52,6 @@ class LeaderBasedAutomationService(
   if (config.automation.enableUnclaimedRewardExpiration) {
     registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
   }
+
+  registerTrigger(new ExpireElectionRequestsTrigger(triggerContext, svTaskContext))
 }

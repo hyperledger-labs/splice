@@ -1,18 +1,36 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.javaapi.data.codegen.{Update, Created, ContractId}
 import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.codegen.java.cn
 import com.daml.network.sv.util.SvUtil
 
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.PartyId
 import org.slf4j.event.Level
 
 import CNNodeTests.BracketSynchronous.*
 
 import java.time.Duration as JavaDuration
+import scala.jdk.CollectionConverters.*
 
 class SvcElectionTimeBasedIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
+
+  def createElectionRequestUpdate(
+      svc: PartyId,
+      requester: PartyId,
+      epoch: Long,
+      reason: cn.svcrules.ElectionRequestReason,
+      ranking: Seq[PartyId],
+  ): Update[Created[ContractId[cn.svcrules.ElectionRequest]]] =
+    new cn.svcrules.ElectionRequest(
+      svc.toProtoPrimitive,
+      requester.toProtoPrimitive,
+      epoch,
+      reason,
+      ranking.map(_.toProtoPrimitive).asJava,
+    ).create
 
   "detect an inactive leader" in { implicit env =>
     val svcRulesBeforeElection = clue("Initialize SVC with 4 SVs") {
@@ -37,6 +55,9 @@ class SvcElectionTimeBasedIntegrationTest
     }
 
     var rounds: Seq[OpenMiningRound.Contract] = Seq.empty[OpenMiningRound.Contract]
+    // It doesn't really matter which sv we pick
+    val pollingIntervalDuration = sv2Backend.config.automation.pollingInterval.asJava
+    val sv1Party = sv1Backend.getSvcInfo().svParty
 
     clue(
       "Wait for first three rounds to be opened"
@@ -70,11 +91,9 @@ class SvcElectionTimeBasedIntegrationTest
       clue(
         "A new leader is elected and leader-based triggers resume operating normally"
       ) {
-        // It doesn't really matter which sv we pick
-        val automationConfig = sv2Backend.config.automation
         val effectiveTimeout = SvUtil
           .fromRelTime(SvUtil.defaultSvcRulesConfig().leaderInactiveTimeout)
-          .plus(automationConfig.pollingInterval.asJava)
+          .plus(pollingIntervalDuration)
 
         val bufferDuration = JavaDuration.ofSeconds(5)
 
@@ -97,6 +116,42 @@ class SvcElectionTimeBasedIntegrationTest
             )
           newRounds.length should be >= 1
         }
+      }
+    }
+
+    clue("Create an outdated request") {
+      val reason = new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
+        com.daml.ledger.javaapi.data.Unit.getInstance()
+      )
+      val ranking = Seq(
+        sv1Backend,
+        sv2Backend,
+        sv3Backend,
+        sv4Backend,
+      ).map(_.getSvcInfo().svParty)
+
+      sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
+        userId = sv1Backend.config.ledgerApiUser,
+        actAs = Seq(svcParty),
+        readAs = Seq.empty,
+        update = createElectionRequestUpdate(
+          svcParty,
+          sv1Party,
+          svcRulesBeforeElection.epoch,
+          reason,
+          ranking,
+        ),
+      )
+    }
+
+    clue("Verify that outdated election requests are expired") {
+      advanceTime(pollingIntervalDuration)
+      eventually() {
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.ElectionRequest.COMPANION)(
+            svcParty,
+            { co => co.data.requester == sv1Party.toProtoPrimitive },
+          ) shouldBe empty
       }
     }
   }

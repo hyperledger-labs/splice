@@ -35,16 +35,9 @@ class ExpireRewardCouponsTrigger(
 
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
-    for {
-      allValidatorCouponsExist <- store.multiDomainAcsStore.allKnownAndNotArchived(
-        expiredRewardsTask.validatorCoupons
-      )
-      allAppCouponsExist <- store.multiDomainAcsStore.allKnownAndNotArchived(
-        expiredRewardsTask.appCoupons
-      )
-    } yield !(allValidatorCouponsExist && allAppCouponsExist)
-  }
+  ): Future[Boolean] = store.multiDomainAcsStore.hasArchived(
+    expiredRewardsTask.validatorCoupons ++ expiredRewardsTask.appCoupons
+  )
 
   override def completeTaskAsLeader(
       expiredRewardsTask: ExpiredRewardCouponsBatch

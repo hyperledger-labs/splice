@@ -141,12 +141,11 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .value
   }
 
-  def allKnownAndNotArchived(ids: Seq[ContractId[?]])(implicit
+  def hasArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
-  ): Future[Boolean] = {
+  ): Future[Boolean] =
     // TODO(#6458): implement this as a single DB query
-    Future.sequence(ids.map(lookupContractStateById)).map(_.forall(_.isDefined))
-  }
+    Future.sequence(ids.map(lookupContractStateById)).map(_.exists(_.isEmpty))
 
   override def listContracts[C, TCid <: ContractId[_], T](
       companion: C,

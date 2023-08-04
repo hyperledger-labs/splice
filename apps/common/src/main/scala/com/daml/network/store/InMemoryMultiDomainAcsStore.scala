@@ -279,10 +279,9 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       st.lookupContractState(id).flatMap(_.toActiveState)
     }
 
-  def allKnownAndNotArchived(ids: Seq[ContractId[?]])(implicit
+  def hasArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
-  ): Future[Boolean] =
-    Future.sequence(ids.map(lookupContractStateById)).map(_.forall(_.isDefined))
+  ): Future[Boolean] = Future.sequence(ids.map(lookupContractStateById)).map(_.exists(_.isEmpty))
 
   /** Find a contract that satisfies a predicate.
     *

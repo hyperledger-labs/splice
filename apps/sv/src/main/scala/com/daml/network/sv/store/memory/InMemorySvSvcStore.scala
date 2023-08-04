@@ -487,9 +487,9 @@ class InMemorySvSvcStore(
   ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] =
     multiDomainAcsStore
       .filterContractsOnDomain(
-        cn.svcrules.ElectionRequest.COMPANION,
+        ElectionRequest.COMPANION,
         svcRules.domain,
-        { c: Contract[?, cn.svcrules.ElectionRequest] =>
+        { c: Contract[?, ElectionRequest] =>
           svcRules.payload.members.keySet
             .contains(c.payload.requester) && c.payload.epoch == svcRules.payload.epoch
         },
@@ -497,8 +497,8 @@ class InMemorySvSvcStore(
       .map(
         _.foldLeft(
           Map[String, Contract[
-            cn.svcrules.ElectionRequest.ContractId,
-            cn.svcrules.ElectionRequest,
+            ElectionRequest.ContractId,
+            ElectionRequest,
           ]]()
         ) { (acc, contract) =>
           if (acc.contains(contract.payload.requester)) acc
@@ -511,11 +511,31 @@ class InMemorySvSvcStore(
       tc: TraceContext
   ): Future[QueryResult[Option[Contract[ElectionRequest.ContractId, ElectionRequest]]]] =
     defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(cn.svcrules.ElectionRequest.COMPANION)(
+      multiDomainAcsStore.findContractOnDomainWithOffset(ElectionRequest.COMPANION)(
         _,
         co => co.payload.epoch == epoch && co.payload.requester == requester.toProtoPrimitive,
       )
     )
+
+  override def listExpiredElectionRequests(
+      epoch: Long
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    ElectionRequest.ContractId,
+    ElectionRequest,
+  ]]] =
+    for {
+      domain <- defaultAcsDomainIdF
+      contracts <- multiDomainAcsStore.filterContractsOnDomain(
+        ElectionRequest.COMPANION,
+        domain,
+        {
+          co: Contract[
+            ElectionRequest.ContractId,
+            ElectionRequest,
+          ] => co.payload.epoch < epoch
+        },
+      )
+    } yield contracts
 
   override def getImportShipmentFor(
       receiver: PartyId

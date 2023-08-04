@@ -262,6 +262,13 @@ class DbSvSvcStore(
     MultiDomainAcsStore.QueryResult[Option[Contract[ElectionRequest.ContractId, ElectionRequest]]]
   ] = ???
 
+  override def listExpiredElectionRequests(
+      epoch: Long
+  )(implicit tc: TraceContext): Future[Seq[Contract[
+    ElectionRequest.ContractId,
+    ElectionRequest,
+  ]]] = ???
+
   override def getImportShipmentFor(receiver: PartyId)(implicit
       tc: TraceContext
   ): Future[AcsStoreDump.ImportShipment] = ???
