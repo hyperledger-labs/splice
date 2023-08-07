@@ -39,6 +39,12 @@ data DomainFeesConfig = DomainFeesConfig with
   deriving (Eq, Show)
 
 
+validGlobalDomainConfig : GlobalDomainConfig -> Bool
+validGlobalDomainConfig config =
+  config.activeDomain `Set.member` config.requiredDomains
+
+-- TODO(#7081) - Remove this section once we have switched over completely to MemberTraffic contracts
+
 -- Extra traffic tracking
 -------------------------
 
@@ -69,7 +75,6 @@ template ValidatorTraffic with
       && ccSpent >= 0.0
       && usdSpent >= 0.0
 
-
 initialValidatorTraffic : Party -> Party -> Text -> Int -> ValidatorTraffic
 initialValidatorTraffic svc validator domainId amount = ValidatorTraffic with
   svc = svc
@@ -81,6 +86,34 @@ initialValidatorTraffic svc validator domainId amount = ValidatorTraffic with
   lastPurchasedAt = time (date 1 Jan 1) 00 00 00
   domainId
 
-validGlobalDomainConfig : GlobalDomainConfig -> Bool
-validGlobalDomainConfig config =
-  config.activeDomain `Set.member` config.requiredDomains
+
+-- Per sequencer member domain traffic tracking
+------------------------------------------------
+
+-- | The state of the extra domain traffic purchases of a sequencer member.
+template MemberTraffic with
+    svc : Party
+    memberId : Text -- ^ The id of the sequencer member (participant or mediator) for which traffic has been purchased
+    domainId : Text -- ^ The id of the domain for which this contract tracks purchased extra traffic.
+    totalPurchased : Int -- ^ The number of bytes of extra traffic purchased
+    numPurchases : Int -- ^ Number of times extra traffic has been purchased
+    ccSpent : Decimal -- ^ Total CC spent on extra traffic
+    usdSpent : Decimal -- ^ Total USD spent on extra traffic
+  where
+    signatory svc
+
+    ensure totalPurchased >= 0
+      && numPurchases >= 0
+      && ccSpent >= 0.0
+      && usdSpent >= 0.0
+
+
+initialMemberTraffic : Party -> Text -> Text -> Int -> MemberTraffic
+initialMemberTraffic svc memberId domainId amount = MemberTraffic with
+    svc = svc
+    memberId = memberId
+    domainId
+    totalPurchased = amount
+    numPurchases = 0
+    ccSpent = 0.0
+    usdSpent = 0.0

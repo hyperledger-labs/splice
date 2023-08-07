@@ -1,0 +1,26 @@
+module CN.Wallet.TopUpState where
+
+import DA.Date
+import DA.Time
+
+-- | The state of a given top-up loop.
+--
+-- Records the last time when this validator purchased traffic for this member in order to:
+-- 1. allow for crash fault tolerant deduplication of traffic purchases
+-- 2. allow enforcing a rate limit to prevent the validator from spending too much on traffic purchases.
+template ValidatorTopUpState with
+    validator : Party -- ^ The validator operator purchasing traffic for the given member
+    memberId : Text -- ^ The id of the sequencer member (participant or mediator) for which traffic has been purchased
+    domainId : Text -- ^ The id of the domain for which this contract tracks purchased extra traffic.
+    lastPurchasedAt : Time -- ^ Time when the traffic was last purchased by the validator for the given member
+  where
+    signatory validator
+
+
+initialValidatorTopUpState: Party -> Text -> Text -> ValidatorTopUpState
+initialValidatorTopUpState validator memberId domainId = do
+  ValidatorTopUpState with
+    validator
+    memberId
+    domainId
+    lastPurchasedAt = time (date 1 Jan 1) 00 00 00

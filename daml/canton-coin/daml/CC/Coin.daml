@@ -6,7 +6,7 @@ import Prelude hiding (forA)
 import DA.Action (void, foldlA)
 import DA.Exception
 import DA.Foldable (forA_)
-import DA.List (dedupSort)
+import DA.List (dedupSort, dedup)
 import DA.Map (Map)
 import qualified DA.Map as Map
 import DA.Set (Set)
@@ -278,7 +278,7 @@ template CoinRules
     -- Global domain usage
     ----------------------
 
-    -- TODO(#3742): consider also declaring this method in the CoinRules interface
+    -- TODO(#7081) - Remove this once we've switched over entirely to MemberTraffic contracts
     nonconsuming choice CoinRules_BuyExtraTraffic
       : (ContractId ValidatorTraffic, Optional (ContractId API.Coin))
       with
@@ -335,6 +335,7 @@ template CoinRules
               domainId = traffic.domainId
         return (newTraffic, result.senderChangeCoin)
 
+    -- TODO(#7081) - Remove this once we've switched over entirely to MemberTraffic contracts
     -- Disincentivize the creation of duplicate traffic contracts by giving
     -- the SVC the right to retire the duplicates with a lower amount of purchased extra traffic.
     nonconsuming choice CoinRules_ArchiveDuplicateValidatorTrafficContracts : ()
@@ -358,6 +359,86 @@ template CoinRules
           require "Purchased amount of duplicate is smaller or equal to reference"
             (duplicate.totalPurchased <= traffic.totalPurchased)
 
+    -- TODO(#3742): consider also declaring this method in the CoinRules interface
+    nonconsuming choice CoinRules_BuyMemberTraffic
+      : (ContractId MemberTraffic, Optional (ContractId API.Coin))
+      with
+        inputs : [API.TransferInput]
+        context : API.PaymentTransferContext
+        buyer : Party
+        provider : Party
+        memberId : Text
+        domainId : Text
+        trafficAmount : Int
+      controller provider
+      do
+        requireUnlocked lock
+        -- validate choice parameters
+        now <- getTime
+        let configUsd = getValueAsOf now configSchedule
+        require "Known domain-id" (domainId `Set.member` configUsd.globalDomain.requiredDomains)
+        let minTopupAmount = configUsd.globalDomain.fees.minTopupAmount
+        require ("trafficAmount " <> show trafficAmount <> " is at least as much as the configured minTopupAmount " <> show minTopupAmount)
+          (trafficAmount >= minTopupAmount)
+        (trafficCostCc, trafficCostUsd) <- computeDomainFees provider trafficAmount this context
+        let transfer = API.Transfer with
+              sender = provider
+              -- rewards go to SVC for self top-ups and to the provider for third-party top-ups
+              provider = if (buyer == provider) then svc else provider
+              inputs
+              outputs = [ API.TransferOutput with
+                            receiver = svc
+                            amount = trafficCostCc
+                            receiverFeeRatio = 0.0
+                            lock = None
+                        ]
+        result <- API.exercisePaymentTransfer context transfer
+        let [API.TransferResultCoin coin] = result.createdCoins
+        -- burn the coin created for the SVC
+        _ <- archive coin
+        -- create a new MemberTraffic contract for the purchased traffic
+        newTraffic <- create MemberTraffic with
+              svc
+              memberId
+              domainId
+              totalPurchased = trafficAmount
+              numPurchases = 1
+              ccSpent = trafficCostCc
+              usdSpent =  trafficCostUsd
+        return (newTraffic, result.senderChangeCoin)
+
+    nonconsuming choice CoinRules_MergeMemberTrafficContracts : ContractId MemberTraffic
+      with
+        trafficCids : [ContractId MemberTraffic]
+      controller svc
+      do
+        requireUnlocked lock
+
+        -- fetch, validate and archive all given contracts
+        let firstCid::remainingCids = (dedup trafficCids)
+        first <- fetch firstCid
+        archive firstCid
+        require "SVC matches" (first.svc == svc)
+        rest <- forA remainingCids $ \trafficCid -> do
+          traffic <- fetch trafficCid
+          require "SVC matches" (traffic.svc == svc)
+          require "Member-id matches" (traffic.memberId == first.memberId)
+          require "Domain-id matches" (traffic.domainId == first.domainId)
+          archive trafficCid
+          pure traffic
+        let traffics = first::rest
+
+        -- create a new aggregated member traffic contract.
+        let mergedTraffic = foldl (\acc traffic -> MemberTraffic with
+                svc
+                memberId = acc.memberId
+                domainId = acc.domainId
+                totalPurchased = acc.totalPurchased + traffic.totalPurchased
+                numPurchases = acc.numPurchases + traffic.numPurchases
+                usdSpent = acc.usdSpent + traffic.usdSpent
+                ccSpent = acc.ccSpent + traffic.ccSpent
+              ) (initialMemberTraffic svc first.memberId first.domainId 0) traffics
+        create mergedTraffic
 
     -- Coin usage
     -------------
