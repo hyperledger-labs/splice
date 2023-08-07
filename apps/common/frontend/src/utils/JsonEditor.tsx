@@ -13,7 +13,7 @@ interface JsonEditorProps {
   onChange: (updatedJson: Record<string, JSONValue>, time?: string) => void;
 }
 
-const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) => {
+export const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) => {
   const [json, setJson] = useState(data);
 
   const handleValueChange = (key: string, value: JSONValue) => {
@@ -61,11 +61,9 @@ const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) => {
 
   return (
     <>
-      <Table style={{ tableLayout: 'fixed' }} className="sv-coin-price-table">
+      <Table style={{ tableLayout: 'fixed' }}>
         <TableBody>{renderJsonValue(json)}</TableBody>
       </Table>
     </>
   );
 };
-
-export default JsonEditor;

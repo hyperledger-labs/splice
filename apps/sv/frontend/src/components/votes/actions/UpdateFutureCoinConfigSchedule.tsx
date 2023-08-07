@@ -1,4 +1,4 @@
-import { Loading } from 'common-frontend';
+import { JSONValue, Loading } from 'common-frontend';
 import React from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';
@@ -9,7 +9,6 @@ import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcR
 
 import { useSvcInfos } from '../../../contexts/SvContext';
 import { DropdownSchedules } from '../../../utils/DropdownSchedules';
-import { JSONValue } from '../../../utils/JsonType';
 
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');

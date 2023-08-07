@@ -1,4 +1,4 @@
-import { getUTCWithOffset, Loading } from 'common-frontend';
+import { getUTCWithOffset, JSONValue, JsonEditor, Loading } from 'common-frontend';
 import { Dayjs } from 'dayjs';
 import React, { useState } from 'react';
 
@@ -10,8 +10,6 @@ import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../../../contexts/SvContext';
-import JsonEditor from '../../../utils/JsonEditor';
-import { JSONValue } from '../../../utils/JsonType';
 
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');

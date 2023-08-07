@@ -9,3 +9,5 @@ export * from './temporal-fns';
 export * from './coinRules';
 export * from './structuralSharing';
 export * from './AppManager';
+export * from './JsonEditor';
+export * from './JsonType';

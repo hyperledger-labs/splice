@@ -1,4 +1,4 @@
-import { getUTCWithOffset } from 'common-frontend';
+import { JSONValue, JsonEditor, getUTCWithOffset } from 'common-frontend';
 import { Dayjs } from 'dayjs';
 import React, { useState } from 'react';
 
@@ -8,9 +8,6 @@ import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker
 import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
 import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
-
-import JsonEditor from './JsonEditor';
-import { JSONValue } from './JsonType';
 
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');

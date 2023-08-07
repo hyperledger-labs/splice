@@ -1,4 +1,4 @@
-import { Loading } from 'common-frontend';
+import { JSONValue, JsonEditor, Loading } from 'common-frontend';
 import React from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';
@@ -9,8 +9,6 @@ import {
 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../../../contexts/SvContext';
-import JsonEditor from '../../../utils/JsonEditor';
-import { JSONValue } from '../../../utils/JsonType';
 
 const SetSvcRulesConfig: React.FC<{
   chooseAction: (action: ActionRequiringConfirmation) => void;
