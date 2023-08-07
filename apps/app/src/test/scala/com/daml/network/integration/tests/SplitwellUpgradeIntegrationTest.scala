@@ -163,7 +163,7 @@ class SplitwellUpgradeIntegrationTest
             "group, balance update, and invite contracts all follow",
             { _ =>
               // group is transferred out by UpgradeGroupTrigger,
-              // and in by the TransferInTrigger.
+              // and in by the AssignTrigger.
               val contractDomains =
                 splitwellBackend.participantClient.transfer.lookup_contract_domain(
                   group.contract.contractId,

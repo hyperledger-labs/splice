@@ -16,11 +16,11 @@ import com.google.protobuf
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as coinCodegen}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
-  IncompleteTransferEvent,
+  IncompleteReassignmentEvent,
   TransactionTreeUpdate,
-  Transfer,
-  TransferEvent,
-  TransferUpdate,
+  Reassignment,
+  ReassignmentEvent,
+  ReassignmentUpdate,
 }
 import com.daml.network.util.{Contract, Trees}
 import com.digitalasset.canton.BaseTest
@@ -222,16 +222,16 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val defaultEffectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
-  protected def toIncompleteTransferOut[TCid <: ContractId[T], T](
+  protected def toIncompleteUnassign[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],
-      transferOutId: String,
+      unassignId: String,
       source: DomainId,
       target: DomainId,
       counter: Long,
-  ): IncompleteTransferEvent.Out = IncompleteTransferEvent.Out(
-    toTransferOutEvent(
+  ): IncompleteReassignmentEvent.Unassign = IncompleteReassignmentEvent.Unassign(
+    toUnassignEvent(
       contract.contractId,
-      transferOutId,
+      unassignId,
       source,
       target,
       counter,
@@ -239,31 +239,31 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     toCreatedEvent(contract),
   )
 
-  protected def toIncompleteTransferIn[TCid <: ContractId[T], T](
+  protected def toIncompleteAssign[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],
-      transferOutId: String,
+      unassignId: String,
       source: DomainId,
       target: DomainId,
       counter: Long,
-  ): IncompleteTransferEvent.In = IncompleteTransferEvent.In(
-    toTransferInEvent(
+  ): IncompleteReassignmentEvent.Assign = IncompleteReassignmentEvent.Assign(
+    toAssignEvent(
       contract,
-      transferOutId,
+      unassignId,
       source,
       target,
       counter,
     )
   )
 
-  protected def toTransferOutEvent(
+  protected def toUnassignEvent(
       contractId: ContractId[_],
-      transferOutId: String,
+      unassignId: String,
       source: DomainId,
       target: DomainId,
       counter: Long,
-  ): TransferEvent.Out =
-    TransferEvent.Out(
-      transferOutId = transferOutId,
+  ): ReassignmentEvent.Unassign =
+    ReassignmentEvent.Unassign(
+      unassignId = unassignId,
       submitter = userParty(1),
       contractId = contractId,
       source = source,
@@ -271,14 +271,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       counter = counter,
     )
 
-  protected def toTransferInEvent[TCid <: ContractId[T], T](
+  protected def toAssignEvent[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],
-      transferOutId: String,
+      unassignId: String,
       source: DomainId,
       target: DomainId,
       counter: Long,
-  ): TransferEvent.In = TransferEvent.In(
-    transferOutId = transferOutId,
+  ): ReassignmentEvent.Assign = ReassignmentEvent.Assign(
+    unassignId = unassignId,
     submitter = userParty(1),
     source = source,
     target = target,
@@ -315,7 +315,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         ActiveContract(domain, toCreatedEvent(contract), counter)
       },
       incompleteOut.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
-        toIncompleteTransferOut(
+        toIncompleteUnassign(
           c,
           tfid,
           sourceDomain,
@@ -324,7 +324,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         )
       },
       incompleteIn.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
-        toIncompleteTransferIn(
+        toIncompleteAssign(
           c,
           tfid,
           sourceDomain,
@@ -408,16 +408,16 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         .map(_ => tx)
     }
 
-    def transferOut[TCid <: ContractId[T], T](
+    def unassign[TCid <: ContractId[T], T](
         contractAndDomain: (Contract[TCid, T], DomainId),
-        transferId: String,
+        reassignmentId: String,
         counter: Long,
-    )(implicit store: MultiDomainAcsStore): Future[Transfer[TransferEvent.Out]] = {
-      val transfer = mkTransfer(
+    )(implicit store: MultiDomainAcsStore): Future[Reassignment[ReassignmentEvent.Unassign]] = {
+      val reassignment = mkReassignment(
         nextOffset,
-        toTransferOutEvent(
+        toUnassignEvent(
           contractAndDomain._1.contractId,
-          transferId,
+          reassignmentId,
           domain,
           contractAndDomain._2,
           counter,
@@ -427,21 +427,21 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       store.ingestionSink
         .ingestUpdate(
           domain,
-          TransferUpdate(transfer),
+          ReassignmentUpdate(reassignment),
         )
-        .map(_ => transfer)
+        .map(_ => reassignment)
     }
 
-    def transferIn[TCid <: ContractId[T], T](
+    def assign[TCid <: ContractId[T], T](
         contractAndDomain: (Contract[TCid, T], DomainId),
-        transferId: String,
+        reassignmentId: String,
         counter: Long,
-    )(implicit store: MultiDomainAcsStore): Future[Transfer[TransferEvent.In]] = {
-      val transfer = mkTransfer(
+    )(implicit store: MultiDomainAcsStore): Future[Reassignment[ReassignmentEvent.Assign]] = {
+      val reassignment = mkReassignment(
         nextOffset,
-        toTransferInEvent(
+        toAssignEvent(
           contractAndDomain._1,
-          transferId,
+          reassignmentId,
           contractAndDomain._2,
           domain,
           counter,
@@ -451,9 +451,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       store.ingestionSink
         .ingestUpdate(
           domain,
-          TransferUpdate(transfer),
+          ReassignmentUpdate(reassignment),
         )
-        .map(_ => transfer)
+        .map(_ => reassignment)
     }
 
     def exercise[TCid <: ContractId[T], T](
@@ -528,8 +528,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected def mkTransfer[T <: TransferEvent](offset: String, event: T): Transfer[T] =
-    Transfer(
+  protected def mkReassignment[T <: ReassignmentEvent](offset: String, event: T): Reassignment[T] =
+    Reassignment(
       updateId = "",
       offset = new LedgerOffset.Absolute(offset),
       event = event,
@@ -577,8 +577,8 @@ object StoreTest {
   object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
     def parseAcs(
         acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteTransferEvent.Out],
-        incompleteIn: Seq[IncompleteTransferEvent.In],
+        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit
         tc: TraceContext
     ): Seq[(DomainId, TestTxLogEntry)] = Seq.empty

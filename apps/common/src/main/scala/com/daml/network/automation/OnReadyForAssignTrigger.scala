@@ -3,32 +3,32 @@ package com.daml.network.automation
 import akka.NotUsed
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
-import com.daml.network.environment.ledger.api.TransferEvent
+import com.daml.network.environment.ledger.api.ReassignmentEvent
 import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-abstract class OnReadyForTransferInTrigger(
+abstract class OnReadyForAssignTrigger(
     store: CNNodeAppStore[_, _]
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends SourceBasedTrigger[TransferEvent.Out] {
+) extends SourceBasedTrigger[ReassignmentEvent.Unassign] {
 
   override protected def source(implicit
       traceContext: TraceContext
-  ): Source[TransferEvent.Out, NotUsed] =
-    store.multiDomainAcsStore.streamReadyForTransferIn()
+  ): Source[ReassignmentEvent.Unassign, NotUsed] =
+    store.multiDomainAcsStore.streamReadyForAssign()
 
   override final protected def isStaleTask(
-      task: TransferEvent.Out
+      task: ReassignmentEvent.Unassign
   )(implicit tc: TraceContext): Future[Boolean] = {
-    import MultiDomainAcsStore.TransferId
+    import MultiDomainAcsStore.ReassignmentId
     store.multiDomainAcsStore
-      .isReadyForTransferIn(task.contractId, TransferId.fromTransferOut(task))
+      .isReadyForAssign(task.contractId, ReassignmentId.fromUnassign(task))
       .map(!_)
   }
 

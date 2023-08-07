@@ -20,7 +20,7 @@ import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.environment.ledger.api.ActiveContract
-import com.daml.network.environment.ledger.api.IncompleteTransferEvent
+import com.daml.network.environment.ledger.api.IncompleteReassignmentEvent
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
 
@@ -96,8 +96,8 @@ class ScanTxLogParser(
   // TODO(#4906): handle in-flight contracts when we tackle global domain migration
   override def parseAcs(
       acs: Seq[ActiveContract],
-      incompleteOut: Seq[IncompleteTransferEvent.Out],
-      incompleteIn: Seq[IncompleteTransferEvent.In],
+      incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+      incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
   )(implicit
       tc: TraceContext
   ): Seq[(DomainId, ScanTxLogParser.TxLogEntry)] = acs.collect(ac =>
@@ -488,12 +488,14 @@ object ScanTxLogParser {
     )(implicit lc: ErrorLoggingContext): State = {
 
       // second child event is the transfer of CC from validator to SVC to buy extra traffic
-      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      val transferNode = (transferEvent match {
+      val reassignmentEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      val transferNode = (reassignmentEvent match {
         case e: ExercisedEvent => Transfer.unapply(e)
         case _ => None
       }).getOrElse(
-        throw new RuntimeException(s"Unable to parse event ${transferEvent.getEventId} as Transfer")
+        throw new RuntimeException(
+          s"Unable to parse event ${reassignmentEvent.getEventId} as Transfer"
+        )
       )
       val validatorParty = Codec
         .decode(Codec.Party)(transferNode.argument.value.transfer.sender)
@@ -522,7 +524,13 @@ object ScanTxLogParser {
       State(immutable.Queue(buyExtraTrafficEntry))
         // append the entries for rewards
         .appended(
-          State.fromTransfer(tx, transferEvent, domainId, transferNode, Some(event.getEventId()))
+          State.fromTransfer(
+            tx,
+            reassignmentEvent,
+            domainId,
+            transferNode,
+            Some(event.getEventId()),
+          )
         )
 
     }

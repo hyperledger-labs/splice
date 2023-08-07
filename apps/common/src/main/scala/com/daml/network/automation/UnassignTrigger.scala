@@ -17,7 +17,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
+class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
     override protected val context: TriggerContext,
     store: CNNodeAppStore[_, _],
     connection: CNLedgerConnection,
@@ -51,23 +51,23 @@ class TransferOutTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Cont
           )
         } else
           for {
-            _ <- connection.submitTransferAndWaitNoDedup(
+            _ <- connection.submitReassignmentAndWaitNoDedup(
               submitter = partyId,
-              command = LedgerClient.TransferCommand.Out(
+              command = LedgerClient.ReassignmentCommand.Unassign(
                 contractId = contract.contractId,
                 source = task.domain,
                 target = targetDomainId,
               ),
             )
-          } yield show"Submitted transfer out of $cid from ${task.domain} to ${targetDomainId}"
+          } yield show"Submitted unassign of $cid from ${task.domain} to ${targetDomainId}"
 
     } yield TaskSuccess(outcome)
   }
 }
 
-object TransferOutTrigger {
+object UnassignTrigger {
   type Template[TCid <: ContractId[T], T <: CodegenTemplate] =
-    TransferOutTrigger[Contract.Companion.Template[TCid, T], TCid, T]
+    UnassignTrigger[Contract.Companion.Template[TCid, T], TCid, T]
   type Interface[I, Id <: ContractId[I], View <: DamlRecord[View]] =
-    TransferOutTrigger[Contract.Companion.Interface[Id, I, View], Id, View]
+    UnassignTrigger[Contract.Companion.Interface[Id, I, View], Id, View]
 }

@@ -9,32 +9,32 @@ import com.daml.ledger.api.v2.reassignment as multidomain
 import com.daml.ledger.api.v2.state_service
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
-object IncompleteTransferEvent {
-  case class Out(
-      transferEvent: TransferEvent.Out,
+object IncompleteReassignmentEvent {
+  case class Unassign(
+      reassignmentEvent: ReassignmentEvent.Unassign,
       createdEvent: CreatedEvent,
   )
-  case class In(
-      transferEvent: TransferEvent.In
+  case class Assign(
+      reassignmentEvent: ReassignmentEvent.Assign
   )
   def fromProto(
       proto: state_service.IncompleteUnassigned
-  ): Out =
-    Out(
-      transferEvent = TransferEvent.Out.fromProto(proto.getUnassignedEvent),
+  ): Unassign =
+    Unassign(
+      reassignmentEvent = ReassignmentEvent.Unassign.fromProto(proto.getUnassignedEvent),
       createdEvent =
         CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
     )
 
   def fromProto(
       proto: state_service.IncompleteAssigned
-  ): In =
-    In(
-      transferEvent = TransferEvent.In.fromProto(proto.getAssignedEvent)
+  ): Assign =
+    Assign(
+      reassignmentEvent = ReassignmentEvent.Assign.fromProto(proto.getAssignedEvent)
     )
 }
 
-sealed trait TransferEvent extends Product with Serializable with PrettyPrinting {
+sealed trait ReassignmentEvent extends Product with Serializable with PrettyPrinting {
   def submitter: PartyId
 
   def source: DomainId
@@ -44,68 +44,68 @@ sealed trait TransferEvent extends Product with Serializable with PrettyPrinting
   def counter: Long
 }
 
-object TransferEvent {
-  private case class TransferOutId(s: String) extends PrettyPrinting {
+object ReassignmentEvent {
+  private case class UnassignId(s: String) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = prettyOfString(_.s)
   }
 
-  final case class Out(
+  final case class Unassign(
       override val submitter: PartyId,
       override val source: DomainId,
       override val target: DomainId,
-      transferOutId: String,
+      unassignId: String,
       contractId: ContractId[_],
       override val counter: Long,
-  ) extends TransferEvent {
+  ) extends ReassignmentEvent {
     def pretty: Pretty[this.type] =
       prettyOfClass(
         param("submitter", _.submitter),
         param("source", _.source),
         param("target", _.target),
-        param("transferOutId", o => TransferOutId(o.transferOutId)),
+        param("unassignId", o => UnassignId(o.unassignId)),
         param("contractId", _.contractId),
       )
   }
 
-  object Out {
-    private[api] def fromProto(proto: multidomain.UnassignedEvent): Out = {
-      Out(
+  object Unassign {
+    private[api] def fromProto(proto: multidomain.UnassignedEvent): Unassign = {
+      Unassign(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
         source = DomainId.tryFromString(proto.source),
         target = DomainId.tryFromString(proto.target),
-        transferOutId = proto.unassignId,
+        unassignId = proto.unassignId,
         contractId = new ContractId(proto.contractId),
         counter = proto.reassignmentCounter,
       )
     }
   }
 
-  final case class In(
+  final case class Assign(
       override val submitter: PartyId,
       override val source: DomainId,
       override val target: DomainId,
-      transferOutId: String,
+      unassignId: String,
       createdEvent: CreatedEvent,
       override val counter: Long,
-  ) extends TransferEvent {
+  ) extends ReassignmentEvent {
     def pretty: Pretty[this.type] =
       prettyOfClass(
         param("submitter", _.submitter),
         param("source", _.source),
         param("target", _.target),
-        param("transferOutId", i => TransferOutId(i.transferOutId)),
+        param("unassignId", i => UnassignId(i.unassignId)),
         param("createdEvent", _.createdEvent),
       )
   }
 
-  object In {
-    private[api] def fromProto(proto: multidomain.AssignedEvent): In = {
+  object Assign {
+    private[api] def fromProto(proto: multidomain.AssignedEvent): Assign = {
       import com.daml.ledger.api.v1.event as scalaEvent
-      In(
+      Assign(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
         source = DomainId.tryFromString(proto.source),
         target = DomainId.tryFromString(proto.target),
-        transferOutId = proto.unassignId,
+        unassignId = proto.unassignId,
         createdEvent =
           CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
         counter = proto.reassignmentCounter,

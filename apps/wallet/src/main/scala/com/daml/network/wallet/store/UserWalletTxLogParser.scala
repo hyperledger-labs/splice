@@ -53,7 +53,7 @@ import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
-import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteTransferEvent}
+import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.digitalasset.canton.topology.DomainId
 
 class UserWalletTxLogParser(
@@ -564,8 +564,8 @@ class UserWalletTxLogParser(
 
   override def parseAcs(
       acs: Seq[ActiveContract],
-      incompleteOut: Seq[IncompleteTransferEvent.Out],
-      incompleteIn: Seq[IncompleteTransferEvent.In],
+      incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+      incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
   )(implicit
       tc: TraceContext
   ): Seq[(DomainId, TxLogEntry)] = {
@@ -1144,16 +1144,24 @@ object UserWalletTxLogParser {
         domainId: DomainId,
     )(implicit lc: ErrorLoggingContext): State = {
       // second child event is the transfer of CC from validator to SVC to buy extra traffic
-      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      val reassignmentEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
       // Calculate tx log entries from transfer of CC from validator to SVC
-      val transferNode = (transferEvent match {
+      val transferNode = (reassignmentEvent match {
         case e: ExercisedEvent => Transfer.unapply(e)
         case _ => None
       }).getOrElse(
-        throw new RuntimeException(s"Unable to parse event ${transferEvent.getEventId} as Transfer")
+        throw new RuntimeException(
+          s"Unable to parse event ${reassignmentEvent.getEventId} as Transfer"
+        )
       )
       val stateFromTransfer =
-        State.fromTransfer(tx, transferEvent, domainId, transferNode, TxLogEntry.Transfer.Transfer)
+        State.fromTransfer(
+          tx,
+          reassignmentEvent,
+          domainId,
+          transferNode,
+          TxLogEntry.Transfer.Transfer,
+        )
 
       // third child event is burning of transferred coin by SVC
       val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(2))
@@ -1176,7 +1184,7 @@ object UserWalletTxLogParser {
           TxLogEntry.BalanceChange(
             indexRecord = TxLogIndexRecord(
               optOffset = Some(tx.getOffset),
-              eventId = transferEvent.getEventId,
+              eventId = reassignmentEvent.getEventId,
               domainId = domainId,
               acsContractId = None,
             ),

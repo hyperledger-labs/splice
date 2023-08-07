@@ -449,19 +449,19 @@ private[environment] class LedgerClient(
     } yield res
   }
 
-  def submitTransfer(
+  def submitReassignment(
       applicationId: String,
       commandId: String,
       submissionId: String,
       submitter: PartyId,
-      command: LedgerClient.TransferCommand,
+      command: LedgerClient.ReassignmentCommand,
   ): Future[Unit] =
     for {
       stub <- withCredentials(commandSubmissionServiceStub)
       res <- stub
         .submitReassignment(
           LedgerClient
-            .TransferSubmitRequest(
+            .ReassignmentSubmitRequest(
               applicationId,
               commandId,
               submissionId,
@@ -589,7 +589,7 @@ object LedgerClient {
             case lapi.reassignment.Reassignment.Event.AssignedEvent(assign) => assign.target
           }
           GetTreeUpdatesResponse(
-            TransferUpdate(Transfer.fromProto(x)),
+            ReassignmentUpdate(Reassignment.fromProto(x)),
             DomainId.tryFromString(domainIdP),
           )
 
@@ -598,14 +598,14 @@ object LedgerClient {
     }
   }
 
-  sealed abstract class TransferCommand extends Product with Serializable
+  sealed abstract class ReassignmentCommand extends Product with Serializable
 
-  object TransferCommand {
-    final case class Out(
+  object ReassignmentCommand {
+    final case class Unassign(
         contractId: ContractId[_],
         source: DomainId,
         target: DomainId,
-    ) extends TransferCommand {
+    ) extends ReassignmentCommand {
       def toProto: lapi.reassignment_command.UnassignCommand =
         lapi.reassignment_command.UnassignCommand(
           contractId = contractId.contractId,
@@ -615,9 +615,9 @@ object LedgerClient {
     }
 
     object Out {
-      implicit val pretty: Pretty[Out] = {
+      implicit val pretty: Pretty[Unassign] = {
         import Pretty.*
-        prettyOfClass[Out](
+        prettyOfClass[Unassign](
           param("contractId", t => t.contractId),
           param("source", _.source),
           param("target", _.target),
@@ -625,26 +625,26 @@ object LedgerClient {
       }
     }
 
-    final case class In(
-        transferOutId: String,
+    final case class Assign(
+        unassignId: String,
         source: DomainId,
         target: DomainId,
-    ) extends TransferCommand {
+    ) extends ReassignmentCommand {
       def toProto: lapi.reassignment_command.AssignCommand =
         lapi.reassignment_command.AssignCommand(
-          unassignId = transferOutId,
+          unassignId = unassignId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
         )
     }
   }
 
-  final case class TransferSubmitRequest(
+  final case class ReassignmentSubmitRequest(
       applicationId: String,
       commandId: String,
       submissionId: String,
       submitter: PartyId,
-      command: TransferCommand,
+      command: ReassignmentCommand,
   ) {
     def toProto: lapi.command_submission_service.SubmitReassignmentRequest = {
       val baseCommand = lapi.reassignment_command.ReassignmentCommand(
@@ -654,10 +654,10 @@ object LedgerClient {
         submitter = submitter.toProtoPrimitive,
       )
       val updatedCommand = command match {
-        case out: TransferCommand.Out =>
-          baseCommand.withUnassignCommand(out.toProto)
-        case in: TransferCommand.In =>
-          baseCommand.withAssignCommand(in.toProto)
+        case unassign: ReassignmentCommand.Unassign =>
+          baseCommand.withUnassignCommand(unassign.toProto)
+        case assign: ReassignmentCommand.Assign =>
+          baseCommand.withAssignCommand(assign.toProto)
       }
       lapi.command_submission_service.SubmitReassignmentRequest(
         Some(updatedCommand)

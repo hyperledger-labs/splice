@@ -9,10 +9,10 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
-  IncompleteTransferEvent,
+  IncompleteReassignmentEvent,
   TransactionTreeUpdate,
-  TransferEvent,
-  TransferUpdate,
+  ReassignmentEvent,
+  ReassignmentUpdate,
   TreeUpdate,
 }
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
@@ -294,9 +294,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .mapConcat(identity)
   }
 
-  override def streamReadyForTransferIn(): Source[TransferEvent.Out, NotUsed] = ???
+  override def streamReadyForAssign(): Source[ReassignmentEvent.Unassign, NotUsed] = ???
 
-  override def isReadyForTransferIn(contractId: ContractId[_], out: TransferId): Future[Boolean] =
+  override def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId): Future[Boolean] =
     ???
 
   override def signalWhenIngestedOrShutdown(offset: String)(implicit
@@ -401,8 +401,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     override def ingestAcs(
         offset: String,
         acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteTransferEvent.Out],
-        incompleteIn: Seq[IncompleteTransferEvent.In],
+        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit traceContext: TraceContext): Future[Unit] = {
       assert(
         finishedAcsIngestion.isCompleted == false,
@@ -467,7 +467,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         transfer: TreeUpdate,
     )(implicit tc: TraceContext): Future[(WorkTodo, Seq[TXE])] = {
       transfer match {
-        case TransferUpdate(_) =>
+        case ReassignmentUpdate(_) =>
           // TODO (#5314): support transfers
           Future.failed(new UnsupportedOperationException("Transfers are unsupported."))
         case TransactionTreeUpdate(tree) =>
@@ -612,12 +612,12 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           numFilteredArchivedEvents = numDeletesWanted - numDeletesDone,
           // TODO (#5314): all these below are multi-domain
           updatedContractStates = Vector.empty,
-          addedTransferInEvents = Vector.empty,
-          numFilteredTransferInEvents = 0,
-          removedTransferInEvents = Vector.empty,
-          addedTransferOutEvents = Vector.empty,
-          numFilteredTransferOutEvents = 0,
-          removedTransferOutEvents = Vector.empty,
+          addedAssignEvents = Vector.empty,
+          numFilteredAssignEvents = 0,
+          removedAssignEvents = Vector.empty,
+          addedUnassignEvents = Vector.empty,
+          numFilteredUnassignEvents = 0,
+          removedUnassignEvents = Vector.empty,
           prunedContracts = Vector.empty,
         )
       }

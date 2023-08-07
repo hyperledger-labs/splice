@@ -30,7 +30,7 @@ abstract class MultiDomainAcsStoreTest[
   import MultiDomainAcsStore.*
 
   private var transferCounter = 0
-  protected def nextTransferId: String = {
+  protected def nextReassignmentId: String = {
     val id = "%08d".format(transferCounter)
     transferCounter += 1
     id
@@ -80,7 +80,7 @@ abstract class MultiDomainAcsStoreTest[
 
   protected def assertTestState(
       contractStateEventsById: Map[ContractId[_], ContractStateEvent] = Map.empty,
-      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
+      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]] = Map.empty,
   )(implicit store: Store): Future[Assertion]
 
   protected def assertList(
@@ -107,14 +107,14 @@ abstract class MultiDomainAcsStoreTest[
   protected def assertLookupNone(c: C)(implicit store: MultiDomainAcsStore) =
     store.lookupContractById(AppRewardCoupon.COMPANION)(c.contractId)
 
-  protected def assertReadyForTransferIn(
+  protected def assertReadyForAssign(
       contractId: ContractId[_],
-      transferId: TransferId,
+      reassignmentId: ReassignmentId,
       expected: Boolean,
   )(implicit
       store: MultiDomainAcsStore
   ) =
-    store.isReadyForTransferIn(contractId, transferId).map {
+    store.isReadyForAssign(contractId, reassignmentId).map {
       _ shouldBe expected
     }
 

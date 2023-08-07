@@ -42,16 +42,16 @@ class TransferFollowTrigger(
     val leaderCid = PrettyContractId(task.leader.contract)
     val followerCid = PrettyContractId(task.follower.contract)
     for {
-      _ <- connection.submitTransferAndWaitNoDedup(
+      _ <- connection.submitReassignmentAndWaitNoDedup(
         submitter = partyId,
-        command = LedgerClient.TransferCommand.Out(
+        command = LedgerClient.ReassignmentCommand.Unassign(
           contractId = task.follower.contractId,
           source = task.follower.domain,
           target = task.leader.domain,
         ),
       )
     } yield TaskSuccess(
-      show"Submitted transfer out of $followerCid from ${task.follower.domain} to ${task.leader.domain} of $leaderCid"
+      show"Submitted unassign of $followerCid from ${task.follower.domain} to ${task.leader.domain} of $leaderCid"
     )
   }
 

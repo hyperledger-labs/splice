@@ -4,7 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferFollowTrigger,
-  TransferInTrigger,
+  AssignTrigger,
 }
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.automation.confirmation.{
@@ -106,7 +106,7 @@ class SvSvcAutomationService(
   )
 
   registerTrigger(new SvcRulesTransferTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new TransferInTrigger(triggerContext, svcStore, connection, store.key.svcParty))
+  registerTrigger(new AssignTrigger(triggerContext, svcStore, connection, store.key.svcParty))
 
   registerTrigger(
     new TransferFollowTrigger(

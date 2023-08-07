@@ -22,7 +22,7 @@ import com.daml.network.environment.ledger.api.{
   ActiveContract,
   DedupConfig,
   DedupOffset,
-  IncompleteTransferEvent,
+  IncompleteReassignmentEvent,
   LedgerClient,
   NoDedup,
 }
@@ -459,7 +459,11 @@ class CNLedgerConnection(
       filter: IngestionFilter,
       offset: ParticipantOffset.Value.Absolute,
   ): Future[
-    (Seq[ActiveContract], Seq[IncompleteTransferEvent.Out], Seq[IncompleteTransferEvent.In])
+    (
+        Seq[ActiveContract],
+        Seq[IncompleteReassignmentEvent.Unassign],
+        Seq[IncompleteReassignmentEvent.Assign],
+    )
   ] = {
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
@@ -478,12 +482,12 @@ class CNLedgerConnection(
       incompleteOut = contractStateComponents.collect {
         case lapi.state_service.GetActiveContractsResponse.ContractEntry
               .IncompleteUnassigned(ev) =>
-          IncompleteTransferEvent.fromProto(ev)
+          IncompleteReassignmentEvent.fromProto(ev)
       }
       incompleteIn = contractStateComponents.collect {
         case lapi.state_service.GetActiveContractsResponse.ContractEntry
               .IncompleteAssigned(ev) =>
-          IncompleteTransferEvent.fromProto(ev)
+          IncompleteReassignmentEvent.fromProto(ev)
       }
     } yield (active, incompleteOut, incompleteIn)
   }
@@ -791,23 +795,23 @@ class CNLedgerConnection(
         logger,
       )
   }
-  def submitTransferAndWaitNoDedup(
+  def submitReassignmentAndWaitNoDedup(
       submitter: PartyId,
-      command: LedgerClient.TransferCommand,
+      command: LedgerClient.ReassignmentCommand,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val commandId = UUID.randomUUID().toString()
-    logger.debug(s"transfer $commandId is for $command")
+    logger.debug(s"reassignment $commandId is for $command")
 
     val (ks, completion) = cancelIfFailed(
       client
         .completions(applicationId, Seq(submitter), begin = None)
-        .wireTap(csr => logger.trace(s"completions while awaiting transfer $commandId: $csr"))
+        .wireTap(csr => logger.trace(s"completions while awaiting reassignment $commandId: $csr"))
     )(awaitCompletion(applicationId = applicationId, commandId = commandId))(
       // We call the callbacks for handling stale contract errors here, but wait for the offset
       // ingestion at which the completion is reported.
       callCallbacksOnCompletionNoWaitForOffset(
         client
-          .submitTransfer(
+          .submitReassignment(
             applicationId,
             commandId,
             submissionId = commandId,
@@ -816,7 +820,7 @@ class CNLedgerConnection(
           )
           .andThen { _ =>
             logger.info(
-              s"Submitted transfer to ledger, waiting for completion: commandId: $commandId"
+              s"Submitted reassignment to ledger, waiting for completion: commandId: $commandId"
             )
           }
       )
@@ -835,7 +839,7 @@ class CNLedgerConnection(
       }
       .onShutdown {
         logger.debug(
-          s"shutting down while awaiting completion of transfer $commandId; pretending a completion arrived"
+          s"shutting down while awaiting completion of reassignment $commandId; pretending a completion arrived"
         )
         ks.shutdown()
         ()
@@ -871,7 +875,7 @@ class CNLedgerConnection(
       .mapError { case te: concurrent.TimeoutException =>
         DEADLINE_EXCEEDED
           .withCause(te)
-          .augmentDescription(s"timeout while awaiting completion of transfer $commandId")
+          .augmentDescription(s"timeout while awaiting completion of reassignment $commandId")
           .asRuntimeException()
       }
       .collect {
@@ -890,7 +894,7 @@ class CNLedgerConnection(
           } getOrElse {
             throw UNAVAILABLE
               .augmentDescription(
-                s"participant stopped while awaiting completion of transfer $commandId"
+                s"participant stopped while awaiting completion of reassignment $commandId"
               )
               .asRuntimeException()
           }))

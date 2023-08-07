@@ -10,7 +10,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteTransferEvent}
+import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.digitalasset.canton.topology.DomainId
 
 /** Stores historical information that can be used to construct application-specific historical events,
@@ -66,8 +66,8 @@ object TxLogStore {
     /** Extract application-specific TxLog entries from the acs, before starting to ingest transactions */
     def parseAcs(
         acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteTransferEvent.Out],
-        incompleteIn: Seq[IncompleteTransferEvent.In],
+        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit
         tc: TraceContext
     ): Seq[(DomainId, TXE)]
@@ -103,8 +103,8 @@ object TxLogStore {
         extends Parser[TXI, TXE] {
       override def parseAcs(
           acs: Seq[ActiveContract],
-          incompleteOut: Seq[IncompleteTransferEvent.Out],
-          incompleteIn: Seq[IncompleteTransferEvent.In],
+          incompleteUnassign: Seq[IncompleteReassignmentEvent.Unassign],
+          incompleteAssign: Seq[IncompleteReassignmentEvent.Assign],
       )(implicit
           tc: TraceContext
       ): Seq[(DomainId, TXE)] = Seq.empty

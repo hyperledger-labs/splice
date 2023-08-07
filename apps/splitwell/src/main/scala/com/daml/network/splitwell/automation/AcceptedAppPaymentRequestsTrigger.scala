@@ -75,7 +75,7 @@ class AcceptedAppPaymentRequestsTrigger(
               .map(
                 _.getOrElse(
                   throw new IllegalStateException(
-                    s"Invariant violation: transfer in progress $transferInProgressId not known"
+                    s"Invariant violation: assign progress $transferInProgressId not known"
                   )
                 )
               )

@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.environment.ledger.api.LedgerClient.TransferCommand
+import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand
 import com.daml.network.util.PrettyInstances.prettyCodegenContractId
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -20,12 +20,12 @@ import scala.concurrent.{ExecutionContext, Future}
 
 import store.SplitwellStore
 
-/** Transfer out certain `Group`s matching the criteria defined in
+/** Unassign certain `Group`s matching the criteria defined in
   * [[SplitwellStore#listTransferrableGroups]].  We expect separate automation
-  * to handle the transfer-in.
+  * to handle the assign.
   *
-  * This is not a [[com.daml.network.automation.TransferOutTrigger]] because a
-  * contract's readiness is not a good condition to justify its transfer-out;
+  * This is not a [[com.daml.network.automation.UnassignTrigger]] because a
+  * contract's readiness is not a good condition to justify its unassign;
   * it applies only to `Group`s on certain domains that have certain associated
   * contracts on the preferred domain.
   */
@@ -53,9 +53,9 @@ private[automation] class UpgradeGroupTrigger(
     val (groupId, domainId) = task
     for {
       preferredDomain <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-      _ <- connection.submitTransferAndWaitNoDedup(
+      _ <- connection.submitReassignmentAndWaitNoDedup(
         submitter = store.providerParty,
-        command = TransferCommand.Out(
+        command = ReassignmentCommand.Unassign(
           contractId = groupId,
           source = domainId,
           target = preferredDomain,
@@ -63,7 +63,7 @@ private[automation] class UpgradeGroupTrigger(
       )
     } yield {
       TaskSuccess(
-        show"Successfully transferred out group $groupId from $domainId"
+        show"Successfully unassigned group $groupId from $domainId"
       )
     }
   }

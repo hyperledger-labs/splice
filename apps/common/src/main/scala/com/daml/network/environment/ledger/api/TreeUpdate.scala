@@ -6,4 +6,4 @@ sealed abstract class TreeUpdate extends Product with Serializable
 
 final case class TransactionTreeUpdate(tree: TransactionTree) extends TreeUpdate
 
-final case class TransferUpdate(transfer: Transfer[TransferEvent]) extends TreeUpdate
+final case class ReassignmentUpdate(transfer: Reassignment[ReassignmentEvent]) extends TreeUpdate

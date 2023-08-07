@@ -53,9 +53,9 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       nextContractStateEventNumber = 0,
       contractStateEvents = SortedMap.empty,
       contractStateEventsById = Map.empty,
-      incompleteTransferOut = Set.empty,
-      incompleteTransferIn = Set.empty,
-      incompleteTransfersById = Map.empty,
+      incompleteUnassign = Set.empty,
+      incompleteAssign = Set.empty,
+      incompleteReassignmentsById = Map.empty,
       offsetChanged = Promise(),
       offsetIngestionsToSignal = SortedMap.empty,
       txLog = Queue.empty,
@@ -90,8 +90,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     override def ingestAcs(
         offset: String,
         acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteTransferEvent.Out],
-        incompleteIn: Seq[IncompleteTransferEvent.In],
+        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.ingestAcs(
@@ -124,7 +124,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
             offsetIngestionsToSignal.foreach(_.success(()))
             offsetChanged.success(())
           }
-        case TransferUpdate(transfer) =>
+        case ReassignmentUpdate(transfer) =>
           updateState(
             _.ingestTransfer(transfer, contractFilter.contains)
           ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
@@ -357,14 +357,14 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   ): Future[Option[Contract[TCid, T]]] =
     findContractOnDomainWithOffset(companion)(domain, p).map(_.value)
 
-  override def streamReadyForTransferIn(
-  ): Source[TransferEvent.Out, NotUsed] =
+  override def streamReadyForAssign(
+  ): Source[ReassignmentEvent.Unassign, NotUsed] =
     Source
-      .unfoldAsync(0: Long)(eventNumber => nextReadyForTransferIn(eventNumber).map(Some(_)))
+      .unfoldAsync(0: Long)(eventNumber => nextReadyForAssign(eventNumber).map(Some(_)))
 
-  private def nextReadyForTransferIn(
+  private def nextReadyForAssign(
       startingFromIncl: Long
-  ): Future[(Long, TransferEvent.Out)] = {
+  ): Future[(Long, ReassignmentEvent.Unassign)] = {
     val st = stateVar
     val optEntry = st.contractStateEvents
       .iteratorFrom(startingFromIncl)
@@ -378,23 +378,21 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       })
     optEntry match {
       case None =>
-        st.offsetChanged.future.flatMap(_ =>
-          nextReadyForTransferIn(st.nextContractStateEventNumber)
-        )
+        st.offsetChanged.future.flatMap(_ => nextReadyForAssign(st.nextContractStateEventNumber))
       case Some((eventNumber, co)) => Future((eventNumber + 1, co))
     }
   }
 
-  override def isReadyForTransferIn(
+  override def isReadyForAssign(
       contractId: ContractId[_],
-      transfer: TransferId,
+      transfer: ReassignmentId,
   ): Future[Boolean] =
     offsetAndStateAfterIngestingAcs().map { case (_, st) =>
       st.contractStateEventsById.get(contractId).fold(false) { num =>
         val contractState = st.contractStateEvents(num).state
         contractState match {
           case StoreContractState.InFlight(out) =>
-            TransferId.fromTransferOut(out) == transfer
+            ReassignmentId.fromUnassign(out) == transfer
           case _ => false
         }
       }
@@ -530,9 +528,9 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
         .mapValues(num => stateVar.contractStateEvents(num))
         .toMap
     )
-  private[store] def incompleteTransfersById
-      : Future[Map[ContractId[_], NonEmpty[Set[TransferId]]]] =
-    Future.successful(stateVar.incompleteTransfersById)
+  private[store] def incompleteReassignmentsById
+      : Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]] =
+    Future.successful(stateVar.incompleteReassignmentsById)
 
   override def close(): Unit = ()
 
@@ -564,7 +562,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
 object InMemoryMultiDomainAcsStore {
 
-  import MultiDomainAcsStore.{ContractStateEvent, StoreContractState, TransferId}
+  import MultiDomainAcsStore.{ContractStateEvent, StoreContractState, ReassignmentId}
 
   /** General assumption: We're connected to both source and target domain.
     * Trivially given for non-multi hosted parties. For multi-hosted parties
@@ -579,17 +577,17 @@ object InMemoryMultiDomainAcsStore {
     *   - added added on first transfer/create
     *   - updated to the state with the highest transfer counter
     *   - removed together with the entry in createdEvents
-    * - incompleteTransferOut/In
-    *   - added on transfer out/in if contract matches filter and matching transfer in/out has not been observed
-    *   - removed on matching transfer in/out
-    * - incompleteTransfersById: index on top of incompleteTransferIn/incompleteTransferOut, always updated together
+    * - incomplete assignment
+    *   - added on assignment if contract matches filter and matching unassign has not been observed
+    *   - removed on matching unassign
+    * - incompleteReassignmentsById: index on top of incomplete assign/incomplete unassign, always updated together
     */
   private case class State[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
       offset: Option[String],
       nextCreateEventNumber: Long,
       // All active contracts across all domains that match our contract filter. Contracts are inserted
-      // when we see the first create or transfer in and removed on archive.
-      // Event number stays stable across transfers.
+      // when we see the first create or assign and removed on archive.
+      // Event number stays stable across reassignments.
       createEvents: SortedMap[Long, CreatedEvent],
       createEventsById: Map[ContractId[_], Long],
       nextContractStateEventNumber: Long,
@@ -600,10 +598,10 @@ object InMemoryMultiDomainAcsStore {
       contractStateEvents: SortedMap[Long, ContractStateEvent],
       contractStateEventsById: Map[ContractId[_], Long],
 
-      // incomplete transfers
-      incompleteTransferOut: Set[TransferId],
-      incompleteTransferIn: Set[TransferId],
-      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]],
+      // incomplete reassignments
+      incompleteUnassign: Set[ReassignmentId],
+      incompleteAssign: Set[ReassignmentId],
+      incompleteReassignmentsById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]],
       offsetChanged: Promise[Unit],
       offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
       txLog: Queue[TXI],
@@ -635,8 +633,8 @@ object InMemoryMultiDomainAcsStore {
 
     def ingestAcs(
         evs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteTransferEvent.Out],
-        incompleteIn: Seq[IncompleteTransferEvent.In],
+        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
         acsOffset: String,
         txLogParser: TxLogStore.Parser[TXI, TXE],
         p: CreatedEvent => Boolean,
@@ -645,10 +643,10 @@ object InMemoryMultiDomainAcsStore {
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
       val (stAcs, summaryAcs) = ingestActiveContracts(evs, p)
-      val (stInFlightOut, summaryTransferOut) =
-        stAcs.ingestIncompleteTransferOuts(incompleteOut, summaryAcs, p)
-      val (stInFlightIn, summaryTransferIn) =
-        stInFlightOut.ingestIncompleteTransferIns(incompleteIn, summaryTransferOut, p)
+      val (stInFlightOut, summaryUnassign) =
+        stAcs.ingestIncompleteUnssigns(incompleteOut, summaryAcs, p)
+      val (stInFlightIn, summaryAssign) =
+        stInFlightOut.ingestIncompleteAssigns(incompleteIn, summaryUnassign, p)
       val (stFinal, offsetsToRemove) = stInFlightIn.removeOffsetSignalsBefore(acsOffset)
       val parsedTxLogEntries = txLogParser.parseAcs(evs, incompleteOut, incompleteIn)
       (
@@ -662,7 +660,7 @@ object InMemoryMultiDomainAcsStore {
             .to(collection.immutable.Queue),
         ),
         (
-          summaryTransferIn.copy(
+          summaryAssign.copy(
             newAcsSize = stFinal.createEvents.size,
             ingestedTxLogEntries = parsedTxLogEntries.map(_._2),
           ),
@@ -742,11 +740,11 @@ object InMemoryMultiDomainAcsStore {
     }
 
     def ingestTransfer(
-        transfer: Transfer[TransferEvent],
+        transfer: Reassignment[ReassignmentEvent],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isDefined, "state was switched to update ingestion")
-      val (newSt, summary) = ingestTransferEvent(transfer.event, p)
+      val (newSt, summary) = ingestReassignmentEvent(transfer.event, p)
       val newOffset = transfer.offset.getOffset
       val (newStWithoutOffsets, offsetsToRemove) =
         newSt.removeOffsetSignalsBefore(newOffset)
@@ -818,7 +816,7 @@ object InMemoryMultiDomainAcsStore {
       val ev = contractStateEvents(evNum)
       ev.state match {
         case StoreContractState.Archived =>
-          val incompleteTransfers = incompleteTransfersById.get(cid)
+          val incompleteTransfers = incompleteReassignmentsById.get(cid)
           if (incompleteTransfers.isEmpty) {
             val createNum = createEventsById(cid)
             (
@@ -827,7 +825,7 @@ object InMemoryMultiDomainAcsStore {
                 createEventsById = createEventsById - cid,
                 contractStateEvents = contractStateEvents - evNum,
                 contractStateEventsById = contractStateEventsById - cid,
-                incompleteTransfersById = incompleteTransfersById - cid,
+                incompleteReassignmentsById = incompleteReassignmentsById - cid,
               ),
               summary.copy(
                 prunedContracts = summary.prunedContracts :+ cid
@@ -860,9 +858,9 @@ object InMemoryMultiDomainAcsStore {
       }
     }
 
-    // Used during bootstrapping to ingest in-flight transfer outs
-    private def ingestIncompleteTransferOuts(
-        evs: Seq[IncompleteTransferEvent.Out],
+    // Used during bootstrapping to ingest in-flight unassigns
+    private def ingestIncompleteUnssigns(
+        evs: Seq[IncompleteReassignmentEvent.Unassign],
         summary: IngestionSummary[TXE],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
@@ -871,34 +869,34 @@ object InMemoryMultiDomainAcsStore {
           if (p(ev.createdEvent)) {
             val (newStCreate, createSummary) = ingestCreatedEvent(
               ev.createdEvent,
-              ev.transferEvent.source,
-              // counter - 1 so that the transfer out event below overwrites the state produced by this.
-              ev.transferEvent.counter - 1,
+              ev.reassignmentEvent.source,
+              // counter - 1 so that the unassign event below overwrites the state produced by this.
+              ev.reassignmentEvent.counter - 1,
               summary,
             )
-            newStCreate.ingestTransferOutEvent(ev.transferEvent, createSummary)
+            newStCreate.ingestUnassignEvent(ev.reassignmentEvent, createSummary)
           } else {
             (
               st,
-              summary.copy(numFilteredTransferOutEvents = summary.numFilteredTransferOutEvents + 1),
+              summary.copy(numFilteredUnassignEvents = summary.numFilteredUnassignEvents + 1),
             )
           }
         }
     }
 
-    private def ingestIncompleteTransferIns(
-        evs: Seq[IncompleteTransferEvent.In],
+    private def ingestIncompleteAssigns(
+        evs: Seq[IncompleteReassignmentEvent.Assign],
         summary: IngestionSummary[TXE],
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       evs
         .foldLeft((this, summary)) { case ((st, summary), ev) =>
-          if (p(ev.transferEvent.createdEvent)) {
-            st.ingestTransferInEvent(ev.transferEvent, summary)
+          if (p(ev.reassignmentEvent.createdEvent)) {
+            st.ingestAssignEvent(ev.reassignmentEvent, summary)
           } else {
             (
               st,
-              summary.copy(numFilteredTransferOutEvents = summary.numFilteredTransferOutEvents + 1),
+              summary.copy(numFilteredUnassignEvents = summary.numFilteredUnassignEvents + 1),
             )
           }
         }
@@ -958,106 +956,106 @@ object InMemoryMultiDomainAcsStore {
       }
     }
 
-    private def ingestTransferEvent(
-        event: TransferEvent,
+    private def ingestReassignmentEvent(
+        event: ReassignmentEvent,
         p: CreatedEvent => Boolean,
     ): (State[TXI, TXE], IngestionSummary[TXE]) =
       event match {
-        case out: TransferEvent.Out =>
-          ingestTransferOutEvent(out, IngestionSummary.empty[TXE])
-        case in: TransferEvent.In =>
-          if (p(in.createdEvent)) {
-            ingestTransferInEvent(in, IngestionSummary.empty[TXE])
+        case unassign: ReassignmentEvent.Unassign =>
+          ingestUnassignEvent(unassign, IngestionSummary.empty[TXE])
+        case assign: ReassignmentEvent.Assign =>
+          if (p(assign.createdEvent)) {
+            ingestAssignEvent(assign, IngestionSummary.empty[TXE])
           } else {
             (
               this,
               IngestionSummary
                 .empty[TXE]
                 .copy(
-                  numFilteredTransferInEvents = 1
+                  numFilteredAssignEvents = 1
                 ),
             )
           }
       }
 
-    private def ingestTransferInEvent(
-        in: TransferEvent.In,
+    private def ingestAssignEvent(
+        assign: ReassignmentEvent.Assign,
         summary: IngestionSummary[TXE],
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
-      val transferId = TransferId.fromTransferIn(in)
-      val cid = new ContractId(in.createdEvent.getContractId)
+      val reassignmentId = ReassignmentId.fromAssign(assign)
+      val cid = new ContractId(assign.createdEvent.getContractId)
       // First update create events and contract locations by only looking at the create event.
       val (createSt, createSummary) = ingestCreatedEvent(
-        in.createdEvent,
-        in.target,
-        in.counter,
+        assign.createdEvent,
+        assign.target,
+        assign.counter,
         summary,
       )
-      if (incompleteTransferOut.contains(transferId)) {
-        val newIncompleteTransfersById = incompleteTransfersById.updatedWith(cid)(
-          _.flatMap(prev => NonEmpty.from(prev - transferId))
+      if (incompleteUnassign.contains(reassignmentId)) {
+        val newincompleteReassignmentsById = incompleteReassignmentsById.updatedWith(cid)(
+          _.flatMap(prev => NonEmpty.from(prev - reassignmentId))
         )
         val newSt: State[TXI, TXE] = createSt
           .copy(
-            incompleteTransferOut = incompleteTransferOut - transferId,
-            incompleteTransfersById = newIncompleteTransfersById,
+            incompleteUnassign = incompleteUnassign - reassignmentId,
+            incompleteReassignmentsById = newincompleteReassignmentsById,
           )
         val newSummary = createSummary.copy(
-          removedTransferOutEvents = summary.removedTransferOutEvents :+ (cid, transferId)
+          removedUnassignEvents = summary.removedUnassignEvents :+ (cid, reassignmentId)
         )
         newSt.pruneContractState(cid, newSummary)
       } else {
         (
           createSt.copy(
-            incompleteTransferIn = incompleteTransferIn + transferId,
-            incompleteTransfersById = incompleteTransfersById.updatedWith(cid) { prev =>
-              Some(prev.fold(NonEmpty(Set, transferId))(_.incl(transferId)))
+            incompleteAssign = incompleteAssign + reassignmentId,
+            incompleteReassignmentsById = incompleteReassignmentsById.updatedWith(cid) { prev =>
+              Some(prev.fold(NonEmpty(Set, reassignmentId))(_.incl(reassignmentId)))
             },
           ),
           createSummary.copy(
-            addedTransferInEvents = summary.addedTransferInEvents :+ (cid, transferId)
+            addedAssignEvents = summary.addedAssignEvents :+ (cid, reassignmentId)
           ),
         )
       }
     }
 
-    private def ingestTransferOutEvent(
-        out: TransferEvent.Out,
+    private def ingestUnassignEvent(
+        out: ReassignmentEvent.Unassign,
         summary: IngestionSummary[TXE],
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
-      val transferId = TransferId.fromTransferOut(out)
+      val reassignmentId = ReassignmentId.fromUnassign(out)
       val cid = out.contractId
       if (!createEventsById.contains(out.contractId)) {
         (
           this,
-          summary.copy(numFilteredTransferOutEvents = summary.numFilteredTransferOutEvents + 1),
+          summary.copy(numFilteredUnassignEvents = summary.numFilteredUnassignEvents + 1),
         )
       } else {
         val (newSt, tfSummary): (State[TXI, TXE], IngestionSummary[TXE]) =
-          if (incompleteTransferIn.contains(transferId)) {
-            val newIncompleteTransfersById =
-              incompleteTransfersById.updatedWith(cid)(
-                _.flatMap(prev => NonEmpty.from(prev - transferId))
+          if (incompleteAssign.contains(reassignmentId)) {
+            val newincompleteReassignmentsById =
+              incompleteReassignmentsById.updatedWith(cid)(
+                _.flatMap(prev => NonEmpty.from(prev - reassignmentId))
               )
             (
               copy(
-                incompleteTransferIn = incompleteTransferIn - transferId,
-                incompleteTransfersById = newIncompleteTransfersById,
+                incompleteAssign = incompleteAssign - reassignmentId,
+                incompleteReassignmentsById = newincompleteReassignmentsById,
               ),
               summary.copy(
-                removedTransferInEvents = summary.removedTransferInEvents :+ (cid, transferId)
+                removedAssignEvents = summary.removedAssignEvents :+ (cid, reassignmentId)
               ),
             )
           } else {
             (
               copy(
-                incompleteTransferOut = incompleteTransferOut + transferId,
-                incompleteTransfersById = incompleteTransfersById.updatedWith(cid) { prev =>
-                  Some(prev.fold(NonEmpty(Set, transferId))(_.incl(transferId)))
+                incompleteUnassign = incompleteUnassign + reassignmentId,
+                incompleteReassignmentsById = incompleteReassignmentsById.updatedWith(cid) { prev =>
+                  Some(prev.fold(NonEmpty(Set, reassignmentId))(_.incl(reassignmentId)))
                 },
               ),
               summary.copy(
-                addedTransferOutEvents = summary.addedTransferOutEvents :+ (cid, transferId)
+                addedUnassignEvents = summary.addedUnassignEvents :+ (cid, reassignmentId)
               ),
             )
           }

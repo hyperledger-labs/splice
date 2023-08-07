@@ -6,7 +6,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, TransferId}
+import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
 import com.daml.network.store.db.AcsTables.*
 import com.daml.network.store.{MultiDomainAcsStoreTest, StoreTest}
@@ -83,7 +83,7 @@ class DbMultiDomainAcsStoreTest
   }
   override def assertTestState(
       contractStateEventsById: Map[ContractId[_], ContractStateEvent] = Map.empty,
-      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[TransferId]]] = Map.empty,
+      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]] = Map.empty,
   )(implicit store: Store): Future[Assertion] = Future.successful(succeed)
 
   private var eventNumber = 0L

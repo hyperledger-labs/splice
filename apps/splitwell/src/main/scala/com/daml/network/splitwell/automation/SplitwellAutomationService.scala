@@ -5,7 +5,7 @@ import cats.syntax.apply.*
 import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferFollowTrigger,
-  TransferInTrigger,
+  AssignTrigger,
 }
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
@@ -64,7 +64,7 @@ class SplitwellAutomationService(
   )
 
   registerTrigger(
-    new TransferInTrigger(
+    new AssignTrigger(
       triggerContext,
       store,
       connection,

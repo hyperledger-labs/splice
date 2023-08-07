@@ -15,7 +15,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Ingestion for ACS and transfer stores.
   * We ingest them independently but we ensure that the acs store
   * is never caught up further than the transfer store to avoid losing
-  * track of contracts on a transfer out.
+  * track of contracts on a unassign.
   */
 class UpdateIngestionService(
     ingestionTargetName: String,

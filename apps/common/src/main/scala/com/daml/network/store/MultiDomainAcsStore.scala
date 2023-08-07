@@ -23,8 +23,8 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
-  IncompleteTransferEvent,
-  TransferEvent,
+  IncompleteReassignmentEvent,
+  ReassignmentEvent,
   TreeUpdate,
 }
 import com.daml.network.util.Contract.Companion
@@ -179,16 +179,16 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       traceContext: TraceContext,
   ): Source[AssignedContract[TCid, T], NotUsed]
 
-  /** Stream all transfer out events that are ready for transfer in.
-    * The only guarantee provided is that a transfer out that does not get transferred in
+  /** Stream all unassign events that are ready for assign.
+    * The only guarantee provided is that a unassign that does not get transferred in
     * will eventually appear on the stream.
     */
-  def streamReadyForTransferIn(): Source[TransferEvent.Out, NotUsed]
+  def streamReadyForAssign(): Source[ReassignmentEvent.Unassign, NotUsed]
 
-  /** Returns true if the transfer out event can still potentially be transferred in.
-    * Intended to be used as a staleness check for the results of `streamReadyForTransferIn`.
+  /** Returns true if the unassign event can still potentially be transferred in.
+    * Intended to be used as a staleness check for the results of `streamReadyForAssign`.
     */
-  def isReadyForTransferIn(contractId: ContractId[_], out: TransferId): Future[Boolean]
+  def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId): Future[Boolean]
 
   /** Signal when the store has finished ingesting ledger data from the given offset
     * or a larger one or node-level shutdown was initiated
@@ -547,13 +547,13 @@ object MultiDomainAcsStore {
       }
     }
 
-  final case class TransferId(source: DomainId, id: String)
+  final case class ReassignmentId(source: DomainId, id: String)
 
-  object TransferId {
-    def fromTransferIn(in: TransferEvent.In) =
-      TransferId(in.source, in.transferOutId)
-    def fromTransferOut(out: TransferEvent.Out) =
-      TransferId(out.source, out.transferOutId)
+  object ReassignmentId {
+    def fromAssign(in: ReassignmentEvent.Assign) =
+      ReassignmentId(in.source, in.unassignId)
+    def fromUnassign(out: ReassignmentEvent.Unassign) =
+      ReassignmentId(out.source, out.unassignId)
   }
 
   sealed abstract class ContractState extends PrettyPrinting with Product with Serializable {
@@ -590,8 +590,8 @@ object MultiDomainAcsStore {
     def ingestAcs(
         offset: String,
         acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteTransferEvent.Out],
-        incompleteIn: Seq[IncompleteTransferEvent.In],
+        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit traceContext: TraceContext): Future[Unit]
 
     def ingestUpdate(domain: DomainId, transfer: TreeUpdate)(implicit
@@ -634,7 +634,7 @@ object MultiDomainAcsStore {
   }
   object StoreContractState {
 
-    /** Observed activation (transfer in/create).
+    /** Observed activation (assign/create).
       */
     final case class Assigned(domain: DomainId) extends StoreContractState {
       override def pretty: Pretty[this.type] = prettyOfClass(
@@ -642,9 +642,9 @@ object MultiDomainAcsStore {
       )
     }
 
-    /** Observed transfer out but not transfer in.
+    /** Observed unassign but not assign.
       */
-    final case class InFlight(out: TransferEvent.Out) extends StoreContractState {
+    final case class InFlight(out: ReassignmentEvent.Unassign) extends StoreContractState {
       override def pretty: Pretty[this.type] = prettyOfClass(
         param("out", _.out)
       )

@@ -1,16 +1,9 @@
 package com.daml.network.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{
-  OnReadyForTransferInTrigger,
-  TaskOutcome,
-  TaskSuccess,
-  TriggerContext,
-}
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.environment.ledger.api.{LedgerClient, TransferEvent}
+import com.daml.network.environment.ledger.api.{LedgerClient, ReassignmentEvent}
 import com.daml.network.store.CNNodeAppStore
-import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -18,7 +11,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TransferInTrigger(
+class AssignTrigger(
     override protected val context: TriggerContext,
     store: CNNodeAppStore[_, _],
     connection: CNLedgerConnection,
@@ -27,33 +20,33 @@ class TransferInTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnReadyForTransferInTrigger(
+) extends OnReadyForAssignTrigger(
       store
     ) {
 
   override protected def completeTask(
-      transferOut: TransferEvent.Out
+      unassign: ReassignmentEvent.Unassign
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       outcome <-
-        if (partyId == transferOut.submitter) {
+        if (partyId == unassign.submitter) {
           for {
             msg <- connection
-              .submitTransferAndWaitNoDedup(
+              .submitReassignmentAndWaitNoDedup(
                 submitter = partyId,
-                command = LedgerClient.TransferCommand.In(
-                  transferOutId = transferOut.transferOutId,
-                  source = transferOut.source,
-                  target = transferOut.target,
+                command = LedgerClient.ReassignmentCommand.Assign(
+                  unassignId = unassign.unassignId,
+                  source = unassign.source,
+                  target = unassign.target,
                 ),
               )
               .map(_ =>
-                show"Initiated transfer in of ${transferOut.contractId.contractId} from ${transferOut.source} to ${transferOut.target}"
+                show"Initiated assign of ${unassign.contractId.contractId} from ${unassign.source} to ${unassign.target}"
               )
           } yield msg
         } else {
           Future.successful(
-            show"Ignoring tranfer out of ${transferOut.contractId.contractId}, not initiated by our party"
+            show"Ignoring unassign of ${unassign.contractId.contractId}, not initiated by our party"
           )
         }
     } yield TaskSuccess(outcome)

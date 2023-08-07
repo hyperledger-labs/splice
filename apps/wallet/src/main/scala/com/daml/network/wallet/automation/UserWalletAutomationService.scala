@@ -1,11 +1,7 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{
-  CNNodeAppAutomationService,
-  TransferInTrigger,
-  TransferOutTrigger,
-}
+import com.daml.network.automation.{CNNodeAppAutomationService, AssignTrigger, UnassignTrigger}
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
@@ -57,7 +53,7 @@ class UserWalletAutomationService(
   }
 
   registerTrigger(
-    new TransferOutTrigger.Template(
+    new UnassignTrigger.Template(
       triggerContext,
       store,
       connection,
@@ -67,7 +63,7 @@ class UserWalletAutomationService(
     )
   )
   registerTrigger(
-    new TransferOutTrigger.Interface(
+    new UnassignTrigger.Interface(
       triggerContext,
       store,
       connection,
@@ -77,5 +73,5 @@ class UserWalletAutomationService(
     )
   )
 
-  registerTrigger(new TransferInTrigger(triggerContext, store, connection, store.key.endUserParty))
+  registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.endUserParty))
 }

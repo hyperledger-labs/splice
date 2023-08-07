@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{CNNodeAppAutomationService, TransferInTrigger}
+import com.daml.network.automation.{CNNodeAppAutomationService, AssignTrigger}
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -31,5 +31,5 @@ class SvSvAutomationService(
       retryProvider,
     ) {
   registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))
-  registerTrigger(new TransferInTrigger(triggerContext, svStore, connection, store.key.svParty))
+  registerTrigger(new AssignTrigger(triggerContext, svStore, connection, store.key.svParty))
 }
