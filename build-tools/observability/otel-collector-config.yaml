@@ -8,11 +8,11 @@ receivers:
     config:
       scrape_configs:
         - job_name: 'cometbft'
-          scrape_interval: 5s
+          scrape_interval: 15s
           static_configs:
             - targets: [ 'localhost:26610', 'localhost:26620', 'localhost:26630', 'localhost:26640']
         - job_name: 'canton'
-          scrape_interval: 5s
+          scrape_interval: 15s
           static_configs:
             - targets: [ 'localhost:12340' ]
           metric_relabel_configs:
@@ -21,7 +21,7 @@ receivers:
               target_label: application_id
               replacement: ""
         - job_name: 'canton_sim'
-          scrape_interval: 5s
+          scrape_interval: 15s
           static_configs:
             - targets: [ 'localhost:12341' ]
           metric_relabel_configs:
