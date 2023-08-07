@@ -15,10 +15,20 @@ receivers:
           scrape_interval: 5s
           static_configs:
             - targets: [ 'localhost:12340' ]
+          metric_relabel_configs:
+            - source_labels: [ application_id ]
+              regex: .*
+              target_label: application_id
+              replacement: ""
         - job_name: 'canton_sim'
           scrape_interval: 5s
           static_configs:
             - targets: [ 'localhost:12341' ]
+          metric_relabel_configs:
+            - source_labels: [ application_id ]
+              regex: .*
+              target_label: application_id
+              replacement: ""
 
 exporters:
   prometheusremotewrite:
