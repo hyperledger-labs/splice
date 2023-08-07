@@ -7,7 +7,7 @@ import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 
 abstract class SvFrontendCommonIntegrationTest
-    extends FrontendIntegrationTest("sv1", "sv2")
+    extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2")
     with FrontendLoginUtil {
 
   val sv1Port = 3010
