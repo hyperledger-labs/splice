@@ -31,4 +31,7 @@ case class AutomationConfig(
     /** Only intended for testing. Allows disabling governance automation.
       */
     enableSvcGovernance: Boolean = true,
+    /** Only intended for testing. Allows disabling governance automation.
+      */
+    enableCometbftReconciliation: Boolean = true,
 ) {}

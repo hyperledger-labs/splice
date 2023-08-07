@@ -32,6 +32,8 @@ Release Notes
     * Cumberland's name and public key have also been added in ``sv-values.yaml``,
       to be included in the sv-app's configuration as another identity that should be
       approved to join the SVC on TestNet.
+    * Removed the SV `cometbft.automationEnabled` option from ``sv-values.yaml``. The automation is enabled by default and
+      the CometBFT network is updated to reflect the current SV network.
 
 * Documentation:
 

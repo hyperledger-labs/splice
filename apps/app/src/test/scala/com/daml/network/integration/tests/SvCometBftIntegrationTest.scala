@@ -36,11 +36,12 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             .replace(
               Some(
                 CometBftConfig(
-                  enabled = true,
-                  automationEnabled = true,
+                  enabled = true
                 )
               )
             )
+            .focus(_.automation.enableCometbftReconciliation)
+            .replace(true)
         }(config)
       )
       .withManualStart

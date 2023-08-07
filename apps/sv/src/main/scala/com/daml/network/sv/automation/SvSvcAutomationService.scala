@@ -66,7 +66,7 @@ class SvSvcAutomationService(
 
   // Register optional BFT triggers
   cometBft.foreach { node =>
-    if (node.cometBftConfig.automationEnabled) {
+    if (triggerContext.config.enableCometbftReconciliation) {
       registerTrigger(
         new PublishLocalCometBftNodeConfigTrigger(triggerContext, svcStore, connection, node)
       )

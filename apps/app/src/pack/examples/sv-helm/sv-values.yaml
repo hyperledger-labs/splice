@@ -12,7 +12,6 @@ auth:
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
 cometBFT:
   enabled: true
-  automationEnabled: false
   connectionUri: "http://cometbft-cometbft-rpc:26657"
 # PARTICIPANT_BOOTSTRAP_START
 # Uncomment the two lines below if you are bootstrapping from an existing participant

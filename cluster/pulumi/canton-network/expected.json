@@ -2053,7 +2053,6 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "automationEnabled": false,
           "connectionUri": "http://cometbft-sv-1-cometbft-rpc:26657",
           "enabled": true
         },
@@ -2783,7 +2782,6 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "automationEnabled": false,
           "connectionUri": "http://cometbft-sv-2-cometbft-rpc:26657",
           "enabled": true
         },
@@ -3423,7 +3421,6 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "automationEnabled": false,
           "connectionUri": "http://cometbft-sv-3-cometbft-rpc:26657",
           "enabled": true
         },
@@ -4063,7 +4060,6 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "automationEnabled": false,
           "connectionUri": "http://cometbft-sv-4-cometbft-rpc:26657",
           "enabled": true
         },

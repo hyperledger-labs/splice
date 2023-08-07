@@ -349,7 +349,6 @@
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
         "cometBFT": {
-          "automationEnabled": false,
           "connectionUri": "http://cometbft-cometbft-rpc:26657",
           "enabled": true
         },

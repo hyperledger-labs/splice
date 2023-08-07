@@ -202,7 +202,6 @@ export function installSvNode(config: SvConfig): {
     onboardingName: config.onboardingName,
     cometBFT: {
       enabled: true,
-      automationEnabled: false,
       connectionUri: `http://cometbft-${config.nodename}-cometbft-rpc:26657`,
     },
     globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
