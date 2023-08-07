@@ -55,7 +55,7 @@ new k8s.helm.v3.Release('observability-metrics', {
                 // discover all pod/service monitors across all namespaces
                 podMonitorSelectorNilUsesHelmValues: false,
                 serviceMonitorSelectorNilUsesHelmValues: false,
-                enableFeatures: ['native-histograms'],
+                enableFeatures: ['native-histograms', 'memory-snapshot-on-shutdown'],
                 enableRemoteWriteReceiver: true,
                 retention: '1y',
                 retentionSize: '100GB',

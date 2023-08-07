@@ -157,7 +157,8 @@
         "prometheus": {
           "prometheusSpec": {
             "enableFeatures": [
-              "native-histograms"
+              "native-histograms",
+              "memory-snapshot-on-shutdown"
             ],
             "enableRemoteWriteReceiver": true,
             "podMonitorSelectorNilUsesHelmValues": false,
