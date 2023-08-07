@@ -10,7 +10,7 @@ resources:
     memory: 8Gi
 
 db:
-  volumeSize: 60Gi
+  volumeSize: 80Gi
   volumeStorageClass: standard-rwo
 
 postgresPassword: ""

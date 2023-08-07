@@ -1176,7 +1176,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "60Gi",
+          "volumeSize": "80Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
@@ -1859,7 +1859,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "60Gi",
+          "volumeSize": "80Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
@@ -2588,7 +2588,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "60Gi",
+          "volumeSize": "80Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
@@ -3299,7 +3299,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "60Gi",
+          "volumeSize": "80Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
@@ -3938,7 +3938,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "60Gi",
+          "volumeSize": "80Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
@@ -4316,7 +4316,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
-          "volumeSize": "60Gi",
+          "volumeSize": "80Gi",
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
