@@ -25,6 +25,7 @@
         - [Check for Cluster Updates](#check-for-cluster-updates)
         - [Check for Autoscaler Activity](#check-for-autoscaler-activity)
       - [Canton Ledger Prometheus Metrics](#canton-ledger-prometheus-metrics)
+      - [Alerts](#alerts)
     - [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
     - [Managing GKE Kubernetes Versions](#managing-gke-kubernetes-versions)
   - [Interacting with a Canton Network Cluster](#interacting-with-a-canton-network-cluster)
@@ -590,6 +591,14 @@ We expose prometheus metrics for our three participants and the domain on the fo
 - SVC Participant: `http://${cluster}.network.canton.global:10013/metrics`
 - Validator1 Participant: `http://${cluster}.network.canton.global:10113/metrics`
 - Splitwell Participant: `http://${cluster}.network.canton.global:10213/metrics`
+
+#### Alerts
+
+We have configured alert policies on Google Cloud for our `devnet`, `testnet`, and `testnet-preview` clusters.
+Our policies can be configured and extended via the
+[Google alerting dashoard](https://console.cloud.google.com/monitoring/alerting?project=da-cn-devnet).
+When an alert triggers, we are notified over Slack on the `#team-canton-network-internal-ci` channel.
+At the time of writing, we have only configured alerts on unexpectedly high CPU usage.
 
 ### Checking Pod Node Assignments and Memory Usage
 
