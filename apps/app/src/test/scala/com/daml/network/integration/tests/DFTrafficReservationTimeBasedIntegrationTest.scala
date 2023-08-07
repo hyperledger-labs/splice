@@ -110,6 +110,7 @@ class DFTrafficReservationTimeBasedIntegrationTest
           traffic.data.domainId shouldBe domainId.toProtoPrimitive
           traffic.data.totalPurchased shouldBe topupAmount
 
+          ensureTopupIsVisible(aliceValidatorBackend.participantClientWithAdminToken)
           val trafficState = getTrafficState(aliceValidatorBackend, domainId)
           trafficState.extraTrafficRemainder.value should be > reservedTraffic
         },
@@ -179,6 +180,7 @@ class DFTrafficReservationTimeBasedIntegrationTest
           traffic.data.domainId shouldBe domainId.toProtoPrimitive
           traffic.data.totalPurchased shouldBe (2 * topupAmount)
 
+          ensureTopupIsVisible(aliceValidatorBackend.participantClientWithAdminToken)
           val trafficState = getTrafficState(aliceValidatorBackend, domainId)
           trafficState.extraTrafficRemainder.value should be > reservedTraffic
         },
@@ -216,11 +218,13 @@ class DFTrafficReservationTimeBasedIntegrationTest
       advanceTimeByMinTopupInterval(aliceValidatorBackend)
     // Advance time to trigger traffic reconciliation loop
     advanceTimeByPollingInterval(aliceValidatorBackend)
-    // Do a self-ping to ensure that aliceValidator's participant sees the top-up
-    // (https://github.com/DACH-NY/canton/issues/13222)
-    aliceValidatorBackend.participantClientWithAdminToken.health.ping(
-      aliceValidatorBackend.participantClient.id
-    )
+  }
+
+  private def ensureTopupIsVisible(participantClient: CNParticipantClientReference) = {
+    // Do a ping to force a new event to be sequenced.  Without this, the latest sequenced event's timestamp
+    // could still be before the effective timestamp of the top up, in which case the top-up will not be
+    // visible to the participant.
+    participantClient.health.ping(participantClient.id)
   }
 
   private def tryCreatingDirectoryEntry(
