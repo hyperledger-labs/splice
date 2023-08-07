@@ -28,7 +28,8 @@ if (!isDevNet) {
 }
 
 const approveSvRunbook =
-  process.env.APPROVE_SV_RUNBOOK !== undefined && process.env.APPROVE_SV_RUNBOOK !== '';
+  (process.env.APPROVE_SV_RUNBOOK !== undefined && process.env.APPROVE_SV_RUNBOOK !== '') ||
+  isDevNet;
 if (approveSvRunbook) {
   console.error('Approving SV used in SV runbook');
 }
@@ -95,6 +96,14 @@ const sv34ApprovedSvIdentities = [
   },
 ];
 
+const svRunbookApprovedSvIdentities = [
+  {
+    name: 'DA-Helm-Test-Node',
+    publicKey:
+      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==',
+  },
+];
+
 const approvedSvIdentities = (
   isDevNet
     ? loadYamlFromFile(
@@ -103,7 +112,9 @@ const approvedSvIdentities = (
     : loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
       )
-).approvedSvIdentities.concat(doubleSv ? [] : sv34ApprovedSvIdentities);
+).approvedSvIdentities
+  .concat(approveSvRunbook ? svRunbookApprovedSvIdentities : [])
+  .concat(doubleSv ? [] : sv34ApprovedSvIdentities);
 
 function joinViaSv1(
   sv1: pulumi.Resource,
