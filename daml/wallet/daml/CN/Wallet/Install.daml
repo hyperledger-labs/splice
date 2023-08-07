@@ -300,20 +300,35 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_TransferOffer_Withdraw : TransferOfferTrackingInfo
       with
         cid : ContractId TransferOffer
+        reason : Text
       controller validatorParty
-      do exercise cid TransferOffer_Withdraw
+      do exercise cid TransferOffer_Withdraw with ..
+
+    nonconsuming choice WalletAppInstall_TransferOffer_Expire : TransferOfferTrackingInfo
+      with
+        cid : ContractId TransferOffer
+      controller validatorParty
+      do exercise cid $ TransferOffer_Expire with actor = endUserParty
 
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Abort : TransferOfferTrackingInfo
       with
         cid : ContractId AcceptedTransferOffer
+        reason : Text
       controller validatorParty
-      do exercise cid $ AcceptedTransferOffer_Abort
+      do exercise cid $ AcceptedTransferOffer_Abort with ..
 
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : TransferOfferTrackingInfo
       with
         cid : ContractId AcceptedTransferOffer
+        reason : Text
       controller validatorParty
-      do exercise cid $ AcceptedTransferOffer_Withdraw
+      do exercise cid $ AcceptedTransferOffer_Withdraw with ..
+
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Expire : TransferOfferTrackingInfo
+      with
+        cid : ContractId AcceptedTransferOffer
+      controller validatorParty
+      do exercise cid $ AcceptedTransferOffer_Expire with actor = endUserParty
 
     nonconsuming choice WalletAppInstall_FeaturedAppRights_Cancel : ()
       with

@@ -94,7 +94,8 @@ class AcceptedTransferOfferTrigger(
     for {
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
-        acceptedOffer.contractId
+        acceptedOffer.contractId,
+        reason,
       )
       _ <- connection
         .submitWithResultNoDedup(

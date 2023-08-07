@@ -57,7 +57,7 @@ testTransferOffers = script do
   submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall WalletAppInstall_TransferOffer_Reject with cid = offer
 
   offer <- createOffer 4.0 "to be withdrawn" t "to_be_withdrawn"
-  submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall WalletAppInstall_TransferOffer_Withdraw with cid = offer
+  submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall WalletAppInstall_TransferOffer_Withdraw with cid = offer, reason = "test withdraw"
 
   offer <- createOffer 7.0 "To expire" t "to_expire"
   passTime (minutes 6)
@@ -72,6 +72,7 @@ testTransferOffers = script do
   submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall
         WalletAppInstall_AcceptedTransferOffer_Abort with
           cid = accepted
+          reason = "test abort"
 
   offer <- createOffer 8.5 "To withdraw acceptance" t "to_withdraw_acceptance"
   accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
@@ -79,6 +80,7 @@ testTransferOffers = script do
   submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_AcceptedTransferOffer_Withdraw with
           cid = accepted
+          reason = "test withdraw accepted"
 
   t <- getTime
   offer <- createOffer 100.0 "Insufficient funds" t "insufficient_funds"

@@ -45,18 +45,8 @@ class ExpireAcceptedTransferOfferTrigger(
       install <- store.getInstall()
       user = store.key.endUserParty.toProtoPrimitive
       _ <- user match {
-        case task.work.contract.payload.sender =>
-          val cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
-            task.work.contractId
-          )
-          connection.submitWithResultNoDedup(
-            Seq(store.key.validatorParty),
-            Seq(store.key.endUserParty),
-            cmd,
-            task.work.domain,
-          )
-        case task.work.contract.payload.receiver =>
-          val cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Withdraw(
+        case task.work.contract.payload.sender | task.work.contract.payload.receiver =>
+          val cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Expire(
             task.work.contractId
           )
           connection.submitWithResultNoDedup(
@@ -69,7 +59,7 @@ class ExpireAcceptedTransferOfferTrigger(
           Future.failed(
             new StatusRuntimeException(
               Status.INTERNAL.withDescription(
-                s"User ($user) is unexpectedly neither sender ($task.work.contract.payload.sender) nor receiver ($task.work.contract.payload.receiver)"
+                s"User ($user) is unexpectedly neither sender (${task.work.contract.payload.sender}) nor receiver (${task.work.contract.payload.receiver})"
               )
             )
           )
