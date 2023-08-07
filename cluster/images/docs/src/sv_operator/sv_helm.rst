@@ -830,6 +830,7 @@ Please modify the command as follows:
 
 Open another browser window without saved site content for the wallet web application. e.g. an incognito window.
 :ref:`Login to your wallet UI <helm-sv-wallet-ui>` with the credentials of the temporary user you have just created.
+You should see a message that this user is not onboarded, please go ahead and click the "Onboard Yourself" button to complete the onbaording.
 You can observe the original ``Party Id`` on the top navigation bar, prefixed with the old SV name.
 You will also notice the coin balance is the same as the amount you held before the network upgrade.
 
