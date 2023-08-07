@@ -35,6 +35,7 @@
         "common",
         "canton-network",
         "infra",
-        "sv-runbook"
+        "sv-runbook",
+        "observability"
     ]
 }
