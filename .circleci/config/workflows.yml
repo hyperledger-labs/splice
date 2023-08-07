@@ -84,7 +84,7 @@ workflows:
         name: "scala_test frontend wall clock time"
         test_names_file: "test-full-class-names-frontend.log"
         start_canton_options: "-w"
-        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge+"
         parallelism: 4
@@ -98,7 +98,7 @@ workflows:
         name: "scala_test frontend sim time"
         test_names_file: "test-full-class-names-frontend-sim-time.log"
         start_canton_options: "-s"
-        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge"
         parallelism: 1
@@ -112,7 +112,7 @@ workflows:
         name: "scala_test frontend app manager"
         test_names_file: "test-full-class-names-frontend-app-manager.log"
         start_canton_options: "-w"
-        extra_pre_sbt_cmd: "./start-frontends.sh -d -e -s -m"
+        extra_pre_sbt_cmd: "./start-frontends.sh -d -s -m"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge"
         parallelism: 1

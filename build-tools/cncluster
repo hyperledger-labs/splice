@@ -881,7 +881,7 @@ function subcmd_start_frontends() {
     _log "Starting frontends needed for preflight check..."
 
     (cd "${REPO_ROOT}" && \
-         NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global ./start-frontends.sh -d -p)
+         NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global ./start-frontends.sh -d -v -p)
 }
 
 ###

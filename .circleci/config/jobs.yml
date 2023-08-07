@@ -397,7 +397,14 @@ jobs:
             # TODO(#3560) remove the `|| true` once all clusters have this script
             scripts/start-postgres-for-preflight.sh || true
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -p
+
+            # TODO(#7115) remove the usage check once all clusters have the updated script
+            if [[ -n $(./start-frontends.sh -h | grep "shared validator") ]]
+            then
+              NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -v -p
+            else
+              NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -p
+            fi
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"

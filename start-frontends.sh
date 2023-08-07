@@ -71,7 +71,7 @@ function usage() {
   echo "  -d   start in detached mode"
   echo "  -a   run all frontends with canton-network-test auth0 tenant and no test auth"
   echo "  -p   run the frontends needed for the preflight self-hosted directory UI test"
-  echo "  -e   run frontends with dedicated validator for users"
+  echo "  -v   run frontends with a shared validator for all users"
   echo "  -s   run frontends with multiple super validators for Sv*IntegrationTest in CI"
   echo "  -m   run frontends with app manager frontends"
 }
@@ -80,11 +80,11 @@ function usage() {
 daemon=0
 enable_test_auth="true"
 use_preflight_frontends=0
-dedicated_validator_for_users=0
+shared_validator_for_users=0
 multiple_svs=0
 app_manager=0
 
-while getopts "hdapesm" arg; do
+while getopts "hdapvsm" arg; do
   case ${arg} in
     h)
       usage
@@ -99,8 +99,8 @@ while getopts "hdapesm" arg; do
     p)
       use_preflight_frontends=1
       ;;
-    e)
-      dedicated_validator_for_users=1
+    v)
+      shared_validator_for_users=1
       ;;
     s)
       multiple_svs=1
@@ -142,9 +142,9 @@ done
 
 # The set of frontends we want to start as part of typical integration testing
 function start_local_frontends() {
-  validator_for_bob="alice"
-  if [ $dedicated_validator_for_users -eq 1 ]; then
-    validator_for_bob="bob"
+  validator_for_bob="bob"
+  if [ $shared_validator_for_users -eq 1 ]; then
+    validator_for_bob="alice"
   fi
 
   # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
