@@ -1,12 +1,10 @@
 import {
   Contract,
-  sameContracts,
-  useInterval,
   DirectoryEntry as DirectoryEntryComponent,
   DirectoryField,
-  TransferButton,
-  Loading,
   ErrorDisplay,
+  Loading,
+  TransferButton,
 } from 'common-frontend';
 import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
@@ -28,18 +26,19 @@ import {
   Typography,
 } from '@mui/material';
 
-import { SplitwellInstall } from '@daml.js/splitwell/lib/CN/Splitwell';
 import {
-  AcceptedGroupInvite,
   BalanceUpdate,
   Group as CodegenGroup,
+  SplitwellInstall,
 } from '@daml.js/splitwell/lib/CN/Splitwell';
 import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
-import { useSplitwellClient } from '../contexts/SplitwellServiceContext';
 import {
+  useAcceptedInvites,
   useAddMember,
+  useBalances,
+  useBalanceUpdates,
   useCreateInvite,
   useEnterPayment,
   useGroups,
@@ -56,55 +55,33 @@ interface BalancesProps {
   install: ContractId<SplitwellInstall>;
 }
 
-const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean => {
-  if (a.size !== b.size) {
-    return false;
-  }
-  for (let [k, va] of a) {
-    const vb = b.get(k);
-    if (va !== vb) {
-      return false;
-    }
-  }
-  return true;
-};
-
 const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, install }) => {
   const config = useConfig();
-  const splitwellClient = useSplitwellClient();
-  const [balances, setBalances] = useState<Map<string, string>>(new Map());
-  const fetchBalances = useCallback(async () => {
-    const balanceMap = (
-      await splitwellClient.listBalances(party, group.payload.id.unpack, group.payload.owner)
-    ).balances;
-    let balances = new Map<string, string>();
-    [group.payload.owner].concat(group.payload.members).forEach(p => {
-      if (p !== party) {
-        const balance: string | undefined = balanceMap[p];
-        if (balance) {
-          balances.set(p, balance);
-        } else {
-          balances.set(p, '0.0');
-        }
-      }
-    });
-    setBalances(prev => (balanceEqual(prev, balances) ? prev : balances));
-  }, [splitwellClient, setBalances, group, party]);
-
-  useInterval(fetchBalances);
+  const balances = useBalances(group, party);
 
   const initiateTransfer = useInitiateTransfer(party, provider, domainId, install);
 
   const groupId = group.payload.id;
 
   const initiateSettleDebts = useCallback(() => {
-    const amounts: ReceiverCCAmount[] = Array.from(balances)
-      .filter(([_, v]) => new Decimal(v).isNegative())
-      .map(([k, v]) => {
-        return { receiver: k, ccAmount: Decimal.abs(new Decimal(v)).toString() };
-      });
-    return initiateTransfer.mutateAsync({ groupId, amounts });
+    if (balances.data) {
+      const amounts: ReceiverCCAmount[] = Array.from(balances.data)
+        .filter(([_, v]) => new Decimal(v).isNegative())
+        .map(([k, v]) => {
+          return { receiver: k, ccAmount: Decimal.abs(new Decimal(v)).toString() };
+        });
+      return initiateTransfer.mutateAsync({ groupId, amounts });
+    } else {
+      return Promise.reject('Balances not yet fetched.');
+    }
   }, [balances, groupId, initiateTransfer]);
+
+  if (balances.isLoading) {
+    return <Loading />;
+  }
+  if (balances.isError) {
+    return <ErrorDisplay message="Error while retrieving group balances." />;
+  }
 
   return (
     <Stack>
@@ -118,7 +95,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, i
           }}
         >
           <TableBody>
-            {Array.from(balances).map(([party, balance]) => (
+            {Array.from(balances.data).map(([party, balance]) => (
               <TableRow key={party} className="balances-table-row">
                 <TableCell>
                   <DirectoryEntryComponent className="balances-table-receiver" partyId={party} />
@@ -156,24 +133,23 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   domainId,
   install,
 }) => {
-  const splitwellClient = useSplitwellClient();
-  const [acceptedInvites, setAcceptedInvites] = useState<Contract<AcceptedGroupInvite>[]>([]);
-  const fetchAcceptedInvites = useCallback(async () => {
-    const invites = (await splitwellClient.listAcceptedGroupInvites(party, group.payload.id.unpack))
-      .acceptedGroupInvites;
-    const decoded = invites.map(c => Contract.decodeOpenAPI(c, AcceptedGroupInvite));
-    setAcceptedInvites(prev => (sameContracts(decoded, prev) ? prev : decoded));
-  }, [group.payload.id.unpack, party, splitwellClient]);
-  useInterval(fetchAcceptedInvites);
+  const acceptedInvites = useAcceptedInvites(group, party);
 
   const addMember = useAddMember(party, provider, domainId, install);
+
+  if (acceptedInvites.isLoading) {
+    return <Loading />;
+  }
+  if (acceptedInvites.isError) {
+    return <ErrorDisplay message="Error while retrieving accepted invites." />;
+  }
 
   return (
     <Box>
       <Stack sx={{ px: 2, py: 1 }}>
         <Typography variant="button">Membership Requests</Typography>
         <List>
-          {acceptedInvites.map(invite => (
+          {acceptedInvites.data.map(invite => (
             <ListItem key={invite.contractId}>
               <Button
                 data-group={group.payload.id.unpack}
@@ -285,16 +261,7 @@ interface BalanceUpdatesProps {
 }
 
 const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
-  const splitwellClient = useSplitwellClient();
-  const [balanceUpdates, setBalanceUpdates] = useState<Contract<BalanceUpdate>[]>([]);
-  const fetchBalanceUpdates = useCallback(async () => {
-    const balanceUpdates = (
-      await splitwellClient.listBalanceUpdates(party, group.payload.id.unpack, group.payload.owner)
-    ).balanceUpdates;
-    const decoded = balanceUpdates.reverse().map(c => Contract.decodeOpenAPI(c, BalanceUpdate));
-    setBalanceUpdates(prev => (sameContracts(decoded, prev) ? prev : decoded));
-  }, [splitwellClient, group, party]);
-  useInterval(fetchBalanceUpdates);
+  const balanceUpdates = useBalanceUpdates(group, party);
 
   const Update: React.FC<{ update: Contract<BalanceUpdate> }> = ({ update }) => {
     if (update.payload.update.tag === 'ExternalPayment') {
@@ -322,11 +289,19 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
       return <ListItem>Netting: Not yet implemented</ListItem>;
     }
   };
+
+  if (balanceUpdates.isLoading) {
+    return <Loading />;
+  }
+  if (balanceUpdates.isError) {
+    return <ErrorDisplay message="Error while retrieving balance updates." />;
+  }
+
   return (
     <Stack sx={{ px: 2, py: 1 }}>
       <Typography variant="button">Balance Updates</Typography>
       <List>
-        {balanceUpdates.map(c => (
+        {balanceUpdates.data.map(c => (
           <Update key={c.contractId} update={c} />
         ))}
       </List>

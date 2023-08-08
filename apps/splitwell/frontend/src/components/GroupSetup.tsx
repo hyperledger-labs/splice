@@ -1,4 +1,4 @@
-import { Contract, AssignedContract, sameAssignedContracts, useInterval } from 'common-frontend';
+import { AssignedContract, Contract, ErrorDisplay, Loading } from 'common-frontend';
 import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
@@ -6,9 +6,7 @@ import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from 
 import { GroupInvite, SplitwellInstall } from '@daml.js/splitwell/lib/CN/Splitwell';
 import { ContractId } from '@daml/types';
 
-import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
-import { useSplitwellClient } from '../contexts/SplitwellServiceContext';
-import { useRequestGroup } from '../hooks/mutations/useRequestGroup';
+import { useGroupInvites, useJoinGroup, useRequestGroup } from '../hooks';
 import { SplitwellInstalls } from '../utils/installs';
 
 interface GroupSetupProps {
@@ -38,8 +36,6 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
   newGroupInstall,
   installs,
 }) => {
-  const splitwellClient = useSplitwellClient();
-  const ledgerApiClient = useSplitwellLedgerApiClient();
   const [groupId, setGroupId] = useState<string>('');
   const [groupInvite, setGroupInvite] = useState<GroupInviteInput>({
     type: 'noparse',
@@ -51,18 +47,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     await requestGroup.mutate(groupId);
   };
 
-  const [groupInvites, setGroupInvites] = useState<AssignedContract<GroupInvite>[]>([]);
-
-  const fetchInvites = useCallback(async () => {
-    const groupInvites = (await splitwellClient.listGroupInvites(party)).groupInvites;
-    const decoded = groupInvites.flatMap(c => {
-      const d = AssignedContract.decodeContractWithState(c, GroupInvite);
-      return d === undefined ? [] : [d];
-    });
-    setGroupInvites(prev => (sameAssignedContracts(prev, decoded) ? prev : decoded));
-  }, [splitwellClient, party]);
-
-  useInterval(fetchInvites);
+  const groupInvites = useGroupInvites(party);
 
   const setGroupInviteInput = useCallback(
     (rawValue: string) => {
@@ -92,6 +77,8 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     [installs, setGroupInvite]
   );
 
+  const joinGroup = useJoinGroup();
+
   const onJoinGroup = async () => {
     // otherwise this callback shouldn't have been called
     if (groupInvite.type === 'good') {
@@ -99,20 +86,26 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
         inviteContract: { contract: inviteContract, domainId: inviteDomainId },
         install: inviteInstall,
       } = groupInvite;
-      await ledgerApiClient.acceptInvite(
+      joinGroup.mutate({
         party,
         provider,
-        inviteContract.contractId,
+        inviteContract,
+        installContractId: inviteInstall,
         inviteDomainId,
-        inviteInstall,
-        inviteContract
-      );
+      });
     }
   };
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
   };
+
+  if (groupInvites.isLoading) {
+    return <Loading />;
+  }
+  if (groupInvites.isError) {
+    return <ErrorDisplay message="Error while retrieving group invites." />;
+  }
 
   return (
     <Stack spacing={2}>
@@ -143,7 +136,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
       </Button>
       <List>
         <Typography>Created group invites</Typography>
-        {groupInvites.map(({ contract: invite, domainId }) => {
+        {groupInvites.data.map(({ contract: invite, domainId }) => {
           const encodedInvite = JSON.stringify({ ...invite, domainId });
           return (
             <ListItem className="invites-list-item" key={invite.contractId}>

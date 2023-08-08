@@ -15,7 +15,7 @@ export const SplitwellClientProvider: React.FC<React.PropsWithChildren<Splitwell
   const client: openapi.SplitwellApi = useMemo(() => {
     const configuration = openapi.createConfiguration({
       baseServer: new openapi.ServerConfiguration(url, {}),
-      promiseMiddleware: [new OpenAPILoggingMiddleware('directory')],
+      promiseMiddleware: [new OpenAPILoggingMiddleware('splitwell')],
     });
     return new openapi.SplitwellApi(configuration);
   }, [url]);
