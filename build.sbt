@@ -59,6 +59,7 @@ lazy val root = (project in file("."))
     `canton-coin-daml`,
     `canton-coin-v1test-daml`,
     `canton-coin-v2test-daml`,
+    `canton-name-service-daml`,
     `wallet-payments-daml`,
     `wallet-daml`,
     `wallet-v1test-daml`,
@@ -259,6 +260,15 @@ lazy val `wallet-v1test-daml` =
 lazy val `directory-daml` =
   project
     .in(file("daml/directory-service"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `canton-name-service-daml` =
+  project
+    .in(file("daml/canton-name-service"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,

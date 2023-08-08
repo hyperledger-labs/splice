@@ -1,0 +1,187 @@
+module CN.Cns where
+
+import DA.Time
+
+import CC.API.V1.Coin
+import CC.Schedule
+import CN.Wallet.Payment
+import CN.Wallet.Subscriptions
+import CN.Util.Assert
+
+-- | The rules governing how users can pay to use the Canton Name service.
+template CnsRules
+  with
+    svc : Party
+    configSchedule : Schedule Time CnsRulesConfig
+  where
+    signatory svc
+    ensure validSchedule configSchedule validCnsConfig
+
+    -- Request a cns entry, to be paid and renewed via subscription payments.
+    -- The SubscriptionRequest is accepted (or rejected) via the user's wallet by offering the initial payment.
+    nonconsuming choice CnsRules_RequestEntry : (ContractId CnsEntryContext, ContractId SubscriptionRequest)
+      with
+        name : Text
+        url : Text
+        description : Text
+        user : Party
+      controller user
+      do
+        context <- create CnsEntryContext with
+          ..
+        now <- getTime
+        let subscriptionData = Subscription with
+              sender = user
+              receiver = svc
+              provider = svc
+              svc
+              context = toInterfaceContractId context
+            config = getValueAsOf now configSchedule
+            payData = SubscriptionPayData with
+              paymentAmount = PaymentAmount config.entryFee USD
+              paymentInterval = config.entryLifetime
+              paymentDuration = config.renewalDuration
+        request <- create SubscriptionRequest with
+          subscriptionData
+          payData
+        pure (context, request)
+
+    -- Collect a user's initial payment for a cns entry allocation.
+    -- By collecting the initial payment, the SVC ultimately agrees to both
+    -- the creation of the cns entry and the establishment of subscription payments for renewing it.
+    nonconsuming choice CnsRules_CollectInitialEntryPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
+      with
+        user : Party
+        paymentCid : ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+      controller svc, user
+      do
+        payment <- fetch paymentCid
+        require "user matches payment sender" (payment.subscriptionData.sender == user)
+        Some (_, context) <- fetchFromInterface @CnsEntryContext payment.subscriptionData.context
+        -- accept payment which creates the subscription
+        (_, subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
+          transferContext
+        -- burn the received coin
+        archive coinCid
+        subscriptionState <- fetch subscriptionStateCid
+        -- deliver the promised good: create the cns entry
+        entryCid <- case context of
+          CnsEntryContext{..} -> create CnsEntry with
+            expiresAt = subscriptionState.nextPaymentDueAt
+            ..
+        -- return the created contracts
+        pure (entryCid, subscriptionStateCid)
+
+    -- Collect a recurring entry renewal payment, renewing the entry.
+    nonconsuming choice CnsRules_CollectEntryRenewalPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
+      with
+        user : Party
+        paymentCid : ContractId SubscriptionPayment
+        entryCid : ContractId CnsEntry -- ^ The currently active entry.
+        transferContext : AppTransferContext
+      controller svc, user
+      do
+        payment <- fetch paymentCid
+        require "user matches payment sender" (payment.subscriptionData.sender == user)
+        Some (_, context) <- fetchFromInterface @CnsEntryContext payment.subscriptionData.context
+        entry <- fetch entryCid
+        -- sanity checks
+        require "Current entry matches subscription context"
+          ((CnsEntryContext svc entry.user entry.name entry.url entry.description) == context)
+        require "Subscription entry renewal times are in sync"
+          (payment.thisPaymentDueAt == entry.expiresAt)
+        -- accept payment
+        (subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionPayment_Collect with
+          transferContext
+        -- burn the received coin
+        archive coinCid
+        -- renew the entry
+        entryCid <- exercise entryCid CnsEntry_Renew with
+          extension = payment.payData.paymentInterval
+        -- return the created contracts
+        pure (entryCid, subscriptionStateCid)
+
+data CnsRulesConfig = CnsRulesConfig with
+    renewalDuration : RelTime -- Length of interval within which user can renew. At the end the entry expires
+    entryLifetime : RelTime -- Duration until an entry expires
+    entryFee : Decimal -- Fee for each entry
+  deriving (Eq, Show)
+
+template CnsEntryContext
+  with
+    svc : Party
+    user : Party
+    name : Text
+    url : Text
+    description : Text
+  where
+    signatory svc, user
+
+    interface instance SubscriptionContext for CnsEntryContext where
+      view = SubscriptionContextView with
+        description = "Cns entry: " <> show name
+        svc
+        sender = user
+
+    nonconsuming choice CnsEntryContext_CollectInitialEntryPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
+      with
+        paymentCid : ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+        cnsRulesCid : ContractId CnsRules
+      controller svc
+      do
+        exercise cnsRulesCid CnsRules_CollectInitialEntryPayment with
+          user
+          paymentCid
+          transferContext
+
+    nonconsuming choice CnsEntryContext_CollectEntryRenewalPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
+      with
+        paymentCid : ContractId SubscriptionPayment
+        entryCid : ContractId CnsEntry -- ^ The currently active entry.
+        transferContext : AppTransferContext
+        cnsRulesCid : ContractId CnsRules
+      controller svc
+      do
+        exercise cnsRulesCid CnsRules_CollectEntryRenewalPayment with
+          user
+          paymentCid
+          entryCid
+          transferContext
+
+
+-- | A cns entry that needs to be renewed continuously.
+-- Renewal recreates this contract with an updated `expiresAt` field.
+template CnsEntry
+  with
+    user : Party
+    svc : Party
+    name : Text
+    url : Text -- either empty or contains a valid http/https url
+    description : Text -- can be empty
+    expiresAt : Time
+  where
+    signatory user, svc
+
+    choice CnsEntry_Expire : ()
+      with
+        actor : Party
+      controller actor
+      do time <- getTime
+         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+         require "Contract expired" (expiresAt < time)
+
+    choice CnsEntry_Renew : ContractId CnsEntry
+      with
+        extension : RelTime
+      controller user, svc
+      do require "Extension positive" (extension > aunit)
+         create this with
+           expiresAt = this.expiresAt `addRelTime` extension
+
+validCnsConfig : CnsRulesConfig -> Bool
+validCnsConfig CnsRulesConfig{..} =
+    renewalDuration > days 0
+    && entryLifetime > days 0
+    && entryFee > 0.0

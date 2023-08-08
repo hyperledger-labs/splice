@@ -1,6 +1,7 @@
 daml/app-manager/.daml/dist/app-manager-0.1.0.dar 110ecadc6a1fc4b1ad4a1d5235fe2e07bc3e752a26d709f149636ed54fadcf45
 daml/canton-coin-api/.daml/dist/canton-coin-api-0.1.0.dar ef3e5597ce694abf5fe3763483eb81b6a90bb81f7a3015681cf54f19a552ec47
 daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar ef8782c44f8a2883709cf2b92ed173e5398fe67d3b0201838141888139a7631a
+daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar fbec5d87fbc274d66b4c02cb0c55307d94a23dfa292bae11a87997c26f4e1200
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar 5d2be5e65e7512d2151ebdf0d4f7fc6ed6d1f8dc60b0470c4dc61809f940ddc9
 daml/directory-service/.daml/dist/directory-service-0.1.0.dar ee8bd3a338fadd0bc0ae6c94ddb80fe62880b1b077f4a1da9c87f0906da821c9
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar 0ea7dd6ff2e931e24e6576a81ad96b71da78c1229e6445747518b6ad299f50c0
