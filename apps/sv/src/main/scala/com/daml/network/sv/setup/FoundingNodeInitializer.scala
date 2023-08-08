@@ -34,7 +34,7 @@ import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
@@ -237,7 +237,9 @@ class FoundingNodeInitializer(
           initialValues = DynamicDomainParameters.initialXValues(clock, ProtocolVersion.dev)
           values = initialValues.copy(
             // TODO(#6055) Consider increasing topology change delay again
-            topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0)
+            topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
+            // TODO(#7147) Enable ACS committments again once Canton stops exploding.
+            reconciliationInterval = PositiveSeconds.tryOfDays(365),
           )(initialValues.representativeProtocolVersion)
           domainParametersState <- participantAdminConnection.proposeInitialDomainParameters(
             domainId,
