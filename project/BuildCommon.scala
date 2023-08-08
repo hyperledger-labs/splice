@@ -175,7 +175,7 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; runShellcheck ; syncpackCheck",
+          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; runShellcheck ; syncpackCheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case
@@ -1152,7 +1152,7 @@ object BuildCommon {
       dars.map(_.toString) ++ Seq[String]("-o", damlTsCodegenDir.value.toString)
     val cacheDir = streams.value.cacheDirectory
     val cache =
-      FileFunction.cached(cacheDir) { _ =>
+      FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         damlTsCodegenDir.value.delete()
         BuildUtil.runCommand("daml2js" +: args, log)
         (baseDirectory.value / "daml.js" ** "*").get.toSet

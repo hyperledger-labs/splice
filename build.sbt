@@ -102,15 +102,37 @@ lazy val root = (project in file("."))
       val outputFile = "daml/dars.lock"
       " " + (Seq(outputFile) ++ darPaths).mkString(" ")
     },
+    cantonDarsLockCheckerFileArg := {
+      val darFiles: Seq[File] = damlBuild.all(allDarsFilter).value.flatten
+      val basePath = baseDirectory.value.toPath
+      val cantonPath = basePath.resolve("canton")
+      val darPaths = for {
+        file <- darFiles
+        path = file.toPath
+        if path.startsWith(cantonPath)
+      } yield basePath.relativize(path)
+      val outputFile = "canton/dars.lock"
+      " " + (Seq(outputFile) ++ darPaths).mkString(" ")
+    },
     damlDarsLockFileUpdate :=
       Def.taskDyn {
         (`build-tools-dar-lock-checker` / Compile / run)
           .toTask(" update" + damlDarsLockCheckerFileArg.value)
       }.value,
+    cantonDarsLockFileUpdate :=
+      Def.taskDyn {
+        (`build-tools-dar-lock-checker` / Compile / run)
+          .toTask(" update" + cantonDarsLockCheckerFileArg.value)
+      }.value,
     damlDarsLockFileCheck :=
       Def.taskDyn {
         (`build-tools-dar-lock-checker` / Compile / run)
           .toTask(" check" + damlDarsLockCheckerFileArg.value)
+      }.value,
+    cantonDarsLockFileCheck :=
+      Def.taskDyn {
+        (`build-tools-dar-lock-checker` / Compile / run)
+          .toTask(" check" + cantonDarsLockCheckerFileArg.value)
       }.value,
   )
 
@@ -118,6 +140,10 @@ val damlDarsLockFileCheck = taskKey[Unit]("Check the daml/dars.lock file")
 val damlDarsLockFileUpdate = taskKey[Unit]("Update the daml/dars.lock file")
 val damlDarsLockCheckerFileArg =
   taskKey[String]("Argument line for updating the daml/dars.lock file")
+val cantonDarsLockFileCheck = taskKey[Unit]("Check the canton/dars.lock file")
+val cantonDarsLockFileUpdate = taskKey[Unit]("Update the canton/dars.lock file")
+val cantonDarsLockCheckerFileArg =
+  taskKey[String]("Argument line for updating the canton/dars.lock file")
 
 lazy val `build-tools-dar-lock-checker` = project
   .in(file("build-tools/dar-lock-checker"))

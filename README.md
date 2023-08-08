@@ -494,7 +494,7 @@ Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
       The exclusion is because those files are under a symlink and we don’t want to change them twice.
    4. Create a commit to ease review, `git add canton/ && git commit -m"Undo our changes"`
 3. Checkout the commit of the Canton OSS repo to which you have decided to upgrade in Step 1.2
-4. Execute the following steps in your Canton Coin repo:
+4. Execute the following steps in your Canton Network Node repo:
    1. Copy the Canton changes: `./scripts/copy-canton.sh $PATH_TO_CANTON_OSS`
    2. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit"`
    3. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`.
@@ -529,8 +529,9 @@ Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
      - If the file already exists in our fork, you may need to [update the build dependencies](#updating-canton-build-dependencies).
 6. Step 5 may have made changes to `package-lock.json` files; commit all of these changes.
 7. Run `sbt damlDarsLockFileUpdate` and commit the changes to `daml/dars.lock`.
-8. Make a PR with your changes, so CI starts churning.
-9. If there are any, remove all `*.rej` files.
+8. Run `sbt cantonDarsLockFileUpdate` and commit the changes to `canton/dars.lock`.
+9. Make a PR with your changes, so CI starts churning.
+10. If there are any, remove all `*.rej` files.
 
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 

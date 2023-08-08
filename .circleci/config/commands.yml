@@ -149,12 +149,11 @@ commands:
       - save_cache:
           name: Uploading Coursier cache
           # The cache is stored only when the build definition or dependencies change
-          key: &coursier-cache-key coursier-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}-buildcommon:{{ checksum "project/BuildCommon.scala" }}-configyml={{ checksum ".circleci/config.yml" }}-buildproperties={{ checksum "project/build.properties" }}-houserules={{ checksum "project/Houserules.scala" }}-plugins={{ checksum "project/plugins.sbt" }}-build={{ checksum "build.sbt" }}
+          key: &coursier-cache-key coursier-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}-buildcommon:{{ checksum "project/BuildCommon.scala" }}-buildproperties={{ checksum "project/build.properties" }}-houserules={{ checksum "project/Houserules.scala" }}-plugins={{ checksum "project/plugins.sbt" }}-build={{ checksum "build.sbt" }}
           # Components of the cache key:
           # - Keyword "coursier" to indicate this stores the coursier cache.
           # - Name of the job, to avoid interferences between jobs. (Different jobs populate the cached folders differently.)
           # - Dockerfile to start with a clean state if build tools are updated.
-          # - This file to be on the save side.
           # - Everything in project that may contain a dependency.
           # - build.sbt as it may contain a hardcoded dependency.
           paths:
@@ -163,7 +162,7 @@ commands:
       - save_cache:
           name: Uploading Sbt caches
           # The cache is stored only when the build definition or dependencies change
-          key: &sbt-cache-key sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}-buildcommon:{{ checksum "project/BuildCommon.scala" }}-configyml={{ checksum ".circleci/config.yml" }}-buildproperties={{ checksum "project/build.properties" }}-houserules={{ checksum "project/Houserules.scala" }}-plugins={{ checksum "project/plugins.sbt" }}-build={{ checksum "build.sbt" }}
+          key: &sbt-cache-key sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}-buildcommon:{{ checksum "project/BuildCommon.scala" }}-buildproperties={{ checksum "project/build.properties" }}-houserules={{ checksum "project/Houserules.scala" }}-plugins={{ checksum "project/plugins.sbt" }}-build={{ checksum "build.sbt" }}
           # Components of the cache key:
           # - Keyword "sbt" to indicate this stores Sbt caches.
           # - Otherwise as for the coursier cache key.
@@ -293,18 +292,20 @@ commands:
           name: Create archive of Daml compilation artifacts
           command: |
             mkdir -p /tmp/daml
-            find daml/ -type d -name ".daml" | tar --use-compress-program=pigz -cf /tmp/daml/daml.tar.gz -T -
+            find . -type d -name ".daml" | tar --use-compress-program=pigz -cvf /tmp/daml/daml.tar.gz -T -
       - save_cache:
           name: Uploading artifacts generated from daml code
           # Components of the cache key:
           # - Keyword "daml-artifacts" for uniqueness
           # - The branch name
           # - The build configuration (build.properties, BuildCommon.scala, DamlPlugin.scala, build.sbt)
-          # - The daml lock file
+          # - The CN dars lock file
+          # - The Canton dars lock file, since we cache also artifacts for those dars
           # - rev: to allow for updating the cache when sources have changed
-          key: &daml_artifacts daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} rev:{{ .Revision }}
+          key: &daml_artifacts daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonDars:{{ checksum "canton/dars.lock" }} rev:{{ .Revision }}
           paths:
             - /tmp/daml
+            - apps/common/frontend/daml.js
 
   restore_daml_artifacts:
     steps:
@@ -312,13 +313,13 @@ commands:
           name: Downloading archive of Daml compilation artifacts
           keys:
             - *daml_artifacts
-            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }}
-            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }}
+            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonDars:{{ checksum "canton/dars.lock" }}
+            - daml-artifacts-<< pipeline.parameters.cache-version >> branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonDars:{{ checksum "canton/dars.lock" }}
       - run:
           name: Extracting Daml compilation artifacts
           command: |
             if [[ -e /tmp/daml/daml.tar.gz ]]; then
-              tar --use-compress-program=pigz -xf /tmp/daml/daml.tar.gz
+              tar --use-compress-program=pigz -xvf /tmp/daml/daml.tar.gz
             else
               echo "No cached daml artifacts files found. Skipping..."
             fi
