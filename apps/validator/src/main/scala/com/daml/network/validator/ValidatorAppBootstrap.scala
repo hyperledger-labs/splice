@@ -3,7 +3,6 @@ package com.daml.network.validator
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.implicits.*
-import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.CNNodeBootstrapBase
@@ -49,7 +48,6 @@ class ValidatorAppBootstrap(
       SharedCNNodeAppParameters,
     ](
       name,
-      config,
       validatorAppParameters,
       clock,
       metrics,
@@ -70,6 +68,7 @@ class ValidatorAppBootstrap(
           loggerFactory,
           tracerProvider,
           futureSupervisor,
+          metrics,
         )
       )
     )

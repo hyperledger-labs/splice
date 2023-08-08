@@ -48,7 +48,6 @@ class DirectoryAppBootstrap(
       SharedCNNodeAppParameters,
     ](
       name,
-      config,
       directoryAppParameters,
       clock,
       metrics,
@@ -69,6 +68,7 @@ class DirectoryAppBootstrap(
           loggerFactory,
           tracerProvider,
           futureSupervisor,
+          metrics,
         )
       )
     )

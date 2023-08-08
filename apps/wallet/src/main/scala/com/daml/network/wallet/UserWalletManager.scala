@@ -96,7 +96,12 @@ class UserWalletManager(
       // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
       // without the entire node going down.
       val userRetryProvider =
-        RetryProvider(loggerFactory, retryProvider.timeouts, retryProvider.futureSupervisor)
+        RetryProvider(
+          loggerFactory,
+          retryProvider.timeouts,
+          retryProvider.futureSupervisor,
+          retryProvider.metricsFactory,
+        )
       val walletService = new UserWalletService(
         ledgerClient,
         globalDomain,

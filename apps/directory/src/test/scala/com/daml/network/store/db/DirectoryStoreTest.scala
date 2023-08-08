@@ -26,6 +26,7 @@ import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDec
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.google.protobuf
@@ -265,7 +266,7 @@ class InMemoryDirectoryStoreTest extends DirectoryStoreTest {
       svcParty,
       GlobalOnlyDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -302,7 +303,7 @@ class DbDirectoryStoreTest
       storage,
       GlobalOnlyDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

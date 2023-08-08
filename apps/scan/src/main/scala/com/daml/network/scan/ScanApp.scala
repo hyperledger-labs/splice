@@ -15,6 +15,7 @@ import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.admin.http.HttpScanHandler
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
+import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.store.PageLimit
 import com.daml.network.util.HasHealth
@@ -46,6 +47,7 @@ class ScanApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
+    nodeMetrics: ScanAppMetrics,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -58,6 +60,7 @@ class ScanApp(
       loggerFactory,
       tracerProvider,
       futureSupervisor,
+      nodeMetrics,
     ) {
 
   override def initialize(

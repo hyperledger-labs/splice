@@ -3,10 +3,11 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
+import com.daml.nameof.NameOf.functionFullName
 import com.daml.network.CNNodeMetrics
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
-import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
 import com.digitalasset.canton.lifecycle.{HasCloseContext, Lifecycle}
@@ -16,12 +17,11 @@ import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.NodeId
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
-import com.daml.nameof.NameOf.functionFullName
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-import scala.concurrent.{blocking, Future}
+import scala.concurrent.{Future, blocking}
 
 object CNNodeBootstrap {
   type HealthDumpFunction = () => Future[File]
@@ -69,7 +69,6 @@ abstract class CNNodeBootstrapBase[
     ParameterConfig <: CantonNodeParameters,
 ](
     override val name: InstanceName,
-    config: NodeConfig,
     parameterConfig: ParameterConfig,
     val clock: Clock,
     nodeMetrics: CNNodeMetrics,
@@ -84,12 +83,10 @@ abstract class CNNodeBootstrapBase[
     with HasCloseContext
     with NoTracing {
 
-  protected val adminApiConfig = config.adminApi
   protected val tracerProvider = TracerProvider.Factory(configuredOpenTelemetry, name.unwrap)
   implicit val tracer: Tracer = tracerProvider.tracer
 
   private val isRunningVar = new AtomicBoolean(true)
-  protected val dbStorageMetrics = nodeMetrics.dbStorage
   protected val storage =
     storageFactory
       .tryCreate(
@@ -97,7 +94,7 @@ abstract class CNNodeBootstrapBase[
         parameterConfig.logQueryCost,
         clock,
         Some(scheduler),
-        dbStorageMetrics,
+        nodeMetrics.dbStorage,
         parameterConfig.processingTimeouts,
         loggerFactory,
       )

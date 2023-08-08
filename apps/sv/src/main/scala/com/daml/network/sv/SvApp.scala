@@ -37,6 +37,7 @@ import com.daml.network.sv.cometbft.{
   CometBftNode,
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.sv.setup.{FoundingNodeInitializer, JoiningNodeInitializer}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
@@ -78,6 +79,7 @@ class SvApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
+    metrics: SvAppMetrics,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -90,6 +92,7 @@ class SvApp(
       loggerFactory,
       tracerProvider,
       futureSupervisor,
+      metrics,
     ) {
 
   private val cometBftConfig = config.cometBftConfig

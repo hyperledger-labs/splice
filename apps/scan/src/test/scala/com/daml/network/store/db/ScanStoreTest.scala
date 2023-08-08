@@ -32,11 +32,12 @@ import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.ScanTxLogParser.TxLogIndexRecord
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{StoreTest, TxLogStore, StoreErrors}
+import com.daml.network.store.{StoreErrors, StoreTest, TxLogStore}
 import com.daml.network.util.{CNNodeUtil, Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
@@ -1075,7 +1076,7 @@ class InMemoryScanStoreTest extends ScanStoreTest {
       ),
       loggerFactory,
       transactionTreeSource,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -1116,7 +1117,7 @@ class DbScanStoreTest
       ),
       loggerFactory,
       transactionTreeSource,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

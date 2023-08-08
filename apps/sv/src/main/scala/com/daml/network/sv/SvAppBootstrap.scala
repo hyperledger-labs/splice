@@ -48,7 +48,6 @@ class SvAppBootstrap(
       SharedCNNodeAppParameters,
     ](
       name,
-      config,
       svAppParameters,
       clock,
       metrics,
@@ -69,6 +68,7 @@ class SvAppBootstrap(
           loggerFactory,
           tracerProvider,
           futureSupervisor,
+          metrics,
         )
       )
     )

@@ -14,6 +14,7 @@ import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.google.protobuf
@@ -161,7 +162,7 @@ class InMemorySvSvStoreTest extends SvSvStoreTest {
       SvStore.Key(storeSvParty, svcParty),
       svDomainConfig,
       loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -198,7 +199,7 @@ class DbSvSvStoreTest
       storage,
       svDomainConfig,
       loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

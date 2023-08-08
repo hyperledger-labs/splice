@@ -5,6 +5,7 @@ import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{BaseTest, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 import org.scalatest.wordspec.AsyncWordSpec
@@ -25,7 +26,7 @@ class InMemoryDomainStoreTest extends AsyncWordSpec with BaseTest {
       new InMemoryDomainStore(
         alice,
         loggerFactory,
-        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       )
     )
 

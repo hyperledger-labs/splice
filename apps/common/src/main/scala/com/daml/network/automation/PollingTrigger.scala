@@ -44,6 +44,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     "transient",
     "non-transient",
     s"restarting after ${context.config.pollingInterval}",
+    context.metricsFactory,
   )
 
   override def isHealthy: Boolean = pollingLoopRef.get().exists(!_.isCompleted)

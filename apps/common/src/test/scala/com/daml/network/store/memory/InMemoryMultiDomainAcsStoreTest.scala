@@ -12,11 +12,12 @@ import com.daml.network.store.{
   MultiDomainAcsStoreTest,
 }
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
-import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 
 import java.util.concurrent.atomic.AtomicReference
 
@@ -34,7 +35,7 @@ class InMemoryMultiDomainAcsStoreTest
       loggerFactory,
       contractFilter,
       TestTxLogStoreParser,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(actorSystem.dispatcher)
 
   override def assertTestState(

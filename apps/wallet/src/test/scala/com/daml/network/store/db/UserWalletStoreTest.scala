@@ -27,6 +27,7 @@ import com.daml.network.wallet.store.UserWalletStore.{AppPaymentRequest, Subscri
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
@@ -1031,7 +1032,8 @@ class InMemoryUserWalletStoreTest extends UserWalletStoreTest {
       defaultAcsDomain = domainAlias,
       loggerFactory = loggerFactory,
       transactionTreeSource = transactionTreeSource,
-      retryProvider = RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      retryProvider =
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -1071,7 +1073,8 @@ class DbUserWalletStoreTest
       storage = storage,
       loggerFactory = loggerFactory,
       transactionTreeSource = transactionTreeSource,
-      retryProvider = RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+      retryProvider =
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

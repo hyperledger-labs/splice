@@ -6,6 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResp
 import akka.http.scaladsl.server.Directive0
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.CNNodeMetrics
 import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.auth.{AuthToken, AuthTokenManager, AuthTokenSource, AuthTokenSourceNone}
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
@@ -43,6 +44,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
+    nodeMetrics: CNNodeMetrics,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -56,7 +58,12 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   val name: InstanceName
 
   protected val retryProvider: RetryProvider =
-    RetryProvider(loggerFactory, parameters.processingTimeouts, futureSupervisor)
+    RetryProvider(
+      loggerFactory,
+      parameters.processingTimeouts,
+      futureSupervisor,
+      nodeMetrics.metricsFactory,
+    )
 
   override val timeouts = parameters.processingTimeouts
 

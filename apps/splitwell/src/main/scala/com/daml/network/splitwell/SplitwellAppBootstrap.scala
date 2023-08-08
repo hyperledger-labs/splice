@@ -48,7 +48,6 @@ class SplitwellAppBootstrap(
       SharedCNNodeAppParameters,
     ](
       name,
-      config,
       splitwellAppParameters,
       clock,
       metrics,
@@ -69,6 +68,7 @@ class SplitwellAppBootstrap(
           loggerFactory,
           tracerProvider,
           futureSupervisor,
+          metrics,
         )
       )
     )

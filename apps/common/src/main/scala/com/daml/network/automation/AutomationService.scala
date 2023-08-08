@@ -28,7 +28,13 @@ abstract class AutomationService(
 
   /** Shared parameters for instantiating triggers. */
   protected def triggerContext: TriggerContext =
-    TriggerContext(automationConfig, clock, retryProvider, loggerFactory)
+    TriggerContext(
+      automationConfig,
+      clock,
+      retryProvider,
+      loggerFactory,
+      retryProvider.metricsFactory,
+    )
 
   override def isHealthy: Boolean = backgroundServices.get().forall(_.isHealthy)
 

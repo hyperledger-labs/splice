@@ -3,8 +3,8 @@ package com.daml.network.splitwell
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import cats.syntax.traverse.*
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
@@ -23,6 +23,7 @@ import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClie
 import com.daml.network.splitwell.admin.http.HttpSplitwellHandler
 import com.daml.network.splitwell.automation.SplitwellAutomationService
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
+import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -52,6 +53,7 @@ class SplitwellApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
+    metrics: SplitwellAppMetrics,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -64,6 +66,7 @@ class SplitwellApp(
       loggerFactory,
       tracerProvider,
       futureSupervisor,
+      metrics,
     ) {
 
   override lazy val ports = Map("admin" -> config.adminApi.port)

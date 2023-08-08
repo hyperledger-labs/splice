@@ -48,7 +48,6 @@ class ScanAppBootstrap(
       SharedCNNodeAppParameters,
     ](
       name,
-      config,
       scanAppParameters,
       clock,
       metrics,
@@ -69,6 +68,7 @@ class ScanAppBootstrap(
           loggerFactory,
           tracerProvider,
           futureSupervisor,
+          metrics,
         )
       )
     )

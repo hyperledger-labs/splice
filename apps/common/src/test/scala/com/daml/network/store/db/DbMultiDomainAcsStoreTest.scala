@@ -15,6 +15,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import org.scalatest.Assertion
 import slick.jdbc.JdbcProfile
@@ -75,7 +76,7 @@ class DbMultiDomainAcsStoreTest
         loggerFactory,
         contractFilter,
         TestTxLogStoreParser,
-        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop),
+        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
         (evt, _) => Right(create(store.storeId, evt)),
         (_, _) => Right(DBIO.successful(())),
       )

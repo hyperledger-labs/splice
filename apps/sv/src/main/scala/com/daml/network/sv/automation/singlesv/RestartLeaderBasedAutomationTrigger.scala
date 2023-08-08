@@ -118,7 +118,12 @@ class RestartLeaderBasedAutomationTrigger(
        closeService()
 
        val retryProvider =
-         RetryProvider(loggerFactory, timeouts, appLevelRetryProvider.futureSupervisor)
+         RetryProvider(
+           loggerFactory,
+           timeouts,
+           appLevelRetryProvider.futureSupervisor,
+           context.metricsFactory,
+         )
        val leaderBasedAutomation = new LeaderBasedAutomationService(
          clock,
          config,

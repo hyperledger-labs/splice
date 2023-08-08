@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.automation.TransferFollowTrigger.LubTask
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.store.CNNodeAppStore
@@ -14,8 +14,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-
-import TransferFollowTrigger.LubTask
 
 /** Trigger that submits transfers to make contracts "follow" another contract, e.g.,
   * splitwell BalanceUpdates follow the corresponding Group contracts.

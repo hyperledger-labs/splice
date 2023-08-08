@@ -12,36 +12,23 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.auth.{
-  AdminAuthExtractor,
-  AuthConfig,
-  AuthExtractor,
-  HMACVerifier,
-  RSAVerifier,
-}
+import com.daml.network.auth.*
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
-import com.daml.network.environment.{
-  CNLedgerClient,
-  CNLedgerConnection,
-  CNNode,
-  CNNodeStatus,
-  ParticipantAdminConnection,
-  TrafficBalanceService,
-}
+import com.daml.network.environment.*
 import com.daml.network.http.v0.appManager.AppManagerResource
 import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
 import com.daml.network.http.v0.validatorPublic.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
-import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.setup.ParticipantInitializer
-import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{CoinConfigSchedule, HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.{
@@ -56,6 +43,7 @@ import com.daml.network.validator.config.{
   ValidatorAppBackendConfig,
   ValidatorOnboardingConfig,
 }
+import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.validator.store.{
   AppManagerStore,
   ParticipantIdentitiesStore,
@@ -95,6 +83,7 @@ class ValidatorApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     futureSupervisor: FutureSupervisor,
+    metrics: ValidatorAppMetrics,
 )(implicit
     ac: ActorSystem,
     esf: ExecutionSequencerFactory,
@@ -107,6 +96,7 @@ class ValidatorApp(
       loggerFactory,
       tracerProvider,
       futureSupervisor,
+      metrics,
     )
     with BasicDirectives {
 

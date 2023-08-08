@@ -32,9 +32,11 @@ trait CNNodeEnvironment extends Environment {
   override type Config = CNNodeConfig
   override type Console = CNNodeConsoleEnvironment
 
-  // TODO(tech-debt): check that the CNNodeMetrics factory is used in all of this trait's methods.
   val cnNodeMetrics =
-    CNNodeMetricsFactory.forConfig(config.monitoring.metrics, testingConfig.metricsFactoryType)
+    CNNodeMetricsFactory.forConfig(
+      configuredOpenTelemetry.openTelemetry.getMeterProvider,
+      testingConfig.metricsFactoryType,
+    )
 
   protected def createValidator(
       name: String,
