@@ -61,7 +61,7 @@ initCollective initialOpenRounds isDevNet = do
         leaderInactiveTimeout = seconds 70
         domainNodeConfigLimits = defaultDomainNodeConfigLimits
         maxTextLength = 1024
-        initialTrafficGrant = 100_000
+        initialTrafficGrant = 1_000_000
         globalDomain = initialGlobalDomainConfig
   let coinConfig = defaultCoinConfig
 
@@ -71,6 +71,7 @@ initCollective initialOpenRounds isDevNet = do
       svc
       founderParty = sv1
       founderName = "sv1"
+      founderParticipantId = "sv1-participant-id"
       founderDomainNodes = Map.fromList
         -- NOTE: the Canton domain and CometBft keys and config need to be allocated before bootstrapping the SvcRules
         -- as we need a working domain to create and exercise Daml contracts.
@@ -107,6 +108,7 @@ initCollective initialOpenRounds isDevNet = do
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
       newMemberParty = svParty
       newMemberName = svName
+      newMemberParticipantId = svName <> "-participant-id"
       joinedAsOfRound = earliestOpenRound.round
       domainId = coinConfig.globalDomain.activeDomain
 

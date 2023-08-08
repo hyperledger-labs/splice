@@ -128,7 +128,8 @@ testRequiredNumOfConfirmationInDevNet = do
     [(svcRulesCid, _)] <- query @SvcRules svc
     let svName = "sv" <> show i
     phamtonSv <- allocateParty $ svName
-    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember phamtonSv svName (Round 3) domainId
+    submit svc $ exerciseCmd svcRulesCid $
+      SvcRules_AddMember phamtonSv svName (svName <> "-participant-id") (Round 3) domainId
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
@@ -142,6 +143,7 @@ testRequiredNumOfConfirmationInDevNet = do
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
           newMemberParty = svX
           newMemberName = "svX"
+          newMemberParticipantId = "svX-participant-id"
           joinedAsOfRound = (Round 3)
           domainId
   confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
@@ -185,6 +187,7 @@ testConfirmationExpiry = do
       svcAction = SRARC_AddMember $ SvcRules_AddMember with
         newMemberParty = svX
         newMemberName = "svX"
+        newMemberParticipantId = "svX-participant-id"
         joinedAsOfRound = (Round 3)
         domainId
 
@@ -218,7 +221,7 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
   svX <- allocateParty "svX"
   coinConfig <- getCoinConfig app
   let domainId = coinConfig.globalDomain.activeDomain
-  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" (Round 3) domainId)
+  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId)
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   (round, _) <- getLatestOpenRound app
@@ -231,7 +234,7 @@ testActivityLockingOnSvcRulesCoinRulesChoices = do
 
   [(svcRulesCid, _)] <- query @SvcRules svc
   svX <- allocateParty "svX"
-  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" (Round 3) domainId)
+  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId)
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   (round, _) <- getLatestOpenRound app

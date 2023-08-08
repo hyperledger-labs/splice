@@ -306,6 +306,7 @@ class JoiningNodeInitializer(
                       openMiningRounds.middle.contractId,
                       openMiningRounds.newest.contractId,
                       coinRules.contractId,
+                      participantId.toProtoPrimitive,
                     )
                     svcStoreWithIngestion.connection.submitCommandsNoDedup(
                       Seq(svcStore.key.svParty),

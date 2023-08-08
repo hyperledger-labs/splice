@@ -6,7 +6,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import scala.jdk.CollectionConverters.*
 
@@ -24,7 +24,7 @@ trait SvTestUtil extends CNNodeTestCommon {
   def addPhantomSv()(implicit env: CNNodeTestConsoleEnvironment) = {
     // random value for test
     val svXParty = allocateRandomSvParty("svX")
-    addSvMember(svXParty, "svX, the phantom of the SVC")
+    addSvMember(svXParty, "svX, the phantom of the SVC", sv1Backend.participantClient.id)
   }
 
   def median(values: Seq[BigDecimal]): Option[BigDecimal] = {
@@ -44,6 +44,7 @@ trait SvTestUtil extends CNNodeTestCommon {
   def addSvMember(
       svParty: PartyId,
       svName: String,
+      svParticipantId: ParticipantId,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val nextMiningRound = clue("Getting next open round") {
       val (openRounds, _) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
@@ -62,6 +63,7 @@ trait SvTestUtil extends CNNodeTestCommon {
           .exerciseSvcRules_AddMember(
             svParty.toProtoPrimitive,
             svName,
+            svParticipantId.toProtoPrimitive,
             nextMiningRound,
             coinConfig.globalDomain.activeDomain,
           )

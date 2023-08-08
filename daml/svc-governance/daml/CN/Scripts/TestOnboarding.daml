@@ -19,7 +19,7 @@ import CN.SvOnboarding
 import CC.Scripts.Util
 import CC.Scripts.Parameters
 import CN.Scripts.SvcTestUtils
-import CC.GlobalDomain (ValidatorTraffic, initialValidatorTraffic)
+import CC.GlobalDomain (ValidatorTraffic, initialValidatorTraffic, MemberTraffic, initialMemberTraffic)
 import CC.Coin (CoinRules, Coin)
 import CC.Round
 import CC.Schedule
@@ -57,9 +57,12 @@ testInitialTrafficGrant = do
   -- check that the initial traffic contract with the initial grant amount is created for each SV
   let domainId = coinConfig.globalDomain.activeDomain
   let initialTrafficGrant = svcRules.config.initialTrafficGrant
-  forA_ [sv1, sv2, sv3, sv4] $ \sv -> do
+  forA_ (zip [sv1, sv2, sv3, sv4] ["sv1", "sv2", "sv3", "sv4"]) $ \(sv, svName) -> do
     [(_, initialTraffic)] <- queryFilter @ValidatorTraffic svc (\r -> r.validator == sv)
     initialTraffic === initialValidatorTraffic svc sv domainId initialTrafficGrant
+    let svParticipantId = svName <> "-participant-id"
+    [(_, initialParticipantTraffic)] <- queryFilter @MemberTraffic svc (\r -> r.memberId == svParticipantId)
+    initialParticipantTraffic === initialMemberTraffic svc svParticipantId domainId initialTrafficGrant
     pure ()
 
 testSvOnboarding : Script ()
@@ -127,6 +130,7 @@ testSvOnboarding = do
     middleRoundCid
     latestRoundCid = earliestRoundCid
     coinRulesCid
+    svParticipantId = "svX-participant-id"
   submitMultiMustFail [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
     sv = svX
     svOnboardingConfirmedCid
@@ -134,6 +138,7 @@ testSvOnboarding = do
     middleRoundCid = earliestRoundCid
     latestRoundCid = earliestRoundCid
     coinRulesCid
+    svParticipantId = "svX-participant-id"
 
   -- svX completes its own onboarding by adding itself to the SvcRules
   submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
@@ -143,6 +148,7 @@ testSvOnboarding = do
     middleRoundCid
     latestRoundCid
     coinRulesCid
+    svParticipantId = "svX-participant-id"
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   case Map.lookup svX svcRules.members of
@@ -238,7 +244,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
   let domainId = coinConfig.globalDomain.activeDomain
 
   -- create a SvOnboardingConfirmed contract
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX" (Round 3) domainId
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX" "svX-participant-id" (Round 3) domainId
 
   -- leader can archive the onboarding as svX is added as member
   leaderSubmits app $ \cid -> exerciseCmd cid $
@@ -293,7 +299,7 @@ testSvNameUniquenessNotInDevNet = do
   let domainId = coinConfig.globalDomain.activeDomain
 
   svX <- allocateParty "svX"
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" (Round 3) domainId
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId
 
 
 testSvMemberOverwriteInDevNet : Script ()
@@ -310,10 +316,10 @@ testSvMemberOverwriteInDevNet = do
   let domainId = coinConfig.globalDomain.activeDomain
 
   -- Failing the template precondition check if the existing member being overwritten is the current leader.
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" (Round 3) domainId
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" "sv1-participant-id" (Round 3) domainId
 
   -- overwriting existing member successfuly
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" (Round 3) domainId
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId
 
   pure ()
 

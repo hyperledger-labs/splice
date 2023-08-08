@@ -127,6 +127,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
               new svcr.SvcRules_AddMember(
                 "alice",
                 "Alice",
+                "alice-participant-id",
                 new round.Round(42),
                 previousGlobalId.toProtoPrimitive,
               )

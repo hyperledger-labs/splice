@@ -464,6 +464,7 @@ class FoundingNodeInitializer(
                         svcParty.toProtoPrimitive,
                         svParty.toProtoPrimitive,
                         foundingConfig.name,
+                        participantId.toProtoPrimitive,
                         founderDomainNodes,
                         defaultCoinConfig(
                           foundingConfig.initialTickDuration,
@@ -483,11 +484,7 @@ class FoundingNodeInitializer(
                           .asJava,
                         defaultEnabledChoices,
                         foundingConfig.isDevNet,
-                      ).createAnd
-                        .exerciseSvcBootstrap_Bootstrap()
-                        .commands
-                        .asScala
-                        .toSeq,
+                      ).createAnd.exerciseSvcBootstrap_Bootstrap.commands.asScala.toSeq,
                       commandId = CNLedgerConnection
                         .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
                       deduplicationOffset = offset,

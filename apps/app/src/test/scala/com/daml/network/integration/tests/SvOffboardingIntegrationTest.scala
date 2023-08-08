@@ -18,7 +18,7 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
       "Add 1 phantom SVs to SVC", {
         val sv5Name = "sv5"
         val sv5PartyId = allocateRandomSvParty(sv5Name)
-        addSvMember(sv5PartyId, sv5Name)
+        addSvMember(sv5PartyId, sv5Name, sv1Backend.participantClient.id)
         sv5PartyId.toProtoPrimitive
       },
     )(

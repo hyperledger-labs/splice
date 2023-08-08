@@ -475,6 +475,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
               .exerciseSvcRules_AddMember(
                 fakeSv4Party.toProtoPrimitive,
                 "Canton-Foundation-4",
+                sv1Backend.participantClient.id.toProtoPrimitive,
                 new Round(3),
                 coinConfig.globalDomain.activeDomain,
               ),
@@ -531,7 +532,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         for { i <- 1 to 3 } {
           val name = s"phantom sv$i"
           val partyId = allocateRandomSvParty(name)
-          addSvMember(partyId, name)
+          addSvMember(partyId, name, sv1Backend.participantClient.id)
         }
       },
     )(
