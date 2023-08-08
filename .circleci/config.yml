@@ -426,6 +426,14 @@ commands:
         description: Number of seconds to wait between retries
         type: integer
         default: 5
+      cmd_retry_condition:
+        description: Condition for retrying the command (up to the maximum number of retries)
+        type: string
+        default: "true"
+      cmd_before_retry:
+        description: Extra command to run before retrying the command
+        type: string
+        default: ""
       timeout:
         type: string
         default: "25m"
@@ -459,12 +467,17 @@ commands:
       additional_nix_args:
         type: string
         default: ""
+      cluster:
+        type: enum
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "devnet", "testnet", "testnet-preview", "none", "observability"]
+        default: "none"
     steps:
       - run_bash_command_in_nix:
           cmd_name: Executing "sbt << parameters.cmd >>"
           no_output_timeout: << parameters.no_output_timeout >>
           when: << parameters.when >>
           additional_nix_args: --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS << parameters.additional_nix_args >>
+          cluster: << parameters.cluster >>
           cmd: |
             on_exit() {
               local CODE="$?"
@@ -522,6 +535,8 @@ commands:
             << parameters.post_sbt_cmd >>
           cmd_retry_count: << parameters.cmd_retry_count >>
           cmd_retry_wait: << parameters.cmd_retry_wait >>
+          cmd_retry_condition: << parameters.cmd_retry_condition >>
+          cmd_before_retry: << parameters.cmd_before_retry >>
 
   collect_failing_test_data_and_send_to_datadog:
     steps:
@@ -572,6 +587,14 @@ commands:
         description: Number of seconds to wait between retries
         type: integer
         default: 5
+      cmd_retry_condition:
+        description: Condition for retrying the command (up to the maximum number of retries)
+        type: string
+        default: "true"
+      cmd_before_retry:
+        description: Extra command to run before retrying the command
+        type: string
+        default: ""
       gce_authenticate:
         type: boolean
         default: false
@@ -676,8 +699,13 @@ commands:
                     bash $CMD_FILE
                   }
                   cmd_wrapper && break
+                  if [ << parameters.cmd_retry_condition >> != true ]; then
+                    echo "Retry condition not met, not retrying" >&2
+                    exit 1
+                  fi
                   n=$[$n+1]
                   sleep << parameters.cmd_retry_wait >>
+                  << parameters.cmd_before_retry >>
               done
 
               if [ $n -gt $MAX_RETRY ]; then
@@ -869,6 +897,31 @@ commands:
               n=$((n+1))
               sleep 10
             done
+
+            sudo tee /etc/strongswan.d/logging.conf \<<'EOF'
+            charon-cmd {
+                 filelog {
+                     charon {
+                           path = /var/log/vpn.log
+                           time_format = %b %e %T
+                           ike_name = yes
+                           flush_line = yes
+                           append = yes
+                           default = 1
+                     }
+                    # Uncomment to log also to stderr (but that pollutes also the test step in case we retry there after a VPN failure)
+                    #  stderr {
+                    #        ike = 2
+                    #  }
+                 }
+            }
+      - run:
+          name: Copy vpn-related scripts
+          command: |
+            # We're copying the vpn scripts out of the repo so that we can use them also later,
+            # after we checkout an older commit for preflight checks. For vpn scripts, always
+            # using the latest version seems the most sensible anyway.
+            cp -r .circleci/vpn-scripts /tmp
       - run:
           name: Dump public IP
           command: curl checkip.amazonaws.com
@@ -881,24 +934,8 @@ commands:
           # because the interactive password prompt reads directly from
           # /dev/tty rather than stdin, and simple IO piping doesn't work
           command: |
-            cat \<<EOF >route
-            #!/usr/bin/expect -f
-            set timeout -1
-
-            set VPN_HOST_NAME [lindex \$argv 0]
-            set VPN_USER [lindex \$argv 1]
-            set VPN_PASSWORD [lindex \$argv 2]
-
-            spawn echo \$VPN_USER \$VPN_PASSWORD
-            spawn sudo charon-cmd --host \$VPN_HOST_NAME --identity \$VPN_USER --eap-identity \$VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
-            expect "EAP password: "
-
-            send "\$VPN_PASSWORD\r"
-            expect eof
-            EOF
-
-            chmod +x route
-            ./route $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
+            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
+            /usr/bin/sudo chmod a+w /var/log/vpn.log
       - run:
           name: Define local hostname
           command: |
@@ -910,27 +947,8 @@ commands:
       - run:
           name: Verify VPN connection
           command: |
-            set +e
+            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
 
-            echo "Checking IP"
-
-            count=0
-            success=42
-            while [ ${count} -lt 60 ]; do
-              if [ "$(curl checkip.amazonaws.com)" == "$VPN_HOST_IP" ]; then
-                echo "Check IP passed"
-                success=0
-                break
-              else
-                echo "Current IP is not desired VPN server IP. Retry count $count"
-                (( count++ ))
-                sleep 1
-              fi
-            done
-
-            # We want to activate the VPN only for our k8s admin API
-            # and for the k8s egress. Therefore, we drop the default route.
-            sudo ip route del default table 220
   # This is separate from setup_vpn since we need to interleave the step that sets up
   # nix for this to work
   setup_vpn_routes:
@@ -949,22 +967,8 @@ commands:
           # Separate command since running this outside of nix is easier.
           name: Setup VPN Routes - Adding new routes
           command: |
-            set -eoux pipefail
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
-            # Virtual IP setup by charon-cmd, we assume this is only ip4 interface without a broadcast address.
-            echo "Dumping full ip config for debugging"
-            sudo ip addr
-            echo "Querying for VPN IP"
-            VPN_IP=$(sudo ip --json addr show dev ens5 | tee /dev/stderr | jq -r '.[0].addr_info | .[] | select(.family == "inet" and (has("broadcast") | not)) | .local')
-            [[ -z "$VPN_IP" ]] && { echo "Cannot find VPN_IP, please check VPN connectivity" ; exit 1; }
-            echo "Querying for network gateway"
-            GATEWAY=$(sudo ip --json route list | tee /dev/stderr | jq -r '.[]|select(.gateway)|.gateway')
-            echo "Querying for egress IP"
-            EGRESS_IP=$(getent hosts $GCP_CLUSTER_BASENAME.network.canton.global | tee /dev/stderr | awk '{ print $1 }')
-            sudo ip route add $EGRESS_IP via $GATEWAY table 220 src $VPN_IP
-            KUBE_IP=$(sed -E -n 's|^.*server: https://(.*)$|\1|p' .kubecfg)
-            echo "Setting VPN IP"
-            sudo ip route add $KUBE_IP via $GATEWAY table 220 src $VPN_IP
+            /tmp/vpn-scripts/setup-vpn-routes.sh
 
   checkout_cluster_version:
     parameters:
@@ -1553,9 +1557,6 @@ jobs:
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
-            # needed for SV bootstrapping preflight check
-            # TODO(#3560) remove the `|| true` once all clusters have this script
-            scripts/start-postgres-for-preflight.sh || true
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
 
             # TODO(#7115) remove the usage check once all clusters have the updated script
@@ -1567,10 +1568,35 @@ jobs:
             fi
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh
-          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS"
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
           extra_parameters: -DAUTH0_TENANT=dev
           timeout: "15m"
+          cmd_retry_count: 3
+          # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
+          # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cluster: << parameters.cluster >>
+          cmd_before_retry: |
+            echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
+
+            ./stop-frontends.sh
+
+            /tmp/vpn-scripts/stop-vpn.sh
+
+            echo "Starting VPN..." | tee -a /var/log/vpn.log
+            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD &
+
+            echo "Waiting for VPN to reconnect"
+            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
+
+            echo "Authenticating to cluster again"
+            export KUBECONFIG=$PWD/.kubecfg
+            cncluster activate
+
+            echo "Setting VPN routes again"
+            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            /tmp/vpn-scripts/setup-vpn-routes.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job
@@ -1578,6 +1604,10 @@ jobs:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
       - collect_test_timings_and_send_to_datadog
+      - store_artifacts:
+          name: Upload vpn log
+          path: /var/log/vpn.log
+
 
   preflight_sv_check:
     parameters:
@@ -1649,10 +1679,35 @@ jobs:
             --keep ARTIFACTORY_USER \
             --keep ARTIFACTORY_PASSWORD \
             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID \
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
+            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cluster: << parameters.cluster >>
           cmd: |
             cncluster preflight_sv
+          cmd_retry_count: 3
+          # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
+          # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_before_retry: |
+            echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
+
+            ./stop-frontends.sh
+
+            /tmp/vpn-scripts/stop-vpn.sh
+
+            echo "Starting VPN..." | tee -a /var/log/vpn.log
+            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD &
+
+            echo "Waiting for VPN to reconnect"
+            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
+
+            echo "Authenticating to cluster again"
+            export KUBECONFIG=$PWD/.kubecfg
+            cncluster activate
+
+            echo "Setting VPN routes again"
+            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            /tmp/vpn-scripts/setup-vpn-routes.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job

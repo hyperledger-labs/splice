@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+
+set timeout -1
+
+set VPN_HOST_NAME [lindex $argv 0]
+set VPN_USER [lindex $argv 1]
+set VPN_PASSWORD [lindex $argv 2]
+
+spawn echo $VPN_USER $VPN_PASSWORD
+spawn /usr/bin/sudo charon-cmd --host $VPN_HOST_NAME --identity $VPN_USER --eap-identity $VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
+expect "EAP password: "
+
+send "$VPN_PASSWORD\r"
+expect eof
