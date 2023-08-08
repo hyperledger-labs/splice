@@ -105,8 +105,8 @@ object SvUtil {
   def defaultSvcRulesConfig(): SvcRulesConfig = new SvcRulesConfig(
     10, // numUnclaimedRewardsThreshold
     new RelTime(TimeUnit.MINUTES.toMicros(5)), // actionConfirmationTimeout
-    new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingTimeout
-    new RelTime(TimeUnit.HOURS.toMicros(24)), // svOnboardingConfirmedTimeout
+    new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingRequestTimeout
+    new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingConfirmedTimeout
     new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout
     new RelTime(TimeUnit.SECONDS.toMicros(70)), // leaderInactiveTimeout
     defaultDomainNodeConfigLimits,
