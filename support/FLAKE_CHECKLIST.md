@@ -168,7 +168,10 @@ B. finding a solution or at least workaround for the issue.
 In order to use their time effectively, create an GitHub issue for your problem and make sure it
 (or a comment on it) contains:
 
-- [ ] All logs that are potentially relevant to analyzing the problem (e.g., as a zip file).
+- [ ] All logs that are potentially relevant to analyzing the problem, as lnav-readable files (or one big zip file).
+      Upload the logs themselves, not just links to our CI runs or gcloud logs.
+      The Canton team doesn't have access to our gcloud and they don't have the necessary context to download the right logs from our CI runs.
+      You can use `cncluster gcloud_logs --download-only` to obtain lnav-readable logs from gcloud.
 - [ ] A *concise* summary of your analysis and your best hypotheses about what the root cause might be.
 - [ ] The context in which the error happened; e.g.:
   - Which nodes (participants, sequencer nodes, mediator nodes) are involved?
