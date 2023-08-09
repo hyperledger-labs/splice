@@ -716,12 +716,19 @@ commands:
             EOF
 
   cleanup_sbt_test_job:
+    parameters:
+      upload_caches:
+        type: boolean
+        default: true
     steps:
       - upload_test_reports
-      - save_sbt_cache
-      - save_compiled_classes
-      - save_frontend_node_modules
-      - save_daml_artifacts
+      - when:
+          condition: << parameters.upload_caches >>
+          steps:
+            - save_sbt_cache
+            - save_compiled_classes
+            - save_frontend_node_modules
+            - save_daml_artifacts
       - run:
           name: Convert time stamps in browser logs
           when: always
@@ -1529,6 +1536,9 @@ jobs:
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
+      - run:
+          # TODO(#7167): remove this once all clusters are beyond commit 3a7d28d
+          touch "canton/dars.lock"
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
@@ -1600,7 +1610,8 @@ jobs:
             /tmp/vpn-scripts/setup-vpn-routes.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - cleanup_sbt_test_job
+      - cleanup_sbt_test_job:
+          upload_caches: false
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
@@ -1658,6 +1669,9 @@ jobs:
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
+      - run:
+          # TODO(#7167): remove this once all clusters are beyond commit 3a7d28d
+          touch "canton/dars.lock"
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
@@ -1711,7 +1725,8 @@ jobs:
             /tmp/vpn-scripts/setup-vpn-routes.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - cleanup_sbt_test_job
+      - cleanup_sbt_test_job:
+          upload_caches: false
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>

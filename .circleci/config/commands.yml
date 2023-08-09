@@ -656,12 +656,19 @@ commands:
             EOF
 
   cleanup_sbt_test_job:
+    parameters:
+      upload_caches:
+        type: boolean
+        default: true
     steps:
       - upload_test_reports
-      - save_sbt_cache
-      - save_compiled_classes
-      - save_frontend_node_modules
-      - save_daml_artifacts
+      - when:
+          condition: << parameters.upload_caches >>
+          steps:
+            - save_sbt_cache
+            - save_compiled_classes
+            - save_frontend_node_modules
+            - save_daml_artifacts
       - run:
           name: Convert time stamps in browser logs
           when: always
