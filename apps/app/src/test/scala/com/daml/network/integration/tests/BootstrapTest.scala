@@ -13,7 +13,7 @@ import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-class DFBootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
+class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
