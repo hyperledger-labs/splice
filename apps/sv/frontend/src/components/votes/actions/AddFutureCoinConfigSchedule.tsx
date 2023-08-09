@@ -15,10 +15,6 @@ const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
-function getMinimalEffectiveDateTime(voteRequestTimeout: string) {
-  return dayjs().add(Math.trunc(parseInt(voteRequestTimeout) / 1000), 'milliseconds');
-}
-
 const AddFutureCoinConfigSchedule: React.FC<{
   chooseAction: (action: ActionRequiringConfirmation) => void;
 }> = ({ chooseAction }) => {
@@ -38,14 +34,7 @@ const AddFutureCoinConfigSchedule: React.FC<{
     return <p>no VoteRequest contractId is specified</p>;
   }
 
-  const minimalEffectiveDateTime = getMinimalEffectiveDateTime(
-    svcInfosQuery.data?.svcRules.payload.config.voteRequestTimeout.microseconds
-  );
-
   async function addFutureCoinConfigScheduleAction(config: Record<string, JSONValue>) {
-    if (dayjs(date).isBefore(getMinimalEffectiveDateTime(minimalEffectiveDateTime))) {
-      return;
-    }
     const newItem: Tuple2<string, CoinConfig<'USD'>> = {
       _1: dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]'),
       _2: CoinConfig(USD).decoder.runWithException(config),
@@ -61,14 +50,6 @@ const AddFutureCoinConfigSchedule: React.FC<{
     });
   }
 
-  function setNewDate(newValue: Dayjs | null) {
-    if (newValue !== null) {
-      newValue.isBefore(minimalEffectiveDateTime)
-        ? setDate(minimalEffectiveDateTime.add(1, 'minutes'))
-        : setDate(newValue);
-    }
-  }
-
   return (
     <Stack direction="column" mb={4} spacing={1}>
       <Typography variant="h6">Configuration</Typography>
@@ -76,9 +57,9 @@ const AddFutureCoinConfigSchedule: React.FC<{
         <DesktopDateTimePicker
           label={`Enter time in local timezone (${getUTCWithOffset()})`}
           value={date}
-          minDateTime={minimalEffectiveDateTime}
+          minDateTime={dayjs()}
           readOnly={false}
-          onChange={(newValue: Dayjs | null) => setNewDate(newValue)}
+          onChange={(newValue: Dayjs | null) => setDate(newValue)}
           slotProps={{
             textField: {
               id: 'datetime-picker-coin-configuration',

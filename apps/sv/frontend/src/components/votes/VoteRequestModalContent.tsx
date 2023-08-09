@@ -36,11 +36,13 @@ import ActionView from './actions/views/ActionView';
 interface VoteRequestModalProps {
   voteRequestContractId?: ContractId<VoteRequest>;
   handleClose: () => void;
+  staled: boolean;
 }
 
 const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
   voteRequestContractId,
   handleClose,
+  staled,
 }) => {
   const voteRequestQuery = useVoteRequest(voteRequestContractId);
 
@@ -185,8 +187,14 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
           </TableContainer>
         </Stack>
         <Stack>
-          {voteRequestContractId && (
+          {voteRequestContractId && !staled && (
             <VoteForm vote={curSvVote} voteRequestCid={voteRequestContractId} />
+          )}
+          {staled && (
+            <Stack>
+              <Typography variant="h5">Status</Typography>
+              <p>Rejected due to a time conflict with another schedule.</p>
+            </Stack>
           )}
         </Stack>
         <Stack direction="column" mb={4} spacing={1}>

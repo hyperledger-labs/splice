@@ -28,7 +28,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.setup.SvcPartyHosting
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
+import com.daml.network.sv.util.SvUtil.{generateRandomOnboardingSecret, requiredNumVotes}
 import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract}
@@ -299,6 +299,7 @@ class HttpSvHandler(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         svcPartyId = svcParty.toProtoPrimitive,
+        votingThreshold = requiredNumVotes(svcRules),
         latestMiningRound = latestOpenMiningRound.toJson,
         coinRules = coinRules.toJson,
         svcRules = svcRules.contract.toJson,

@@ -1,5 +1,10 @@
-import { CopyableTypography, DateDisplay, Loading, SvClientProvider } from 'common-frontend';
-import { Contract } from 'common-frontend';
+import {
+  Contract,
+  CopyableTypography,
+  DateDisplay,
+  Loading,
+  SvClientProvider,
+} from 'common-frontend';
 import React, { useMemo, useState } from 'react';
 
 import { ClickAwayListener } from '@mui/base';
@@ -44,26 +49,48 @@ const ListVoteRequests: React.FC = () => {
     ? listVoteRequestsQuery.data.map(v => v.contractId)
     : [];
   const votesQuery = useListVotes(voteRequestIds);
-
   const svcInfosQuery = useSvcInfos();
+
   const [voteRequestContractId, setVoteRequestContractId] = useState<
     ContractId<VoteRequest> | undefined
   >(undefined);
   const [isVoteRequestModalOpen, setVoteRequestModalOpen] = useState<boolean>(false);
+  const [staledVoteRequestModal, setStaledVoteRequestModal] = useState<boolean>(false);
 
-  const openModalWithVoteRequest = (voteRequestContractId: ContractId<VoteRequest>) => {
+  const openModalWithVoteRequest = (
+    voteRequestContractId: ContractId<VoteRequest>,
+    staled: boolean
+  ) => {
     setVoteRequestContractId(voteRequestContractId);
+    setStaledVoteRequestModal(staled);
     setVoteRequestModalOpen(true);
   };
 
   const handleClose = () => setVoteRequestModalOpen(false);
 
   const svPartyId = svcInfosQuery.data?.svPartyId;
+  const votingThreshold = svcInfosQuery.data?.votingThreshold;
+
   const alreadyVotedRequestIds = useMemo(() => {
     return svPartyId && votesQuery.data
       ? new Set(votesQuery.data.filter(v => v.voter === svPartyId).map(v => v.requestCid))
       : new Set();
   }, [votesQuery.data, svPartyId]);
+
+  const staledVotedRequestsIds = useMemo(() => {
+    if (!votesQuery.data || !votingThreshold) {
+      return [];
+    }
+    const groupedVotes = votesQuery.data.reduce((dic: { [key: string]: number }, vote) => {
+      if (vote.accept) {
+        dic[vote.requestCid] = (dic[vote.requestCid] || 0) + 1;
+      }
+      return dic;
+    }, {});
+    return Object.entries(groupedVotes)
+      .filter(([requestCid, totalVotes]) => totalVotes >= votingThreshold)
+      .map(([Cid, _]) => Cid);
+  }, [votesQuery.data, votingThreshold]);
 
   if (listVoteRequestsQuery.isLoading || svcInfosQuery.isLoading || votesQuery.isLoading) {
     return <Loading />;
@@ -85,8 +112,15 @@ const ListVoteRequests: React.FC = () => {
     }
   });
 
-  const voteRequestsNotVoted = voteRequests.filter(v => !alreadyVotedRequestIds.has(v.contractId));
-  const voteRequestsVoted = voteRequests.filter(v => alreadyVotedRequestIds.has(v.contractId));
+  const voteRequestsNotVoted = voteRequests.filter(
+    v => !alreadyVotedRequestIds.has(v.contractId) && !staledVotedRequestsIds.includes(v.contractId)
+  );
+  const voteRequestsVoted = voteRequests.filter(
+    v => alreadyVotedRequestIds.has(v.contractId) && !staledVotedRequestsIds.includes(v.contractId)
+  );
+  const voteRequestsStaled = voteRequests.filter(v =>
+    staledVotedRequestsIds.includes(v.contractId)
+  );
 
   function getAction(action: ActionRequiringConfirmation) {
     if (action.tag === 'ARC_SvcRules') {
@@ -121,7 +155,7 @@ const ListVoteRequests: React.FC = () => {
   return (
     <>
       <Typography mt={6} variant="h4">
-        Votes
+        Vote Requests
       </Typography>
       <Typography mt={6} variant="h5">
         Action Needed
@@ -132,6 +166,7 @@ const ListVoteRequests: React.FC = () => {
         svcRules={svcInfosQuery.data!.svcRules}
         openModalWithVoteRequest={openModalWithVoteRequest}
         tableBodyId={'sv-voting-action-needed-table-body'}
+        staled={false}
       />
       <Typography mt={6} variant="h5">
         In Progress
@@ -142,7 +177,23 @@ const ListVoteRequests: React.FC = () => {
         svcRules={svcInfosQuery.data!.svcRules}
         openModalWithVoteRequest={openModalWithVoteRequest}
         tableBodyId={'sv-voting-in-progress-table-body'}
+        staled={false}
       />
+      {voteRequestsStaled.length > 0 && (
+        <Stack>
+          <Typography mt={6} variant="h5">
+            Rejected due to coin configuration schedule conflict
+          </Typography>
+          <ListVoteRequestsTable
+            voteRequests={voteRequestsStaled}
+            getAction={getAction}
+            svcRules={svcInfosQuery.data!.svcRules}
+            openModalWithVoteRequest={openModalWithVoteRequest}
+            tableBodyId={'sv-voting-staled-table-body'}
+            staled
+          />
+        </Stack>
+      )}
       <Modal
         open={isVoteRequestModalOpen}
         onClose={handleClose}
@@ -164,6 +215,7 @@ const ListVoteRequests: React.FC = () => {
                 <VoteRequestModalContent
                   voteRequestContractId={voteRequestContractId}
                   handleClose={handleClose}
+                  staled={staledVoteRequestModal}
                 />
               </Card>
             </Container>
@@ -182,7 +234,8 @@ interface VoteRequestsRowProps {
   idx: number;
   description: string;
   url: string;
-  openModalWithVoteRequest: (contractId: ContractId<VoteRequest>) => void;
+  openModalWithVoteRequest: (contractId: ContractId<VoteRequest>, staled: boolean) => void;
+  staled: boolean;
 }
 
 const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
@@ -194,6 +247,7 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
   description,
   url,
   openModalWithVoteRequest,
+  staled,
 }) => {
   const [open, setOpen] = useState(-1);
   const votesQuery = useListVotes(contractId ? [contractId] : []);
@@ -241,7 +295,7 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
             size="small"
             variant="contained"
             color="primary"
-            onClick={() => openModalWithVoteRequest(contractId)}
+            onClick={() => openModalWithVoteRequest(contractId, staled)}
             className="vote-row-review-button"
           >
             Review
@@ -287,10 +341,14 @@ const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
 
 interface ListVoteRequestsTableProps {
   voteRequests: Contract<VoteRequest>[];
-  getAction: (action: ActionRequiringConfirmation) => string;
+  getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
   svcRules: Contract<SvcRules>;
-  openModalWithVoteRequest: (voteRequestContractId: ContractId<VoteRequest>) => void;
+  openModalWithVoteRequest: (
+    voteRequestContractId: ContractId<VoteRequest>,
+    staled: boolean
+  ) => void;
   tableBodyId: string;
+  staled: boolean;
 }
 
 const ListVoteRequestsTable: React.FC<ListVoteRequestsTableProps> = ({
@@ -299,6 +357,7 @@ const ListVoteRequestsTable: React.FC<ListVoteRequestsTableProps> = ({
   svcRules,
   openModalWithVoteRequest,
   tableBodyId,
+  staled,
 }) => {
   return (
     <TableContainer>
@@ -319,13 +378,14 @@ const ListVoteRequestsTable: React.FC<ListVoteRequestsTableProps> = ({
               <VoteRequestRow
                 key={request.contractId}
                 contractId={request.contractId}
-                action={getAction(request.payload.action)}
+                action={getAction(request.payload.action, staled)}
                 requester={svcRules.payload.members.get(request.payload.requester)?.name!}
                 expires={new Date(request.payload.expiresAt)}
                 idx={index}
                 description={request.payload.reason.body}
                 url={request.payload.reason.url}
                 openModalWithVoteRequest={openModalWithVoteRequest}
+                staled={staled}
               />
             );
           })}
