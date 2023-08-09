@@ -12,7 +12,7 @@ RUN mkdir /app
 WORKDIR /app
 
 # move tarball to a static name
-ADD target/canton .
+ADD target/canton.tar .
 
 COPY empty.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
 

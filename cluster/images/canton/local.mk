@@ -1,6 +1,6 @@
 dir := $(call current_dir)
 
-target-canton := $(dir)/target/canton
+target-canton := $(dir)/target/canton.tar
 target-logback := $(dir)/target/logback.xml
 
 include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
@@ -8,11 +8,13 @@ include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
 $(dir)/$(docker-build): $(dir)/empty.conf $(dir)/target/entrypoint.sh $(target-canton) $(target-logback)
 
 $(target-canton):
-	rm -rf $@
-	mkdir -p $@
-	cp -R $$(dirname $$(dirname $$(which canton)))/. $@
-	chmod -R +w $@
-	sed -i -E 's|#!.*/bin/sh|#!/usr/bin/env sh|' $@/bin/canton
+	rm -f $@ ;\
+	mkdir -p $(@D) ;\
+	DIR=$$(mktemp -d) ;\
+	cp -R $$(dirname $$(dirname $$(which canton)))/. $$DIR ;\
+	chmod -R +w $$DIR ;\
+	sed -i -E 's|#!.*/bin/sh|#!/usr/bin/env sh|' $$DIR/bin/canton ;\
+    tar cf $@ -C $$DIR .
 
 $(target-logback): ${REPO_ROOT}/scripts/canton-logback.xml
 	cp $< $@
