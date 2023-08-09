@@ -18,9 +18,6 @@ println("Uploading DAR files...")
 aliceValidator.participantClient.upload_dar_unless_exists(
   "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 )
-aliceValidator.participantClient.upload_dar_unless_exists(
-  "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
-)
 
 println("Onboarding users...")
 val bobValidator = aliceValidator

@@ -25,7 +25,7 @@ class WalletSubscriptionsFrontendIntegrationTest
 
     "show and cancel subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val alicePartyId = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
       val directoryParty = createDirectoryEntryForDirectoryItself
       createDirectoryEntry(alicePartyId, aliceDirectoryClient, aliceEntryName, aliceWalletClient)
@@ -94,7 +94,7 @@ class WalletSubscriptionsFrontendIntegrationTest
 
     "disable cancelling non-idle transactions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val alicePartyId = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(50) // she'll need this for MakePayment to happen (but not collection)
       clue("Create subscription, the payment on which won't be collected") {
         createSelfSubscription(
@@ -123,7 +123,7 @@ class WalletSubscriptionsFrontendIntegrationTest
 
     "allow accepting subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName1 = perTestCaseName("alice")
       createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName1, aliceWalletClient)
 

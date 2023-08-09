@@ -50,10 +50,7 @@ export async function installValidator1(
     validatorWalletUser,
     xns,
     participant,
-    appDars: [
-      'cn-node-0.1.0-SNAPSHOT/dars/directory-service-0.1.0.dar',
-      'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar',
-    ],
+    appDars: ['cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar'],
     validatorPartyHint: `${name}_validator_service_user`,
     extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     svSponsorAddress: 'http://sv-app.sv-1:5014',

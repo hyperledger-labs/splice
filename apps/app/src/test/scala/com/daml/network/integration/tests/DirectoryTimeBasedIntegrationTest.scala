@@ -23,8 +23,6 @@ class DirectoryTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  private val directoryDarPath =
-    "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
   private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://cns-dir-url.com"
   private val testEntryDescription = "Sample CNS Directory Entry Description"
@@ -37,10 +35,6 @@ class DirectoryTimeBasedIntegrationTest
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
-      .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
-        bobValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
-      })
 
   "Directory service" should {
 

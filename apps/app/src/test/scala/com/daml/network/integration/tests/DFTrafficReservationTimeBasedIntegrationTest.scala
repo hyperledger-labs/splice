@@ -28,8 +28,6 @@ class DFTrafficReservationTimeBasedIntegrationTest
     with TimeTestUtil
     with DomainFeesTestUtil {
 
-  private val directoryDarPath =
-    "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
   private val testEntryUrl = "https://cns-dir-url.com"
   private val testEntryDescription = "Sample CNS Directory Entry Description"
   private val rng = new Random(5)
@@ -85,9 +83,6 @@ class DFTrafficReservationTimeBasedIntegrationTest
         )(config)
       )
       .withMemberTrafficInsteadOfValidatorTraffic
-      .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
-      })
   }
 
   "traffic reservation" in { implicit env =>

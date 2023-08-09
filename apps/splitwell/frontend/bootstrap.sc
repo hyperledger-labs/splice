@@ -17,7 +17,6 @@ bobValidator.waitForInitialization()
 println("Uploading DAR files...")
 Seq(aliceValidator.participantClient, bobValidator.participantClient).foreach { p =>
   p.upload_dar_unless_exists("daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
-  p.upload_dar_unless_exists("daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 }
 
 println("Onboarding users...")
@@ -72,9 +71,9 @@ def ensureDirectoryEntry(
     }
   }
 }
-ensureDirectoryEntry(aliceUserParty, "alice.unverified.cns", "https://alice-url.cns.com", "",  aliceDirectory, aliceWallet)
-ensureDirectoryEntry(bobUserParty, "bob.unverified.cns", "https://bob-url.cns.com", "",  bobDirectory, bobWallet)
-ensureDirectoryEntry(charlieUserParty, "charlie.unverified.cns", "https://charlie-url.cns.com", "",  charlieDirectory, charlieWallet)
+ensureDirectoryEntry(aliceUserParty, "alice.unverified.cns", "https://alice-url.cns.com", "", aliceDirectory, aliceWallet)
+ensureDirectoryEntry(bobUserParty, "bob.unverified.cns", "https://bob-url.cns.com", "", bobDirectory, bobWallet)
+ensureDirectoryEntry(charlieUserParty, "charlie.unverified.cns", "https://charlie-url.cns.com", "", charlieDirectory, charlieWallet)
 
 println("Waiting for splitwell initialization...")
 providerSplitwellBackend.waitForInitialization()

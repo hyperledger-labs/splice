@@ -29,10 +29,10 @@ class WalletTransfersFrontendIntegrationTest
 
     "create a p2p transfer" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice")
 
-      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob")
 
       val cc = BigDecimal(10)
@@ -115,10 +115,10 @@ class WalletTransfersFrontendIntegrationTest
 
     "show a list of transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice")
 
-      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob")
       val bobDirectoryDisplay = expectedCns(bobUserParty, bobDirectoryName)
 
@@ -185,10 +185,10 @@ class WalletTransfersFrontendIntegrationTest
 
     "not show transfer offers I created" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice")
 
-      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob")
 
       val transferExpiry = CantonTimestamp.now().plusSeconds(100)
@@ -229,10 +229,10 @@ class WalletTransfersFrontendIntegrationTest
 
     "allow accepting transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice")
 
-      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob")
 
       val cc = BigDecimal(10)
@@ -286,10 +286,10 @@ class WalletTransfersFrontendIntegrationTest
 
     "allow rejecting transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice")
 
-      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob")
 
       val cc = BigDecimal(10)

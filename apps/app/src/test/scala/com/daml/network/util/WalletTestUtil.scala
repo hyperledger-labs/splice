@@ -405,17 +405,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
   }
 
-  private val directoryDarPath =
-    "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
-
-  protected def setupForTestWithDirectory(
-      walletClient: WalletAppClientReference,
-      validator: ValidatorAppBackendReference,
-  ) = {
-    validator.participantClient.upload_dar_unless_exists(directoryDarPath)
-    onboardWalletUser(walletClient, validator)
-  }
-
   protected def createDirectoryEntryForDirectoryItself(implicit
       env: CNNodeTestConsoleEnvironment
   ): String = {

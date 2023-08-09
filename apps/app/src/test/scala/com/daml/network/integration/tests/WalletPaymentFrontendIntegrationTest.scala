@@ -31,7 +31,7 @@ class WalletPaymentFrontendIntegrationTest
 
       "allow accepting payments in CC" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-        val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
@@ -112,7 +112,7 @@ class WalletPaymentFrontendIntegrationTest
 
       "allow accepting payments in USD" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-        val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
@@ -197,7 +197,7 @@ class WalletPaymentFrontendIntegrationTest
 
       "allow accepting payments in CC" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-        val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
@@ -281,7 +281,7 @@ class WalletPaymentFrontendIntegrationTest
 
       "allow accepting payments in USD" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-        val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,
@@ -365,7 +365,7 @@ class WalletPaymentFrontendIntegrationTest
 
       "allow accepting payments in both CC & USD" in { implicit env =>
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-        val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
           aliceUserParty,

@@ -33,8 +33,6 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
     with TimeTestUtil
     with DirectoryTestUtil {
 
-  private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
-
   private val packageSignatures = {
     // Note: the directory-service.dar suffices as it transitively references canton-coin.dar as well.
     ResourceTemplateDecoder.loadPackageSignaturesFromResource("dar/directory-service-0.1.0.dar")
@@ -49,10 +47,6 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
-      // upload directory dar
-      .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
-      })
 
   protected def createTestContracts()(implicit env: FixtureParam): (Set[String], Set[String]) = {
     clue("Advance by one round, so we can check that we properly restore open mining rounds") {

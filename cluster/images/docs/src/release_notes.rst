@@ -15,6 +15,8 @@ Release Notes
       identities and the other for DevNet-approved ones. The instructions for deploying the
       ``cn-sv-node`` Helm chart have been updated to use this separate values file.
 
+* The validator service now automatically uploads the directory service Daml DAR package to its participant. End-users and bootstrap scripts no longer need to upload the directory app models explicitly.
+
 2023-08-07
 ----------
 

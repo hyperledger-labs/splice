@@ -28,7 +28,6 @@ class SplitwellFrontendIntegrationTest
     with FrontendLoginUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
-  private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -39,10 +38,9 @@ class SplitwellFrontendIntegrationTest
           .simpleTopology(this.getClass.getSimpleName)
           .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
           .setup(env)
-        Seq(splitwellDarPath, directoryDarPath).foreach { path =>
-          aliceValidatorBackend.participantClient.upload_dar_unless_exists(path)
-          bobValidatorBackend.participantClient.upload_dar_unless_exists(path)
-        }
+
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
 
   "A splitwell UI" should {

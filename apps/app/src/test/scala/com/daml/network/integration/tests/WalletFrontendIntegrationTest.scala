@@ -193,7 +193,7 @@ class WalletFrontendIntegrationTest
       // Create directory entry for alice
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val entryName = perTestCaseName("alice")
-      val aliceParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       createDirectoryEntry(
         aliceParty,

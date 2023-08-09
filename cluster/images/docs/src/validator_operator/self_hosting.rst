@@ -186,11 +186,7 @@ Configuring the Directory UI
 
 The Canton Network includes a Canton Name Service (CNS), which maps party IDs to human-readable names, much like the DNS does for IP addresses.
 
-First - you will need to upload the directory's dar file to your validator's participant. Go to the terminal in which you are running the validator (the one using "validator.conf"), and type ::
-
-  validatorApp.participantClient.upload_dar_unless_exists("dars/directory-service-0.1.0.dar")
-
-Before you can use the Directory UI, you need to configure the URL of the directory backend similar to
+Before you can use the CNS web UI, you need to configure the URL of the directory backend similar to
 how you configured the Wallet UI earlier. For that,
 open ``web-uis/directory/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal|:
 
@@ -359,19 +355,13 @@ NETWORK_AUTH_VALIDATOR_USER_NAME      The subject identifier of your "Validator 
 
         NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator-secure.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
 
-10. Upload the directory DAR.
-
-  ::
-
-    validatorApp.participantClient.upload_dar_unless_exists("dars/directory-service-0.1.0.dar")
-
-11. If you have not already done so, while trying out the insecure
+10. If you have not already done so, while trying out the insecure
     setup.  Follow the steps for :ref:`configuring the wallet UI <configuring-wallet-ui>`
     and :ref:`configuring the directory UI <configuring-directory-ui>`. For the next steps, the occurences of
     ``TARGET_CLUSTER`` in the ``config.js`` files should have been
     replaced.
 
-12. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
+11. Modify the ``auth`` section in your wallet web UI configuration at ``web-uis/wallet/config.js`` with the following block, manually replacing variables with values described below:
 
   ::
 
@@ -389,7 +379,7 @@ NETWORK_AUTH_DOMAIN_URL               The "Domain" of your tenant (at the top of
 NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" application (at the top of the application's settings page)
 ====================================  =====
 
-13. Repeat step 12 for the directory UI configuration, at
+12. Repeat step 11 for the directory UI configuration, at
     ``web-uis/directory/config.js``.  The final section ``auth``
     section should look close to this but you need to replace the
     authority and client_id as explained for the wallet above.
@@ -404,8 +394,8 @@ NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" ap
       token_scope: "daml_ledger_api",
     },
 
-14. Start Nginx to host the static files as described in the :ref:`previous section on hosting the UIs <hosting-the-uis>`.
-15. Open the wallet UI at http://wallet.localhost:3000 and click the "Log in with OAuth2" button
+13. Start Nginx to host the static files as described in the :ref:`previous section on hosting the UIs <hosting-the-uis>`.
+14. Open the wallet UI at http://wallet.localhost:3000 and click the "Log in with OAuth2" button
 
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 

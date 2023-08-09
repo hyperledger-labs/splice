@@ -36,7 +36,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
     "show all types of transactions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
 
       waitForWalletUser(aliceValidatorWalletClient)
@@ -170,11 +170,11 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
     "paginate transactions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = setupForTestWithDirectory(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
       waitForWalletUser(aliceValidatorWalletClient)
 
-      val bobUserParty = setupForTestWithDirectory(bobWalletClient, bobValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobEntryName = perTestCaseName("bob")
       waitForWalletUser(bobValidatorWalletClient)
 

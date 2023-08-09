@@ -13,9 +13,6 @@ class DirectoryFrontendIntegrationTest
     with DirectoryFrontendTestUtil
     with FrontendLoginUtil {
 
-  private val directoryDarPath =
-    "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
-
   override def environmentDefinition =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
@@ -23,9 +20,6 @@ class DirectoryFrontendIntegrationTest
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
-      .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
-      })
 
   "A directory UI" should {
 
