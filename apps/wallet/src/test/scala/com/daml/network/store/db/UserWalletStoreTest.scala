@@ -50,8 +50,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           unwantedContract = walletInstall(user2)
           wantedContract = walletInstall(user1)
-          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwantedContract, createdEventSignatories = Seq(user2))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(wantedContract, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
         } yield {
           eventually() {
             store.getInstall().futureValue.contractId should be(
@@ -68,8 +72,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           allAcsStores = Seq(store1.multiDomainAcsStore, store2.multiDomainAcsStore)
           install1 = walletInstall(user1)
           install2 = walletInstall(user2)
-          _ <- dummyDomain.createMulti(install1)(allAcsStores)
-          _ <- dummyDomain.createMulti(install2)(allAcsStores)
+          _ <- dummyDomain.createMulti(install1, createdEventSignatories = Seq(user1))(allAcsStores)
+          _ <- dummyDomain.createMulti(install2, createdEventSignatories = Seq(user2))(allAcsStores)
         } yield {
           eventually() {
             store1.getInstall().futureValue.contractId should be(
@@ -91,8 +95,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           offer1 = transferOffer(user1, user2, 10.0, paymentCodegen.Currency.CC, time(1))
           offer3 = transferOffer(user1, user2, 20.0, paymentCodegen.Currency.USD, time(3))
-          _ <- dummyDomain.create(offer1)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(offer3)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(offer3, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
         } yield {
           def cidsAt(t: CantonTimestamp) = store
             .listExpiredTransferOffers(t, 10)(TraceContext.empty)
@@ -121,8 +129,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           offer1 = acceptedTransferOffer(user1, user2, 10.0, paymentCodegen.Currency.CC, time(1))
           offer3 = acceptedTransferOffer(user1, user2, 20.0, paymentCodegen.Currency.USD, time(3))
-          _ <- dummyDomain.create(offer1)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(offer3)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(offer3, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
         } yield {
           def cidsAt(t: CantonTimestamp) = store
             .listExpiredAcceptedTransferOffers(t, 10)(TraceContext.empty)
@@ -154,10 +166,18 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           (offer1, request1) = paymentExpiringAt(1)
           (offer3, request3) = paymentExpiringAt(3)
-          _ <- dummyDomain.create(offer1)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(request1)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(offer3)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(request3)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(request1, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(offer3, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(request3, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
         } yield {
           def cidsAt(t: CantonTimestamp) = store
             .listExpiredAppPaymentRequests(t, 10)(TraceContext.empty)
@@ -205,10 +225,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             paymentCodegen.Currency.CC,
             time(1),
           )
-          _ <- dummyDomain.createMulti(offer1)(allAcsStores)
-          _ <- dummyDomain.createMulti(request1)(allAcsStores)
-          _ <- dummyDomain.createMulti(offer2)(allAcsStores)
-          _ <- dummyDomain.createMulti(request2)(allAcsStores)
+          _ <- dummyDomain.createMulti(offer1, createdEventSignatories = Seq(user1))(allAcsStores)
+          _ <- dummyDomain.createMulti(request1, createdEventSignatories = Seq(user1))(allAcsStores)
+          _ <- dummyDomain.createMulti(offer2, createdEventSignatories = Seq(user2))(allAcsStores)
+          _ <- dummyDomain.createMulti(request2, createdEventSignatories = Seq(user2))(allAcsStores)
         } yield {
           def resultCids(r: AppPaymentRequest) =
             r.deliveryOffer.contractId.contractId -> r.appPaymentRequest.contractId.contractId
@@ -266,16 +286,28 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             paymentCodegen.Currency.CC,
             time(3),
           )
-          _ <- dummyDomain.create(offer1)(store1.multiDomainAcsStore)
-          _ <- dummyDomain.create(request1)(store1.multiDomainAcsStore)
+          _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(request1, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
           // Withdrawing or rejecting a request atomically archives both the offer and the request
-          _ <- dummyDomain.create(offer2)(store1.multiDomainAcsStore)
-          _ <- dummyDomain.create(request2)(store1.multiDomainAcsStore)
+          _ <- dummyDomain.create(offer2, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(request2, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
           _ <- dummyDomain.archive(offer2)(store1.multiDomainAcsStore)
           _ <- dummyDomain.archive(request2)(store1.multiDomainAcsStore)
           // Accepting a request archives the request, but not the offer
-          _ <- dummyDomain.create(offer3)(store1.multiDomainAcsStore)
-          _ <- dummyDomain.create(request3)(store1.multiDomainAcsStore)
+          _ <- dummyDomain.create(offer3, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(request3, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
           _ <- dummyDomain.archive(request3)(store1.multiDomainAcsStore)
         } yield {
           def resultCids(r: AppPaymentRequest) =
@@ -314,12 +346,24 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           (context2, subscription2, idleState2) = subscriptionDueAt(3, 1)
           (context1, subscription1, idleState1) = subscriptionDueAt(3, 2)
-          _ <- dummyDomain.create(context2)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(subscription2)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(idleState2)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(context1)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(subscription1)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(idleState1)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(context2, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(subscription2, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(idleState2, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(context1, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(subscription1, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(idleState1, createdEventSignatories = Seq(user1))(
+            store.multiDomainAcsStore
+          )
         } yield {
           def cidsAt(t: CantonTimestamp) = store
             .listSubscriptionStatesReadyForPayment(t, 10)(TraceContext.empty)
@@ -378,12 +422,16 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             lockedCoinCid,
             1L,
           )
-          _ <- dummyDomain.createMulti(context1)(allAcsStores)
-          _ <- dummyDomain.createMulti(subscription1)(allAcsStores)
-          _ <- dummyDomain.createMulti(state1)(allAcsStores)
-          _ <- dummyDomain.createMulti(context2)(allAcsStores)
-          _ <- dummyDomain.createMulti(subscription2)(allAcsStores)
-          _ <- dummyDomain.createMulti(state2)(allAcsStores)
+          _ <- dummyDomain.createMulti(context1, createdEventSignatories = Seq(user1))(allAcsStores)
+          _ <- dummyDomain.createMulti(subscription1, createdEventSignatories = Seq(user1))(
+            allAcsStores
+          )
+          _ <- dummyDomain.createMulti(state1, createdEventSignatories = Seq(user1))(allAcsStores)
+          _ <- dummyDomain.createMulti(context2, createdEventSignatories = Seq(user1))(allAcsStores)
+          _ <- dummyDomain.createMulti(subscription2, createdEventSignatories = Seq(user1))(
+            allAcsStores
+          )
+          _ <- dummyDomain.createMulti(state2, createdEventSignatories = Seq(user1))(allAcsStores)
         } yield {
           eventually() {
             val actual = resultCids(store1)
@@ -414,11 +462,17 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             lockedCoinCid,
             1,
           )
-          _ <- dummyDomain.create(context1)(store1.multiDomainAcsStore)
-          _ <- dummyDomain.create(subscription1)(store1.multiDomainAcsStore)
+          _ <- dummyDomain.create(context1, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(subscription1, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
           // After a payment has been made to extend a subscription, the old state is archived and a new one is created
           _ <- dummyDomain.archive(state1)(store1.multiDomainAcsStore)
-          _ <- dummyDomain.create(state2)(store1.multiDomainAcsStore)
+          _ <- dummyDomain.create(state2, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
         } yield {
           eventually() {
             val actual = resultCids(store1)
@@ -440,8 +494,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             payData,
             time(1),
           )
-          _ <- dummyDomain.create(context1)(store1.multiDomainAcsStore)
-          _ <- dummyDomain.create(subscription1)(store1.multiDomainAcsStore)
+          _ <- dummyDomain.create(context1, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(subscription1, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
           // If a subscription is expired because of a missed payment, all 3 contracts are archived
           _ <- dummyDomain.archive(state1)(store1.multiDomainAcsStore)
           _ <- dummyDomain.archive(subscription1)(store1.multiDomainAcsStore)
@@ -474,12 +532,16 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           context2 = subscriptionContext(user2, provider1)
           subscription2 = subscription(context2)
           request2 = subscriptionRequest(subscription2.payload, payData)
-          _ <- dummyDomain.createMulti(context1)(allAcsStores)
-          _ <- dummyDomain.createMulti(subscription1)(allAcsStores)
-          _ <- dummyDomain.createMulti(request1)(allAcsStores)
-          _ <- dummyDomain.createMulti(context2)(allAcsStores)
-          _ <- dummyDomain.createMulti(subscription2)(allAcsStores)
-          _ <- dummyDomain.createMulti(request2)(allAcsStores)
+          _ <- dummyDomain.createMulti(context1, createdEventSignatories = Seq(user1))(allAcsStores)
+          _ <- dummyDomain.createMulti(subscription1, createdEventSignatories = Seq(user1))(
+            allAcsStores
+          )
+          _ <- dummyDomain.createMulti(request1, createdEventSignatories = Seq(user1))(allAcsStores)
+          _ <- dummyDomain.createMulti(context2, createdEventSignatories = Seq(user2))(allAcsStores)
+          _ <- dummyDomain.createMulti(subscription2, createdEventSignatories = Seq(user2))(
+            allAcsStores
+          )
+          _ <- dummyDomain.createMulti(request2, createdEventSignatories = Seq(user2))(allAcsStores)
         } yield {
           def resultCids(r: SubscriptionRequest) =
             r.context.contractId.contractId -> r.subscription.contractId.contractId
@@ -1007,7 +1069,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         )
           .toValue(_.toValue),
       ),
-      Seq(toCreatedEvent(coinContract)),
+      Seq(toCreatedEvent(coinContract, Seq(receiver))),
     )
   }
 

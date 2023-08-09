@@ -100,7 +100,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
           incompleteIn,
           offset,
           txLogParser,
-          contractFilter.contains,
+          contractFilter,
         )
       ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
         logger.debug(
@@ -118,7 +118,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
       update match {
         case TransactionTreeUpdate(tree) =>
           updateState(
-            _.ingestTransaction(domain, tree, contractFilter.contains, txLogParser, logger)
+            _.ingestTransaction(domain, tree, contractFilter, txLogParser, logger)
           ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
             logger.debug(show"Ingested transaction $summary")
             offsetIngestionsToSignal.foreach(_.success(()))
@@ -637,16 +637,20 @@ object InMemoryMultiDomainAcsStore {
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
         acsOffset: String,
         txLogParser: TxLogStore.Parser[TXI, TXE],
-        p: CreatedEvent => Boolean,
+        contractFilter: MultiDomainAcsStore.ContractFilter,
     )(implicit
         tc: TraceContext
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
-      val (stAcs, summaryAcs) = ingestActiveContracts(evs, p)
+      val (stAcs, summaryAcs) = ingestActiveContracts(evs, contractFilter)
       val (stInFlightOut, summaryUnassign) =
-        stAcs.ingestIncompleteUnssigns(incompleteOut, summaryAcs, p)
+        stAcs.ingestIncompleteUnssigns(incompleteOut, summaryAcs, contractFilter.contains)
       val (stInFlightIn, summaryAssign) =
-        stInFlightOut.ingestIncompleteAssigns(incompleteIn, summaryUnassign, p)
+        stInFlightOut.ingestIncompleteAssigns(
+          incompleteIn,
+          summaryUnassign,
+          contractFilter.contains,
+        )
       val (stFinal, offsetsToRemove) = stInFlightIn.removeOffsetSignalsBefore(acsOffset)
       val parsedTxLogEntries = txLogParser.parseAcs(evs, incompleteOut, incompleteIn)
       (
@@ -674,7 +678,7 @@ object InMemoryMultiDomainAcsStore {
     def ingestTransaction(
         domain: DomainId,
         tx: TransactionTree,
-        p: CreatedEvent => Boolean,
+        contractFilter: MultiDomainAcsStore.ContractFilter,
         txLogParser: TxLogStore.Parser[TXI, TXE],
         logger: TracedLogger,
     )(implicit
@@ -685,7 +689,8 @@ object InMemoryMultiDomainAcsStore {
       val (stNew, summary) = Trees.foldTree(tx, (this, IngestionSummary.empty[TXE]))(
         onCreate = {
           case ((st, summary), ev, _) => {
-            if (p(ev)) {
+            if (contractFilter.contains(ev)) {
+              contractFilter.ensureStakeholderOf(ev)
               st.ingestCreatedEvent(
                 ev,
                 domain,
@@ -840,12 +845,13 @@ object InMemoryMultiDomainAcsStore {
 
     private def ingestActiveContracts(
         contracts: Seq[ActiveContract],
-        p: CreatedEvent => Boolean,
+        contractFilter: MultiDomainAcsStore.ContractFilter,
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
       contracts.foldLeft((this, IngestionSummary.empty[TXE])) { case ((st, summary), contract) =>
         val ev = contract.createdEvent
-        if (p(ev)) {
+        if (contractFilter.contains(ev)) {
+          contractFilter.ensureStakeholderOf(ev)
           st.ingestCreatedEvent(
             ev,
             contract.domainId,

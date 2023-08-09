@@ -414,7 +414,10 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         // TODO(#5643): batch inserts
         toInsert = acs
           .filter(contract => contractFilter.contains(contract.createdEvent))
-          .map(contract => contract.createdEvent.getContractId -> Insert(contract.createdEvent))
+          .map { contract =>
+            contractFilter.ensureStakeholderOf(contract.createdEvent)
+            contract.createdEvent.getContractId -> Insert(contract.createdEvent)
+          }
         workTodo = WorkTodo(
           None,
           offset,
@@ -483,6 +486,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             )(
               onCreate = (st, ev, _) => {
                 if (contractFilter.contains(ev)) {
+                  contractFilter.ensureStakeholderOf(ev)
                   st.copy(todo = st.todo + (ev.getContractId -> Insert(ev)))
                 } else {
                   st.copy(numFilteredCreatedEvents = st.numFilteredCreatedEvents + 1)

@@ -35,6 +35,7 @@ import java.time.Instant
 import scala.concurrent.Future
 
 abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
+  val provider = providerParty(0)
 
   "DirectoryStore" should {
 
@@ -45,8 +46,12 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore()
           unwantedContract = directoryInstall(1)
           wantedContract = directoryInstall(2)
-          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwantedContract, createdEventSignatories = Seq(provider))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(wantedContract, createdEventSignatories = Seq(provider))(
+            store.multiDomainAcsStore
+          )
         } yield {
           eventually() {
             store.lookupInstallByUserWithOffset(userParty(2)).futureValue.value should be(
@@ -72,8 +77,12 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore()
           unwantedContract = directoryEntry(1, "unwanted")
           wantedContract = directoryEntry(2, "wanted")
-          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwantedContract, createdEventSignatories = Seq(provider))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(wantedContract, createdEventSignatories = Seq(provider))(
+            store.multiDomainAcsStore
+          )
         } yield {
           eventually() {
             store.lookupEntryByNameWithOffset("wanted").futureValue.value should be(
@@ -107,8 +116,12 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
             }
           _ <- Future.traverse(data) { case (contextContract, idleContract) =>
             for {
-              _ <- dummyDomain.create(contextContract)(store.multiDomainAcsStore)
-              _ <- dummyDomain.create(idleContract)(store.multiDomainAcsStore)
+              _ <- dummyDomain.create(contextContract, createdEventSignatories = Seq(provider))(
+                store.multiDomainAcsStore
+              )
+              _ <- dummyDomain.create(idleContract, createdEventSignatories = Seq(provider))(
+                store.multiDomainAcsStore
+              )
             } yield ()
           }
         } yield {
@@ -136,9 +149,15 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
           unwantedContract = directoryEntry(1, "unwanted")
           bContract = directoryEntry(2, "b")
           aContract = directoryEntry(2, "a")
-          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(bContract)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwantedContract, createdEventSignatories = Seq(provider))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(bContract, createdEventSignatories = Seq(provider))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(aContract, createdEventSignatories = Seq(provider))(
+            store.multiDomainAcsStore
+          )
         } yield {
           eventually() {
             store.lookupEntryByParty(userParty(2)).futureValue should be(Some(aContract))
@@ -149,8 +168,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
     }
 
   }
-
-  val provider = providerParty(0)
 
   private def directoryInstall(n: Int) = {
     val templateId = DirectoryInstall.TEMPLATE_ID

@@ -96,7 +96,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
 
   protected def toCreatedEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T]
+      contract: Contract[TCid, T],
+      signatories: Seq[PartyId] = Seq.empty,
   ): CreatedEvent = {
     new CreatedEvent(
       eventId = "dummyEventId",
@@ -108,7 +109,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       createArgumentsBlob = contract.createArgumentsBlob,
       contractMetadata = contract.metadata,
       witnessParties = Seq.empty.asJava,
-      signatories = Seq.empty.asJava,
+      signatories = signatories.map(_.toProtoPrimitive).asJava,
       observers = Seq.empty.asJava,
       agreementText = None.toJava,
       contractKey = None.toJava,
@@ -138,7 +139,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contract: Contract[TCid, T],
       counter: Long,
   ): ActiveContract =
-    ActiveContract(domain, toCreatedEvent(contract), counter)
+    ActiveContract(domain, toCreatedEvent(contract, Seq(svcParty)), counter)
 
   protected def exercisedEvent[TCid <: ContractId[T], T](
       contractId: String,
@@ -236,7 +237,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       target,
       counter,
     ),
-    toCreatedEvent(contract),
+    toCreatedEvent(contract, Seq(svcParty)),
   )
 
   protected def toIncompleteAssign[TCid <: ContractId[T], T](
@@ -282,7 +283,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     submitter = userParty(1),
     source = source,
     target = target,
-    createdEvent = toCreatedEvent(contract),
+    createdEvent = toCreatedEvent(contract, Seq(svcParty)),
     counter = counter,
   )
 
@@ -300,7 +301,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       offset: String,
       createRequests: Seq[Contract[TCid, T]],
       effectiveAt: Instant,
-  ) = mkTx(offset, createRequests.map[TreeEvent](toCreatedEvent), effectiveAt)
+      createdEventSignatories: Seq[PartyId],
+  ) = mkTx(
+    offset,
+    createRequests.map[TreeEvent](toCreatedEvent(_, createdEventSignatories)),
+    effectiveAt,
+  )
 
   protected def acs[TCid <: ContractId[T], T](
       acs: Seq[(Contract[TCid, T], DomainId, Long)] = Seq.empty,
@@ -312,7 +318,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     _ <- store.ingestionSink.ingestAcs(
       acsOffset,
       acs.map { case (contract, domain, counter) =>
-        ActiveContract(domain, toCreatedEvent(contract), counter)
+        ActiveContract(domain, toCreatedEvent(contract, Seq(svcParty)), counter)
       },
       incompleteOut.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
         toIncompleteUnassign(
@@ -342,11 +348,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         c: Contract[TCid, T],
         offset: String = nextOffset,
         txEffectiveAt: Instant = defaultEffectiveAt,
+        createdEventSignatories: Seq[PartyId] = Seq(svcParty),
     )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
         txEffectiveAt,
+        createdEventSignatories,
       )
 
       store.ingestionSink
@@ -361,11 +369,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         c: Contract[TCid, T],
         offset: String = nextOffset,
         txEffectiveAt: Instant = defaultEffectiveAt,
+        createdEventSignatories: Seq[PartyId] = Seq(svcParty),
     )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
         txEffectiveAt,
+        createdEventSignatories,
       )
       val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests

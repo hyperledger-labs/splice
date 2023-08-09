@@ -270,6 +270,17 @@ object MultiDomainAcsStore {
     )(ev: CreatedEvent): Option[Contract[Id, View]]
 
     def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]]
+
+    def isStakeholderOf(ev: CreatedEvent): Boolean
+
+    def ensureStakeholderOf(ev: CreatedEvent): Unit = {
+      if (!isStakeholderOf(ev)) {
+        // We decided to crash the store when we see an CreatedEvent that store party is not a stakeholder of it. Discussion in #6527
+        throw new IllegalStateException(
+          s"Cannot ingest an CreatedEvent the the store party is not the stakeholder of the store party. Crashing... : $ev"
+        )
+      }
+    }
   }
 
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
@@ -320,6 +331,11 @@ object MultiDomainAcsStore {
         (_, decoder) <- templateFilters.get(ev.getTemplateId)
         contract <- decoder(ev)
       } yield contract
+
+    override def isStakeholderOf(ev: CreatedEvent): Boolean = {
+      val eventStakeholder = (ev.getSignatories.asScala ++ ev.getObservers.asScala).toSet
+      eventStakeholder.contains(primaryParty.toProtoPrimitive)
+    }
   }
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */

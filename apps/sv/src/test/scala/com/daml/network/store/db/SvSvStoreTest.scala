@@ -35,8 +35,14 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         val secondOffset = "0202"
         for {
           store <- mkStore()
-          _ <- dummyDomain.create(wanted, firstOffset)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(unwanted, secondOffset)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(wanted, firstOffset, createdEventSignatories = Seq(storeSvParty))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            unwanted,
+            secondOffset,
+            createdEventSignatories = Seq(storeSvParty),
+          )(store.multiDomainAcsStore)
         } yield {
           eventually() {
             store.lookupValidatorOnboardingBySecretWithOffset("good_secret").futureValue should be(
@@ -64,8 +70,14 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         val secondOffset = "0202"
         for {
           store <- mkStore()
-          _ <- dummyDomain.create(wanted, firstOffset)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(unwanted, secondOffset)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(wanted, firstOffset, createdEventSignatories = Seq(storeSvParty))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            unwanted,
+            secondOffset,
+            createdEventSignatories = Seq(storeSvParty),
+          )(store.multiDomainAcsStore)
         } yield {
           eventually() {
             store.lookupUsedSecretWithOffset("good_secret").futureValue should be(
@@ -86,8 +98,14 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         val secondOffset = "0202"
         for {
           store <- mkStore()
-          _ <- dummyDomain.create(wanted, firstOffset)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(unwanted, secondOffset)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(wanted, firstOffset, createdEventSignatories = Seq(storeSvParty))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            unwanted,
+            secondOffset,
+            createdEventSignatories = Seq(storeSvParty),
+          )(store.multiDomainAcsStore)
         } yield {
           eventually() {
             store.lookupApprovedSvIdentityByNameWithOffset("good_name").futureValue should be(

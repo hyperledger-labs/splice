@@ -211,6 +211,16 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertTestState()
       } yield succeed
     }
+    "throws if the store primary party is not a stakeholder of the created event" in {
+      implicit val store = mkStore()
+      recoverToSucceededIf[IllegalStateException] {
+        for {
+          _ <- acs()
+          _ <- assertList()
+          _ <- d1.create(c(1), createdEventSignatories = Seq(userParty(1)))
+        } yield succeed
+      }
+    }
     "ingestion can be restarted at any time" in {
       implicit val store = mkStore()
       for {
