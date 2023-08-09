@@ -18,7 +18,7 @@ import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAV
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
@@ -27,6 +27,7 @@ import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.SvSvcAutomationService
 import com.daml.network.sv.automation.SvSvAutomationService
@@ -100,14 +101,17 @@ class SvApp(
 
   override def packages = super.packages ++ Seq("dar/svc-governance-0.1.0.dar")
 
-  override def preInitializeBeforeLedgerConnection(): Future[Unit] =
-    ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+  override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
+    // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
+    _ <- tryEnsureVersionMatch(config.onboarding)
+    _ <- ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
       config.participantClient,
       config.participantBootstrappingDump,
       loggerFactory,
       retryProvider,
       clock,
     )
+  } yield ()
 
   override def initializeNode(ledgerClient: CNLedgerClient): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
@@ -439,6 +443,37 @@ class SvApp(
         )
       )
   }
+
+  private def tryEnsureVersionMatch(onboardingO: Option[SvOnboardingConfig]): Future[Unit] =
+    onboardingO match {
+      case Some(onboarding) =>
+        onboarding match {
+          case SvOnboardingConfig.JoinWithKey(_, svClient, _, _) =>
+            retryProvider.waitUntil(
+              "version checked via sponsor SV",
+              // we checkVersionCompatibility on every CN app connection
+              withSvConnection(svClient.adminApi)(_.checkActive()),
+              logger,
+            )
+          case _: SvOnboardingConfig.FoundCollective => {
+            logger.info("Skipping early version check because we are the founding SV.")
+            Future.unit
+          }
+        }
+      case None => {
+        // Given that the helm charts we ship to customers always set an
+        // onboaring config, the risk of ending up in this condition is slim.
+        logger.info("Skipping early version check because no onboarding sponsor is configured.")
+        Future.unit
+      }
+    }
+
+  private def withSvConnection[T](
+      svConfig: NetworkAppClientConfig
+  )(f: SvConnection => Future[T]): Future[T] =
+    SvConnection(svConfig, retryProvider, loggerFactory).flatMap(con =>
+      f(con).andThen(_ => con.close())
+    )
 
   private def waitUntilConfiguredOnboardingContractsHaveBeenCreated(
       store: SvSvStore

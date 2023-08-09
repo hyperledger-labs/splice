@@ -19,7 +19,6 @@ import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
@@ -160,9 +159,8 @@ abstract class HttpAppConnection(
       logger.debug(s"Found app version: ${versionInfo}")(TraceContext.empty)
       val myVersion = BuildInfo.compiledVersion
       if (versionInfo.version != myVersion) {
-        val myCommitTs = Instant.ofEpochSecond(BuildInfo.commitUnixTimestamp.toLong)
         val errorMsg = s"Version mismatch detected, please download the latest bundle. " +
-          s"Your executable is from $myCommitTs, while the cloud applications you are connecting to are from ${versionInfo.commitTs}"
+          s"Your executable is on $myVersion, while the application you are connecting to is on ${versionInfo.version}"
         if (config.failOnVersionMismatch)
           sys.error(errorMsg)
         else

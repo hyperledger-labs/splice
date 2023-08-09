@@ -25,7 +25,8 @@ import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
 import com.daml.network.http.v0.validatorPublic.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.scan.admin.api.client.{ScanConnection, MinimalScanConnection}
+import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
@@ -110,47 +111,45 @@ class ValidatorApp(
       config.foundingSvClient.adminApi
     )(svConnection => f(svConnection.withGlobalLock(_, _, _)))
 
-  override def preInitializeBeforeLedgerConnection(): Future[Unit] =
-    ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+  override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
+    // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
+    _ <- ensureVersionMatch(config.scanClient)
+    _ <- ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
       config.participantClient,
       config.participantBootstrappingDump,
       loggerFactory,
       retryProvider,
       clock,
     )
+  } yield ()
 
-  // Note that for the validator of an SV app, the user will be created by the SV app with a
-  // primary party set to the SV app already so this is a noop.
-  // For regular validators, this allocates a new user.
   override def preInitializeAfterLedgerConnection(connection: CNLedgerConnection) =
-    for {
-      // TODO(#5803) Consider removing this once Canton stops falling apart.
-      // Wait for the sponsoring SV which also ensures the domain is initialized.
-      _ <- config.onboarding.traverse_(waitUntilSponsorIsActive(_))
-      _ <- withGlobalLock[Unit, Unit](lock =>
-        lock(
-          "Domain connection and primary party allocation of validator",
-          false,
-          () =>
-            withParticipantAdminConnection { participantAdminConnection =>
-              for {
-                _ <- ensureGlobalDomainRegistered(participantAdminConnection)
-                _ <- ensureExtraDomainsRegistered(participantAdminConnection)
-                _ <- connection.ensureUserPrimaryPartyIsAllocated(
-                  config.ledgerApiUser,
-                  config.validatorPartyHint
-                    .getOrElse(
-                      CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                    ),
-                  participantAdminConnection,
-                  // We have an outer lock around both here so we don't need to lock here.
-                  noLock,
-                ) whenA config.allocateLedgerApiUserParty
-              } yield ()
-            },
-        )
+    // TODO(#5855) Remove the lock
+    withGlobalLock[Unit, Unit](lock =>
+      lock(
+        "Domain connection and primary party allocation of validator",
+        false,
+        () =>
+          withParticipantAdminConnection { participantAdminConnection =>
+            for {
+              _ <- ensureGlobalDomainRegistered(participantAdminConnection)
+              _ <- ensureExtraDomainsRegistered(participantAdminConnection)
+              // Note that for the validator of an SV app, the user will be created by the SV app with a
+              // primary party set to the SV app already so this is a noop.
+              _ <- connection.ensureUserPrimaryPartyIsAllocated(
+                config.ledgerApiUser,
+                config.validatorPartyHint
+                  .getOrElse(
+                    CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                  ),
+                participantAdminConnection,
+                // We have an outer lock around both here so we don't need to lock here.
+                noLock,
+              ) whenA config.allocateLedgerApiUserParty
+            } yield ()
+          },
       )
-    } yield ()
+    )
 
   private def setupWalletDars(
       participantAdminConnection: ParticipantAdminConnection
@@ -275,18 +274,26 @@ class ValidatorApp(
     )
   }
 
+  private def ensureVersionMatch(scanClient: ScanAppClientConfig): Future[Unit] =
+    retryProvider.waitUntil(
+      "version checked via scan",
+      // we checkVersionCompatibility on every CN app connection
+      withMinimalScanConnection(scanClient)(_.checkActive()),
+      logger,
+    )
+
+  private def withMinimalScanConnection[T](
+      config: ScanAppClientConfig
+  )(f: MinimalScanConnection => Future[T]): Future[T] =
+    MinimalScanConnection(config, retryProvider, loggerFactory).flatMap(con =>
+      f(con).andThen(_ => con.close())
+    )
+
   private def withSvConnection[T](
       svConfig: NetworkAppClientConfig
   )(f: SvConnection => Future[T]): Future[T] =
     SvConnection(svConfig, retryProvider, loggerFactory).flatMap(con =>
       f(con).andThen(_ => con.close())
-    )
-
-  private def waitUntilSponsorIsActive(onboarding: ValidatorOnboardingConfig): Future[Unit] =
-    retryProvider.waitUntil(
-      "Sponsor SV is active",
-      withSvConnection(onboarding.svClient.adminApi)(_.checkActive()),
-      logger,
     )
 
   private def requestOnboarding(

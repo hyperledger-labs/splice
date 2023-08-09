@@ -389,3 +389,37 @@ object ScanConnection {
   }
 
 }
+
+/** Connection to the admin API of CC Scan usable for version and availability checks
+  * before a ledger connection is available.
+  */
+// TODO(tech-debt) consider removing this if we stop doing early version checks
+class MinimalScanConnection(
+    config: ScanAppClientConfig,
+    retryProvider: RetryProvider,
+    loggerFactory: NamedLoggerFactory,
+)(implicit
+    ec: ExecutionContextExecutor,
+    tc: TraceContext,
+    mat: Materializer,
+    httpClient: HttpRequest => Future[HttpResponse],
+    templateDecoder: TemplateJsonDecoder,
+) extends HttpAppConnection(config.adminApi, retryProvider, loggerFactory) {
+  override def serviceName: String = "scan"
+}
+object MinimalScanConnection {
+  def apply(
+      config: ScanAppClientConfig,
+      retryProvider: RetryProvider,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      tc: TraceContext,
+      mat: Materializer,
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateDecoder: TemplateJsonDecoder,
+  ): Future[MinimalScanConnection] =
+    HttpAppConnection.checkVersionOrClose(
+      new MinimalScanConnection(config, retryProvider, loggerFactory)
+    )
+}

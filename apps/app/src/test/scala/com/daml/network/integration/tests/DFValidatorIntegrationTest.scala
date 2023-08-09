@@ -367,13 +367,4 @@ class DFValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
     }
 
   }
-
-  "stop an uninitialized validator" in { implicit env =>
-    // No svc initialized, so the validator will not succeed in initialization,
-    // but we terminate it before any initialization timeout.
-    aliceValidatorBackend.start()
-    aliceValidatorBackend.stop()
-    // If the validator's shutdown left a dirty state this will throw an ERROR.
-    initSvcWithSv1Only()
-  }
 }

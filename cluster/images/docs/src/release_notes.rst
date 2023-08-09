@@ -6,6 +6,8 @@ Release Notes
 2023-08-14
 ----------
 
+* SV and validator apps now fail earlier and with a more clear error message if the version of their node software mismatches the version on the cluster they are connecting to.
+
 * Documentation:
 
     * The list of approved SV members has been moved from the ``sv-values.yaml`` file into
