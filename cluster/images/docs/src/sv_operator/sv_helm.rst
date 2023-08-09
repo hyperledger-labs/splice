@@ -92,7 +92,7 @@ https://digitalasset.jfrog.io/ui/user_profile. Based on that, set the following 
 Name                   Value
 ---------------------- ------------------------------------------------------------------------------------------
 ARTIFACTORY_USER       Your Artifactory user name shown at the top right.
-ARTIFACTORY_PASSWORD   Your Artifactory API key. If you don't have one you can generate one on your profile page.
+ARTIFACTORY_PASSWORD   Your Artifactory Identity token. If you don't have one you can generate one on your profile page.
 ====================== ==========================================================================================
 
 Ensure that your local helm installation has access to the Digital Asset Helm chart repository:
@@ -354,7 +354,7 @@ To do that, you first must generate the keys that will identify the node.
 
 .. note::
   You need access to the canton `network docker repo <https://digitalasset.jfrog.io/ui/native/canton-network-docker>`_ to successfully generate the node identity.
-  You can access your username and get the API key for your Artifactory account through the UI, using the top right `Edit profile` option.
+  You can access your username and get the Identity token for your Artifactory account through the UI, using the top right `Edit profile` option.
 
   | This can be configured by running:
   | :code:`docker login -u <your_artifactory_user> -p <your_artifactory_api_key> digitalasset-canton-network-docker.jfog.io`

@@ -81,7 +81,7 @@ clusters.)
     extra-experimental-features = nix-command flakes
     ```
 4. Configure artifactory credentials
-   You can create an artifactory API key [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
+   You can generate an artifactory Identity Token [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    If you need permissions - please email help@digitalasset.com and ask for artifactory permissions.
    1. For Nix can download `canton`.
@@ -89,14 +89,14 @@ clusters.)
       ```
       machine digitalasset.jfrog.io
       login yourartifactoryusername
-      password yourartifactoryapikey
+      password yourartifactoryidentitytoken
       ```
    2. For access to the canton enterprise docker repo and for sbt to download internal dependencies
       To do so, the `ARTIFACTORY_USER` and `ARTIFACTORY_PASSWORD` must be configured.
       Best would be to add the to the `.envrc.private` file like so:
       ```
       export ARTIFACTORY_USER="yourartifactoryusername"
-      export ARTIFACTORY_PASSWORD="yourartifactoryapikey"
+      export ARTIFACTORY_PASSWORD="yourartifactoryidentitytoken"
       ```
 5. After switching to the CC repo you should see a line like
    ```
@@ -110,7 +110,7 @@ clusters.)
    ```
    1. Check that your access token is valid by running the following sample command:
       ```
-      curl -vvv -L -u<yourartifactoryusername>:<yourartifactoryapikey> "https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz" -o canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz
+      curl -vvv -L -u<yourartifactoryusername>:<yourartifactoryidentitytoken> "https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz" -o canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz
       ```
       If the download fails, check that your access token matches what is set in [Artifactory](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
       Also, check you have visability via the UI [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-enterprise).
