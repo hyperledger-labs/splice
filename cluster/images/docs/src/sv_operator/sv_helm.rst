@@ -549,7 +549,11 @@ particularly if all helm charts are deployed at the same time. The
 Configuring the Cluster Ingress
 -------------------------------
 
-The following routes should be configured in your cluster ingress controller:
+The following routes should be configured in your cluster ingress
+controller. Note that the path should be stripped and only the suffix
+under ``*`` should end up at the pod. So for example
+``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/foobar`` should get routed to
+``http://validator-app.sv:5003/foobar``.
 
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5003 of service ``validator-app`` in the ``sv`` namespace
