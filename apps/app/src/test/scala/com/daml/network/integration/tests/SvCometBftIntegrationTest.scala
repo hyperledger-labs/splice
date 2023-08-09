@@ -6,7 +6,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.CometBftNetworkPlugin
 import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
+  CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftHttpError
@@ -20,7 +20,7 @@ import monocle.macros.syntax.lens.*
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
+class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment with SvTestUtil {
 
   import ExecutionContext.Implicits.global
   registerPlugin(new CometBftNetworkPlugin("sv_cometbft_integration_test", NamedLoggerFactory.root))
@@ -44,40 +44,24 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
             .replace(true)
         }(config)
       )
-      .withManualStart
-
-  "report cometBft status and debug dump" in { implicit env =>
-    initSvc()
-    forAll(env.svs.local) { sv =>
-      eventually() {
-        sv.cometBftNodeStatus().catchingUp shouldBe false
-        sv.cometBftNodeDump().abciInfo.isObject shouldBe true
-      }
-    }
-  }
-
-  "sv1 starts as the genesis validator" in { implicit env =>
-    initSvcWithSv1Only()
-    withClue("Configured validator voting power is eventually reconciled") {
-      eventually() {
-        sendEmptyTransactionToIncreaseBlockHeight(sv1Backend)
-        sv1Backend.cometBftNodeStatus().votingPower.doubleValue should be(1d)
-      }
-    }
-  }
 
   "all nodes become validators" in { implicit env =>
-    initSvc()
     forAll(env.svs.local) { sv =>
       eventually(timeUntilSuccess = 2.minute) {
         withClue(s"CometBFT node for ${sv.name} becomes a validator") {
-          sendEmptyTransactionToIncreaseBlockHeight(sv)
-          val dump = sv.cometBftNodeDump()
-          logger.debug(s"Node dump for ${sv.name}: $dump")
-          sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
+          cometBFTnodeIsUpToDateValidator(sv)
         }
       }
     }
+  }
+
+  private def cometBFTnodeIsUpToDateValidator(sv: SvAppBackendReference) = {
+    // node is up to date
+    sv.cometBftNodeStatus().catchingUp shouldBe false
+    // validate dump
+    sv.cometBftNodeDump().abciInfo.isObject shouldBe true
+    sendEmptyTransactionToIncreaseBlockHeight(sv)
+    sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
   }
 
   // The changes to a validator is visible only in height H+1, and take effect in H+2,
@@ -85,10 +69,8 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
   private def sendEmptyTransactionToIncreaseBlockHeight(
       sv: SvAppBackendReference
   ): Unit = {
-    new CometBftHttpRpcClient(
-      CometBftConnectionConfig(sv.config.cometBftConfig.value.connectionUri),
-      NamedLoggerFactory.root,
-    ).sendAndWaitForCommit(Array.emptyByteArray)
+    cometbftClientForSvApp(sv)
+      .sendAndWaitForCommit(Array.emptyByteArray)
       .recover {
         case CometBftHttpError(_, error)
             if error.error.noSpaces.contains("tx already exists in cache") =>
@@ -98,4 +80,10 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTest with SvTestUtil {
       .futureValue
   }
 
+  private def cometbftClientForSvApp(sv: SvAppBackendReference) = {
+    new CometBftHttpRpcClient(
+      CometBftConnectionConfig(sv.config.cometBftConfig.value.connectionUri),
+      NamedLoggerFactory.root,
+    )
+  }
 }
