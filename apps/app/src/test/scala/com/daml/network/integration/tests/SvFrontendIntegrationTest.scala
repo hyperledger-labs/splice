@@ -872,6 +872,12 @@ class SvFrontendIntegrationTest
             val tb = tbody.value
             val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
             rows.size shouldBe previousVoteRequestsInProgress
+            sv1ScanBackend
+              .getCoinRules()
+              .contract
+              .payload
+              .configSchedule
+              .futureValues should not be empty
           }
 
           val (_, requestIdUpdate) = actAndCheck(
@@ -933,6 +939,12 @@ class SvFrontendIntegrationTest
             val tb = tbody.value
             val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
             rows.size shouldBe previousVoteRequestsInProgress
+            sv1ScanBackend
+              .getCoinRules()
+              .contract
+              .payload
+              .configSchedule
+              .futureValues should not be empty
           }
 
           val (_, requestIdRemove) = actAndCheck(
