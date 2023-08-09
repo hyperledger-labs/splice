@@ -280,10 +280,6 @@ commands:
               tar --use-compress-program=pigz -xf /tmp/npm_install/openapi-ts-client.tar.gz
             else
               echo "No npm install cache found. Skipping..."
-
-              # TODO(#6992): remove this once the cache on main is correct
-              echo "Removing artifacts from wrong partial cache"
-              rm -rf ./apps/node_modules
             fi
 
   save_daml_artifacts:
