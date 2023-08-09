@@ -6,6 +6,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cc.coin.*
+import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
@@ -25,9 +26,9 @@ import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
 import com.daml.network.sv.store.{ExpiredRewardCouponsBatch, SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{CNNodeUtil, Contract, ContractWithState, AssignedContract}
+import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -369,6 +370,19 @@ class InMemorySvSvcStore(
       )
     )
 
+  override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] = {
+    multiDomainAcsStore
+      .listContractsOnDomain(MemberTraffic.COMPANION, domainId)
+      .map(
+        _.filter(_.payload.memberId == memberId.toProtoPrimitive)
+          .map(_.payload.totalPurchased.toLong)
+          .sum
+      )
+  }
+
+  // TODO(#7146): Remove once we have completely switched over to MemberTraffic contracts
   override def listDuplicateValidatorTrafficContracts(
       validator: PartyId,
       domainId: DomainId,

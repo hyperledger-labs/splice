@@ -25,6 +25,7 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
+      .withMemberTrafficInsteadOfValidatorTraffic
   }
 
   "A wallet" should {
@@ -62,7 +63,7 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
 
       actAndCheck(
         "Purchase extra traffic for SV1", {
-          buyExtraTraffic(sv1ValidatorBackend, sv1WalletClient.list().coins, trafficAmount, now)
+          buyMemberTraffic(sv1ValidatorBackend, trafficAmount, now, sv1WalletClient.list().coins)
         },
       )(
         "Check that an extra traffic purchase is registered in SV1's tx history",
@@ -109,11 +110,11 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
 
       actAndCheck(
         "Purchase extra traffic for aliceValidator", {
-          buyExtraTraffic(
+          buyMemberTraffic(
             aliceValidatorBackend,
-            aliceValidatorWalletClient.list().coins,
             trafficAmount,
             now,
+            aliceValidatorWalletClient.list().coins,
           )
         },
       )(

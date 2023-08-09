@@ -19,12 +19,14 @@ class ScanFrontendTimeBasedIntegrationTest
     with DomainFeesTestUtil {
 
   val coinPrice = 2
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withCoinPrice(coinPrice)
+      .withMemberTrafficInsteadOfValidatorTraffic
 
   def compareLeaderboardTable(
       resultRowClassName: String,
@@ -234,22 +236,19 @@ class ScanFrontendTimeBasedIntegrationTest
           aliceValidatorWalletClient.tap(100.0)
           bobValidatorWalletClient.tap(100.0)
           val trafficAmount = 1_000_000L
-          buyExtraTraffic(
+          buyMemberTraffic(
             aliceValidatorBackend,
-            aliceValidatorWalletClient.list().coins,
             trafficAmount,
             env.environment.clock.now,
           )
           advanceRoundsByOneTick
-          buyExtraTraffic(
+          buyMemberTraffic(
             aliceValidatorBackend,
-            aliceValidatorWalletClient.list().coins,
             trafficAmount,
             env.environment.clock.now,
           )
-          buyExtraTraffic(
+          buyMemberTraffic(
             bobValidatorBackend,
-            bobValidatorWalletClient.list().coins,
             trafficAmount,
             env.environment.clock.now,
           )

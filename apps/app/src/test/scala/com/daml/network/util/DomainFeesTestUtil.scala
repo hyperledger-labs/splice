@@ -3,12 +3,20 @@ package com.daml.network.util
 import com.daml.ledger.javaapi
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.globaldomain.{
+  MemberTraffic,
   ValidatorTraffic,
   ValidatorTrafficCreationIntent,
 }
-import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyExtraTraffic
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_BuyExtraTraffic
+import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
+  CO_BuyExtraTraffic,
+  CO_BuyMemberTraffic,
+}
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
+  COO_BuyExtraTraffic,
+  COO_BuyMemberTraffic,
+}
 import com.daml.network.codegen.java.cn.wallet.install.{CoinOperation, WalletAppInstall}
+import com.daml.network.codegen.java.cn.wallet.topupstate.ValidatorTopUpState
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types as daTypes
 import com.daml.network.console.ValidatorAppBackendReference
@@ -20,8 +28,10 @@ import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.CoinPosition
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.SequencedEventTrafficState
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, Member}
 
+import java.time.Instant
+import java.util.Optional
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
@@ -46,6 +56,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       )
   }
 
+  // TODO(#7081): Remove this once we've switched over entirely to MemberTraffic contracts
   private def getOrCreateIntentOrTrafficCid(
       validatorApp: ValidatorAppBackendReference,
       ts: CantonTimestamp,
@@ -82,6 +93,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     }
   }
 
+  // TODO(#7081): Remove this once we've switched over entirely to MemberTraffic contracts
   def getValidatorTraffic(
       validatorApp: ValidatorAppBackendReference,
       domainId: DomainId,
@@ -92,7 +104,22 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     ).loneElement
   }
 
+  def getTotalPurchasedTraffic(
+      memberId: Member,
+      domainId: DomainId,
+  )(implicit env: CNNodeTestConsoleEnvironment): Long = {
+    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+      .filterJava(MemberTraffic.COMPANION)(
+        sv1Backend.getSvcInfo().svcParty,
+        co => co.data.domainId == domainId.toProtoPrimitive && co.data.memberId == memberId.toProtoPrimitive,
+      )
+      .map(_.data.totalPurchased.toLong)
+      .sum
+  }
+
   /** Buy extra traffic for a given validator with the provided coins.
+    *
+    * TODO(#7081): Remove this once we've switched over entirely to MemberTraffic contracts
     */
   def buyExtraTraffic(
       validatorApp: ValidatorAppBackendReference,
@@ -152,6 +179,109 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
         .asScala
         .toSeq
     ) { case Seq(coo: COO_BuyExtraTraffic) =>
+      coo.contractIdValue
+    }
+  }
+
+  private def getOrCreateTopupStateCid(
+      validatorApp: ValidatorAppBackendReference,
+      memberId: Member,
+      domainId: DomainId,
+  ): ValidatorTopUpState.ContractId = {
+    inside(listValidatorContracts(ValidatorTopUpState.COMPANION)(validatorApp)) {
+      case Seq(topupState) => topupState.id
+      case Seq() =>
+        val validatorParty = validatorApp.getValidatorPartyId()
+        val topupStateCreationCmd = ValidatorTopUpState.create(
+          validatorParty.toProtoPrimitive,
+          memberId.toProtoPrimitive,
+          domainId.toProtoPrimitive,
+          Instant.ofEpochSecond(0),
+        )
+        val topupStateCid =
+          validatorApp.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              userId = validatorApp.config.ledgerApiUser,
+              actAs = Seq(validatorParty),
+              readAs = Seq(validatorParty),
+              update = topupStateCreationCmd,
+              domainId = Some(domainId),
+            )
+            .contractId
+        new ValidatorTopUpState.ContractId(topupStateCid.contractId)
+    }
+  }
+
+  /** Perform a self top-up with the provided coins.
+    *
+    * A self top-up is one where a (super-)validator purchases traffic for its own participant.
+    * On DevNet, we auto-tap coins for extra traffic purchases, so inputCoins can be omitted for DevNet clusters.
+    */
+  def buyMemberTraffic(
+      validatorApp: ValidatorAppBackendReference,
+      trafficAmount: Long,
+      ts: CantonTimestamp,
+      inputCoins: Seq[CoinPosition] = Seq(),
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val memberId = validatorApp.participantClient.id
+    val validatorParty = validatorApp.getValidatorPartyId()
+    val buyerParty = validatorParty // for the case of a self top-up
+    val domainId =
+      DomainId.tryFromString(sv1ScanBackend.getCoinConfigAsOf(ts).globalDomain.activeDomain)
+    val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
+    val topupStateCid = getOrCreateTopupStateCid(validatorApp, memberId, domainId)
+    val walletInstall = inside(
+      validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(WalletAppInstall.COMPANION)(
+          validatorParty,
+          c => c.data.validatorParty == c.data.endUserParty,
+        )
+    ) { case Seq(install) => install }
+    val executeBatchCmd = walletInstall.id.exerciseWalletAppInstall_ExecuteBatch(
+      new v1.coin.PaymentTransferContext(
+        transferContext.coinRules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+        new v1.coin.TransferContext(
+          transferContext.latestOpenMiningRound.contract.contractId
+            .toInterface(v1.round.OpenMiningRound.INTERFACE),
+          Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
+          Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
+          None.toJava,
+        ),
+      ),
+      inputCoins
+        .map(_.contract.contractId.contractId)
+        .map[v1.coin.TransferInput](cid =>
+          new v1.coin.transferinput.InputCoin(new v1.coin.Coin.ContractId(cid))
+        )
+        .asJava,
+      List[CoinOperation](
+        new CO_BuyMemberTraffic(
+          trafficAmount,
+          memberId.toProtoPrimitive,
+          domainId.toProtoPrimitive,
+          buyerParty.toProtoPrimitive,
+          new RelTime(1),
+          Optional.of(topupStateCid),
+        )
+      ).asJava,
+    )
+    inside(
+      validatorApp.participantClientWithAdminToken.ledger_api_extensions.commands
+        .submitWithResult(
+          validatorApp.config.ledgerApiUser,
+          Seq(validatorParty),
+          Seq(validatorParty),
+          executeBatchCmd,
+          disclosedContracts = DisclosedContracts(
+            transferContext.coinRules,
+            transferContext.latestOpenMiningRound,
+          ).toLedgerApiDisclosedContracts,
+        )
+        .exerciseResult
+        .outcomes
+        .asScala
+        .toSeq
+    ) { case Seq(coo: COO_BuyMemberTraffic) =>
       coo.contractIdValue
     }
   }

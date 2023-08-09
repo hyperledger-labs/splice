@@ -84,6 +84,7 @@ class DFTrafficReservationTimeBasedIntegrationTest
             .replace(NonNegativeFiniteDuration.ofSeconds(0))
         )(config)
       )
+      .withMemberTrafficInsteadOfValidatorTraffic
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(directoryDarPath)
       })
@@ -103,12 +104,9 @@ class DFTrafficReservationTimeBasedIntegrationTest
       )(
         "The top-up was completed",
         _ => {
-          val traffic = getValidatorTraffic(aliceValidatorBackend, domainId)
-          traffic.data.validator shouldBe aliceValidatorBackend
-            .getValidatorPartyId()
-            .toProtoPrimitive
-          traffic.data.domainId shouldBe domainId.toProtoPrimitive
-          traffic.data.totalPurchased shouldBe topupAmount
+          val traffic =
+            getTotalPurchasedTraffic(aliceValidatorBackend.participantClient.id, domainId)
+          traffic shouldBe topupAmount
 
           ensureTopupIsVisible(aliceValidatorBackend.participantClientWithAdminToken)
           val trafficState = getTrafficState(aliceValidatorBackend, domainId)
@@ -173,12 +171,9 @@ class DFTrafficReservationTimeBasedIntegrationTest
       )(
         "Top-ups still succeeds",
         _ => {
-          val traffic = getValidatorTraffic(aliceValidatorBackend, domainId)
-          traffic.data.validator shouldBe aliceValidatorBackend
-            .getValidatorPartyId()
-            .toProtoPrimitive
-          traffic.data.domainId shouldBe domainId.toProtoPrimitive
-          traffic.data.totalPurchased shouldBe (2 * topupAmount)
+          val traffic =
+            getTotalPurchasedTraffic(aliceValidatorBackend.participantClient.id, domainId)
+          traffic shouldBe (2 * topupAmount)
 
           ensureTopupIsVisible(aliceValidatorBackend.participantClientWithAdminToken)
           val trafficState = getTrafficState(aliceValidatorBackend, domainId)

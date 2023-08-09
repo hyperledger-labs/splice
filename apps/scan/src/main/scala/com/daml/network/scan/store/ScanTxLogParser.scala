@@ -49,6 +49,8 @@ class ScanTxLogParser(
             State.empty
           case CoinRules_BuyExtraTraffic(node) =>
             State.fromBuyExtraTraffic(tree, exercised, domainId, node)
+          case CoinRules_BuyMemberTraffic(node) =>
+            State.fromBuyMemberTraffic(tree, exercised, domainId, node)
           case CoinExpire(node) =>
             State.fromCoinExpireSummary(tree, exercised, domainId, node.result.value)
           case LockedCoinExpireCoin(node) =>
@@ -480,6 +482,7 @@ object ScanTxLogParser {
       )
     }
 
+    // TODO(#7801): Remove once we've switched over to MemberTraffic contracts
     def fromBuyExtraTraffic(
         tx: TransactionTree,
         event: ExercisedEvent,
@@ -488,13 +491,13 @@ object ScanTxLogParser {
     )(implicit lc: ErrorLoggingContext): State = {
 
       // second child event is the transfer of CC from validator to SVC to buy extra traffic
-      val reassignmentEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      val transferNode = (reassignmentEvent match {
+      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      val transferNode = (transferEvent match {
         case e: ExercisedEvent => Transfer.unapply(e)
         case _ => None
       }).getOrElse(
         throw new RuntimeException(
-          s"Unable to parse event ${reassignmentEvent.getEventId} as Transfer"
+          s"Unable to parse event ${transferEvent.getEventId} as Transfer"
         )
       )
       val validatorParty = Codec
@@ -526,7 +529,62 @@ object ScanTxLogParser {
         .appended(
           State.fromTransfer(
             tx,
-            reassignmentEvent,
+            transferEvent,
+            domainId,
+            transferNode,
+            Some(event.getEventId()),
+          )
+        )
+
+    }
+
+    def fromBuyMemberTraffic(
+        tx: TransactionTree,
+        event: ExercisedEvent,
+        domainId: DomainId,
+        node: ExerciseNode[CoinRules_BuyMemberTraffic.Arg, CoinRules_BuyMemberTraffic.Res],
+    )(implicit lc: ErrorLoggingContext): State = {
+
+      // second child event is the transfer of CC from validator to SVC to buy extra traffic
+      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      val transferNode = (transferEvent match {
+        case e: ExercisedEvent => Transfer.unapply(e)
+        case _ => None
+      }).getOrElse(
+        throw new RuntimeException(
+          s"Unable to parse event ${transferEvent.getEventId} as Transfer"
+        )
+      )
+      val validatorParty = Codec
+        .decode(Codec.Party)(transferNode.argument.value.transfer.sender)
+        .getOrElse(
+          throw Status.INTERNAL
+            .withDescription(
+              s"Cannot decode party ID ${transferNode.argument.value.transfer.sender}"
+            )
+            .asRuntimeException()
+        )
+      val round = transferNode.result.value.round
+      val trafficPurchased = node.argument.value.trafficAmount
+      val ccSpent = transferNode.argument.value.transfer.outputs.get(0).amount
+      val buyExtraTrafficEntry = TxLogEntry.EmptyTxLogEntry(
+        indexRecord = TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
+          offset = tx.getOffset(),
+          eventId = event.getEventId(),
+          domainId = domainId,
+          round = round.number,
+          validator = validatorParty,
+          trafficPurchased = trafficPurchased,
+          ccSpent = ccSpent,
+        )
+      )
+
+      State(immutable.Queue(buyExtraTrafficEntry))
+        // append the entries for rewards
+        .appended(
+          State.fromTransfer(
+            tx,
+            transferEvent,
             domainId,
             transferNode,
             Some(event.getEventId()),

@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.cc.globaldomain.{
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.topupstate.ValidatorTopUpState
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
@@ -106,6 +107,18 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
         defaultDomainId,
         intent => intent.payload.domainId == domainId.toProtoPrimitive,
       )
+    )
+
+  def lookupValidatorTopUpStateWithOffset(
+      domainId: DomainId
+  ): Future[
+    QueryResult[
+      Option[Contract[ValidatorTopUpState.ContractId, ValidatorTopUpState]]
+    ]
+  ] =
+    multiDomainAcsStore.findContractOnDomainWithOffset(ValidatorTopUpState.COMPANION)(
+      domainId,
+      intent => intent.payload.domainId == domainId.toProtoPrimitive,
     )
 
   def listUsers()(implicit tc: TraceContext): Future[Seq[String]] = {
@@ -282,6 +295,7 @@ object ValidatorStore {
             co.payload.svc == svc
         ),
         mkFilter(ValidatorTrafficCreationIntent.COMPANION)(co => co.payload.validator == validator),
+        mkFilter(ValidatorTopUpState.COMPANION)(co => co.payload.validator == validator),
         mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == validator

@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinimport
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.{ValidatorTraffic, MemberTraffic}
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
@@ -169,6 +169,7 @@ object LockedCoinExpireCoin extends ExerciseNodeCompanion {
   override def resToValue(res: Res) = res.toValue
 }
 
+// TODO(#7081): Remove once we've switched over completely to MemberTraffic contracts
 object CoinRules_BuyExtraTraffic extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.CoinRules
   override type Arg = coinCodegen.CoinRules_BuyExtraTraffic
@@ -182,6 +183,30 @@ object CoinRules_BuyExtraTraffic extends ExerciseNodeCompanion {
 
   override val resDecoder = Tuple2.valueDecoder(
     cid => new ValidatorTraffic.ContractId(cid.asContractId().get().getValue),
+    PrimitiveValueDecoders.fromOptional(cid =>
+      new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    ),
+  )
+
+  override def resToValue(res: Res): Value = res.toValue(
+    trafficCid => trafficCid.toValue,
+    optionalCoin => DamlOptional.of(optionalCoin.map(_.toValue): Optional[Value]),
+  )
+}
+
+object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {
+  override type Tpl = coinCodegen.CoinRules
+  override type Arg = coinCodegen.CoinRules_BuyMemberTraffic
+  override type Res =
+    Tuple2[MemberTraffic.ContractId, Optional[v1.coin.Coin.ContractId]]
+  override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_BuyMemberTraffic
+  override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
+  override val argDecoder = coinCodegen.CoinRules_BuyMemberTraffic.valueDecoder()
+
+  override def argToValue(arg: Arg): Value = arg.toValue
+
+  override val resDecoder = Tuple2.valueDecoder(
+    cid => new MemberTraffic.ContractId(cid.asContractId().get().getValue),
     PrimitiveValueDecoders.fromOptional(cid =>
       new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
     ),

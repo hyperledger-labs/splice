@@ -235,7 +235,14 @@ class TreasuryService(
 
         case _: coinoperation.CO_Tap => Future.unit
 
+        // TODO(#7081): Remove this once we've switched over to MemberTraffic contracts
         case _: coinoperation.CO_BuyExtraTraffic => Future.unit
+
+        // TODO(tech-debt): Ideally, we should modify the BuyMemberTraffic choice to also return
+        //  the ValidatorTopUpState contract Id in the COOutcome and ingest these into the store
+        //  in order to do the staleness check here. BuyMemberTraffic txs are always placed into
+        //  their own batch so a failure of this tx should not impact other coin txs.
+        case _: coinoperation.CO_BuyMemberTraffic => Future.unit
 
         case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
       }

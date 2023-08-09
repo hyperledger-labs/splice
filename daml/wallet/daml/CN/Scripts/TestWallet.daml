@@ -648,9 +648,8 @@ testBuyMemberTraffic = script do
   Some traffic2 <- queryContractId @MemberTraffic app.svc trafficCid2
 
   -- check the app reward coupons once more
-  [(coupon1Cid_, coupon1_), (coupon2Cid, coupon2)] <- query @AppRewardCoupon app.svc
-  coupon1Cid_ === coupon1Cid
-  coupon1_ === coupon1
+  [(coupon2Cid, coupon2), (coupon1Cid_, coupon1_)] <- query @AppRewardCoupon app.svc
+  (coupon1Cid_, coupon1_) === (coupon1Cid, coupon1_)
   coupon2Cid =/= coupon1Cid
   coupon2.provider === app.svc
   coupon2.round === openRound.round

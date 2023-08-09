@@ -42,18 +42,32 @@ class ValidatorAutomationService(
 
   registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
   registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
-  registerTrigger(
-    new TopupValidatorTrafficBalanceTrigger(
-      triggerContext,
-      store,
-      connection,
-      participantAdminConnection,
-      buyExtraTrafficConfig,
-      clock,
-      walletManager,
-      scanConnection,
+  if (automationConfig.useMemberTrafficInsteadOfValidatorTraffic)
+    registerTrigger(
+      new TopupMemberTrafficTrigger(
+        triggerContext,
+        store,
+        connection,
+        participantAdminConnection,
+        buyExtraTrafficConfig,
+        clock,
+        walletManager,
+        scanConnection,
+      )
     )
-  )
+  else
+    registerTrigger(
+      new TopupValidatorTrafficBalanceTrigger(
+        triggerContext,
+        store,
+        connection,
+        participantAdminConnection,
+        buyExtraTrafficConfig,
+        clock,
+        walletManager,
+        scanConnection,
+      )
+    )
   backupDumpConfig.foreach(config =>
     registerTrigger(
       new PeriodicParticipantIdentitiesBackupTrigger(

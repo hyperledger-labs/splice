@@ -81,14 +81,24 @@ class SvSvcAutomationService(
   }
 
   globalLockO.foreach(lock =>
-    registerTrigger(
-      new ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
-        triggerContext,
-        svcStore,
-        participantAdminConnection,
-        lock,
+    if (config.automation.useMemberTrafficInsteadOfValidatorTraffic)
+      registerTrigger(
+        new ReconcileSequencerLimitWithMemberTrafficTrigger(
+          triggerContext,
+          svcStore,
+          participantAdminConnection,
+          lock,
+        )
       )
-    )
+    else
+      registerTrigger(
+        new ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
+          triggerContext,
+          svcStore,
+          participantAdminConnection,
+          lock,
+        )
+      )
   )
   if (config.automation.enableLeaderReplacement) {
     registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))

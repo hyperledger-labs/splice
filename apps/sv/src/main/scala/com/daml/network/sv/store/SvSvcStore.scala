@@ -26,12 +26,12 @@ import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{CNNodeUtil, Contract, AssignedContract, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
@@ -364,6 +364,11 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       )
     )
 
+  def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long]
+
+  // TODO(#7146): Remove once we have completely switched over to MemberTraffic contracts
   def listDuplicateValidatorTrafficContracts(
       validator: PartyId,
       domainId: DomainId,
@@ -580,6 +585,7 @@ object SvSvcStore {
         mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
         mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc),
         mkFilter(cc.globaldomain.ValidatorTraffic.COMPANION)(vt => vt.payload.svc == svc),
+        mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc),
       ) ++
         (if (enableCoinRulesUpgrade)
            Map(mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))

@@ -19,11 +19,11 @@ import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.{ExpiredRewardCouponsBatch, SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template
-import com.daml.network.util.{Contract, AssignedContract, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import slick.dbio.DBIO
@@ -210,6 +210,11 @@ class DbSvSvcStore(
     MultiDomainAcsStore.QueryResult[Option[Contract[ValidatorLicense.ContractId, ValidatorLicense]]]
   ] = ???
 
+  override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] = ???
+
+  // TODO(#7146): Remove once we have completely switched over to MemberTraffic contracts
   override def listDuplicateValidatorTrafficContracts(
       validator: PartyId,
       domainId: DomainId,

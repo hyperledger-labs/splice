@@ -15,6 +15,7 @@ import com.daml.network.codegen.java.cc.coin.invalidtransferreason.{
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
   CO_AppPayment,
   CO_BuyExtraTraffic,
+  CO_BuyMemberTraffic,
   CO_CompleteAcceptedTransfer,
   CO_MergeTransferInputs,
   CO_SubscriptionAcceptAndMakeInitialPayment,
@@ -31,6 +32,7 @@ import com.daml.network.history.{
   CoinCreate,
   CoinExpire,
   CoinRules_BuyExtraTraffic,
+  CoinRules_BuyMemberTraffic,
   ImportCrate_ReceiveCoin,
   LockedCoinExpireCoin,
   LockedCoinOwnerExpireLock,
@@ -92,7 +94,7 @@ class UserWalletTxLogParser(
             // Unfortunately there is not a 1:1 correspondence between CoinOperationOutcome and child events in the
             // transaction tree:
             // - COO_Error does not produce any child event
-            // - COO_BuyExtraTraffic can produce up to 2 child events of interest
+            // - COO_BuyExtraTraffic and COO_BuyMemberTraffic can produce up to 2 child events of interest
             //   - tapping of coins to pay for extra traffic (only on DevNet)
             //   - the actual purchase of extra traffic
             // - all other outcomes produce exactly one child exercise event
@@ -120,6 +122,7 @@ class UserWalletTxLogParser(
                           ),
                           nextChildEventId,
                         )
+                      // TODO(#7081): Remove once we've completely switched over to the BuyMemberTraffic choice
                       case (op: CO_BuyExtraTraffic, outcome) =>
                         // Special handling for CO_BuyExtraTraffic to associate multiple events with it.
                         // Since on DevNet, we auto-tap coins, there will be five associated events.
@@ -165,6 +168,68 @@ class UserWalletTxLogParser(
                           )
                         val eventsOfInterest = childEvents.filter(e =>
                           Seq("CoinRules_BuyExtraTraffic", "CoinRules_DevNet_Tap")
+                            .contains(e.getChoice)
+                        )
+                        (
+                          result.appended((op, outcome, Right(eventsOfInterest))),
+                          nextChildEventId + childEventCount,
+                        )
+                      case (op: CO_BuyMemberTraffic, outcome) =>
+                        // Special handling for CO_BuyMemberTraffic to associate multiple events with it.
+                        // Since we auto-tap coins on DevNet, there will be 7 associated events.
+                        // - CoinRules_Fetch
+                        // - OpenMiningRound_Fetch
+                        // - CoinRules_ComputeFees
+                        // - CoinRules_DevNet_Tap
+                        // - CoinRules_BuyMemberTraffic
+                        // - Archive (of the old ValidatorTopUpState)
+                        // - Create (of the new ValidatorTopUpState)
+                        // The first 4 of these are related to identifying the amount of CC to tap to cover
+                        // the purchase and then actually tapping it.
+                        // On non-DevNet, there will be only 4 associated events.
+                        // - CoinRules_Fetch
+                        // - CoinRules_BuyMemberTraffic
+                        // - Archive (of the old ValidatorTopUpState)
+                        // - Create (of the new ValidatorTopUpState)
+                        val (childEventCount, expectedChildExercisedEvents) = tree.getEventsById
+                          // assume non-DevNet if the second event is the BuyMemberTraffic choice
+                          .get(exercised.getChildEventIds.get(nextChildEventId + 1)) match {
+                          case e: ExercisedEvent if e.getChoice == "CoinRules_BuyMemberTraffic" =>
+                            (4, Seq("CoinRules_Fetch", "CoinRules_BuyMemberTraffic", "Archive"))
+                          case _ =>
+                            (
+                              7,
+                              Seq(
+                                "CoinRules_Fetch",
+                                "OpenMiningRound_Fetch",
+                                "CoinRules_ComputeFees",
+                                "CoinRules_DevNet_Tap",
+                                "CoinRules_BuyMemberTraffic",
+                                "Archive",
+                              ),
+                            )
+                        }
+
+                        val childExercisedEvents = exercised.getChildEventIds.asScala.toSeq
+                          .slice(nextChildEventId, nextChildEventId + childEventCount)
+                          .map(tree.getEventsById.get)
+                          .flatMap {
+                            case e: ExercisedEvent =>
+                              Seq(e)
+                            case e: CreatedEvent
+                                if e.getTemplateId.getEntityName == "ValidatorTopUpState" =>
+                              Seq()
+                            case e =>
+                              logger.warn(s"Unexpected event $e.")
+                              Seq()
+                          }
+                        if (childExercisedEvents.map(_.getChoice) != expectedChildExercisedEvents)
+                          logger.warn(
+                            s"Expected events $expectedChildExercisedEvents. Got ${childExercisedEvents
+                                .map(_.getChoice)}"
+                          )
+                        val eventsOfInterest = childExercisedEvents.filter(e =>
+                          Seq("CoinRules_BuyMemberTraffic", "CoinRules_DevNet_Tap")
                             .contains(e.getChoice)
                         )
                         (
@@ -515,11 +580,15 @@ class UserWalletTxLogParser(
             )
 
           // ------------------------------------------------------------------
-          // Buying extra traffic
+          // Buying domain traffic
           // ------------------------------------------------------------------
 
+          // TODO(#7081): Remove once we've fully switched over to MemberTraffic contracts
           case CoinRules_BuyExtraTraffic(_) =>
-            now(State.fromBuyExtraTraffic(tree, exercised, domainId))
+            now(State.fromBuyMemberTraffic(tree, exercised, domainId))
+
+          case CoinRules_BuyMemberTraffic(_) =>
+            now(State.fromBuyMemberTraffic(tree, exercised, domainId))
 
           // ------------------------------------------------------------------
           // Other
@@ -1138,26 +1207,26 @@ object UserWalletTxLogParser {
       )
     }
 
-    def fromBuyExtraTraffic(
+    def fromBuyMemberTraffic(
         tx: TransactionTree,
         event: ExercisedEvent,
         domainId: DomainId,
     )(implicit lc: ErrorLoggingContext): State = {
       // second child event is the transfer of CC from validator to SVC to buy extra traffic
-      val reassignmentEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
       // Calculate tx log entries from transfer of CC from validator to SVC
-      val transferNode = (reassignmentEvent match {
+      val transferNode = (transferEvent match {
         case e: ExercisedEvent => Transfer.unapply(e)
         case _ => None
       }).getOrElse(
         throw new RuntimeException(
-          s"Unable to parse event ${reassignmentEvent.getEventId} as Transfer"
+          s"Unable to parse event ${transferEvent.getEventId} as Transfer"
         )
       )
       val stateFromTransfer =
         State.fromTransfer(
           tx,
-          reassignmentEvent,
+          transferEvent,
           domainId,
           transferNode,
           TxLogEntry.Transfer.Transfer,
@@ -1184,7 +1253,7 @@ object UserWalletTxLogParser {
           TxLogEntry.BalanceChange(
             indexRecord = TxLogIndexRecord(
               optOffset = Some(tx.getOffset),
-              eventId = reassignmentEvent.getEventId,
+              eventId = transferEvent.getEventId,
               domainId = domainId,
               acsContractId = None,
             ),

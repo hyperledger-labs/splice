@@ -127,7 +127,7 @@ workflows:
         test_names_file: "test-full-class-names-domain-fees.log"
         start_canton_options: "-w -t"
         resource_class: "xlarge"
-        parallelism: 1
+        parallelism: 2
     - scala_test:
         <<: *notify-fail
         context:
