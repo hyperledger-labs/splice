@@ -267,7 +267,6 @@ object ValidatorStore {
           co.payload.validatorParty == validator &&
             co.payload.svcParty == svc
         ),
-        mkFilter(coinCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(validatorLicenseCodegen.ValidatorLicense.COMPANION)(co =>
           co.payload.validator == validator && co.payload.svc == svc
         ),
