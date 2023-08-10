@@ -277,6 +277,13 @@ function _assert_lock() {
 declare -A subcommand_whitelist
 
 function _prompt_to_confirm() {
+    # Assert lock before checking if prompt was confirmed previously.
+    # This is to ensure the current invocation obeys the lock guard
+    # regardless of prior invocations using --no-lock or not
+    if [ "${1-}" != "--no-lock" ]; then
+        _assert_lock
+    fi
+
     # Many subcommands invoke other subcommands to do their work. This
     # keeps a record of the first confirmation prompt to avoid
     # prompting the user at every one of these steps.  We also
@@ -287,10 +294,6 @@ function _prompt_to_confirm() {
     fi
 
     _cluster_show
-
-    if [ "${1-}" != "--no-lock" ]; then
-        _assert_lock
-    fi
 
     if [ -z "${GCP_CLUSTER_PROD_LIKE-}" ] ; then
         if [ -n "${CNCLUSTER_AUTOCONFIRM-}" ] ; then
