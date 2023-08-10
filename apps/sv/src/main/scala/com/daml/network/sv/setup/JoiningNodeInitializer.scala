@@ -16,6 +16,7 @@ import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -169,14 +170,16 @@ class JoiningNodeInitializer(
             () =>
               // TODO(#7048) this lock is a band-aid to reduce flakiness while waiting for the upstream fix; remove me
               // We always call withAcquiredGlobalLock(...) and svcRulesLock.lock() in that order, to prevent deadlocks.
-              svcRulesLock.withLock("sequencer onboarding")(
+              svcRulesLock.withLock("sequencer onboarding") {
+                // TODO(#7048) wait to ensure no currently in-flight transaction reaches the sequencer; remove me
+                Threading.sleep(5000)
                 localDomainNode.onboardLocalSequencerIfRequired(
                   config.domains.global.alias,
                   globalDomain,
                   participantAdminConnection,
                   svConnection,
                 )
-              ),
+              },
           )
           _ <- svConnection.withGlobalLock(
             "Onboarding of mediator",

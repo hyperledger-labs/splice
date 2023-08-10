@@ -53,4 +53,7 @@ Attempted to read Testcontainers configuration file at file:
 # Trying to start a BiDi connection to Firefox repeatedly might fail some attempts with an 405 method not allowed
 Invalid Status code=405 text=Method Not Allowed","logger_name":"o.o.s.remote.http.WebSocket"
 
+# TODO(#7048) remove once we can make sequencer onboarding faster again so that locks are released more quickly
+onboard/sv/party-migration/authorize resulted in a timeout
+
 # Make sure to have a trailing newline
