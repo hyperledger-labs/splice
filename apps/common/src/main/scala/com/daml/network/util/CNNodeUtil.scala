@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.{Command, Unit as DamlUnit}
 import com.daml.lf.data.Numeric
+import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.Coin
@@ -207,6 +208,21 @@ object CNNodeUtil {
 
     // tick duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
+  )
+
+  def defaultCnsConfig: cn.cns.CnsRulesConfig = new cn.cns.CnsRulesConfig(
+    // renewalDuration
+    new RelTime(
+      TimeUnit.NANOSECONDS.toMicros(NonNegativeFiniteDuration.ofDays(30).duration.toNanos)
+    ),
+
+    // entryLifetime
+    new RelTime(
+      TimeUnit.NANOSECONDS.toMicros(NonNegativeFiniteDuration.ofDays(90).duration.toNanos)
+    ),
+
+    // entryFee
+    damlDecimal(1.0),
   )
 
   private def defaultGlobalDomainConfig(

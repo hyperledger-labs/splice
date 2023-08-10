@@ -220,7 +220,9 @@ lazy val `svc-governance-daml` =
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-coin-daml` / Compile / damlBuild).value ++
-          (`canton-coin-api-daml` / Compile / damlBuild).value,
+          (`canton-coin-api-daml` / Compile / damlBuild).value ++
+          (`canton-name-service-daml` / Compile / damlBuild).value ++
+          (`wallet-payments-daml` / Compile / damlBuild).value,
     )
 
 lazy val `svc-governance-v1test-daml` =
@@ -326,6 +328,7 @@ lazy val `apps-common` =
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",
       `canton-coin-daml`,
+      `canton-name-service-daml`,
       `canton-coin-v1test-daml`,
       `canton-coin-v2test-daml`,
       `wallet-daml` % "test",

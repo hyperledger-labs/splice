@@ -19,11 +19,12 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, Sv
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{ExpiringLock, SvUtil, SvcRulesLock}
 import com.daml.network.util.CNNodeUtil.{
+  defaultCnsConfig,
   defaultCoinConfig,
   defaultCoinConfigSchedule,
   defaultEnabledChoices,
 }
-import com.daml.network.util.{GcpBucket, AssignedContract, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -474,6 +475,7 @@ class FoundingNodeInitializer(
                           domainId,
                         ),
                         foundingConfig.initialCoinPrice.bigDecimal,
+                        defaultCnsConfig,
                         svcRulesConfig,
                         optOpenMiningRounds.map(_.asJava).toJava,
                         trafficStateForAllMembers

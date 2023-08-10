@@ -8,9 +8,11 @@ import CC.API.V1.Coin(TransferInput(InputCoin))
 import CC.Coin
 import CC.Scripts.Util
 import CN.Cns
+import CN.Scripts.CnsRulesParameters
 import CN.Wallet.Subscriptions
 
 import CC.Schedule
+
 
 testWithSubscription : Script ()
 testWithSubscription = script do
@@ -20,15 +22,8 @@ testWithSubscription = script do
   runCoinDepositBots app
 
   -- cnsRules
-  let renewalDuration = days 30
-      entryLifetime = days 90
-      entryFee = 1.0
-      cnsRulesConfig = CnsRulesConfig with
-        renewalDuration
-        entryLifetime
-        entryFee
-      configSchedule = Schedule with
-        initialValue = cnsRulesConfig
+  let configSchedule = Schedule with
+        initialValue = defaultCnsRulesConfig
         futureValues = []
 
   cnsRulesCid <- submitMulti [app.svc] [] $ createCmd CnsRules with
@@ -74,7 +69,7 @@ testWithSubscription = script do
   [(_, reward), _] <- query @CC.Coin.AppRewardCoupon app.svc
   reward.amount ===
     transferConfigCC.createFee.fee +
-    transferConfigCC.transferFee.initialRate * entryFee
+    transferConfigCC.transferFee.initialRate * defaultCnsRulesConfig.entryFee
   reward.featured === False
 
   Some entry <- queryContractId alice.primaryParty entryCid
@@ -83,7 +78,7 @@ testWithSubscription = script do
   entry.name === "cns.darth.vader"
   entry.user === alice.primaryParty
   subscriptionState.nextPaymentDueAt === entry.expiresAt
-  subscriptionState.payData.paymentInterval === cnsRulesConfig.entryLifetime
+  subscriptionState.payData.paymentInterval === configSchedule.initialValue.entryLifetime
 
   -- cc wallet automatically selects a large enough coin and initiates a subscription payment during the scheduled renewal period
   passTime (days 60)

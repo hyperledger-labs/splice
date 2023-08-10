@@ -24,6 +24,7 @@ import CN.SvcRules
 import CN.SvcBootstrap
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
+import CN.Scripts.CnsRulesParameters
 import CN.Util.ExpiringContract
 
 
@@ -64,6 +65,7 @@ initCollective initialOpenRounds isDevNet = do
         initialTrafficGrant = 1_000_000
         globalDomain = initialGlobalDomainConfig
   let coinConfig = defaultCoinConfig
+  let cnsRulesConfig = defaultCnsRulesConfig
 
   -- have sv1 bootstrap the collective
   submit svc $ createAndExerciseCmd
@@ -84,6 +86,7 @@ initCollective initialOpenRounds isDevNet = do
         )]
       coinConfig
       coinPrice = 1.0
+      cnsRulesConfig
       config
       initialTrafficState = Map.empty
       enabledChoices = API.enableAllChoices

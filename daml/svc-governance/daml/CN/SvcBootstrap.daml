@@ -12,6 +12,7 @@ import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
 import CC.Round
 
+import CN.Cns
 import CN.Util.Assert
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
@@ -26,6 +27,7 @@ template SvcBootstrap with
     founderDomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
     coinConfig : CoinConfig USD
     coinPrice : Decimal
+    cnsRulesConfig: CnsRulesConfig
     config : SvcRulesConfig
     initialOpenRounds : Optional [OpenMiningRound]
     initialTrafficState: Map.Map Text TrafficState
@@ -47,6 +49,11 @@ template SvcBootstrap with
           enabledChoices
           isDevNet
           lock = False
+        _ <- create CnsRules with
+          svc
+          configSchedule = Schedule with
+            initialValue = cnsRulesConfig
+            futureValues = []
         -- bootstrap rounds if necessary
         earliestOpenRound <- case initialOpenRounds of
           None -> do

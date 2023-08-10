@@ -10,6 +10,7 @@ import Daml.Script
 import DA.Time
 
 import CC.API.V1.Round (Round(..))
+import CC.API.V1.Coin(TransferInput(InputCoin))
 import CC.Round
 import CC.Coin
 
@@ -19,6 +20,9 @@ import CN.Util.Assert
 import CC.Scripts.Parameters
 import CC.Scripts.Util
 import CN.Scripts.SvcTestUtils
+import CN.Cns
+import CN.Scripts.CnsRulesParameters
+import CN.Wallet.Subscriptions
 
 import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
@@ -327,3 +331,105 @@ getLockedCoin app owner lockHolder amount lockDuration =  do
   lockTo1 app owner lockHolder amount lockDuration
   [(cid, _)] <- query @LockedCoin lockHolder
   pure cid
+
+
+-- Testing CNS decentralization
+-------------------------------
+
+testDecentralizedCns : Script ()
+testDecentralizedCns = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+
+  alice <- setupUser app "alice" app.svc
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(cnsRulesCid, _)] <- query @CnsRules svc
+
+  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
+    user = alice.primaryParty
+
+  coin <- tap app alice 1.5
+
+  paymentContext <- getPaymentTransferContext app alice
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputCoin $ toInterfaceContractId coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  -- SVs create confirmations for SVC to collect initial payment of the requested cns entry.
+  appContext <- getAppTransferContext app app.svcUser
+  let collectInitialPaymentAction = ARC_CnsEntryContext with
+        cnsEntryContextCid = entryContext
+        cnsEntryContextAction = CNSRARC_CollectInitialEntryPayment $ CnsEntryContext_CollectInitialEntryPayment with
+          paymentCid = initialPaymentCid
+          transferContext = appContext
+          cnsRulesCid
+
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action = collectInitialPaymentAction
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 4
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_ExecuteConfirmedAction with
+      action = collectInitialPaymentAction
+      coinRulesCid = None
+      confirmationCids
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 0
+
+  [(entryCid, entry)] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
+  [(subscriptionStateCid, subscriptionState)] <- queryFilter @SubscriptionIdleState app.svc (\state -> state.subscriptionData.sender == alice.primaryParty)
+
+  subscriptionState.nextPaymentDueAt === entry.expiresAt
+
+  passTime (days 60)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app app.svcUser
+
+  coin <- tap app alice 1.5
+  (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin $ toInterfaceContractId coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  -- SVs create confirmations for SVC to collect renewal payment of the requested cns entry.
+  let collectRenewalPaymentAction = ARC_CnsEntryContext with
+        cnsEntryContextCid = entryContext
+        cnsEntryContextAction = CNSRARC_CollectRenewalEntryPayment $ CnsEntryContext_CollectEntryRenewalPayment with
+          paymentCid
+          entryCid
+          transferContext = appContext
+          cnsRulesCid
+
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action = collectRenewalPaymentAction
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 4
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_ExecuteConfirmedAction with
+      action = collectRenewalPaymentAction
+      coinRulesCid = None
+      confirmationCids
+
+  [(_, renewedEntry)] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
+  [(_, renewedSubscriptionState)] <- queryFilter @SubscriptionIdleState app.svc (\state -> state.subscriptionData.sender == alice.primaryParty)
+
+  renewedEntry.expiresAt === addRelTime entry.expiresAt defaultCnsRulesConfig.entryLifetime
+  renewedSubscriptionState.nextPaymentDueAt === renewedEntry.expiresAt
+
+  pure ()
+

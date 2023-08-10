@@ -10,6 +10,7 @@ import qualified DA.Text as T
 import DA.Time
 
 import CC.Coin
+
 import CC.Round
 import CC.Util
 import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
@@ -18,6 +19,7 @@ import CC.ValidatorLicense
 import CC.GlobalDomain (initialValidatorTraffic, ValidatorTraffic, initialMemberTraffic)
 
 import qualified CN.CometBft as CometBft
+import CN.Cns
 import CN.SvOnboarding
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
@@ -61,6 +63,9 @@ data ActionRequiringConfirmation
       svcAction : SvcRules_ActionRequiringConfirmation
   | ARC_CoinRules with
       coinRulesAction : CoinRules_ActionRequiringConfirmation
+  | ARC_CnsEntryContext with
+      cnsEntryContextCid : ContractId CnsEntryContext
+      cnsEntryContextAction : CnsEntryContext_ActionRequiringConfirmation
   deriving (Eq, Show)
 
 data CoinRules_ActionRequiringConfirmation
@@ -93,6 +98,13 @@ data SvcRules_ActionRequiringConfirmation
     -- ^ Revoke a specific featured app right.
   | SRARC_SetConfig SvcRules_SetConfig
     -- ^ Voted action to change the `SvcRulesConfig`. Not idempotent.
+  deriving (Eq, Show)
+
+data CnsEntryContext_ActionRequiringConfirmation
+  = CNSRARC_CollectInitialEntryPayment CnsEntryContext_CollectInitialEntryPayment
+    -- ^ Automated action to collect initial payment of an cns entry.
+  | CNSRARC_CollectRenewalEntryPayment CnsEntryContext_CollectEntryRenewalPayment
+    -- ^ Automated action to collect renewal payment of an cns entry.
   deriving (Eq, Show)
 
 -- | Information about members relevant to collective governance.
@@ -1059,7 +1071,10 @@ executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
       SRARC_GrantFeaturedAppRight choiceArg -> void $ exercise svcRulesCid choiceArg
       SRARC_RevokeFeaturedAppRight choiceArg -> void $ exercise svcRulesCid choiceArg
       SRARC_SetConfig choiceArg -> void $ exercise svcRulesCid choiceArg
-
+  ARC_CnsEntryContext with .. ->
+    case cnsEntryContextAction of
+      CNSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
+      CNSRARC_CollectRenewalEntryPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
 
 -- Functions implementing instant-runoff voting
 -----------------------------------------------
