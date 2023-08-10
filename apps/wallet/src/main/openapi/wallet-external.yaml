@@ -281,15 +281,16 @@ components:
     RequestBuyTrafficRequest:
       type: object
       required:
-        - member_id
+        - receiving_validator_party_id
         - domain_id
         - traffic_amount
         - tracking_id
         - expires_at
       properties:
-        member_id:
+        receiving_validator_party_id:
           description: |
-            The member id for which the traffic should be purchased, e.g., a participant id.
+            Traffic will be purchased for the validator hosting this party.
+            If the party is hosted on multiple participants, the request will fail with 400 Bad Request.
           type: string
         domain_id:
           description: |
