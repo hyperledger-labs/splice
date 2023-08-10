@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import better.files.File
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.useSelfSignedTokensForLedgerApiAuth
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -13,7 +14,7 @@ import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
-class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
+class DFBootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -24,8 +25,11 @@ class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
         this.getClass.getSimpleName,
       )
       .clearConfigTransforms()
-      .withTrafficTopupsDisabled // TODO(#7204)
-      .addConfigTransforms((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
+      .withTrafficTopupsEnabled
+      .addConfigTransform((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
+      // We reduce the polling interval here primarily for the top-up trigger to ensure that a top-up happens as soon as
+      // possible during the validator setup and other txs do not get throttled for want of traffic.
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.reducePollingInterval(config))
 
   "Bootstrap script should pass" in { implicit env =>
     // the script logs errors when a CNS name check fails but then recovers from this

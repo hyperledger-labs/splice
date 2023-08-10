@@ -32,7 +32,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withTrafficTopupsDisabled // TODO(#7204)
+      .withTrafficTopupsDisabled // TODO(#7222)
       .withManualStart
 
   "start and restart cleanly" in { implicit env =>
