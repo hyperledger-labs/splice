@@ -41,28 +41,27 @@ class AdvanceOpenMiningRoundTrigger(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val rounds = task.work.openRounds
-    store
-      .getSvcRules()
-      .foreach(svcRules =>
-        logger.debug(s"Starting work as leader ${svcRules.payload.leader} for ${task.work}")
-      )
     for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
+      _ = logger.debug(s"Starting work as leader ${svcRules.payload.leader} for ${task.work}")
       coinPriceVotes <- store.listMemberCoinPriceVotes()
-      cmd = svcRules.contractId.exerciseSvcRules_AdvanceOpenMiningRounds(
-        task.work.coinRulesId,
-        rounds.oldest.contractId,
-        rounds.middle.contractId,
-        rounds.newest.contractId,
-        coinPriceVotes.map(_.contractId).asJava,
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_AdvanceOpenMiningRounds(
+          task.work.coinRulesId,
+          rounds.oldest.contractId,
+          rounds.middle.contractId,
+          rounds.newest.contractId,
+          coinPriceVotes.map(_.contractId).asJava,
+        )
       )
-      (offset, _) <- svTaskContext.connection.submitWithResultAndOffsetNoDedup(
-        Seq(store.key.svParty),
-        Seq(store.key.svcParty),
-        cmd,
-        domainId = domainId,
-      )
+      (offset, _) <- svTaskContext.connection
+        .submit(
+          Seq(store.key.svParty),
+          Seq(store.key.svcParty),
+          cmd,
+        )
+        .noDedup
+        .yieldResultAndOffset()
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
     )
@@ -74,8 +73,8 @@ class AdvanceOpenMiningRoundTrigger(
     import cats.instances.future.*
     import cats.syntax.traverse.*
 
+    val domainId = task.work.openRounds.domain
     (for {
-      domainId <- OptionT liftF store.domains.waitForDomainConnection(store.defaultAcsDomain)
       _ <- OptionT(
         store.multiDomainAcsStore
           .lookupContractByIdOnDomain(cc.coin.CoinRules.COMPANION)(domainId, task.work.coinRulesId)

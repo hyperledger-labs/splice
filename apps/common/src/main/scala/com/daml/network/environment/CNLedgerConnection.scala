@@ -1127,7 +1127,7 @@ object CNLedgerConnection {
   object YieldResult {
     private[this] object OnlyInstance extends YieldResult[Any, Nothing]
     implicit def update[T]: YieldResult[Update[T], T] = OnlyInstance
-    implicit def exercising[T]: YieldResult[Contract.Exercising[Any, Update[T]], T] =
+    implicit def exercising[T]: YieldResult[Contract.Exercising[Any, T], T] =
       OnlyInstance
   }
 

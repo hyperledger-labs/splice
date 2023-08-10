@@ -31,7 +31,11 @@ case class AutomationConfig(
     /** Only intended for testing. Allows disabling governance automation.
       */
     enableSvcGovernance: Boolean = true,
-    /** Only intended for testing. Allows disabling governance automation.
+    /** Only intended for testing. Allows disabling archival of closed rounds.
+      */
+    enableClosedRoundArchival: Boolean = true,
+    /** Only intended for testing. Allows disabling cometbft config
+      * publish/reconcile automation.
       */
     enableCometbftReconciliation: Boolean = true,
     /** Only intended for PoC. Enables using MemberTraffic contracts instead of ValidatorTraffic contracts for domain fees.

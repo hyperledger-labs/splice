@@ -62,7 +62,8 @@ class SvSvcAutomationService(
   if (config.automation.enableSvRewards) {
     registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
   }
-  registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
+  if (config.automation.enableClosedRoundArchival)
+    registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
 
   // Register optional BFT triggers
   cometBft.foreach { node =>
@@ -124,7 +125,13 @@ class SvSvcAutomationService(
       svcStore,
       connection,
       store.key.svcParty,
-      implicit tc => svcStore.listSvcRulesTransferFollowers(),
+      implicit tc =>
+        svcStore.listSvcRulesTransferFollowers().flatMap { svcRulesFollowers =>
+          // don't try to schedule CoinRules' followers if CoinRules might move
+          // (i.e. be one of svcRulesFollowers)
+          if (svcRulesFollowers.nonEmpty) Future successful svcRulesFollowers
+          else svcStore.listCoinRulesTransferFollowers()
+        },
     )
   )
 

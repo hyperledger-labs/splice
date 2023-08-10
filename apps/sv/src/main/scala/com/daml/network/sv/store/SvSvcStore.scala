@@ -121,7 +121,14 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
         case Seq(oldest, middle, newest)
             if oldest.payload.round.number + 1 == middle.payload.round.number &&
               newest.payload.round.number - 1 == middle.payload.round.number =>
-          Some(SvSvcStore.OpenMiningRoundTriple(oldest = oldest, middle = middle, newest = newest))
+          Some(
+            SvSvcStore.OpenMiningRoundTriple(
+              oldest = oldest,
+              middle = middle,
+              newest = newest,
+              domain = domain,
+            )
+          )
         case _ => None
       }
     } yield result
@@ -505,6 +512,10 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   def listSvcRulesTransferFollowers()(implicit
       tc: TraceContext
   ): Future[Seq[FollowTask[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules, ?, ?]]]
+
+  def listCoinRulesTransferFollowers()(implicit
+      tc: TraceContext
+  ): Future[Seq[FollowTask[cc.coin.CoinRules.ContractId, cc.coin.CoinRules, ?, ?]]]
 }
 
 object SvSvcStore {
@@ -573,6 +584,7 @@ object SvSvcStore {
         mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
         mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.SvcReward.COMPANION)(co => co.payload.svc == svc),
@@ -601,9 +613,15 @@ object SvSvcStore {
       oldest: OpenMiningRoundContract,
       middle: OpenMiningRoundContract,
       newest: OpenMiningRoundContract,
+      domain: DomainId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
-      prettyOfClass(param("oldest", _.oldest), param("middle", _.middle), param("newest", _.newest))
+      prettyOfClass(
+        param("oldest", _.oldest),
+        param("middle", _.middle),
+        param("newest", _.newest),
+        param("domain", _.domain),
+      )
 
     /** The time after which these can be advanced at assuming the given tick duration. */
     def readyToAdvanceAt: Instant = {

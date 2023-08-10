@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.{Identifier as JIdentifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{
   Contract as CodegenContract,
   ContractCompanion as TemplateCompanion,
@@ -37,6 +37,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         c.copy(
           // Need to disable triggers so workflows stay open
           enableSvcGovernance = false,
+          enableClosedRoundArchival = false,
           enableSvRewards = false,
         )
       )(config)
@@ -55,7 +56,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       globalUpgradeDomain
     ) withClue "find the global-upgrade domain ID"
 
-    val previousGlobalId = clue("change coinconfig to migrate domains") {
+    val (previousGlobalId, coinRulesCid) = clue("change coinconfig to migrate domains") {
       inside(sv1ScanBackend.getCoinRules()) {
         case ContractWithState(firstCoinRules, Assigned(global1)) =>
           val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
@@ -89,7 +90,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
               setScheduleResult shouldBe secondCoinRules.contractId
             }
           }
-          global1
+          (global1, setScheduleResult)
       }
     }
 
@@ -218,6 +219,61 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       )
     }
 
+    clue("create svc-signed coin contracts of various kinds") {
+      val (oldestRound, newestRound) = {
+        val rounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._1
+        (rounds.headOption.value, rounds.lastOption.value)
+      }
+
+      actAndCheck(
+        "create sample IssuingMiningRound",
+        exerciseSvc(
+          new cc.round.IssuingMiningRound(
+            svcParty.toProtoPrimitive,
+            new cc.api.v1.round.Round(42),
+            new java.math.BigDecimal(42),
+            new java.math.BigDecimal(42),
+            new java.math.BigDecimal(42),
+            oldestRound.payload.opensAt,
+            newestRound.payload.targetClosesAt,
+          ).create()
+        ),
+      )(
+        "ensure IssuingMiningRound is there",
+        _ => nonEmptyOnSv1(cc.round.IssuingMiningRound.COMPANION),
+      )
+
+      actAndCheck(
+        "create sample ClosedMiningRound",
+        exerciseSvc(
+          new cc.round.ClosedMiningRound(
+            svcParty.toProtoPrimitive,
+            new cc.api.v1.round.Round(42),
+            new java.math.BigDecimal(42),
+            new java.math.BigDecimal(42),
+            new java.math.BigDecimal(42),
+          )
+            .create()
+        ),
+      )(
+        "ensure ClosedMiningRound is there",
+        _ => nonEmptyOnSv1(cc.round.ClosedMiningRound.COMPANION),
+      )
+
+      actAndCheck(
+        "create sample FeaturedAppRight",
+        exerciseSvc(coinRulesCid.exerciseCoinRules_DevNet_FeatureApp(sv1Party.toProtoPrimitive)),
+      )("ensure FeaturedAppRight is there", _ => nonEmptyOnSv1(cc.coin.FeaturedAppRight.COMPANION))
+
+      actAndCheck(
+        "create sample UnclaimedReward",
+        exerciseSvc(
+          new cc.coin.UnclaimedReward(svcParty.toProtoPrimitive, new java.math.BigDecimal(42))
+            .create()
+        ),
+      )("ensure UnclaimedReward is there", _ => nonEmptyOnSv1(cc.coin.UnclaimedReward.COMPANION))
+    }
+
     advanceTime(timeToWaitForNewRule) withClue "advance time"
 
     clue("see whether the svcrules moves") {
@@ -237,27 +293,23 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       }
     }
 
-    clue("see whether governance contracts follow svcrules") {
-      import language.existentials
-      type FilterableCompanion =
-        TemplateCompanion[_ <: CodegenContract[TCid, Data], TCid, Data] forSome {
-          type Data <: Template
-          type TCid <: ContractId[Data]
-        }
-      def c(fc: FilterableCompanion) = (fc, svcParty)
-      val companions = Table[FilterableCompanion, PartyId](
-        ("companion", "querying party"),
-        c(svcr.Vote.COMPANION),
-        c(svcr.VoteRequest.COMPANION),
-        c(svcr.Confirmation.COMPANION),
-        c(svcr.SvReward.COMPANION),
-        c(svcr.ElectionRequest.COMPANION),
-        (so.ApprovedSvIdentity.COMPANION, sv1Party), // only has the sv party as a stakeholder
-        c(so.SvOnboardingRequest.COMPANION),
-        c(so.SvOnboardingConfirmed.COMPANION),
+    import language.existentials
+    type FilterableCompanion =
+      TemplateCompanion[_ <: CodegenContract[TCid, Data], TCid, Data] forSome {
+        type Data <: Template
+        type TCid <: ContractId[Data]
+      }
+
+    def c(fc: FilterableCompanion, queryParty: PartyId = svcParty) =
+      (fc, queryParty)
+
+    def allContractsMigrated(rows: (FilterableCompanion, PartyId)*) = {
+      val companions = Table[JIdentifier, FilterableCompanion, PartyId](
+        ("template", "companion", "querying party"),
+        rows.map { case (c, p) => (c.TEMPLATE_ID, c, p) }: _*
       )
       eventually() {
-        tForEvery(companions) { (companion, queryingParty) =>
+        tForEvery(companions) { (_, companion, queryingParty) =>
           val contractIds = sv1Backend.participantClient.ledger_api_extensions.acs
             .filterJava(companion)(queryingParty)
             .map(_.id: LfContractId)
@@ -271,8 +323,39 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         }
       }
     }
+
+    clue("see whether governance contracts follow svcrules") {
+      allContractsMigrated(
+        c(svcr.Vote.COMPANION),
+        c(svcr.VoteRequest.COMPANION),
+        c(svcr.Confirmation.COMPANION),
+        c(svcr.SvReward.COMPANION),
+        c(svcr.ElectionRequest.COMPANION),
+        c(so.ApprovedSvIdentity.COMPANION, sv1Party), // only has the sv party as a stakeholder
+        c(so.SvOnboardingRequest.COMPANION),
+        c(so.SvOnboardingConfirmed.COMPANION),
+      )
+    }
+
+    // wait a tick for next, as below wait for CoinRules to move
+    advanceTime(tickDurationWithBuffer)
+
+    clue(
+      "see whether coin contracts signed only by SVC (in particular mining rounds) follow svcrules"
+    ) {
+      allContractsMigrated(
+        c(cc.round.OpenMiningRound.COMPANION),
+        c(cc.round.SummarizingMiningRound.COMPANION),
+        c(cc.round.IssuingMiningRound.COMPANION),
+        c(cc.round.ClosedMiningRound.COMPANION),
+        c(cc.coin.FeaturedAppRight.COMPANION),
+        // TODO (#7210) c(cc.coin.SvcReward.COMPANION),
+        c(cc.coin.UnclaimedReward.COMPANION),
+        c(cc.validatorlicense.ValidatorLicense.COMPANION),
+      )
+    }
+
   // check scan for other contracts' transfer:
-  // TODO (#5957) check coin contracts signed only by SVC (in particular mining rounds)
   // TODO (#5958) check coin and wallet contracts
   // TODO (#5959) check directory contracts
   }

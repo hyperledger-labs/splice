@@ -5,6 +5,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger
+import TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
@@ -288,7 +289,11 @@ class DbSvSvcStore(
 
   override def listSvcRulesTransferFollowers()(implicit
       tc: TraceContext
-  ): Future[Seq[TransferFollowTrigger.Task[SvcRules.ContractId, SvcRules, _, _]]] = ???
+  ): Future[Seq[FollowTask[SvcRules.ContractId, SvcRules, _, _]]] = ???
+
+  override def listCoinRulesTransferFollowers()(implicit
+      tc: TraceContext
+  ): Future[Seq[FollowTask[CoinRules.ContractId, CoinRules, ?, ?]]] = ???
 }
 
 object DbSvSvcStore {

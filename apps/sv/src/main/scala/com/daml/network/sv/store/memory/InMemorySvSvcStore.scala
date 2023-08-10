@@ -569,25 +569,32 @@ class InMemorySvSvcStore(
     cratesForReceiver,
   )
 
+  import language.existentials
+
+  private[this] def listAssignedContractsNotOnDomainN(
+      excludedDomain: DomainId,
+      companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: Template }*
+  )(implicit tc: TraceContext) = Future
+    .traverse(companions)(listAssignedContractsNotOnDomain(excludedDomain, _))
+    .map(_.view.flatten)
+
   private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
       tc: TraceContext
   ): Future[Seq[AssignedContract[?, ?]]] = {
     import com.daml.network.codegen.java.cn.svcrules as svcr
-    def c[C, I <: ContractId[?], P](c: C)(implicit companion: ContractCompanion[C, I, P]) =
-      listAssignedContractsNotOnDomain(targetDomain, c)
-
     for {
       coinRulesO <- lookupCoinRules()
-      otherContracts <- Future sequence Seq(
-        c(svcr.Vote.COMPANION),
-        c(svcr.VoteRequest.COMPANION),
-        c(svcr.Confirmation.COMPANION),
-        c(svcr.SvReward.COMPANION),
-        c(svcr.ElectionRequest.COMPANION),
-        c(so.SvOnboardingRequest.COMPANION),
-        c(so.SvOnboardingConfirmed.COMPANION),
+      otherContracts <- listAssignedContractsNotOnDomainN(
+        targetDomain,
+        svcr.Vote.COMPANION,
+        svcr.VoteRequest.COMPANION,
+        svcr.Confirmation.COMPANION,
+        svcr.SvReward.COMPANION,
+        svcr.ElectionRequest.COMPANION,
+        so.SvOnboardingRequest.COMPANION,
+        so.SvOnboardingConfirmed.COMPANION,
       )
-    } yield (otherContracts.view.flatten ++ coinRulesO
+    } yield (otherContracts ++ coinRulesO
       .filterNot(_.domain == targetDomain)
       .toList).toSeq
   }
@@ -600,4 +607,21 @@ class InMemorySvSvcStore(
         .map(_ map (FollowTask(svcRules, _)))
     }.getOrElse(Future successful Seq.empty))
   }
+
+  override final def listCoinRulesTransferFollowers()(implicit
+      tc: TraceContext
+  ): Future[Seq[FollowTask[cc.coin.CoinRules.ContractId, cc.coin.CoinRules, ?, ?]]] =
+    lookupCoinRules().flatMap(_.map { coinRules =>
+      listAssignedContractsNotOnDomainN(
+        coinRules.domain,
+        cc.round.OpenMiningRound.COMPANION,
+        cc.round.SummarizingMiningRound.COMPANION,
+        cc.round.IssuingMiningRound.COMPANION,
+        cc.round.ClosedMiningRound.COMPANION,
+        cc.coin.FeaturedAppRight.COMPANION,
+        cc.coin.SvcReward.COMPANION,
+        cc.coin.UnclaimedReward.COMPANION,
+        cc.validatorlicense.ValidatorLicense.COMPANION,
+      ).map(_.map(FollowTask(coinRules, _)).toSeq)
+    }.getOrElse(Future successful Seq.empty))
 }
