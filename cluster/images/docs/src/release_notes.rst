@@ -8,6 +8,11 @@ Release Notes
 
 * SV and validator apps now fail earlier and with a more clear error message if the version of their node software mismatches the version on the cluster they are connecting to.
 
+* Deployment updates:
+
+    * The SV name for the node operated by Fiutur been updated.
+      Note the updated SV name in ``approved-sv-id-values-dev.yaml``: `Fiutur`.
+
 * Documentation:
 
     * The list of approved SV members has been moved from the ``sv-values.yaml`` file into
