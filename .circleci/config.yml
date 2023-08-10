@@ -715,13 +715,15 @@ commands:
     parameters:
       upload_caches:
         type: boolean
-        default: true
+        default: false
     steps:
       - upload_test_reports
+      # sbt caches are job-specific, so we're ignoring the upload_caches parameter,
+      # and saving those caches in every job
+      - save_sbt_cache
       - when:
           condition: << parameters.upload_caches >>
           steps:
-            - save_sbt_cache
             - save_compiled_classes
             - save_frontend_node_modules
             - save_daml_artifacts
@@ -776,9 +778,6 @@ commands:
       test_names_file:
         type: string
     steps:
-      - execute_sbt_command:
-          cmd: printTests
-          fail_on_error_in_output: false
       - run:
           name: Splitting tests
           command: |
@@ -1246,19 +1245,21 @@ jobs:
       - checkout
       - record_job_start_time
       - setup_sbt_test_job
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: "observability"
       # Used to pull docker images for cometbft
       - docker_login_artifactory
       - docker_pull_test_images
       # Start canton before compiling, as it takes a long time to start
-      # This ensure the compile time is not really wasted
-      # The time to compile is 2-3x more than the average time needed to start canton
+      # Note that we start canton before connecting VPN, so some initial
+      # metrics from Canton will be lost. Currently, they're Canton metrics
+      # before our actual tests start are not of interest for us,
+      # so we accept that.
       - start_canton_in_background:
           start_canton_options: << parameters.start_canton_options >>
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: "observability"
       - execute_sbt_command:
-          cmd: "Test/compile"
+          cmd: "Test/compile printTests"
           cmd_retry_count: 2
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
@@ -1282,7 +1283,8 @@ jobs:
       - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
-          cmd: "bundle"
+          # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
+          cmd: "Test/compile bundle"
           cmd_retry_count: 5
       - run:
           name: Copy bundle
@@ -1310,7 +1312,8 @@ jobs:
            # which would lead to an error due to a misisng `delete` permission
            gsutil cp -n /tmp/artifacts/*.tar.gz gs://release-bundles
          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
-      - cleanup_sbt_test_job
+      - cleanup_sbt_test_job:
+          upload_caches: true
       - collect_test_timings_and_send_to_datadog
 
   deployment_test:
@@ -1537,7 +1540,7 @@ jobs:
           touch "canton/dars.lock"
       - restore_daml_artifacts
       - execute_sbt_command:
-          cmd: "Test/compile"
+          cmd: "Test/compile printTests"
           cmd_retry_count: 2
           # TODO(#6153): we bumped this up to allow nix to rebuild everything if needed.
           # Instead, we should fetch the correct nix cache and avoid those rebuilds
@@ -1606,8 +1609,7 @@ jobs:
             /tmp/vpn-scripts/setup-vpn-routes.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - cleanup_sbt_test_job:
-          upload_caches: false
+      - cleanup_sbt_test_job
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
@@ -1721,8 +1723,7 @@ jobs:
             /tmp/vpn-scripts/setup-vpn-routes.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
-      - cleanup_sbt_test_job:
-          upload_caches: false
+      - cleanup_sbt_test_job
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
