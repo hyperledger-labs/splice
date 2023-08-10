@@ -283,8 +283,10 @@ class UserWalletTxLogParser(
                         details,
                       )
                     // The errors below should not produce notifications
+                    // TODO(#7081): Remove CO_BuyExtraTraffic from this list once we switch over to MemberTraffic contracts
                     case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
-                        _: CO_MergeTransferInputs | _: CO_BuyExtraTraffic | _: CO_Tap =>
+                        _: CO_MergeTransferInputs | _: CO_BuyExtraTraffic | _: CO_BuyMemberTraffic |
+                        _: CO_Tap =>
                       State.empty
                     case _ => throw new RuntimeException(s"Invalid operation $op")
                   }

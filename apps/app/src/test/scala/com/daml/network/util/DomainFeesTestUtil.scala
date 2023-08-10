@@ -11,11 +11,12 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
   CO_BuyExtraTraffic,
   CO_BuyMemberTraffic,
 }
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
-  COO_BuyExtraTraffic,
-  COO_BuyMemberTraffic,
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_BuyExtraTraffic
+import com.daml.network.codegen.java.cn.wallet.install.{
+  CoinOperation,
+  CoinOperationOutcome,
+  WalletAppInstall,
 }
-import com.daml.network.codegen.java.cn.wallet.install.{CoinOperation, WalletAppInstall}
 import com.daml.network.codegen.java.cn.wallet.topupstate.ValidatorTopUpState
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types as daTypes
@@ -222,7 +223,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       trafficAmount: Long,
       ts: CantonTimestamp,
       inputCoins: Seq[CoinPosition] = Seq(),
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
+  )(implicit env: CNNodeTestConsoleEnvironment): CoinOperationOutcome = {
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
     val buyerParty = validatorParty // for the case of a self top-up
@@ -281,8 +282,8 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
         .outcomes
         .asScala
         .toSeq
-    ) { case Seq(coo: COO_BuyMemberTraffic) =>
-      coo.contractIdValue
+    ) { case Seq(outcome) =>
+      outcome
     }
   }
 

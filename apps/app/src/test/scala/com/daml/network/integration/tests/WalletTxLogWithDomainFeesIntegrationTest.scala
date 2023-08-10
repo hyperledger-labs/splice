@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_Error
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
-
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
@@ -35,6 +35,27 @@ class WalletTxLogWithDomainFeesIntegrationTest
       val domainFeesConfig = sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount, 1_000_000L)
       val (_, totalCostCc) = computeDomainFees(trafficAmount, now)
+
+      actAndCheck(
+        "Fail to purchase extra traffic for SV1", {
+          inside(
+            buyMemberTraffic(sv1ValidatorBackend, domainFeesConfig.minTopupAmount - 1, now)
+          ) { case coo: COO_Error =>
+            coo.toString should include regex ("trafficAmount .* is at least as much as the configured minTopupAmount")
+          }
+        },
+      )(
+        "The failure was ignored by the tx log parser",
+        _ => {
+          // In case the error is unexpected, the wallet tx log parser will add a log entry of
+          // of type Unknown (and also log an error).
+          // See https://github.com/DACH-NY/canton-network-node/issues/7197
+          checkTxHistory(
+            sv1WalletClient,
+            Seq[CheckTxHistoryFn](),
+          )
+        },
+      )
 
       actAndCheck(
         "Purchase extra traffic for SV1", {
