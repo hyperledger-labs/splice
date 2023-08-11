@@ -157,6 +157,25 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
 
   type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor with WebStorage
 
+  val aliceWalletUIPort = 3000
+  val bobWalletUIPort = 3001
+  val charlieWalletUIPort = 3002
+
+  val aliceDirectoryUIPort = 3100
+
+  val sv1UIPort = 3211
+  val sv2UIPort = 3212
+
+  val scanUIPort = 3311
+
+  val aliceSplitwellUIPort = 3400
+  val bobSplitwellUIPort = 3401
+  val charlieSplitwellUIPort = 3402
+  val splitwellSplitwellUIPort = 3420
+
+  val aliceAppManagerUIPort = 3500
+  val splitwellAppManagerUIPort = 3520
+
   val options: FirefoxOptions =
     new FirefoxOptions()
       .setLogLevel(FirefoxDriverLogLevel.DEBUG)

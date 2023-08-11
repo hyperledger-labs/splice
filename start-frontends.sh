@@ -148,27 +148,39 @@ function start_local_frontends() {
   fi
 
   # start_frontend <app>     <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-address>
+
+  # Wallet
   start_frontend   wallet    3000 alice   "alice"              $enable_test_auth
   start_frontend   wallet    3001 bob     $validator_for_bob   $enable_test_auth
-  if [ $app_manager -eq 1 ]; then
-      start_frontend   splitwell 3002 splitwell "splitwell"        $enable_test_auth
-  else
-      start_frontend   splitwell 3002 alice   "alice"              $enable_test_auth
-      start_frontend   splitwell 3003 bob     $validator_for_bob   $enable_test_auth
-      start_frontend   splitwell 3005 charlie "alice"              $enable_test_auth
-  fi
-  start_frontend   directory 3004 alice   "alice"              $enable_test_auth
-  start_frontend   sv        3010 sv1     "sv1"                $enable_test_auth
   start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth
-  start_frontend   scan      3006 scan    "scan"               "false"           "none"
-  if [ $app_manager -eq 1 ]; then
-    start_frontend   app-manager 3100 alice     "alice"              $enable_test_auth
-    start_frontend   app-manager 3102 splitwell "splitwell"          $enable_test_auth
+
+  # Directory
+  start_frontend   directory 3100 alice   "alice"              $enable_test_auth
+
+  # SV
+  start_frontend   sv        3211 sv1     "sv1"                $enable_test_auth
+  if [ $multiple_svs -eq 1 ]; then
+    start_frontend sv 3212 sv2 "sv2" $enable_test_auth
   fi
 
-  if [ $multiple_svs -eq 1 ]; then
-    start_frontend sv 3012 sv2 "sv2" $enable_test_auth
+  # Scan
+  start_frontend   scan      3311 scan    "scan"               "false"           "none"
+
+  # Splitwell
+  if [ $app_manager -eq 1 ]; then
+      start_frontend   splitwell 3420 splitwell "splitwell"        $enable_test_auth
+  else
+      start_frontend   splitwell 3400 alice   "alice"              $enable_test_auth
+      start_frontend   splitwell 3401 bob     $validator_for_bob   $enable_test_auth
+      start_frontend   splitwell 3402 charlie "alice"              $enable_test_auth
   fi
+
+  # App manager
+  if [ $app_manager -eq 1 ]; then
+    start_frontend   app-manager 3500 alice     "alice"              $enable_test_auth
+    start_frontend   app-manager 3520 splitwell "splitwell"          $enable_test_auth
+  fi
+
 }
 
 # The set of frontends we want to start for the preflight self-hosted directory UI test

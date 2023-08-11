@@ -72,7 +72,7 @@ class ScanFrontendTimeBasedIntegrationTest
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
           "Go to app leaderboard page in scan UI",
-          go to "http://localhost:3006/app-leaderboard",
+          go to s"http://localhost:${scanUIPort}/app-leaderboard",
         )(
           "Check app leaderboard table and see entry",
           _ => {
@@ -90,7 +90,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
         actAndCheck(
           "Go to validator leaderboard page in scan UI",
-          go to "http://localhost:3006/validator-leaderboard",
+          go to s"http://localhost:${scanUIPort}/validator-leaderboard",
         )(
           "Check validator leaderboard table and see entry",
           _ => {
@@ -109,7 +109,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
     "see expected current and future coin configurations" in { implicit env =>
       withFrontEnd("scan-ui") { implicit webDriver =>
-        actAndCheck("Go to Scan UI main page", go to "http://localhost:3006")(
+        actAndCheck("Go to Scan UI main page", go to s"http://localhost:${scanUIPort}")(
           "Check the initial coin config matches the defaults",
           _ => {
             find(id("coin-creation-fee")).value.text should matchText(
@@ -262,7 +262,7 @@ class ScanFrontendTimeBasedIntegrationTest
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
           "Go to Scan UI main page",
-          go to "http://localhost:3006/domain-fees-leaderboard",
+          go to s"http://localhost:${scanUIPort}/domain-fees-leaderboard",
         )(
           "See both entries in the leaderboard",
           _ => {
@@ -312,7 +312,7 @@ class ScanFrontendTimeBasedIntegrationTest
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
           "Go to Scan UI main page",
-          go to "http://localhost:3006",
+          go to s"http://localhost:${scanUIPort}",
         )(
           "See valid total coin balance",
           _ => {

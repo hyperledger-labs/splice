@@ -10,8 +10,6 @@ abstract class SvFrontendCommonIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2")
     with FrontendLoginUtil {
 
-  val sv1Port = 3010
-
   "can create a valid CRARC_SetEnabledChoices vote request" in { implicit env =>
     val requestReasonUrl = "This is a request reason url."
     val requestReasonBody = "This is a request reason."
@@ -23,8 +21,8 @@ abstract class SvFrontendCommonIntegrationTest
     withFrontEnd("sv1") { implicit webDriver =>
       actAndCheck(
         "sv1 operator can login and browse to the governance tab", {
-          go to s"http://localhost:$sv1Port/votes"
-          loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+          go to s"http://localhost:$sv1UIPort/votes"
+          loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
         },
       )(
         "sv1 can see the create vote request button",

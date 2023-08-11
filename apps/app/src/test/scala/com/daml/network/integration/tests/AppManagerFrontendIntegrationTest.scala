@@ -29,9 +29,11 @@ class AppManagerFrontendIntegrationTest
     "register, install and launch splitwell" in { implicit env =>
       val installLink = withFrontEnd("splitwell") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session
-        login(3102, splitwellValidatorBackend.config.ledgerApiUser)
+        login(splitwellAppManagerUIPort, splitwellValidatorBackend.config.ledgerApiUser)
         textField("register-app-name-input").underlying.sendKeys("splitwell")
-        textField("register-app-ui-url-input").underlying.sendKeys("http://localhost:3002")
+        textField("register-app-ui-url-input").underlying.sendKeys(
+          s"http://localhost:${splitwellSplitwellUIPort}"
+        )
         find(className("register-app-release-bundle-input")).value.underlying
           .sendKeys(splitwellBundle.getAbsolutePath)
         click on id("register-app-add-domain-button")
@@ -50,7 +52,7 @@ class AppManagerFrontendIntegrationTest
         link
       }
       withFrontEnd("alice") { implicit webDriver =>
-        login(3100, aliceValidatorBackend.config.ledgerApiUser)
+        login(aliceAppManagerUIPort, aliceValidatorBackend.config.ledgerApiUser)
         textField(id("install-app-input")).value = installLink
         actAndCheck("Click on install app button", click on id("install-app-button"))(
           "App appears in installed apps",
@@ -64,7 +66,7 @@ class AppManagerFrontendIntegrationTest
         clickOn(id("oidc-login-button"))
         actAndCheck(
           "Login to app manager",
-          loginOnCurrentPage(3100, aliceValidatorBackend.config.ledgerApiUser),
+          loginOnCurrentPage(aliceAppManagerUIPort, aliceValidatorBackend.config.ledgerApiUser),
         )("authorize button appears", _ => find(id("authorize-button")) should not be empty)
         actAndCheck("Authorize app and get redirected", click on ("authorize-button"))(
           "splitwell UI shows up",

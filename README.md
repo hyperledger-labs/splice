@@ -914,13 +914,26 @@ Note you can add the flag ``-s`` to skip ``sbt --batch bundle``.
 ./start-frontends.sh
 ```
 
-Once this is complete, the front ends will be running on the following URL's:
+Once this is complete, the front ends will be running on the ports on localhost as follows:
 
-| App       | Alice                     | Bob                      | Charlie                 |
-|:----------|:-------------------------:|:------------------------:|:-----------------------:|
-| Wallet    | <http://localhost:3000>   | <http://localhost:3001>  |                         |
-| Splitwell | <http://localhost:3002>   | <http://localhost:3003>  | <http://localhost:3005> |
-| Directory | <http://localhost:3004>   |                          |                         |
+3<frontend><user>, where:
+
+- <frontend> is as follows:
+  - 0 for wallet
+  - 1 for directory
+  - 2 for sv UI
+  - 3 for scan
+  - 4 for splitwell
+  - 5 for app manager
+- <user> is as follows:
+  - 00 for alice
+  - 01 for bob
+  - 02 for charlie
+  - 11 for sv1
+  - 12 for sv2
+  - 20 for splitwell
+
+See the start-frontends.sh script for the full explicit list of frontends and their port numbers.
 
 For the UI's running as Alice and Bob, you can login as the
 `alice_wallet_user` and `bob_wallet_user` users respectively.

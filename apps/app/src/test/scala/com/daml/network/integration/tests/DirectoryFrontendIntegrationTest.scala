@@ -35,10 +35,10 @@ class DirectoryFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session
-        login(3000, aliceDamlUser)
+        login(aliceWalletUIPort, aliceDamlUser)
 
         reserveDirectoryNameFor(
-          () => login(3004, aliceDamlUser),
+          () => login(aliceDirectoryUIPort, aliceDamlUser),
           entryName,
           "1.0",
           "USD",
@@ -66,8 +66,8 @@ class DirectoryFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         // login to wallet UI once to create saved localstorage auth session
-        login(3000, aliceDamlUser)
-        login(3004, aliceDamlUser)
+        login(aliceWalletUIPort, aliceDamlUser)
+        login(aliceDirectoryUIPort, aliceDamlUser)
         waitForQuery(id("entry-name-field"))
 
         clue("requesting an invalid name to check invalid name message") {
@@ -86,7 +86,7 @@ class DirectoryFrontendIntegrationTest
     }
 
     "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
-      withAuth0LoginCheck("alice", 3004)((_, _, _) => ())
+      withAuth0LoginCheck("alice", aliceDirectoryUIPort)((_, _, _) => ())
     }
   }
 }

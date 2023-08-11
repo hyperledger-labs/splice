@@ -51,14 +51,11 @@ class SvFrontendTimeBasedIntegrationTest
   }
 
   "SV UIs" should {
-    val sv1Port = 3010
-    val sv2Port = 3012
-
     "see election results reflected in the UI" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "log in to sv1 UI", {
-            login(sv1Port, sv1Backend.config.ledgerApiUser)
+            login(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see the expected leader and epoch",
@@ -89,7 +86,7 @@ class SvFrontendTimeBasedIntegrationTest
       withFrontEnd("sv2") { implicit webDriver =>
         actAndCheck(
           "log in to sv2 UI", {
-            login(sv2Port, sv2Backend.config.ledgerApiUser)
+            login(sv2UIPort, sv2Backend.config.ledgerApiUser)
           },
         )(
           "We see a new leader and epoch",

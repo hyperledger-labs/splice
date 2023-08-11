@@ -62,12 +62,12 @@ class SplitwellFrontendIntegrationTest
       bobWalletClient.tap(550)
 
       val invite = withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        login(3002, aliceDamlUser)
+        login(aliceSplitwellUIPort, aliceDamlUser)
         createGroupAndInviteLink(groupName)
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
-        login(3003, bobDamlUser)
+        login(bobSplitwellUIPort, bobDamlUser)
         requestGroupMembership(invite)
       }
 
@@ -76,7 +76,7 @@ class SplitwellFrontendIntegrationTest
       }
 
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
-        login(3005, charlieDamlUser)
+        login(charlieSplitwellUIPort, charlieDamlUser)
         requestGroupMembership(invite)
       }
 
@@ -200,12 +200,12 @@ class SplitwellFrontendIntegrationTest
       bobWalletClient.tap(510)
 
       val invite = withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        login(3002, aliceDamlUser)
+        login(aliceSplitwellUIPort, aliceDamlUser)
         createGroupAndInviteLink(groupName)
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
-        login(3003, bobDamlUser)
+        login(bobSplitwellUIPort, bobDamlUser)
         requestGroupMembership(invite)
       }
 
@@ -218,7 +218,7 @@ class SplitwellFrontendIntegrationTest
         enterSplitwellPayment(aliceEntryName, aliceUserParty, 500)
 
         // Bob is redirected to wallet ..
-        loginOnCurrentPage(3001, bobDamlUser)
+        loginOnCurrentPage(bobWalletUIPort, bobDamlUser)
 
         click on className("payment-accept")
 
@@ -273,7 +273,7 @@ class SplitwellFrontendIntegrationTest
 
       // Alice creates three groups - abc, ab, ac
       val (invite1, invite2, invite3) = withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        login(3002, aliceDamlUser)
+        login(aliceSplitwellUIPort, aliceDamlUser)
 
         val invite1 = createGroupAndInviteLink("group-abc")
         val invite2 = createGroupAndInviteLink("group-ab")
@@ -284,14 +284,14 @@ class SplitwellFrontendIntegrationTest
 
       // Bob requests to join groups abc and ab
       withFrontEnd("bobSplitwell") { implicit webDriver =>
-        login(3003, bobDamlUser)
+        login(bobSplitwellUIPort, bobDamlUser)
         requestGroupMembership(invite1)
         requestGroupMembership(invite2)
       }
 
       // Charlie requests to join groups abc and ac
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
-        login(3005, charlieDamlUser)
+        login(charlieSplitwellUIPort, charlieDamlUser)
         requestGroupMembership(invite1)
         requestGroupMembership(invite3)
       }
@@ -349,7 +349,7 @@ class SplitwellFrontendIntegrationTest
     }
 
     "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
-      withAuth0LoginCheck("aliceSplitwell", 3005)((_, _, _) => ())
+      withAuth0LoginCheck("aliceSplitwell", aliceSplitwellUIPort)((_, _, _) => ())
     }
   }
 }

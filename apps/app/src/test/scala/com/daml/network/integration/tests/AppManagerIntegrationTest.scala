@@ -52,7 +52,7 @@ class AppManagerIntegrationTest
         splitwellValidatorBackend.registerApp(
           splitwellBackend.config.providerUser,
           "splitwell",
-          "http://localhost:3002",
+          "http://localhost:3400",
           Seq(
             Domain(
               "splitwell",
@@ -100,7 +100,7 @@ class AppManagerIntegrationTest
         InstalledApp(
           splitwell.provider,
           "splitwell",
-          "http://localhost:3002",
+          "http://localhost:3400",
         )
       )
     }

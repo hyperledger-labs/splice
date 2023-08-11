@@ -22,14 +22,11 @@ class SvFrontendIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
 
   "SV UIs" should {
-    val sv1Port = 3010
-    val sv2Port = 3012
-
     "have basic login functionality" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "login works with correct password", {
-            login(sv1Port, sv1Backend.config.ledgerApiUser)
+            login(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
           "logged in in the sv ui",
@@ -44,7 +41,7 @@ class SvFrontendIntegrationTest
           {
             actAndCheck(
               "login does not work with wrong user", {
-                login(sv1Port, "WrongUser")
+                login(sv1UIPort, "WrongUser")
               },
             )(
               "login fails",
@@ -65,7 +62,7 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "svc and coin infos are displayed in pretty json", {
-            login(sv1Port, sv1Backend.config.ledgerApiUser)
+            login(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see the 5 tab panels",
@@ -120,8 +117,8 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         val (_, rowSize) = actAndCheck(
           "sv1 operator can login and browse to the validator onboarding tab", {
-            go to s"http://localhost:$sv1Port/validator-onboarding"
-            loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+            go to s"http://localhost:$sv1UIPort/validator-onboarding"
+            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see a button for creating onboarding secret",
@@ -179,8 +176,8 @@ class SvFrontendIntegrationTest
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 operator can login and browse to the coin price tab", {
-            go to s"http://localhost:$sv1Port/cc-price"
-            loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+            go to s"http://localhost:$sv1UIPort/cc-price"
+            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
           "We see a median coin price, desired coin price of SV1 and other SVs, open mining rounds",
@@ -317,8 +314,8 @@ class SvFrontendIntegrationTest
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -366,8 +363,8 @@ class SvFrontendIntegrationTest
 
         val (_, reviewButton) = actAndCheck(
           "sv2 operator can login and browse to the governance tab", {
-            go to s"http://localhost:$sv2Port/votes"
-            loginOnCurrentPage(sv2Port, sv2Backend.config.ledgerApiUser)
+            go to s"http://localhost:$sv2UIPort/votes"
+            loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
           },
         )(
           "sv2 can see the new vote request",
@@ -545,8 +542,8 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -612,7 +609,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can create a new vote request to revoke the featured app right", {
-              go to s"http://localhost:$sv1Port/votes"
+              go to s"http://localhost:$sv1UIPort/votes"
 
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("SRARC_RevokeFeaturedAppRight")
@@ -654,8 +651,8 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -711,8 +708,8 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -794,8 +791,8 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",
@@ -1001,8 +998,8 @@ class SvFrontendIntegrationTest
         withFrontEnd("sv2") { implicit webDriver =>
           actAndCheck(
             "sv2 operator login and browse to the governance tab", {
-              go to s"http://localhost:$sv2Port/votes"
-              loginOnCurrentPage(sv2Port, sv2Backend.config.ledgerApiUser)
+              go to s"http://localhost:$sv2UIPort/votes"
+              loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
             },
           )(
             "sv2 sees the new vote request",
@@ -1045,8 +1042,8 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
-              go to s"http://localhost:$sv1Port/votes"
-              loginOnCurrentPage(sv1Port, sv1Backend.config.ledgerApiUser)
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
             "sv1 can see the create vote request button",

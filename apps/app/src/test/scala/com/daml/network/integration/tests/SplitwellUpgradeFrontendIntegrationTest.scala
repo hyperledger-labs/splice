@@ -48,7 +48,7 @@ class SplitwellUpgradeFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceUser = aliceSplitwellClient.config.ledgerApiUser
       withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
-        login(3002, aliceUser)
+        login(aliceSplitwellUIPort, aliceUser)
       }
 
       eventually() {
@@ -108,14 +108,14 @@ class SplitwellUpgradeFrontendIntegrationTest
       ) {
 
         val invite = withFrontEnd(aliceSplitwellFE) { implicit webDriver =>
-          login(3002, aliceDamlUser)
+          login(aliceSplitwellUIPort, aliceDamlUser)
           eventually() { userIsLoggedIn() }
           createGroupAndInviteLink(aGroupName) withClue "alice creates unshared group"
           createGroupAndInviteLink(abGroupName) withClue "alice creates group/copies invite"
         }
 
         withFrontEnd(bobSplitwellFE) { implicit webDriver =>
-          login(3003, bobDamlUser)
+          login(bobSplitwellUIPort, bobDamlUser)
           eventually() { userIsLoggedIn() }
           createGroupAndInviteLink(bGroupName)
           requestGroupMembership(invite) withClue "bob asks to join alice's group"
@@ -229,7 +229,10 @@ class SplitwellUpgradeFrontendIntegrationTest
             "Test that once all users are migrated we eventually end up with everything being transferred to the new domain"
           ) {
             withFrontEnd(bobSplitwellFE) { implicit webDriver =>
-              actAndCheck("return from wallet to splitwell", go to "http://localhost:3003")(
+              actAndCheck(
+                "return from wallet to splitwell",
+                go to s"http://localhost:${bobSplitwellUIPort}",
+              )(
                 "bob is back on splitwell and upgrading",
                 { _ =>
                   userIsLoggedIn()
@@ -247,14 +250,14 @@ class SplitwellUpgradeFrontendIntegrationTest
 
             withFrontEnd(bobSplitwellFE) { implicit webDriver =>
               go to bobWalletResume
-              loginOnCurrentPage(3001, bobDamlUser)
+              loginOnCurrentPage(bobWalletUIPort, bobDamlUser)
               actAndCheck(
                 "Bob completes payment after migration",
                 click on className("payment-accept"),
               )(
                 "Bob returns to splitwell and balance update gets transferred to splitwellUpgrade",
                 _ => {
-                  currentUrl should startWith(s"http://localhost:3003")
+                  currentUrl should startWith(s"http://localhost:${bobSplitwellUIPort}")
                   val balanceUpdates =
                     bobSplitwellClient.listBalanceUpdates(GroupKey(abGroupName, alice))
                   balanceUpdates should have size 3
