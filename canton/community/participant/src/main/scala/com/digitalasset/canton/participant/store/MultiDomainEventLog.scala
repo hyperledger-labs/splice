@@ -40,7 +40,6 @@ import com.digitalasset.canton.participant.sync.{
 }
 import com.digitalasset.canton.participant.{GlobalOffset, LocalOffset}
 import com.digitalasset.canton.platform.akkastreams.dispatcher.Dispatcher
-import com.digitalasset.canton.platform.akkastreams.dispatcher.SubSource.RangeSource
 import com.digitalasset.canton.protocol.TargetDomainId
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.store.{IndexedDomain, IndexedStringStore}
@@ -125,19 +124,6 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
   def subscribe(startInclusive: Option[GlobalOffset])(implicit
       traceContext: TraceContext
   ): Source[(GlobalOffset, Traced[LedgerSyncEvent]), NotUsed]
-
-  // TODO(#11002) This serves the PoC implementation of multi-domain Ledger API. In case PoC concluded this might be eligible for removal.
-  /** Yields an akka source with ledger end. */
-  def subscribeForLedgerEnds(startExclusive: GlobalOffset): Source[GlobalOffset, NotUsed] =
-    dispatcher
-      .startingAt(
-        startExclusive = startExclusive,
-        subSource = RangeSource { (_fromExcl, toIncl) =>
-          Source.single((toIncl, ()))
-        },
-        endInclusive = None,
-      )
-      .map { case (globalOffset, _) => globalOffset }
 
   /** Yields all events with offset up to `upToInclusive`. */
   def lookupEventRange(upToInclusive: Option[GlobalOffset], limit: Option[Int])(implicit
@@ -428,15 +414,15 @@ object MultiDomainEventLog {
     final case class Publication(
         globalOffset: GlobalOffset,
         publicationTime: CantonTimestamp,
-        inFlightReference: Option[InFlightReference],
-        deduplicationInfo: Option[DeduplicationInfo],
+        inFlightReferenceO: Option[InFlightReference],
+        deduplicationInfoO: Option[DeduplicationInfo],
         event: LedgerSyncEvent,
     ) extends PrettyPrinting {
 
       override def pretty: Pretty[Publication] = prettyOfClass(
         param("global offset", _.globalOffset),
-        paramIfDefined("in-flight reference", _.inFlightReference),
-        paramIfDefined("deduplication info", _.deduplicationInfo),
+        paramIfDefined("in-flight reference", _.inFlightReferenceO),
+        paramIfDefined("deduplication info", _.deduplicationInfoO),
         param("event", _.event),
       )
     }

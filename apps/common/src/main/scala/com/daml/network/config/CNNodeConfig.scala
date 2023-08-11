@@ -57,6 +57,7 @@ case class SharedCNNodeAppParameters(
     override val dontWarnOnDeprecatedPV: Boolean,
     override val initialProtocolVersion: ProtocolVersion,
     override val dbMigrateAndStart: Boolean,
+    override val skipTopologyManagerSignatureValidation: Boolean,
 ) extends CantonNodeParameters {
   override val delayLoggingThreshold = delayLoggingThreshold_.toInternal
 }

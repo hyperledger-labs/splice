@@ -61,7 +61,7 @@ class RetryProvider(
   // TODO(#4405) Derive from FlagCloseable isClosing state.
   private val shutdownSignal = Promise[UnlessShutdown[Nothing]]()
 
-  runOnShutdown(new RunOnShutdown {
+  runOnShutdown_(new RunOnShutdown {
     override def name: String = s"trigger promise for shutdown signal"
     override def done: Boolean = shutdownSignal.isCompleted
     override def run(): Unit = {

@@ -171,7 +171,7 @@ abstract class CantonNodeBootstrapBase[
       canton.topology.admin.v0.TopologyAggregationServiceGrpc
         .bindService(
           new GrpcTopologyAggregationService(
-            // TODO(#11255) remove map filter
+            // TODO(#14048) remove map filter
             sequencedTopologyStores.mapFilter(TopologyStoreId.select[TopologyStoreId.DomainStore]),
             ips,
             loggerFactory,
@@ -371,23 +371,20 @@ abstract class CantonNodeBootstrapBase[
     .onShutdown(Left("Aborted due to shutdown"))
 
   protected def startTopologyManagementWriteService[E <: CantonError](
-      topologyManager: TopologyManager[E],
-      authorizedStore: TopologyStore[TopologyStoreId.AuthorizedStore],
+      topologyManager: TopologyManager[E]
   ): Unit = {
     adminServerRegistry
       .addServiceU(
-        topologyManagerWriteService(topologyManager, authorizedStore)
+        topologyManagerWriteService(topologyManager)
       )
   }
 
   protected def topologyManagerWriteService[E <: CantonError](
-      topologyManager: TopologyManager[E],
-      authorizedStore: TopologyStore[TopologyStoreId.AuthorizedStore],
+      topologyManager: TopologyManager[E]
   ): ServerServiceDefinition = {
     TopologyManagerWriteServiceGrpc.bindService(
       new GrpcTopologyManagerWriteService(
         topologyManager,
-        authorizedStore,
         crypto.value.cryptoPublicStore,
         parameterConfig.initialProtocolVersion,
         loggerFactory,

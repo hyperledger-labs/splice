@@ -121,7 +121,7 @@ class TreasuryService(
     queue
   }
 
-  retryProvider.runOnShutdown(new RunOnShutdown {
+  retryProvider.runOnShutdown_(new RunOnShutdown {
     override def name: String = s"terminate coin operation batch executor"
     override def done: Boolean = false // It's OK to under-approximate this value
     override def run(): Unit = {

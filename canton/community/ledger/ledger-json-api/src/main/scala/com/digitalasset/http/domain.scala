@@ -24,7 +24,6 @@ import scalaz.syntax.show.*
 import scalaz.syntax.std.option.*
 import scalaz.syntax.traverse.*
 import scalaz.{-\/, @@, Applicative, Bitraverse, Functor, NonEmptyList, Tag, Traverse, \/, \/-}
-import spray.json.JsValue
 import scalaz.syntax.tag.*
 
 import scala.annotation.tailrec
@@ -32,7 +31,7 @@ import scala.annotation.tailrec
 package object domain {
   import scalaz.{@@, Tag}
 
-  import com.daml.fetchcontracts.{domain => here}
+  import com.daml.fetchcontracts.{domain as here}
 
   type Error = here.Error
   final val Error = here.Error
@@ -70,6 +69,10 @@ package object domain {
 
   type SubmissionId = String @@ SubmissionIdTag
   val SubmissionId = Tag.of[SubmissionIdTag]
+
+  type WorkflowIdTag = lar.WorkflowIdTag
+  type WorkflowId = String @@ WorkflowIdTag
+  val WorkflowId = Tag.of[WorkflowIdTag]
 
   type LfType = typesig.Type
 
@@ -160,7 +163,7 @@ package domain {
       locator: ContractLocator[LfV],
       readAs: Option[NonEmptyList[Party]],
   ) {
-     def traverseLocator[F[_]: Functor, OV](
+    def traverseLocator[F[_]: Functor, OV](
         f: ContractLocator[LfV] => F[ContractLocator[OV]]
     ): F[FetchRequest[OV]] = f(locator) map (l => copy(locator = l))
   }
@@ -184,7 +187,6 @@ package domain {
 
   final case class GetActiveContractsRequest(
       templateIds: NonEmpty[Set[ContractTypeId.OptionalPkg]],
-      query: Map[String, JsValue],
       readAs: Option[NonEmptyList[Party]],
   )
 
@@ -194,7 +196,6 @@ package domain {
 
   final case class SearchForeverQuery(
       templateIds: NonEmpty[Set[ContractTypeId.OptionalPkg]],
-      query: Map[String, JsValue],
       offset: Option[domain.Offset],
   )
 
@@ -207,9 +208,10 @@ package domain {
   final case class CanReadAs(party: Party) extends UserRight
 
   object UserRights {
-    import com.digitalasset.canton.ledger.api.domain.{UserRight => LedgerUserRight}, com.daml.lf.data.Ref
-    import scalaz.syntax.traverse._
-    import scalaz.syntax.std.either._
+    import com.digitalasset.canton.ledger.api.domain.{UserRight as LedgerUserRight},
+      com.daml.lf.data.Ref
+    import scalaz.syntax.traverse.*
+    import scalaz.syntax.std.either.*
 
     def toLedgerUserRights(input: List[UserRight]): String \/ List[LedgerUserRight] =
       input.traverse {
@@ -320,8 +322,8 @@ package domain {
     object Arguments {
       final case class Blob(payloadBlob: PbAny) extends Arguments[Nothing]
       final case class Record[+LfV](payload: LfV) extends Arguments[LfV]
-       val blobKey = "payloadBlob"
-       val recordKey = "payload"
+      val blobKey = "payloadBlob"
+      val recordKey = "payload"
 
       implicit val covariant: Traverse[Arguments] = new Traverse[Arguments] {
         override def traverseImpl[G[_]: Applicative, A, B](
@@ -339,7 +341,7 @@ package domain {
         contractKeyHash: Option[Base16],
         driverMetadata: Option[Base64],
     ) {
-      import com.daml.api.util.TimestampConversion.{fromLf => timestampLfToProto}
+      import com.daml.api.util.TimestampConversion.{fromLf as timestampLfToProto}
 
       def toLedgerApi: lav1.contract_metadata.ContractMetadata =
         lav1.contract_metadata.ContractMetadata(
@@ -351,10 +353,10 @@ package domain {
 
     object Metadata extends ((Time.Timestamp, Option[Base16], Option[Base64]) => Metadata) {
       // meant only for testing
-       def fromLedgerApi(
+      def fromLedgerApi(
           la: lav1.contract_metadata.ContractMetadata
       ): Error \/ Metadata = {
-        import com.daml.api.util.{TimestampConversion => TSC}
+        import com.daml.api.util.{TimestampConversion as TSC}
         def boxIfNE[Tag](bs: ByteString): Option[ByteString @@ Tag] =
           if (bs.isEmpty) None else Some(Tag(bs))
         for {
@@ -390,6 +392,7 @@ package domain {
       actAs: Option[NonEmptyList[Party]],
       readAs: Option[List[Party]],
       submissionId: Option[SubmissionId],
+      workflowId: Option[WorkflowId],
       deduplicationPeriod: Option[domain.DeduplicationPeriod],
       disclosedContracts: Option[List[DisclosedContract[TmplId, LfV]]],
   )
@@ -399,7 +402,7 @@ package domain {
     type IgnoreDisclosed = CommandMeta[Any, Any]
     type LAV = CommandMeta[ContractTypeId.Template.RequiredPkg, lav1.value.Record]
 
-     implicit final class `ensureDisclosedAreRecords op`[L](
+    implicit final class `ensureDisclosedAreRecords op`[L](
         private val self: CommandMeta[L, lav1.value.Value]
     ) extends AnyVal {
       def ensureDisclosedAreRecords: Error \/ CommandMeta[L, lav1.value.Record] =
@@ -539,7 +542,7 @@ package domain {
     }
   }
 
-   object ActiveContractExtras {
+  object ActiveContractExtras {
     // only used in integration tests
     implicit val `AcC hasTemplateId`: HasTemplateId.Compat[ActiveContract.ResolvedCtTyId] =
       new HasTemplateId[ActiveContract.ResolvedCtTyId] {
@@ -804,7 +807,7 @@ package domain {
     implicit final class `CAEC traversePayloadArg`[P, Ar, T, I](
         private val self: CreateAndExerciseCommand[P, Ar, T, I]
     ) extends AnyVal {
-       def traversePayloadsAndArgument[G[_]: Applicative, P2, Ar2](
+      def traversePayloadsAndArgument[G[_]: Applicative, P2, Ar2](
           f: P => G[P2],
           g: Ar => G[Ar2],
       ): G[CreateAndExerciseCommand[P2, Ar2, T, I]] =
@@ -853,7 +856,7 @@ package domain {
       override def traverseImpl[G[_]: Applicative, A, B](
           fa: CreateCommandResponse[A]
       )(f: A => G[B]): G[CreateCommandResponse[B]] = {
-        import scalaz.syntax.apply._
+        import scalaz.syntax.apply.*
         val gk: G[Option[B]] = fa.key traverse f
         val ga: G[B] = f(fa.payload)
         ^(gk, ga)((k, a) => fa.copy(key = k, payload = a))
@@ -939,11 +942,11 @@ package domain {
 
   final case class AsyncWarningsWrapper(warnings: ServiceWarning)
 
-  import com.daml.ledger.api.{v1 => lav1}
+  import com.daml.ledger.api.{v1 as lav1}
   import com.daml.lf.data.Ref
   import com.daml.nonempty.NonEmpty
   import scalaz.{-\/, Applicative, Traverse, \/, \/-}
-  import scalaz.syntax.functor._
+  import scalaz.syntax.functor.*
 
   import scala.collection.IterableOps
 
@@ -970,7 +973,7 @@ package domain {
     * }}}
     */
   sealed abstract class ContractTypeId[+PkgId]
-    extends Product3[PkgId, String, String]
+      extends Product3[PkgId, String, String]
       with Serializable
       with ContractTypeId.Ops[ContractTypeId, PkgId] {
     val packageId: PkgId
@@ -996,17 +999,17 @@ package domain {
     }
 
     override final def hashCode = {
-      import scala.util.hashing.{MurmurHash3 => H}
+      import scala.util.hashing.{MurmurHash3 as H}
       H.productHash(this, H.productSeed, ignorePrefix = true)
     }
   }
 
   object ResolvedQuery {
     def apply(resolved: ContractTypeId.Resolved): ResolvedQuery = {
-      import ContractTypeId._
+      import ContractTypeId.*
       resolved match {
-        case t@Template(_, _, _) => ByTemplateId(t)
-        case i@Interface(_, _, _) => ByInterfaceId(i)
+        case t @ Template(_, _, _) => ByTemplateId(t)
+        case i @ Interface(_, _, _) => ByInterfaceId(i)
       }
     }
 
@@ -1029,37 +1032,38 @@ package domain {
     }
 
     def partition[CC[_], C](
-                             resolved: IterableOps[ContractTypeId.Resolved, CC, C]
-                           ): (CC[ContractTypeId.Template.Resolved], CC[ContractTypeId.Interface.Resolved]) =
+        resolved: IterableOps[ContractTypeId.Resolved, CC, C]
+    ): (CC[ContractTypeId.Template.Resolved], CC[ContractTypeId.Interface.Resolved]) =
       resolved.partitionMap {
-        case t@ContractTypeId.Template(_, _, _) => Left(t)
-        case i@ContractTypeId.Interface(_, _, _) => Right(i)
+        case t @ ContractTypeId.Template(_, _, _) => Left(t)
+        case i @ ContractTypeId.Interface(_, _, _) => Right(i)
       }
 
     sealed abstract class Unsupported(val errorMsg: String) extends Product with Serializable
 
     final case object CannotQueryBothTemplateIdsAndInterfaceIds
-      extends Unsupported("Cannot query both templates IDs and interface IDs")
+        extends Unsupported("Cannot query both templates IDs and interface IDs")
 
     final case object CannotQueryManyInterfaceIds
-      extends Unsupported("Cannot query more than one interface ID")
+        extends Unsupported("Cannot query more than one interface ID")
 
-    final case object CannotBeEmpty extends Unsupported("Cannot resolve any template ID from request")
+    final case object CannotBeEmpty
+        extends Unsupported("Cannot resolve any template ID from request")
 
     final case class ByTemplateIds(templateIds: NonEmpty[Set[ContractTypeId.Template.Resolved]])
-      extends ResolvedQuery {
+        extends ResolvedQuery {
       def resolved: NonEmpty[Set[ContractTypeId.Resolved]] =
         templateIds.map(id => id: ContractTypeId.Resolved)
     }
 
     final case class ByTemplateId(templateId: ContractTypeId.Template.Resolved)
-      extends ResolvedQuery {
+        extends ResolvedQuery {
       def resolved: NonEmpty[Set[ContractTypeId.Resolved]] =
         NonEmpty(Set, templateId: ContractTypeId.Resolved)
     }
 
     final case class ByInterfaceId(interfaceId: ContractTypeId.Interface.Resolved)
-      extends ResolvedQuery {
+        extends ResolvedQuery {
       def resolved: NonEmpty[Set[ContractTypeId.Resolved]] =
         NonEmpty(Set, interfaceId: ContractTypeId.Resolved)
     }
@@ -1071,18 +1075,18 @@ package domain {
 
   object ContractTypeId extends ContractTypeIdLike[ContractTypeId] {
     final case class Unknown[+PkgId](
-                                      packageId: PkgId,
-                                      moduleName: String,
-                                      entityName: String,
-                                    ) extends ContractTypeId[PkgId]
-      with Ops[Unknown, PkgId] {
+        packageId: PkgId,
+        moduleName: String,
+        entityName: String,
+    ) extends ContractTypeId[PkgId]
+        with Ops[Unknown, PkgId] {
       override def productPrefix = "ContractTypeId"
 
       override def copy[PkgId0](
-                                 packageId: PkgId0 = packageId,
-                                 moduleName: String = moduleName,
-                                 entityName: String = entityName,
-                               ) = Unknown(packageId, moduleName, entityName)
+          packageId: PkgId0 = packageId,
+          moduleName: String = moduleName,
+          entityName: String = entityName,
+      ) = Unknown(packageId, moduleName, entityName)
     }
 
     sealed abstract class Definite[+PkgId] extends ContractTypeId[PkgId] with Ops[Definite, PkgId]
@@ -1093,15 +1097,15 @@ package domain {
       * IDs for resolution, and that resolving to an interface ID should be an error.
       */
     final case class Template[+PkgId](packageId: PkgId, moduleName: String, entityName: String)
-      extends Definite[PkgId]
+        extends Definite[PkgId]
         with Ops[Template, PkgId] {
       override def productPrefix = "TemplateId"
 
       override def copy[PkgId0](
-                                 packageId: PkgId0 = packageId,
-                                 moduleName: String = moduleName,
-                                 entityName: String = entityName,
-                               ) = Template(packageId, moduleName, entityName)
+          packageId: PkgId0 = packageId,
+          moduleName: String = moduleName,
+          entityName: String = entityName,
+      ) = Template(packageId, moduleName, entityName)
     }
 
     /** A contract type ID known to be an interface, not a template.  When resolved,
@@ -1110,22 +1114,22 @@ package domain {
       * IDs for resolution, and that resolving to a template ID should be an error.
       */
     final case class Interface[+PkgId](packageId: PkgId, moduleName: String, entityName: String)
-      extends Definite[PkgId]
+        extends Definite[PkgId]
         with Ops[Interface, PkgId] {
       override def productPrefix = "InterfaceId"
 
       override def copy[PkgId0](
-                                 packageId: PkgId0 = packageId,
-                                 moduleName: String = moduleName,
-                                 entityName: String = entityName,
-                               ) = Interface(packageId, moduleName, entityName)
+          packageId: PkgId0 = packageId,
+          moduleName: String = moduleName,
+          entityName: String = entityName,
+      ) = Interface(packageId, moduleName, entityName)
     }
 
     override def apply[PkgId](
-                               packageId: PkgId,
-                               moduleName: String,
-                               entityName: String,
-                             ): ContractTypeId[PkgId] =
+        packageId: PkgId,
+        moduleName: String,
+        entityName: String,
+    ): ContractTypeId[PkgId] =
       Unknown(packageId, moduleName, entityName)
 
     // Product3 makes custom unapply really cheap
@@ -1133,12 +1137,12 @@ package domain {
 
     // belongs in ultimate parent `object`
     implicit def `ContractTypeId covariant`[F[T] <: ContractTypeId[T] with ContractTypeId.Ops[F, T]]
-    : Traverse[F] =
+        : Traverse[F] =
       new Traverse[F] {
         override def map[A, B](fa: F[A])(f: A => B): F[B] =
           fa.copy(packageId = f(fa.packageId))
 
-        override def traverseImpl[G[_] : Applicative, A, B](fa: F[A])(f: A => G[B]): G[F[B]] =
+        override def traverseImpl[G[_]: Applicative, A, B](fa: F[A])(f: A => G[B]): G[F[B]] =
           f(fa.packageId) map (p2 => fa.copy(packageId = p2))
       }
 
@@ -1162,10 +1166,10 @@ package domain {
     sealed trait Ops[+CtId[_], +PkgId] {
       this: ContractTypeId[PkgId] =>
       def copy[PkgId0](
-                        packageId: PkgId0 = packageId,
-                        moduleName: String = moduleName,
-                        entityName: String = entityName,
-                      ): CtId[PkgId0]
+          packageId: PkgId0 = packageId,
+          moduleName: String = moduleName,
+          entityName: String = entityName,
+      ): CtId[PkgId0]
     }
   }
 

@@ -22,6 +22,7 @@ import com.digitalasset.canton.participant.protocol.ProtocolProcessor.{
   DomainParametersError,
   NoMediatorError,
 }
+import com.digitalasset.canton.participant.protocol.SubmissionTracker.SubmissionData
 import com.digitalasset.canton.participant.protocol.TestProcessingSteps.{
   TestPendingRequestData,
   TestPendingRequestDataType,
@@ -41,7 +42,7 @@ import com.digitalasset.canton.participant.store.{
   TransferLookup,
 }
 import com.digitalasset.canton.participant.sync.TimestampedEvent
-import com.digitalasset.canton.protocol.messages.EncryptedViewMessageDecryptionError.SyncCryptoDecryptError
+import com.digitalasset.canton.protocol.messages.EncryptedViewMessageError.SyncCryptoDecryptError
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{
   DynamicDomainParametersWithValidity,
@@ -70,6 +71,7 @@ class TestProcessingSteps(
     pendingSubmissionMap: concurrent.Map[Int, Unit],
     pendingRequestData: Option[TestPendingRequestData],
     informeesOfView: ViewHash => Set[Informee] = _ => Set.empty,
+    submissionDataForTrackerO: Option[SubmissionData] = None,
 )(implicit val ec: ExecutionContext)
     extends ProcessingSteps[
       Int,
@@ -127,7 +129,7 @@ class TestProcessingSteps(
 
   override def getSubmissionDataForTracker(
       views: Seq[DecryptedView]
-  ): Option[SubmissionTracker.SubmissionData] = None
+  ): Option[SubmissionTracker.SubmissionData] = submissionDataForTrackerO
 
   override def participantResponseDeadlineFor(
       parameters: DynamicDomainParametersWithValidity,
@@ -191,8 +193,7 @@ class TestProcessingSteps(
         .bimap(
           err =>
             SyncCryptoDecryptError(
-              SyncCryptoDecryptionError(FailedToDecrypt(err.toString)),
-              envelope.protocolMessage,
+              SyncCryptoDecryptionError(FailedToDecrypt(err.toString))
             ),
           hash =>
             WithRecipients(treeFor(envelope.protocolMessage.viewHash, hash), envelope.recipients),
@@ -206,11 +207,16 @@ class TestProcessingSteps(
     )
   }
 
+  override def computeFullViews(
+      decryptedViewsWithSignatures: Seq[(WithRecipients[DecryptedView], Option[Signature])]
+  ): (Seq[(WithRecipients[FullView], Option[Signature])], Seq[ProtocolProcessor.MalformedPayload]) =
+    (decryptedViewsWithSignatures, Seq.empty)
+
   override def computeActivenessSetAndPendingContracts(
       ts: CantonTimestamp,
       rc: RequestCounter,
       sc: SequencerCounter,
-      decryptedViewsWithSignatures: NonEmpty[
+      fullViewsWithSignatures: NonEmpty[
         Seq[(WithRecipients[TestViewTree], Option[Signature])]
       ],
       malformedPayloads: Seq[ProtocolProcessor.MalformedPayload],
@@ -261,7 +267,7 @@ class TestProcessingSteps(
       ts: CantonTimestamp,
       rc: RequestCounter,
       sc: SequencerCounter,
-      decryptedViews: NonEmpty[Seq[WithRecipients[DecryptedView]]],
+      fullViews: NonEmpty[Seq[WithRecipients[DecryptedView]]],
       freshOwnTimelyTx: Boolean,
   )(implicit traceContext: TraceContext): (Option[TimestampedEvent], Option[PendingSubmissionId]) =
     (None, None)
@@ -325,6 +331,7 @@ object TestProcessingSteps {
 
   case object TestViewType extends ViewType {
     override type View = TestViewTree
+    override type FullView = TestViewTree
 
     override def toProtoEnum: v0.ViewType =
       throw new UnsupportedOperationException("TestViewType cannot be serialized")

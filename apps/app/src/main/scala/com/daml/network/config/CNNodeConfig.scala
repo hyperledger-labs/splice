@@ -108,6 +108,7 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = false,
+        skipTopologyManagerSignatureValidation = false,
       )
     }
 
@@ -148,6 +149,7 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = false,
+        skipTopologyManagerSignatureValidation = false,
       )
     }
 
@@ -187,6 +189,7 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = false,
+        skipTopologyManagerSignatureValidation = false,
       )
     }
 
@@ -232,6 +235,7 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = false,
+        skipTopologyManagerSignatureValidation = false,
       )
     }
 
@@ -277,6 +281,7 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = false,
+        skipTopologyManagerSignatureValidation = false,
       )
     }
 

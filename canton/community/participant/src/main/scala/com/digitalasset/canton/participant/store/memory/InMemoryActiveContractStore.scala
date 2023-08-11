@@ -58,12 +58,12 @@ class InMemoryActiveContractStore(
       }
     })
 
-  override def archiveContracts(contractIds: Seq[LfContractId], toc: TimeOfChange)(implicit
+  override def archiveContracts(archivals: Seq[LfContractId], toc: TimeOfChange)(implicit
       traceContext: TraceContext
   ): CheckedT[Future, AcsError, AcsWarning, Unit] =
     CheckedT(Future.successful {
-      logger.trace(show"Archiving contracts at $toc: $contractIds")
-      contractIds.to(LazyList).traverse_ { contractId =>
+      logger.trace(show"Archiving contracts at $toc: $archivals")
+      archivals.to(LazyList).traverse_ { case contractId =>
         updateTable(contractId, _.addArchival(contractId, toc))
       }
     })
@@ -83,12 +83,11 @@ class InMemoryActiveContractStore(
 
   override def snapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): Future[SortedMap[LfContractId, (CantonTimestamp, TransferCounter)]] = Future.successful {
-    val snapshot = SortedMap.newBuilder[LfContractId, (CantonTimestamp, TransferCounter)]
+  ): Future[SortedMap[LfContractId, (CantonTimestamp, TransferCounterO)]] = Future.successful {
+    val snapshot = SortedMap.newBuilder[LfContractId, (CantonTimestamp, TransferCounterO)]
     table.foreach { case (contractId, contractStatus) =>
       contractStatus.activeBy(timestamp).foreach { case (activationTimestamp, transferCounterO) =>
-        snapshot += (contractId -> (activationTimestamp, transferCounterO
-          .getOrElse(TransferCounter.Genesis)))
+        snapshot += (contractId -> (activationTimestamp, transferCounterO))
       }
     }
     snapshot.result()
@@ -96,12 +95,11 @@ class InMemoryActiveContractStore(
 
   override def snapshot(rc: RequestCounter)(implicit
       traceContext: TraceContext
-  ): Future[SortedMap[LfContractId, (RequestCounter, TransferCounter)]] = Future.successful {
-    val snapshot = SortedMap.newBuilder[LfContractId, (RequestCounter, TransferCounter)]
+  ): Future[SortedMap[LfContractId, (RequestCounter, TransferCounterO)]] = Future.successful {
+    val snapshot = SortedMap.newBuilder[LfContractId, (RequestCounter, TransferCounterO)]
     table.foreach { case (contractId, contractStatus) =>
       contractStatus.activeBy(rc).foreach { case (activationRc, transferCounterO) =>
-        snapshot += (contractId -> (activationRc, transferCounterO
-          .getOrElse(TransferCounter.Genesis)))
+        snapshot += (contractId -> (activationRc, transferCounterO))
       }
     }
     snapshot.result()
@@ -120,6 +118,36 @@ class InMemoryActiveContractStore(
         )
         .toMap
     }
+
+  override def bulkContractsTransferCounterSnapshot(
+      contractIds: Set[LfContractId],
+      requestCounter: RequestCounter,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Map[LfContractId, TransferCounterO]] = {
+    logger.debug(
+      s"Looking up transfer counters for contracts $contractIds up to but not including $requestCounter"
+    )
+    if (requestCounter == RequestCounter.MinValue)
+      ErrorUtil.internalError(
+        new IllegalArgumentException(
+          s"The request counter $requestCounter should not be equal to ${RequestCounter.MinValue}"
+        )
+      )
+    Future.successful {
+      contractIds
+        .to(LazyList)
+        .mapFilter(contractId =>
+          table
+            .get(contractId)
+            .flatMap(_.activeBy(requestCounter - 1))
+            .map { case (_, transferCounter) =>
+              contractId -> transferCounter
+            }
+        )
+        .toMap
+    }
+  }
 
   override def transferInContracts(
       transferIns: Seq[(LfContractId, SourceDomainId, TransferCounterO)],
@@ -206,24 +234,68 @@ class InMemoryActiveContractStore(
         s"Provided timestamps are in the wrong order: $fromExclusive and $toInclusive",
       )
 
-      val changesByToc: Map[TimeOfChange, List[(LfContractId, ActivenessChange)]] = table.toList
-        .flatMap { case (coid, status) =>
-          status.changes
-            .filter { case (ch, _) => ch.toc > fromExclusive && ch.toc <= toInclusive }
-            .toList
-            .map(ch => (coid, ch._1))
-        }
-        .groupBy(_._2.toc)
+      // obtain the maximum creation timestamp per contract up to a certain rc
+      val latestActivationTransferCounterPerCid
+          : Map[(LfContractId, RequestCounter), TransferCounterO] =
+        table.toList.flatMap { case (cid, status) =>
+          // we only constrain here the upper bound timestamp, because we want to find the
+          // transfer counter of archivals, which might have been activated earlier
+          // than the lower bound
+          /*
+             TODO(i12904): Here we compute the maximum of the previous transfer counters;
+              instead, we could retrieve the transfer counter of the latest activation
+           */
+          val filterToc = status.changes.filter { case (ch, _) => ch.toc <= toInclusive }
+          filterToc
+            .map { case (change, _) =>
+              (
+                (cid, change.toc.rc),
+                filterToc
+                  .collect {
+                    case (ch, detail) if ch.isActivation && ch.toc.rc <= change.toc.rc =>
+                      detail.transferCounter
+                  }
+                  .maxOption
+                  .flatten,
+              )
+            }
+        }.toMap
 
-      val byTsAndChangeType: Map[TimeOfChange, Map[Boolean, List[LfContractId]]] = changesByToc
-        .fmap(_.groupBy(_._2.isActivation).fmap(_.map(_._1)))
+      val changesByToc
+          : Map[TimeOfChange, List[(LfContractId, ActivenessChange, ActivenessChangeDetail)]] =
+        table.toList
+          .flatMap { case (coid, status) =>
+            status.changes
+              .filter { case (ch, _) => ch.toc > fromExclusive && ch.toc <= toInclusive }
+              .toList
+              .map { case (activenessChange, activenessChangeDetail) =>
+                (coid, activenessChange, activenessChangeDetail)
+              }
+          }
+          .groupBy(_._2.toc)
+
+      val byTsAndChangeType
+          : Map[TimeOfChange, Map[Boolean, List[(LfContractId, TransferCounterO)]]] = changesByToc
+        .fmap(_.groupBy(_._2.isActivation).fmap(_.map {
+          case (coid, activenessChange, activenessChangeDetail) =>
+            if (!activenessChange.isActivation && !activenessChangeDetail.isTransfer)
+              (
+                coid,
+                latestActivationTransferCounterPerCid.getOrElse(
+                  (coid, activenessChange.toc.rc),
+                  activenessChangeDetail.transferCounter,
+                ),
+              )
+            else
+              (coid, activenessChangeDetail.transferCounter)
+        }))
 
       byTsAndChangeType
         .to(LazyList)
         .sortBy { case (timeOfChange, _) => timeOfChange }
         .map { case (toc, changes) =>
-          val activatedIds = changes.getOrElse(true, Iterable.empty).toSet
-          val deactivatedIds = changes.getOrElse(false, Iterable.empty).toSet
+          val activatedIds = changes.getOrElse(true, Iterable.empty).toMap
+          val deactivatedIds = changes.getOrElse(false, Iterable.empty).toMap
           (
             toc,
             ActiveContractIdsChange(
@@ -269,7 +341,7 @@ object InMemoryActiveContractStore {
     def create(toc: TimeOfChange, transferCounter: TransferCounterO): IndividualChange =
       Activation(toc) -> CreationArchivalDetail(transferCounter)
     def archive(toc: TimeOfChange): IndividualChange =
-      Deactivation(toc) -> CreationArchivalDetail(transferCounter = None)
+      Deactivation(toc) -> CreationArchivalDetail(None)
     def transferIn(
         toc: TimeOfChange,
         remoteDomain: DomainId,
@@ -589,7 +661,7 @@ object InMemoryActiveContractStore {
             detail match {
               case TransferDetails(targetDomain, transferCounter) =>
                 TransferredAway(TargetDomainId(targetDomain), transferCounter)
-              case CreationArchivalDetail(_) => Archived
+              case CreationArchivalDetail(transferCounter) => Archived
             }
         ContractState(status, change.toc)
       }

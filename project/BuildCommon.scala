@@ -421,6 +421,7 @@ object BuildCommon {
           opentelemetry_instrumentation_grpc,
           opentelemetry_zipkin,
           opentelemetry_jaeger,
+          opentelemetry_trace,
         ),
         dependencyOverrides ++= Seq(log4j_core, log4j_api),
       )
@@ -691,6 +692,9 @@ object BuildCommon {
           cats_scalacheck % Test,
           mockito_scala % Test,
           scalatestMockito % Test,
+          magnolia % Test,
+          magnolify_scalacheck % Test,
+          magnolify_shared % Test,
           daml_lf_transaction % Test,
           daml_lf_transaction_test_lib % Test,
           daml_test_evidence_tag % Test,
@@ -868,7 +872,7 @@ object BuildCommon {
             ),
             (
               (Compile / baseDirectory).value,
-              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.7.0.dar",
+              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.8.0.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
@@ -1098,7 +1102,7 @@ object BuildCommon {
   }
 
   lazy val `canton-ledger-json-api` = {
-    import CantonDependencies.*
+    import CantonDependencies._
     sbt.Project
       .apply("canton-ledger-json-api", file("canton/community/ledger/ledger-json-api"))
       .dependsOn(
@@ -1122,6 +1126,7 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           akka_http,
           akka_http_core,
+          daml_akka_http_metrics,
           daml_lf_api_type_signature,
           spray_json_derived_codecs,
           akka_stream_testkit % Test,

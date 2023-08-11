@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.util.retry
 
+import cats.Eval
 import cats.syntax.flatMap.*
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
@@ -106,6 +107,7 @@ abstract class RetryWithDelay(
     resetRetriesAfter: Option[FiniteDuration],
     flagCloseable: FlagCloseable,
     retryLogLevel: Option[Level],
+    killSwitchRetries: Eval[Boolean],
 ) extends Policy(logger) {
 
   private val complainAfterRetries: Int = 60
@@ -381,6 +383,7 @@ final case class Directly(
       resetRetriesAfter = None,
       flagCloseable,
       retryLogLevel,
+      killSwitchRetries = Eval.now(false),
     ) {
 
   override def nextDelay(nextCount: Int, delay: FiniteDuration): FiniteDuration = Duration.Zero
@@ -406,6 +409,7 @@ final case class Pause(
       resetRetriesAfter = None,
       flagCloseable,
       retryLogLevel,
+      killSwitchRetries = Eval.now(false),
     ) {
 
   override def nextDelay(nextCount: Int, delay: FiniteDuration): FiniteDuration = delay
@@ -455,6 +459,7 @@ final case class Backoff(
     longDescription: String = "",
     actionable: Option[String] = None,
     retryLogLevel: Option[Level] = None,
+    killSwitchRetries: Eval[Boolean] = Eval.now(false),
 )(implicit jitter: Jitter = Jitter.full(maxDelay))
     extends RetryWithDelay(
       logger,
@@ -466,6 +471,7 @@ final case class Backoff(
       resetRetriesAfter,
       flagCloseable,
       retryLogLevel,
+      killSwitchRetries,
     ) {
 
   override def nextDelay(nextCount: Int, delay: FiniteDuration): FiniteDuration =

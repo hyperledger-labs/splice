@@ -40,7 +40,7 @@ import com.digitalasset.canton.platform.apiserver.ratelimiting.{
   ThreadpoolCheck,
 }
 import com.digitalasset.canton.platform.apiserver.{ApiServerConfig, ApiServiceOwner, LedgerFeatures}
-import com.digitalasset.canton.platform.configuration.{
+import com.digitalasset.canton.platform.config.{
   AcsStreamsConfig as LedgerAcsStreamsConfig,
   IndexServiceConfig as LedgerIndexServiceConfig,
   ServerRole,
@@ -58,9 +58,11 @@ import com.digitalasset.canton.platform.localstore.api.UserManagementStore
 import com.digitalasset.canton.platform.services.time.TimeProviderType
 import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.DbSupport.ParticipantDataSourceConfig
+import com.digitalasset.canton.platform.store.dao.events.ContractLoader
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{FutureUtil, SimpleExecutionQueue}
-import io.grpc.{BindableService, ServerInterceptor}
+import io.grpc.ServerInterceptor
+import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 import io.scalaland.chimney.dsl.*
 
@@ -73,23 +75,19 @@ import scala.concurrent.Future
   * @param config ledger api server configuration
   * @param participantDataSourceConfig configuration for the data source (e.g., jdbc url)
   * @param dbConfig the Index DB config
-  * @param createExternalServices A factory to create additional gRPC BindableService-s,
-  *                               which will be bound to the Ledger API gRPC endpoint.
-  *                               All the BindableService-s, which implement java.lang.AutoCloseable,
-  *                               will be also closed upon Ledger API service teardown.
   * @param executionContext the execution context
   */
 class StartableStoppableLedgerApiServer(
     config: CantonLedgerApiServerWrapper.Config,
     participantDataSourceConfig: ParticipantDataSourceConfig,
     dbConfig: DbSupport.DbConfig,
-    createExternalServices: () => List[BindableService] = () => Nil,
     telemetry: Telemetry,
     futureSupervisor: FutureSupervisor,
     multiDomainEnabled: Boolean,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     actorSystem: ActorSystem,
+    tracer: Tracer,
 ) extends FlagCloseableAsync
     with NamedLogging {
 
@@ -210,10 +208,11 @@ class StartableStoppableLedgerApiServer(
       dataSourceProperties = Some(
         DbSupport.DataSourceProperties(
           connectionPool = DamlIndexerConfig
-            .createDataSourceProperties(config.indexerConfig.ingestionParallelism.unwrap)
-            .connectionPool
-            .copy(connectionTimeout = config.serverConfig.databaseConnectionTimeout.underlying),
-          postgres = config.serverConfig.postgresDataSource.damlConfig,
+            .createConnectionPoolConfig(
+              ingestionParallelism = config.indexerConfig.ingestionParallelism.unwrap,
+              connectionTimeout = config.serverConfig.databaseConnectionTimeout.underlying,
+            ),
+          postgres = config.serverConfig.postgresDataSource,
         )
       ),
     )
@@ -236,6 +235,7 @@ class StartableStoppableLedgerApiServer(
           config.serverConfig.commandService.maxCommandsInFlight,
           config.metrics,
           executionContext,
+          tracer,
           loggerFactory,
           multiDomainEnabled = multiDomainEnabled,
         )
@@ -252,6 +252,7 @@ class StartableStoppableLedgerApiServer(
         inMemoryStateUpdaterFlow,
         config.serverConfig.additionalMigrationPaths,
         executionContext,
+        tracer,
         loggerFactory,
         multiDomainEnabled = multiDomainEnabled,
       )
@@ -262,6 +263,21 @@ class StartableStoppableLedgerApiServer(
           dbConfig = dbConfig,
           loggerFactory = loggerFactory,
         )
+      contractLoader <- {
+        import config.cantonParameterConfig.ledgerApiServerParameters.contractLoader.*
+        ContractLoader.create(
+          contractStorageBackend = dbSupport.storageBackendFactory.createContractStorageBackend(
+            inMemoryState.ledgerEndCache,
+            inMemoryState.stringInterningView,
+          ),
+          dbDispatcher = dbSupport.dbDispatcher,
+          metrics = config.metrics,
+          maxQueueSize = maxQueueSize.value,
+          maxBatchSize = maxBatchSize.value,
+          parallelism = parallelism.value,
+          loggerFactory = loggerFactory,
+        )
+      }
       indexService <- new IndexServiceOwner(
         dbSupport = dbSupport,
         initialLedgerId = domain.LedgerId(config.ledgerId),
@@ -274,6 +290,7 @@ class StartableStoppableLedgerApiServer(
         tracer = config.tracerProvider.tracer,
         loggerFactory = loggerFactory,
         incompleteOffsets = timedReadService.incompleteReassignmentOffsets(_, _)(_),
+        contractLoader = contractLoader,
       )
       userManagementStore = getUserManagementStore(dbSupport, loggerFactory)
       partyRecordStore = new PersistentPartyRecordStore(
@@ -318,11 +335,11 @@ class StartableStoppableLedgerApiServer(
         jwtTimestampLeeway =
           config.cantonParameterConfig.ledgerApiServerParameters.jwtTimestampLeeway,
         meteringReportKey = config.meteringReportKey,
-        createExternalServices = createExternalServices,
         explicitDisclosureUnsafeEnabled = config.serverConfig.explicitDisclosureUnsafe,
         telemetry = telemetry,
         loggerFactory = loggerFactory,
         multiDomainEnabled = multiDomainEnabled,
+        upgradingEnabled = config.cantonParameterConfig.enableContractUpgrading,
       )
       _ <- startHttpApiIfEnabled
       _ <- {
@@ -418,14 +435,11 @@ class StartableStoppableLedgerApiServer(
   private def getApiServerConfig: ApiServerConfig = ApiServerConfig(
     address = Some(config.serverConfig.address),
     apiStreamShutdownTimeout = config.serverConfig.apiStreamShutdownTimeout.unwrap,
-    command = config.serverConfig.commandService.damlConfig,
+    command = config.serverConfig.commandService,
     configurationLoadTimeout = config.serverConfig.configurationLoadTimeout.unwrap,
-    initialLedgerConfiguration =
-      None, // CantonSyncService provides ledger configuration via ReadService bypassing the WriteService
     managementServiceTimeout = config.serverConfig.managementServiceTimeout.underlying,
     maxInboundMessageSize = config.serverConfig.maxInboundMessageSize.unwrap,
     port = Port(config.serverConfig.port.unwrap),
-    portFile = None,
     rateLimit = config.serverConfig.rateLimit,
     seeding = config.cantonParameterConfig.ledgerApiServerParameters.contractIdSeeding,
     timeProviderType = config.testingTimeService match {
@@ -434,7 +448,7 @@ class StartableStoppableLedgerApiServer(
     },
     tls = config.serverConfig.tls
       .map(LedgerApiServerConfig.ledgerApiServerTlsConfigFromCantonServerConfig),
-    userManagement = config.serverConfig.userManagementService.damlConfig,
+    userManagement = config.serverConfig.userManagementService,
   )
 
   private def startHttpApiIfEnabled: ResourceOwner[Unit] =

@@ -6,10 +6,10 @@ package util
 
 import domain.{JwtPayload, JwtWritePayload}
 import com.daml.http.EndpointsCompanion.Unauthorized
-import com.daml.lf.value.test.ValueGenerators.{party => partyGen}
+import com.daml.lf.value.test.ValueGenerators.{party as partyGen}
 import com.daml.scalautil.Statement.discard
 import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.NonEmptyReturningOps._
+import com.daml.nonempty.NonEmptyReturningOps.*
 
 import org.scalacheck.{Arbitrary, Gen}
 import Arbitrary.arbitrary
@@ -18,16 +18,16 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import scalaz.{-\/, \/-, NonEmptyList}
-import scalaz.std.set._
-import scalaz.syntax.foldable1._
-import scalaz.scalacheck.ScalazArbitrary._
+import scalaz.std.set.*
+import scalaz.syntax.foldable1.*
+import scalaz.scalacheck.ScalazArbitrary.*
 
 class JwtPartiesTest
     extends AnyWordSpec
     with ScalaFutures
     with Matchers
     with ScalaCheckDrivenPropertyChecks {
-  import JwtPartiesTest._
+  import JwtPartiesTest.*
 
   "ensureReadAsAllowedByJwt" should {
     import JwtParties.{ensureReadAsAllowedByJwt, EnsureReadAsDisallowedError}
@@ -57,7 +57,7 @@ class JwtPartiesTest
     "use Jwt if explicit spec is absent" in forAll { jwp: JwtWritePayload =>
       discard(resolveRefParties(None, jwp) should ===(jwp.parties))
       resolveRefParties(
-        Some(domain.CommandMeta(None, None, None, None, None, None)),
+        Some(domain.CommandMeta(None, None, None, None, None, None, None)),
         jwp,
       ) should ===(
         jwp.parties
@@ -109,10 +109,11 @@ object JwtPartiesTest {
 
   private[http] def partiesOnlyMeta(actAs: NonEmptyList[domain.Party], readAs: List[domain.Party]) =
     domain.CommandMeta(
-      None,
+      commandId = None,
       actAs = Some(actAs),
       readAs = Some(readAs),
       submissionId = None,
+      workflowId = None,
       deduplicationPeriod = None,
       disclosedContracts = None,
     )

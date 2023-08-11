@@ -86,14 +86,15 @@ object EmbeddedMediatorInitialization {
       processorAndClient <- EitherT.right(
         TopologyTransactionProcessor.createProcessorAndClientForDomain(
           mediatorTopologyStore,
+          mediatorId,
           id,
           protocolVersion,
-          crypto.pureCrypto,
+          crypto,
           Map(),
           cantonParameterConfig,
           clock,
           futureSupervisor,
-          loggerFactory,
+          loggerFactory.append("client", "mediator"),
         )
       )
       (topologyProcessor, topologyClient) = processorAndClient
@@ -138,7 +139,7 @@ object EmbeddedMediatorInitialization {
           futureSupervisor,
           loggerFactory,
         )
-      _ <- EitherT.right[String](mediatorRuntime.start())
+      _ <- mediatorRuntime.start()
     } yield mediatorRuntime
   }
 }

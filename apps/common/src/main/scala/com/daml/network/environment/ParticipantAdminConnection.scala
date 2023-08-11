@@ -145,6 +145,7 @@ class ParticipantAdminConnection(
         chunkSize,
         observer,
         gzipFormat = true,
+        Map.empty,
       )
     ).discard
     requestComplete.future

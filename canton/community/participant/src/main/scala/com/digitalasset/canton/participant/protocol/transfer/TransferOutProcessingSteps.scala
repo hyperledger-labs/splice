@@ -14,6 +14,7 @@ import com.digitalasset.canton.data.{
   CantonTimestamp,
   FullTransferOutTree,
   TransferSubmitterMetadata,
+  ViewPosition,
   ViewType,
 }
 import com.digitalasset.canton.ledger.participant.state.v2.CompletionInfo
@@ -272,7 +273,7 @@ class TransferOutProcessingSteps(
       envelope: OpenEnvelope[EncryptedViewMessage[TransferOutViewType]]
   )(implicit
       tc: TraceContext
-  ): EitherT[Future, EncryptedViewMessageDecryptionError[TransferOutViewType], WithRecipients[
+  ): EitherT[Future, EncryptedViewMessageError[TransferOutViewType], WithRecipients[
     FullTransferOutTree
   ]] = {
     EncryptedViewMessage
@@ -305,7 +306,7 @@ class TransferOutProcessingSteps(
       ts: CantonTimestamp,
       rc: RequestCounter,
       sc: SequencerCounter,
-      decryptedViewsWithSignatures: NonEmpty[
+      fullViewsWithSignatures: NonEmpty[
         Seq[(WithRecipients[FullTransferOutTree], Option[Signature])]
       ],
       malformedPayloads: Seq[ProtocolProcessor.MalformedPayload],
@@ -314,7 +315,7 @@ class TransferOutProcessingSteps(
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransferProcessorError, CheckActivenessAndWritePendingContracts] = {
-    val correctRootHashes = decryptedViewsWithSignatures.map { case (rootHashes, _) => rootHashes }
+    val correctRootHashes = fullViewsWithSignatures.map { case (rootHashes, _) => rootHashes }
     // TODO(i12926): Send a rejection if malformedPayloads is non-empty
     for {
       txOutRequestAndRecipients <- EitherT.cond[Future](
@@ -328,11 +329,12 @@ class TransferOutProcessingSteps(
         Left(TransferOutProcessorError.AbortedDueToShutdownOut(txOutRequest.contractId))
       )
       contractIdS = Set(contractId)
-      contractsCheck = ActivenessCheck(
+      contractsCheck = ActivenessCheck.tryCreate(
         checkFresh = Set.empty,
         checkFree = Set.empty,
         checkActive = contractIdS,
         lock = contractIdS,
+        needPriorState = contractIdS,
       )
       activenessSet = ActivenessSet(
         contracts = contractsCheck,
@@ -428,6 +430,7 @@ class TransferOutProcessingSteps(
       _ <- TransferOutValidation(
         fullTree,
         storedContract.contract.metadata.stakeholders,
+        storedContract.contract.rawContractInstance.contractInstance.unversioned.template,
         sourceDomainProtocolVersion,
         sourceSnapshot.ipsSnapshot,
         targetTopology,
@@ -507,6 +510,8 @@ class TransferOutProcessingSteps(
         requestId,
         transferringParticipant,
         activenessResult,
+        storedContract.contractId,
+        fullTree.transferCounter,
         confirmingStakeholders.toSet,
         fullTree.viewHash,
         fullTree.tree.rootHash,
@@ -723,17 +728,27 @@ class TransferOutProcessingSteps(
       requestId: RequestId,
       transferringParticipant: Boolean,
       activenessResult: ActivenessResult,
+      contractId: LfContractId,
+      declaredTransferCounter: TransferCounterO,
       confirmingStakeholders: Set[LfPartyId],
       viewHash: ViewHash,
       rootHash: RootHash,
-  ): Option[MediatorResponse] =
+  ): Option[MediatorResponse] = {
+    val expectedPriorTransferCounter = Map[LfContractId, Option[ActiveContractStore.Status]](
+      contractId -> Some(ActiveContractStore.Active(declaredTransferCounter.map(_ - 1)))
+    )
+
+    val successful =
+      declaredTransferCounter.forall(_ > TransferCounter.Genesis) &&
+        activenessResult.isSuccessful &&
+        activenessResult.contracts.priorStates == expectedPriorTransferCounter
     // send a response only if the participant is a transferring participant or the activeness check has failed
-    if (transferringParticipant || !activenessResult.isSuccessful) {
+    if (transferringParticipant || !successful) {
       val adminPartySet =
         if (transferringParticipant) Set(participantId.adminParty.toLf) else Set.empty[LfPartyId]
       val confirmingParties = confirmingStakeholders union adminPartySet
       val localVerdict =
-        if (activenessResult.isSuccessful) LocalApprove(sourceDomainProtocolVersion.v)
+        if (successful) LocalApprove(sourceDomainProtocolVersion.v)
         else
           LocalReject.TransferOutRejects.ActivenessCheckFailed.Reject(s"$activenessResult")(
             LocalVerdict.protocolVersionRepresentativeFor(sourceDomainProtocolVersion.v)
@@ -743,6 +758,7 @@ class TransferOutProcessingSteps(
           requestId,
           participantId,
           Some(viewHash),
+          Some(ViewPosition.root),
           localVerdict,
           Some(rootHash),
           confirmingParties,
@@ -752,7 +768,7 @@ class TransferOutProcessingSteps(
       )
       Some(response)
     } else None
-
+  }
 }
 
 object TransferOutProcessingSteps {

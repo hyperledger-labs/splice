@@ -482,7 +482,9 @@ trait ParticipantReferenceCommon
 
   @Help.Summary("Commands to pruning the archive of the ledger", FeatureFlag.Preview)
   @Help.Group("Ledger Pruning")
-  def pruning: ParticipantPruningAdministrationGroup
+  def pruning: ParticipantPruningAdministrationGroup = pruning_
+  private lazy val pruning_ =
+    new ParticipantPruningAdministrationGroup(this, consoleEnvironment, loggerFactory)
 
   @Help.Summary("Manage participant replication")
   @Help.Group("Replication")
@@ -560,12 +562,6 @@ trait RemoteParticipantReferenceCommon
   @Help.Group("Testing")
   override def testing: ParticipantTestingGroup = testing_
 
-  private lazy val pruning_ =
-    new ParticipantPruningAdministrationGroup(this, consoleEnvironment, loggerFactory)
-  @Help.Summary("Commands to prune the archive of the participant ledger")
-  @Help.Group("Participant Pruning")
-  def pruning: ParticipantPruningAdministrationGroup = pruning_
-
   private lazy val repair_ =
     new ParticipantRepairAdministration(consoleEnvironment, this, loggerFactory)
 
@@ -641,12 +637,6 @@ class LocalParticipantReference(
     new LocalParticipantTestingGroup(this, consoleEnvironment, loggerFactory)
   @Help.Summary("Commands used for development and testing", FeatureFlag.Testing)
   override def testing: LocalParticipantTestingGroup = testing_
-
-  private lazy val pruning_ =
-    new LocalParticipantPruningAdministrationGroup(this, consoleEnvironment, loggerFactory)
-  @Help.Summary("Commands to truncate the archive of the ledger", FeatureFlag.Preview)
-  @Help.Group("Ledger Pruning")
-  def pruning: LocalParticipantPruningAdministrationGroup = pruning_
 
   private lazy val commitments_ =
     new LocalCommitmentsAdministrationGroup(this, consoleEnvironment, loggerFactory)
@@ -782,7 +772,7 @@ class LocalParticipantReferenceX(
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 
-  // TODO(#11255) these are "remote" groups. the normal participant node has "local" versions.
+  // TODO(#14048) these are "remote" groups. the normal participant node has "local" versions.
   //   but rather than keeping this, we should make local == remote and add local methods separately
   @Help.Summary("Inspect and manage parties")
   @Help.Group("Parties")
@@ -795,12 +785,6 @@ class LocalParticipantReferenceX(
   @Help.Summary("Commands used for development and testing", FeatureFlag.Testing)
   @Help.Group("Testing")
   override def testing: ParticipantTestingGroup = testing_
-
-  private lazy val pruning_ =
-    new ParticipantPruningAdministrationGroup(this, consoleEnvironment, loggerFactory)
-  @Help.Summary("Commands to prune the archive of the participant ledger")
-  @Help.Group("Participant Pruning")
-  def pruning: ParticipantPruningAdministrationGroup = pruning_
 
   private lazy val repair_ =
     new LocalParticipantRepairAdministration(consoleEnvironment, this, loggerFactory) {

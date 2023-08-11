@@ -13,7 +13,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.SubmissionErrorGroup
 import com.digitalasset.canton.error.*
-import com.digitalasset.canton.ledger.error.LedgerApiErrors
+import com.digitalasset.canton.ledger.error.groups.ConsistencyErrors
 import com.digitalasset.canton.ledger.participant.state.v2.{
   ChangeId,
   SubmitterInfo,
@@ -67,6 +67,7 @@ class TransactionProcessor(
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
     skipRecipientsCheck: Boolean,
+    enableContractUpgrading: Boolean,
 )(implicit val ec: ExecutionContext)
     extends ProtocolProcessor[
       TransactionProcessingSteps.SubmissionParam,
@@ -89,6 +90,7 @@ class TransactionProcessor(
           damle,
           confirmationRequestFactory.transactionTreeFactory,
           staticDomainParameters.protocolVersion,
+          enableContractUpgrading,
           loggerFactory,
         ),
         staticDomainParameters,
@@ -97,7 +99,7 @@ class TransactionProcessor(
         metrics,
         new SerializableContractAuthenticatorImpl(new UnicumGenerator(crypto.pureCrypto)),
         new AuthenticationValidator(),
-        new AuthorizationValidator(participantId),
+        new AuthorizationValidator(participantId, enableContractUpgrading),
         new InternalConsistencyChecker(
           staticDomainParameters.uniqueContractKeys,
           staticDomainParameters.protocolVersion,
@@ -207,7 +209,7 @@ object TransactionProcessor {
         existingSubmissionId: Option[LedgerSubmissionId],
         existingSubmissionDomain: DomainId,
     ) extends TransactionErrorImpl(cause = "The submission is already in flight")(
-          LedgerApiErrors.ConsistencyErrors.SubmissionAlreadyInFlight.code
+          ConsistencyErrors.SubmissionAlreadyInFlight.code
         )
         with TransactionSubmissionError
 

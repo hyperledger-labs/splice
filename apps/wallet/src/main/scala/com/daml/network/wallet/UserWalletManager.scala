@@ -51,7 +51,7 @@ class UserWalletManager(
       : scala.collection.concurrent.Map[String, (RetryProvider, UserWalletService)] =
     TrieMap.empty
 
-  retryProvider.runOnShutdown(new RunOnShutdown {
+  retryProvider.runOnShutdown_(new RunOnShutdown {
     override def name = s"shutdown per-user retry providers"
     // this is not perfectly precise, but RetryProvider.close is idempotent
     override def done = false

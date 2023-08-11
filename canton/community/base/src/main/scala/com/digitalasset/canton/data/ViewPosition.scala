@@ -3,9 +3,12 @@
 
 package com.digitalasset.canton.data
 
+import cats.Order
+import cats.instances.list.*
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
 import com.digitalasset.canton.data.ViewPosition.MerkleSeqIndex.Direction
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.protocol.v2
 import com.digitalasset.canton.serialization.DeterministicEncoding
 import com.google.protobuf.ByteString
 
@@ -16,7 +19,7 @@ import com.google.protobuf.ByteString
   *                 The path starts at the view rather than the root so that paths to the root can
   *                 be shared.
   */
-final case class ViewPosition(position: List[MerklePathElement]) extends AnyVal {
+final case class ViewPosition(position: List[MerklePathElement]) extends PrettyPrinting {
 
   /** Adds a [[ViewPosition.MerklePathElement]] at the start of the path. */
   def +:(index: MerklePathElement): ViewPosition = new ViewPosition(index :: position)
@@ -26,6 +29,10 @@ final case class ViewPosition(position: List[MerklePathElement]) extends AnyVal 
 
   /** Reverse the position, as well as all contained MerkleSeqIndex path elements */
   def reverse: ViewPositionFromRoot = ViewPositionFromRoot(position.reverse.map(_.reverse))
+
+  def toProtoV2: v2.ViewPosition = v2.ViewPosition(position = position.map(_.toProtoV2))
+
+  override def pretty: Pretty[ViewPosition] = prettyOfClass(unnamedParam(_.position.mkShow()))
 }
 
 /** Same as [[ViewPosition]], with the position directed from the root to the leaf */
@@ -44,10 +51,25 @@ object ViewPosition {
     prettyOfClass(unnamedParam(_.position))
   }
 
+  /** Will fail with an exception, if used to compare `ListIndex` with `MerkleSeqIndex` or `MerkleSeqIndexFromRoot`.
+    */
+  private[canton] val orderViewPosition: Order[ViewPosition] =
+    Order.by((_: ViewPosition).position.reverse)(
+      catsKernelStdOrderForList(MerklePathElement.orderMerklePathElement)
+    )
+
+  def fromProtoV2(viewPositionP: v2.ViewPosition): ViewPosition = {
+    val v2.ViewPosition(positionP) = viewPositionP
+    val position = positionP.map(MerkleSeqIndex.fromProtoV2).toList
+    ViewPosition(position)
+  }
+
   /** A single element on a path through a Merkle tree. */
   sealed trait MerklePathElement extends Product with Serializable with PrettyPrinting {
     def encodeDeterministically: ByteString
     def reverse: MerklePathElement
+
+    def toProtoV2: v2.MerkleSeqIndex
   }
 
   /** For [[MerkleTreeInnerNode]]s which branch to a list of subviews,
@@ -62,6 +84,11 @@ object ViewPosition {
     override def pretty: Pretty[ListIndex] = prettyOfString(_.index.toString)
 
     override lazy val reverse: ListIndex = this
+
+    override def toProtoV2: v2.MerkleSeqIndex =
+      throw new UnsupportedOperationException(
+        "ListIndex is for legacy use only and should not be serialized"
+      )
   }
 
   /** A leaf position in a [[MerkleSeq]], encodes as a path of directions from the leaf to the root.
@@ -77,6 +104,9 @@ object ViewPosition {
       prettyOfString(_ => index.reverse.map(_.show).mkString(""))
 
     override lazy val reverse: MerkleSeqIndexFromRoot = MerkleSeqIndexFromRoot(index.reverse)
+
+    override def toProtoV2: v2.MerkleSeqIndex =
+      v2.MerkleSeqIndex(isRight = index.map(_ == Direction.Right))
   }
 
   /** Same as [[MerkleSeqIndex]], with the position directed from the root to the leaf */
@@ -90,6 +120,10 @@ object ViewPosition {
       prettyOfString(_ => index.map(_.show).mkString(""))
 
     override lazy val reverse: MerkleSeqIndex = MerkleSeqIndex(index.reverse)
+
+    def toProtoV2: v2.MerkleSeqIndex = throw new UnsupportedOperationException(
+      "MerkleSeqIndexFromRoot is for internal use only and should not be serialized"
+    )
   }
 
   object MerklePathElement {
@@ -97,6 +131,27 @@ object ViewPosition {
     // Must be unique to prevent collisions of view position encodings
     private[ViewPosition] val ListIndexPrefix: Byte = 1
     private[ViewPosition] val MerkleSeqIndexPrefix: Byte = 2
+
+    /** Will throw if used to compare `ListIndex` with `MerkleSeqIndex` or `MerkleSeqIndexFromRoot`.
+      */
+    private[data] val orderMerklePathElement: Order[MerklePathElement] = Order.from {
+      case (ListIndex(index1), ListIndex(index2)) =>
+        implicitly[Order[Int]].compare(index1, index2)
+
+      case (MerkleSeqIndexFromRoot(index1), MerkleSeqIndexFromRoot(index2)) =>
+        implicitly[Order[List[Direction]]].compare(index1, index2)
+
+      case (MerkleSeqIndex(index1), element2) =>
+        orderMerklePathElement.compare(MerkleSeqIndexFromRoot(index1.reverse), element2)
+
+      case (element1, MerkleSeqIndex(index2)) =>
+        orderMerklePathElement.compare(element1, MerkleSeqIndexFromRoot(index2.reverse))
+
+      case (element1, element2) =>
+        throw new UnsupportedOperationException(
+          s"Unable to compare ${element1.getClass.getSimpleName} with ${element2.getClass.getSimpleName}."
+        )
+    }
   }
 
   object MerkleSeqIndex {
@@ -104,6 +159,11 @@ object ViewPosition {
       def encodeDeterministically: ByteString
     }
     object Direction {
+
+      implicit val orderDirection: Order[Direction] = Order.by {
+        case Left => 0
+        case Right => 1
+      }
 
       case object Left extends Direction {
         override def encodeDeterministically: ByteString = DeterministicEncoding.encodeByte(0)
@@ -116,6 +176,11 @@ object ViewPosition {
 
         override def pretty: Pretty[Right.type] = prettyOfString(_ => "R")
       }
+    }
+
+    def fromProtoV2(merkleSeqIndexP: v2.MerkleSeqIndex): MerkleSeqIndex = {
+      val v2.MerkleSeqIndex(isRightP) = merkleSeqIndexP
+      MerkleSeqIndex(isRightP.map(if (_) Direction.Right else Direction.Left).toList)
     }
   }
 

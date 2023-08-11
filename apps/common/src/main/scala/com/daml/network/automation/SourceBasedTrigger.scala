@@ -33,7 +33,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     new AtomicReference(None)
 
   // When node-level shutdown is initiated, we need to kill the akka source.
-  context.retryProvider.runOnShutdown(new RunOnShutdown {
+  context.retryProvider.runOnShutdown_(new RunOnShutdown {
     override def name: String = s"terminate source processing loop"
     override def done: Boolean = executionHandleRef.get().exists(_.completed.isCompleted)
     override def run(): Unit =

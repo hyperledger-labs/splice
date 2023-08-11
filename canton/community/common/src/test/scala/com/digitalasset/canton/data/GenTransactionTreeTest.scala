@@ -5,7 +5,7 @@ package com.digitalasset.canton.data
 
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.crypto.{HashPurpose, Salt, TestSalt}
 import com.digitalasset.canton.data.LightTransactionViewTree.InvalidLightTransactionViewTree
@@ -20,7 +20,7 @@ import com.digitalasset.canton.sequencing.protocol.{
 }
 import com.digitalasset.canton.topology.client.PartyTopologySnapshotClient
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.topology.{MediatorRef, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{
   BaseTestWordSpec,
@@ -29,6 +29,7 @@ import com.digitalasset.canton.{
   LfPartyId,
   ProtocolVersionChecksAnyWordSpec,
 }
+import monocle.PIso
 
 import java.time.Duration
 import scala.annotation.nowarn
@@ -93,7 +94,7 @@ class GenTransactionTreeTest
           testedProtocolVersion,
         ) should equal(example.fullInformeeTree.toInformeeTree)
 
-        fullInformeeTree.informeesAndThresholdByView shouldEqual expectedInformeesAndThresholdByView
+        fullInformeeTree.informeesAndThresholdByViewHash shouldEqual expectedInformeesAndThresholdByView
       }
 
       "compute a partially blinded informee tree" in {
@@ -109,7 +110,7 @@ class GenTransactionTreeTest
             informees.exists(i => parties.contains(i.party))
           }
 
-        expectedInformeeTree.informeesByView shouldEqual expectedInformeesByView
+        expectedInformeeTree.informeesByViewHash shouldEqual expectedInformeesByView
       }
 
       "be serialized and deserialized" in {
@@ -131,28 +132,24 @@ class GenTransactionTreeTest
       }
 
       "correctly reconstruct the full transaction view trees from the lightweight ones" in {
-        val neAllLightTrees =
-          NonEmpty.from(example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion))
-        val neAllTrees = NonEmpty.from(example.transactionTree.allTransactionViewTrees)
-        neAllLightTrees.flatMap(lvts =>
-          LightTransactionViewTree
-            .toAllFullViewTrees(testedProtocolVersion, factory.cryptoOps)(lvts)
-            .toOption
-        ) shouldBe neAllTrees
+        val allLightTrees =
+          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+        val allTrees = example.transactionTree.allTransactionViewTrees
+        LightTransactionViewTree
+          .toFullViewTrees(PIso.id, testedProtocolVersion, factory.cryptoOps, topLevelOnly = false)(
+            allLightTrees
+          ) shouldBe (allTrees, Seq.empty, Seq.empty)
       }
 
       "correctly reconstruct the top-level transaction view trees from the lightweight ones" in {
         val allLightTrees =
           example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
-        val neAllLightTrees = NonEmpty.from(allLightTrees)
-        val neAllTrees =
-          NonEmpty.from(example.transactionTree.allTransactionViewTrees.filter(_.isTopLevel))
+        val allTrees = example.transactionTree.allTransactionViewTrees.filter(_.isTopLevel)
 
-        neAllLightTrees.flatMap(lvts =>
-          LightTransactionViewTree
-            .toToplevelFullViewTrees(testedProtocolVersion, factory.cryptoOps)(lvts)
-            .toOption
-        ) shouldBe neAllTrees
+        LightTransactionViewTree
+          .toFullViewTrees(PIso.id, testedProtocolVersion, factory.cryptoOps, topLevelOnly = true)(
+            allLightTrees
+          ) shouldBe (allTrees, Seq.empty, Seq.empty)
       }
 
       "correctly reconstruct the top-level transaction view trees from the lightweight ones for each informee" in {
@@ -182,15 +179,71 @@ class GenTransactionTreeTest
           val topLevelForInf = allTrees.filter(t => topLevelHashesForInf.contains(t.viewHash))
           val allLightWeightForInf =
             allLightTrees.filter(_._2.flatten.contains(inf)).map(_._1).toList
-          val res =
-            LightTransactionViewTree
-              .toToplevelFullViewTrees(testedProtocolVersion, factory.cryptoOps)(
-                NonEmptyUtil.fromUnsafe(allLightWeightForInf)
-              )
-              .value
-          res.toList shouldBe topLevelForInf
+          LightTransactionViewTree
+            .toFullViewTrees(
+              PIso.id,
+              testedProtocolVersion,
+              factory.cryptoOps,
+              topLevelOnly = true,
+            )(
+              allLightWeightForInf
+            ) shouldBe (topLevelForInf, Seq.empty, Seq.empty)
         }
+      }
 
+      "correctly report missing subviews" in {
+        val allLightTrees =
+          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+        val removedLightTreeO = allLightTrees.find(_.viewPosition.position.size > 1)
+        val inputLightTrees = allLightTrees.filterNot(removedLightTreeO.contains)
+        val badLightTrees = inputLightTrees.filter(tree =>
+          ViewPosition.isDescendant(
+            removedLightTreeO.fold(ViewPosition.root)(_.viewPosition),
+            tree.viewPosition,
+          )
+        )
+
+        val allFullTrees = example.transactionTree.allTransactionViewTrees
+        val expectedFullTrees = allFullTrees.filter(tree =>
+          !ViewPosition.isDescendant(
+            removedLightTreeO.fold(ViewPosition.root)(_.viewPosition),
+            tree.viewPosition,
+          )
+        )
+
+        LightTransactionViewTree
+          .toFullViewTrees(PIso.id, testedProtocolVersion, factory.cryptoOps, topLevelOnly = false)(
+            inputLightTrees
+          ) shouldBe (expectedFullTrees, badLightTrees, Seq.empty)
+      }
+
+      "correctly process duplicate views" in {
+        val allLightTrees =
+          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+        val allFullTrees = example.transactionTree.allTransactionViewTrees
+
+        val inputLightTrees1 = allLightTrees.flatMap(tree => Seq(tree, tree))
+        LightTransactionViewTree
+          .toFullViewTrees(PIso.id, testedProtocolVersion, factory.cryptoOps, topLevelOnly = false)(
+            inputLightTrees1
+          ) shouldBe (allFullTrees, Seq.empty, allLightTrees)
+
+        val inputLightTrees2 = allLightTrees ++ allLightTrees
+        LightTransactionViewTree
+          .toFullViewTrees(PIso.id, testedProtocolVersion, factory.cryptoOps, topLevelOnly = false)(
+            inputLightTrees2
+          ) shouldBe (allFullTrees, Seq.empty, allLightTrees)
+      }
+
+      "correctly process views in an unusual order" in {
+        val allLightTrees =
+          example.transactionTree.allLightTransactionViewTrees(testedProtocolVersion)
+        val inputLightTrees = allLightTrees.sortBy(_.viewPosition.position.size)
+        val allFullTrees = example.transactionTree.allTransactionViewTrees
+        LightTransactionViewTree
+          .toFullViewTrees(PIso.id, testedProtocolVersion, factory.cryptoOps, topLevelOnly = false)(
+            inputLightTrees
+          ) shouldBe (allFullTrees, Seq.empty, Seq.empty)
       }
     }
   }
@@ -674,7 +727,7 @@ class GenTransactionTreeTest
       CommonMetadata(factory.cryptoOps)(
         factory.confirmationPolicy,
         factory.domainId,
-        MediatorRef(factory.mediatorId),
+        factory.mediatorRef,
         mkTestSalt(0),
         factory.transactionUuid,
         protocolVersion,

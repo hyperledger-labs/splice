@@ -51,7 +51,7 @@ object Dependencies {
     "io.spray" %% "spray-json" % "1.3.6"
 
   lazy val akka_spray_json =
-    "com.typesafe.akka" %% "akka-http-spray-json" % "10.2.8"
+    "com.typesafe.akka" %% "akka-http-spray-json" % CantonDependencies.akka_http_version
 
   lazy val better_files = CantonDependencies.better_files
 

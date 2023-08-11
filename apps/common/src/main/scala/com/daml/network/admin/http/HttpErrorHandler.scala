@@ -18,7 +18,7 @@ import akka.http.scaladsl.server.Directives.{
   withRequestTimeoutResponse,
 }
 import akka.util.ByteString
-import com.digitalasset.canton.ledger.error.groups.CommandExecution.Interpreter
+import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors.Interpreter
 import com.daml.network.http.v0.definitions as d0
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -100,7 +100,7 @@ final class HttpErrorHandler(
         val conflictErrorCodes = Seq(
           Interpreter.GenericInterpretationError,
           Interpreter.UnhandledException,
-          Interpreter.UserError,
+          Interpreter.InterpretationUserError,
           Interpreter.TemplatePreconditionViolated,
         )
         if (conflictErrorCodes.exists(ErrorCodeUtils.isError(grpcDesc, _)))

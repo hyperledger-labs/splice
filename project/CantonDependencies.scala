@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.7.0-snapshot.20230710.11943.0.v20c0149b"
+  val version: String = "2.8.0-snapshot.20230807.12017.0.v7ba1e675"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
@@ -19,8 +19,8 @@ object CantonDependencies {
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
-  lazy val akka_version = "2.6.18"
-  lazy val akka_http_version = "10.2.8"
+  lazy val akka_version = "2.6.21"
+  lazy val akka_http_version = "10.2.10"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
@@ -98,6 +98,7 @@ object CantonDependencies {
     "com.daml" %% "contextualized-logging" % daml_libraries_version
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
   lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
+  lazy val daml_akka_http_metrics = "com.daml" %% "akka-http-metrics" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
   lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
@@ -137,7 +138,7 @@ object CantonDependencies {
   lazy val akka_http_core = "com.typesafe.akka" %% "akka-http-core" % akka_http_version
   lazy val akka_http_testkit = "com.typesafe.akka" %% "akka-http-testkit" % akka_http_version
 
-  lazy val scala_logging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2"
+  lazy val scala_logging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
   lazy val scalacheck = "org.scalacheck" %% "scalacheck" % "1.15.4"
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
   lazy val scalatestScalacheck =
@@ -173,6 +174,10 @@ object CantonDependencies {
   lazy val cats_scalacheck = "io.chrisdavenport" %% "cats-scalacheck" % "0.2.0"
 
   lazy val chimney = "io.scalaland" %% "chimney" % "0.6.1"
+
+  lazy val magnolia = "com.softwaremill.magnolia1_2" %% "magnolia" % "1.1.3"
+  lazy val magnolify_shared = "com.spotify" % "magnolify-shared_2.13" % "0.6.2"
+  lazy val magnolify_scalacheck = "com.spotify" % "magnolify-scalacheck_2.13" % "0.6.2"
 
   lazy val circe_core = "io.circe" %% "circe-core" % circe_version
   lazy val circe_generic = "io.circe" %% "circe-generic" % circe_version
@@ -218,6 +223,8 @@ object CantonDependencies {
     "io.opentelemetry" % "opentelemetry-exporter-zipkin" % opentelemetry_version
   lazy val opentelemetry_jaeger =
     "io.opentelemetry" % "opentelemetry-exporter-jaeger" % opentelemetry_version
+  lazy val opentelemetry_trace =
+    "io.opentelemetry" % "opentelemetry-exporter-otlp-trace" % opentelemetry_version
   lazy val opentelemetry_instrumentation_grpc =
     "io.opentelemetry.instrumentation" % "opentelemetry-grpc-1.6" % s"$opentelemetry_version-alpha"
 

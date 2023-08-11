@@ -34,7 +34,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
   private val currentSubscription = new AtomicReference[Option[CNLedgerSubscription[?]]](None)
   private val ingestionLoopTerminatedF = new AtomicReference[Future[Done]](Future.successful(Done))
 
-  retryProvider.runOnShutdown(new RunOnShutdown {
+  retryProvider.runOnShutdown_(new RunOnShutdown {
     override def name: String = s"terminate subscription"
     // this is not perfectly precise, but CNLedgerSubscription.initiateShutdown is idempotent
     override def done: Boolean = false

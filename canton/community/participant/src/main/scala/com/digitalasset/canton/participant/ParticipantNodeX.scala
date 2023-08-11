@@ -55,11 +55,11 @@ import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, SingleUseCell}
 import com.digitalasset.canton.version.ProtocolVersion
-import io.grpc.{BindableService, ServerServiceDefinition}
+import io.grpc.ServerServiceDefinition
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 class ParticipantNodeBootstrapX(
     arguments: CantonNodeBootstrapCommonArguments[
@@ -80,6 +80,7 @@ class ParticipantNodeBootstrapX(
     private[canton] val persistentStateFactory: ParticipantNodePersistentStateFactory,
     ledgerApiServerFactory: CantonLedgerApiServerFactory,
     skipRecipientsCheck: Boolean,
+    abortRetry: Eval[Boolean],
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     scheduler: ScheduledExecutorService,
@@ -163,7 +164,7 @@ class ParticipantNodeBootstrapX(
           manager: SyncDomainPersistentStateManager,
           crypto: SyncCryptoApiProvider,
       ): PackageInspectionOps = new PackageInspectionOps() {
-        // TODO(#11255) the package inspection ops requires some serious refactoring in order to remove the circular dependency
+        // TODO(#12944) the package inspection ops requires some serious refactoring in order to remove the circular dependency
         //    however, this is just used for package removal which we can punt for the moment
         override def packageVetted(packageId: PackageId)(implicit
             tc: TraceContext
@@ -190,7 +191,7 @@ class ParticipantNodeBootstrapX(
       override def vetPackages(packages: Seq[PackageId], synchronize: Boolean)(implicit
           traceContext: TraceContext
       ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
-        // TODO(#11255) this vetting extension might fail on concurrent uploads of dars
+        // TODO(#14069) this vetting extension might fail on concurrent uploads of dars
         val currentMappingF = performUnlessClosingF(functionFullName)(
           topologyManager.store
             .findPositiveTransactions(
@@ -225,7 +226,7 @@ class ParticipantNodeBootstrapX(
                     (currentPackages ++ packages).distinct,
                   ),
                   serial = nextSerial,
-                  // TODO(#11255) auto-determine signing keys
+                  // TODO(#12390) auto-determine signing keys
                   signingKeys = Seq(participantId.uid.namespace.fingerprint),
                   parameters.initialProtocolVersion,
                   expectFullAuthorization = true,
@@ -245,7 +246,7 @@ class ParticipantNodeBootstrapX(
       )(implicit
           traceContext: TraceContext
       ): EitherT[FutureUnlessShutdown, ParticipantTopologyManagerError, Unit] = {
-        // TODO(#11255) make this "extend" / not replace
+        // TODO(#14069) make this "extend" / not replace
         //    this will also be potentially racy!
         performUnlessClosingEitherUSF(functionFullName)(
           topologyManager
@@ -260,7 +261,7 @@ class ParticipantNodeBootstrapX(
                 groupAddressing = false,
               ),
               serial = None,
-              // TODO(#11255) auto-determine signing keys
+              // TODO(#12390) auto-determine signing keys
               signingKeys = Seq(partyId.uid.namespace.fingerprint),
               protocolVersion,
               expectFullAuthorization = true,
@@ -306,6 +307,8 @@ class ParticipantNodeBootstrapX(
         }
         partyNotifier
       }
+
+      storage.setAbortRetry(abortRetry)
 
       createParticipantServices(
         participantId,
@@ -385,7 +388,7 @@ class ParticipantNodeBootstrapX(
       sync: CantonSyncService,
       packageService: PackageService,
   ): Unit = {
-    // TODO(#11255) implement me
+    // TODO(#14048) implement me
 
   }
 }
@@ -419,14 +422,9 @@ object ParticipantNodeBootstrapX {
         persistentStateFactory = ParticipantNodePersistentStateFactory,
         ledgerApiServerFactory = ledgerApiServerFactory,
         skipRecipientsCheck = true,
+        abortRetry = Eval.always(false),
       )
     }
-
-    override protected def additionalGrpcServices(arguments: Arguments)(implicit
-        executionContext: ExecutionContext,
-        actorSystem: ActorSystem,
-    ): (CantonSyncService, Eval[ParticipantNodePersistentState]) => List[BindableService] =
-      (_, _) => Nil
 
     override protected def multiDomainEnabledForLedgerApiServer: Boolean = true
   }

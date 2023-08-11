@@ -113,6 +113,23 @@ class ActionDescriptionTest extends AnyWordSpec with BaseTest {
       }
     }
 
+    "deserialize to the same value (V2)" in {
+      val tests = Seq(
+        CreateActionDescription(unsuffixedId, seed, dummyVersion)(representativePV),
+        tryCreateExerciseActionDescription(
+          Some(LfTransactionBuilder.defaultInterfaceId),
+          Some(LfTransactionBuilder.defaultTemplateId),
+          ProtocolVersion.v5,
+        ),
+        fetchAction,
+        LookupByKeyActionDescription.tryCreate(globalKey, dummyVersion, representativePV),
+      )
+
+      forEvery(tests) { actionDescription =>
+        ActionDescription.fromProtoV2(actionDescription.toProtoV2) shouldBe Right(actionDescription)
+      }
+    }
+
     "reject creation" when {
       "interfaceId is set and the protocol version is too old" in {
         def create(

@@ -235,7 +235,8 @@ object NonNegativeFiniteDuration
     }
 
   implicit val nonNegativeFiniteDurationWriter: ConfigWriter[NonNegativeFiniteDuration] =
-    ConfigWriter.toString(_.toString)
+    // avoid pretty printing by converting the underlying value to string
+    ConfigWriter.toString(_.underlying.toString)
 }
 
 /** Duration class used for positive finite durations. */
@@ -285,7 +286,8 @@ object PositiveFiniteDuration extends RefinedNonNegativeDurationCompanion[Positi
   }
 
   private[canton] implicit val positiveFiniteDurationWriter: ConfigWriter[PositiveFiniteDuration] =
-    ConfigWriter.toString(_.toString)
+    // avoid pretty printing by converting the underlying value to string
+    ConfigWriter.toString(_.underlying.toString)
 }
 
 /** Duration class used for positive durations that are rounded to the second. */

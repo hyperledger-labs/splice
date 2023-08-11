@@ -5,8 +5,8 @@ package com.digitalasset.canton.participant.protocol
 
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.TransactionViewTree
-import com.digitalasset.canton.protocol.{RequestId, ViewHash}
+import com.digitalasset.canton.data.{TransactionViewTree, ViewPosition}
+import com.digitalasset.canton.protocol.RequestId
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -15,18 +15,19 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class AuthorizationValidator(participantId: ParticipantId)(implicit
-    executionContext: ExecutionContext
+class AuthorizationValidator(participantId: ParticipantId, enableContractUpgrading: Boolean)(
+    implicit executionContext: ExecutionContext
 ) {
 
   def checkAuthorization(
       requestId: RequestId,
       rootViews: NonEmpty[Seq[TransactionViewTree]],
       snapshot: TopologySnapshot,
-  ): Future[Map[ViewHash, String]] =
+  ): Future[Map[ViewPosition, String]] =
     rootViews.forgetNE
       .parTraverseFilter { rootView =>
-        val authorizers = rootView.viewParticipantData.rootAction.authorizers
+        val authorizers =
+          rootView.viewParticipantData.rootAction(enableContractUpgrading).authorizers
 
         def err(details: String): String =
           show"Received a request with id $requestId with a view that is not correctly authorized. Rejecting request...\n$details"
@@ -88,7 +89,7 @@ class AuthorizationValidator(participantId: ParticipantId)(implicit
             }
         }
 
-        errOF.map(_.map(rootView.viewHash -> _))
+        errOF.map(_.map(rootView.viewPosition -> _))
       }
       .map(_.toMap)
 }

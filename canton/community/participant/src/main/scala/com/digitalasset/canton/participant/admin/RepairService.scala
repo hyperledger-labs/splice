@@ -30,7 +30,12 @@ import com.digitalasset.canton.ledger.api.validation.{
   StricterValueValidator as LedgerApiValueValidator,
 }
 import com.digitalasset.canton.ledger.participant.state.v2.TransactionMeta
-import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext, Lifecycle}
+import com.digitalasset.canton.lifecycle.{
+  FlagCloseable,
+  FutureUnlessShutdown,
+  HasCloseContext,
+  Lifecycle,
+}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{
   HasLoggerName,
@@ -66,10 +71,12 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.*
+import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 
 import java.time.Instant
 import scala.Ordered.orderingToOrdered
 import scala.collection.immutable.HashMap
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Implements the repair commands.
@@ -728,7 +735,7 @@ class RepairService(
               s"Contract ${cid} does not exist in domain ${repair.domainAlias} and cannot be purged. Set ignoreAlreadyPurged = true to skip non-existing contracts."
             ),
           )
-        case Some(ActiveContractStore.Active(_)) =>
+        case Some(ActiveContractStore.Active(transferCounter)) =>
           for {
             contract <- EitherT
               .fromOption[Future](
@@ -787,7 +794,7 @@ class RepairService(
       batchSize: PositiveInt,
   )(implicit traceContext: TraceContext): EitherT[Future, String, Unit] =
     MonadUtil
-      .batchedSequentialTraverse(parameters.maxDbConnections * 2, batchSize.value)(cids)(
+      .batchedSequentialTraverse(parameters.maxDbConnections * PositiveInt.two, batchSize)(cids)(
         migrateContracts(_, repairSource, repairTarget, skipInactive).map(_ => Seq[Unit]())
       )
       .map(_ => ())
@@ -1049,6 +1056,12 @@ class RepairService(
       .toEitherTWithNonaborts
       .leftMap(e => log(s"Failed to transfer in contract ${cid} in ActiveContractStore: ${e}"))
 
+  /*
+  We do not store transfer counters for archivals in the repair service,
+  given that we do not store them as part of normal transaction processing either.
+  The latter is due to the fact that we do not know the correct transfer counters
+  at the time we persist the deactivation in the ACS.
+   */
   private def persistArchival(
       repair: RepairRequest
   )(cid: LfContractId)(implicit traceContext: TraceContext): EitherT[Future, String, Unit] =
@@ -1171,16 +1184,80 @@ class RepairService(
     } yield ()
   }
 
-  /** Repair commands are inserted where processing starts again upon reconnection. */
-  private def initRepairRequestAndVerifyPreconditions(
+  /** Allows to wait until clean head has progressed up to a certain timestamp */
+  def awaitCleanHeadForTimestamp(
+      domainId: DomainId,
+      timestamp: CantonTimestamp,
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
+    def check(
+        persistentState: SyncDomainPersistentState,
+        indexedDomain: IndexedDomain,
+    ): Future[Either[String, Unit]] = {
+      SyncDomainEphemeralStateFactory
+        .startingPoints(
+          indexedDomain,
+          persistentState.requestJournalStore,
+          persistentState.sequencerCounterTrackerStore,
+          persistentState.sequencedEventStore,
+          multiDomainEventLog.value,
+        )
+        .map { startingPoints =>
+          if (startingPoints.processing.prenextTimestamp >= timestamp) {
+            logger.debug(
+              s"Clean head reached ${startingPoints.processing.prenextTimestamp}, clearing ${timestamp}"
+            )
+            Right(())
+          } else {
+            logger.debug(
+              s"Clean head is still at ${startingPoints.processing.prenextTimestamp} which is not yet ${timestamp}"
+            )
+            Left(
+              s"Clean head is still at ${startingPoints.processing.prenextTimestamp} which is not yet ${timestamp}"
+            )
+          }
+        }
+    }
+    getPersistentState(domainId)
+      .mapK(FutureUnlessShutdown.outcomeK)
+      .flatMap { case (persistentState, _, indexedDomain) =>
+        EitherT(
+          retry
+            .Pause(
+              logger,
+              this,
+              retry.Forever,
+              50.milliseconds,
+              s"awaiting clean-head for=${domainId} at ts=${timestamp}",
+            )
+            .unlessShutdown(
+              FutureUnlessShutdown.outcomeF(check(persistentState, indexedDomain)),
+              AllExnRetryable,
+            )
+        )
+      }
+  }
+
+  private def getPersistentState(
       domainId: DomainId
-  )(implicit traceContext: TraceContext): EitherT[Future, String, RepairRequest] = {
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, String, (SyncDomainPersistentState, String, IndexedDomain)] = {
     val domainAlias = aliasManager.aliasForDomainId(domainId).fold(domainId.filterString)(_.unwrap)
     for {
       persistentState <- EitherT.fromEither[Future](
         lookUpDomainPersistence(domainId, s"domain ${domainAlias}")
       )
       indexedDomain <- EitherT.right(IndexedDomain.indexed(indexedStringStore)(domainId))
+    } yield (persistentState, domainAlias, indexedDomain)
+  }
+
+  /** Repair commands are inserted where processing starts again upon reconnection. */
+  private def initRepairRequestAndVerifyPreconditions(
+      domainId: DomainId
+  )(implicit traceContext: TraceContext): EitherT[Future, String, RepairRequest] = {
+    for {
+      obtainedPersistentState <- getPersistentState(domainId)
+      (persistentState, domainAlias, indexedDomain) = obtainedPersistentState
       startingPoints <- EitherTUtil.fromFuture(
         SyncDomainEphemeralStateFactory.startingPoints(
           indexedDomain,

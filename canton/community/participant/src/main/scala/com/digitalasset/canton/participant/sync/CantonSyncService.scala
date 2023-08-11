@@ -42,7 +42,8 @@ import com.digitalasset.canton.health.HealthReporting.{
 }
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.configuration.*
-import com.digitalasset.canton.ledger.error.{CommonErrors, LedgerApiErrors, PackageServiceError}
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
+import com.digitalasset.canton.ledger.error.{CommonErrors, PackageServiceErrors}
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.v2.ReadService.ConnectedDomainResponse
 import com.digitalasset.canton.ledger.participant.state.v2.*
@@ -270,7 +271,6 @@ class CantonSyncService(
 
   private val domainRouter =
     DomainRouter(
-      packageService,
       connectedDomainsLookup,
       domainConnectionConfigStore,
       aliasManager,
@@ -279,7 +279,7 @@ class CantonSyncService(
       autoTransferTransaction = parameters.enablePreviewFeatures,
       parameters.processingTimeouts,
       loggerFactory,
-    )(ec, TraceContext.empty)
+    )(ec)
 
   private val transferCoordination: TransferCoordination =
     TransferCoordination(
@@ -414,7 +414,6 @@ class CantonSyncService(
     participantNodePersistentState,
     pruningProcessor,
     parameters.processingTimeouts,
-    parameters.maxDbConnections,
     loggerFactory,
   )
 
@@ -454,9 +453,9 @@ class CantonSyncService(
           s"Could not locate pruning point: ${message}. Considering success for idempotency"
         )
         Right(())
-      case Left(LedgerPruningOnlySupportedInEnterpriseEdition(message)) =>
+      case Left(err @ LedgerPruningOnlySupportedInEnterpriseEdition) =>
         logger.warn(
-          s"Canton participant pruning not supported in canton-open-source edition: ${message}"
+          s"Canton participant pruning not supported in canton-open-source edition: ${err.message}"
         )
         Left(PruningServiceError.PruningNotSupportedInCommunityEdition.Error())
       case Left(err: LedgerPruningOffsetNonCantonFormat) =>
@@ -672,7 +671,7 @@ class CantonSyncService(
           sourceDescriptionLenLimit <- EitherT.fromEither[Future](
             String256M
               .create(sourceDescription.getOrElse(""), Some("package source description"))
-              .leftMap(PackageServiceError.InternalError.Generic.apply)
+              .leftMap(PackageServiceErrors.InternalError.Generic.apply)
           )
           _ <- packageService
             .storeValidatedPackagesAndSyncEvent(
@@ -683,7 +682,7 @@ class CantonSyncService(
               vetAllPackages = true,
               synchronizeVetting = false,
             )
-            .onShutdown(Left(PackageServiceError.ParticipantShuttingDown.Error()))
+            .onShutdown(Left(PackageServiceErrors.ParticipantShuttingDown.Error()))
         } yield SubmissionResult.Acknowledged
         ret.valueOr(err => TransactionError.internalError(CantonError.stringFromContext(err)))
       }
@@ -1234,7 +1233,9 @@ class CantonSyncService(
               partyNotifier,
               missingKeysAlerter,
               domainHandle.topologyClient,
+              domainCrypto,
               trafficStateController,
+              domainHandle.staticParameters.protocolVersion,
             ),
           missingKeysAlerter,
           transferCoordination,
@@ -1431,7 +1432,14 @@ class CantonSyncService(
             syncService.timeTracker.awaitTick(tick).fold(Future.unit)(_.void)
           )
         )
-        _ = logger.debug(s"Received timestamp from $alias for migration")
+        _ <- repairService
+          .awaitCleanHeadForTimestamp(syncService.domainId, tick)
+          .leftMap(err =>
+            SyncServiceError.SyncServiceInternalError.CleanHeadAwaitFailed(alias, tick, err)
+          )
+        _ = logger.debug(
+          s"Received timestamp from $alias for migration and advanced clean-head to it"
+        )
         _ <- EitherT.fromEither[FutureUnlessShutdown](performDomainDisconnect(alias))
       } yield success)
         .leftMap[SyncDomainMigrationError](err =>
@@ -1540,17 +1548,17 @@ class CantonSyncService(
         for {
           syncDomain <- EitherT.fromOption[Future](
             readySyncDomainById(domain),
-            ifNone = LedgerApiErrors.RequestValidation.InvalidArgument
+            ifNone = RequestValidationErrors.InvalidArgument
               .Reject(s"Domain ID not found: $domain"): DamlError,
           )
           remoteProtocolVersion <- EitherT.fromOptionF(
             protocolVersionGetter(Traced(remoteDomain)),
-            ifNone = LedgerApiErrors.RequestValidation.InvalidArgument
+            ifNone = RequestValidationErrors.InvalidArgument
               .Reject(s"Domain ID's protocol version not found: $remoteDomain"): DamlError,
           )
           _ <- transfer(remoteProtocolVersion)(syncDomain)
             .leftMap(error =>
-              LedgerApiErrors.RequestValidation.InvalidArgument
+              RequestValidationErrors.InvalidArgument
                 .Reject(
                   error.message
                 ): DamlError // TODO(i13240): Improve reassignment-submission Ledger API errors
@@ -2019,7 +2027,12 @@ object SyncServiceError extends SyncServiceErrorGroup {
           cause = "Failed to await for participant becoming active due to missing domain objects"
         )
         with SyncServiceError
-
+    final case class CleanHeadAwaitFailed(domain: DomainAlias, ts: CantonTimestamp, err: String)(
+        implicit val loggingContext: ErrorLoggingContext
+    ) extends CantonError.Impl(
+          cause = s"Failed to await for clean-head at ${ts}: $err"
+        )
+        with SyncServiceError
   }
 
   @Explanation("The participant has detected that another node is behaving maliciously.")

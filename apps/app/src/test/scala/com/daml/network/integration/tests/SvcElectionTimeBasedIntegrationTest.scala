@@ -1,15 +1,14 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.javaapi.data.codegen.{Update, Created, ContractId}
+import com.daml.ledger.javaapi.data.codegen.{Created, Update}
 import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.codegen.java.cn
 import com.daml.network.sv.util.SvUtil
-
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.slf4j.event.Level
-
 import CNNodeTests.BracketSynchronous.*
+import com.daml.network.codegen.java.cn.svcrules.ElectionRequest
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
@@ -23,7 +22,7 @@ class SvcElectionTimeBasedIntegrationTest
       epoch: Long,
       reason: cn.svcrules.ElectionRequestReason,
       ranking: Seq[PartyId],
-  ): Update[Created[ContractId[cn.svcrules.ElectionRequest]]] =
+  ): Update[Created[ElectionRequest.ContractId]] =
     new cn.svcrules.ElectionRequest(
       svc.toProtoPrimitive,
       requester.toProtoPrimitive,

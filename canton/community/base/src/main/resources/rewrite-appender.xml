@@ -114,6 +114,36 @@
             <testing>true</testing>
         </rewrite>
 
+        <!-- # TODO(#13519): Suppress error in JSON API integration tests and remove these two exceptions -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.daml.http.StaticContentRouter</logger>
+            <maxLevel>INFO</maxLevel>
+            <contains>StaticContentRouter configured: StaticContentConfig</contains>
+            <testing>true</testing>
+        </rewrite>
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.daml.http.StaticContentRouter</logger>
+            <maxLevel>INFO</maxLevel>
+            <contains>DO NOT USE StaticContentRouter IN PRODUCTION, CONSIDER SETTING UP REVERSE PROXY!!!</contains>
+            <testing>true</testing>
+        </rewrite>
+
+        <!-- # TODO(#13519): Suppress error in JSON API integration tests and remove this exception -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.ledger.api.auth.interceptor.AuthorizationInterceptor</logger>
+            <maxLevel>INFO</maxLevel>
+            <contains>Could not resolve is_deactivated status for user </contains>
+            <testing>true</testing>
+        </rewrite>
+
+        <!-- KMS integration test might disable certificate verification -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>software.amazon.awssdk.http.nio.netty.internal.SslContextProvider</logger>
+            <maxLevel>INFO</maxLevel>
+            <contains>SSL Certificate verification is disabled</contains>
+            <testing>true</testing>
+        </rewrite>
+
         <!-- Emitted when trying to connect to the database and Oracle is not ready yet -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
             <logger>com.zaxxer.hikari.pool.HikariPool</logger>
@@ -319,6 +349,13 @@
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
             <logger>com.digitalasset.canton.concurrent.ExecutionContextMonitor</logger>
             <contains></contains>
+            <maxLevel>INFO</maxLevel>
+            <testing>true</testing>
+        </rewrite>
+        <!-- Suppress delay logger during tests -->
+        <rewrite class="com.digitalasset.canton.logging.Rewrite">
+            <logger>com.digitalasset.canton.participant.sync.SyncDomain</logger>
+            <contains>Late processing (or clock skew) of batch with counter</contains>
             <maxLevel>INFO</maxLevel>
             <testing>true</testing>
         </rewrite>

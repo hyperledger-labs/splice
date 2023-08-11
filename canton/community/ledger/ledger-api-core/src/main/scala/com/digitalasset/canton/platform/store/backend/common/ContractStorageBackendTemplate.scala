@@ -3,21 +3,19 @@
 
 package com.digitalasset.canton.platform.store.backend.common
 
-import anorm.SqlParser.{array, byteArray, int, long}
+import anorm.SqlParser.{array, byteArray, int, str}
 import anorm.{ResultSetParser, Row, RowParser, SimpleSql, SqlParser, ~}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.platform.store.backend.ContractStorageBackend
-import com.digitalasset.canton.platform.store.backend.ContractStorageBackend.RawContractState
-import com.digitalasset.canton.platform.store.backend.Conversions.{
-  contractId,
-  offset,
-  timestampFromMicros,
+import com.digitalasset.canton.platform.store.backend.ContractStorageBackend.{
+  RawArchivedContract,
+  RawCreatedContract,
 }
+import com.digitalasset.canton.platform.store.backend.Conversions.{contractId, timestampFromMicros}
 import com.digitalasset.canton.platform.store.backend.common.ComposableQuery.{
   CompositeSql,
   SqlStringInterpolation,
 }
-import com.digitalasset.canton.platform.store.backend.common.SimpleSqlAsVectorOf.*
 import com.digitalasset.canton.platform.store.cache.LedgerEndCache
 import com.digitalasset.canton.platform.store.interfaces.LedgerDaoContractsReader.{
   KeyAssigned,
@@ -67,135 +65,92 @@ class ContractStorageBackendTemplate(
       .getOrElse(KeyUnassigned)
   }
 
-  private val fullDetailsContractRowParser: RowParser[ContractStorageBackend.RawContractState] =
-    (int("template_id").?
+  private val archivedContractRowParser: RowParser[(ContractId, RawArchivedContract)] =
+    (str("contract_id") ~ array[Int]("flat_event_witnesses"))
+      .map { case coid ~ flatEventWitnesses =>
+        ContractId.assertFromString(coid) -> RawArchivedContract(
+          flatEventWitnesses = flatEventWitnesses.view
+            .map(stringInterning.party.externalize)
+            .toSet
+        )
+      }
+
+  override def archivedContracts(contractIds: Seq[ContractId], before: Offset)(
+      connection: Connection
+  ): Map[ContractId, RawArchivedContract] =
+    if (contractIds.isEmpty) Map.empty
+    else {
+      import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
+      SQL"""
+       SELECT contract_id, flat_event_witnesses
+       FROM participant_events_consuming_exercise
+       WHERE
+         contract_id ${queryStrategy.anyOfStrings(contractIds.map(_.coid))}
+         AND event_offset <= $before"""
+        .as(archivedContractRowParser.*)(connection)
+        .toMap
+    }
+
+  private val createdContractRowParser: RowParser[(ContractId, RawCreatedContract)] =
+    (str("contract_id")
+      ~ int("template_id")
       ~ array[Int]("flat_event_witnesses")
-      ~ byteArray("create_argument").?
+      ~ byteArray("create_argument")
       ~ int("create_argument_compression").?
-      ~ int("event_kind")
-      ~ timestampFromMicros("ledger_effective_time").?)
+      ~ timestampFromMicros("ledger_effective_time")
+      ~ str("create_agreement_text").?
+      ~ array[Int]("create_signatories")
+      ~ byteArray("create_key_value").?
+      ~ int("create_key_value_compression").?
+      ~ array[Int]("create_key_maintainers").?
+      ~ byteArray("driver_metadata").?)
       .map {
-        case internalTemplateId ~ flatEventWitnesses ~ createArgument ~ createArgumentCompression ~ eventKind ~ ledgerEffectiveTime =>
-          RawContractState(
-            templateId = internalTemplateId.map(stringInterning.templateId.unsafe.externalize),
+        case coid ~ internalTemplateId ~ flatEventWitnesses ~ createArgument ~ createArgumentCompression ~ ledgerEffectiveTime ~ agreementText ~ signatories ~ createKey ~ createKeyCompression ~ keyMaintainers ~ driverMetadata =>
+          ContractId.assertFromString(coid) -> RawCreatedContract(
+            templateId = stringInterning.templateId.unsafe.externalize(internalTemplateId),
             flatEventWitnesses = flatEventWitnesses.view
               .map(stringInterning.party.externalize)
               .toSet,
             createArgument = createArgument,
             createArgumentCompression = createArgumentCompression,
-            eventKind = eventKind,
             ledgerEffectiveTime = ledgerEffectiveTime,
+            agreementText = agreementText,
+            signatories = signatories.view.map(i => stringInterning.party.externalize(i)).toSet,
+            createKey = createKey,
+            createKeyCompression = createKeyCompression,
+            keyMaintainers =
+              keyMaintainers.map(_.view.map(i => stringInterning.party.externalize(i)).toSet),
+            driverMetadata = driverMetadata,
           )
       }
 
-  override def contractState(contractId: ContractId, before: Offset)(
+  override def createdContracts(contractIds: Seq[ContractId], before: Offset)(
       connection: Connection
-  ): Option[ContractStorageBackend.RawContractState] = {
-    import com.digitalasset.canton.platform.store.backend.Conversions.ContractIdToStatement
-    import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
-    SQL"""
-           (SELECT
-             event_sequential_id,
-             template_id,
-             flat_event_witnesses,
-             create_argument,
-             create_argument_compression,
-             10 as event_kind,
-             ledger_effective_time
-           FROM participant_events_create
-           WHERE
-             contract_id = $contractId
-             AND event_offset <= $before)
-           UNION ALL
-           (SELECT
-             event_sequential_id,
-             template_id,
-             flat_event_witnesses,
-             NULL as create_argument,
-             NULL as create_argument_compression,
-             20 as event_kind,
-             ledger_effective_time
-           FROM participant_events_consuming_exercise
-           WHERE
-             contract_id = $contractId
-             AND event_offset <= $before)
-           ORDER BY event_sequential_id DESC
-           FETCH NEXT 1 ROW ONLY"""
-      .as(fullDetailsContractRowParser.singleOpt)(connection)
-  }
-
-  private val contractStateRowParser: RowParser[ContractStorageBackend.RawContractStateEvent] =
-    (int("event_kind") ~
-      contractId("contract_id") ~
-      int("template_id").? ~
-      timestampFromMicros("ledger_effective_time").? ~
-      byteArray("create_key_value").? ~
-      int("create_key_value_compression").? ~
-      byteArray("create_argument").? ~
-      int("create_argument_compression").? ~
-      long("event_sequential_id") ~
-      array[Int]("flat_event_witnesses") ~
-      offset("event_offset")).map {
-      case eventKind ~ contractId ~ internalTemplateId ~ ledgerEffectiveTime ~ createKeyValue ~ createKeyCompression ~ createArgument ~ createArgumentCompression ~ eventSequentialId ~ flatEventWitnesses ~ offset =>
-        ContractStorageBackend.RawContractStateEvent(
-          eventKind,
-          contractId,
-          internalTemplateId.map(stringInterning.templateId.externalize),
-          ledgerEffectiveTime,
-          createKeyValue,
-          createKeyCompression,
-          createArgument,
-          createArgumentCompression,
-          flatEventWitnesses.view
-            .map(stringInterning.party.externalize)
-            .toSet,
-          eventSequentialId,
-          offset,
-        )
+  ): Map[ContractId, RawCreatedContract] =
+    if (contractIds.isEmpty) Map.empty
+    else {
+      import com.digitalasset.canton.platform.store.backend.Conversions.OffsetToStatement
+      SQL"""
+         SELECT
+           contract_id,
+           template_id,
+           flat_event_witnesses,
+           create_argument,
+           create_argument_compression,
+           ledger_effective_time,
+           create_agreement_text,
+           create_signatories,
+           create_key_value,
+           create_key_value_compression,
+           create_key_maintainers,
+           driver_metadata
+         FROM participant_events_create
+         WHERE
+           contract_id ${queryStrategy.anyOfStrings(contractIds.map(_.coid))}
+           AND event_offset <= $before"""
+        .as(createdContractRowParser.*)(connection)
+        .toMap
     }
-
-  override def contractStateEvents(startExclusive: Long, endInclusive: Long)(
-      connection: Connection
-  ): Vector[ContractStorageBackend.RawContractStateEvent] = {
-    SQL"""
-         (SELECT
-               10 as event_kind,
-               contract_id,
-               template_id,
-               create_key_value,
-               create_key_value_compression,
-               create_argument,
-               create_argument_compression,
-               flat_event_witnesses,
-               ledger_effective_time,
-               event_sequential_id,
-               event_offset
-           FROM
-               participant_events_create
-           WHERE
-               event_sequential_id > $startExclusive
-               and event_sequential_id <= $endInclusive)
-         UNION ALL
-         (SELECT
-               20 as event_kind,
-               contract_id,
-               template_id,
-               create_key_value,
-               create_key_value_compression,
-               NULL as create_argument,
-               NULL as create_argument_compression,
-               flat_event_witnesses,
-               ledger_effective_time,
-               event_sequential_id,
-               event_offset
-           FROM
-               participant_events_consuming_exercise
-           WHERE
-               event_sequential_id > $startExclusive
-               and event_sequential_id <= $endInclusive)
-         ORDER BY event_sequential_id ASC"""
-      .asVectorOf(contractStateRowParser)(connection)
-  }
 
   private val contractRowParser: RowParser[ContractStorageBackend.RawContract] =
     (int("template_id")

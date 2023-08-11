@@ -4,7 +4,7 @@
 package com.digitalasset.canton.participant
 
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveNumeric}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveNumeric}
 import com.digitalasset.canton.config.{
   ApiLoggingConfig,
   BatchAggregatorConfig,
@@ -35,14 +35,16 @@ final case class ParticipantNodeParameters(
     protocolConfig: ParticipantProtocolConfig,
     uniqueContractKeys: Boolean,
     ledgerApiServerParameters: LedgerApiServerParametersConfig,
-    maxDbConnections: Int,
+    maxDbConnections: PositiveInt,
     excludeInfrastructureTransactions: Boolean,
     enableEngineStackTrace: Boolean,
+    enableContractUpgrading: Boolean,
 ) extends CantonNodeParameters
     with HasGeneralCantonNodeParameters {
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
   override def devVersionSupport: Boolean = protocolConfig.devVersionSupport
   override def initialProtocolVersion: ProtocolVersion = protocolConfig.initialProtocolVersion
+
 }
 
 object ParticipantNodeParameters {
@@ -59,6 +61,7 @@ object ParticipantNodeParameters {
       cachingConfigs = CachingConfigs(),
       sequencerClient = SequencerClientConfig(),
       dbMigrateAndStart = false,
+      skipTopologyManagerSignatureValidation = false,
     ),
     partyChangeNotification = PartyNotificationConfig.Eager,
     adminWorkflow = AdminWorkflowConfig(
@@ -82,8 +85,9 @@ object ParticipantNodeParameters {
     ),
     uniqueContractKeys = false,
     ledgerApiServerParameters = LedgerApiServerParametersConfig(),
-    maxDbConnections = 10,
+    maxDbConnections = PositiveInt.tryCreate(10),
     excludeInfrastructureTransactions = true,
     enableEngineStackTrace = false,
+    enableContractUpgrading = false,
   )
 }

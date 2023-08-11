@@ -42,6 +42,11 @@ import com.digitalasset.canton.domain.DomainNodeParameters
 import com.digitalasset.canton.domain.config.*
 import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.environment.CantonNodeParameters
+import com.digitalasset.canton.ledger.runner.common.PureConfigReaderWriter.Secure.{
+  commandConfigurationConvert,
+  dbConfigPostgresDataSourceConfigConvert,
+  userManagementServiceConfigConvert,
+}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsPrefix, MetricsReporterConfig}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
@@ -284,11 +289,14 @@ final case class CantonParameters(
   * @param enablePreviewCommands         Feature flag to enable the set of commands that use functionality which we don't deem stable.
   * @param enableTestingCommands         Feature flag to enable the set of commands used by Canton developers for testing purposes.
   * @param enableRepairCommands          Feature flag to enable the set of commands used by Canton operators for manual repair purposes.
+  * @param skipTopologyManagerSignatureValidation If true, the signature validation of the domain topology transaction messages (2.x) will be skipped
   */
 final case class CantonFeatures(
     enablePreviewCommands: Boolean = false,
     enableTestingCommands: Boolean = false,
     enableRepairCommands: Boolean = false,
+    // TODO(#9014) remove for x-nodes
+    skipTopologyManagerSignatureValidation: Boolean = false,
 ) {
   def featureFlags: Set[FeatureFlag] = {
     (Seq(FeatureFlag.Stable)
@@ -412,22 +420,24 @@ trait CantonConfig {
       val participantParameters = participantConfig.parameters
       ParticipantNodeParameters(
         general = CantonNodeParameterConverter.general(this, participantConfig),
-        participantParameters.partyChangeNotification,
-        participantParameters.adminWorkflow,
-        participantParameters.maxUnzippedDarSize,
-        participantParameters.stores,
-        participantParameters.transferTimeProofFreshnessProportion,
+        partyChangeNotification = participantParameters.partyChangeNotification,
+        adminWorkflow = participantParameters.adminWorkflow,
+        maxUnzippedDarSize = participantParameters.maxUnzippedDarSize,
+        stores = participantParameters.stores,
+        transferTimeProofFreshnessProportion =
+          participantParameters.transferTimeProofFreshnessProportion,
         protocolConfig = ParticipantProtocolConfig(
           minimumProtocolVersion = participantParameters.minimumProtocolVersion.map(_.unwrap),
           devVersionSupport = participantParameters.devVersionSupport,
           dontWarnOnDeprecatedPV = participantParameters.dontWarnOnDeprecatedPV,
           initialProtocolVersion = participantParameters.initialProtocolVersion.unwrap,
         ),
-        participantConfig.init.parameters.uniqueContractKeys,
-        participantParameters.ledgerApiServerParameters,
-        maxDbConnections = participantConfig.storage.maxConnectionsCanton(true, false, false).value,
-        participantParameters.excludeInfrastructureTransactions,
-        participantParameters.enableEngineStackTraces,
+        uniqueContractKeys = participantConfig.init.parameters.uniqueContractKeys,
+        ledgerApiServerParameters = participantParameters.ledgerApiServerParameters,
+        maxDbConnections = participantConfig.storage.maxConnectionsCanton(true, false, false),
+        excludeInfrastructureTransactions = participantParameters.excludeInfrastructureTransactions,
+        enableEngineStackTrace = participantParameters.enableEngineStackTraces,
+        enableContractUpgrading = participantParameters.enableContractUpgrading,
       )
     }
 
@@ -512,6 +522,7 @@ private[config] object CantonNodeParameterConverter {
       node.caching,
       parent.parameters.nonStandardConfig,
       node.storage.parameters.migrateAndStart,
+      parent.features.skipTopologyManagerSignatureValidation,
     )
   }
 
@@ -544,13 +555,13 @@ object CantonConfig {
   )
 
   class ConfigReaders(implicit private val elc: ErrorLoggingContext) {
-    import DeprecatedConfigUtils.*
     import CantonConfigUtil.*
+    import DeprecatedConfigUtils.*
     import ParticipantInitConfig.DeprecatedImplicits.*
     import com.digitalasset.canton.config.CheckConfig.IsActive.DeprecatedImplicits.*
+    import com.digitalasset.canton.metrics.MetricsReporterConfig.DeprecatedImplicits.*
     import com.digitalasset.canton.participant.config.ActiveContractsServiceConfig.DeprecatedImplicits.*
     import com.digitalasset.canton.participant.config.LedgerApiServerConfig.DeprecatedImplicits.*
-    import com.digitalasset.canton.metrics.MetricsReporterConfig.DeprecatedImplicits.*
 
     lazy implicit val lengthLimitedStringReader: ConfigReader[LengthLimitedString] = {
       ConfigReader.fromString[LengthLimitedString] { str =>
@@ -601,6 +612,8 @@ object CantonConfig {
     implicit val tracingConfigZipkinSpanExporterReader
         : ConfigReader[TracingConfig.Exporter.Zipkin] =
       deriveReader[TracingConfig.Exporter.Zipkin]
+    implicit val tracingConfigOtlpSpanExporterReader: ConfigReader[TracingConfig.Exporter.Otlp] =
+      deriveReader[TracingConfig.Exporter.Otlp]
     implicit val tracingConfigSpanExporterReader: ConfigReader[TracingConfig.Exporter] =
       deriveReader[TracingConfig.Exporter]
     implicit val tracingConfigAlwaysOnSamplerReader: ConfigReader[TracingConfig.Sampler.AlwaysOn] =
@@ -613,6 +626,9 @@ object CantonConfig {
       deriveReader[TracingConfig.Sampler.TraceIdRatio]
     implicit val tracingConfigSamplerReader: ConfigReader[TracingConfig.Sampler] =
       deriveReader[TracingConfig.Sampler]
+    implicit val tracingConfigBatchSpanProcessorReader
+        : ConfigReader[TracingConfig.BatchSpanProcessor] =
+      deriveReader[TracingConfig.BatchSpanProcessor]
     implicit val tracingConfigTracerReader: ConfigReader[TracingConfig.Tracer] =
       deriveReader[TracingConfig.Tracer]
     // treat TracingConfig.Propagation as an enum as we currently only have case object types in the sealed family
@@ -785,8 +801,6 @@ object CantonConfig {
       deriveReader[AuthServiceConfig.Wildcard.type]
     lazy implicit val authServiceConfigReader: ConfigReader[AuthServiceConfig] =
       deriveReader[AuthServiceConfig]
-    lazy implicit val postgresDataSourceConfigReader: ConfigReader[PostgresDataSourceConfigCanton] =
-      deriveReader[PostgresDataSourceConfigCanton]
     lazy implicit val rateLimitConfigReader: ConfigReader[RateLimitingConfig] =
       deriveReader[RateLimitingConfig]
     lazy implicit val ledgerApiServerConfigReader: ConfigReader[LedgerApiServerConfig] =
@@ -820,10 +834,6 @@ object CantonConfig {
         : ConfigReader[FlatTransactionStreamsConfig] = deriveReader[FlatTransactionStreamsConfig]
     lazy implicit val treeTransactionStreamsConfigReader
         : ConfigReader[TreeTransactionStreamsConfig] = deriveReader[TreeTransactionStreamsConfig]
-    lazy implicit val commandServiceConfigReader: ConfigReader[CommandServiceConfig] =
-      deriveReader[CommandServiceConfig]
-    lazy implicit val userManagementServiceConfigReader: ConfigReader[UserManagementServiceConfig] =
-      deriveReader[UserManagementServiceConfig]
     lazy implicit val indexerConfigReader: ConfigReader[IndexerConfig] =
       deriveReader[IndexerConfig]
     lazy implicit val packageMetadataViewConfigReader: ConfigReader[PackageMetadataViewConfig] =
@@ -938,6 +948,8 @@ object CantonConfig {
       deriveReader[AdminWorkflowConfig]
     lazy implicit val participantStoreConfigReader: ConfigReader[ParticipantStoreConfig] =
       deriveReader[ParticipantStoreConfig]
+    lazy implicit val ledgerApiContractLoaderConfigReader: ConfigReader[ContractLoaderConfig] =
+      deriveReader[ContractLoaderConfig]
     lazy implicit val ledgerApiServerParametersConfigReader
         : ConfigReader[LedgerApiServerParametersConfig] =
       deriveReader[LedgerApiServerParametersConfig]
@@ -1015,6 +1027,8 @@ object CantonConfig {
     implicit val tracingConfigZipkinSpanExporterWriter
         : ConfigWriter[TracingConfig.Exporter.Zipkin] =
       deriveWriter[TracingConfig.Exporter.Zipkin]
+    implicit val tracingConfigOtlpSpanExporterWriter: ConfigWriter[TracingConfig.Exporter.Otlp] =
+      deriveWriter[TracingConfig.Exporter.Otlp]
     implicit val tracingConfigSpanExporterWriter: ConfigWriter[TracingConfig.Exporter] =
       deriveWriter[TracingConfig.Exporter]
     implicit val tracingConfigAlwaysOnSamplerWriter: ConfigWriter[TracingConfig.Sampler.AlwaysOn] =
@@ -1027,6 +1041,9 @@ object CantonConfig {
       deriveWriter[TracingConfig.Sampler.TraceIdRatio]
     implicit val tracingConfigSamplerWriter: ConfigWriter[TracingConfig.Sampler] =
       deriveWriter[TracingConfig.Sampler]
+    implicit val tracingConfigBatchSpanProcessorWriter
+        : ConfigWriter[TracingConfig.BatchSpanProcessor] =
+      deriveWriter[TracingConfig.BatchSpanProcessor]
     implicit val tracingConfigTracerWriter: ConfigWriter[TracingConfig.Tracer] =
       deriveWriter[TracingConfig.Tracer]
     // treat TracingConfig.Propagation as an enum as we currently only have case object types in the sealed family
@@ -1163,8 +1180,6 @@ object CantonConfig {
       deriveWriter[AuthServiceConfig.Wildcard.type]
     lazy implicit val authServiceConfigWriter: ConfigWriter[AuthServiceConfig] =
       deriveWriter[AuthServiceConfig]
-    lazy implicit val postgresDataSourceWriter: ConfigWriter[PostgresDataSourceConfigCanton] =
-      deriveWriter[PostgresDataSourceConfigCanton]
     lazy implicit val rateLimitConfigWriter: ConfigWriter[RateLimitingConfig] =
       deriveWriter[RateLimitingConfig]
     lazy implicit val ledgerApiServerConfigWriter: ConfigWriter[LedgerApiServerConfig] =
@@ -1193,10 +1208,6 @@ object CantonConfig {
         : ConfigWriter[FlatTransactionStreamsConfig] = deriveWriter[FlatTransactionStreamsConfig]
     lazy implicit val treeTransactionStreamsConfigWriter
         : ConfigWriter[TreeTransactionStreamsConfig] = deriveWriter[TreeTransactionStreamsConfig]
-    lazy implicit val commandServiceConfigWriter: ConfigWriter[CommandServiceConfig] =
-      deriveWriter[CommandServiceConfig]
-    lazy implicit val userManagementServiceConfigWriter: ConfigWriter[UserManagementServiceConfig] =
-      deriveWriter[UserManagementServiceConfig]
     lazy implicit val packageMetadataViewConfigWriter: ConfigWriter[PackageMetadataViewConfig] =
       deriveWriter[PackageMetadataViewConfig]
     lazy implicit val indexerConfigWriter: ConfigWriter[IndexerConfig] =
@@ -1307,6 +1318,8 @@ object CantonConfig {
       deriveWriter[AdminWorkflowConfig]
     lazy implicit val participantStoreConfigWriter: ConfigWriter[ParticipantStoreConfig] =
       deriveWriter[ParticipantStoreConfig]
+    lazy implicit val ledgerApiContractLoaderConfigWriter: ConfigWriter[ContractLoaderConfig] =
+      deriveWriter[ContractLoaderConfig]
     lazy implicit val ledgerApiServerParametersConfigWriter
         : ConfigWriter[LedgerApiServerParametersConfig] =
       deriveWriter[LedgerApiServerParametersConfig]

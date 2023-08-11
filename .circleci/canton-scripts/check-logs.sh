@@ -87,8 +87,9 @@ find_exceptions |
 find_secrets() {
   set +o pipefail # rg returns 1 if there were not matches
   rg -o -e "(secret|token|private-key|password)=[^,[:space:]]*" "$LOGFILE" |
-    # we mask secrets as "****" in our logs
-    rg -v "=\\\\\"\*\*\*\*\\\\\"" || true
+    # we mask secrets as "****" in our logs and testcontainers obfuscates secrets as "hidden non-blank value"
+    # (https://github.com/testcontainers/testcontainers-java/blob/bf5605a2031d7f29f86a85430e3509a198c6e125/core/src/main/java/org/testcontainers/utility/AuthConfigUtil.java#L33)
+    rg -v -e "=\\\\\"\*\*\*\*\\\\\"" -e "=hidden" || true
 }
 
 # Find leaked secrets

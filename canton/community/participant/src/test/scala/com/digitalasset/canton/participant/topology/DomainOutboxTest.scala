@@ -38,7 +38,7 @@ class DomainOutboxTest extends AsyncWordSpec with BaseTest {
   import DefaultTestIdentities.*
 
   private val clock = new WallClock(timeouts, loggerFactory)
-  private val crypto = TestingIdentityFactory(loggerFactory).newCrypto(participant1)
+  private val crypto = TestingIdentityFactory.newCrypto(loggerFactory)(participant1)
   private val publicKey =
     FutureUtil
       .noisyAwaitResult(crypto.cryptoPublicStore.signingKeys.value, "get public key", 10.seconds)
@@ -95,6 +95,8 @@ class DomainOutboxTest extends AsyncWordSpec with BaseTest {
     val expect = new AtomicInteger(expectI)
     override def submit(
         transactions: Seq[SignedTopologyTransaction[TopologyChangeOp]]
+    )(implicit
+        traceContext: TraceContext
     ): FutureUnlessShutdown[Seq[RegisterTopologyTransactionResponseResult.State]] =
       FutureUnlessShutdown.outcomeF {
         logger.debug(s"Observed ${transactions.length} transactions")

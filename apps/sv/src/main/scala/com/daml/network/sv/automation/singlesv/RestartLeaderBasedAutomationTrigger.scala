@@ -61,7 +61,7 @@ class RestartLeaderBasedAutomationTrigger(
   private def closeService(): Unit =
     epochStateVar.foreach(epochState => Lifecycle.close(epochState.leaderBasedAutomation)(logger))
 
-  appLevelRetryProvider.runOnShutdown(new RunOnShutdown {
+  appLevelRetryProvider.runOnShutdown_(new RunOnShutdown {
     override def name = s"shutdown per-epoch retry provider"
     override def done = false
     override def run() = closeRetryProvider()

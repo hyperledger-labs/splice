@@ -159,6 +159,7 @@ class ParticipantPartiesAdministrationGroupX(
       // TODO(i10809) replace wait for domain for a clean topology synchronisation using the dispatcher info
       waitForDomain: DomainChoice = DomainChoice.Only(Seq()),
       synchronizeParticipants: Seq[ParticipantReferenceX] = Seq(),
+      groupAddressing: Boolean = false,
   ): PartyId = {
 
     def registered(lst: => Seq[ListPartiesResult]): Set[DomainId] = {
@@ -241,7 +242,7 @@ class ParticipantPartiesAdministrationGroupX(
             )
               .map(domains => (p, domains intersect domainIds))
           }
-          _ <- runPartyCommand(partyId, participants, threshold).toEither
+          _ <- runPartyCommand(partyId, participants, threshold, groupAddressing).toEither
           _ <- validDisplayName match {
             case None => Right(())
             case Some(name) =>
@@ -284,13 +285,14 @@ class ParticipantPartiesAdministrationGroupX(
       partyId: PartyId,
       participants: Seq[ParticipantId],
       threshold: PositiveInt,
+      groupAddressing: Boolean,
       force: Boolean = false,
   ): ConsoleCommandResult[SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX]] = {
 
     runner
       .adminCommand(
         TopologyAdminCommandsX.Write.Propose(
-          // TODO(#11255) properly set the serial or introduce auto-detection so we don't
+          // TODO(#14048) properly set the serial or introduce auto-detection so we don't
           //              have to set it on the client side
           mapping = PartyToParticipantX(
             partyId,
@@ -303,7 +305,7 @@ class ParticipantPartiesAdministrationGroupX(
                 else ParticipantPermissionX.Submission,
               )
             ),
-            groupAddressing = false,
+            groupAddressing,
           ),
           signedBy = Seq(this.participantId.uid.namespace.fingerprint),
           serial = None,
@@ -313,7 +315,7 @@ class ParticipantPartiesAdministrationGroupX(
 
   @Help.Summary("Disable party on participant")
   def disable(name: Identifier, force: Boolean = false): Unit = {
-    // TODO(#11255) implement me
+    // TODO(#14068) implement me
     throw new UnsupportedOperationException("not yet implemented")
   }
 

@@ -47,7 +47,8 @@ abstract class TopologyManager[E <: CantonError](
     protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
 )(implicit ec: ExecutionContext)
-    extends NamedLogging
+    extends TopologyManagerStatus
+    with NamedLogging
     with FlagCloseableAsync {
 
   protected val validator =
@@ -59,7 +60,7 @@ abstract class TopologyManager[E <: CantonError](
     )
 
   /** returns the current queue size (how many changes are being processed) */
-  def queueSize: Int = sequentialQueue.queueSize
+  override def queueSize: Int = sequentialQueue.queueSize
 
   protected def checkTransactionNotAddedBefore(
       transaction: SignedTopologyTransaction[TopologyChangeOp]
@@ -460,24 +461,10 @@ abstract class TopologyManager[E <: CantonError](
         case Some(
               ValidatedTopologyTransaction(
                 `transaction`,
-                Some(TopologyTransactionRejection.NotAuthorized),
+                Some(rejection),
               )
             ) =>
-          Left(TopologyManagerError.UnauthorizedTransaction.Failure(): TopologyManagerError)
-        case Some(
-              ValidatedTopologyTransaction(
-                `transaction`,
-                Some(TopologyTransactionRejection.SignatureCheckFailed(err)),
-              )
-            ) =>
-          Left(TopologyManagerError.InvalidSignatureError.Failure(err): TopologyManagerError)
-        case Some(
-              ValidatedTopologyTransaction(
-                `transaction`,
-                Some(TopologyTransactionRejection.SerialMismatch(expected, actual)),
-              )
-            ) =>
-          Left(TopologyManagerError.SerialMismatch.Failure(expected, actual): TopologyManagerError)
+          Left(rejection.toTopologyManagerError)
         case Some(tx: ValidatedTopologyTransaction) =>
           Left(TopologyManagerError.InternalError.ReplaceExistingFailed(tx))
         case None => Right(())

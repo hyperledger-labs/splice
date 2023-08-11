@@ -4,12 +4,12 @@
 package com.daml.http.util
 
 import com.daml.http.domain
-import com.daml.ledger.api.refinements.{ApiTypes => lar}
-import com.daml.ledger.api.{v1 => lav1}
+import com.daml.ledger.api.refinements.{ApiTypes as lar}
+import com.daml.ledger.api.{v1 as lav1}
 import lav1.commands.Commands.DeduplicationPeriod
 import scalaz.NonEmptyList
-import scalaz.syntax.foldable._
-import scalaz.syntax.tag._
+import scalaz.syntax.foldable.*
+import scalaz.syntax.tag.*
 
 object Commands {
   def create(
@@ -75,6 +75,7 @@ object Commands {
       command: lav1.commands.Command.Command,
       deduplicationPeriod: DeduplicationPeriod,
       submissionId: Option[domain.SubmissionId],
+      workflowId: Option[domain.WorkflowId],
       disclosedContracts: Seq[domain.DisclosedContract.LAV],
   ): lav1.command_service.SubmitAndWaitRequest = {
     val commands = lav1.commands.Commands(
@@ -95,8 +96,13 @@ object Commands {
       disclosedContracts = disclosedContracts map (_.toLedgerApi),
       commands = Seq(lav1.commands.Command(command)),
     )
-    val updatedCommands =
+    val commandsWithSubmissionId =
       domain.SubmissionId.unsubst(submissionId).map(commands.withSubmissionId).getOrElse(commands)
-    lav1.command_service.SubmitAndWaitRequest(Some(updatedCommands))
+    val commandsWithWorkflowId =
+      domain.WorkflowId
+        .unsubst(workflowId)
+        .map(commandsWithSubmissionId.withWorkflowId)
+        .getOrElse(commandsWithSubmissionId)
+    lav1.command_service.SubmitAndWaitRequest(Some(commandsWithWorkflowId))
   }
 }

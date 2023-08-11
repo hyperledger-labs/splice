@@ -13,6 +13,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, TransferSubmitterMetadata}
 import com.digitalasset.canton.health.ComponentHealthState
@@ -23,7 +24,12 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.PackageService
 import com.digitalasset.canton.participant.domain.{DomainHandle, DomainRegistryError}
-import com.digitalasset.canton.participant.event.{AcsChange, RecordTime}
+import com.digitalasset.canton.participant.event.{
+  AcsChange,
+  ContractMetadataAndTransferCounter,
+  ContractStakeholdersAndTransferCounter,
+  RecordTime,
+}
 import com.digitalasset.canton.participant.metrics.{PruningMetrics, SyncDomainMetrics}
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.SubmissionDuringShutdown
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.{
@@ -97,7 +103,6 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param ephemeral         The ephemeral state of the sync domain.
   * @param packageService    Underlying package management service.
   * @param domainCrypto      Synchronisation crypto utility combining IPS and Crypto operations for a single domain.
-  * @param topologyProcessor Processor of topology messages from the sequencer.
   */
 class SyncDomain(
     val domainId: DomainId,
@@ -134,7 +139,7 @@ class SyncDomain(
 
   override protected def timeouts: ProcessingTimeout = parameters.processingTimeouts
 
-  override val name = SyncDomain.healthName
+  override val name: String = SyncDomain.healthName
   override val initialHealthState: ComponentHealthState = ComponentHealthState.NotInitializedState
   override val closingState: ComponentHealthState =
     ComponentHealthState.failed("Disconnected from domain")
@@ -150,7 +155,6 @@ class SyncDomain(
     ConfirmationRequestFactory(participantId, domainId, staticDomainParameters.protocolVersion)(
       domainCrypto.crypto.pureCrypto,
       seedGenerator,
-      packageService,
       parameters.loggingConfig,
       staticDomainParameters.uniqueContractKeys,
       loggerFactory,
@@ -180,6 +184,7 @@ class SyncDomain(
     loggerFactory,
     futureSupervisor,
     skipRecipientsCheck = skipRecipientsCheck,
+    enableContractUpgrading = parameters.enableContractUpgrading,
   )
 
   private val transferOutProcessor: TransferOutProcessor = new TransferOutProcessor(
@@ -324,35 +329,55 @@ class SyncDomain(
     def withMetadataSeq(cids: Seq[LfContractId]): Future[Seq[StoredContract]] =
       persistent.contractStore
         .lookupManyUncached(cids)
-        .map(_.zip(cids).map {
-          case (None, cid) =>
-            val errMsg = s"Contract $cid is in active contract store but not in the contract store"
-            ErrorUtil.internalError(new IllegalStateException(errMsg))
-          case (Some(sc), _) => sc
+        .map(_.map {
+          case (cid, None) =>
+            ErrorUtil.internalError(
+              new IllegalStateException(
+                s"Contract $cid is in the active contract store but not in the contract store"
+              )
+            )
+          case (_, Some(sc)) => sc
         })
 
     def lookupChangeMetadata(change: ActiveContractIdsChange): Future[AcsChange] = {
       for {
         // TODO(i9270) extract magic numbers
         storedActivatedContracts <- MonadUtil.batchedSequentialTraverse(
-          parallelism = 20,
-          chunkSize = 500,
-        )(change.activations.toSeq)(withMetadataSeq)
+          parallelism = PositiveInt.tryCreate(20),
+          chunkSize = PositiveInt.tryCreate(500),
+        )(change.activations.keySet.toSeq)(withMetadataSeq)
         storedDeactivatedContracts <- MonadUtil
-          .batchedSequentialTraverse(parallelism = 20, chunkSize = 500)(change.deactivations.toSeq)(
+          .batchedSequentialTraverse(
+            parallelism = PositiveInt.tryCreate(20),
+            chunkSize = PositiveInt.tryCreate(500),
+          )(
+            change.deactivations.keySet.toSeq
+          )(
             withMetadataSeq
           )
       } yield {
         AcsChange(
           activations = storedActivatedContracts
             .map(c =>
-              c.contractId -> WithContractHash.fromContract(c.contract, c.contract.metadata)
+              c.contractId -> WithContractHash.fromContract(
+                c.contract,
+                ContractMetadataAndTransferCounter(
+                  c.contract.metadata,
+                  change.activations(c.contractId),
+                ),
+              )
             )
             .toMap,
           deactivations = storedDeactivatedContracts
             .map(c =>
               c.contractId -> WithContractHash
-                .fromContract(c.contract, c.contract.metadata.stakeholders)
+                .fromContract(
+                  c.contract,
+                  ContractStakeholdersAndTransferCounter(
+                    c.contract.metadata.stakeholders,
+                    change.deactivations(c.contractId),
+                  ),
+                )
             )
             .toMap,
         )

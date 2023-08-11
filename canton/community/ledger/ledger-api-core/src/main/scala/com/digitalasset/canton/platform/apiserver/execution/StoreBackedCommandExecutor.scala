@@ -14,10 +14,13 @@ import com.daml.lf.engine.{
   ResultInterruption,
   ResultNeedAuthority,
   ResultNeedContract,
+  ResultNeedCreate,
   ResultNeedKey,
   ResultNeedPackage,
+  ResultNeedUpgradeVerification,
 }
 import com.daml.lf.transaction.{Node, SubmittedTransaction, Transaction}
+import com.daml.lf.value.Value
 import com.daml.metrics.{Metrics, Timed, Tracked}
 import com.digitalasset.canton.data.ProcessedDisclosedContract
 import com.digitalasset.canton.ledger.api.domain.Commands as ApiCommands
@@ -63,7 +66,13 @@ private[apiserver] final class StoreBackedCommandExecutor(
   ): Future[Either[ErrorCause, CommandExecutionResult]] = {
     val interpretationTimeNanos = new AtomicLong(0L)
     val start = System.nanoTime()
+    val coids = commands.commands.commands.toSeq.foldLeft(Set.empty[Value.ContractId]) {
+      case (acc, com.daml.lf.command.ApiCommand.Exercise(_, coid, _, argument)) =>
+        argument.collectCids(acc) + coid
+      case (acc, _) => acc
+    }
     for {
+      _ <- Future.sequence(coids.map(contractStore.lookupContractStateWithoutDivulgence))
       submissionResult <- submitToEngine(commands, submissionSeed, interpretationTimeNanos)
       submission <- consume(
         commands.actAs,
@@ -206,6 +215,9 @@ private[apiserver] final class StoreBackedCommandExecutor(
               )
             }
 
+        case ResultNeedCreate(acoid, resume) =>
+          resolveStep(resume(None)) // TODO(#14281) Add ResultNeedCreate support
+
         case ResultNeedKey(key, resume) =>
           val start = System.nanoTime
           Timed
@@ -271,6 +283,13 @@ private[apiserver] final class StoreBackedCommandExecutor(
                 )
               )
             }
+        case ResultNeedUpgradeVerification(_, _, _, _, resume) =>
+          resolveStep(
+            Tracked.value(
+              metrics.daml.execution.engineRunning,
+              trackSyncExecution(interpretationTimeNanos)(resume(None)),
+            )
+          )
       }
 
     resolveStep(result).andThen { case _ =>

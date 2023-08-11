@@ -16,7 +16,7 @@ import com.daml.metrics.Metrics
 import com.digitalasset.canton.ledger.api.domain.{LedgerId, ParticipantId}
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, ReportsHealth}
 import com.digitalasset.canton.ledger.configuration.Configuration
-import com.digitalasset.canton.ledger.error.LedgerApiErrors
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.index.v2.MeteringStore.ReportData
 import com.digitalasset.canton.ledger.participant.state.index.v2.{
@@ -36,7 +36,7 @@ import com.digitalasset.canton.logging.{
   NamedLogging,
 }
 import com.digitalasset.canton.platform.*
-import com.digitalasset.canton.platform.configuration.{
+import com.digitalasset.canton.platform.config.{
   AcsStreamsConfig,
   TransactionFlatStreamsConfig,
   TransactionTreeStreamsConfig,
@@ -78,6 +78,7 @@ private class JdbcLedgerDao(
     tracer: Tracer,
     val loggerFactory: NamedLoggerFactory,
     incompleteOffsets: (Offset, Set[Ref.Party], TraceContext) => Future[Vector[Offset]],
+    contractLoader: ContractLoader,
 ) extends LedgerDao
     with NamedLogging {
 
@@ -466,7 +467,7 @@ private class JdbcLedgerDao(
             conn,
           )
         ) {
-          throw LedgerApiErrors.RequestValidation.OffsetOutOfRange
+          throw RequestValidationErrors.OffsetOutOfRange
             .Reject(
               "Pruning offset for all divulged contracts needs to be after the migration offset"
             )(ErrorLoggingContext(logger, loggingContext))
@@ -616,6 +617,7 @@ private class JdbcLedgerDao(
 
   override val contractsReader: ContractsReader =
     ContractsReader(
+      contractLoader,
       dbDispatcher,
       metrics,
       readStorageBackend.contractStorageBackend,
@@ -738,6 +740,7 @@ private[platform] object JdbcLedgerDao {
       tracer: Tracer,
       loggerFactory: NamedLoggerFactory,
       incompleteOffsets: (Offset, Set[Ref.Party], TraceContext) => Future[Vector[Offset]],
+      contractLoader: ContractLoader = ContractLoader.dummyLoader,
   ): LedgerReadDao =
     new JdbcLedgerDao(
       dbDispatcher = dbSupport.dbDispatcher,
@@ -759,6 +762,7 @@ private[platform] object JdbcLedgerDao {
       tracer = tracer,
       loggerFactory = loggerFactory,
       incompleteOffsets = incompleteOffsets,
+      contractLoader = contractLoader,
     )
 
   def write(
@@ -778,6 +782,7 @@ private[platform] object JdbcLedgerDao {
       globalMaxEventPayloadQueries: Int,
       tracer: Tracer,
       loggerFactory: NamedLoggerFactory,
+      contractLoader: ContractLoader = ContractLoader.dummyLoader,
   ): LedgerDao =
     new JdbcLedgerDao(
       dbDispatcher = dbSupport.dbDispatcher,
@@ -799,6 +804,7 @@ private[platform] object JdbcLedgerDao {
       tracer = tracer,
       loggerFactory = loggerFactory,
       incompleteOffsets = (_, _, _) => Future.successful(Vector.empty),
+      contractLoader = contractLoader,
     )
 
   val acceptType = "accept"

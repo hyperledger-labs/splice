@@ -20,6 +20,8 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `BaseLedgerApiAdministration.timeouts` made public
 * `LedgerApiCommandRunner.ledgerApiCommand` made public
 * `AdminCommandRunner.adminCommand` made public
+* `DynamicDomainParameters` made public
+* `nonNegativeFiniteDurationWriter` made public
 ## Misc
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`
@@ -45,6 +47,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added an optional `darFile` parameter to `ParticipantAdminCommands.UploadDar` so we can more conveniently upload DARs from weird locations (like JARs).
 * Decreases the `maxPollInterval` to 100ms from 5s, in the `eventually` methods in `BaseTest`
 * Compute the minimum poll interval used in `eventually` to 10% of the `maxPollInterval`
+* Added `suppressFailedClues` to `BaseTest` trait.
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

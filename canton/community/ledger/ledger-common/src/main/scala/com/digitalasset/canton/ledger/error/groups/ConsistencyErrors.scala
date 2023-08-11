@@ -8,14 +8,13 @@ import com.daml.error.{
   DamlErrorWithDefiniteAnswer,
   ErrorCategory,
   ErrorCode,
-  ErrorGroup,
   ErrorResource,
   Explanation,
   Resolution,
 }
 import com.daml.lf.transaction.GlobalKey
 import com.daml.lf.value.Value
-import com.digitalasset.canton.ledger.error.LedgerApiErrors
+import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.LedgerApiErrorGroup.ConsistencyErrorGroup
 import com.digitalasset.canton.ledger.participant.state.v2.ChangeId
 
 import java.time.Instant
@@ -23,7 +22,7 @@ import java.time.Instant
 @Explanation(
   "Potential consistency errors raised due to race conditions during command submission or returned as submission rejections by the backing ledger."
 )
-object ConsistencyErrors extends ErrorGroup()(LedgerApiErrors.errorClass) {
+object ConsistencyErrors extends ConsistencyErrorGroup {
 
   @Explanation("A command with the given command id has already been successfully processed.")
   @Resolution(
@@ -113,7 +112,7 @@ object ConsistencyErrors extends ErrorGroup()(LedgerApiErrors.errorClass) {
           cause = s"Unknown contracts: ${notFoundContractIds.mkString("[", ", ", "]")}"
         ) {
       override def resources: Seq[(ErrorResource, String)] = Seq(
-        (ErrorResource.ContractId, notFoundContractIds.mkString("[", ", ", "]"))
+        (ErrorResource.ContractIds, notFoundContractIds.mkString("[", ", ", "]"))
       )
     }
 
@@ -150,11 +149,15 @@ object ConsistencyErrors extends ErrorGroup()(LedgerApiErrors.errorClass) {
     ) extends DamlErrorWithDefiniteAnswer(
           cause = cause
         ) {
-      override def resources: Seq[(ErrorResource, String)] = Seq(
-        // TODO(i12763): Reconsider the transport format for the contract key.
-        //                   If the key is big, it can force chunking other resources.
-        (ErrorResource.ContractKey, key.toString())
-      )
+      override def resources: Seq[(ErrorResource, String)] =
+        CommandExecutionErrors.withEncodedValue(key.key) { encodedKey =>
+          Seq(
+            // TODO(i12763): Reconsider the transport format for the contract key.
+            //                   If the key is big, it can force chunking other resources.
+            (ErrorResource.TemplateId, key.templateId.toString),
+            (ErrorResource.ContractKey, encodedKey),
+          )
+        }
     }
 
     final case class Reject(reason: String)(implicit
@@ -203,11 +206,15 @@ object ConsistencyErrors extends ErrorGroup()(LedgerApiErrors.errorClass) {
     ) extends DamlErrorWithDefiniteAnswer(
           cause = cause
         ) {
-      override def resources: Seq[(ErrorResource, String)] = Seq(
-        // TODO(i12763): Reconsider the transport format for the contract key.
-        //                   If the key is big, it can force chunking other resources.
-        (ErrorResource.ContractKey, key.toString())
-      )
+      override def resources: Seq[(ErrorResource, String)] =
+        CommandExecutionErrors.withEncodedValue(key.key) { encodedKey =>
+          Seq(
+            // TODO(i12763): Reconsider the transport format for the contract key.
+            //                   If the key is big, it can force chunking other resources.
+            (ErrorResource.TemplateId, key.templateId.toString),
+            (ErrorResource.ContractKey, encodedKey),
+          )
+        }
     }
 
     final case class Reject(override val cause: String)(implicit

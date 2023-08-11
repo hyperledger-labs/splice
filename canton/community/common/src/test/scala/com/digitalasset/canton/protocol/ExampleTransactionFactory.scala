@@ -6,7 +6,7 @@ package com.digitalasset.canton.protocol
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
 import com.daml.lf.data.Ref.PackageId
-import com.daml.lf.data.{Bytes, ImmArray, Ref}
+import com.daml.lf.data.{Bytes, ImmArray}
 import com.daml.lf.transaction.Versioned
 import com.daml.lf.value.Value
 import com.daml.lf.value.Value.{
@@ -17,6 +17,7 @@ import com.daml.lf.value.Value.{
   VersionedValue,
 }
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton
 import com.digitalasset.canton.*
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
@@ -24,14 +25,18 @@ import com.digitalasset.canton.data.TransactionViewDecomposition.{NewView, SameV
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod.DeduplicationDuration
-import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
+import com.digitalasset.canton.protocol.ExampleTransactionFactory.{contractInstance, *}
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
   Confirmation,
   Observation,
   Submission,
 }
-import com.digitalasset.canton.topology.transaction.{ParticipantAttributes, TrustLevel}
+import com.digitalasset.canton.topology.transaction.{
+  ParticipantAttributes,
+  TrustLevel,
+  VettedPackages,
+}
 import com.digitalasset.canton.topology.{
   DomainId,
   MediatorId,
@@ -79,7 +84,7 @@ object ExampleTransactionFactory {
 
   def contractInstance(
       capturedIds: Seq[LfContractId] = Seq.empty,
-      templateId: Ref.Identifier = templateId,
+      templateId: LfTemplateId = templateId,
   ): LfContractInst =
     LfContractInst(templateId, versionedValueCapturing(capturedIds.toList))
 
@@ -154,6 +159,7 @@ object ExampleTransactionFactory {
       exerciseResult: Option[Value] = Some(Value.ValueNone),
       key: Option[LfGlobalKeyWithMaintainers] = None,
       byKey: Boolean = false,
+      templateId: LfTemplateId = templateId,
   ): LfNodeExercises =
     LfNodeExercises(
       targetCoid = targetCoid,
@@ -319,7 +325,7 @@ object ExampleTransactionFactory {
   val commandId: CommandId = DefaultDamlValues.commandId()
   val workflowId: WorkflowId = WorkflowId.assertFromString("testWorkflowId")
 
-  def defaultTestingTopology =
+  val defaultTestingTopology: TestingTopology =
     TestingTopology(
       topology = Map(
         submitter -> Map(submitterParticipant -> Submission),
@@ -331,7 +337,9 @@ object ExampleTransactionFactory {
         ),
       ),
       participants = Map(submitterParticipant -> ParticipantAttributes(Submission, TrustLevel.Vip)),
-      packages = Seq(ExampleTransactionFactory.packageId),
+      packages = Seq(submitterParticipant, signatoryParticipant).map(
+        VettedPackages(_, Seq(ExampleTransactionFactory.packageId))
+      ),
     )
 
   def defaultTestingIdentityFactory: TestingIdentityFactory =
@@ -365,8 +373,8 @@ class ExampleTransactionFactory(
     val transactionUuid: UUID = UUID.fromString("11111111-2222-3333-4444-555555555555"),
     val confirmationPolicy: ConfirmationPolicy = ConfirmationPolicy.Signatory,
     val domainId: DomainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("example::default")),
-    val mediatorId: MediatorId = MediatorId(
-      UniqueIdentifier.tryFromProtoPrimitive("mediator::default")
+    val mediatorRef: MediatorRef = MediatorRef(
+      MediatorId(UniqueIdentifier.tryFromProtoPrimitive("mediator::default"))
     ),
     val ledgerTime: CantonTimestamp = CantonTimestamp.Epoch,
     val ledgerTimeUsed: CantonTimestamp = CantonTimestamp.Epoch.minusSeconds(1),
@@ -398,8 +406,8 @@ class ExampleTransactionFactory(
     val submittingAdminPartyO =
       Option.when(isRoot)(submitterMetadata.submitterParticipant.adminParty.toLf)
     confirmationPolicy
-      .informeesAndThreshold(rootNode, submittingAdminPartyO, topologySnapshot, protocolVersion)
-      .flatMap { case (viewInformees, viewThreshold) =>
+      .informeesAndThreshold(rootNode, topologySnapshot)
+      .map { case (viewInformees, viewThreshold) =>
         val result = NewView(
           rootNode,
           viewInformees,
@@ -409,15 +417,10 @@ class ExampleTransactionFactory(
           tailNodes,
           rootRbContext,
         )
-        result
-          .compliesWith(
-            confirmationPolicy,
-            submittingAdminPartyO,
-            topologySnapshot,
-            protocolVersion,
-          )
-          .map(_ => result)
-          .valueOr(err => throw new IllegalArgumentException(err))
+
+        if (protocolVersion >= ProtocolVersion.v5)
+          result.withSubmittingAdminParty(submittingAdminPartyO, confirmationPolicy)
+        else result
       }
   }
 
@@ -509,7 +512,7 @@ class ExampleTransactionFactory(
     val (contractSalt, unicum) = unicumGenerator
       .generateSaltAndUnicum(
         domainId,
-        MediatorRef(mediatorId),
+        mediatorRef,
         transactionUuid,
         viewPosition,
         viewParticipantDataSalt,
@@ -571,12 +574,19 @@ class ExampleTransactionFactory(
 
     val submittingAdminPartyO =
       Option.when(isRoot)(submitterMetadata.submitterParticipant.adminParty.toLf)
-    val (informees, threshold) =
+    val (rawInformees, rawThreshold) =
       Await.result(
-        confirmationPolicy
-          .informeesAndThreshold(node, submittingAdminPartyO, topologySnapshot, protocolVersion),
+        confirmationPolicy.informeesAndThreshold(node, topologySnapshot),
         10.seconds,
       )
+    val (informees, threshold) =
+      if (protocolVersion >= ProtocolVersion.v5)
+        confirmationPolicy.withSubmittingAdminParty(submittingAdminPartyO)(
+          rawInformees,
+          rawThreshold,
+        )
+      else (rawInformees, rawThreshold)
+
     val viewCommonData =
       ViewCommonData.create(cryptoOps)(
         informees,
@@ -660,7 +670,7 @@ class ExampleTransactionFactory(
     CommonMetadata(cryptoOps)(
       confirmationPolicy,
       domainId,
-      MediatorRef(mediatorId),
+      mediatorRef,
       Salt.tryDeriveSalt(transactionSeed, 1, cryptoOps),
       transactionUuid,
       protocolVersion,
@@ -714,7 +724,7 @@ class ExampleTransactionFactory(
     )
 
   def rootTransactionViewTree(rootViews: MerkleTree[TransactionView]*): TransactionViewTree =
-    TransactionViewTree(
+    TransactionViewTree.tryCreate(
       GenTransactionTree.tryCreate(cryptoOps)(
         submitterMetadata,
         commonMetadata,
@@ -740,7 +750,7 @@ class ExampleTransactionFactory(
     }
 
   def nonRootTransactionViewTree(rootViews: MerkleTree[TransactionView]*): TransactionViewTree =
-    TransactionViewTree(
+    TransactionViewTree.tryCreate(
       GenTransactionTree.tryCreate(cryptoOps)(
         blinded(submitterMetadata),
         commonMetadata,
@@ -1055,7 +1065,7 @@ class ExampleTransactionFactory(
 
     private def genNode(id: LfContractId): LfNodeExercises =
       exerciseNodeWithoutChildren(
-        id,
+        targetCoid = id,
         actingParties = Set(submitter),
         signatories = Set(submitter),
         observers = Set(observer),
@@ -1066,6 +1076,26 @@ class ExampleTransactionFactory(
     override def reinterpretedNode: LfNodeExercises = node
 
     override def consuming: Boolean = true
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+  case class UpgradedSingleExercise(
+      seed: LfHash,
+      nodeId: LfNodeId = LfNodeId(0),
+      lfContractId: LfContractId = suffixedId(-1, 0),
+      contractId: LfContractId = suffixedId(-1, 0),
+      contractInstance: LfContractInst = ExampleTransactionFactory.contractInstance(),
+      agreementText: String = "",
+      saltO: Option[Salt] = saltConditionally(TestSalt.generateSalt(random.nextInt())),
+      consuming: Boolean = true,
+  ) extends SingleNode(Some(seed)) {
+    val upgradedTemplateId: canton.protocol.LfTemplateId =
+      templateId.copy(packageId = LfPackageId.assertFromString("upgraded"))
+    private def genNode(id: LfContractId): LfNodeExercises =
+      exerciseNode(targetCoid = id, templateId = upgradedTemplateId, signatories = Set(submitter))
+    override def node: LfNodeExercises = genNode(contractId)
+    override def lfNode: LfNodeExercises = genNode(lfContractId)
+    override def reinterpretedNode: LfNodeExercises = node
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
@@ -1225,9 +1255,6 @@ class ExampleTransactionFactory(
     * 1.3.1.0 View110
     */
   case object MultipleRootsAndViewNestings extends ExampleTransaction {
-
-    override def supportedConfirmationPolicies: Set[ConfirmationPolicy] =
-      Set(ConfirmationPolicy.Signatory, ConfirmationPolicy.Full)
 
     override def cryptoOps: HashOps with RandomOps = ExampleTransactionFactory.this.cryptoOps
 
@@ -1765,9 +1792,6 @@ class ExampleTransactionFactory(
     * 2. View2
     */
   case object ViewInterleavings extends ExampleTransaction {
-
-    override def supportedConfirmationPolicies: Set[ConfirmationPolicy] =
-      Set(ConfirmationPolicy.Signatory, ConfirmationPolicy.Full)
 
     override def cryptoOps: HashOps with RandomOps = ExampleTransactionFactory.this.cryptoOps
 
@@ -2425,9 +2449,6 @@ class ExampleTransactionFactory(
     * 1.1. view10
     */
   case object TransientContracts extends ExampleTransaction {
-
-    override def supportedConfirmationPolicies: Set[ConfirmationPolicy] =
-      Set(ConfirmationPolicy.Signatory, ConfirmationPolicy.Full)
 
     override def cryptoOps: HashOps with RandomOps = ExampleTransactionFactory.this.cryptoOps
 

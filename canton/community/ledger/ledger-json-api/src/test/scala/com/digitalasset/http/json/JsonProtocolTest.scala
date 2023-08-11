@@ -269,13 +269,13 @@ class JsonProtocolTest
   "domain.CommandMeta" - {
     "is entirely optional" in {
       "{}".parseJson.convertTo[domain.CommandMeta[JsValue, JsValue]] should ===(
-        domain.CommandMeta(None, None, None, None, None, None)
+        domain.CommandMeta(None, None, None, None, None, None, None)
       )
     }
 
     "is entirely optional when NoDisclosed" in {
       "{}".parseJson.convertTo[domain.CommandMeta.NoDisclosed] should ===(
-        domain.CommandMeta(None, None, None, None, None, None)
+        domain.CommandMeta(None, None, None, None, None, None, None)
       )
     }
   }
@@ -310,7 +310,7 @@ class JsonProtocolTest
         (
           DisclosedContract.Arguments.Blob {
             import com.google.protobuf.any.Any.pack, com.daml.lf.value.Value,
-            com.digitalasset.canton.platform.participant.util.LfEngineToApi.lfValueToApiRecord
+              com.digitalasset.canton.platform.participant.util.LfEngineToApi.lfValueToApiRecord
             inside(
               lfValueToApiRecord(
                 true,

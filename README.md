@@ -473,7 +473,7 @@ file along with your dar changes.
 
 #### Bumping Our Canton fork
 
-Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
+Current Canton commit: `e296d313200b82cc3623d2a9e2a3ca51aacdd21c`
 
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
@@ -504,8 +504,8 @@ Current Canton commit: `37a1ced9e5272fd0116377b058cd164dc8b6f66f`
       2. Set `version` in `CantonDependencies.scala` to the SDK version from Step 1.2
       3. Set `daml_version` in `nix/canton-sources.json` to the SDK version from Step 1.2
       4. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same version.
-      5. Change the JSON API hash in `jsonapi.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `jsonapi.nix`, and then call `direnv reload`,
-         to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
+      5. Change the hashes for both the linux and macos releases in `daml2js.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `daml2js.nix`,
+         and then call `direnv reload` to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
          Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
       6. You might also want to bump ``ledgerApiVersion`` in ``Dependencies.scala``. However, in general this must be kept in sync with the ledger API version
          server by the Canton binary not the Canton fork.

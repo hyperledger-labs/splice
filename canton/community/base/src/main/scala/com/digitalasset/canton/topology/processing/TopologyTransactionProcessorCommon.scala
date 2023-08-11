@@ -12,7 +12,7 @@ import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, L
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.{DefaultOpenEnvelope, ProtocolMessage}
 import com.digitalasset.canton.sequencing.*
-import com.digitalasset.canton.sequencing.protocol.{Batch, Deliver, DeliverError}
+import com.digitalasset.canton.sequencing.protocol.{Deliver, DeliverError}
 import com.digitalasset.canton.time.DomainTimeTracker
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor.subscriptionTimestamp
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreCommon}
@@ -98,7 +98,8 @@ abstract class TopologyTransactionProcessorCommonImpl[M](
   ): Future[Option[(SequencedTime, EffectiveTime)]]
 
   protected def initializeTopologyTimestampPlusEpsilonTracker(
-      processorTs: CantonTimestamp
+      processorTs: CantonTimestamp,
+      maxStored: Option[SequencedTime],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[EffectiveTime]
@@ -140,7 +141,7 @@ abstract class TopologyTransactionProcessorCommonImpl[M](
         maxTimestampFromStore()
       )
       (processorTs, clientTs) = subscriptionTimestamp(start, stateStoreTsO)
-      _ <- initializeTopologyTimestampPlusEpsilonTracker(processorTs)
+      _ <- initializeTopologyTimestampPlusEpsilonTracker(processorTs, stateStoreTsO.map(_._1))
 
       clientInitTimes <- clientTs match {
         case Left(sequencedTs) =>
@@ -154,6 +155,19 @@ abstract class TopologyTransactionProcessorCommonImpl[M](
       logger.debug(
         s"Initializing topology processing for start=$start with effective ts ${clientInitTimes.map(_._1)}"
       )
+
+      // let our client know about the latest known information right now, but schedule the updating
+      // of the approximate time subsequently
+      val maxEffective = clientInitTimes
+        .map { case (effective, _) => effective }
+        .maxOption
+        .getOrElse(EffectiveTime.MinValue)
+      val minApproximate = clientInitTimes
+        .map { case (_, approximate) => approximate }
+        .minOption
+        .getOrElse(ApproximateTime.MaxValue)
+      listenersUpdateHead(maxEffective, minApproximate, potentialChanges = true)
+
       val directExecutionContext = DirectExecutionContext(logger)
       clientInitTimes.foreach { case (effective, approximate) =>
         // if the effective time is in the future, schedule a clock to update the time accordingly
@@ -162,10 +176,6 @@ abstract class TopologyTransactionProcessorCommonImpl[M](
             // The effective time is in the past. Directly advance our approximate time to the respective effective time
             listenersUpdateHead(effective, effective.toApproximate, potentialChanges = true)
           case Some(tickF) =>
-            // set approximate time now and schedule task to update the approximate time to the effective time in the future
-            if (effective.value != approximate.value) {
-              listenersUpdateHead(effective, approximate, potentialChanges = true)
-            }
             FutureUtil.doNotAwait(
               tickF.map(_ =>
                 listenersUpdateHead(effective, effective.toApproximate, potentialChanges = true)
@@ -204,10 +214,19 @@ abstract class TopologyTransactionProcessorCommonImpl[M](
       envelopes: Traced[List[DefaultOpenEnvelope]],
   ): HandlerResult =
     envelopes.withTraceContext { implicit traceContext => env =>
-      internalProcessEnvelopes(sc, ts, extractTopologyUpdates(env))
+      internalProcessEnvelopes(
+        sc,
+        ts,
+        extractTopologyUpdatesAndValidateEnvelope(SequencedTime(ts), env),
+      )
     }
 
-  protected def extractTopologyUpdates(value: List[DefaultOpenEnvelope]): List[M]
+  protected def extractTopologyUpdatesAndValidateEnvelope(
+      ts: SequencedTime,
+      value: List[DefaultOpenEnvelope],
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[List[M]]
 
   private[processing] def process(
       sequencingTimestamp: SequencedTime,
@@ -219,10 +238,9 @@ abstract class TopologyTransactionProcessorCommonImpl[M](
   protected def internalProcessEnvelopes(
       sc: SequencerCounter,
       ts: CantonTimestamp,
-      messages: => List[M],
+      updatesF: FutureUnlessShutdown[List[M]],
   )(implicit traceContext: TraceContext): HandlerResult = {
     val sequencedTime = SequencedTime(ts)
-    val updatesF = performUnlessClosingF(functionFullName)(Future { messages })
     def computeEffectiveTime(
         updates: List[M]
     ): FutureUnlessShutdown[EffectiveTime] = {
@@ -296,27 +314,20 @@ abstract class TopologyTransactionProcessorCommonImpl[M](
             {
               case Deliver(sc, ts, _, _, batch) =>
                 logger.debug(s"Processing sequenced event with counter $sc and timestamp $ts")
-                def extractAndCheckMessages(
-                    batch: Batch[DefaultOpenEnvelope]
-                ): List[M] = {
-                  extractTopologyUpdates(
-                    ProtocolMessage.filterDomainsEnvelopes(
-                      batch,
-                      domainId,
-                      (wrongMsgs: List[DefaultOpenEnvelope]) =>
-                        TopologyManagerError.TopologyManagerAlarm
-                          .Warn(
-                            s"received messages with wrong domain ids: ${wrongMsgs.map(_.protocolMessage.domainId)}"
-                          )
-                          .report(),
-                    )
-                  )
-                }
-                internalProcessEnvelopes(
-                  sc,
-                  ts,
-                  extractAndCheckMessages(batch),
+                val transactionsF = extractTopologyUpdatesAndValidateEnvelope(
+                  SequencedTime(ts),
+                  ProtocolMessage.filterDomainsEnvelopes(
+                    batch,
+                    domainId,
+                    (wrongMsgs: List[DefaultOpenEnvelope]) =>
+                      TopologyManagerError.TopologyManagerAlarm
+                        .Warn(
+                          s"received messages with wrong domain ids: ${wrongMsgs.map(_.protocolMessage.domainId)}"
+                        )
+                        .report(),
+                  ),
                 )
+                internalProcessEnvelopes(sc, ts, transactionsF)
               case _: DeliverError => HandlerResult.done
             }
           }

@@ -34,15 +34,12 @@ import com.digitalasset.canton.{LfPartyId, TransferCounterO}
   *                                            or `creations` overlaps with `transferIns`.
   */
 final case class CommitSet(
-    archivals: Map[LfContractId, WithContractHash[Set[LfPartyId]]],
+    archivals: Map[LfContractId, WithContractHash[ArchivalCommit]],
     creations: Map[LfContractId, WithContractHash[CreationCommit]],
     transferOuts: Map[LfContractId, WithContractHash[TransferOutCommit]],
     transferIns: Map[LfContractId, WithContractHash[TransferInCommit]],
     keyUpdates: Map[LfGlobalKey, ContractKeyJournal.Status],
 ) extends PrettyPrinting {
-  // In a request by a malicious submitter,
-  // creations may overlap with transferIns because transfer-in requests can be batched with a confirmation request.
-  // A transfer-out request cannot be batched with a confirmation request, though.
   requireDisjoint(transferOuts.keySet -> "Transfer-outs", archivals.keySet -> "archivals")
   requireDisjoint(transferIns.keySet -> "Transfer-ins", creations.keySet -> "creations")
 
@@ -87,6 +84,14 @@ object CommitSet {
       param("transferId", _.transferId),
       param("contractMetadata", _.contractMetadata),
       paramIfDefined("transferCounter", _.transferCounter),
+    )
+  }
+  final case class ArchivalCommit(
+      stakeholders: Set[LfPartyId]
+  ) extends PrettyPrinting {
+
+    override def pretty: Pretty[ArchivalCommit] = prettyOfClass(
+      param("stakeholders", _.stakeholders)
     )
   }
 }
