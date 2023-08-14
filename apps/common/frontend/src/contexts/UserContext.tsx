@@ -1,6 +1,6 @@
 import { User } from 'oidc-client-ts';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { useAuth } from 'react-oidc-context';
+import { AuthState, useAuth } from 'react-oidc-context';
 
 import {
   AuthConfig,
@@ -17,6 +17,7 @@ interface UserState {
   userAccessToken?: string;
 
   isAuthenticated: boolean;
+  oidcAuthState?: AuthState;
 
   loginWithSst: (id: string, secret: string, audience: string, scope?: string) => void;
   loginWithOidc: () => void;
@@ -128,6 +129,7 @@ export const UserProvider: React.FC<{
   return (
     <UserContext.Provider
       value={{
+        oidcAuthState: auth,
         isAuthenticated,
         userId,
         userAccessToken,

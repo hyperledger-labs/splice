@@ -6,9 +6,10 @@ import {
   UserProvider,
   theme,
   cnReplaceEqualDeep,
+  useUserState,
 } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import {
   createBrowserRouter,
@@ -70,6 +71,18 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
 const SplitwellAuthCheck: React.FC = () => {
   const config = useConfig();
+  const { loginWithOidc, oidcAuthState } = useUserState();
+  useEffect(() => {
+    // Auth-login after the user launched the app from their app manager.
+    if (
+      config.appManager &&
+      oidcAuthState &&
+      !oidcAuthState.isLoading &&
+      !oidcAuthState.isAuthenticated
+    ) {
+      loginWithOidc();
+    }
+  }, [loginWithOidc, oidcAuthState, config]);
   return <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />;
 };
 

@@ -44,6 +44,7 @@ import io.grpc.stub.{AbstractStub, StreamObserver}
 import java.io.Closeable
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 sealed abstract class DedupConfig
 
@@ -320,22 +321,26 @@ private[environment] class LedgerClient(
     } yield res
   }
 
-  def listUsers()(implicit ec: ExecutionContext): Future[Seq[User]] = {
-    val request = new ListUsersRequest(java.util.Optional.empty, Integer.MAX_VALUE).toProto
+  def listUsersProto(pageToken: Option[String], pageSize: Int = 100)(implicit
+      ec: ExecutionContext
+  ): Future[(Seq[UserManagementServiceOuterClass.User], Option[String])] = {
+    val request = new ListUsersRequest(pageToken.toJava, pageSize).toProto
     for {
       stub <- withCredentials(userManagementServiceStub)
       res <- wrapFuture(stub.listUsers(request, _))
-      _ <-
-        if (res.getNextPageToken() != "") {
-          // If we have more than Integer.MAX_VALUE users we are probably going to see other problems first.
-          ErrorUtil.internalError(
-            new IllegalStateException(
-              "Participant has more users than can be listed in one API call."
-            )
-          )
-        } else { Future.unit }
-    } yield res.getUsersList().asScala.toSeq.map(User.fromProto(_))
+
+    } yield (
+      res.getUsersList().asScala.toSeq,
+      Option.when(res.getNextPageToken() != "")(res.getNextPageToken()),
+    )
   }
+
+  def listUsers(pageToken: Option[String], pageSize: Int = 100)(implicit
+      ec: ExecutionContext
+  ): Future[(Seq[User], Option[String])] =
+    listUsersProto(pageToken, pageSize).map { case (users, nextPage) =>
+      (users.map(User.fromProto(_)), nextPage)
+    }
 
   def getUserProto(
       userId: String

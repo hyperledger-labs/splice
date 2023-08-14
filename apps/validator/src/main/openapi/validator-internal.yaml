@@ -100,11 +100,43 @@ paths:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantIdentitiesDump"
 
-  /app-manager/authorize:
+  /app-manager/apps/installed/{provider}/authorize:
     post:
       tags: [appManager]
       x-jvm-package: appManager
-      operationId: "authorize"
+      operationId: "authorizeApp"
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+              required:
+                - user_id
+      responses:
+        200:
+          description: ok"
+
+  /app-manager/apps/installed/{provider}/check-authorizization:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "checkAppAuthorized"
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -128,7 +160,10 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/AuthorizeResponse"
+                "$ref": "#/components/schemas/CheckAppAuthorizedResponse"
+        403:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
+
   /app-manager/oauth2/.well-known/openid-configuration:
     get:
       tags: [appManager]
@@ -487,7 +522,7 @@ components:
           items:
             type: string
 
-    AuthorizeResponse:
+    CheckAppAuthorizedResponse:
       type: object
       required:
         - redirect_uri

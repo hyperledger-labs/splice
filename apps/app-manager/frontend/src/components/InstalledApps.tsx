@@ -1,18 +1,10 @@
 import * as openapi from 'validator-openapi';
-import { DirectoryEntry, ErrorDisplay, Loading, appLaunchUrl } from 'common-frontend';
+import { DirectoryEntry, ErrorDisplay, Loading, appLaunchUrl, useUserState } from 'common-frontend';
 import React, { useState } from 'react';
 
-import {
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  Input,
-  Link,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Button, Card, CardActions, CardContent, Input, Stack, Typography } from '@mui/material';
 
+import { useAppManagerClient } from '../contexts/AppManagerServiceContext';
 import { useInstallApp, useInstalledApps } from '../hooks';
 import { config } from '../utils/config';
 
@@ -22,9 +14,16 @@ const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
       oidcAuthority: `${config.services.validator.url}/app-manager/oauth2/`,
       jsonApi: `${config.services.validator.url}/`,
       wallet: config.services.wallet.uiUrl,
+      clientId: app.provider,
     },
     app.url
   );
+  const client = useAppManagerClient();
+  const { userId } = useUserState();
+  const onLaunch = async (e: React.MouseEvent) => {
+    await client.authorizeApp(app.provider, userId!);
+    window.location.href = redirectUri;
+  };
   return (
     <Card className="installed-app" variant="outlined">
       <CardContent>
@@ -32,9 +31,9 @@ const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
         <DirectoryEntry partyId={app.provider} />
       </CardContent>
       <CardActions>
-        <Link className="installed-app-link" href={redirectUri.toString()}>
+        <Button className="installed-app-link" onClick={e => onLaunch(e)}>
           Launch
-        </Link>
+        </Button>
       </CardActions>
     </Card>
   );

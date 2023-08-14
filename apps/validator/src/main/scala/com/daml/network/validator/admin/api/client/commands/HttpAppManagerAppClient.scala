@@ -148,17 +148,38 @@ object HttpAppManagerAppClient {
     }
   }
 
-  final case class Authorize(redirectUri: String, state: String, userId: String)
-      extends BaseCommand[http.AuthorizeResponse, String] {
+  final case class AuthorizeApp(
+      provider: PartyId,
+      userId: String,
+  ) extends BaseCommand[http.AuthorizeAppResponse, Unit] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.AuthorizeResponse] =
-      client.authorize(redirectUri, state, userId, headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.AuthorizeAppResponse] =
+      client.authorizeApp(provider.toProtoPrimitive, userId, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.AuthorizeResponse.OK(response) =>
+    ) = { case http.AuthorizeAppResponse.OK =>
+      Right(())
+    }
+  }
+
+  final case class CheckAppAuthorized(
+      provider: PartyId,
+      redirectUri: String,
+      state: String,
+      userId: String,
+  ) extends BaseCommand[http.CheckAppAuthorizedResponse, String] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.CheckAppAuthorizedResponse] =
+      client.checkAppAuthorized(provider.toProtoPrimitive, redirectUri, state, userId, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.CheckAppAuthorizedResponse.OK(response) =>
       Right(response.redirectUri)
     }
   }

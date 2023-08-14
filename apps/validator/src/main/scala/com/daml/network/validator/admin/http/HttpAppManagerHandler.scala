@@ -87,24 +87,65 @@ class HttpAppManagerHandler(
   private val codes: collection.concurrent.Map[String, String] =
     collection.concurrent.TrieMap.empty
 
-  // This is the endpoint that the app manager frontend calls after the user got redirected to /authorize
-  // and logged in and confirmed that they want to authorize the app.
-  def authorize(
-      respond: v0.AppManagerResource.AuthorizeResponse.type
-  )(redirectUri: String, state: String, userId: String)(
+  def authorizeApp(
+      respond: v0.AppManagerResource.AuthorizeAppResponse.type
+  )(provider: String, userId: String)(
       extracted: Unit
-  ): Future[v0.AppManagerResource.AuthorizeResponse] =
+  ): Future[v0.AppManagerResource.AuthorizeAppResponse] =
     withNewTrace(workflowId) { _ => _ =>
-      val authorizationCode = UUID.randomUUID.toString
-      codes += authorizationCode -> userId
-      Future.successful(
-        // TODO(#6839) Consider just letting the frontend compute this instead of returning it here.
-        definitions.AuthorizeResponse(
-          Uri(redirectUri)
-            .withQuery(Uri.Query("code" -> authorizationCode, "state" -> state))
-            .toString
+      for {
+        primaryParty <- ledgerConnection.getPrimaryParty(userId)
+        providerPartyId = PartyId.tryFromProtoPrimitive(provider)
+        // TODO(#7099) This relies on pretty printing of the provider party id to
+        // make the string short enough that it satisfies the user id limits. Switch to
+        // interned provider party id instead.
+        appUserId = s"app.$userId.$providerPartyId"
+        _ <- ledgerConnection.createUserWithPrimaryParty(appUserId, primaryParty, Seq.empty)
+        _ <- ledgerConnection.ensureUserMetadataAnnotation(
+          appUserId,
+          Map("provider" -> provider, "user" -> userId),
         )
-      )
+      } yield v0.AppManagerResource.AuthorizeAppResponse.OK
+    }
+
+  // This is the endpoint that the app manager frontend calls after the user got redirected to /authorize
+  // as part of the OAuth2 flow to confirm that they
+  // authorized the app.
+  def checkAppAuthorized(
+      respond: v0.AppManagerResource.CheckAppAuthorizedResponse.type
+  )(provider: String, redirectUri: String, state: String, userId: String)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.CheckAppAuthorizedResponse] =
+    withNewTrace(workflowId) { _ => _ =>
+      // TODO(#7092) Avoid linear search across all users.
+      ledgerConnection
+        .findUserProto(user =>
+          user.hasMetadata && user.getMetadata.getAnnotationsOrDefault(
+            "provider",
+            "",
+          ) == provider && user.getMetadata.getAnnotationsOrDefault("user", "") == userId
+        )
+        .flatMap {
+          case None =>
+            Future.successful(
+              v0.AppManagerResource.CheckAppAuthorizedResponse.Forbidden(
+                definitions.ErrorResponse(
+                  s"App $provider is not authorized for $userId"
+                )
+              )
+            )
+          case Some(appUser) =>
+            val authorizationCode = UUID.randomUUID.toString
+            codes += authorizationCode -> appUser.getId()
+            Future.successful(
+              // TODO(#6839) Consider just letting the frontend compute this instead of returning it here.
+              definitions.CheckAppAuthorizedResponse(
+                Uri(redirectUri)
+                  .withQuery(Uri.Query("code" -> authorizationCode, "state" -> state))
+                  .toString
+              )
+            )
+        }
     }
 
   def oauth2Jwks(

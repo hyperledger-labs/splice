@@ -105,11 +105,19 @@ class AppManagerIntegrationTest
       )
     }
     "support oauth2 authorization code grant" in { implicit env =>
+      val provider = splitwellBackend.getProviderPartyId()
       val state = "dummyState"
-      val userId = "myuser"
+      val userId = aliceWalletClient.config.ledgerApiUser
       val redirectUri = "https://example.com"
       val clientId = "dummclientid"
-      val redirected = Uri(aliceValidatorBackend.authorize(redirectUri, state, userId))
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      assertThrowsAndLogsCommandFailures(
+        aliceValidatorBackend.checkAppAuthorized(provider, redirectUri, state, userId),
+        _.errorMessage should include("not authorized"),
+      )
+      aliceValidatorBackend.authorizeApp(provider, userId)
+      val redirected =
+        Uri(aliceValidatorBackend.checkAppAuthorized(provider, redirectUri, state, userId))
       val code = redirected.query().get("code").value
       val token = aliceValidatorBackend.oauth2Token("code", code, redirectUri, clientId).accessToken
 
@@ -127,7 +135,7 @@ class AppManagerIntegrationTest
       val algorithm = Algorithm.RSA256(publicKey, null)
       val verifier = JWT.require(algorithm).build()
       val decodedJwt = verifier.verify(token)
-      decodedJwt.getSubject() shouldBe userId
+      decodedJwt.getSubject() shouldBe s"app.$userId.$provider"
     }
 
     "json api proxy sets CORS headers" in { implicit env =>

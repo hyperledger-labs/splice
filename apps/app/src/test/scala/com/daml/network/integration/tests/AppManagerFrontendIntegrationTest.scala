@@ -54,21 +54,16 @@ class AppManagerFrontendIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         login(aliceAppManagerUIPort, aliceValidatorBackend.config.ledgerApiUser)
         textField(id("install-app-input")).value = installLink
-        actAndCheck("Click on install app button", click on id("install-app-button"))(
-          "App appears in installed apps",
-          _ =>
-            inside(findAll(className("installed-app")).toSeq) { case Seq(splitwell) =>
-              splitwell.childElement(className("installed-app-name")).text shouldBe "splitwell"
-              click on splitwell.childElement(className("installed-app-link"))
-            },
-        )
-        waitForQuery(id("oidc-login-button"))
-        clickOn(id("oidc-login-button"))
-        actAndCheck(
-          "Login to app manager",
-          loginOnCurrentPage(aliceAppManagerUIPort, aliceValidatorBackend.config.ledgerApiUser),
-        )("authorize button appears", _ => find(id("authorize-button")) should not be empty)
-        actAndCheck("Authorize app and get redirected", click on ("authorize-button"))(
+        val (_, splitwell) =
+          actAndCheck("Click on install app button", click on id("install-app-button"))(
+            "App appears in installed apps",
+            _ =>
+              inside(findAll(className("installed-app")).toSeq) { case Seq(splitwell) =>
+                splitwell.childElement(className("installed-app-name")).text shouldBe "splitwell"
+                splitwell
+              },
+          )
+        actAndCheck("Launch app", click on splitwell.childElement(className("installed-app-link")))(
           "splitwell UI shows up",
           _ =>
             // This also implies the install contract has been created

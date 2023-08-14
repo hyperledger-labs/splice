@@ -35,6 +35,7 @@ export type SplitwellConfig = {
   auth: z.infer<typeof authSchema>;
   testAuth?: z.infer<typeof testAuthSchema>;
   services: SplitwellServicesConfig;
+  appManager: boolean;
 };
 
 const staticConfig = reader.loadConfig();
@@ -50,7 +51,9 @@ export const useConfig = (): SplitwellConfig => {
   const appManagerConfig = useAppManagerConfig();
   const authConfig: z.infer<typeof authSchema> = mandatoryConfig(
     'auth',
-    appManagerConfig ? appManagerAuthConfig(appManagerConfig.oidcAuthority) : staticConfig.auth
+    appManagerConfig
+      ? appManagerAuthConfig(appManagerConfig.clientId, appManagerConfig.oidcAuthority)
+      : staticConfig.auth
   );
   const walletConfig: z.infer<typeof walletSchema> = mandatoryConfig(
     'wallet',
@@ -70,5 +73,6 @@ export const useConfig = (): SplitwellConfig => {
       splitwell: staticConfig.services.splitwell,
       jsonApi: jsonApiConfig,
     },
+    appManager: !!appManagerConfig,
   };
 };

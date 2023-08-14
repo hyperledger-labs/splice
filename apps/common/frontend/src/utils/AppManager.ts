@@ -8,6 +8,12 @@ const appManagerSchema = z.object({
   oidcAuthority: z.string().url(),
   jsonApi: z.string().url(),
   wallet: z.string().url(),
+  // We use the client id here to pass the provider-party-id along since
+  // that makes the integration in the third-party app
+  // a bit easier as the full config can be statically
+  // determined without needing to make a request
+  // to its backend to query for the provider id.
+  clientId: z.string(),
 });
 
 export type AppManagerConfig = z.infer<typeof appManagerSchema>;
@@ -29,12 +35,15 @@ export const useAppManagerConfig = (): AppManagerConfig | undefined => {
 };
 
 // TODO(#8369) Stop hardcoding half of the parameters here
-export const appManagerAuthConfig = (oidcAuthority: string): z.infer<typeof authSchema> => ({
+export const appManagerAuthConfig = (
+  clientId: string,
+  oidcAuthority: string
+): z.infer<typeof authSchema> => ({
   algorithm: Algorithm.RS256,
   token_scope: 'daml_ledger_api',
   token_audience: 'https://canton.network.global',
   authority: oidcAuthority,
-  client_id: 'dummyclientid',
+  client_id: clientId,
 });
 
 export const appLaunchUrl = (config: AppManagerConfig, url: string): string => {

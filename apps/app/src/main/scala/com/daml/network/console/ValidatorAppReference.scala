@@ -156,10 +156,25 @@ abstract class ValidatorAppReference(
       )
     }
 
-  def authorize(redirectUri: String, state: String, userId: String): String =
+  def authorizeApp(
+      provider: PartyId,
+      userId: String,
+  ): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.Authorize(redirectUri, state, userId)
+        HttpAppManagerAppClient.AuthorizeApp(provider, userId)
+      )
+    }
+
+  def checkAppAuthorized(
+      provider: PartyId,
+      redirectUri: String,
+      state: String,
+      userId: String,
+  ): String =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.CheckAppAuthorized(provider, redirectUri, state, userId)
       )
     }
 

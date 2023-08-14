@@ -42,7 +42,7 @@ class ParticipantIdentitiesStore(
       )
       bootstrapTxs <- participantAdminConnection.getIdentityBootstrapTransactions(id.uid)
       users <- connection
-        .listUsers()
+        .listAllUsers()
         .map(users =>
           users.map(user =>
             ParticipantIdentitiesDump.ParticipantUser(

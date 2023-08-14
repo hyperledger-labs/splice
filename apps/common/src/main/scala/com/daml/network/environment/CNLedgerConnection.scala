@@ -7,6 +7,7 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v1.admin.ObjectMetaOuterClass
+import com.daml.ledger.api.v1.admin.UserManagementServiceOuterClass
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
@@ -37,14 +38,14 @@ import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   SyncCloseable,
 }
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.Value
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
+import com.digitalasset.canton.util.{AkkaUtil, ErrorUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
@@ -600,7 +601,35 @@ class CNLedgerConnection(
       logger,
     )
 
-  def listUsers(): Future[Seq[User]] = client.listUsers()
+  def findUserProto(
+      predicate: UserManagementServiceOuterClass.User => Boolean
+  ): Future[Option[UserManagementServiceOuterClass.User]] = {
+    def go(token: Option[String]): Future[Option[UserManagementServiceOuterClass.User]] =
+      client.listUsersProto(token).flatMap { case (users, nextTokenO) =>
+        users.find(predicate) match {
+          case Some(user) => Future.successful(Some(user))
+          case None =>
+            nextTokenO match {
+              case None => Future.successful(None)
+              case Some(nextToken) => go(Some(nextToken))
+            }
+        }
+      }
+    go(None)
+  }
+
+  def listAllUsers()(implicit elc: ErrorLoggingContext, ec: ExecutionContext): Future[Seq[User]] =
+    client.listUsers(None, Integer.MAX_VALUE).map { case (users, nextPageToken) =>
+      if (nextPageToken.isDefined) {
+        // If we have more than Integer.MAX_VALUE users we are probably going to see other problems first.
+        ErrorUtil.internalError(
+          new IllegalStateException(
+            "Participant has more users than can be listed in one API call."
+          )
+        )
+      }
+      users
+    }
 
   def getUser(user: String): Future[User] = client.getUser(user)
 
@@ -644,21 +673,29 @@ class CNLedgerConnection(
   def ensureUserMetadataAnnotation(userId: String, key: String, value: String)(implicit
       ec: ExecutionContext
   ): Future[Unit] =
+    ensureUserMetadataAnnotation(userId, Map(key -> value))
+
+  def ensureUserMetadataAnnotation(userId: String, annotations: Map[String, String])(implicit
+      ec: ExecutionContext
+  ): Future[Unit] =
     retryProvider.ensureThatB(
-      s"user $userId has metadata $key set to $value",
+      s"user $userId has metadata annotations $annotations",
       client.getUserProto(userId).map { user =>
-        user.hasMetadata && user.getMetadata.getAnnotationsMap.asScala
-          .get(key)
-          .fold(false)(_ == value)
+        if (!user.hasMetadata)
+          false
+        else {
+          val existingAnnotations = user.getMetadata.getAnnotationsMap.asScala
+          annotations.forall { case (k, v) => existingAnnotations.get(k).fold(false)(_ == v) }
+        }
       },
       for {
         user <- client.getUserProto(userId)
         newMetadata =
           if (user.hasMetadata) {
             val metadata = user.getMetadata
-            metadata.toBuilder.putAnnotations(key, value).build
+            metadata.toBuilder.putAllAnnotations(annotations.asJava).build
           } else {
-            ObjectMetaOuterClass.ObjectMeta.newBuilder.putAnnotations(key, value).build
+            ObjectMetaOuterClass.ObjectMeta.newBuilder.putAllAnnotations(annotations.asJava).build
           }
         newUser = user.toBuilder.setMetadata(newMetadata).build
         mask = FieldMask.newBuilder
