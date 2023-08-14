@@ -2,30 +2,29 @@ package com.daml.network.integration.tests
 
 import com.daml.ledger.javaapi.data.{Identifier as JIdentifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
-  ContractCompanion as TemplateCompanion,
   ContractId,
   Update,
+  Contract as CodegenContract,
+  ContractCompanion as TemplateCompanion,
 }
-import com.daml.network.store.MultiDomainAcsStore.ContractState
-import ContractState.Assigned
-import com.daml.network.config.CNNodeConfigTransforms.updateAllAutomationConfigs
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cn.svcrules as svcr
-import com.daml.network.codegen.java.cn.svonboarding as so
+import com.daml.network.codegen.java.cn.{svcrules as svcr, svonboarding as so}
+import com.daml.network.codegen.java.da.types.Tuple2
+import com.daml.network.config.CNNodeConfigTransforms.updateAllAutomationConfigs
+import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.util.{
   AssignedContract,
   CoinConfigSchedule,
   ConfigScheduleUtil,
   ContractWithState,
 }
-import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery
 
-import scala.jdk.CollectionConverters.*
 import java.time.Instant
+import scala.jdk.CollectionConverters.*
 
 /** You must `start-canton` with `-g` to run this test locally. */
 class GlobalDomainUpgradeTimeBasedIntegrationTest
@@ -67,19 +66,16 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           globalUpgradeId.toProtoPrimitive should not be activeDomainId
           global1.toProtoPrimitive shouldBe activeDomainId
 
-          val upgradeAfterTick = createConfigSchedule(
-            currentSchedule,
-            (
-              timeUntilNewRule.asJava,
-              mkUpdatedCoinConfig(
-                currentSchedule,
-                defaultTickDuration,
-                nextDomainId = Some(globalUpgradeId),
-              ),
+          val upgradeAfterTick = new Tuple2(
+            env.environment.clock.now.add(timeUntilNewRule.asJava).toInstant,
+            mkUpdatedCoinConfig(
+              currentSchedule,
+              defaultTickDuration,
+              nextDomainId = Some(globalUpgradeId),
             ),
           )
 
-          val setScheduleResult = setConfigScheduleManually(
+          val setScheduleResult = cleanAndAddNewSchedule(
             AssignedContract(firstCoinRules, global1),
             upgradeAfterTick,
           ) withClue "set config schedule with upgraded domain"
@@ -360,17 +356,35 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
   // TODO (#5959) check directory contracts
   }
 
-  private[this] def setConfigScheduleManually(
+  private[this] def cleanAndAddNewSchedule(
       start: AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules],
-      schedule: cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]],
-  )(implicit fp: FixtureParam): cc.coin.CoinRules.ContractId =
+      newSchedule: Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]],
+  )(implicit fp: FixtureParam): cc.coin.CoinRules.ContractId = {
+    sv1ScanBackend
+      .getCoinRules()
+      .payload
+      .configSchedule
+      .futureValues
+      .forEach(config => {
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+          .submitWithResult(
+            userId = sv1Backend.config.ledgerApiUser,
+            actAs = Seq(svcParty),
+            readAs = Seq.empty,
+            update = start.contractId
+              .exerciseCoinRules_RemoveFutureCoinConfigSchedule(config._1),
+            domainId = Some(start.domain),
+          )
+          .exerciseResult
+      })
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
       .submitWithResult(
         userId = sv1Backend.config.ledgerApiUser,
         actAs = Seq(svcParty),
         readAs = Seq.empty,
-        update = start.contractId.exerciseCoinRules_SetConfigSchedule(schedule),
+        update = start.contractId.exerciseCoinRules_AddFutureCoinConfigSchedule(newSchedule),
         domainId = Some(start.domain),
       )
       .exerciseResult
+  }
 }

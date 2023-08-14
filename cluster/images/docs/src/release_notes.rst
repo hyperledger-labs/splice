@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+2023-08-21
+----------
+
+* Frontend updates:
+
+    * Retired the action to entirely replace the coin config schedule `SetConfigSchedule`.
+      The governance actions to add/remove/modify individual scheduled coin config changes should be used instead.
+
 2023-08-14
 ----------
 

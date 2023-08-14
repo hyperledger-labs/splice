@@ -1,16 +1,19 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coin.{
+  CoinRules_AddFutureCoinConfigSchedule,
+  CoinRules_RemoveFutureCoinConfigSchedule,
+}
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.codegen.java.cc.coin.CoinRules_SetConfigSchedule
-
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_SetConfigSchedule
-
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
+  CRARC_AddFutureCoinConfigSchedule,
+  CRARC_RemoveFutureCoinConfigSchedule,
+}
 import com.daml.network.codegen.java.da.types.Tuple2
-
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.integration.tests.CNNodeTests
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -19,7 +22,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.defaultCoinConfig
-
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.DomainId
 
@@ -78,7 +80,38 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
     configSchedule
   }
 
-  def setConfigSchedule(configSchedule: Schedule[Instant, CoinConfig[USD]])(implicit
+  def setFutureConfigSchedule(configSchedule: Schedule[Instant, CoinConfig[USD]])(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): Unit = {
+    // clean all futureValues
+    sv1Backend
+      .getSvcInfo()
+      .coinRules
+      .payload
+      .configSchedule
+      .futureValues
+      .forEach(value => {
+        votingFlow(
+          new ARC_CoinRules(
+            new CRARC_RemoveFutureCoinConfigSchedule(
+              new CoinRules_RemoveFutureCoinConfigSchedule(value._1)
+            )
+          )
+        )
+      })
+    // add new futureValues
+    configSchedule.futureValues.forEach(value => {
+      votingFlow(
+        new ARC_CoinRules(
+          new CRARC_AddFutureCoinConfigSchedule(
+            new CoinRules_AddFutureCoinConfigSchedule(value)
+          )
+        )
+      )
+    })
+  }
+
+  def votingFlow(action: ActionRequiringConfirmation)(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     val svcRules = sv1Backend.getSvcInfo().svcRules
@@ -87,11 +120,6 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
     val voteRequestCid = clue("request vote for config schedule change") {
       val (_, voteRequestCid) = actAndCheck(
         "sv1 creates a vote request", {
-          val action: ActionRequiringConfirmation = new ARC_CoinRules(
-            new CRARC_SetConfigSchedule(
-              new CoinRules_SetConfigSchedule(configSchedule)
-            )
-          )
           sv1Backend.createVoteRequest(
             sv1Party.toProtoPrimitive,
             action,
@@ -121,9 +149,10 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
               ) {
                 eventually() {
                   sv.listVoteRequests()
-                    .filter(_.contractId.contractId == voteRequestCid.contractId) should have size 1
+                    .filter(
+                      _.contractId.contractId == voteRequestCid.contractId
+                    ) should have size 1
                 }
-
                 actAndCheck(
                   s"${sv.name} casts a vote", {
                     sv.castVote(
@@ -147,4 +176,5 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
         })
     }
   }
+
 }

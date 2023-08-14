@@ -46,7 +46,8 @@ class ScanConnectionIntegrationTest
             ),
           ),
         )
-      setConfigSchedule(configSchedule)
+
+      setFutureConfigSchedule(configSchedule)
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(

@@ -352,7 +352,7 @@ template CoinRulesV2Test
       controller svc
       do create this with enabledChoices = newEnabledChoices
 
-    choice CoinRulesV2Test_SetConfigSchedule : ContractId CoinRulesV2Test
+    choice CoinRulesV2Test_ConfigSchedule : ContractId CoinRulesV2Test
       with
         newConfigSchedule : Schedule Time (CoinConfig USD)
       controller svc

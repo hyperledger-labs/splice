@@ -168,7 +168,8 @@ class ScanFrontendTimeBasedIntegrationTest
                 ),
               ),
             )
-          setConfigSchedule(configSchedule)
+
+          setFutureConfigSchedule(configSchedule)
         },
       )(
         "check that the new config has changed in the UI",
@@ -201,7 +202,8 @@ class ScanFrontendTimeBasedIntegrationTest
                 ),
               ),
             )
-          setConfigSchedule(configSchedule)
+
+          setFutureConfigSchedule(configSchedule)
         },
       )(
         "check that the next change will be applied in 24 hours",

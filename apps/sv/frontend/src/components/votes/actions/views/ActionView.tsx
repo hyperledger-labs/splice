@@ -1,11 +1,9 @@
 import { Loading, PartyId } from 'common-frontend';
 import dayjs from 'dayjs';
-import React, { ReactElement, useState } from 'react';
+import React, { ReactElement } from 'react';
 
 import {
   Chip,
-  FormControl,
-  NativeSelect,
   Table,
   TableBody,
   TableCell,
@@ -14,9 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
-import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
 import { EnabledChoices } from '@daml.js/canton-coin-api-0.1.0/lib/CC/API/V1/Coin';
 import {
   ActionRequiringConfirmation,
@@ -106,15 +102,6 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
   } else if (action.tag === 'ARC_CoinRules') {
     const coinRulesAction = action.value.coinRulesAction;
     switch (coinRulesAction.tag) {
-      case 'CRARC_SetConfigSchedule': {
-        return (
-          <ActionValueTable
-            actionType={actionType}
-            actionName={coinRulesAction.tag}
-            dropdownMap={coinRulesAction.value.newConfigSchedule}
-          />
-        );
-      }
       case 'CRARC_SetEnabledChoices': {
         return (
           <ActionValueTable
@@ -193,8 +180,7 @@ const ActionValueTable: React.FC<{
   actionType: string;
   actionName: string;
   valuesMap?: { [key: string]: React.ReactElement };
-  dropdownMap?: Schedule<string, CoinConfig<USD>>;
-}> = ({ actionType, actionName, valuesMap, dropdownMap }) => {
+}> = ({ actionType, actionName, valuesMap }) => {
   return (
     <>
       <TableContainer>
@@ -232,12 +218,6 @@ const ActionValueTable: React.FC<{
           </TableBody>
         </Table>
       </TableContainer>
-      {dropdownMap && (
-        <DropdownSchedules
-          initialValue={dropdownMap.initialValue}
-          futureValues={dropdownMap.futureValues}
-        />
-      )}
     </>
   );
 };
@@ -249,51 +229,6 @@ const PrettyJsonPrint: React.FC<{
     <pre style={{ whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
       {typeof data !== 'string' ? JSON.stringify(data, null, 2) : data}
     </pre>
-  );
-};
-
-//TODO(#6930): remove it when retire setconfigschedule
-const DropdownSchedules: React.FC<{
-  initialValue: CoinConfig<USD>;
-  futureValues: Tuple2<string, CoinConfig<USD>>[];
-}> = ({ initialValue, futureValues }) => {
-  interface DropdownOption {
-    value: string;
-    label: string;
-  }
-
-  const dropdownOptions: DropdownOption[] = [
-    { value: JSON.stringify(initialValue, null, 2), label: 'Current Configuration' },
-    ...futureValues.map(value => ({
-      value: JSON.stringify(value._2, null, 2),
-      label: `Configuration from: ${dayjs(value._1).toString().replace('GMT', 'UTC')}`,
-    })),
-  ];
-
-  const [selectedOption, setSelectedOption] = useState<string>('Current Configuration');
-
-  const handleOptionChange = (option: string) => {
-    setSelectedOption(option);
-  };
-
-  return (
-    <>
-      <FormControl>
-        <NativeSelect
-          inputProps={{ id: 'dropdown-display-schedules-datetime' }}
-          value={selectedOption}
-          onChange={e => handleOptionChange(e.target.value)}
-        >
-          {dropdownOptions &&
-            dropdownOptions.map((option, index) => (
-              <option key={'member-option-' + index} value={option.label}>
-                {option.label}
-              </option>
-            ))}
-        </NativeSelect>
-      </FormControl>
-      <PrettyJsonPrint data={dropdownOptions.filter(e => e.label === selectedOption)[0].value} />
-    </>
   );
 };
 

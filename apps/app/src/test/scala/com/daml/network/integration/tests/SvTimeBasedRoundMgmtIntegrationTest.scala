@@ -1,17 +1,15 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
-
-import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.ConfigScheduleUtil
-
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.time.EnrichedDurations.*
 
-import java.time.{Duration as JavaDuration}
+import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
 
 class SvTimeBasedRoundMgmtIntegrationTest
@@ -100,7 +98,8 @@ class SvTimeBasedRoundMgmtIntegrationTest
     val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
 
     val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
-    setConfigSchedule(
+
+    setFutureConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
         (
@@ -202,7 +201,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
     val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.activeDomain
-    setConfigSchedule(
+    setFutureConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
         (
@@ -377,7 +376,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     val config101 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 101)
     val config102 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 102)
 
-    setConfigSchedule(
+    setFutureConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
         (JavaDuration.ofSeconds(150), config101),
@@ -417,8 +416,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
         )
       }
 
-      // set configSchedule
-      setConfigSchedule(configSchedule)
+      setFutureConfigSchedule(configSchedule)
     }
 
     // Each advanceRoundsByOneTick will advance the time by exactly 160 second.

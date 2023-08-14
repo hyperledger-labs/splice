@@ -735,17 +735,6 @@ template CoinRules
         requireUnlocked lock
         create this with enabledChoices = newEnabledChoices
 
-    choice CoinRules_SetConfigSchedule : ContractId CoinRules
-      with
-        newConfigSchedule : Schedule Time (CoinConfig USD)
-      controller svc
-      do
-        requireUnlocked lock
-        forA_ (nextChangeScheduledAt newConfigSchedule) $ \t -> do
-          now <- getTime
-          require "Next change is scheduled in the future" (now < t)
-        create this with configSchedule = newConfigSchedule
-
     -- This inserts a new CoinConfig Schedule into the future Schedules
     choice CoinRules_AddFutureCoinConfigSchedule: ContractId CoinRules
       with

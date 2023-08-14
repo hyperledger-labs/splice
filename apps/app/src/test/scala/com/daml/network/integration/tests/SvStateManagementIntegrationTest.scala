@@ -1,14 +1,13 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coin.CoinRules_SetConfigSchedule
+import com.daml.network.codegen.java.cc.coin.CoinRules_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, TransferConfig, USD}
-import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_SetConfigSchedule
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
@@ -20,7 +19,6 @@ import com.daml.network.util.Codec
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
-import java.util
 import scala.jdk.OptionConverters.*
 
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
@@ -282,20 +280,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
             ),
           )
 
-        sv1Backend.getSvcInfo().coinRules.payload.configSchedule.futureValues
-        val futureValues = new util.ArrayList[
-          com.daml.network.codegen.java.da.types.Tuple2[Instant, CoinConfig[USD]]
-        ]();
-        futureValues.add(futureValue)
-
-        val newConfig = new Schedule[Instant, CoinConfig[USD]](
-          initialValue,
-          futureValues,
-        )
-
         val action: ActionRequiringConfirmation =
           new ARC_CoinRules(
-            new CRARC_SetConfigSchedule(new CoinRules_SetConfigSchedule(newConfig))
+            new CRARC_AddFutureCoinConfigSchedule(
+              new CoinRules_AddFutureCoinConfigSchedule(futureValue)
+            )
           )
 
         sv1Backend.createVoteRequest(

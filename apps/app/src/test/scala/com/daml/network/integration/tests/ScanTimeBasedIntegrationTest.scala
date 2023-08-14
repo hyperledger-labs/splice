@@ -1,20 +1,19 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.console.WalletAppClientReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{CNNodeUtil, ConfigScheduleUtil, TimeTestUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.console.WalletAppClientReference
+import com.daml.network.util.*
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
-import com.daml.network.util.Codec
-import com.digitalasset.canton.topology.PartyId
 
 class ScanTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
@@ -98,7 +97,7 @@ class ScanTimeBasedIntegrationTest
           ),
         )
 
-      setConfigSchedule(configSchedule)
+      setFutureConfigSchedule(configSchedule)
 
       advanceRoundsByOneTick
     }

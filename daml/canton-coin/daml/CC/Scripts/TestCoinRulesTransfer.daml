@@ -24,7 +24,7 @@ testUsageFees = do
   let outputAmount1 = 59.80
       outputAmount2 = 10.0
       outputAmount3 = 20.0
-  
+
   coin1 <- tap app alice coin1Amount
   coin2 <- tap app alice coin2Amount
   coin3 <- tap app alice coin3Amount
@@ -160,21 +160,20 @@ testCoinUsedAfterHoldingFeeChanged: Script ()
 testCoinUsedAfterHoldingFeeChanged = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   now <- getTime
-  
+
   let holdingFee = 0.000005
       smallerHoldingFee = 0.00005
       transferAmount = 10.0
 
   Some (coinRulesCid, coinRules) <- queryCoinRulesByKey app.svc
 
-  submitMulti [app.svc] [app.svc] $ exerciseCmd coinRulesCid CoinRules_SetConfigSchedule with
-    newConfigSchedule = coinRules.configSchedule with
-      futureValues = [(
+  submitMulti [app.svc] [app.svc] $ exerciseCmd coinRulesCid CoinRules_AddFutureCoinConfigSchedule with
+    newScheduleItem = (
           addRelTime now (minutes 1),
           coinRules.configSchedule.initialValue with
             transferConfig = coinRules.configSchedule.initialValue.transferConfig with
               holdingFee = RatePerRound smallerHoldingFee
-        )]
+        )
 
   runNextIssuance app
   coinRound2Cid <- tap app alice 100.0
@@ -226,4 +225,3 @@ transfer coinRulesCid transferContext svc sender receiver coinCid amount = do
                       lock = None
                       receiverFeeRatio = 1.0]
       context = transferContext
-

@@ -19,8 +19,8 @@ import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
 import java.time.{Duration, Instant}
-import scala.jdk.CollectionConverters.*
 import scala.annotation.nowarn
+import scala.jdk.CollectionConverters.*
 
 @nowarn("msg=match may not be exhaustive")
 class TimeBasedTreasuryIntegrationTestWithoutMerging
@@ -235,7 +235,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         )
       ).asJava,
     )
-    setConfigSchedule(configSchedule)
+
+    setFutureConfigSchedule(configSchedule)
 
     val (alice, _) = onboardAliceAndBob()
 
