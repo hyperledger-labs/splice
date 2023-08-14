@@ -782,7 +782,7 @@ commands:
           cmd: |
             mkdir -p log
             top -b -o %MEM -c -w 256 > log/memory &
-            ./start-canton.sh << parameters.start_canton_options >> -b -m
+            ./start-canton.sh << parameters.start_canton_options >> -b
           background: true
           additional_nix_args: "--keep CIRCLE_USERNAME --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_NUM --keep CIRCLE_JOB --keep CIRCLE_NODE_INDEX"
 

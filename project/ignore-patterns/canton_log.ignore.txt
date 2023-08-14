@@ -60,9 +60,4 @@ Synchronous event processing failed for event batch with sequencer counters.*
 # Detailed API logging is extremely useful for debugging so we turn this on in our tests.
 Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
 
-# Remove once https://github.com/digital-asset/daml/pull/17181 is merged
-Instrument daml.cache.size has recorded multiple values for the same attributes.
-Instrument daml.cache.weight has recorded multiple values for the same attributes.
-Too many log messages detected. Will only log once per minute from now on.","logger_name":"i.o.s.m.i.s.AsynchronousMetricStorage"
-
 # Make sure to have a trailing newline
