@@ -179,7 +179,7 @@ class ScanFrontendTimeBasedIntegrationTest
               s"${2 * newHoldingFee} CC/Round"
             )
 
-            find(id("next-config-update")).value.text should equal(
+            find(id("next-config-update-time")).value.text should equal(
               "No currently scheduled configuration changes"
             )
           }
@@ -213,7 +213,7 @@ class ScanFrontendTimeBasedIntegrationTest
               s"${sv1ScanBackend.getCoinRules().contract.payload.configSchedule.initialValue.transferConfig.holdingFee.rate} CC/Round"
             )
 
-            find(id("next-config-update")).value.text should equal("1 day").or(
+            find(id("next-config-update-time")).value.text should equal("1 day").or(
               equal("About 24 hours")
             )
           }

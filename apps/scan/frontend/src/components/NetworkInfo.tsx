@@ -72,13 +72,21 @@ const NextConfigUpdate: React.FC = () => {
   return (
     <Stack spacing={2}>
       <Typography variant="h3">Next Configuration Update</Typography>
-      <Typography variant="body1" id="next-config-update">
-        {configurationUpdate ? (
-          formatDistanceToNow(configurationUpdate, { includeSeconds: true })
-        ) : (
-          <Typography variant="caption">No currently scheduled configuration changes</Typography>
-        )}
-      </Typography>
+      {configurationUpdate ? (
+        <Stack spacing={4}>
+          <Typography variant="body1" id="next-config-update-time">
+            {formatDistanceToNow(configurationUpdate, { includeSeconds: true })}
+          </Typography>
+          <Typography variant="h3" id="next-config-update">
+            Fees
+          </Typography>
+          <FeesTable coinConfig={futureValues.at(0)!._2} />
+        </Stack>
+      ) : (
+        <Typography variant="caption" id="next-config-update-time">
+          No currently scheduled configuration changes
+        </Typography>
+      )}
     </Stack>
   );
 };
