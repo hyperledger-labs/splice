@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{BodyPartEntity, Uri}
+import akka.http.scaladsl.model.BodyPartEntity
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -103,14 +103,12 @@ abstract class ValidatorAppReference(
 
   def registerApp(
       providerUserId: String,
-      name: String,
-      uiUrl: Uri,
-      domains: Seq[definitions.Domain],
+      configuration: definitions.AppConfiguration,
       release: BodyPartEntity,
   ): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.RegisterApp(providerUserId, name, uiUrl, domains, release)
+        HttpAppManagerAppClient.RegisterApp(providerUserId, configuration, release)
       )
     }
 

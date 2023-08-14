@@ -1,6 +1,6 @@
 package com.daml.network.validator.admin.api.client.commands
 
-import akka.http.scaladsl.model.{BodyPartEntity, HttpHeader, HttpRequest, HttpResponse, Uri}
+import akka.http.scaladsl.model.{BodyPartEntity, HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
@@ -34,9 +34,7 @@ object HttpAppManagerAppClient {
 
   final case class RegisterApp(
       providerUserId: String,
-      name: String,
-      uiUrl: Uri,
-      domains: Seq[definitions.Domain],
+      configuration: definitions.AppConfiguration,
       release: BodyPartEntity,
   ) extends BaseCommand[http.RegisterAppResponse, Unit] {
     def submitRequest(
@@ -45,9 +43,7 @@ object HttpAppManagerAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.RegisterAppResponse] =
       client.registerApp(
         providerUserId,
-        name,
-        uiUrl.toString,
-        domains.asJson.noSpaces,
+        configuration.asJson.noSpaces,
         release,
         headers,
       )

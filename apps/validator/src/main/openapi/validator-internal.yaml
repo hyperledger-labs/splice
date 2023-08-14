@@ -341,32 +341,28 @@ paths:
               type: object
               required:
                 - provider_user_id
-                - name
-                - ui_url
-                - domains
+                - configuration
                 - release
               properties:
                 # TODO(#6839) Read this from the token once we have auth.
                 provider_user_id:
                   type: string
-                name:
+                configuration:
                   type: string
-                ui_url:
-                  type: string
-                # Guardrail generates garbage when
-                # trying to use an object here so we pass a JSON encoded string.
-                domains:
-                  type: string
+                  description: |
+                    JSON-encoded AppConfiguration. While OpenAPI supports
+                    specifying an actual JSON object here both guardrails and
+                    the typescript code generator have partially broken support for this.
                 release:
                   type: string
                   format: binary
       responses:
         "201":
           description: ok
-        "409":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "409":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
 
   # We proxy the JSON API here to set CORS headers.
   # TODO(#6839) Consider exposing these as /app-manager/v1 instead.This would make it a bit

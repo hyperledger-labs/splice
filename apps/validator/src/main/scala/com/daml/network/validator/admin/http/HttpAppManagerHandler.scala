@@ -284,60 +284,62 @@ class HttpAppManagerHandler(
 
   def registerApp(respond: v0.AppManagerResource.RegisterAppResponse.type)(
       providerUserId: String,
-      name: String,
-      uiUrl: String,
-      domains: String,
+      configuration: String,
       release: (java.io.File, Option[String], ContentType),
   )(extracted: Unit): Future[v0.AppManagerResource.RegisterAppResponse] =
     withNewTrace(workflowId) { implicit tc => _ =>
-      for {
-        providerPartyId <- ledgerConnection.getPrimaryParty(providerUserId)
-        decodedDomains = decode[Vector[definitions.Domain]](domains).valueOr(err =>
-          throw new IllegalArgumentException(s"Invalid domains: $err")
-        )
-        releaseManifest = readAppRelease(release._1)
-        dars = readDars(new FileInputStream(release._1))
-        _ <- participantAdminConnection.uploadDarFiles(
-          dars.map(_._1),
-          lock,
-        )
-        _ <- store.storeAppRelease(
-          AppManagerStore.AppRelease(
-            providerPartyId,
-            definitions.AppRelease(
-              releaseManifest.version,
-              dars.map(_._2.toHexString).toVector,
-            ),
+      decode[definitions.AppConfiguration](configuration) match {
+        case Left(err) =>
+          Future.successful(
+            v0.AppManagerResource.RegisterAppResponse.BadRequest(
+              definitions.ErrorResponse(
+                s"App configuration could not be decoded: $err"
+              )
+            )
           )
-        )
-        // TODO(#6839) Support updating the configuration and bump version
-        // on each update.
-        configurationVersion = 1L
-        _ <- store.storeAppConfiguration(
-          AppManagerStore.AppConfiguration(
-            providerPartyId,
-            definitions.AppConfiguration(
-              version = configurationVersion,
-              name = name,
-              uiUrl = uiUrl,
-              releaseConfigurations = Vector(
-                definitions.ReleaseConfiguration(
-                  domains = decodedDomains,
-                  releaseVersion = releaseManifest.version,
-                  requiredFor = definitions.Timespan(),
+        case Right(configuration) =>
+          if (configuration.version != 0) {
+            Future.successful(
+              v0.AppManagerResource.RegisterAppResponse.BadRequest(
+                definitions.ErrorResponse(
+                  s"Configuration version on registration must be 0 but was ${configuration.version}"
                 )
-              ),
-            ),
-          )
-        )
-        _ <- store.storeRegisteredApp(
-          AppManagerStore.RegisteredApp(
-            providerPartyId,
-            name,
-            configurationVersion,
-          )
-        )
-      } yield v0.AppManagerResource.RegisterAppResponse.Created
+              )
+            )
+          } else {
+            for {
+              providerPartyId <- ledgerConnection.getPrimaryParty(providerUserId)
+              releaseManifest = readAppRelease(release._1)
+              dars = readDars(new FileInputStream(release._1))
+              _ <- participantAdminConnection.uploadDarFiles(
+                dars.map(_._1),
+                lock,
+              )
+              _ <- store.storeAppRelease(
+                AppManagerStore.AppRelease(
+                  providerPartyId,
+                  definitions.AppRelease(
+                    releaseManifest.version,
+                    dars.map(_._2.toHexString).toVector,
+                  ),
+                )
+              )
+              _ <- store.storeAppConfiguration(
+                AppManagerStore.AppConfiguration(
+                  providerPartyId,
+                  configuration,
+                )
+              )
+              _ <- store.storeRegisteredApp(
+                AppManagerStore.RegisteredApp(
+                  providerPartyId,
+                  configuration.name,
+                  configuration.version,
+                )
+              )
+            } yield v0.AppManagerResource.RegisterAppResponse.Created
+          }
+      }
     }
 
   def registerAppMapFileField(

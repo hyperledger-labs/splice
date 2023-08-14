@@ -12,7 +12,14 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.http.v0.definitions.{Domain, InstalledApp, RegisteredApp}
+import com.daml.network.http.v0.definitions.{
+  AppConfiguration,
+  Domain,
+  InstalledApp,
+  RegisteredApp,
+  ReleaseConfiguration,
+  Timespan,
+}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
@@ -51,13 +58,22 @@ class AppManagerIntegrationTest
         // Shared integration test so we upload here rather than within the tests.
         splitwellValidatorBackend.registerApp(
           splitwellBackend.config.providerUser,
-          "splitwell",
-          "http://localhost:3400",
-          Seq(
-            Domain(
-              "splitwell",
-              "http://localhost:5108",
-            )
+          AppConfiguration(
+            0L,
+            "splitwell",
+            "http://localhost:3400",
+            Vector(
+              ReleaseConfiguration(
+                domains = Vector(
+                  Domain(
+                    "splitwell",
+                    "http://localhost:5108",
+                  )
+                ),
+                releaseVersion = "1.0.0",
+                requiredFor = Timespan(),
+              )
+            ),
           ),
           splitwellBundleEntity,
         )

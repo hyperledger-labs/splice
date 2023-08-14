@@ -1,22 +1,38 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
 import { useUserState } from 'common-frontend';
-import { Domain, HttpFile } from 'validator-openapi';
+import { AppConfiguration, HttpFile, ReleaseConfiguration } from 'validator-openapi';
 
 import { useAppManagerClient } from '../../contexts/AppManagerServiceContext';
 
 export type RegisterAppRequest = {
-  name: string;
-  uiUrl: string;
-  domains: Domain[];
+  configuration: AppConfiguration;
   release: HttpFile;
 };
+
+// The generated code doesn't seem to expose the ObjectSerializer which should usually do this so we have to do it ourselves.
+const encodeConfiguration = (configuration: AppConfiguration) => ({
+  version: configuration.version,
+  name: configuration.name,
+  ui_url: configuration.uiUrl,
+  release_configurations: configuration.releaseConfigurations.map(encodeReleaseConfiguration),
+});
+
+const encodeReleaseConfiguration = (configuration: ReleaseConfiguration) => ({
+  release_version: configuration.releaseVersion,
+  domains: configuration.domains,
+  required_for: configuration.requiredFor,
+});
 
 export const useRegisterApp = (): UseMutationResult<void, unknown, RegisterAppRequest, unknown> => {
   const userId = useUserState().userId!;
   const appManagerClient = useAppManagerClient();
   return useMutation({
-    mutationFn: async ({ name, uiUrl, domains, release }) => {
-      await appManagerClient.registerApp(userId, name, uiUrl, JSON.stringify(domains), release);
+    mutationFn: async ({ configuration, release }) => {
+      await appManagerClient.registerApp(
+        userId,
+        JSON.stringify(encodeConfiguration(configuration)),
+        release
+      );
     },
   });
 };

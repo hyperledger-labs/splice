@@ -18,6 +18,8 @@ import {
 } from 'react-router-dom';
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import { AppManagerClientProvider } from './contexts/AppManagerServiceContext';
 import Apps from './routes/Apps';
@@ -48,7 +50,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
           <DirectoryClientProvider url={config.services.directory.url}>
             <AppManagerClientProvider url={config.services.validator.url}>
-              {children}
+              <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
             </AppManagerClientProvider>
           </DirectoryClientProvider>
         </UserProvider>
