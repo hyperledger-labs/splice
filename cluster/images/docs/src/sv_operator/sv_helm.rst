@@ -82,6 +82,8 @@ You will be using them every time you want to deploy a new SV node, i.e., also w
 The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
 For DevNet and the current early version of TestNet, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
 
+.. _identity-token:
+
 Preparing a Cluster for Installation
 ------------------------------------
 

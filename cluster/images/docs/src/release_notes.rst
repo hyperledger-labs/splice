@@ -6,6 +6,12 @@ Release Notes
 2023-08-21
 ----------
 
+* Jfrog Artifact API Keys will be deprecated during the second half of 2023. You will need to to update the passwords of both the helm repository
+  and the k8s secret from an API key to an Identity Token.
+
+    * More information: `Introducing JFrog Access and Identity Tokens <https://jfrog.com/help/r/platform-api-key-deprecation-and-the-new-reference-tokens>`_
+    * HowTo: :ref:`add your Artifactory password<identity-token>` (we suggest deleting the existing ones using `helm repo remove` and `kubectl delete secret`)
+
 * Frontend updates:
 
     * Retired the action to entirely replace the coin config schedule `SetConfigSchedule`.
