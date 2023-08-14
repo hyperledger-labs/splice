@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.round.{OpenMiningRound}
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -10,7 +10,9 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import monocle.Monocle.toAppliedFocusOps
 
 import java.time.{Instant, Duration as JavaDuration}
 import scala.concurrent.duration.*
@@ -107,9 +109,22 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
     .withManualStart
     // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
     .withoutAutomaticRewardsCollectionAndCoinMerging
+
+  // TODO(#5938) remove localDomainNode = None for non-sv1
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     baseEnvironmentDefinition
+      .addConfigTransform((_, config) =>
+        config.copy(svApps =
+          config.svApps.map(e =>
+            if (e._1 != InstanceName.tryCreate("sv1")) {
+              e.focus(_._2.localDomainNode).replace(None)
+            } else {
+              e
+            }
+          )
+        )
+      )
 }
 
 abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment

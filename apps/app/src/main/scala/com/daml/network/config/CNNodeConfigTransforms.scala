@@ -9,13 +9,7 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.config.{
-  SvAppBackendConfig,
-  SvDomainNodeConfig,
-  SvMediatorConfig,
-  SvOnboardingConfig,
-  SvSequencerConfig,
-}
+import com.daml.network.sv.config.*
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
