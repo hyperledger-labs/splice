@@ -117,7 +117,7 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({ data, 
   return (
     <Card variant="outlined">
       <CardContent>
-        <Stack direction="column">
+        <Stack direction="column" spacing={2}>
           <Typography variant="h5">App Configuration</Typography>
           <TextField
             inputProps={{ className: 'app-config-name-input' }}

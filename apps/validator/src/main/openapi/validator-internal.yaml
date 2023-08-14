@@ -309,6 +309,61 @@ paths:
                 "$ref": "#/components/schemas/AppRelease"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /app-manager/apps/registered/{provider}/publish-release:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "publishAppRelease"
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - release
+              properties:
+                release:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: ok
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "409":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
+  /app-manager/apps/registered/{provider}/update-configuration:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "updateAppConfiguration"
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAppConfigurationRequest"
+      responses:
+        "201":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "409":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
   /app-manager/dars/{dar_hash}:
     get:
       tags: [appManager]
@@ -626,15 +681,15 @@ components:
       type: object
       required:
         - provider
-        - name
         - app_url
+        - configuration
       properties:
         provider:
           type: string
-        name:
-          type: string
         app_url:
           type: string
+        configuration:
+          $ref: "#/components/schemas/AppConfiguration"
 
     AppConfiguration:
       type: object
@@ -737,3 +792,11 @@ components:
       properties:
         app_url:
           type: string
+
+    UpdateAppConfigurationRequest:
+      type: object
+      required:
+        - configuration
+      properties:
+        configuration:
+          $ref: "#/components/schemas/AppConfiguration"

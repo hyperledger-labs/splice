@@ -207,11 +207,10 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   ): Future[Seq[ValidatorStore.RegisteredApp]] =
     multiDomainAcsStore.listContracts(appManagerCodegen.RegisteredApp.COMPANION).flatMap { apps =>
       apps.toList.traverseFilter { app =>
-        lookupAppConfiguration(
-          PartyId.tryFromProtoPrimitive(app.contract.payload.provider),
-          app.contract.payload.latestConfigurationVersion,
+        lookupLatestAppConfiguration(
+          PartyId.tryFromProtoPrimitive(app.contract.payload.provider)
         ).map(config =>
-          config.value.map(
+          config.map(
             ValidatorStore.RegisteredApp(
               app,
               _,

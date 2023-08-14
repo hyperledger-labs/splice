@@ -38,12 +38,39 @@ class AppManagerIntegrationTest
     with WalletTestUtil {
 
   private val splitwellBundle = new File(
-    "apps/splitwell/src/test/resources/splitwell-bundle.tar.gz"
+    "apps/splitwell/src/test/resources/splitwell-bundle-1.0.0.tar.gz"
+  )
+
+  private val splitwellBundleUpgrade = new File(
+    "apps/splitwell/src/test/resources/splitwell-bundle-2.0.0.tar.gz"
   )
 
   private def splitwellBundleEntity = HttpEntity.fromFile(
     ContentTypes.`application/octet-stream`,
     splitwellBundle,
+  )
+
+  private def splitwellBundleUpgradeEntity = HttpEntity.fromFile(
+    ContentTypes.`application/octet-stream`,
+    splitwellBundleUpgrade,
+  )
+
+  private val configuration1_0 = AppConfiguration(
+    0L,
+    "splitwell",
+    "http://localhost:3420",
+    Vector(
+      ReleaseConfiguration(
+        domains = Vector(
+          Domain(
+            "splitwell",
+            "http://localhost:5108",
+          )
+        ),
+        releaseVersion = "1.0.0",
+        requiredFor = Timespan(),
+      )
+    ),
   )
 
   override def environmentDefinition
@@ -58,23 +85,7 @@ class AppManagerIntegrationTest
         // Shared integration test so we upload here rather than within the tests.
         splitwellValidatorBackend.registerApp(
           splitwellBackend.config.providerUser,
-          AppConfiguration(
-            0L,
-            "splitwell",
-            "http://localhost:3400",
-            Vector(
-              ReleaseConfiguration(
-                domains = Vector(
-                  Domain(
-                    "splitwell",
-                    "http://localhost:5108",
-                  )
-                ),
-                releaseVersion = "1.0.0",
-                requiredFor = Timespan(),
-              )
-            ),
-          ),
+          configuration1_0,
           splitwellBundleEntity,
         )
       }
@@ -85,12 +96,12 @@ class AppManagerIntegrationTest
       splitwellValidatorBackend.listRegisteredApps() shouldBe Seq(
         RegisteredApp(
           provider.toProtoPrimitive,
-          "splitwell",
           splitwellValidatorBackend.config.appManager.value.appManagerApiUrl
             .withPath(
               Uri.Path(s"/app-manager/apps/registered/${provider.toProtoPrimitive}")
             )
             .toString,
+          configuration1_0,
         )
       )
       val configuration = splitwellValidatorBackend.getLatestAppConfiguration(provider)
@@ -116,9 +127,60 @@ class AppManagerIntegrationTest
         InstalledApp(
           splitwell.provider,
           "splitwell",
-          "http://localhost:3400",
+          "http://localhost:3420",
         )
       )
+    }
+    "support publishing new releases and updating configurations" in { implicit env =>
+      val provider = splitwellBackend.getProviderPartyId()
+      splitwellValidatorBackend.getLatestAppConfiguration(provider).version shouldBe 0
+      // publish configuration for the same release version
+      splitwellValidatorBackend.updateAppConfiguration(provider, configuration1_0.copy(version = 1))
+      splitwellValidatorBackend.getLatestAppConfiguration(provider).version shouldBe 1
+      assertThrowsAndLogsCommandFailures(
+        splitwellValidatorBackend.updateAppConfiguration(
+          provider,
+          configuration1_0.copy(
+            version = 3
+          ),
+        ),
+        _.errorMessage should include(
+          "Tried to update configuration to version 3 but previous config was version 1"
+        ),
+      )
+      // cannot publish for version != currentVersion + 1
+      // publish configuration with new release version before uploading release,
+      val newReleaseConfig = ReleaseConfiguration(
+        domains = Vector.empty,
+        releaseVersion = "2.0.0",
+        requiredFor = Timespan(),
+      )
+      assertThrowsAndLogsCommandFailures(
+        splitwellValidatorBackend.updateAppConfiguration(
+          provider,
+          configuration1_0.copy(
+            version = 2,
+            releaseConfigurations = newReleaseConfig
+              +: configuration1_0.releaseConfigurations,
+          ),
+        ),
+        _.errorMessage should include("release with that version has not been uploaded"),
+      )
+      assertThrowsAndLogsCommandFailures(
+        splitwellValidatorBackend.getAppRelease(provider, "2.0.0").version,
+        _.errorMessage should include("No release 2.0.0 found"),
+      )
+      splitwellValidatorBackend.publishAppRelease(provider, splitwellBundleUpgradeEntity)
+      splitwellValidatorBackend.getAppRelease(provider, "2.0.0").version shouldBe "2.0.0"
+      splitwellValidatorBackend.updateAppConfiguration(
+        provider,
+        configuration1_0.copy(
+          version = 2,
+          releaseConfigurations = newReleaseConfig
+            +: configuration1_0.releaseConfigurations,
+        ),
+      )
+      splitwellValidatorBackend.getLatestAppConfiguration(provider).version shouldBe 2
     }
     "support oauth2 authorization code grant" in { implicit env =>
       val provider = splitwellBackend.getProviderPartyId()

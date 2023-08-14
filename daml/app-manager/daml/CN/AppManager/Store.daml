@@ -38,25 +38,8 @@ template RegisteredApp
   with
     validatorOperator : Party
     provider : Party
-    latestConfigurationVersion : Int
  where
    signatory validatorOperator
-
-   choice UpdateConfiguration : (ContractId AppConfiguration, ContractId RegisteredApp)
-     with
-       newConfiguration : Text
-     controller validatorOperator
-     do -- Old versions are not archived. We preserve all history.
-        appConfigCid <- create AppConfiguration with
-          json = newConfiguration
-          version = latestConfigurationVersion + 1
-          provider
-          validatorOperator
-        registeredAppCid <- create RegisteredApp with
-          latestConfigurationVersion = latestConfigurationVersion + 1
-          ..
-        pure (appConfigCid, registeredAppCid)
-
 
 -- | An installed application. The version specifies
 -- the configuration that is currently installed.

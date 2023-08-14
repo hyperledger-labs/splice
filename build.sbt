@@ -801,17 +801,26 @@ lazy val `apps-splitwell` =
         val log = streams.value.log
         val splitwellOutput = (`splitwell-daml` / Compile / damlBuild).value
         val splitwellDar = ((`splitwell-daml` / Compile / damlBuild).value).head.toString
-        val output = baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle.tar.gz"
+        val output1_0 =
+          baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle-1.0.0.tar.gz"
+        val output2_0 =
+          baseDirectory.value / "src" / "test" / "resources" / "splitwell-bundle-2.0.0.tar.gz"
         val createBundle = baseDirectory.value / "../../scripts/create-bundle.sh"
         val cacheDir = streams.value.cacheDirectory
         val cache = FileFunction.cached(cacheDir) { _ =>
           runCommand(
-            Seq(createBundle.toString, splitwellDar, "splitwell", "1.0.0", output.toString),
+            Seq(createBundle.toString, splitwellDar, "splitwell", "1.0.0", output1_0.toString),
             log,
             None,
             None,
           )
-          Set(output)
+          runCommand(
+            Seq(createBundle.toString, splitwellDar, "splitwell", "2.0.0", output2_0.toString),
+            log,
+            None,
+            None,
+          )
+          Set(output1_0, output2_0)
 
         }
         cache((createBundle +: splitwellOutput).toSet).toSeq

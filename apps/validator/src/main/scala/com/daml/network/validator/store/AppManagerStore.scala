@@ -90,7 +90,6 @@ final class AppManagerStore(
       new codegen.RegisteredApp(
         validator.toProtoPrimitive,
         registered.provider.toProtoPrimitive,
-        registered.latestConfigurationVersion,
       ),
     )
 
@@ -169,18 +168,23 @@ final class AppManagerStore(
         )
       )
 
-  def getAppRelease(provider: PartyId, version: String): Future[AppRelease] =
+  def lookupAppRelease(provider: PartyId, version: String): Future[Option[AppRelease]] =
     store
       .lookupAppRelease(provider, version)
       .map(
-        _.value.fold(
-          throw Status.NOT_FOUND
-            .withDescription(show"No release $version found for app $provider")
-            .asRuntimeException
-        )((c: ContractWithState[_, codegen.AppRelease]) =>
+        _.value.map(c =>
           AppRelease(provider, decodeOrThrow[definitions.AppRelease](c.contract.payload.json))
         )
       )
+
+  def getAppRelease(provider: PartyId, version: String): Future[AppRelease] =
+    lookupAppRelease(provider, version).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(show"No release $version found for app $provider")
+          .asRuntimeException
+      )
+    )
 
   private def toInstalledApp(c: ContractWithState[_, codegen.InstalledApp]) =
     InstalledApp(
@@ -211,8 +215,7 @@ final class AppManagerStore(
             PartyId.tryFromProtoPrimitive(app.registered.contract.payload.provider),
             decodeOrThrow[definitions.AppConfiguration](
               app.configuration.contract.payload.json
-            ).name,
-            app.configuration.contract.payload.version,
+            ),
           )
         )
       )
@@ -248,18 +251,17 @@ object AppManagerStore {
 
   final case class RegisteredApp(
       provider: PartyId,
-      name: String,
-      latestConfigurationVersion: Long,
+      configuration: definitions.AppConfiguration,
   ) {
     def toJson(appManagerApiUrl: Uri): definitions.RegisteredApp =
       definitions.RegisteredApp(
         provider.toProtoPrimitive,
-        name,
         appManagerApiUrl
           .withPath(
             appManagerApiUrl.path / "app-manager" / "apps" / "registered" / provider.toProtoPrimitive
           )
           .toString,
+        configuration,
       )
   }
 

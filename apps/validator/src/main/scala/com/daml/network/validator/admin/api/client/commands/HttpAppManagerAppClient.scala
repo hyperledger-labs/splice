@@ -55,6 +55,50 @@ object HttpAppManagerAppClient {
     }
   }
 
+  final case class PublishAppRelease(
+      provider: PartyId,
+      release: BodyPartEntity,
+  ) extends BaseCommand[http.PublishAppReleaseResponse, Unit] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.PublishAppReleaseResponse] =
+      client.publishAppRelease(
+        provider.toProtoPrimitive,
+        release,
+        headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.PublishAppReleaseResponse.Created =>
+      Right(())
+    }
+  }
+
+  final case class UpdateAppConfiguration(
+      provider: PartyId,
+      configuration: definitions.AppConfiguration,
+  ) extends BaseCommand[http.UpdateAppConfigurationResponse, Unit] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.UpdateAppConfigurationResponse] =
+      client.updateAppConfiguration(
+        provider.toProtoPrimitive,
+        definitions.UpdateAppConfigurationRequest(
+          configuration
+        ),
+        headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.UpdateAppConfigurationResponse.Created =>
+      Right(())
+    }
+  }
+
   final case object ListRegisteredApps
       extends BaseCommand[http.ListRegisteredAppsResponse, Seq[definitions.RegisteredApp]] {
     def submitRequest(

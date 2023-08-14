@@ -112,6 +112,20 @@ abstract class ValidatorAppReference(
       )
     }
 
+  def publishAppRelease(provider: PartyId, release: BodyPartEntity): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.PublishAppRelease(provider, release)
+      )
+    }
+
+  def updateAppConfiguration(provider: PartyId, configuration: definitions.AppConfiguration): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.UpdateAppConfiguration(provider, configuration)
+      )
+    }
+
   def listRegisteredApps(): Seq[definitions.RegisteredApp] =
     consoleEnvironment.run {
       httpCommand(

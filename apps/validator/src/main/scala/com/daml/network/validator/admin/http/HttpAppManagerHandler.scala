@@ -309,21 +309,7 @@ class HttpAppManagerHandler(
           } else {
             for {
               providerPartyId <- ledgerConnection.getPrimaryParty(providerUserId)
-              releaseManifest = readAppRelease(release._1)
-              dars = readDars(new FileInputStream(release._1))
-              _ <- participantAdminConnection.uploadDarFiles(
-                dars.map(_._1),
-                lock,
-              )
-              _ <- store.storeAppRelease(
-                AppManagerStore.AppRelease(
-                  providerPartyId,
-                  definitions.AppRelease(
-                    releaseManifest.version,
-                    dars.map(_._2.toHexString).toVector,
-                  ),
-                )
-              )
+              _ <- storeAppRelease(providerPartyId, release._1)
               _ <- store.storeAppConfiguration(
                 AppManagerStore.AppConfiguration(
                   providerPartyId,
@@ -333,8 +319,7 @@ class HttpAppManagerHandler(
               _ <- store.storeRegisteredApp(
                 AppManagerStore.RegisteredApp(
                   providerPartyId,
-                  configuration.name,
-                  configuration.version,
+                  configuration,
                 )
               )
             } yield v0.AppManagerResource.RegisterAppResponse.Created
@@ -348,7 +333,96 @@ class HttpAppManagerHandler(
       contentType: ContentType,
   ): File =
     // File is deleted by the generated code in guardrail.
-    File.createTempFile("app-bundle_", ".tgz")
+    File.createTempFile("release_", ".tgz")
+
+  def publishAppRelease(
+      respond: v0.AppManagerResource.PublishAppReleaseResponse.type
+  )(provider: String, release: (File, Option[String], ContentType))(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.PublishAppReleaseResponse] =
+    withNewTrace(workflowId) { implicit tc => _ =>
+      val providerParty = PartyId.tryFromProtoPrimitive(provider)
+      for {
+        _ <- store.getLatestAppConfiguration(providerParty) // Check that app is registered
+        _ <- storeAppRelease(providerParty, release._1)
+      } yield v0.AppManagerResource.PublishAppReleaseResponse.Created
+    }
+
+  def publishAppReleaseMapFileField(
+      fieldName: String,
+      fileName: Option[String],
+      contentType: ContentType,
+  ): File =
+    // File is deleted by the generated code in guardrail.
+    File.createTempFile("release_", ".tgz")
+
+  private def storeAppRelease(provider: PartyId, release: java.io.File)(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    for {
+      releaseManifest <- Future { readAppRelease(release) }
+      dars <- Future { readDars(new FileInputStream(release)) }
+      _ <- participantAdminConnection.uploadDarFiles(
+        dars.map(_._1),
+        lock,
+      )
+      _ <- store.storeAppRelease(
+        AppManagerStore.AppRelease(
+          provider,
+          definitions.AppRelease(
+            releaseManifest.version,
+            dars.map(_._2.toHexString).toVector,
+          ),
+        )
+      )
+    } yield ()
+
+  def updateAppConfiguration(
+      respond: v0.AppManagerResource.UpdateAppConfigurationResponse.type
+  )(provider: String, body: definitions.UpdateAppConfigurationRequest)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.UpdateAppConfigurationResponse] =
+    withNewTrace(workflowId) { implicit tc => _ =>
+      val providerParty = PartyId.tryFromProtoPrimitive(provider)
+      validateAppConfiguration(providerParty, body.configuration).flatMap {
+        case Left(err) => Future.successful(err)
+        case Right(()) =>
+          for {
+            _ <- store.storeAppConfiguration(
+              AppManagerStore.AppConfiguration(providerParty, body.configuration)
+            )
+          } yield v0.AppManagerResource.UpdateAppConfigurationResponse.Created
+      }
+    }
+
+  private def validateAppConfiguration(
+      provider: PartyId,
+      configuration: definitions.AppConfiguration,
+  )(implicit
+      tc: TraceContext
+  ): Future[Either[v0.AppManagerResource.UpdateAppConfigurationResponse, Unit]] =
+    (for {
+      latestConfig <- EitherT.right(store.getLatestAppConfiguration(provider))
+      _ <- EitherTUtil.ifThenET(latestConfig.configuration.version + 1 != configuration.version)(
+        EitherT.leftT[Future, Unit](
+          v0.AppManagerResource.UpdateAppConfigurationResponse.Conflict(
+            definitions.ErrorResponse(
+              show"Tried to update configuration to version ${configuration.version} but previous config was version ${latestConfig.configuration.version}"
+            )
+          )
+        )
+      )
+      _ <- configuration.releaseConfigurations.traverse { config =>
+        EitherT.fromOptionF(
+          store.lookupAppRelease(provider, config.releaseVersion),
+          v0.AppManagerResource.UpdateAppConfigurationResponse.BadRequest(
+            definitions.ErrorResponse(
+              show"Release configuration references release version ${config.releaseVersion} but release with that version has not been uploaded"
+            )
+          ),
+        )
+      }
+    } yield ()).value
 
   def installApp(respond: v0.AppManagerResource.InstallAppResponse.type)(
       body: definitions.InstallAppRequest

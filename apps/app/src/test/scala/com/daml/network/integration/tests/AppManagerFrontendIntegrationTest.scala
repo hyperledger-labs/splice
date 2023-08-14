@@ -1,10 +1,14 @@
 package com.daml.network.integration.tests
 
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import cats.syntax.either.*
 import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.http.v0.definitions.{AppConfiguration, ReleaseConfiguration, Timespan}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, DirectoryFrontendTestUtil, WalletTestUtil}
 
 import java.io.File
+import scala.util.Try
 
 class AppManagerFrontendIntegrationTest
     extends FrontendIntegrationTest("splitwell", "alice")
@@ -13,7 +17,16 @@ class AppManagerFrontendIntegrationTest
     with FrontendLoginUtil {
 
   private val splitwellBundle = new File(
-    "apps/splitwell/src/test/resources/splitwell-bundle.tar.gz"
+    "apps/splitwell/src/test/resources/splitwell-bundle-1.0.0.tar.gz"
+  )
+
+  private val splitwellBundleUpgrade = new File(
+    "apps/splitwell/src/test/resources/splitwell-bundle-2.0.0.tar.gz"
+  )
+
+  private def splitwellBundleEntity = HttpEntity.fromFile(
+    ContentTypes.`application/octet-stream`,
+    splitwellBundle,
   )
 
   override def environmentDefinition =
@@ -70,6 +83,66 @@ class AppManagerFrontendIntegrationTest
             // This also implies the install contract has been created
             // which means we can properly do writes through the user’s participant.
             find(id("create-group-button")) should not be empty,
+        )
+      }
+    }
+    "publish new app releases and update configurations" in { implicit env =>
+      val provider = splitwellBackend.getProviderPartyId()
+      val configuration1_0 = AppConfiguration(
+        0L,
+        "splitwell",
+        s"http://localhost:${splitwellSplitwellUIPort}",
+        Vector(
+          ReleaseConfiguration(
+            domains = Vector.empty,
+            releaseVersion = "1.0.0",
+            requiredFor = Timespan(),
+          )
+        ),
+      )
+      splitwellValidatorBackend.registerApp(
+        splitwellBackend.config.providerUser,
+        configuration1_0,
+        splitwellBundleEntity,
+      )
+      assertThrowsAndLogsCommandFailures(
+        splitwellValidatorBackend.getAppRelease(provider, "2.0.0").version shouldBe "2.0.0",
+        _.errorMessage should include("No release 2.0.0 found"),
+      )
+      splitwellValidatorBackend.getLatestAppConfiguration(provider).version shouldBe 0
+      withFrontEnd("splitwell") { implicit webDriver =>
+        login(splitwellAppManagerUIPort, splitwellValidatorBackend.config.ledgerApiUser)
+        val splitwell = find(className("registered-app")).value
+        splitwell
+          .childElement(className("registered-app-release-bundle-input"))
+          .underlying
+          .sendKeys(splitwellBundleUpgrade.getAbsolutePath)
+        actAndCheck(
+          "click on publish app release button",
+          click on splitwell.childElement(className("registered-app-publish-release-button")),
+        )(
+          "release is uploaded",
+          _ =>
+            Try(
+              loggerFactory.suppressErrors(
+                splitwellValidatorBackend.getAppRelease(provider, "2.0.0").version shouldBe "2.0.0"
+              )
+            ).toEither.valueOr(fail(_)),
+        )
+        click on splitwell.childElement(className("registered-app-edit-configuration-button"))
+        inside(splitwell.childElement(className("release-config-release-version-input"))) {
+          case textField: TextField => textField.value = "2.0.0"
+        }
+        actAndCheck(
+          "click on update app configuration",
+          click on splitwell.childElement(className("registered-app-update-configuration-button")),
+        )(
+          "configuration is updated",
+          _ => {
+            val latestConfig = splitwellValidatorBackend.getLatestAppConfiguration(provider)
+            latestConfig.version shouldBe 1
+            latestConfig.releaseConfigurations.loneElement.releaseVersion shouldBe "2.0.0"
+          },
         )
       }
     }

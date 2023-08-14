@@ -9,21 +9,103 @@ import {
   Card,
   CardActions,
   CardContent,
+  CardHeader,
   IconButton,
   Link,
   Stack,
   Typography,
 } from '@mui/material';
 
-import { useRegisterApp, useRegisteredApps } from '../hooks';
+import {
+  usePublishAppRelease,
+  useRegisterApp,
+  useRegisteredApps,
+  useUpdateAppConfiguration,
+} from '../hooks';
 import { ConfigurationEditor } from './AppConfiguration';
 
 const RegisteredApp: React.FC<{ app: openapi.RegisteredApp }> = ({ app }) => {
+  const [appRelease, setAppRelease] = useState<File | null>(null);
+  const [updatedAppConfiguration, setUpdatedAppConfiguration] = useState<
+    openapi.AppConfiguration | undefined
+  >(undefined);
+  const updateAppConfiguration = useUpdateAppConfiguration();
+  const publishAppRelease = usePublishAppRelease();
+  const onUpdateAppConfiguration = async () => {
+    await updateAppConfiguration.mutateAsync({
+      provider: app.provider,
+      configuration: updatedAppConfiguration!,
+    });
+    setUpdatedAppConfiguration(undefined);
+  };
+  const onPublishAppRelease = async () => {
+    await publishAppRelease.mutateAsync({ provider: app.provider, release: appRelease! });
+    setAppRelease(null);
+  };
   return (
     <Card className="registered-app" variant="outlined">
+      <CardHeader className="registered-app-name" title={app.configuration.name} />
       <CardContent>
-        <Typography className="registered-app-name">{app.name}</Typography>
-        <DirectoryEntry partyId={app.provider} />
+        <Stack direction="column" alignItems="flex-start" spacing={2}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Typography color="text.secondary">App Provider</Typography>
+            <DirectoryEntry partyId={app.provider} />
+          </Stack>
+          <Stack direction="row" spacing={2}>
+            {/* Setting the id does not seem to be possible here so we go for a classname. */}
+            <MuiFileInput
+              label="Release Bundle"
+              inputProps={{ className: 'registered-app-release-bundle-input' }}
+              value={appRelease}
+              onChange={value => setAppRelease(value)}
+            />
+            <Button
+              onClick={onPublishAppRelease}
+              disabled={!appRelease}
+              className="registered-app-publish-release-button"
+            >
+              Publish Release
+            </Button>
+          </Stack>
+          {!updatedAppConfiguration && (
+            <Button
+              className="registered-app-edit-configuration-button"
+              onClick={() =>
+                setUpdatedAppConfiguration({
+                  ...app.configuration,
+                  version: app.configuration.version + 1,
+                })
+              }
+            >
+              Edit Configuration
+            </Button>
+          )}
+          {updatedAppConfiguration && (
+            <Card
+              className="registered-app-configuration-update"
+              sx={{ margin: '30px' }}
+              variant="outlined"
+            >
+              <CardContent sx={{ padding: '60px' }}>
+                <ConfigurationEditor
+                  data={updatedAppConfiguration}
+                  onChange={setUpdatedAppConfiguration}
+                />
+              </CardContent>
+              <CardActions>
+                <Button
+                  onClick={onUpdateAppConfiguration}
+                  className="registered-app-update-configuration-button"
+                >
+                  Update Configuration
+                </Button>
+                <Button color="warning" onClick={() => setUpdatedAppConfiguration(undefined)}>
+                  Cancel
+                </Button>
+              </CardActions>
+            </Card>
+          )}
+        </Stack>
       </CardContent>
       <CardActions>
         <Link href={app.appUrl} className="registered-app-link">
