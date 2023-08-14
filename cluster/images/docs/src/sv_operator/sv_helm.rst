@@ -359,7 +359,7 @@ To do that, you first must generate the keys that will identify the node.
   You can access your username and get the Identity token for your Artifactory account through the UI, using the top right `Edit profile` option.
 
   | This can be configured by running:
-  | :code:`docker login -u <your_artifactory_user> -p <your_artifactory_api_key> digitalasset-canton-network-docker.jfog.io`
+  | :code:`docker login -u <your_artifactory_user> -p <your_artifactory_api_key> digitalasset-canton-network-docker.jfrog.io`
 
 .. _cometbft-identity:
 
