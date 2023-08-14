@@ -655,13 +655,15 @@ commands:
     parameters:
       upload_caches:
         type: boolean
-        default: true
+        default: false
     steps:
       - upload_test_reports
+      # sbt caches are job-specific, so we're ignoring the upload_caches parameter,
+      # and saving those caches in every job
+      - save_sbt_cache
       - when:
           condition: << parameters.upload_caches >>
           steps:
-            - save_sbt_cache
             - save_compiled_classes
             - save_frontend_node_modules
             - save_daml_artifacts
