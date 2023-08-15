@@ -5,6 +5,8 @@ cluster:
 
 # Node names use as a moniker to identify the node in the CometBFT network
 nodeName: ""
+# Is the helm chart deployed on devnet
+isDevNet: true
 
 founder:
   # The CometBFT node ID of the founding node

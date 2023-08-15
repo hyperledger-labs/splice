@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as fs from 'fs';
 import * as _ from 'lodash';
-import { ExactNamespace, loadYamlFromFile } from 'cn-pulumi-common';
+import { ExactNamespace, isDevNet, loadYamlFromFile } from 'cn-pulumi-common';
 
 import { installCNSVHelmChart } from './helm';
 import { CLUSTER_BASENAME, REPO_ROOT, SV_NAME, TARGET_CLUSTER } from './utils';
@@ -54,6 +54,7 @@ export function installCometBftNode(xns: ExactNamespace): void {
         gateway: 'cluster-ingress/cn-apps-gateway',
         port: 26696,
       },
+      isDevNet: isDevNet,
     }),
     true
   );

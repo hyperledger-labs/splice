@@ -6,5 +6,11 @@
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 {{ $_ := required ".Values.postgres is required." .Values.postgres }}
 {{ $_ := required ".Values.postgresPassword is required." .Values.postgresPassword }}
-{{ $_ := required ".Values.sequencerDriver.address is required." .Values.sequencerDriver.address }}
-{{ $_ := required ".Values.sequencerDriver.password is required." .Values.sequencerDriver.password }}
+{{ $_ := required ".Values.sequencerDriver.type is required." (.Values.sequencerDriver).type }}
+{{- if eq .Values.sequencerDriver.type "postgres"}}
+{{ $_ := required ".Values.sequencerDriver.address is required." (.Values.sequencerDriver).address }}
+{{ $_ := required ".Values.sequencerDriver.password is required." (.Values.sequencerDriver).password }}
+{{- else if eq .Values.sequencerDriver.type "cometbft"}}
+{{ $_ := required ".Values.sequencerDriver.host is required." (.Values.sequencerDriver).host }}
+{{ $_ := required ".Values.sequencerDriver.port is required." (.Values.sequencerDriver).port }}
+{{- end}}

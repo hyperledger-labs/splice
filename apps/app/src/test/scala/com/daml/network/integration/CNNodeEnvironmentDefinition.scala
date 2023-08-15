@@ -271,6 +271,10 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
     fromResource("preflight-topology.conf", testName).clearConfigTransforms()
   }
 
+  def svPreflightTopology(testName: String): CNNodeEnvironmentDefinition = {
+    fromResource("sv-preflight-topology.conf", testName).clearConfigTransforms()
+  }
+
   def fromResource(path: String, testName: String): CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition(
       baseConfig = loadConfigFromResources(path),

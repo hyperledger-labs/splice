@@ -130,6 +130,18 @@ function getCometBftDebugData(
   return (
     <div>
       <JSONPretty
+        id="comet-bft-debug-abci"
+        style={{ fontSize: '10pt' }}
+        data={data.response?.abciInfo}
+        theme={JSONPrettyMon}
+      />
+      <JSONPretty
+        id="comet-bft-debug-validators"
+        style={{ fontSize: '10pt' }}
+        data={data.response?.validators}
+        theme={JSONPrettyMon}
+      />
+      <JSONPretty
         id="comet-bft-debug-status"
         style={{ fontSize: '10pt' }}
         data={data.response?.status}

@@ -1,9 +1,12 @@
-import { Output, Resource } from '@pulumi/pulumi';
+import * as pulumi from '@pulumi/pulumi';
+import { Service } from '@pulumi/kubernetes/core/v1';
+import { Output } from '@pulumi/pulumi';
 import {
   CLUSTER_DNS_NAME,
   CLUSTER_BASENAME,
   ExactNamespace,
   installCNHelmChart,
+  isDevNet,
 } from 'cn-pulumi-common';
 
 const sv1NodeConfig = {
@@ -89,17 +92,18 @@ export function installCometBftNode(
   xns: ExactNamespace,
   nodename: string,
   onboardingName: string
-): Resource {
-  return installCNHelmChart(xns, 'cometbft', 'cn-cometbft', {
+): Service {
+  const nodeConfig = nodeConfigs[nodename];
+  const cometbftRelease = installCNHelmChart(xns, 'cometbft', 'cn-cometbft', {
     nodeName: onboardingName,
     imageName: 'cometbft',
     founder: founder,
     istioVirtualService: {
       enabled: true,
       gateway: 'cluster-ingress/cn-apps-gateway',
-      port: nodeConfigs[nodename].istioPort,
+      port: nodeConfig.istioPort,
     },
-    node: nodeConfigs[nodename],
+    node: nodeConfig,
     peers: Object.keys(nodeConfigs)
       .filter(key => key !== nodename && key !== 'sv-1')
       .map(svName => {
@@ -114,10 +118,15 @@ export function installCometBftNode(
           externalAddress: p2pServiceAddress(`cometbft-${svName}`, svName),
         };
       }),
+    isDevNet: isDevNet,
     genesis: {
       chainId: `${CLUSTER_BASENAME}`,
     },
   });
+  return Service.get(
+    `${nodeConfig.identifier}-cometbft-rpc`,
+    pulumi.interpolate`${cometbftRelease.status.namespace}/${nodeConfig.identifier}-cometbft-rpc`
+  );
 }
 
 type NodeConfig = {

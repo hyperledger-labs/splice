@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { Service } from '@pulumi/kubernetes/core/v1';
 import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 import { domainFeesConfig } from './domainFeesCfg';
@@ -19,10 +20,9 @@ export function installDomain(
 export function installGlobalDomain(
   xns: ExactNamespace,
   name: string,
-  postgresDb: pulumi.Output<string>,
   withDomainFees: boolean,
   postgres: Postgres,
-  sequencerPostgres: Postgres
+  sequencer: PostgresSequencer | CometBftSequencer
 ): pulumi.Resource {
   if (withDomainFees) {
     console.error('Running with domain fees');
@@ -30,10 +30,18 @@ export function installGlobalDomain(
   return installCNHelmChart(xns, name, 'cn-global-domain', {
     postgres: postgres.address,
     postgresPassword: postgres.password,
-    sequencerDriver: {
-      address: sequencerPostgres.address,
-      password: sequencerPostgres.password,
-    },
+    sequencerDriver:
+      sequencer.driver === 'cometbft'
+        ? {
+            type: sequencer.driver,
+            host: pulumi.interpolate`${sequencer.service.metadata.name}.${sequencer.service.metadata.namespace}.svc.cluster.local`,
+            port: 26657,
+          }
+        : {
+            type: sequencer.driver,
+            address: sequencer.postgres.address,
+            password: sequencer.postgres.password,
+          },
     trafficControl: withDomainFees
       ? {
           enabled: true,
@@ -66,3 +74,13 @@ export function installParticipant(
     dependsOn
   );
 }
+
+type PostgresSequencer = {
+  driver: 'postgres';
+  postgres: Postgres;
+};
+
+type CometBftSequencer = {
+  driver: 'cometbft';
+  service: Service;
+};

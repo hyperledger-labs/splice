@@ -796,6 +796,38 @@
   },
   {
     "custom": false,
+    "id": "undefined/cometbft-sv-1-cometbft-rpc",
+    "inputs": {},
+    "name": "cometbft-sv-1-cometbft-rpc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": false,
+    "id": "undefined/cometbft-sv-2-cometbft-rpc",
+    "inputs": {},
+    "name": "cometbft-sv-2-cometbft-rpc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": false,
+    "id": "undefined/cometbft-sv-3-cometbft-rpc",
+    "inputs": {},
+    "name": "cometbft-sv-3-cometbft-rpc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": false,
+    "id": "undefined/cometbft-sv-4-cometbft-rpc",
+    "inputs": {},
+    "name": "cometbft-sv-4-cometbft-rpc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": false,
     "id": "https://www.googleapis.com/compute/v1/projects/test-project/global/networks/default",
     "inputs": {},
     "name": "default",
@@ -1456,6 +1488,7 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -1650,7 +1683,9 @@
           }
         },
         "sequencerDriver": {
-          "address": "postgres.sv-1.svc.cluster.local"
+          "host": "undefined.undefined.svc.cluster.local",
+          "port": 26657,
+          "type": "cometbft"
         },
         "trafficControl": {}
       }
@@ -2279,6 +2314,7 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -2395,7 +2431,9 @@
           }
         },
         "sequencerDriver": {
-          "address": "postgres.sv-1.svc.cluster.local"
+          "host": "undefined.undefined.svc.cluster.local",
+          "port": 26657,
+          "type": "cometbft"
         },
         "trafficControl": {}
       }
@@ -3006,6 +3044,7 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -3122,7 +3161,9 @@
           }
         },
         "sequencerDriver": {
-          "address": "postgres.sv-1.svc.cluster.local"
+          "host": "undefined.undefined.svc.cluster.local",
+          "port": 26657,
+          "type": "cometbft"
         },
         "trafficControl": {}
       }
@@ -3660,6 +3701,7 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -3776,7 +3818,9 @@
           }
         },
         "sequencerDriver": {
-          "address": "postgres.sv-1.svc.cluster.local"
+          "host": "undefined.undefined.svc.cluster.local",
+          "port": 26657,
+          "type": "cometbft"
         },
         "trafficControl": {}
       }

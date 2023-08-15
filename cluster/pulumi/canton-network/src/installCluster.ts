@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0Client, loadYamlFromFile, requireEnv } from 'cn-pulumi-common';
+import { Auth0Client, isDevNet, loadYamlFromFile, requireEnv } from 'cn-pulumi-common';
 import {
   BackupConfig,
   installGcpBucket,
@@ -22,7 +22,6 @@ import { installValidator1 } from './validator1';
 
 const REPO_ROOT = requireEnv('REPO_ROOT', 'root directory of the repo');
 
-const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
@@ -47,6 +46,10 @@ if (withDomainFees && !doubleSv) {
   );
   exit(1);
 }
+
+const globalDomainSequencerDriver = isDevNet ? 'cometbft' : 'postgres';
+
+pulumi.log.error(`Initializing with global domain with ${globalDomainSequencerDriver}`);
 
 type BootstrapCliConfig = {
   cluster: string;
@@ -184,6 +187,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     bootstrappingDumpConfig,
     withDomainNode: true,
     auth0ValidatorAppName: 'sv1_validator',
+    sequencerDriver: globalDomainSequencerDriver,
   });
 
   installSvNode({
@@ -204,6 +208,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     withDomainNode: isDevNet,
     auth0ValidatorAppName: 'sv2_validator',
     bootstrappingDumpConfig,
+    sequencerDriver: globalDomainSequencerDriver,
   });
   if (!doubleSv) {
     installSvNode({
@@ -222,6 +227,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       withDomainNode: isDevNet,
       auth0ValidatorAppName: 'sv3_validator',
       bootstrappingDumpConfig,
+      sequencerDriver: globalDomainSequencerDriver,
     });
 
     installSvNode({
@@ -240,6 +246,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       withDomainNode: isDevNet,
       auth0ValidatorAppName: 'sv4_validator',
       bootstrappingDumpConfig,
+      sequencerDriver: globalDomainSequencerDriver,
     });
   }
 

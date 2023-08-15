@@ -4,6 +4,8 @@ images := \
 	canton-domain \
 	canton-sequencer \
 	canton-mediator \
+	canton-cometbft-sequencer \
+	cometbft \
 	\
 	cn-app \
 	sv-app \
@@ -21,7 +23,6 @@ images := \
 	docs \
 	external-proxy-full \
 	gcs-proxy \
-	cometbft
 
 canton-image := cluster/images/canton
 cn-image := cluster/images/cn-app

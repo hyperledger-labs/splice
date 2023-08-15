@@ -1,4 +1,5 @@
 nodeName: "YOUR_SV_NAME"
+isDevNet: false
 
 founder:
   externalAddress: TARGET_CLUSTER.network.canton.global:26656

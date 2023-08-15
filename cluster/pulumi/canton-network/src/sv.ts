@@ -108,6 +108,7 @@ export type SvConfig = {
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   withDomainNode: boolean;
   auth0ValidatorAppName: string;
+  sequencerDriver: 'cometbft' | 'postgres';
 };
 
 async function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
@@ -170,6 +171,7 @@ export function installSvNode(config: SvConfig): {
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
+  const cometBftRpcService = installCometBftNode(xns, config.nodename, config.onboardingName);
 
   const domain = undefined;
 
@@ -180,10 +182,17 @@ export function installSvNode(config: SvConfig): {
     installGlobalDomain(
       xns,
       'global-domain',
-      postgresDb.address,
       config.withDomainFees,
       postgresDb,
-      sequencerDatabase
+      config.sequencerDriver === 'cometbft'
+        ? {
+            driver: 'cometbft',
+            service: cometBftRpcService,
+          }
+        : {
+            driver: 'postgres',
+            postgres: sequencerDatabase,
+          }
     );
   }
 
@@ -195,7 +204,6 @@ export function installSvNode(config: SvConfig): {
     // If we have a dump, we disable auto init.
     !!config.bootstrappingDumpConfig
   );
-  const cometbft = installCometBftNode(xns, config.nodename, config.onboardingName);
 
   const svValues = {
     onboardingType: config.onboarding.type,
@@ -244,7 +252,7 @@ export function installSvNode(config: SvConfig): {
     config.nodename + '-sv-app',
     'cn-sv-node',
     svValues,
-    dependsOn.concat([participant, cometbft].concat(domain ? [domain] : []))
+    dependsOn.concat([participant, cometBftRpcService].concat(domain ? [domain] : []))
   );
 
   if (config.onboarding.type == 'found-collective' && !config.withScan) {

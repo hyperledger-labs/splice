@@ -34,7 +34,22 @@
   ],
   "app_hash": "",
   "app_state": {
-    "sv_node_id": "sv-1"
+    "sv_node_id":
+    {{ if .Values.isDevNet }}
+        "Canton-Foundation-1",
+    {{ else }}
+        "Canton-Foundation",
+    {{ end }}
+    "governance_keys": [
+      {
+        "pub_key": "m16haLzv/d/Ok04Sm39ABk0f0HsSWYNZxrIUiyQ+cK8="
+      }
+    ],
+    "sequencing_keys": [
+      {
+        "pub_key": "dummy/key/here/replace/with/real/oneiyQ+cK8="
+      }
+    ]
   }
 }
 {{- end }}

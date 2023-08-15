@@ -18,63 +18,74 @@ spec:
         app: {{ .Release.Name }}-sequencer
     spec:
       containers:
-      - name: {{ .Release.Name }}-sequencer
-        image: "{{ .Values.imageRepo }}/canton-sequencer:{{ .Values.cluster.imageTag }}"
-        env:
-        - name: JAVA_TOOL_OPTIONS
-          value: {{ .Values.defaultJvmOptions }}
-        - name: CANTON_DOMAIN_POSTGRES_SERVER
-          value: {{ .Values.postgres }}
-        - name: CANTON_DOMAIN_POSTGRES_PASSWORD
-          valueFrom:
-           secretKeyRef:
-              name: "{{ .Release.Name }}-secrets"
-              key: cantonDomainPostgresPassword
-        - name: SEQUENCER_DRIVER_DATABASE_ADDRESS
-          value: {{ .Values.sequencerDriver.address }}
-        - name: SEQUENCER_DRIVER_DATABASE_PASSWORD
-          valueFrom:
-           secretKeyRef:
-              name: "{{ .Release.Name }}-secrets"
-              key: sequencerDriverPostgresPassword
+        - name: {{ .Release.Name }}-sequencer
+        {{- if eq .Values.sequencerDriver.type "cometbft"}}
+          image: "{{ .Values.imageRepo }}/canton-cometbft-sequencer:{{ .Values.cluster.imageTag }}"
+        {{- else}}
+          image: "{{ .Values.imageRepo }}/canton-sequencer:{{ .Values.cluster.imageTag }}"
+        {{- end}}
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.defaultJvmOptions }}
+            - name: CANTON_DOMAIN_POSTGRES_SERVER
+              value: {{ .Values.postgres }}
+            - name: CANTON_DOMAIN_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: cantonDomainPostgresPassword
+        {{- if eq .Values.sequencerDriver.type "postgres"}}
+            - name: SEQUENCER_DRIVER_DATABASE_ADDRESS
+              value: {{ .Values.sequencerDriver.address }}
+            - name: SEQUENCER_DRIVER_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-secrets"
+                  key: sequencerDriverPostgresPassword
+        {{- else if eq .Values.sequencerDriver.type "cometbft"}}
+            - name: SEQUENCER_DRIVER_COMETBFT_HOST
+              value: {{ .Values.sequencerDriver.host }}
+            - name: SEQUENCER_DRIVER_COMETBFT_PORT
+              value: "{{ .Values.sequencerDriver.port }}"
+        {{- end}}
         {{- if (.Values.trafficControl).enabled }}
-        - name: ADDITIONAL_CONFIG_TRAFFIC_CONTROL
-          value: |
-            canton.sequencers-x.sequencer.traffic-control.base-rate = {{ (.Values.trafficControl).baseRate }}
-            canton.sequencers-x.sequencer.traffic-control.max-burst-duration = {{ (.Values.trafficControl).maxBurstDuration }}
+            - name: ADDITIONAL_CONFIG_TRAFFIC_CONTROL
+              value: |
+                canton.sequencers-x.sequencer.traffic-control.base-rate = {{ (.Values.trafficControl).baseRate }}
+                canton.sequencers-x.sequencer.traffic-control.max-burst-duration = {{ (.Values.trafficControl).maxBurstDuration }}
         {{- end }}
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 5008
-          name: cs-pub-api
-          protocol: TCP
-        - containerPort: 5009
-          name: cs-adm-api
-          protocol: TCP
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5008
+              name: cs-pub-api
+              protocol: TCP
+            - containerPort: 5009
+              name: cs-adm-api
+              protocol: TCP
         {{- with .Values.resources }}
-        resources: {{- toYaml . | nindent 10 }}
+          resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-        readinessProbe:
-          failureThreshold: 3
-          periodSeconds: 10
-          successThreshold: 1
-          tcpSocket:
-            port: cs-pub-api
-          timeoutSeconds: 1
-        livenessProbe:
-          failureThreshold: 5
-          periodSeconds: 10
-          successThreshold: 1
-          tcpSocket:
-            port: cs-pub-api
-          timeoutSeconds: 1
-        startupProbe:
-          failureThreshold: 20
-          periodSeconds: 10
-          successThreshold: 1
-          tcpSocket:
-            port: cs-pub-api
-          timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: cs-pub-api
+            timeoutSeconds: 1
+          livenessProbe:
+            failureThreshold: 5
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: cs-pub-api
+            timeoutSeconds: 1
+          startupProbe:
+            failureThreshold: 20
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: cs-pub-api
+            timeoutSeconds: 1
       restartPolicy: Always
 ---
 apiVersion: v1
@@ -86,12 +97,12 @@ spec:
   selector:
     app: {{ .Release.Name }}-sequencer
   ports:
-  - name: cs-pub-api
-    port: 5008
-    protocol: TCP
-  - name: cs-adm-api
-    port: 5009
-    protocol: TCP
-  - name: cs-metrics
-    port: 10013
-    protocol: TCP
+    - name: cs-pub-api
+      port: 5008
+      protocol: TCP
+    - name: cs-adm-api
+      port: 5009
+      protocol: TCP
+    - name: cs-metrics
+      port: 10013
+      protocol: TCP

@@ -2,6 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import * as _ from 'lodash';
+import { Release } from '@pulumi/kubernetes/helm/v3';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
@@ -14,6 +15,8 @@ export const HELM_CHART_TIMEOUT_SEC = 480;
 export const CLUSTER_BASENAME = config.require('CLUSTER_BASENAME');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
+
+export const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
 
 // Refrence to upstream infrastructure stack.
 export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
@@ -89,8 +92,6 @@ export function fixedTokens(): boolean {
 }
 
 export function cnChartValues(chartPath: string, overrideValues: ChartValues = {}): ChartValues {
-  const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
-
   const networkSettings = loadJsonFromFile(
     process.env.REPO_ROOT +
       (isDevNet
@@ -140,7 +141,7 @@ export function installCNHelmChartByNamespaceName(
   chartName: string,
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
-): pulumi.ProviderResource {
+): Release {
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
     {
@@ -162,7 +163,7 @@ export function installCNHelmChart(
   chartName: string,
   values: ChartValues = {},
   dependsOn: pulumi.Resource[] = []
-): pulumi.ProviderResource {
+): Release {
   return installCNHelmChartByNamespaceName(
     xns.logicalName,
     xns.ns.metadata.name,
