@@ -7,7 +7,6 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v1.admin.ObjectMetaOuterClass
-import com.daml.ledger.api.v1.admin.UserManagementServiceOuterClass
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
@@ -603,25 +602,6 @@ class CNLedgerConnection(
       },
       logger,
     )
-
-  def findUserProto(
-      predicate: UserManagementServiceOuterClass.User => Boolean,
-      identityProviderId: Option[String] = None,
-  ): Future[Option[UserManagementServiceOuterClass.User]] = {
-    def go(token: Option[String]): Future[Option[UserManagementServiceOuterClass.User]] =
-      client.listUsersProto(token, identityProviderId = identityProviderId).flatMap {
-        case (users, nextTokenO) =>
-          users.find(predicate) match {
-            case Some(user) => Future.successful(Some(user))
-            case None =>
-              nextTokenO match {
-                case None => Future.successful(None)
-                case Some(nextToken) => go(Some(nextToken))
-              }
-          }
-      }
-    go(None)
-  }
 
   def listAllUsers()(implicit elc: ErrorLoggingContext, ec: ExecutionContext): Future[Seq[User]] =
     client.listUsers(None, Integer.MAX_VALUE).map { case (users, nextPageToken) =>

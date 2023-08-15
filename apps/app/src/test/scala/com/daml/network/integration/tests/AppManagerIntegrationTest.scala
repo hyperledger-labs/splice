@@ -265,7 +265,7 @@ class AppManagerIntegrationTest
       val algorithm = Algorithm.RSA256(publicKey, null)
       val verifier = JWT.require(algorithm).build()
       val decodedJwt = verifier.verify(token)
-      decodedJwt.getSubject() shouldBe s"app.$userId.$provider"
+      decodedJwt.getSubject() shouldBe s"app.$provider.$userId"
     }
 
     "json api proxy sets CORS headers" in { implicit env =>

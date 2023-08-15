@@ -9,6 +9,7 @@ import com.daml.network.validator.util.OAuth2Manager
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -28,6 +29,23 @@ class HttpAppManagerHandler(
 
   private val workflowId = this.getClass.getSimpleName
 
+  private val METADATA_PREFIX = "appmanager.app.network.canton.global"
+
+  private val PROVIDER_PARTY_USER_METADATA_KEY: String =
+    s"$METADATA_PREFIX/provider_party"
+  // The user id on the default IAM (e.g. auth0) for which we create the per-app user in the appmanager IAM.
+  private val USER_ID_USER_METADATA_KEY: String = s"$METADATA_PREFIX/user_id"
+
+  private def perAppUser(userId: String, providerPartyId: PartyId): String =
+    // TODO(#7099) This relies on pretty printing of the provider party id to
+    // make the string short enough that it satisfies the user id limits. Switch to
+    // interned provider party id instead.
+    // We put the providerParty first to make sure that we can use `.` as a safe separator.
+    // Note that the pretty printing does currently produce ... at the end but since those are always there
+    // there is still no possibility of mixing up the separator.
+    // TODO(#7092) Consider if we also need to intern userId to avoid exceeding length limits if userId is already close to the max user id length.
+    s"app.$providerPartyId.$userId"
+
   def authorizeApp(
       respond: v0.AppManagerResource.AuthorizeAppResponse.type
   )(provider: String)(
@@ -37,10 +55,7 @@ class HttpAppManagerHandler(
       for {
         primaryParty <- ledgerConnection.getPrimaryParty(userId)
         providerPartyId = PartyId.tryFromProtoPrimitive(provider)
-        // TODO(#7099) This relies on pretty printing of the provider party id to
-        // make the string short enough that it satisfies the user id limits. Switch to
-        // interned provider party id instead.
-        appUserId = s"app.$userId.$providerPartyId"
+        appUserId = perAppUser(userId, providerPartyId)
         _ <- ledgerConnection.createUserWithPrimaryParty(
           appUserId,
           primaryParty,
@@ -49,7 +64,7 @@ class HttpAppManagerHandler(
         )
         _ <- ledgerConnection.ensureUserMetadataAnnotation(
           appUserId,
-          Map("provider" -> provider, "user" -> userId),
+          Map(PROVIDER_PARTY_USER_METADATA_KEY -> provider, USER_ID_USER_METADATA_KEY -> userId),
           Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
         )
       } yield v0.AppManagerResource.AuthorizeAppResponse.OK
@@ -64,33 +79,27 @@ class HttpAppManagerHandler(
       userId: String
   ): Future[v0.AppManagerResource.CheckAppAuthorizedResponse] =
     withNewTrace(workflowId) { _ => _ =>
-      // TODO(#7092) Avoid linear search across all users.
       ledgerConnection
-        .findUserProto(
-          user =>
-            user.hasMetadata && user.getMetadata.getAnnotationsOrDefault(
-              "provider",
-              "",
-            ) == provider && user.getMetadata.getAnnotationsOrDefault("user", "") == userId,
+        .getUser(
+          perAppUser(userId, PartyId.tryFromProtoPrimitive(provider)),
           Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
         )
-        .flatMap {
-          case None =>
-            Future.successful(
-              v0.AppManagerResource.CheckAppAuthorizedResponse.Forbidden(
-                definitions.ErrorResponse(
-                  s"App $provider is not authorized for $userId"
-                )
-              )
+        .map { appUser =>
+          val authorizationCode = oauth2Manager.generateAuthorizationCode(appUser.getId)
+          // TODO(#6839) Consider just letting the frontend compute this instead of returning it here.
+          v0.AppManagerResource.CheckAppAuthorizedResponse.OK(
+            definitions.CheckAppAuthorizedResponse(
+              Uri(redirectUri)
+                .withQuery(Uri.Query("code" -> authorizationCode, "state" -> state))
+                .toString
             )
-          case Some(appUser) =>
-            val authorizationCode = oauth2Manager.generateAuthorizationCode(appUser.getId())
-            Future.successful(
-              // TODO(#6839) Consider just letting the frontend compute this instead of returning it here.
-              definitions.CheckAppAuthorizedResponse(
-                Uri(redirectUri)
-                  .withQuery(Uri.Query("code" -> authorizationCode, "state" -> state))
-                  .toString
+          )
+        }
+        .recover {
+          case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
+            v0.AppManagerResource.CheckAppAuthorizedResponse.Forbidden(
+              definitions.ErrorResponse(
+                s"App $provider is not authorized for $userId"
               )
             )
         }
