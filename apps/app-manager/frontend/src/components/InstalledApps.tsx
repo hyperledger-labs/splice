@@ -1,12 +1,5 @@
 import * as openapi from 'validator-openapi';
-import {
-  DateDisplay,
-  DirectoryEntry,
-  ErrorDisplay,
-  Loading,
-  appLaunchUrl,
-  useUserState,
-} from 'common-frontend';
+import { DateDisplay, DirectoryEntry, ErrorDisplay, Loading, appLaunchUrl } from 'common-frontend';
 import React, { useState } from 'react';
 
 import {
@@ -119,9 +112,8 @@ const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
     app.latestConfiguration.uiUrl
   );
   const client = useAppManagerClient();
-  const { userId } = useUserState();
   const onLaunch = async (e: React.MouseEvent) => {
-    await client.authorizeApp(app.provider, userId!);
+    await client.authorizeApp(app.provider);
     window.location.href = redirectUri;
   };
   return (

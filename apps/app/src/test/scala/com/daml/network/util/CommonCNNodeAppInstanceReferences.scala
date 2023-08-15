@@ -12,6 +12,7 @@ import com.daml.network.console.{
   ValidatorAppBackendReference,
   ValidatorAppClientReference,
   WalletAppClientReference,
+  AppManagerAppClientReference,
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
@@ -55,6 +56,12 @@ trait CommonCNNodeAppInstanceReferences {
 
   def aliceWalletClient(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"
+  )
+
+  def aliceAppManagerClient(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): AppManagerAppClientReference = uamc(
+    "aliceAppManager"
   )
 
   def aliceValidatorWalletClient(implicit
@@ -217,6 +224,12 @@ trait CommonCNNodeAppInstanceReferences {
   def uwc(name: String)(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference = wc(
     name
   )
+
+  // "user app manager client"
+  def uamc(name: String)(implicit env: CNNodeTestConsoleEnvironment): AppManagerAppClientReference =
+    env.appManagers
+      .find(_.name == name)
+      .getOrElse(sys.error(s"app manager [$name] not configured"))
 
   def wc(name: String)(implicit env: CNNodeTestConsoleEnvironment): WalletAppClientReference =
     env.wallets

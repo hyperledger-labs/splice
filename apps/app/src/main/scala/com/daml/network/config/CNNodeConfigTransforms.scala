@@ -10,7 +10,11 @@ import com.daml.network.splitwell.config.{
   SplitwellDomains,
 }
 import com.daml.network.sv.config.*
-import com.daml.network.validator.config.{AppManagerConfig, ValidatorAppBackendConfig}
+import com.daml.network.validator.config.{
+  AppManagerConfig,
+  AppManagerAppClientConfig,
+  ValidatorAppBackendConfig,
+}
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
@@ -92,6 +96,9 @@ object CNNodeConfigTransforms {
         )
       ),
       updateAllWalletAppClientConfigs_(c => c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")),
+      updateAllAppManagerAppClientConfigs_(c =>
+        c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
+      ),
       updateDirectoryAppConfig(c => c.copy(svUser = s"${c.svUser}-$suffix")),
       updateAllSplitwellAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
       updateAllRemoteSplitwellAppConfigs_(c =>
@@ -174,6 +181,7 @@ object CNNodeConfigTransforms {
   type DirectoryClientConfigReader = CnAppConfigTransform[DirectoryAppClientConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
+  type AppManagerAppClientTransform = CnAppConfigTransform[AppManagerAppClientConfig]
   type ScanAppTransform = CnAppConfigTransform[ScanAppBackendConfig]
   type SplitwellAppTransform = CnAppConfigTransform[SplitwellAppBackendConfig]
   type RemoteSplitwellAppTransform = CnAppConfigTransform[SplitwellAppClientConfig]
@@ -206,6 +214,13 @@ object CNNodeConfigTransforms {
       update: WalletAppClientTransform
   ): CNNodeConfigTransform =
     _.focus(_.walletAppClients).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
+  def updateAllAppManagerAppClientConfigs_(
+      update: AppManagerAppClientTransform
+  ): CNNodeConfigTransform =
+    _.focus(_.appManagerAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 

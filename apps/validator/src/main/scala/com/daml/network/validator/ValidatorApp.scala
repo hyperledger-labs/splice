@@ -20,6 +20,8 @@ import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.http.v0.appManager.AppManagerResource
+import com.daml.network.http.v0.appManagerAdmin.AppManagerAdminResource
+import com.daml.network.http.v0.appManagerPublic.AppManagerPublicResource
 import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import com.daml.network.http.v0.validator.ValidatorResource
@@ -34,7 +36,9 @@ import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{CoinConfigSchedule, HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.http.{
+  HttpAppManagerAdminHandler,
   HttpAppManagerHandler,
+  HttpAppManagerPublicHandler,
   HttpValidatorAdminHandler,
   HttpValidatorHandler,
   HttpValidatorPublicHandler,
@@ -47,7 +51,7 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
-import com.daml.network.validator.util.ValidatorUtil
+import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
 import com.digitalasset.canton.DomainAlias
@@ -560,7 +564,9 @@ class ValidatorApp(
         loggerFactory,
       )
 
-      appManagerHandlerO <- withGlobalLock[Unit, Option[HttpAppManagerHandler]](lock =>
+      appManagerHandlersO <- withGlobalLock[Unit, Option[
+        (HttpAppManagerAdminHandler, HttpAppManagerHandler, HttpAppManagerPublicHandler)
+      ]](lock =>
         config.appManager.traverse { config =>
           val dar = new UploadablePackage {
             lazy val packageId: String = appManagerCodegen.RegisteredApp.TEMPLATE_ID.getPackageId
@@ -568,15 +574,32 @@ class ValidatorApp(
           }
           for {
             _ <- participantAdminConnection.uploadDarFiles(Seq(dar), lock)
-          } yield new HttpAppManagerHandler(
-            config,
-            automation.connection,
-            participantAdminConnection,
-            automation.appManagerStore,
-            lock,
-            retryProvider,
-            loggerFactory,
-          )
+          } yield {
+            val oauth2Manager = new OAuth2Manager(config, loggerFactory)
+            val appManagerAdminHandler = new HttpAppManagerAdminHandler(
+              automation.connection,
+              participantAdminConnection,
+              automation.appManagerStore,
+              lock,
+              retryProvider,
+              loggerFactory,
+            )
+            val appManagerHandler = new HttpAppManagerHandler(
+              config,
+              automation.connection,
+              automation.appManagerStore,
+              oauth2Manager,
+              loggerFactory,
+            )
+            val appManagerPublicHandler = new HttpAppManagerPublicHandler(
+              config,
+              participantAdminConnection,
+              automation.appManagerStore,
+              oauth2Manager,
+              loggerFactory,
+            )
+            (appManagerAdminHandler, appManagerHandler, appManagerPublicHandler)
+          }
         }
       )
 
@@ -644,14 +667,32 @@ class ValidatorApp(
                   ),
                   CommonAdminResource.routes(commonAdminHandler, _ => provide(())),
                 ) ++
-                  appManagerHandlerO
-                    .map(
-                      AppManagerResource.routes(
-                        _,
-                        _ => provide(()),
+                  appManagerHandlersO.toList.flatMap {
+                    case (adminHandler, handler, publicHandler) =>
+                      Seq(
+                        AppManagerAdminResource.routes(
+                          adminHandler,
+                          operationId =>
+                            AdminAuthExtractor(
+                              verifier,
+                              validatorParty,
+                              automation.connection,
+                              loggerFactory,
+                              "app manager admin realm",
+                            )(
+                              operationId
+                            ).tflatMap(_ => provide(())),
+                        ),
+                        AppManagerResource.routes(
+                          handler,
+                          AuthExtractor(verifier, loggerFactory, "app manager user realm"),
+                        ),
+                        AppManagerPublicResource.routes(
+                          publicHandler,
+                          _ => provide(()),
+                        ),
                       )
-                    )
-                    .toList): _*
+                  }): _*
               )
             }
           }

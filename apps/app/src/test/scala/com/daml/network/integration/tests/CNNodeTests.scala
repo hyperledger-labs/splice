@@ -96,6 +96,10 @@ object CNNodeTests {
         env: CNNodeTestConsoleEnvironment
     ): WalletAppClientReference = extendLedgerApiUserWithCaseId(super.wc(name))
 
+    override def uamc(name: String)(implicit
+        env: CNNodeTestConsoleEnvironment
+    ): AppManagerAppClientReference = extendLedgerApiUserWithCaseId(super.uamc(name))
+
     // make `aliceDirectory` etc. use updated usernames
     override def rdp(name: String)(implicit
         env: CNNodeTestConsoleEnvironment
@@ -114,6 +118,17 @@ object CNNodeTests {
     ): WalletAppClientReference = {
       val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
       new WalletAppClientReference(
+        ref.cnNodeConsoleEnvironment,
+        ref.name,
+        config = ref.config.copy(ledgerApiUser = newLedgerApiUser),
+      )
+    }
+
+    private def extendLedgerApiUserWithCaseId(
+        ref: AppManagerAppClientReference
+    ): AppManagerAppClientReference = {
+      val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
+      new AppManagerAppClientReference(
         ref.cnNodeConsoleEnvironment,
         ref.name,
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser),

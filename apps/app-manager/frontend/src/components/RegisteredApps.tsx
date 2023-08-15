@@ -13,6 +13,7 @@ import {
   IconButton,
   Link,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 
@@ -123,6 +124,7 @@ const validAppConfiguration = (config: openapi.AppConfiguration): boolean =>
   config.name !== '' && config.uiUrl !== '' && config.releaseConfigurations.length !== 0;
 
 const RegisteredApps: React.FC = () => {
+  const [appProviderUser, setAppProviderUser] = useState<string>('');
   const [appRelease, setAppRelease] = useState<File | null>(null);
   const [appConfig, setAppConfig] = useState<openapi.AppConfiguration>({
     version: 0,
@@ -150,12 +152,22 @@ const RegisteredApps: React.FC = () => {
               onChange={value => setAppRelease(value)}
             />
           </Stack>
+          <TextField
+            id="register-app-provider-user-input"
+            label="App Provider User"
+            value={appProviderUser}
+            onChange={e => setAppProviderUser(e.target.value)}
+          />
           <Button
             id="register-app-button"
             onClick={() =>
-              registerAppMutation.mutate({ configuration: appConfig, release: appRelease! })
+              registerAppMutation.mutate({
+                configuration: appConfig,
+                release: appRelease!,
+                providerUserId: appProviderUser!,
+              })
             }
-            disabled={!appRelease || !validAppConfiguration(appConfig)}
+            disabled={!appRelease || !validAppConfiguration(appConfig) || !appProviderUser}
           >
             Register app
           </Button>

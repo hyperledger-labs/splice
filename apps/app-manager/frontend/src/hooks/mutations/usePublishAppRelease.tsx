@@ -1,7 +1,7 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
 import { HttpFile } from 'validator-openapi';
 
-import { useAppManagerClient } from '../../contexts/AppManagerServiceContext';
+import { useAppManagerAdminClient } from '../../contexts/AppManagerServiceContext';
 
 export type PublishAppReleaseRequest = {
   provider: string;
@@ -14,7 +14,7 @@ export const usePublishAppRelease = (): UseMutationResult<
   PublishAppReleaseRequest,
   unknown
 > => {
-  const appManagerClient = useAppManagerClient();
+  const appManagerClient = useAppManagerAdminClient();
   return useMutation({
     mutationFn: async ({ provider, release }) => {
       await appManagerClient.publishAppRelease(provider, release);

@@ -1,9 +1,9 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
 
-import { useAppManagerClient } from '../../contexts/AppManagerServiceContext';
+import { useAppManagerAdminClient } from '../../contexts/AppManagerServiceContext';
 
 export const useInstallApp = (): UseMutationResult<void, unknown, string, unknown> => {
-  const appManagerClient = useAppManagerClient();
+  const appManagerClient = useAppManagerAdminClient();
   return useMutation({
     mutationFn: async (appUrl: string) => {
       await appManagerClient.installApp({ appUrl });

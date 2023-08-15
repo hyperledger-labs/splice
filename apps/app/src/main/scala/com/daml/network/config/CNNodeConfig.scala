@@ -60,6 +60,7 @@ case class CNNodeConfig(
     scanApps: Map[InstanceName, ScanAppBackendConfig] = Map.empty,
     scanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
+    appManagerAppClients: Map[InstanceName, AppManagerAppClientConfig] = Map.empty,
     directoryApp: Option[DirectoryAppBackendConfig] = None,
     directoryAppClients: Map[InstanceName, DirectoryAppClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
@@ -518,6 +519,8 @@ object CNNodeConfig {
       deriveReader[WalletDomainConfig]
     implicit val WalletAppClientConfigReader: ConfigReader[WalletAppClientConfig] =
       deriveReader[WalletAppClientConfig]
+    implicit val AppManagerAppClientConfigReader: ConfigReader[AppManagerAppClientConfig] =
+      deriveReader[AppManagerAppClientConfig]
     implicit val directoryConfigReader: ConfigReader[DirectoryAppBackendConfig] =
       deriveReader[DirectoryAppBackendConfig]
     implicit val directoryClientConfigReader: ConfigReader[DirectoryAppClientConfig] =
@@ -698,6 +701,8 @@ object CNNodeConfig {
       deriveWriter[WalletDomainConfig]
     implicit val WalletAppClientConfigWriter: ConfigWriter[WalletAppClientConfig] =
       deriveWriter[WalletAppClientConfig]
+    implicit val AppManagerAppClientConfigWriter: ConfigWriter[AppManagerAppClientConfig] =
+      deriveWriter[AppManagerAppClientConfig]
     implicit val directoryConfigWriter: ConfigWriter[DirectoryAppBackendConfig] =
       deriveWriter[DirectoryAppBackendConfig]
     implicit val directoryClientConfigWriter: ConfigWriter[DirectoryAppClientConfig] =

@@ -10,6 +10,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import com.auth0.jwk.UrlJwkProvider
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.daml.network.auth.AuthUtil
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.http.v0.definitions.{
@@ -241,12 +242,12 @@ class AppManagerIntegrationTest
       val clientId = "dummclientid"
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       assertThrowsAndLogsCommandFailures(
-        aliceValidatorBackend.checkAppAuthorized(provider, redirectUri, state, userId),
+        aliceAppManagerClient.checkAppAuthorized(provider, redirectUri, state),
         _.errorMessage should include("not authorized"),
       )
-      aliceValidatorBackend.authorizeApp(provider, userId)
+      aliceAppManagerClient.authorizeApp(provider)
       val redirected =
-        Uri(aliceValidatorBackend.checkAppAuthorized(provider, redirectUri, state, userId))
+        Uri(aliceAppManagerClient.checkAppAuthorized(provider, redirectUri, state))
       val code = redirected.query().get("code").value
       val token = aliceValidatorBackend.oauth2Token("code", code, redirectUri, clientId).accessToken
 
@@ -332,6 +333,88 @@ class AppManagerIntegrationTest
                 .toProtoPrimitive}","userId":"${aliceValidatorBackend.config.ledgerApiUser}"},"status":200}"""
           }
       }
+    }
+    "app manager admin API auth is setup correctly" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      implicit val sys = env.actorSystem
+      implicit val ec = env.executionContext
+      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+        () =>
+          Http().shutdownAllConnectionPools().map(_ => Done)
+      }
+      val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
+      val request = Post(s"${aliceValidatorBackend.httpClientConfig.url}/app-manager/apps/install")
+        .withEntity(
+          HttpEntity(
+            ContentTypes.`application/json`,
+            s"""{"app_url": "${splitwell.appUrl}"}""",
+          )
+        )
+      def tokenHeader(token: String) = Seq(headers.Authorization(headers.OAuth2BearerToken(token)))
+      val adminJwt = JWT
+        .create()
+        .withAudience(aliceValidatorBackend.config.auth.audience)
+        .withSubject(aliceValidatorBackend.config.ledgerApiUser)
+        .sign(AuthUtil.testSignatureAlgorithm)
+      Http()
+        .singleRequest(request.withHeaders(tokenHeader(adminJwt)))
+        .futureValue
+        .status shouldBe StatusCodes.Created
+      val nonAdminJwt = JWT
+        .create()
+        .withAudience(aliceValidatorBackend.config.auth.audience)
+        .withSubject(aliceWalletClient.config.ledgerApiUser)
+        .sign(AuthUtil.testSignatureAlgorithm)
+      loggerFactory.assertLogs(
+        Http()
+          .singleRequest(request.withHeaders(tokenHeader(nonAdminJwt)))
+          .futureValue
+          .status shouldBe StatusCodes.Forbidden,
+        _.warningMessage should include("Authorization Failed"),
+      )
+      Http()
+        .singleRequest(request)
+        .futureValue
+        .status shouldBe StatusCodes.Unauthorized
+    }
+    "app manager user API auth is setup correctly" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      implicit val sys = env.actorSystem
+      implicit val ec = env.executionContext
+      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+        () =>
+          Http().shutdownAllConnectionPools().map(_ => Done)
+      }
+      val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
+      aliceValidatorBackend.installApp(splitwell.appUrl)
+      val request = Post(
+        s"${aliceValidatorBackend.httpClientConfig.url}/app-manager/apps/installed/${splitwell.provider}/authorize"
+      )
+      def tokenHeader(token: String) = Seq(headers.Authorization(headers.OAuth2BearerToken(token)))
+      val nonAdminJwt = JWT
+        .create()
+        .withAudience(aliceValidatorBackend.config.auth.audience)
+        .withSubject(aliceWalletClient.config.ledgerApiUser)
+        .sign(AuthUtil.testSignatureAlgorithm)
+      Http()
+        .singleRequest(request.withHeaders(tokenHeader(nonAdminJwt)))
+        .futureValue
+        .status shouldBe StatusCodes.OK
+      val nonExistentUserJwt = JWT
+        .create()
+        .withAudience(aliceValidatorBackend.config.auth.audience)
+        .withSubject("foobar")
+        .sign(AuthUtil.testSignatureAlgorithm)
+      // TODO(#7267) This should fail with Forbidden once the auth extractor
+      // checks that the user is allocated.
+      Http()
+        .singleRequest(request.withHeaders(tokenHeader(nonExistentUserJwt)))
+        .futureValue
+        .status shouldBe StatusCodes.NotFound
+      Http()
+        .singleRequest(request)
+        .futureValue
+        .status shouldBe StatusCodes.Unauthorized
     }
   }
 }

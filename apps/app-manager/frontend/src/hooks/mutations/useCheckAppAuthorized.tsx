@@ -6,7 +6,6 @@ export type AuthorizeArguments = {
   provider: string;
   redirectUri: string;
   state: string;
-  userId: string;
 };
 export const useCheckAppAuthorized = (): UseMutationResult<
   string,
@@ -16,8 +15,8 @@ export const useCheckAppAuthorized = (): UseMutationResult<
 > => {
   const appManagerClient = useAppManagerClient();
   return useMutation({
-    mutationFn: async ({ provider, redirectUri, state, userId }): Promise<string> => {
-      return (await appManagerClient.checkAppAuthorized(provider, redirectUri!, state!, userId!))
+    mutationFn: async ({ provider, redirectUri, state }): Promise<string> => {
+      return (await appManagerClient.checkAppAuthorized(provider, redirectUri!, state!))
         .redirectUri;
     },
   });

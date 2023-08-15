@@ -54,6 +54,8 @@ class AppManagerFrontendIntegrationTest
           .sendKeys("http://localhost:5108")
         find(className("register-app-release-bundle-input")).value.underlying
           .sendKeys(splitwellBundle.getAbsolutePath)
+        textField(id("register-app-provider-user-input")).value =
+          splitwellBackend.config.providerUser
         val (_, link) =
           actAndCheck("Click on register app button", click on id("register-app-button"))(
             "App appears in listed apps",

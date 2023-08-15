@@ -8,13 +8,19 @@ import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.daml.network.util.ParticipantIdentitiesDump
 import com.daml.network.validator.admin.api.client.commands.{
+  HttpAppManagerAdminAppClient,
   HttpAppManagerAppClient,
+  HttpAppManagerPublicAppClient,
   HttpValidatorAdminAppClient,
   HttpValidatorAppClient,
   HttpValidatorPublicAppClient,
   UserInfo,
 }
-import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
+import com.daml.network.validator.config.{
+  AppManagerAppClientConfig,
+  ValidatorAppBackendConfig,
+  ValidatorAppClientConfig,
+}
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
@@ -108,21 +114,21 @@ abstract class ValidatorAppReference(
   ): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.RegisterApp(providerUserId, configuration, release)
+        HttpAppManagerAdminAppClient.RegisterApp(providerUserId, configuration, release)
       )
     }
 
   def publishAppRelease(provider: PartyId, release: BodyPartEntity): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.PublishAppRelease(provider, release)
+        HttpAppManagerAdminAppClient.PublishAppRelease(provider, release)
       )
     }
 
   def updateAppConfiguration(provider: PartyId, configuration: definitions.AppConfiguration): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.UpdateAppConfiguration(provider, configuration)
+        HttpAppManagerAdminAppClient.UpdateAppConfiguration(provider, configuration)
       )
     }
 
@@ -136,28 +142,28 @@ abstract class ValidatorAppReference(
   def getLatestAppConfiguration(provider: PartyId): definitions.AppConfiguration =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.GetLatestAppConfiguration(provider)
+        HttpAppManagerPublicAppClient.GetLatestAppConfiguration(provider)
       )
     }
 
   def getAppRelease(provider: PartyId, version: String): definitions.AppRelease =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.GetAppRelease(provider, version)
+        HttpAppManagerPublicAppClient.GetAppRelease(provider, version)
       )
     }
 
   def getDarFile(darHash: String): ByteString =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.GetDarFile(darHash)
+        HttpAppManagerPublicAppClient.GetDarFile(darHash)
       )
     }
 
   def installApp(manifestUrl: String): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.InstallApp(manifestUrl)
+        HttpAppManagerAdminAppClient.InstallApp(manifestUrl)
       )
     }
 
@@ -168,7 +174,7 @@ abstract class ValidatorAppReference(
   ): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.ApproveAppReleaseConfiguration(
+        HttpAppManagerAdminAppClient.ApproveAppReleaseConfiguration(
           provider,
           configurationVersion,
           releaseConfigurationIndex,
@@ -183,39 +189,17 @@ abstract class ValidatorAppReference(
       )
     }
 
-  def authorizeApp(
-      provider: PartyId,
-      userId: String,
-  ): Unit =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAppClient.AuthorizeApp(provider, userId)
-      )
-    }
-
-  def checkAppAuthorized(
-      provider: PartyId,
-      redirectUri: String,
-      state: String,
-      userId: String,
-  ): String =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpAppManagerAppClient.CheckAppAuthorized(provider, redirectUri, state, userId)
-      )
-    }
-
   def oauth2Jwks(): definitions.JwksResponse =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.Oauth2Jwks
+        HttpAppManagerPublicAppClient.Oauth2Jwks
       )
     }
 
   def oauth2OpenIdConfiguration(): definitions.OpenIdConfigurationResponse =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.Oauth2OpenIdConfiguration
+        HttpAppManagerPublicAppClient.Oauth2OpenIdConfiguration
       )
     }
 
@@ -227,7 +211,7 @@ abstract class ValidatorAppReference(
   ): definitions.TokenResponse =
     consoleEnvironment.run {
       httpCommand(
-        HttpAppManagerAppClient.Oauth2Token(grantType, code, redirectUri, clientId)
+        HttpAppManagerPublicAppClient.Oauth2Token(grantType, code, redirectUri, clientId)
       )
     }
 }
@@ -296,4 +280,46 @@ final case class ValidatorAppClientReference(
   override def httpClientConfig = config.adminApi
 
   override protected val instanceType = "Validator Client"
+}
+
+final case class AppManagerAppClientReference(
+    override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
+    override val name: String,
+    val config: AppManagerAppClientConfig,
+) extends HttpCNNodeAppReference
+    with BaseInspection[ParticipantNode] {
+
+  override def httpClientConfig = config.adminApi
+
+  override def token: Option[String] = {
+    Some(
+      AuthUtil.testToken(
+        audience = AuthUtil.testAudience,
+        user = config.ledgerApiUser,
+        secret = AuthUtil.testSecret,
+      )
+    )
+  }
+
+  def authorizeApp(
+      provider: PartyId
+  ): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.AuthorizeApp(provider)
+      )
+    }
+
+  def checkAppAuthorized(
+      provider: PartyId,
+      redirectUri: String,
+      state: String,
+  ): String =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.CheckAppAuthorized(provider, redirectUri, state)
+      )
+    }
+
+  override protected val instanceType = "App Manager User Client"
 }

@@ -4,7 +4,7 @@ import com.daml.network.console.*
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
-import com.daml.network.validator.config.ValidatorAppClientConfig
+import com.daml.network.validator.config.{AppManagerAppClientConfig, ValidatorAppClientConfig}
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -186,6 +186,9 @@ class CNNodeConsoleEnvironment(
   lazy val wallets: Seq[WalletAppClientReference] =
     environment.config.walletAppClients.toSeq.map(createWalletAppClientReference)
 
+  lazy val appManagers: Seq[AppManagerAppClientReference] =
+    environment.config.appManagerAppClients.toSeq.map(createAppManagerAppClientReference)
+
   lazy val directories: NodeReferences[
     DirectoryAppReference,
     DirectoryAppClientReference,
@@ -238,6 +241,11 @@ class CNNodeConsoleEnvironment(
       conf: (InstanceName, WalletAppClientConfig)
   ): WalletAppClientReference =
     new WalletAppClientReference(this, conf._1.unwrap, conf._2)
+
+  private def createAppManagerAppClientReference(
+      conf: (InstanceName, AppManagerAppClientConfig)
+  ): AppManagerAppClientReference =
+    new AppManagerAppClientReference(this, conf._1.unwrap, conf._2)
 
   private def createDirectoryReference(name: String): DirectoryAppBackendReference =
     new DirectoryAppBackendReference(this, name)
@@ -304,6 +312,17 @@ class CNNodeConsoleEnvironment(
         "walletClients",
         helpText("All wallet app user instances" + genericNodeReferencesDoc, "Wallet Users"),
         wallets,
+        Seq("App References"),
+      ) :++
+      appManagers.map(w =>
+        TopLevelValue(w.name, helpText("app manager app user", w.name), w, Seq("App References"))
+      ) :+ TopLevelValue(
+        "appManagerClients",
+        helpText(
+          "All app manager app user instances" + genericNodeReferencesDoc,
+          "App Manager Users",
+        ),
+        appManagers,
         Seq("App References"),
       ) :++
       directories.local.map(v =>

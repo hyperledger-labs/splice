@@ -157,3 +157,10 @@ case class ValidatorAppClientConfig(
 ) extends HttpCNNodeClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
+
+case class AppManagerAppClientConfig(
+    adminApi: NetworkAppClientConfig,
+    ledgerApiUser: String,
+) extends HttpCNNodeClientConfig {
+  override def clientAdminApi: NetworkAppClientConfig = adminApi
+}

@@ -7,9 +7,15 @@ import {
   RequestContext,
   ResponseContext,
   AppManagerApi,
+  AppManagerAdminApi,
 } from 'validator-openapi';
 
-const AppManagerContext = React.createContext<AppManagerApi | undefined>(undefined);
+type AppManagerApis = {
+  api: AppManagerApi;
+  adminApi: AppManagerAdminApi;
+};
+
+const AppManagerContext = React.createContext<AppManagerApis | undefined>(undefined);
 
 export interface AppManagerProps {
   url: string;
@@ -33,16 +39,27 @@ export const AppManagerClientProvider: React.FC<React.PropsWithChildren<AppManag
       ],
     });
 
-    return new AppManagerApi(configuration);
+    return {
+      api: new AppManagerApi(configuration),
+      adminApi: new AppManagerAdminApi(configuration),
+    };
   }, [url, userAccessToken]);
 
   return <AppManagerContext.Provider value={friendlyClient}>{children}</AppManagerContext.Provider>;
 };
 
 export const useAppManagerClient: () => AppManagerApi = () => {
-  const client = useContext<AppManagerApi | undefined>(AppManagerContext);
-  if (!client) {
+  const clients = useContext<AppManagerApis | undefined>(AppManagerContext);
+  if (!clients) {
     throw new Error('App manager client not initialized');
   }
-  return client;
+  return clients.api;
+};
+
+export const useAppManagerAdminClient: () => AppManagerAdminApi = () => {
+  const clients = useContext<AppManagerApis | undefined>(AppManagerContext);
+  if (!clients) {
+    throw new Error('App manager client not initialized');
+  }
+  return clients.adminApi;
 };

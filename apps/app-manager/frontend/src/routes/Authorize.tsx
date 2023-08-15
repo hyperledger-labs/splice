@@ -1,4 +1,4 @@
-import { ErrorDisplay, Loading, useUserState } from 'common-frontend';
+import { ErrorDisplay, Loading } from 'common-frontend';
 import React, { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -8,8 +8,6 @@ import { useCheckAppAuthorized } from '../hooks';
 
 const Authorize: React.FC = () => {
   const [searchParams] = useSearchParams();
-
-  const { userId } = useUserState();
 
   const redirectUri = searchParams.get('redirect_uri');
   const state = searchParams.get('state');
@@ -23,12 +21,11 @@ const Authorize: React.FC = () => {
         provider: provider!,
         redirectUri: redirectUri!,
         state: state!,
-        userId: userId!,
       });
       window.location.assign(response);
     };
     checkAuthorization();
-  }, [authorizeMutation, redirectUri, state, provider, userId]);
+  }, [authorizeMutation, redirectUri, state, provider]);
 
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
