@@ -33,6 +33,7 @@ import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.Pretty
+import com.daml.ledger.api.v1 as lapiv1
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -105,6 +106,9 @@ private[environment] class LedgerClient(
     lapi.command_completion_service.CommandCompletionServiceGrpc.stub(channel)
   private val stateServiceStub: lapi.state_service.StateServiceGrpc.StateServiceStub =
     lapi.state_service.StateServiceGrpc.stub(channel)
+  private val identityProviderConfigServiceStub
+      : lapiv1.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub =
+    lapiv1.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.stub(channel)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -321,13 +325,18 @@ private[environment] class LedgerClient(
     } yield res
   }
 
-  def listUsersProto(pageToken: Option[String], pageSize: Int = 100)(implicit
+  def listUsersProto(
+      pageToken: Option[String],
+      pageSize: Int = 100,
+      identityProviderId: Option[String] = None,
+  )(implicit
       ec: ExecutionContext
   ): Future[(Seq[UserManagementServiceOuterClass.User], Option[String])] = {
-    val request = new ListUsersRequest(pageToken.toJava, pageSize).toProto
+    val requestBuilder = new ListUsersRequest(pageToken.toJava, pageSize).toProto.toBuilder
+    identityProviderId.foreach(requestBuilder.setIdentityProviderId(_))
     for {
       stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.listUsers(request, _))
+      res <- wrapFuture(stub.listUsers(requestBuilder.build, _))
 
     } yield (
       res.getUsersList().asScala.toSeq,
@@ -343,24 +352,32 @@ private[environment] class LedgerClient(
     }
 
   def getUserProto(
-      userId: String
+      userId: String,
+      identityProviderId: Option[String],
   )(implicit ec: ExecutionContext): Future[UserManagementServiceOuterClass.User] = {
-    val request = new GetUserRequest(userId).toProto
+    val requestBuilder = new GetUserRequest(userId).toProto.toBuilder
+    identityProviderId.foreach(requestBuilder.setIdentityProviderId(_))
     for {
       stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.getUser(request, _)).map(_.getUser)
+      res <- wrapFuture(stub.getUser(requestBuilder.build, _)).map(_.getUser)
     } yield res
   }
 
-  def getUser(userId: String)(implicit ec: ExecutionContext): Future[User] =
-    getUserProto(userId).map(User.fromProto(_))
+  def getUser(userId: String, identityProviderId: Option[String])(implicit
+      ec: ExecutionContext
+  ): Future[User] =
+    getUserProto(userId, identityProviderId).map(User.fromProto(_))
 
-  def getOrCreateUser(user: User, initialRights: Seq[User.Right])(implicit
+  def getOrCreateUser(
+      user: User,
+      initialRights: Seq[User.Right],
+      identityProviderId: Option[String],
+  )(implicit
       ec: ExecutionContext
   ): Future[User] = {
-    getUser(user.getId()).recoverWith {
+    getUser(user.getId(), identityProviderId).recoverWith {
       case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-        createUser(user, initialRights)
+        createUser(user, initialRights, identityProviderId)
     }
   }
 
@@ -380,27 +397,36 @@ private[environment] class LedgerClient(
     } yield res
   }
 
-  def createUser(user: User, initialRights: Seq[User.Right])(implicit
-      ec: ExecutionContext
+  def createUser(user: User, initialRights: Seq[User.Right], identityProviderId: Option[String])(
+      implicit ec: ExecutionContext
   ): Future[User] = {
-
     val request = initialRights match {
       case hd +: tl => new CreateUserRequest(user, hd, tl: _*).toProto
       case _ => throw new IllegalArgumentException("createUser requires at least one right")
     }
+    val requestBuilder = request.toBuilder
+    val userBuilder = request.getUser.toBuilder
+    identityProviderId.foreach(
+      userBuilder.setIdentityProviderId(_)
+    )
+    requestBuilder.setUser(userBuilder.build)
     for {
       stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.createUser(request, _)).map(r =>
+      res <- wrapFuture(stub.createUser(requestBuilder.build, _)).map(r =>
         CreateUserResponse.fromProto(r).getUser
       )
     } yield res
   }
 
-  def setUserPrimaryParty(userId: String, primaryParty: PartyId)(implicit
+  def setUserPrimaryParty(
+      userId: String,
+      primaryParty: PartyId,
+      identityProviderId: Option[String],
+  )(implicit
       ec: ExecutionContext
   ): Future[Unit] = {
     for {
-      user <- getUserProto(userId)
+      user <- getUserProto(userId, identityProviderId)
       newUser = user.toBuilder.setPrimaryParty(primaryParty.toProtoPrimitive).build
       _ <- updateUser(newUser, FieldMask.newBuilder.addPaths("primary_party").build)
     } yield ()
@@ -510,6 +536,29 @@ private[environment] class LedgerClient(
         }.toMap
       }
     } yield res
+  }
+
+  def createIdentityProviderConfig(
+      id: String,
+      issuer: String,
+      jwksUrl: String,
+      audience: String,
+  ): Future[Unit] = {
+    for {
+      stub <- withCredentials(identityProviderConfigServiceStub)
+      _ <- stub.createIdentityProviderConfig(
+        lapiv1.admin.identity_provider_config_service.CreateIdentityProviderConfigRequest(
+          Some(
+            lapiv1.admin.identity_provider_config_service.IdentityProviderConfig(
+              identityProviderId = id,
+              issuer = issuer,
+              jwksUrl = jwksUrl,
+              audience = audience,
+            )
+          )
+        )
+      )
+    } yield ()
   }
 }
 

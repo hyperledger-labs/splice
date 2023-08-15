@@ -509,10 +509,13 @@ class CNLedgerConnection(
   ): Future[TransactionTree] =
     client.tryGetTransactionTreeByEventId(parties.map(_.toProtoPrimitive), id)
 
-  def getOptionalPrimaryParty(user: String): Future[Option[PartyId]] = {
+  def getOptionalPrimaryParty(
+      user: String,
+      identityProviderId: Option[String] = None,
+  ): Future[Option[PartyId]] = {
     for {
       user <- client
-        .getUser(user)
+        .getUser(user, identityProviderId)
         .map(Some(_))
       partyId = user.flatMap(_.getPrimaryParty.toScala).map(PartyId.tryFromProtoPrimitive)
     } yield partyId
@@ -602,18 +605,20 @@ class CNLedgerConnection(
     )
 
   def findUserProto(
-      predicate: UserManagementServiceOuterClass.User => Boolean
+      predicate: UserManagementServiceOuterClass.User => Boolean,
+      identityProviderId: Option[String] = None,
   ): Future[Option[UserManagementServiceOuterClass.User]] = {
     def go(token: Option[String]): Future[Option[UserManagementServiceOuterClass.User]] =
-      client.listUsersProto(token).flatMap { case (users, nextTokenO) =>
-        users.find(predicate) match {
-          case Some(user) => Future.successful(Some(user))
-          case None =>
-            nextTokenO match {
-              case None => Future.successful(None)
-              case Some(nextToken) => go(Some(nextToken))
-            }
-        }
+      client.listUsersProto(token, identityProviderId = identityProviderId).flatMap {
+        case (users, nextTokenO) =>
+          users.find(predicate) match {
+            case Some(user) => Future.successful(Some(user))
+            case None =>
+              nextTokenO match {
+                case None => Future.successful(None)
+                case Some(nextToken) => go(Some(nextToken))
+              }
+          }
       }
     go(None)
   }
@@ -631,7 +636,8 @@ class CNLedgerConnection(
       users
     }
 
-  def getUser(user: String): Future[User] = client.getUser(user)
+  def getUser(user: String, identityProviderId: Option[String] = None): Future[User] =
+    client.getUser(user, identityProviderId)
 
   private def createPartyAndUser(
       user: String,
@@ -653,12 +659,17 @@ class CNLedgerConnection(
       user: String,
       party: PartyId,
       userRights: Seq[User.Right],
+      identityProviderId: Option[String] = None,
   ): Future[PartyId] = {
     val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
     val userLf = new User(userId, party.toLf)
     for {
       user <- client
-        .getOrCreateUser(userLf, new User.Right.CanActAs(party.toLf) +: userRights)
+        .getOrCreateUser(
+          userLf,
+          new User.Right.CanActAs(party.toLf) +: userRights,
+          identityProviderId,
+        )
       partyId =
         PartyId.tryFromProtoPrimitive(
           user.getPrimaryParty.toScala
@@ -667,20 +678,28 @@ class CNLedgerConnection(
     } yield partyId
   }
 
-  def setUserPrimaryParty(user: String, party: PartyId): Future[Unit] =
-    client.setUserPrimaryParty(user, party)
+  def setUserPrimaryParty(
+      user: String,
+      party: PartyId,
+      identityProviderId: Option[String] = None,
+  ): Future[Unit] =
+    client.setUserPrimaryParty(user, party, identityProviderId)
 
   def ensureUserMetadataAnnotation(userId: String, key: String, value: String)(implicit
       ec: ExecutionContext
   ): Future[Unit] =
     ensureUserMetadataAnnotation(userId, Map(key -> value))
 
-  def ensureUserMetadataAnnotation(userId: String, annotations: Map[String, String])(implicit
+  def ensureUserMetadataAnnotation(
+      userId: String,
+      annotations: Map[String, String],
+      identityProviderId: Option[String] = None,
+  )(implicit
       ec: ExecutionContext
   ): Future[Unit] =
     retryProvider.ensureThatB(
       s"user $userId has metadata annotations $annotations",
-      client.getUserProto(userId).map { user =>
+      client.getUserProto(userId, identityProviderId).map { user =>
         if (!user.hasMetadata)
           false
         else {
@@ -689,7 +708,7 @@ class CNLedgerConnection(
         }
       },
       for {
-        user <- client.getUserProto(userId)
+        user <- client.getUserProto(userId, identityProviderId)
         newMetadata =
           if (user.hasMetadata) {
             val metadata = user.getMetadata
@@ -707,10 +726,14 @@ class CNLedgerConnection(
       logger,
     )
 
-  def waitForUserMetadata(userId: String, key: String): Future[String] =
+  def waitForUserMetadata(
+      userId: String,
+      key: String,
+      identityProviderId: Option[String] = None,
+  ): Future[String] =
     retryProvider.getValueWithRetriesNoPretty(
       s"metadata field $key of user $userId",
-      client.getUserProto(userId).map { user =>
+      client.getUserProto(userId, identityProviderId).map { user =>
         if (user.hasMetadata) {
           val metadata = user.getMetadata
           metadata.getAnnotationsMap.asScala.getOrElse(
@@ -728,8 +751,12 @@ class CNLedgerConnection(
       logger,
     )
 
-  def lookupUserMetadata(userId: String, key: String): Future[Option[String]] =
-    client.getUserProto(userId).map { user =>
+  def lookupUserMetadata(
+      userId: String,
+      key: String,
+      identityProviderId: Option[String] = None,
+  ): Future[Option[String]] =
+    client.getUserProto(userId, identityProviderId).map { user =>
       if (user.hasMetadata) {
         user.getMetadata.getAnnotationsMap.asScala.get(key)
       } else {
@@ -895,6 +922,18 @@ class CNLedgerConnection(
       _.map(PartyId.tryFromProtoPrimitive(_))
     )
 
+  def ensureIdentityProviderConfig(id: String, issuer: String, jwksUrl: String, audience: String)(
+      implicit tc: TraceContext
+  ): Future[Unit] =
+    retryProvider.retryForAutomation(
+      show"Create identity provider $id",
+      client.createIdentityProviderConfig(id, issuer, jwksUrl, audience).recover {
+        case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
+          logger.info(show"Identity provider $id already exists")
+      },
+      logger,
+    )
+
   // simulate the completion check of command service; future only yields
   // successfully if the completion was OK
   private[this] def awaitCompletion(
@@ -1012,6 +1051,10 @@ class CNLedgerSubscription[S](
 object CNLedgerConnection {
 
   val SVC_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/svc_party"
+
+  val APP_MANAGER_IDENTITY_PROVIDER_ID: String = "app_manager"
+
+  val APP_MANAGER_ISSUER: String = "app_manager"
 
   /** Abstract representation of a command-id for deduplication.
     *

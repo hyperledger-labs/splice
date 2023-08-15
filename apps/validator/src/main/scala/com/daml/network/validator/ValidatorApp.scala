@@ -121,32 +121,43 @@ class ValidatorApp(
   } yield ()
 
   override def preInitializeAfterLedgerConnection(connection: CNLedgerConnection) =
-    // TODO(#5855) Remove the lock
-    withGlobalLock[Unit, Unit](lock =>
-      lock(
-        "Domain connection and primary party allocation of validator",
-        false,
-        () =>
-          withParticipantAdminConnection { participantAdminConnection =>
-            for {
-              _ <- ensureGlobalDomainRegistered(participantAdminConnection)
-              _ <- ensureExtraDomainsRegistered(participantAdminConnection)
-              // Note that for the validator of an SV app, the user will be created by the SV app with a
-              // primary party set to the SV app already so this is a noop.
-              _ <- connection.ensureUserPrimaryPartyIsAllocated(
-                config.ledgerApiUser,
-                config.validatorPartyHint
-                  .getOrElse(
-                    CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                  ),
-                participantAdminConnection,
-                // We have an outer lock around both here so we don't need to lock here.
-                noLock,
-              ) whenA config.allocateLedgerApiUserParty
-            } yield ()
-          },
-      )
-    )
+    for {
+      _ <- config.appManager.traverse_ { appManagerConfig =>
+        connection.ensureIdentityProviderConfig(
+          CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID,
+          appManagerConfig.issuerUrl.toString,
+          appManagerConfig.jwksUri.toString,
+          appManagerConfig.audience,
+        )
+      }
+      _ <-
+        // TODO(#5855) Remove the lock
+        withGlobalLock[Unit, Unit](lock =>
+          lock(
+            "Domain connection and primary party allocation of validator",
+            false,
+            () =>
+              withParticipantAdminConnection { participantAdminConnection =>
+                for {
+                  _ <- ensureGlobalDomainRegistered(participantAdminConnection)
+                  _ <- ensureExtraDomainsRegistered(participantAdminConnection)
+                  // Note that for the validator of an SV app, the user will be created by the SV app with a
+                  // primary party set to the SV app already so this is a noop.
+                  _ <- connection.ensureUserPrimaryPartyIsAllocated(
+                    config.ledgerApiUser,
+                    config.validatorPartyHint
+                      .getOrElse(
+                        CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                      ),
+                    participantAdminConnection,
+                    // We have an outer lock around both here so we don't need to lock here.
+                    noLock,
+                  ) whenA config.allocateLedgerApiUserParty
+                } yield ()
+              },
+          )
+        )
+    } yield ()
 
   private def setupWalletDars(
       participantAdminConnection: ParticipantAdminConnection

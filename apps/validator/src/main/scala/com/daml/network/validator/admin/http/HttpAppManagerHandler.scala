@@ -101,10 +101,16 @@ class HttpAppManagerHandler(
         // make the string short enough that it satisfies the user id limits. Switch to
         // interned provider party id instead.
         appUserId = s"app.$userId.$providerPartyId"
-        _ <- ledgerConnection.createUserWithPrimaryParty(appUserId, primaryParty, Seq.empty)
+        _ <- ledgerConnection.createUserWithPrimaryParty(
+          appUserId,
+          primaryParty,
+          Seq.empty,
+          Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
+        )
         _ <- ledgerConnection.ensureUserMetadataAnnotation(
           appUserId,
           Map("provider" -> provider, "user" -> userId),
+          Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
         )
       } yield v0.AppManagerResource.AuthorizeAppResponse.OK
     }
@@ -120,11 +126,13 @@ class HttpAppManagerHandler(
     withNewTrace(workflowId) { _ => _ =>
       // TODO(#7092) Avoid linear search across all users.
       ledgerConnection
-        .findUserProto(user =>
-          user.hasMetadata && user.getMetadata.getAnnotationsOrDefault(
-            "provider",
-            "",
-          ) == provider && user.getMetadata.getAnnotationsOrDefault("user", "") == userId
+        .findUserProto(
+          user =>
+            user.hasMetadata && user.getMetadata.getAnnotationsOrDefault(
+              "provider",
+              "",
+            ) == provider && user.getMetadata.getAnnotationsOrDefault("user", "") == userId,
+          Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
         )
         .flatMap {
           case None =>
@@ -177,14 +185,9 @@ class HttpAppManagerHandler(
       Future.successful(
         definitions.OpenIdConfigurationResponse(
           issuer = config.issuerUrl.toString,
-          authorizationEndpoint =
-            config.appManagerUiUrl.withPath(config.appManagerUiUrl.path / "authorize").toString,
-          tokenEndpoint = config.appManagerApiUrl
-            .withPath(config.appManagerApiUrl.path / "app-manager" / "oauth2" / "token")
-            .toString,
-          jwksUri = config.appManagerApiUrl
-            .withPath(config.appManagerApiUrl.path / "app-manager" / ".well-known" / "jwks.json")
-            .toString,
+          authorizationEndpoint = config.authorizationEndpoint.toString,
+          tokenEndpoint = config.tokenEndpoint.toString,
+          jwksUri = config.jwksUri.toString,
         )
       )
     }

@@ -44,7 +44,15 @@ final case class AppManagerConfig(
     // Set to 1 minute to avoid spamming logs but still be able to demo things in our cluster.
     // We may want to consider increasing it to 10min or even an hour.
     installedAppsPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(1),
-)
+) {
+  def authorizationEndpoint: Uri = appManagerUiUrl.withPath(appManagerUiUrl.path / "authorize")
+  def tokenEndpoint: Uri =
+    appManagerApiUrl.withPath(appManagerApiUrl.path / "app-manager" / "oauth2" / "token")
+  def jwksUri: Uri =
+    appManagerApiUrl.withPath(
+      appManagerApiUrl.path / "app-manager" / "oauth2" / ".well-known" / "jwks.json"
+    )
+}
 
 final case class BuyExtraTrafficConfig(
     /** target throughput in bytes per second
