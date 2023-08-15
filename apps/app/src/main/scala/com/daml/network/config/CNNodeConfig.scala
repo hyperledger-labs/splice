@@ -76,7 +76,7 @@ case class CNNodeConfig(
       timeouts = TimeoutSettings(
         console = ConsoleCommandTimeout(
           bounded = NonNegativeDuration.tryFromDuration(2.minutes),
-          requestTimeout = NonNegativeDuration.tryFromDuration(30.seconds),
+          requestTimeout = NonNegativeDuration.tryFromDuration(40.seconds),
         )
       )
     ),
