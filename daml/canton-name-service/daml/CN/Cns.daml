@@ -3,7 +3,6 @@ module CN.Cns where
 import DA.Time
 
 import CC.API.V1.Coin
-import CC.Schedule
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 import CN.Util.Assert
@@ -12,10 +11,12 @@ import CN.Util.Assert
 template CnsRules
   with
     svc : Party
-    configSchedule : Schedule Time CnsRulesConfig
+    -- It is accepted to have a single config for now for simplification.
+    -- We can extend it to be effectively dated schedule config like what we have in CoinRules when needed.
+    config : CnsRulesConfig
   where
     signatory svc
-    ensure validSchedule configSchedule validCnsConfig
+    ensure validCnsConfig config
 
     -- Request a cns entry, to be paid and renewed via subscription payments.
     -- The SubscriptionRequest is accepted (or rejected) via the user's wallet by offering the initial payment.
@@ -29,14 +30,12 @@ template CnsRules
       do
         context <- create CnsEntryContext with
           ..
-        now <- getTime
         let subscriptionData = Subscription with
               sender = user
               receiver = svc
               provider = svc
               svc
               context = toInterfaceContractId context
-            config = getValueAsOf now configSchedule
             payData = SubscriptionPayData with
               paymentAmount = PaymentAmount config.entryFee USD
               paymentInterval = config.entryLifetime

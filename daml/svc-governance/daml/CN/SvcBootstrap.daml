@@ -51,9 +51,7 @@ template SvcBootstrap with
           lock = False
         _ <- create CnsRules with
           svc
-          configSchedule = Schedule with
-            initialValue = cnsRulesConfig
-            futureValues = []
+          config = cnsRulesConfig
         -- bootstrap rounds if necessary
         earliestOpenRound <- case initialOpenRounds of
           None -> do
