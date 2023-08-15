@@ -3,6 +3,7 @@ package com.daml.network.unit.wallet
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.store.db.{AcsJdbcTypes, CNPostgresTest}
+import com.daml.network.wallet.store.UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord
 import com.daml.network.wallet.store.db.WalletTables
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.admin.api.client.data.TemplateId
@@ -83,6 +84,7 @@ class WalletPersistenceTest
           eventId = "someEventId",
           Some("010203"),
           DomainId.tryFromString("dummy::domain"),
+          TransactionHistoryTxLogIndexRecord.txLogId.str,
         )
         _ <- storage.queryAndUpdate(
           insertRowIfNotExists(TxLogTable)(

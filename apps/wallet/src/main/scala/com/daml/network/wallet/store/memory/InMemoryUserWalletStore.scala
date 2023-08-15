@@ -98,16 +98,28 @@ class InMemoryUserWalletStore(
   override def listTransactions(
       beginAfterEventId: Option[String],
       limit: Int,
-  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]] =
+  )(implicit
+      lc: TraceContext
+  ): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]] = {
+    def filter(txi: UserWalletTxLogParser.WalletTxLogIndexRecord) = txi match {
+      case _: UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord =>
+        true
+      case _: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord =>
+        false
+    }
     for {
       domain <- domains.waitForDomainConnection(defaultAcsDomain)
       indices = beginAfterEventId.fold(
-        txLog.getTxLogIndicesByOffset(0, limit)
+        txLog.filterTxLogIndicesByOffset(0, limit)(filter)
       )(
-        txLog.getTxLogIndicesAfterEventId(domain, _, limit)
+        txLog.filterTxLogIndicesAfterEventId(domain, _, limit)(filter)
       )
       entries <- Future.traverse(indices)(i =>
         txLogReader.loadTxLogEntry(i.eventId, i.domainId, i.acsContractId)
       )
-    } yield entries
+    } yield entries.map {
+      case entry: UserWalletTxLogParser.TransactionHistoryTxLogEntry => entry
+      case _: UserWalletTxLogParser.TransferOfferTxLogEntry => throw txLogIsOfWrongType()
+    }
+  }
 }

@@ -94,7 +94,16 @@ object TxLogStore {
             logger.error(s"Failed to handle parsing error: ${e.getMessage}", e)
             Seq.empty
           },
-          entries => entries,
+          entries => {
+            // TODO (#7154): uncomment and ensure that the invariant holds in all parsers
+//            val byEventId = entries.groupBy(_.indexRecord.eventId)
+//            val notUnique = byEventId.collect { case (k, vs) if vs.size > 1 => (k, vs) }
+//            assert(
+//              notUnique.isEmpty,
+//              s"TxLogParser returned more than one entry for the same eventId: $notUnique",
+//            )
+            entries
+          },
         )
   }
 

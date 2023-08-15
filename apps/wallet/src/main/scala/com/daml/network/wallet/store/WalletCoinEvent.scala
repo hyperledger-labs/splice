@@ -31,6 +31,88 @@ object WalletAppInstall_ExecuteBatch extends ExerciseNodeCompanion {
   override def resToValue(res: Res) = res.toValue
 }
 
+object WalletAppInstall_CreateTransferOffer extends ExerciseNodeCompanion {
+  override type Tpl = installCodegen.WalletAppInstall
+  override type Arg = installCodegen.WalletAppInstall_CreateTransferOffer
+  override type Res = transferCodegen.TransferOffer.ContractId
+
+  override val templateOrInterface = Left(installCodegen.WalletAppInstall.COMPANION)
+  override val choice = installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_CreateTransferOffer
+
+  override val argDecoder = installCodegen.WalletAppInstall_CreateTransferOffer.valueDecoder()
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = result =>
+    new transferCodegen.TransferOffer.ContractId(result.asContractId().get.getValue)
+  override def resToValue(res: Res) = res.toValue
+}
+
+case object TransferOffer_Accept extends ExerciseNodeCompanion {
+  override type Tpl = transferCodegen.TransferOffer
+  override type Arg = transferCodegen.TransferOffer_Accept
+  override type Res = transferCodegen.AcceptedTransferOffer.ContractId
+
+  override val templateOrInterface = Left(transferCodegen.TransferOffer.COMPANION)
+  override val choice = transferCodegen.TransferOffer.CHOICE_TransferOffer_Accept
+
+  override val argDecoder = transferCodegen.TransferOffer_Accept.valueDecoder()
+
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = result =>
+    new transferCodegen.AcceptedTransferOffer.ContractId(result.asContractId().get.getValue)
+
+  override def resToValue(res: Res) = res.toValue
+}
+
+case object TransferOffer_Reject extends ExerciseNodeCompanion {
+  override type Tpl = transferCodegen.TransferOffer
+  override type Arg = transferCodegen.TransferOffer_Reject
+  override type Res = transferCodegen.TransferOfferTrackingInfo
+
+  override val templateOrInterface = Left(transferCodegen.TransferOffer.COMPANION)
+  override val choice = transferCodegen.TransferOffer.CHOICE_TransferOffer_Reject
+
+  override val argDecoder = transferCodegen.TransferOffer_Reject.valueDecoder()
+
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = transferCodegen.TransferOfferTrackingInfo.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
+}
+
+case object TransferOffer_Withdraw extends ExerciseNodeCompanion {
+  override type Tpl = transferCodegen.TransferOffer
+  override type Arg = transferCodegen.TransferOffer_Withdraw
+  override type Res = transferCodegen.TransferOfferTrackingInfo
+
+  override val templateOrInterface = Left(transferCodegen.TransferOffer.COMPANION)
+  override val choice = transferCodegen.TransferOffer.CHOICE_TransferOffer_Withdraw
+
+  override val argDecoder = transferCodegen.TransferOffer_Withdraw.valueDecoder()
+
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = transferCodegen.TransferOfferTrackingInfo.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
+}
+
+case object TransferOffer_Expire extends ExerciseNodeCompanion {
+  override type Tpl = transferCodegen.TransferOffer
+  override type Arg = transferCodegen.TransferOffer_Expire
+  override type Res = transferCodegen.TransferOfferTrackingInfo
+
+  override val templateOrInterface = Left(transferCodegen.TransferOffer.COMPANION)
+  override val choice = transferCodegen.TransferOffer.CHOICE_TransferOffer_Expire
+
+  override val argDecoder = transferCodegen.TransferOffer_Expire.valueDecoder()
+
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = transferCodegen.TransferOfferTrackingInfo.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
+}
+
 object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
   override type Tpl = transferCodegen.AcceptedTransferOffer
   override type Arg = transferCodegen.AcceptedTransferOffer_Complete
@@ -60,6 +142,55 @@ object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
   )
   override def resToValue(res: Res) =
     res.toValue(_.toValue(_.toValue, _.toValue), x => DamlOptional.of(x.map(_.toValue)))
+}
+
+case object AcceptedTransferOffer_Expire extends ExerciseNodeCompanion {
+  override type Tpl = transferCodegen.AcceptedTransferOffer
+  override type Arg = transferCodegen.AcceptedTransferOffer_Expire
+  override type Res = transferCodegen.TransferOfferTrackingInfo
+
+  override val templateOrInterface = Left(transferCodegen.AcceptedTransferOffer.COMPANION)
+  override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Expire
+
+  override val argDecoder = transferCodegen.AcceptedTransferOffer_Expire.valueDecoder()
+
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = transferCodegen.TransferOfferTrackingInfo.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
+}
+
+case object AcceptedTransferOffer_Abort extends ExerciseNodeCompanion {
+  override type Tpl = transferCodegen.AcceptedTransferOffer
+  override type Arg = transferCodegen.AcceptedTransferOffer_Abort
+  override type Res = transferCodegen.TransferOfferTrackingInfo
+
+  override val templateOrInterface = Left(transferCodegen.AcceptedTransferOffer.COMPANION)
+  override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Abort
+
+  override val argDecoder = transferCodegen.AcceptedTransferOffer_Abort.valueDecoder()
+
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = transferCodegen.TransferOfferTrackingInfo.valueDecoder()
+
+  override def resToValue(res: Res) = res.toValue
+}
+
+case object AcceptedTransferOffer_Withdraw extends ExerciseNodeCompanion {
+  override type Tpl = transferCodegen.AcceptedTransferOffer
+  override type Arg = transferCodegen.AcceptedTransferOffer_Withdraw
+  override type Res = transferCodegen.TransferOfferTrackingInfo
+
+  override val templateOrInterface = Left(transferCodegen.AcceptedTransferOffer.COMPANION)
+  override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Withdraw
+
+  override val argDecoder = transferCodegen.AcceptedTransferOffer_Withdraw.valueDecoder()
+
+  override def argToValue(arg: Arg) = arg.toValue
+
+  override val resDecoder = transferCodegen.TransferOfferTrackingInfo.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
 }
 
 object AppPaymentRequest_Accept extends ExerciseNodeCompanion {

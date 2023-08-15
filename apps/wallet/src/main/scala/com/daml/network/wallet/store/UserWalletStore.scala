@@ -46,7 +46,7 @@ import scala.jdk.CollectionConverters.*
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore
     extends CNNodeAppStoreWithHistory[
-      UserWalletTxLogParser.TxLogIndexRecord,
+      UserWalletTxLogParser.WalletTxLogIndexRecord,
       UserWalletTxLogParser.TxLogEntry,
     ]
     with ConfiguredDefaultDomain
@@ -334,7 +334,7 @@ trait UserWalletStore
   def listTransactions(
       beginAfterEventId: Option[String],
       limit: Int,
-  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]]
+  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]]
 
   override protected def txLogParser =
     new UserWalletTxLogParser(
@@ -393,7 +393,7 @@ object UserWalletStore {
       ],
   )
 
-  type TxLogIndexRecord = UserWalletTxLogParser.TxLogIndexRecord
+  type TxLogIndexRecord = UserWalletTxLogParser.WalletTxLogIndexRecord
   type TxLogEntry = UserWalletTxLogParser.TxLogEntry
 
   def apply(

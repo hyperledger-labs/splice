@@ -98,10 +98,12 @@ create table user_wallet_txlog_store(
     like txlog_store_template including all,
 
     -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
-    foreign key (store_id) references store_descriptors (id)
+    foreign key (store_id) references store_descriptors (id),
 
     -- index columns
     ----------------
+    -- which txlog this entry belongs to TODO (#7153): this might be separate tables, so this column would be unnecessary
+    tx_log_id text not null
 );
 
 -- Directory store
@@ -402,3 +404,4 @@ create index svc_acs_store_sid_tid_ere_r
 create index svc_acs_store_sid_tid_icr
     on svc_acs_store (store_id, template_id, import_crate_receiver)
     where import_crate_receiver is not null;
+

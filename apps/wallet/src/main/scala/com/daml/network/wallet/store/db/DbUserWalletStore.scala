@@ -20,6 +20,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.Json
@@ -104,12 +105,13 @@ class DbUserWalletStore(
             optOffset,
             domainId,
             acsContractId,
+            txLogId,
           ) =>
         val safeEventId = lengthLimited(eventId)
         val safeOffset = optOffset.map(lengthLimited)
         sqlu"""
-              insert into user_wallet_txlog_store(store_id, event_id, "offset", domain_id, acs_contract_id)
-              values ($storeId, $safeEventId, $safeOffset, $domainId, $acsContractId)
+              insert into user_wallet_txlog_store(store_id, event_id, "offset", domain_id, acs_contract_id, tx_log_id)
+              values ($storeId, $safeEventId, $safeOffset, $domainId, $acsContractId, $txLogId)
               on conflict do nothing
             """
     }
@@ -187,15 +189,46 @@ class DbUserWalletStore(
   override def listTransactions(
       beginAfterEventIdO: Option[String],
       limit: Int,
-  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TxLogEntry]] = {
+  )(implicit
+      lc: TraceContext
+  ): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]] = {
     waitUntilAcsIngested {
       for {
         _ <- defaultAcsDomainIdF
-        events <- multiDomainAcsStore.getTxLogEventsInReverseOrder(beginAfterEventIdO, limit)
-        entries <- Future.traverse(events)(e =>
-          txLogReader.loadTxLogEntry(e.eventId, e.domainId, e.acsContractId)
-        )
-      } yield entries
+        events <- storage
+          .query(
+            beginAfterEventIdO.fold(
+              sql"""
+                    select event_id, domain_id, acs_contract_id
+                    from #${DbUserWalletStore.txLogTableName}
+                    where store_id = $storeId
+                      and tx_log_id = ${UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord.txLogId}
+                    order by entry_number desc
+                    limit $limit
+                  """.as[(String, DomainId, Option[ContractId[Any]])]
+            )(beginAfterEventId => sql"""
+                    select event_id, domain_id, acs_contract_id
+                    from #${DbUserWalletStore.txLogTableName}
+                    where store_id = $storeId
+                      and tx_log_id = ${UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord.txLogId}
+                      and entry_number < (
+                          select entry_number
+                          from #${DbUserWalletStore.txLogTableName}
+                          where store_id = $storeId
+                          and event_id = ${lengthLimited(beginAfterEventId)}
+                      )
+                    order by entry_number desc
+                    limit $limit
+                  """.as[(String, DomainId, Option[ContractId[Any]])]),
+            "listTransactions",
+          )
+        entries <- Future.traverse(events) { case (eventId, domainId, acsContractId) =>
+          txLogReader.loadTxLogEntry(eventId, domainId, acsContractId)
+        }
+      } yield entries.map {
+        case entry: UserWalletTxLogParser.TransactionHistoryTxLogEntry => entry
+        case _: UserWalletTxLogParser.TransferOfferTxLogEntry => throw txLogIsOfWrongType()
+      }
     }
   }
 

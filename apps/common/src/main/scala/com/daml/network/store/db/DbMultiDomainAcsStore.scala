@@ -10,17 +10,17 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
-  TransactionTreeUpdate,
   ReassignmentEvent,
   ReassignmentUpdate,
+  TransactionTreeUpdate,
   TreeUpdate,
 }
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.*
 import com.daml.network.util.{
+  AssignedContract,
   Contract,
   ContractWithState,
-  AssignedContract,
   TemplateJsonDecoder,
   Trees,
 }
@@ -674,12 +674,12 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                 select event_id, domain_id, acs_contract_id
                 from #${txLogTableName}
                 where store_id = $storeId
-                and entry_number < (
-                    select entry_number
-                    from #${txLogTableName}
-                    where store_id = $storeId
-                    and event_id = ${lengthLimited(beginAfterEventId)}
-                )
+                  and entry_number < (
+                      select entry_number
+                      from #${txLogTableName}
+                      where store_id = $storeId
+                      and event_id = ${lengthLimited(beginAfterEventId)}
+                  )
                 order by entry_number desc
                 limit $limit
               """.as[(String, DomainId, Option[ContractId[Any]])]),

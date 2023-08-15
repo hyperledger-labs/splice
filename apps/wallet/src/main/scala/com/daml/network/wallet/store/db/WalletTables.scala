@@ -17,6 +17,7 @@ import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
 import io.circe.Json
 import shapeless.HNil
@@ -198,6 +199,7 @@ object WalletTables extends AcsTables {
       eventId: String,
       offset: Option[String],
       domainId: DomainId,
+      txLogId: String,
   )
 
   // Note: currently the index record is empty, but this is likely to change once we want to support more advanced
@@ -207,11 +209,12 @@ object WalletTables extends AcsTables {
       optOffset: Option[String],
       domainId: DomainId,
       acsContractId: Option[ContractId[?]],
+      txLogId: String3,
   )
 
   object UserWalletTxLogStoreRowData {
     def fromIndexRecord(
-        indexRecord: UserWalletTxLogParser.TxLogIndexRecord
+        indexRecord: UserWalletTxLogParser.WalletTxLogIndexRecord
     ): Either[String, UserWalletTxLogStoreRowData] =
       Right(
         UserWalletTxLogStoreRowData(
@@ -219,14 +222,16 @@ object WalletTables extends AcsTables {
           indexRecord.optOffset,
           indexRecord.domainId,
           indexRecord.acsContractId,
+          indexRecord.txLogId,
         )
       )
   }
 
   class UserWalletTxLogStore(_tableTag: Tag)
       extends TxLogStoreTemplate[UserWalletTxLogStoreRow](_tableTag, "user_wallet_txlog_store") {
+    val txLogId: Rep[String] = column[String]("tx_log_id")
     def * =
-      (templateColumns ::: HNil).tupled
+      (templateColumns ::: txLogId :: HNil).tupled
         .<>(UserWalletTxLogStoreRow.tupled, UserWalletTxLogStoreRow.unapply)
   }
 
