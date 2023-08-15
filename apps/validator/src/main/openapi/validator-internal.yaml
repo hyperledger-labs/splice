@@ -164,6 +164,31 @@ paths:
         403:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
 
+  /app-manager/apps/installed/{provider}/approve-release-config:
+    post:
+      tags: [appManager]
+      x-jvm-package: appManager
+      operationId: "approveAppReleaseConfiguration"
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveAppReleaseConfigurationRequest"
+      responses:
+        200:
+          description: ok
+        404:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        500:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /app-manager/oauth2/.well-known/openid-configuration:
     get:
       tags: [appManager]
@@ -667,15 +692,38 @@ components:
       type: object
       required:
         - provider
-        - name
-        - url
+        - latest_configuration
+        - approved_release_configurations
+        - unapproved_release_configurations
       properties:
         provider:
           type: string
-        name:
-          type: string
-        url:
-          type: string
+        latest_configuration:
+          $ref: "#/components/schemas/AppConfiguration"
+        approved_release_configurations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseConfiguration"
+        unapproved_release_configurations:
+          description: |
+            The configurations in latest_configuration excluding the ones in
+            approved_release_configurations. We pass this separately to avoid having
+            to do a structural equality check in the frontend.
+          type: array
+          items:
+            $ref: "#/components/schemas/UnapprovedReleaseConfiguration"
+
+    UnapprovedReleaseConfiguration:
+      type: object
+      required:
+        - release_configuration_index
+        - release_configuration
+      properties:
+        release_configuration_index:
+          type: integer
+          format: int32
+        release_configuration:
+          $ref: "#/components/schemas/ReleaseConfiguration"
 
     RegisteredApp:
       type: object
@@ -800,3 +848,18 @@ components:
       properties:
         configuration:
           $ref: "#/components/schemas/AppConfiguration"
+
+    ApproveAppReleaseConfigurationRequest:
+      type: object
+      required:
+        - configuration_version
+        - release_configuration_index
+      properties:
+        configuration_version:
+          type: integer
+          format: int64
+        release_configuration_index:
+          description: |
+            Index into the release configurations specified on the app configuration.
+          type: integer
+          format: int32

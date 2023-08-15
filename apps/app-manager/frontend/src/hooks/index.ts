@@ -1,3 +1,4 @@
+import { useApproveAppReleaseConfiguration } from './mutations/useApproveAppReleaseConfiguration';
 import { useCheckAppAuthorized } from './mutations/useCheckAppAuthorized';
 import { useInstallApp } from './mutations/useInstallApp';
 import { usePublishAppRelease } from './mutations/usePublishAppRelease';
@@ -14,4 +15,5 @@ export {
   useCheckAppAuthorized,
   usePublishAppRelease,
   useUpdateAppConfiguration,
+  useApproveAppReleaseConfiguration,
 };

@@ -161,6 +161,21 @@ abstract class ValidatorAppReference(
       )
     }
 
+  def approveAppReleaseConfiguration(
+      provider: PartyId,
+      configurationVersion: Long,
+      releaseConfigurationIndex: Int,
+  ): Unit =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerAppClient.ApproveAppReleaseConfiguration(
+          provider,
+          configurationVersion,
+          releaseConfigurationIndex,
+        )
+      )
+    }
+
   def listInstalledApps(): Seq[definitions.InstalledApp] =
     consoleEnvironment.run {
       httpCommand(

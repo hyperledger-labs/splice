@@ -56,8 +56,10 @@ export interface FormattedDateTime {
   time: string;
 }
 
-export const formatDatetime: (datetime: string) => FormattedDateTime = (datetime: string) => {
-  const dateObj = new Date(datetime);
+export const formatDatetime: (datetime: string | Date) => FormattedDateTime = (
+  datetime: string | Date
+) => {
+  const dateObj = typeof datetime == 'string' ? new Date(datetime) : datetime;
   return {
     date: dateObj.toLocaleDateString('en-US', {
       day: '2-digit',

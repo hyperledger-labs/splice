@@ -77,6 +77,26 @@ class AppManagerFrontendIntegrationTest
                 splitwell
               },
           )
+        splitwell
+          .findAllChildElements(className("unapproved-release-configuration"))
+          .toSeq should have size 1
+        splitwell
+          .findAllChildElements(className("approved-release-configuration"))
+          .toSeq should have size 0
+        actAndCheck(
+          "approve release configuration",
+          click on splitwell.childElement(className("approve-release-configuration-button")),
+        )(
+          "release configuration is approved",
+          _ => {
+            splitwell
+              .findAllChildElements(className("unapproved-release-configuration"))
+              .toSeq should have size 0
+            splitwell
+              .findAllChildElements(className("approved-release-configuration"))
+              .toSeq should have size 1
+          },
+        )
         actAndCheck("Launch app", click on splitwell.childElement(className("installed-app-link")))(
           "splitwell UI shows up",
           _ =>

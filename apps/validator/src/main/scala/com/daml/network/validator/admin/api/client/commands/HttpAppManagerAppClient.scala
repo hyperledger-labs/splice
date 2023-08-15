@@ -173,6 +173,32 @@ object HttpAppManagerAppClient {
     }
   }
 
+  final case class ApproveAppReleaseConfiguration(
+      provider: PartyId,
+      configurationVersion: Long,
+      releaseConfigurationIndex: Int,
+  ) extends BaseCommand[http.ApproveAppReleaseConfigurationResponse, Unit] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ApproveAppReleaseConfigurationResponse] =
+      client.approveAppReleaseConfiguration(
+        provider.toProtoPrimitive,
+        definitions
+          .ApproveAppReleaseConfigurationRequest(configurationVersion, releaseConfigurationIndex),
+        headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ApproveAppReleaseConfigurationResponse.OK =>
+      Right(())
+    }
+  }
+
   final case object ListInstalledApps
       extends BaseCommand[http.ListInstalledAppsResponse, Seq[definitions.InstalledApp]] {
     def submitRequest(

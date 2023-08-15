@@ -223,9 +223,55 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   def listInstalledApps()(implicit
       traceContext: TraceContext
   ): Future[Seq[
-    ContractWithState[appManagerCodegen.InstalledApp.ContractId, appManagerCodegen.InstalledApp]
+    ValidatorStore.InstalledApp
   ]] =
-    multiDomainAcsStore.listContracts(appManagerCodegen.InstalledApp.COMPANION)
+    multiDomainAcsStore
+      .listContracts(appManagerCodegen.InstalledApp.COMPANION)
+      .flatMap(_.toList.traverseFilter { app =>
+        val provider = PartyId.tryFromProtoPrimitive(app.contract.payload.provider)
+        for {
+          approvedReleaseConfigs <- listApprovedReleaseConfigurations(provider)
+          latestConfigO <- lookupLatestAppConfiguration(provider)
+        } yield latestConfigO.map(
+          ValidatorStore.InstalledApp(
+            app,
+            _,
+            approvedReleaseConfigs,
+          )
+        )
+      })
+
+  private def listApprovedReleaseConfigurations(provider: PartyId)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[
+    ContractWithState[
+      appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
+      appManagerCodegen.ApprovedReleaseConfiguration,
+    ]
+  ]] =
+    multiDomainAcsStore.filterContracts(
+      appManagerCodegen.ApprovedReleaseConfiguration.COMPANION,
+      (c: Contract[_, appManagerCodegen.ApprovedReleaseConfiguration]) =>
+        c.payload.provider == provider.toProtoPrimitive,
+    )
+
+  def lookupApprovedReleaseConfiguration(
+      provider: PartyId,
+      configurationMatches: appManagerCodegen.ApprovedReleaseConfiguration => Boolean,
+  ): Future[QueryResult[Option[ContractWithState[
+    appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
+    appManagerCodegen.ApprovedReleaseConfiguration,
+  ]]]] =
+    multiDomainAcsStore.findContractWithOffset(
+      appManagerCodegen.ApprovedReleaseConfiguration.COMPANION
+    )(
+      (c: Contract[
+        appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
+        appManagerCodegen.ApprovedReleaseConfiguration,
+      ]) =>
+        c.payload.provider == provider.toProtoPrimitive &&
+          configurationMatches(c.payload)
+    )
 }
 
 object ValidatorStore {
@@ -239,6 +285,21 @@ object ValidatorStore {
         appManagerCodegen.AppConfiguration.ContractId,
         appManagerCodegen.AppConfiguration,
       ],
+  )
+
+  final case class InstalledApp(
+      installed: ContractWithState[
+        appManagerCodegen.InstalledApp.ContractId,
+        appManagerCodegen.InstalledApp,
+      ],
+      latestConfiguration: ContractWithState[
+        appManagerCodegen.AppConfiguration.ContractId,
+        appManagerCodegen.AppConfiguration,
+      ],
+      approvedReleaseConfigurations: Seq[ContractWithState[
+        appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
+        appManagerCodegen.ApprovedReleaseConfiguration,
+      ]],
   )
 
   def apply(
@@ -313,6 +374,9 @@ object ValidatorStore {
           co.payload.validatorOperator == validator
         ),
         mkFilter(appManagerCodegen.InstalledApp.COMPANION)(co =>
+          co.payload.validatorOperator == validator
+        ),
+        mkFilter(appManagerCodegen.ApprovedReleaseConfiguration.COMPANION)(co =>
           co.payload.validatorOperator == validator
         ),
       ),

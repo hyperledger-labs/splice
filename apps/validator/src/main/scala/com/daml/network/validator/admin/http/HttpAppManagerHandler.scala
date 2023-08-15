@@ -37,6 +37,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.parser.decode
+import io.grpc.Status
 import java.io.{
   BufferedInputStream,
   BufferedReader,
@@ -439,7 +440,50 @@ class HttpAppManagerHandler(
             appUrl.appRelease(releaseConfig.releaseVersion)
           )
         }
-        _ <- configuration.releaseConfigurations.flatMap(_.domains).traverse_ { domain =>
+        _ <- releases.traverse_(release =>
+          store.storeAppRelease(AppManagerStore.AppRelease(appUrl.provider, release))
+        )
+        _ <- store.storeAppConfiguration(
+          AppManagerStore.AppConfiguration(
+            appUrl.provider,
+            configuration,
+          )
+        )
+        _ <- store.storeInstalledApp(
+          AppManagerStore.InstalledApp(
+            appUrl.provider,
+            appUrl,
+            configuration,
+            Seq.empty,
+          )
+        )
+      } yield v0.AppManagerResource.InstallAppResponse.Created
+    }
+
+  def approveAppReleaseConfiguration(
+      respond: v0.AppManagerResource.ApproveAppReleaseConfigurationResponse.type
+  )(provider: String, body: definitions.ApproveAppReleaseConfigurationRequest)(
+      extracted: Unit
+  ): Future[v0.AppManagerResource.ApproveAppReleaseConfigurationResponse] =
+    withNewTrace(workflowId) { implicit tc => _ =>
+      val providerParty = PartyId.tryFromProtoPrimitive(provider)
+      for {
+        config <- store.getAppConfiguration(providerParty, body.configurationVersion)
+        releaseConfig =
+          config.configuration.releaseConfigurations
+            .lift(body.releaseConfigurationIndex)
+            .getOrElse(
+              throw Status.NOT_FOUND
+                .withDescription(
+                  show"App $providerParty has only ${config.configuration.releaseConfigurations.length} release configs but tried to approve release config at index ${body.releaseConfigurationIndex}"
+                )
+                .asRuntimeException
+            )
+        release <-
+          store.getAppRelease(providerParty, releaseConfig.releaseVersion)
+        // TODO(#7206) Consider switching this to a reconciliation trigger to avoid
+        // partial changes where we change domain config/dars but don't store the ApprovedReleaseConfiguration.
+        _ <- releaseConfig.domains.traverse_ { domain =>
           participantAdminConnection.ensureDomainRegistered(
             DomainConnectionConfig(
               // TODO(#6839) Fix the alias here, we can't assume that app providers use distinct aliases.
@@ -448,16 +492,16 @@ class HttpAppManagerHandler(
             )
           )
         }
-        _ <- releases.flatMap(_.darHashes).traverse_(ensureDar(appUrl, _))
-        _ <- store.storeInstalledApp(
-          AppManagerStore.InstalledApp(
-            appUrl.provider,
-            appUrl,
-            configuration,
-            releases.map(release => release.version -> release).toMap,
+        appUrl <- store.getInstalledAppUrl(providerParty)
+        _ <- release.release.darHashes.traverse_(ensureDar(appUrl, _))
+        _ <- store.storeApprovedReleaseConfiguration(
+          AppManagerStore.ApprovedReleaseConfiguration(
+            providerParty,
+            body.configurationVersion,
+            releaseConfig,
           )
         )
-      } yield v0.AppManagerResource.InstallAppResponse.Created
+      } yield v0.AppManagerResource.ApproveAppReleaseConfigurationResponse.OK
     }
 
   private def ensureDar(appUrl: AppManagerStore.AppUrl, darHash: String)(implicit

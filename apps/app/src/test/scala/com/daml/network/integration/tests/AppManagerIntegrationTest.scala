@@ -19,6 +19,7 @@ import com.daml.network.http.v0.definitions.{
   RegisteredApp,
   ReleaseConfiguration,
   Timespan,
+  UnapprovedReleaseConfiguration,
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -54,22 +55,24 @@ class AppManagerIntegrationTest
     ContentTypes.`application/octet-stream`,
     splitwellBundleUpgrade,
   )
+  val releaseConfiguration1 =
+    ReleaseConfiguration(
+      domains = Vector(
+        Domain(
+          "splitwell",
+          "http://localhost:5108",
+        )
+      ),
+      releaseVersion = "1.0.0",
+      requiredFor = Timespan(),
+    )
 
   private val configuration1_0 = AppConfiguration(
     0L,
     "splitwell",
     "http://localhost:3420",
     Vector(
-      ReleaseConfiguration(
-        domains = Vector(
-          Domain(
-            "splitwell",
-            "http://localhost:5108",
-          )
-        ),
-        releaseVersion = "1.0.0",
-        requiredFor = Timespan(),
-      )
+      releaseConfiguration1
     ),
   )
 
@@ -121,13 +124,24 @@ class AppManagerIntegrationTest
       uploadedDar shouldBe downloadedDar
     }
     "support app installation" in { implicit env =>
+      val provider = splitwellBackend.getProviderPartyId()
       val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
       aliceValidatorBackend.installApp(splitwell.appUrl)
       aliceValidatorBackend.listInstalledApps() shouldBe Seq(
         InstalledApp(
           splitwell.provider,
-          "splitwell",
-          "http://localhost:3420",
+          configuration1_0,
+          Vector.empty,
+          Vector(UnapprovedReleaseConfiguration(0, releaseConfiguration1)),
+        )
+      )
+      aliceValidatorBackend.approveAppReleaseConfiguration(provider, 0, 0)
+      aliceValidatorBackend.listInstalledApps() shouldBe Seq(
+        InstalledApp(
+          splitwell.provider,
+          configuration1_0,
+          Vector(releaseConfiguration1),
+          Vector.empty,
         )
       )
     }

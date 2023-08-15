@@ -8,7 +8,6 @@ import com.daml.network.http.v0.definitions
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.ContractWithState
-import com.daml.network.util.PrettyInstances
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -22,7 +21,6 @@ import io.circe.syntax.*
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 /** A validator-local store for the data required by the app manager.
   * This is internally contract-based but the APIs are deliberately do not expose contracts
@@ -105,9 +103,33 @@ final class AppManagerStore(
         validator.toProtoPrimitive,
         installed.provider.toProtoPrimitive,
         installed.appUrl.appUrl.toString,
-        installed.configuration.version,
-        installed.configuration.asJson.noSpaces,
-        installed.releases.view.mapValues(_.asJson.noSpaces).toMap.asJava,
+      ),
+    )
+
+  def storeApprovedReleaseConfiguration(releaseConfiguration: ApprovedReleaseConfiguration)(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    idempotentCreate(
+      show"release configuration ${releaseConfiguration}",
+      store.lookupApprovedReleaseConfiguration(
+        releaseConfiguration.provider,
+        // TODO(#7089) Compare based on a hash of the canonical JSON and add that to the store.
+        c =>
+          decodeOrThrow[definitions.ReleaseConfiguration](
+            c.json
+          ) == releaseConfiguration.releaseConfiguration,
+      ),
+      CNLedgerConnection.CommandId(
+        "com.daml.network.validator.store.storeApprovedReleaseConfiguration",
+        Seq(validator, releaseConfiguration.provider),
+        // TODO(#7089) Use a hash of the canonical JSON and add that to the store.
+        releaseConfiguration.releaseConfiguration.hashCode.toString,
+      ),
+      new codegen.ApprovedReleaseConfiguration(
+        validator.toProtoPrimitive,
+        releaseConfiguration.provider.toProtoPrimitive,
+        releaseConfiguration.configurationVersion,
+        releaseConfiguration.releaseConfiguration.asJson.noSpaces,
       ),
     )
 
@@ -168,6 +190,30 @@ final class AppManagerStore(
         )
       )
 
+  def lookupAppConfiguration(
+      provider: PartyId,
+      version: Long,
+  ): Future[Option[AppConfiguration]] =
+    store
+      .lookupAppConfiguration(provider, version)
+      .map(
+        _.value.map(c =>
+          AppConfiguration(
+            provider,
+            decodeOrThrow[definitions.AppConfiguration](c.contract.payload.json),
+          )
+        )
+      )
+
+  def getAppConfiguration(provider: PartyId, version: Long): Future[AppConfiguration] =
+    lookupAppConfiguration(provider, version).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(show"App $provider has no configuration with version $version")
+          .asRuntimeException
+      )
+    )
+
   def lookupAppRelease(provider: PartyId, version: String): Future[Option[AppRelease]] =
     store
       .lookupAppRelease(provider, version)
@@ -186,18 +232,24 @@ final class AppManagerStore(
       )
     )
 
-  private def toInstalledApp(c: ContractWithState[_, codegen.InstalledApp]) =
+  private def toInstalledApp(c: ValidatorStore.InstalledApp) =
     InstalledApp(
-      PartyId.tryFromProtoPrimitive(c.contract.payload.provider),
-      AppUrl(c.contract.payload.appUrl),
-      decodeOrThrow[definitions.AppConfiguration](c.contract.payload.configurationJson),
-      c.contract.payload.releasesJson.asScala.view
-        .mapValues(decodeOrThrow[definitions.AppRelease](_))
-        .toMap,
+      PartyId.tryFromProtoPrimitive(c.installed.contract.payload.provider),
+      AppUrl(c.installed.contract.payload.appUrl),
+      decodeOrThrow[definitions.AppConfiguration](c.latestConfiguration.contract.payload.json),
+      c.approvedReleaseConfigurations.map(c =>
+        decodeOrThrow[definitions.ReleaseConfiguration](c.contract.payload.json)
+      ),
     )
 
-  def lookupInstalledApp(provider: PartyId): Future[Option[InstalledApp]] =
-    store.lookupInstalledApp(provider).map(_.value.map(toInstalledApp(_)))
+  def getInstalledAppUrl(provider: PartyId): Future[AppUrl] =
+    store
+      .lookupInstalledApp(provider)
+      .map(
+        _.value.fold(
+          throw Status.NOT_FOUND.withDescription(show"App $provider not found").asRuntimeException()
+        )(c => AppUrl(c.contract.payload.appUrl))
+      )
 
   def listInstalledApps()(implicit tc: TraceContext): Future[Seq[InstalledApp]] =
     store
@@ -231,12 +283,8 @@ final class AppManagerStore(
 object AppManagerStore {
   private implicit val prettyConfiguration: Pretty[definitions.AppConfiguration] =
     PrettyUtil.adHocPrettyInstance
-  private implicit val prettyRelease: Pretty[definitions.AppRelease] =
+  private implicit val prettyReleaseConfiguration: Pretty[definitions.ReleaseConfiguration] =
     PrettyUtil.adHocPrettyInstance
-  private implicit val prettyReleaseMap: Pretty[Map[String, definitions.AppRelease]] = {
-    implicit val prettyVersion: Pretty[String] = PrettyInstances.prettyString
-    PrettyInstances.prettyMap
-  }
 
   final case class AppRelease(provider: PartyId, release: definitions.AppRelease) {
     def toJson: definitions.AppRelease = release
@@ -268,21 +316,40 @@ object AppManagerStore {
   final case class InstalledApp(
       provider: PartyId,
       appUrl: AppUrl,
-      configuration: definitions.AppConfiguration,
-      releases: Map[String, definitions.AppRelease],
+      latestConfiguration: definitions.AppConfiguration,
+      approvedReleaseConfigurations: Seq[definitions.ReleaseConfiguration],
   ) extends PrettyPrinting {
     def toJson: definitions.InstalledApp = definitions.InstalledApp(
       provider = provider.toProtoPrimitive,
-      name = configuration.name,
-      url = configuration.uiUrl,
+      latestConfiguration = latestConfiguration,
+      approvedReleaseConfigurations = approvedReleaseConfigurations.toVector,
+      unapprovedReleaseConfigurations =
+        latestConfiguration.releaseConfigurations.zipWithIndex.flatMap { case (conf, i) =>
+          Option.when(!approvedReleaseConfigurations.contains(conf))(
+            definitions.UnapprovedReleaseConfiguration(i, conf)
+          )
+        },
     )
 
     override def pretty: Pretty[this.type] =
       prettyOfClass(
         param("provider", _.provider),
         param("appUrl", _.appUrl.appUrl),
-        param("configuration", _.configuration),
-        param("releases", _.releases),
+        param("latestConfiguration", _.latestConfiguration),
+        param("approvedReleaseConfigurations", _.approvedReleaseConfigurations),
+      )
+  }
+
+  final case class ApprovedReleaseConfiguration(
+      provider: PartyId,
+      configurationVersion: Long,
+      releaseConfiguration: definitions.ReleaseConfiguration,
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(
+        param("provider", _.provider),
+        param("configurationVersion", _.configurationVersion),
+        param("releaseConfiguraiton", _.releaseConfiguration),
       )
   }
 

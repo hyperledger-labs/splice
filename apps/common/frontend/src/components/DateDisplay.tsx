@@ -1,7 +1,7 @@
 import { formatDatetime } from '../utils/temporal-fns';
 
 interface DateDisplayProps {
-  datetime: string;
+  datetime: string | Date;
 }
 
 const DateDisplay: React.FC<DateDisplayProps> = (props: DateDisplayProps) => {
