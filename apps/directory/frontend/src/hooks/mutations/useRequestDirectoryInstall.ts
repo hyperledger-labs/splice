@@ -32,6 +32,8 @@ const useRequestDirectoryInstall: () => UseMutationResult<
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryDirectoryInstallOperationName] });
     },
+    retry: 3,
+    retryDelay: 500,
   });
 };
 
