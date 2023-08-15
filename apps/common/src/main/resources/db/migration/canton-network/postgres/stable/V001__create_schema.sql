@@ -244,7 +244,8 @@ create table scan_txlog_store
 );
 
 create index scan_txlog_store_sid_irt_r_en
-    on scan_txlog_store (store_id, index_record_type, round, entry_number desc);
+    on scan_txlog_store (store_id, index_record_type, round, entry_number desc)
+    where round is not null;
 
 -- SV store
 ------------------
