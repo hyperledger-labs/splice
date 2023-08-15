@@ -40,6 +40,10 @@ final case class AppManagerConfig(
     appManagerApiUrl: Uri,
     jsonApiUrl: Uri,
     audience: String,
+    // Interval at which the app manager polls installed apps to discover new versions.
+    // Set to 1 minute to avoid spamming logs but still be able to demo things in our cluster.
+    // We may want to consider increasing it to 10min or even an hour.
+    installedAppsPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(1),
 )
 
 final case class BuyExtraTrafficConfig(

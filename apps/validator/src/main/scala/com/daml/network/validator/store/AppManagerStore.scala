@@ -242,14 +242,17 @@ final class AppManagerStore(
       ),
     )
 
-  def getInstalledAppUrl(provider: PartyId): Future[AppUrl] =
+  def lookupInstalledAppUrl(provider: PartyId): Future[Option[AppUrl]] =
     store
       .lookupInstalledApp(provider)
-      .map(
-        _.value.fold(
-          throw Status.NOT_FOUND.withDescription(show"App $provider not found").asRuntimeException()
-        )(c => AppUrl(c.contract.payload.appUrl))
+      .map(_.value.map(c => AppUrl(c.contract.payload.appUrl)))
+
+  def getInstalledAppUrl(provider: PartyId): Future[AppUrl] =
+    lookupInstalledAppUrl(provider).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND.withDescription(show"App $provider not found").asRuntimeException()
       )
+    )
 
   def listInstalledApps()(implicit tc: TraceContext): Future[Seq[InstalledApp]] =
     store

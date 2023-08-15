@@ -46,11 +46,7 @@ import com.daml.network.validator.config.{
   ValidatorOnboardingConfig,
 }
 import com.daml.network.validator.metrics.ValidatorAppMetrics
-import com.daml.network.validator.store.{
-  AppManagerStore,
-  ParticipantIdentitiesStore,
-  ValidatorStore,
-}
+import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
@@ -436,6 +432,7 @@ class ValidatorApp(
         config.automation,
         config.participantIdentitiesBackup,
         config.domains.global.buyExtraTraffic,
+        config.appManager,
         clock,
         walletManager,
         store,
@@ -564,11 +561,7 @@ class ValidatorApp(
             config,
             automation.connection,
             participantAdminConnection,
-            new AppManagerStore(
-              automation,
-              retryProvider,
-              loggerFactory,
-            ),
+            automation.appManagerStore,
             lock,
             retryProvider,
             loggerFactory,

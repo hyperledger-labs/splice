@@ -1,24 +1,30 @@
 package com.daml.network.validator.automation
 
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.{AutomationConfig, BackupDumpConfig}
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.validator.config.BuyExtraTrafficConfig
-import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
+import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
+import com.daml.network.validator.store.{
+  AppManagerStore,
+  ParticipantIdentitiesStore,
+  ValidatorStore,
+}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
     backupDumpConfig: Option[BackupDumpConfig],
     buyExtraTrafficConfig: BuyExtraTrafficConfig,
+    appManagerConfig: Option[AppManagerConfig],
     clock: Clock,
     walletManager: UserWalletManager,
     store: ValidatorStore,
@@ -30,6 +36,7 @@ class ValidatorAutomationService(
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
+    httpClient: HttpRequest => Future[HttpResponse],
     mat: Materializer,
     tracer: Tracer,
 ) extends CNNodeAppAutomationService(
@@ -39,6 +46,13 @@ class ValidatorAutomationService(
       ledgerClient,
       retryProvider,
     ) {
+
+  val appManagerStore =
+    new AppManagerStore(
+      this,
+      retryProvider,
+      loggerFactory,
+    )
 
   registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
   registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
@@ -74,6 +88,16 @@ class ValidatorAutomationService(
         config,
         triggerContext,
         participantIdentitiesStore,
+      )
+    )
+  )
+
+  appManagerConfig.foreach(config =>
+    registerTrigger(
+      new PollInstalledApplicationsTrigger(
+        config,
+        triggerContext,
+        appManagerStore,
       )
     )
   )

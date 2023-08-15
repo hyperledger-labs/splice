@@ -10,7 +10,7 @@ import com.daml.network.splitwell.config.{
   SplitwellDomains,
 }
 import com.daml.network.sv.config.*
-import com.daml.network.validator.config.ValidatorAppBackendConfig
+import com.daml.network.validator.config.{AppManagerConfig, ValidatorAppBackendConfig}
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
@@ -270,6 +270,13 @@ object CNNodeConfigTransforms {
     _.focus(_.validatorApps).modify(_.map { case (name, config) =>
       (name, update(config))
     })
+
+  def updateAllAppManagerConfigs_(
+      update: AppManagerConfig => AppManagerConfig
+  ): CNNodeConfigTransform =
+    updateAllValidatorConfigs_(
+      _.focus(_.appManager).modify(_.map(update))
+    )
 
   def updateAllSplitwellAppConfigs_(
       update: SplitwellAppTransform

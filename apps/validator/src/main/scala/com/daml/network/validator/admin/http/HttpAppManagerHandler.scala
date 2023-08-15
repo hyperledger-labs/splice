@@ -434,7 +434,6 @@ class HttpAppManagerHandler(
         configuration <- HttpUtil.getHttpJson[definitions.AppConfiguration](
           appUrl.latestAppConfiguration
         )
-        // TODO(#7089) Add a review step to install and only add changes for approved releases
         releases <- configuration.releaseConfigurations.traverse { releaseConfig =>
           HttpUtil.getHttpJson[definitions.AppRelease](
             appUrl.appRelease(releaseConfig.releaseVersion)

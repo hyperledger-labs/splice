@@ -27,6 +27,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.google.protobuf.ByteString
 
@@ -83,6 +84,12 @@ class AppManagerIntegrationTest
       .addConfigTransforms(
         CNNodeConfigTransforms.onlySv1,
         (_, config) => CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config),
+        (_, config) =>
+          CNNodeConfigTransforms.updateAllAppManagerConfigs_(
+            _.copy(
+              installedAppsPollingInterval = NonNegativeFiniteDuration.ofSeconds(1)
+            )
+          )(config),
       )
       .withAdditionalSetup { implicit env =>
         // Shared integration test so we upload here rather than within the tests.
@@ -148,6 +155,9 @@ class AppManagerIntegrationTest
     "support publishing new releases and updating configurations" in { implicit env =>
       val provider = splitwellBackend.getProviderPartyId()
       splitwellValidatorBackend.getLatestAppConfiguration(provider).version shouldBe 0
+      val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
+      aliceValidatorBackend.installApp(splitwell.appUrl)
+      aliceValidatorBackend.listInstalledApps().loneElement.latestConfiguration.version shouldBe 0
       // publish configuration for the same release version
       splitwellValidatorBackend.updateAppConfiguration(provider, configuration1_0.copy(version = 1))
       splitwellValidatorBackend.getLatestAppConfiguration(provider).version shouldBe 1
@@ -186,15 +196,42 @@ class AppManagerIntegrationTest
       )
       splitwellValidatorBackend.publishAppRelease(provider, splitwellBundleUpgradeEntity)
       splitwellValidatorBackend.getAppRelease(provider, "2.0.0").version shouldBe "2.0.0"
-      splitwellValidatorBackend.updateAppConfiguration(
-        provider,
-        configuration1_0.copy(
-          version = 2,
-          releaseConfigurations = newReleaseConfig
-            +: configuration1_0.releaseConfigurations,
+      actAndCheck(
+        "provider publishes config version 2",
+        splitwellValidatorBackend.updateAppConfiguration(
+          provider,
+          configuration1_0.copy(
+            version = 2,
+            releaseConfigurations = newReleaseConfig
+              +: configuration1_0.releaseConfigurations,
+          ),
         ),
+      )(
+        "provider and user both observe update",
+        _ => {
+          splitwellValidatorBackend.getLatestAppConfiguration(provider).version shouldBe 2
+          aliceValidatorBackend
+            .listInstalledApps()
+            .loneElement
+            .latestConfiguration
+            .version shouldBe 2
+        },
       )
-      splitwellValidatorBackend.getLatestAppConfiguration(provider).version shouldBe 2
+      // Check that the new release config can be approved.
+      aliceValidatorBackend
+        .listInstalledApps()
+        .loneElement
+        .unapprovedReleaseConfigurations
+        .loneElement shouldBe
+        UnapprovedReleaseConfiguration(
+          0,
+          newReleaseConfig,
+        )
+      aliceValidatorBackend.approveAppReleaseConfiguration(provider, 2, 0)
+      aliceValidatorBackend
+        .listInstalledApps()
+        .loneElement
+        .unapprovedReleaseConfigurations shouldBe empty
     }
     "support oauth2 authorization code grant" in { implicit env =>
       val provider = splitwellBackend.getProviderPartyId()
