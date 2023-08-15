@@ -52,9 +52,10 @@ class ExecuteVoteRequestActionTrigger(
             svcRules <- store.getSvcRules()
             requiredNumVotes = SvUtil.requiredNumVotes(svcRules)
             votes <- store.listEligibleVotes(voteRequestId)
-            acceptVotes = votes.count(_.payload.accept)
+            acceptVotes = votes.count(_.payload.accept == true)
+            rejectVotes = votes.count(_.payload.accept == false)
             taskOutcome <-
-              if (acceptVotes >= requiredNumVotes) {
+              if (acceptVotes >= requiredNumVotes || rejectVotes >= requiredNumVotes) {
                 store.getCoinRules().flatMap { coinRules =>
                   val coinRulesId = coinRules.contractId
                   val cmd = svcRules.contractId.exerciseSvcRules_ExecuteDefiniteVote(

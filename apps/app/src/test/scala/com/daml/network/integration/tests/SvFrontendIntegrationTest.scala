@@ -640,7 +640,7 @@ class SvFrontendIntegrationTest
         }
     }
 
-    "can create a valid SRARC_SetConfig (new SvcRules Configuration) vote request" in {
+    "SV1 can create a valid SRARC_SetConfig (new SvcRules Configuration) vote request and the other SVs reject it" in {
       implicit env =>
         val requestNewNumUnclaimedRewardsThreshold = "40"
         val requestReasonUrl = "This is a request reason url."
@@ -661,7 +661,7 @@ class SvFrontendIntegrationTest
             },
           )
 
-          val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
+          val (_, requestId) = actAndCheck(
             "sv1 operator can create a new vote request", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("SRARC_SetConfig")
@@ -685,16 +685,31 @@ class SvFrontendIntegrationTest
               inside(tbody) { case Some(tb) =>
                 val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
                 rows.size shouldBe previousVoteRequestsInProgress + 1
-                (
-                  rows.head.childElement(className("vote-row-action")).text,
-                  rows.head.childElement(className("vote-row-requester")).text,
-                )
+                val reviewButton = rows.head
+                  .childElement(className("vote-row-review"))
+                  .childElement(className("vote-row-review-button"))
+                reviewButton.text should matchText("REVIEW")
+                reviewButton.underlying.click()
               }
+              val requestId =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
+                }
+              requestId
             },
           )
-          (createdVoteRequestAction, createdVoteRequestRequester)
-        }
 
+          vote(sv2Backend, requestId, false, "1", false)
+          vote(sv3Backend, requestId, false, "1", false)
+          vote(sv4Backend, requestId, false, "1", false)
+
+          eventually() {
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            val tb = tbody.value
+            val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+            rows.size shouldBe previousVoteRequestsInProgress
+          }
+        }
     }
 
     "can create a CRARC_AddFutureCoinConfigSchedule vote request, update it via a CRARC_UpdateFutureCoinConfigSchedule vote request," +
