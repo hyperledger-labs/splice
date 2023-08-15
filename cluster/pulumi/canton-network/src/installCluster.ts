@@ -53,6 +53,11 @@ type BootstrapCliConfig = {
   date: string;
 };
 
+type ApprovedSvIdentity = {
+  name: string;
+  publicKey: string;
+};
+
 const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
   : undefined;
@@ -78,24 +83,6 @@ const SV4_KEY = {
     'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ',
 };
 
-const sv34ApprovedSvIdentities = [
-  {
-    name: 'damlHub',
-    publicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==',
-  },
-  {
-    name: 'Canton-Foundation-3',
-    publicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==',
-  },
-  {
-    name: 'Canton-Foundation-4',
-    publicKey:
-      'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==',
-  },
-];
-
 const svRunbookApprovedSvIdentities = [
   {
     name: 'DA-Helm-Test-Node',
@@ -104,7 +91,9 @@ const svRunbookApprovedSvIdentities = [
   },
 ];
 
-const approvedSvIdentities = (
+const sv34NameSet = new Set<string>(['Canton-Foundation-3', 'Canton-Foundation-4']);
+
+const allApprovedSvIdentities = (
   isDevNet
     ? loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
@@ -112,9 +101,11 @@ const approvedSvIdentities = (
     : loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
       )
-).approvedSvIdentities
-  .concat(approveSvRunbook ? svRunbookApprovedSvIdentities : [])
-  .concat(doubleSv ? [] : sv34ApprovedSvIdentities);
+).approvedSvIdentities.concat(approveSvRunbook ? svRunbookApprovedSvIdentities : []);
+
+const approvedSvIdentities = doubleSv
+  ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv34NameSet.has(id.name))
+  : allApprovedSvIdentities;
 
 function joinViaSv1(
   sv1: pulumi.Resource,

@@ -9,6 +9,10 @@ approvedSvIdentities:
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9/PUF/FFmdhbJNtxt+fR67LEW9vM/NluHSKTecvaqx7EYymDRsJf0GShphXwJAgrFzEOQ0Vsmbu6dmO6N1x8/g==
   - name: Canton-Foundation-2
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==
+  - name: Canton-Foundation-3
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==
+  - name: Canton-Foundation-4
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==
   - name: DA-Test-Node
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA==
   # Jean Safar (CX)
@@ -19,3 +23,5 @@ approvedSvIdentities:
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU/AYexo+CmqZxcNEnKgaNoJmdqhHP2nElBymaE4HREPQ0VgObBRNNMlgU/WfUUKElmn2u2D/b/wNtKKrtTA99A==
   - name: Fiutur
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEejWbMSQyl+LUcpRxBIrh74z+/yOPrCzTIb7wGKPtNWHQ9JB0le62f0IyOvyVEytucIp4JmcR+I3RlX1jycLtpw==
+  - name: damlHub
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==

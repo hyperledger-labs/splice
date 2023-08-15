@@ -36,9 +36,19 @@ if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
+const doubleSv = (process.env.DOUBLE_SV !== undefined && process.env.DOUBLE_SV !== '') || !isDevNet;
+if (doubleSv) {
+  console.error('Launching with a double SV');
+}
+
 type BootstrapCliConfig = {
   cluster: string;
   date: string;
+};
+
+type ApprovedSvIdentity = {
+  name: string;
+  publicKey: string;
 };
 
 const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
@@ -185,13 +195,21 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       .concat(loopback !== null ? loopback : [])
   );
 
-  const approvedSvIds = isDevNet
-    ? loadYamlFromFile(
-        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
-      )
-    : loadYamlFromFile(
-        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
-      );
+  const sv34NameSet = new Set<string>(['Canton-Foundation-3', 'Canton-Foundation-4']);
+
+  const allApprovedSvIdentities = (
+    isDevNet
+      ? loadYamlFromFile(
+          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
+        )
+      : loadYamlFromFile(
+          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
+        )
+  ).approvedSvIdentities;
+
+  const approvedSvIdentities = doubleSv
+    ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv34NameSet.has(id.name))
+    : allApprovedSvIdentities;
 
   const svValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
@@ -203,7 +221,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     participantBootstrappingDump: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
-    ...approvedSvIds,
+    approvedSvIdentities,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
