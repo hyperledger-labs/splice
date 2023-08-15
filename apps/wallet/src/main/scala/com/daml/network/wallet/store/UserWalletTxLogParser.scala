@@ -599,7 +599,6 @@ class UserWalletTxLogParser(
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
           // all possible exercise events that archive coins.
           case CoinArchive(_) =>
-            // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
             throw new RuntimeException(
               s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
             )
@@ -613,7 +612,6 @@ class UserWalletTxLogParser(
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
           // all possible exercise events that produce new coins.
           case CoinCreate(coin) =>
-            // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
             throw new RuntimeException(
               s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
             )

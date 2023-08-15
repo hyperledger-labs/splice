@@ -188,7 +188,6 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       amount: Double,
       nrOfScanBackends: Int,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       {
         participant.ledger_api_extensions.commands.submitWithResult(
@@ -200,7 +199,9 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       },
       logs =>
         inside(logs) { case logLines =>
-          logLines.foreach(_.errorMessage should include("Unexpected coin create event"))
+          logLines
+            .filter(_.errorMessage contains ("RuntimeException"))
+            .foreach(_.errorMessage should include("Unexpected coin create event"))
           logLines should have size (nrOfScanBackends.toLong)
         },
     )

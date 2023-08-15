@@ -1239,7 +1239,6 @@ class WalletTxLogIntegrationTest
         .map(_.indexRecord.eventId)
 
       val coinAmount = BigDecimal(42)
-      // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
       val coin = loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
           createCoin(
@@ -1252,7 +1251,6 @@ class WalletTxLogIntegrationTest
         logs =>
           inside(logs) {
             case logLines if logLines.nonEmpty =>
-              logLines.foreach(_.errorMessage should include("Unexpected coin create event"))
               logLines
                 .filter(_.errorMessage contains ("RuntimeException"))
                 .foreach(_.errorMessage should include("Unexpected coin create event"))
@@ -1260,7 +1258,6 @@ class WalletTxLogIntegrationTest
           },
       )
 
-      // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
           archiveCoin(
@@ -1273,7 +1270,6 @@ class WalletTxLogIntegrationTest
         logs =>
           inside(logs) {
             case logLines if logLines.nonEmpty =>
-              logLines.foreach(_.errorMessage should include("Unexpected coin archive event"))
               logLines
                 .filter(_.errorMessage contains ("RuntimeException"))
                 .foreach(_.errorMessage should include("Unexpected coin archive event"))

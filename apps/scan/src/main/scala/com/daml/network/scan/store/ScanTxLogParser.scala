@@ -58,11 +58,9 @@ class ScanTxLogParser(
           case LockedCoinUnlock(_) =>
             State.empty
           case CoinArchive(_) =>
-            // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
-            logger.error(
+            throw new RuntimeException(
               s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
             )
-            State.empty
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -75,11 +73,9 @@ class ScanTxLogParser(
           case ClosedMiningRoundCreate(round) =>
             State.fromClosedMiningRoundCreate(tree, root, domainId, round)
           case CoinCreate(coin) =>
-            // TODO(#6480) cleanup expecting unexpected error messages in logs as a workaround
-            logger.error(
+            throw new RuntimeException(
               s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
             )
-            State.empty
           case _ => State.empty
         }
 
