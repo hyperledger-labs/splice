@@ -10,6 +10,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.ContractWithState
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.validator.store.ValidatorStore
+import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.topology.PartyId
@@ -108,30 +109,28 @@ final class AppManagerStore(
 
   def storeApprovedReleaseConfiguration(releaseConfiguration: ApprovedReleaseConfiguration)(implicit
       tc: TraceContext
-  ): Future[Unit] =
+  ): Future[Unit] = {
+    val configHash = hashReleaseConfiguration(releaseConfiguration.releaseConfiguration)
     idempotentCreate(
       show"release configuration ${releaseConfiguration}",
       store.lookupApprovedReleaseConfiguration(
         releaseConfiguration.provider,
-        // TODO(#7089) Compare based on a hash of the canonical JSON and add that to the store.
-        c =>
-          decodeOrThrow[definitions.ReleaseConfiguration](
-            c.json
-          ) == releaseConfiguration.releaseConfiguration,
+        configHash,
       ),
       CNLedgerConnection.CommandId(
         "com.daml.network.validator.store.storeApprovedReleaseConfiguration",
         Seq(validator, releaseConfiguration.provider),
-        // TODO(#7089) Use a hash of the canonical JSON and add that to the store.
-        releaseConfiguration.releaseConfiguration.hashCode.toString,
+        configHash.toHexString,
       ),
       new codegen.ApprovedReleaseConfiguration(
         validator.toProtoPrimitive,
         releaseConfiguration.provider.toProtoPrimitive,
         releaseConfiguration.configurationVersion,
         releaseConfiguration.releaseConfiguration.asJson.noSpaces,
+        configHash.toHexString,
       ),
     )
+  }
 
   private def idempotentCreate[TCid, T <: com.daml.ledger.javaapi.data.Template](
       name: String,
@@ -373,5 +372,20 @@ object AppManagerStore {
       appUrl.withPath(appUrl.path / "release" / version / "release.json")
     def darUrl(hash: String): Uri =
       appManagerUri.withPath(appManagerUri.path / "dars" / hash)
+  }
+
+  private val releaseConfigurationHashPurpose = HashPurpose(40, "ReleaseConfiguration")
+
+  private def hashReleaseConfiguration(configuration: definitions.ReleaseConfiguration): Hash = {
+    import spray.json.*
+    import com.digitalasset.canton.platform.apiserver.meteringreport.Jcs
+    val serialized = Jcs
+      .serialize(configuration.asJson.noSpaces.parseJson)
+      .valueOr(err =>
+        throw Status.INTERNAL
+          .withDescription(show"Failed to serialize release configuration as JSON: $err")
+          .asRuntimeException
+      )
+    Hash.build(releaseConfigurationHashPurpose, HashAlgorithm.Sha256).add(serialized).finish()
   }
 }

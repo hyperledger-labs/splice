@@ -66,5 +66,8 @@ template ApprovedReleaseConfiguration
     -- this release config was approved. This only exists for debugging.
     json : Text
     -- ^ The JSON of the release config that was approved
+    jsonHash : Text
+    -- ^ Hash of the canonicalized JSON release configuration. This
+    -- can be used for equality comparisons.
   where
     signatory validatorOperator

@@ -24,6 +24,7 @@ import com.daml.network.util.{Contract, ContractWithState}
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.daml.network.wallet.store.WalletStore
+import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -257,7 +258,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
 
   def lookupApprovedReleaseConfiguration(
       provider: PartyId,
-      configurationMatches: appManagerCodegen.ApprovedReleaseConfiguration => Boolean,
+      releaseConfigurationHash: Hash,
   ): Future[QueryResult[Option[ContractWithState[
     appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
     appManagerCodegen.ApprovedReleaseConfiguration,
@@ -270,7 +271,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
         appManagerCodegen.ApprovedReleaseConfiguration,
       ]) =>
         c.payload.provider == provider.toProtoPrimitive &&
-          configurationMatches(c.payload)
+          c.payload.jsonHash == releaseConfigurationHash.toHexString
     )
 }
 
