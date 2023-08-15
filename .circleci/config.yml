@@ -2118,7 +2118,7 @@ workflows:
         test_names_file: "test-full-class-names-cometbft-single-node-smoke.log"
         start_canton_options: "-w -f -m"
         resource_class: "xlarge"
-        parallelism: 1
+        parallelism: 2
     - bundle:
         <<: *notify-fail
         context:
