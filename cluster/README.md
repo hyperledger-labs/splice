@@ -71,7 +71,7 @@ of which are accessible only through VPN:
 | TestNet         | http://test.network.canton.global         | Weekly, Midnight UTC Sunday | Longer Running Tests                   |
 | DevNet          | http://dev.network.canton.global          | Weekly, 3AM UTC Monday      | Current, Tested `main`                 |
 | CIDaily         | http://cidaily.network.canton.global      | Nightly, 6AM UTC            | Current, Tested `main`                 |
-| Staging         | http://staging.network.canton.global      | After every push to `main`  | Latest `main`                          |
+| CIMain          | http://cimain.network.canton.global       | After every push to `main`  | Latest `main`                          |
 | ScratchNetA     | http://scratcha.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
 | ScratchNetB     | http://scratchb.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
 | ScratchNetC     | http://scratchc.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
