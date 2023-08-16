@@ -96,19 +96,16 @@ class Validator1PreflightIntegrationTest
 
     val bobUser = auth0Users.get("bob-validator1").value
 
-    var alicePartyId = ""
-
-    withFrontEnd("alice-validator1") { implicit webDriver =>
-      alicePartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
+    val alicePartyId = withFrontEnd("alice-validator1") { implicit webDriver =>
+      val alicePartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
       findAll(className("coins-table-row")) should have size 0
+      alicePartyId
     }
 
-    var bobPartyId = ""
-
-    withFrontEnd("bob-validator1") { implicit webDriver =>
-      bobPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
-
+    val bobPartyId = withFrontEnd("bob-validator1") { implicit webDriver =>
+      val bobPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
       findAll(className("coins-table-row")) should have size 0
+      bobPartyId
     }
 
     withFrontEnd("alice-validator1") { implicit webDriver =>
@@ -167,9 +164,6 @@ class Validator1PreflightIntegrationTest
 
   // test is similar to 'settle debts with a single party' in SplitwellFrontendIntegrationTest
   "test splitwell group creation and payment against validator1" in { _ =>
-    var aliceUserPartyId = ""
-    var bobUserPartyId = ""
-
     val groupName = "troika"
 
     val walletUiUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/";
@@ -177,18 +171,18 @@ class Validator1PreflightIntegrationTest
     val aliceUser = auth0Users.get("alice-validator1").value
     val bobUser = auth0Users.get("bob-validator1").value
 
-    withFrontEnd("bob-validator1") { implicit webDriver =>
-      bobUserPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
-
+    val bobUserPartyId = withFrontEnd("bob-validator1") { implicit webDriver =>
+      val bobUserPartyId = loginAndOnboardToWalletUi(bobUser, walletUiUrl)
       tapCoins(710)
+      bobUserPartyId
     }
 
-    val invite = withFrontEnd("alice-validator1") { implicit webDriver =>
-      aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
+    val (aliceUserPartyId, invite) = withFrontEnd("alice-validator1") { implicit webDriver =>
+      val aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
       tapCoins(60)
       loginToSplitwellUi(aliceUser, splitwellUiUrl)
 
-      createGroupAndInviteLink(groupName)
+      (aliceUserPartyId, createGroupAndInviteLink(groupName))
     }
 
     withFrontEnd("bob-validator1") { implicit webDriver =>
