@@ -339,6 +339,10 @@ upcoming week. This allows the TestNet releases to be driven by our
 Wednesday to Wednesday weekly sprint cycle and adequately tested
 before being deployed to customers in TestNet.
 
+A convenient way to move the `testnet-next` tag to the commit of the next `CIDaily` deployment is to run `scripts/unmark-for-testnet.sh`.
+This will remove that tag. The next `CIDaily` deployment will then recreate the tag.
+Note that if the next `CIDaily` deployment fails, the next `TestNet` deployment will too (for lack of a tag).
+
 ### Manually Deploying via CI
 
 If necessary, it is possible to manually trigger CI/CD deployments to

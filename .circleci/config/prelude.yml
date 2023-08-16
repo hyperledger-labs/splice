@@ -25,7 +25,12 @@ parameters:
     type: enum
     enum: [build, deploy-cidaily, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
+  # Tag the current commit for the next TestNet release, overwriting the existing tag if it exists.
   mark-for-testnet:
+    type: boolean
+    default: false
+  # Tag the current commit for the next TestNet release if no commit is tagged already.
+  mark-for-testnet-if-unmarked:
     type: boolean
     default: false
   # Overwrite the bootstrapping config for a cluster. If not set,

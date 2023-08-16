@@ -31,7 +31,12 @@ parameters:
     type: enum
     enum: [build, deploy-cidaily, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
+  # Tag the current commit for the next TestNet release, overwriting the existing tag if it exists.
   mark-for-testnet:
+    type: boolean
+    default: false
+  # Tag the current commit for the next TestNet release if no commit is tagged already.
+  mark-for-testnet-if-unmarked:
     type: boolean
     default: false
   # Overwrite the bootstrapping config for a cluster. If not set,
@@ -1892,8 +1897,8 @@ jobs:
            make cluster/helm/build -j
 
            for chart in cluster/helm/target/*.tgz; do
-              artifactory_url="https://digitalasset.jfrog.io/artifactory"
-              publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
+             artifactory_url="https://digitalasset.jfrog.io/artifactory"
+             publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
            done
 
            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
@@ -1906,11 +1911,16 @@ jobs:
              git push origin "${RELEASE_TAG}"
            fi
            if [[ << pipeline.parameters.mark-for-testnet >> == true ]]; then
-              # This is a mutating tag pointing to the most recent
-              # valid build for TestNet, and therefore the next build
-              # to go to TestNet.
-              git tag --force testnet-next
-              git push --force origin testnet-next
+             # This is a mutating tag pointing to the most recent
+             # valid build for TestNet, and therefore the next build
+             # to go to TestNet.
+             git tag --force testnet-next
+             git push --force origin testnet-next
+           elif [[ << pipeline.parameters.mark-for-testnet-if-unmarked >> == true ]] &&
+             ! [ $(git tag -l testnet-next) ]
+           then
+             git tag testnet-next
+             git push origin testnet-next
            fi
       - collect_test_timings_and_send_to_datadog
 
