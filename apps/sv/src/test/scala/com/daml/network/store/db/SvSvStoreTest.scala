@@ -178,7 +178,6 @@ class InMemorySvSvStoreTest extends SvSvStoreTest {
   override protected def mkStore(): Future[InMemorySvSvStore] = {
     val store = new InMemorySvSvStore(
       SvStore.Key(storeSvParty, svcParty),
-      svDomainConfig,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )

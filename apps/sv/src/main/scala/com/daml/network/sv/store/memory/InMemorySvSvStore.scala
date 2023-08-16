@@ -5,10 +5,9 @@ import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
-import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
-import com.daml.network.sv.config.SvDomainConfig
+import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.sv.store.{SvStore, SvSvStore}
-import com.daml.network.util.{Contract, AssignedContract}
+import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -18,7 +17,6 @@ import scala.concurrent.*
 
 class InMemorySvSvStore(
     override val key: SvStore.Key,
-    override protected[this] val domainConfig: SvDomainConfig,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
 )(implicit
@@ -26,37 +24,38 @@ class InMemorySvSvStore(
     ec: ExecutionContext
 ) extends InMemoryCNNodeAppStoreWithoutHistory
     with SvSvStore {
+  import InMemorySvSvStore.*
+
   override def lookupValidatorOnboardingBySecretWithOffset(
       secret: String
   )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[Option[
     Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding]
-  ]]] = defaultAcsDomainIdF.flatMap(
-    multiDomainAcsStore.findContractOnDomainWithOffset(vo.ValidatorOnboarding.COMPANION)(
-      _,
-      co => co.payload.candidateSecret == secret,
-    )
-  )
+  ]]] =
+    multiDomainAcsStore
+      .findContractWithOffset(vo.ValidatorOnboarding.COMPANION)(
+        (_: Contract[?, vo.ValidatorOnboarding]).payload.candidateSecret == secret
+      )
+      .map(onlyContractResult)
 
   override def lookupUsedSecretWithOffset(secret: String)(implicit
       tc: TraceContext
   ): Future[MultiDomainAcsStore.QueryResult[Option[Contract[UsedSecret.ContractId, UsedSecret]]]] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(vo.UsedSecret.COMPANION)(
-        _,
-        co => co.payload.secret == secret,
+    multiDomainAcsStore
+      .findContractWithOffset(vo.UsedSecret.COMPANION)(
+        (_: Contract[?, vo.UsedSecret]).payload.secret == secret
       )
-    )
+      .map(onlyContractResult)
 
   override def lookupApprovedSvIdentityByNameWithOffset(
       name: String
   )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[Option[
     Contract[ApprovedSvIdentity.ContractId, ApprovedSvIdentity]
-  ]]] = defaultAcsDomainIdF.flatMap(
-    multiDomainAcsStore.findContractOnDomainWithOffset(so.ApprovedSvIdentity.COMPANION)(
-      _,
-      co => co.payload.candidateName == name,
-    )
-  )
+  ]]] =
+    multiDomainAcsStore
+      .findContractWithOffset(so.ApprovedSvIdentity.COMPANION)(
+        (_: Contract[?, so.ApprovedSvIdentity]).payload.candidateName == name
+      )
+      .map(onlyContractResult)
 
   protected[this] override def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
@@ -68,4 +67,11 @@ class InMemorySvSvStore(
     multiDomainAcsStore
       .listAssignedContracts(c)
       .map(_.filterNot(_.domain == excludedDomain))
+}
+
+object InMemorySvSvStore {
+  private def onlyContractResult[TCid, T](
+      q: QueryResult[Option[ContractWithState[TCid, T]]]
+  ): QueryResult[Option[Contract[TCid, T]]] =
+    q map (_ map (_.contract))
 }

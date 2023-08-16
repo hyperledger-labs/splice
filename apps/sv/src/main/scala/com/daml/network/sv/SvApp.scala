@@ -678,7 +678,7 @@ object SvApp {
       svParty.toProtoPrimitive,
       secret,
       (clock.now + expiresIn.toInternal).toInstant,
-    ).create.commands.asScala.toSeq
+    ).create()
     for {
       res <- svStore.lookupUsedSecretWithOffset(secret).flatMap {
         case QueryResult(_, Some(usedSecret)) => {
@@ -696,10 +696,8 @@ object SvApp {
             }
             case QueryResult(_, None) => {
               svStoreWithIngestion.connection
-                .submitCommands(
-                  actAs = Seq(svParty),
-                  readAs = Seq.empty,
-                  commands = validatorOnboarding,
+                .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
+                .withDedup(
                   commandId = CNLedgerConnection
                     .CommandId(
                       "com.daml.network.sv.expectValidatorOnboarding",
@@ -707,8 +705,9 @@ object SvApp {
                       secret, // not a leak as this gets hashed before it's used
                     ),
                   deduplicationOffset = offset,
-                  domainId = globalDomain,
                 )
+                .withDomainId(domainId = globalDomain)
+                .yieldUnit()
                 .map(_ => {
                   logger.info("Created new ValidatorOnboarding contract.")
                   Right(())
@@ -910,7 +909,7 @@ object SvApp {
       svParty.toProtoPrimitive,
       name,
       key,
-    ).create.commands.asScala.toSeq
+    ).create()
     SvUtil.parsePublicKey(key) match {
       case Left(error) => Future.successful(Left(error))
       case Right(_) =>
@@ -929,10 +928,8 @@ object SvApp {
             case QueryResult(offset, None) =>
               for {
                 _ <- svStoreWithIngestion.connection
-                  .submitCommandsTransaction(
-                    actAs = Seq(svParty),
-                    readAs = Seq.empty,
-                    commands = approvedSvIdentity,
+                  .submit(actAs = Seq(svParty), readAs = Seq.empty, update = approvedSvIdentity)
+                  .withDedup(
                     commandId = CNLedgerConnection
                       .CommandId(
                         "com.daml.network.sv.approveSvIdentity",
@@ -940,8 +937,9 @@ object SvApp {
                         s"$key",
                       ),
                     deduplicationOffset = offset,
-                    domainId = globalDomain,
                   )
+                  .withDomainId(globalDomain)
+                  .yieldTransaction()
               } yield {
                 logger.info("Created new ApprovedSvIdentity contract.")
                 Right(())

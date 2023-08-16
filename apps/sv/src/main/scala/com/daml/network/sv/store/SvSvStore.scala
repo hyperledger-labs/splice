@@ -6,12 +6,7 @@ import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{
-  CNNodeAppStoreWithoutHistory,
-  ConfiguredDefaultDomain,
-  MultiDomainAcsStore,
-  PageLimit,
-}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.DbSvSvStore
@@ -26,11 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 
 /* Store used by the SV app for filtering contracts visible to the SV party. */
-trait SvSvStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
-
-  protected[this] def domainConfig: SvDomainConfig
-
-  override final def defaultAcsDomain = domainConfig.global.alias
+trait SvSvStore extends CNNodeAppStoreWithoutHistory {
 
   protected val outerLoggerFactory: NamedLoggerFactory
 
@@ -67,10 +58,10 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomai
 
   def listValidatorOnboardings()(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[vo.ValidatorOnboarding.ContractId, vo.ValidatorOnboarding]]] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(vo.ValidatorOnboarding.COMPANION, _)
-    )
+  ): Future[Seq[Contract[?, vo.ValidatorOnboarding]]] =
+    multiDomainAcsStore
+      .listContracts(vo.ValidatorOnboarding.COMPANION)
+      .map(_ map (_.contract))
 
   def listExpiredValidatorOnboardings()
       : ListExpiredContracts[ValidatorOnboarding.ContractId, ValidatorOnboarding] =
@@ -91,15 +82,13 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomai
 
   def lookupSvOnboardingConfirmed()(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
-  ] = defaultAcsDomainIdF.flatMap(domainId =>
+  ] =
     multiDomainAcsStore
-      .listContractsOnDomain(
+      .listContracts(
         so.SvOnboardingConfirmed.COMPANION,
-        domainId,
         PageLimit(1),
       )
-      .map(_.headOption)
-  )
+      .map(_.headOption map (_.contract))
 
   protected[this] def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
@@ -137,7 +126,7 @@ object SvSvStore {
   ): SvSvStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemorySvSvStore(key, domains, loggerFactory, retryProvider)
+        new InMemorySvSvStore(key, loggerFactory, retryProvider)
       case db: DbStorage =>
         new DbSvSvStore(key, db, domains, loggerFactory, retryProvider)
     }

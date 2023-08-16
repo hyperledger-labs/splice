@@ -797,13 +797,11 @@ class HttpSvHandler(
           .commands
           .asScala
       ).toSeq
-      // No command-dedup required, as the ValidatorOnboarding contract is archived
-      _ <- svcStoreWithIngestion.connection.submitCommandsNoDedup(
-        Seq(svParty),
-        Seq(svcParty),
-        cmds,
-        globalDomain,
-      )
+      _ <- svcStoreWithIngestion.connection
+        .submit(Seq(svParty), Seq(svcParty), cmds)
+        .withDomainId(svcRules.domain)
+        .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
+        .yieldUnit()
     } yield ()
 
   private def startSvOnboarding(

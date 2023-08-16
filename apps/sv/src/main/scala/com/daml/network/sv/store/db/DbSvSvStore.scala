@@ -6,7 +6,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{MultiDomainAcsStore, StoreErrors}
+import com.daml.network.store.{ConfiguredDefaultDomain, MultiDomainAcsStore, StoreErrors}
 import MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.sv.config.SvDomainConfig
@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class DbSvSvStore(
     override val key: SvStore.Key,
     storage: DbStorage,
-    override protected[this] val domainConfig: SvDomainConfig,
+    domainConfig: SvDomainConfig,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
 )(implicit
@@ -45,6 +45,7 @@ class DbSvSvStore(
       ),
     )
     with SvSvStore
+    with ConfiguredDefaultDomain
     with AcsTables
     with AcsQueries
     with StoreErrors
@@ -52,6 +53,8 @@ class DbSvSvStore(
 
   import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
+
+  override final def defaultAcsDomain = domainConfig.global.alias
 
   def storeId: Int = multiDomainAcsStore.storeId
 
