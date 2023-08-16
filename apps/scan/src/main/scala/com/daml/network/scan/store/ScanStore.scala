@@ -3,6 +3,7 @@ package com.daml.network.scan.store
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
+import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
@@ -56,6 +57,10 @@ trait ScanStore
       ContractWithState[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]
     ]
   ]
+
+  def lookupCnsRules()(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]
 
   def getTotalCoinBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
 
@@ -183,6 +188,7 @@ object ScanStore {
       svcParty,
       Map(
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),

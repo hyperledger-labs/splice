@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
+import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -78,6 +79,14 @@ abstract class ScanAppReference(
   def getCoinRulesV1Test(): ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetCoinRulesV1Test(None))
+    }
+
+  @Help.Summary(
+    "Returns the CnsRules."
+  )
+  def getCnsRules(): ContractWithState[CnsRules.ContractId, CnsRules] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetCnsRules(None))
     }
 
   @Help.Summary(

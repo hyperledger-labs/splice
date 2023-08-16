@@ -171,7 +171,7 @@ data TransferSummary = TransferSummary with
     -- If it is zero, then no coin is created for the sender.
     coinPrice : Decimal -- ^ The coin price at the round this transfer was executed.
     changeToInitialAmountAsOfRoundZero : Decimal
-    -- The change to the total balance introduced by this transfer, normalized to round zero, i.e., 
+    -- The change to the total balance introduced by this transfer, normalized to round zero, i.e.,
     -- a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
     changeToHoldingFeesRate : Decimal
     -- ^ The change of total holding fees introduced by this transfer.
@@ -188,7 +188,7 @@ data CoinExpireSummary = CoinExpireSummary with
     owner : Party
     round: Round -- ^ Round for which this expiry was registered.
     changeToInitialAmountAsOfRoundZero : Decimal
-    -- The change to the total balance introduced by a coin expiry, normalized to round zero, i.e., 
+    -- The change to the total balance introduced by a coin expiry, normalized to round zero, i.e.,
     -- a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
     changeToHoldingFeesRate : Decimal
     -- ^ The change of total holding fees introduced by a coin expiry.

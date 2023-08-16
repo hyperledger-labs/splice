@@ -91,6 +91,24 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetCoinRulesResponse"
+  /cns-rules:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getCnsRules"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetCnsRulesRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetCnsRulesResponse"
   /featured-apps:
     get:
       tags: [scan]
@@ -402,6 +420,19 @@ components:
         coin_rules_update:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
       required: ["coin_rules_update"]
+    GetCnsRulesRequest:
+      type: object
+      properties:
+        cached_cns_rules_contract_id:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        cached_cns_rules_domain_id:
+          type: string
+    GetCnsRulesResponse:
+      type: object
+      properties:
+        cns_rules_update:
+          $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+      required: ["cns_rules_update"]
     ListFeaturedAppRightsResponse:
       type: object
       required: ["featured_apps"]

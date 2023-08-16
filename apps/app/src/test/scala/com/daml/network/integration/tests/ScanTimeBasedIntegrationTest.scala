@@ -10,6 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.util.*
+import com.daml.network.util.CNNodeUtil.defaultCnsConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
@@ -298,5 +299,10 @@ class ScanTimeBasedIntegrationTest
           tapRound2Amount - holdingFeeAfterOneRound
       )
     }
+  }
+
+  "return CnsRules contract and config" in { implicit env =>
+    val cnsRules = sv1ScanBackend.getCnsRules()
+    cnsRules.payload.config shouldBe defaultCnsConfig
   }
 }

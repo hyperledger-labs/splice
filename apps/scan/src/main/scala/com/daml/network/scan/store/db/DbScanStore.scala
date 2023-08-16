@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
+import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppBackendConfig
@@ -175,6 +176,29 @@ class DbScanStore(
       )
     } yield contractWithState
   }
+
+  override def lookupCnsRules()(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[CnsRules.ContractId, CnsRules]]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            (selectFromAcsTable(DbScanStore.acsTableName) ++
+              sql"""
+              where store_id = $storeId
+                and template_id = ${CnsRules.TEMPLATE_ID}
+              order by event_number desc
+              limit 1;
+             """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            "lookupCnsRules",
+          )
+          .value
+        contractWithState <- row.traverse(
+          multiDomainAcsStore.contractWithStateFromRow(CnsRules.COMPANION)(_)
+        )
+      } yield contractWithState
+    }
 
   override def lookupValidatorTraffic(validatorParty: PartyId)(implicit
       tc: TraceContext

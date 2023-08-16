@@ -11,8 +11,11 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
+import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.definitions.GetCoinRulesRequest
+import com.daml.network.http.v0.definitions.GetCnsRulesRequest
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
@@ -202,6 +205,41 @@ object HttpScanAppClient {
             response.coinRulesUpdate,
           )
         } yield coinRules
+    }
+  }
+
+  case class GetCnsRules(
+      cachedCnsRules: Option[ContractWithState[CnsRules.ContractId, CnsRules]]
+  ) extends BaseCommand[
+        http.GetCnsRulesResponse,
+        ContractWithState[CnsRules.ContractId, CnsRules],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCnsRulesResponse] = {
+      import MultiDomainAcsStore.ContractState.*
+      client.getCnsRules(
+        GetCnsRulesRequest(
+          cachedCnsRules.map(_.contractId.contractId),
+          cachedCnsRules.flatMap(_.state match {
+            case Assigned(domain) => Some(domain.toProtoPrimitive)
+            case InFlight => None
+          }),
+        ),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetCnsRulesResponse.OK(response) =>
+        for {
+          cnsRules <- ContractWithState.handleMaybeCached(cnsCodegen.CnsRules.COMPANION)(
+            cachedCnsRules,
+            response.cnsRulesUpdate,
+          )
+        } yield cnsRules
     }
   }
 

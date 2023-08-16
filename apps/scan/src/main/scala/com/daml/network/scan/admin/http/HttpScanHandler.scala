@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
+import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
@@ -214,6 +215,36 @@ class HttpScanHandler(
         )
         definitions.GetCoinRulesResponse(
           coinRulesUpdate = response
+        )
+      }
+    }
+
+  def getCnsRules(
+      response: v0.ScanResource.GetCnsRulesResponse.type
+  )(
+      body: com.daml.network.http.v0.definitions.GetCnsRulesRequest
+  )(extracted: Unit): Future[v0.ScanResource.GetCnsRulesResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        cnsRulesO <- store.lookupCnsRules()
+        cnsRules = cnsRulesO getOrElse {
+          throw new NoSuchElementException("found no cnsrules instance")
+        }
+      } yield {
+        val response = MaybeCachedContractWithState(
+          body.cachedCnsRulesContractId match {
+            case Some(cachedContractId) if cachedContractId == cnsRules.contractId.contractId =>
+              logger.debug(
+                show"Not sending ${PrettyContractId(cnsCodegen.CnsRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+              )
+              None
+            case Some(_) | None =>
+              Some(cnsRules.contract.toJson)
+          },
+          domainId = cnsRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
+        )
+        definitions.GetCnsRulesResponse(
+          cnsRulesUpdate = response
         )
       }
     }
