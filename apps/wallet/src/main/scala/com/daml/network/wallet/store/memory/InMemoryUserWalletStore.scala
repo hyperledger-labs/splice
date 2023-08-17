@@ -1,18 +1,18 @@
 package com.daml.network.wallet.store.memory
 
+import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.InMemoryCNNodeAppStore
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
-import cats.syntax.traverse.*
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.*
@@ -127,9 +127,11 @@ class InMemoryUserWalletStore(
 
   override def getLatestTransferOfferEventByTrackingId(
       trackingId: String
-  )(implicit tc: TraceContext): Future[Option[TxLogEntry.TransferOffer]] = {
+  )(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]] = {
     for {
-      indexOpt <- txLog.collectLatestTxLogIndex {
+      (offset, indexOpt) <- txLog.collectLatestTxLogIndexWithOffset {
         case to: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord
             if to.trackingId == trackingId =>
           to
@@ -137,8 +139,11 @@ class InMemoryUserWalletStore(
       entry <- indexOpt.traverse(index =>
         txLogReader.loadTxLogEntry(index.eventId, index.domainId, index.acsContractId)
       )
-    } yield entry.map {
-      case entry: UserWalletTxLogParser.TxLogEntry.TransferOffer => entry
+    } yield entry match {
+      case Some(offer: UserWalletTxLogParser.TxLogEntry.TransferOffer) =>
+        QueryResult(offset, Some(offer))
+      case None =>
+        QueryResult(offset, None)
       case _ => throw txLogIsOfWrongType()
     }
   }

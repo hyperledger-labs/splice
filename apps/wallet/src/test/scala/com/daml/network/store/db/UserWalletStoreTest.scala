@@ -164,7 +164,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore(user1)
           result <- store.getLatestTransferOfferEventByTrackingId("nope")
-        } yield result should be(None)
+        } yield {
+          result.offset should be(initialOffset.toHexString)
+          result.value should be(None)
+        }
       }
 
       "return the latest entry" in {
@@ -193,20 +196,25 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.ingest(mkTransferOffer("bad", badTransferOfferCid))(
             store.multiDomainAcsStore
           )
-          tree <- dummyDomain.ingest(mkAcceptTransfer("good", goodAcceptedTransferOfferCid))(
+          acceptedTree <- dummyDomain.ingest(
+            mkAcceptTransfer("good", goodAcceptedTransferOfferCid)
+          )(
             store.multiDomainAcsStore
           )
           result <- store.getLatestTransferOfferEventByTrackingId("good")
-        } yield result.map(_.status) should be(
-          Some(
-            TransferOfferStatus.Accepted(
-              new transferOffersCodegen.AcceptedTransferOffer.ContractId(
-                goodAcceptedTransferOfferCid
-              ),
-              tree.getTransactionId,
+        } yield {
+          result.offset should be(acceptedTree.getOffset)
+          result.value.map(_.status) should be(
+            Some(
+              TransferOfferStatus.Accepted(
+                new transferOffersCodegen.AcceptedTransferOffer.ContractId(
+                  goodAcceptedTransferOfferCid
+                ),
+                acceptedTree.getTransactionId,
+              )
             )
           )
-        )
+        }
       }
 
     }
@@ -1214,7 +1222,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       transactionTreeSource: TransactionTreeSource = TransactionTreeSource.Unused,
   ): Future[UserWalletStore]
 
-  lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
+  lazy val initialOffset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val domainAlias = DomainAlias.tryCreate(domain)
 }
@@ -1235,7 +1243,7 @@ class InMemoryUserWalletStoreTest extends UserWalletStoreTest {
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(initialOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )
@@ -1276,7 +1284,7 @@ class DbUserWalletStoreTest
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(initialOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )

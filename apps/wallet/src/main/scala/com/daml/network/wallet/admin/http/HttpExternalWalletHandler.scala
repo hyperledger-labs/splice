@@ -4,13 +4,13 @@ import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.environment.ledger.api.DedupDuration
+import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.wallet.WalletResource as r0
 import com.daml.network.http.v0.{external, definitions as d0}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.Codec
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.google.protobuf.Duration
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -30,45 +30,57 @@ class HttpExternalWalletHandler(
       request: d0.CreateTransferOfferRequest
   )(user: String): Future[r0.CreateTransferOfferResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      val sender = getUserWallet(user).store.key.endUserParty
-      exerciseWalletAction((installCid, _) => {
-        val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
-        val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
-        val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
-        Future.successful(
-          installCid
-            .exerciseWalletAppInstall_CreateTransferOffer(
-              receiver.toProtoPrimitive,
-              new PaymentAmount(amount, Currency.CC),
-              request.description,
-              expiresAt.toInstant,
-              request.trackingId,
+      val userWalletStore = getUserWallet(user).store
+      userWalletStore
+        .getLatestTransferOfferEventByTrackingId(request.trackingId)
+        .flatMap {
+          case QueryResult(_, Some(_)) =>
+            Future.failed(
+              io.grpc.Status.ALREADY_EXISTS
+                .withDescription(
+                  s"Transfer offer with trackingId ${request.trackingId} already exists."
+                )
+                .asRuntimeException()
             )
-            .map { cid =>
-              r0.CreateTransferOfferResponse.OK(
-                d0.CreateTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult))
+          case QueryResult(dedupOffset, None) =>
+            val sender = userWalletStore.key.endUserParty
+            exerciseWalletAction((installCid, _) => {
+              val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
+              val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
+              val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
+              Future.successful(
+                installCid
+                  .exerciseWalletAppInstall_CreateTransferOffer(
+                    receiver.toProtoPrimitive,
+                    new PaymentAmount(amount, Currency.CC),
+                    request.description,
+                    expiresAt.toInstant,
+                    request.trackingId,
+                  )
+                  .map { cid =>
+                    r0.CreateTransferOfferResponse.OK(
+                      d0.CreateTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult))
+                    )
+                  }
               )
-            }
-        )
-      })(
-        user,
-        dedup = Some(
-          (
-            CNLedgerConnection.CommandId(
-              "com.daml.network.wallet.createTransferOffer",
-              Seq(
-                sender,
-                Codec.tryDecode(Codec.Party)(request.receiverPartyId),
+            })(
+              user,
+              dedup = Some(
+                (
+                  CNLedgerConnection.CommandId(
+                    "com.daml.network.wallet.createTransferOffer",
+                    Seq(
+                      sender,
+                      Codec.tryDecode(Codec.Party)(request.receiverPartyId),
+                    ),
+                    request.trackingId,
+                  ),
+                  DedupOffset(dedupOffset),
+                )
               ),
-              request.trackingId,
-            ),
-            DedupDuration(
-              Duration.newBuilder().setSeconds(60 * 60 * 24).build()
-            ), // 24 hours, similar to Stripe's API, documented at https://stripe.com/docs/api/idempotent_requests
-            // If you change this, make sure to update the documentation in the OpenAPI specs.
-          )
-        ),
-      ).transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
+            )
+        }
+        .transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
     }
 
   override def listTransferOffers(
@@ -93,7 +105,7 @@ class HttpExternalWalletHandler(
         userStore <- getUserStore(user)
         txLogEntry <- userStore.getLatestTransferOfferEventByTrackingId(trackingId)
       } yield {
-        txLogEntry
+        txLogEntry.value
           .map(_.status)
           .fold[r0.GetTransferOfferStatusResponse](
             r0.GetTransferOfferStatusResponseNotFound(

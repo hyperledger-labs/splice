@@ -1,6 +1,5 @@
 package com.daml.network.wallet.store.db
 
-import cats.data.OptionT
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
@@ -8,16 +7,16 @@ import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.TxLogIndexRecord
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry
-import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.WalletTables.{
   UserWalletAcsStoreRowData,
   UserWalletTxLogStoreRowData,
 }
+import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -63,8 +62,8 @@ class DbUserWalletStore(
     with AcsTables
     with AcsQueries {
 
-  import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
+  import storage.DbStorageConverters.setParameterByteArray
 
   def storeId: Int = multiDomainAcsStore.storeId
 
@@ -238,25 +237,46 @@ class DbUserWalletStore(
 
   override def getLatestTransferOfferEventByTrackingId(trackingId: String)(implicit
       tc: TraceContext
-  ): Future[Option[TxLogEntry.TransferOffer]] = waitUntilAcsIngested {
-    (for {
-      (eventId, domainId, acsContractId) <- storage.querySingle(
-        sql"""
-          select event_id, domain_id, acs_contract_id
-          from #${DbUserWalletStore.txLogTableName}
-          where store_id = $storeId
-            and transfer_offer_tracking_id = ${lengthLimited(trackingId)}
-          order by entry_number desc
-          limit 1
-           """.as[(String, DomainId, Option[ContractId[Any]])].headOption,
-        "getLatestTransferOfferEventByTrackingId",
-      )
-      entry <- OptionT.liftF(txLogReader.loadTxLogEntry(eventId, domainId, acsContractId))
-    } yield entry match {
-      case entry: UserWalletTxLogParser.TxLogEntry.TransferOffer => entry
-      case _ => throw txLogIsOfWrongType()
-    }).value
-  }
+  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]] =
+    waitUntilAcsIngested {
+      import cats.implicits.*
+      for {
+        (offset, eventIdOpt, domainIdOpt, acsContractId) <- storage
+          .querySingle(
+            sql"""
+                select last_ingested_offset, event_id, domain_id, acs_contract_id
+                from  store_descriptors sd left join #${DbUserWalletStore.txLogTableName} tx on sd.id = tx.store_id
+                where sd.id = $storeId
+                  and (tx.transfer_offer_tracking_id = ${lengthLimited(trackingId)}
+                    or tx.transfer_offer_tracking_id is null)
+                order by entry_number desc
+                limit 1
+                 """
+              .as[(String, Option[String], Option[DomainId], Option[ContractId[Any]])]
+              .headOption,
+            "getLatestTransferOfferEventByTrackingId",
+          )
+          .getOrElse(throw offsetExpectedError())
+        entry <- (eventIdOpt, domainIdOpt).tupled.traverse { case (eventId, domainId) =>
+          txLogReader.loadTxLogEntry(eventId, domainId, acsContractId)
+        }
+        result <- entry match {
+          case None =>
+            Future.successful(
+              QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]](offset, None)
+            )
+          case Some(entry: UserWalletTxLogParser.TxLogEntry.TransferOffer) =>
+            Future.successful(
+              QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]](
+                offset,
+                Some(entry),
+              )
+            )
+          case Some(_) =>
+            Future.failed(txLogIsOfWrongType())
+        }
+      } yield result
+    }
 }
 
 object DbUserWalletStore {

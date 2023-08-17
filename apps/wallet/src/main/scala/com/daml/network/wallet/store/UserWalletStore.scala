@@ -96,7 +96,9 @@ trait UserWalletStore
 
   def getLatestTransferOfferEventByTrackingId(
       trackingId: String
-  )(implicit tc: TraceContext): Future[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]
+  )(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]]
 
   def listAppPaymentRequests(implicit tc: TraceContext): Future[Seq[AppPaymentRequest]] = {
     for {

@@ -248,7 +248,9 @@ class WalletPaymentIntegrationTest
             expiration,
             trackingId,
           ),
-          _.errorMessage should include("Command submission already exists"),
+          _.errorMessage should include("Command submission already exists").or(
+            include(s"Transfer offer with trackingId ${trackingId} already exists.")
+          ),
         )
       )
 

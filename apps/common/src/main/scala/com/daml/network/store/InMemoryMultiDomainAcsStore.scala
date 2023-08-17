@@ -481,12 +481,11 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
         .getOrElse(throw txLogNotFound())
     }
 
-  def collectLatestTxLogIndex[T](query: PartialFunction[TXI, T])(implicit
+  def collectLatestTxLogIndexWithOffset[T](query: PartialFunction[TXI, T])(implicit
       ec: ExecutionContext
-  ): Future[Option[T]] =
-    Future {
-      stateVar.txLog.view
-        .collectFirst(query)
+  ): Future[(String, Option[T])] =
+    offsetAndStateAfterIngestingAcs().map { case (offset, state) =>
+      offset -> state.txLog.view.collectFirst(query)
     }
 
   def getTxLogIndicesByFilter(filter: TXI => Boolean): Future[Seq[TXI]] =
