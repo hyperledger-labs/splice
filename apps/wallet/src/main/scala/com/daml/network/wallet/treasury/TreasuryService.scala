@@ -123,12 +123,16 @@ class TreasuryService(
 
   retryProvider.runOnShutdown_(new RunOnShutdown {
     override def name: String = s"terminate coin operation batch executor"
-    override def done: Boolean = false // It's OK to under-approximate this value
+    override def done: Boolean = queueTerminationResult.isCompleted
     override def run(): Unit = {
       logger.debug("Terminating coin operation batch executor, as we are shutting down.")(
         TraceContext.empty
       )
-      queue.complete()
+      try queue.complete()
+      catch {
+        // thrown on completing an already-complete queue
+        case _: IllegalStateException => ()
+      }
     }
   })(TraceContext.empty)
 
