@@ -784,8 +784,9 @@ commands:
         type: string
     steps:
       - execute_sbt_command:
-          cmd: printTests
+          cmd: "Test/compile printTests"
           fail_on_error_in_output: false
+          cmd_retry_count: 2
       - run:
           name: Splitting tests
           command: |
@@ -1190,12 +1191,8 @@ jobs:
             source .envrc.vars
             .circleci/build-config.sh --check
       - setup_sbt_test_job
-      # Surprisingly, running "Test/compile" before speeds up the "scalafixCheck", is a lot faster than just running "scalafixCheck"
       - execute_sbt_command:
-          cmd: "Test/compile"
-          cmd_retry_count: 2
-      - execute_sbt_command:
-          cmd: "lint"
+          cmd: "Test/compile lint"
       - run_todo_script
       - cleanup_sbt_test_job
       - collect_test_timings_and_send_to_datadog
@@ -1266,9 +1263,6 @@ jobs:
       - setup_vpn
       - setup_vpn_routes:
           cluster: "observability"
-      - execute_sbt_command:
-          cmd: "Test/compile"
-          cmd_retry_count: 2
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_splitted_scala_tests:

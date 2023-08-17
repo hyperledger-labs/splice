@@ -719,8 +719,9 @@ commands:
         type: string
     steps:
       - execute_sbt_command:
-          cmd: printTests
+          cmd: "Test/compile printTests"
           fail_on_error_in_output: false
+          cmd_retry_count: 2
       - run:
           name: Splitting tests
           command: |
