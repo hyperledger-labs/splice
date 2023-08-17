@@ -1175,7 +1175,12 @@ printTests := {
   )
 
   val rulesWithOpenFiles = testSplitRules.map { case (t, fileName, p) =>
-    (t, new PrintWriter(new FileWriter(fileName, true)), p)
+    // append writes from the start of the file
+    // if any content already exists and is longer than the content we're writing
+    // it will produce a garbled mess between the two sources
+    // therefore we first ensure that the file is deleted
+    new File(fileName).delete()
+    (t, new PrintWriter(new FileWriter(fileName, false)), p)
   }.zipWithIndex
 
   val (testCounts, unmatchedTestNames) =
