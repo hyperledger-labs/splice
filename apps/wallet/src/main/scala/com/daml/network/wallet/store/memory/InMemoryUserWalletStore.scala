@@ -7,10 +7,12 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.InMemoryCNNodeAppStore
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
+import cats.syntax.traverse.*
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.*
@@ -120,6 +122,24 @@ class InMemoryUserWalletStore(
     } yield entries.map {
       case entry: UserWalletTxLogParser.TransactionHistoryTxLogEntry => entry
       case _: UserWalletTxLogParser.TransferOfferTxLogEntry => throw txLogIsOfWrongType()
+    }
+  }
+
+  override def getLatestTransferOfferEventByTrackingId(
+      trackingId: String
+  )(implicit tc: TraceContext): Future[Option[TxLogEntry.TransferOffer]] = {
+    for {
+      indexOpt <- txLog.collectLatestTxLogIndex {
+        case to: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord
+            if to.trackingId == trackingId =>
+          to
+      }
+      entry <- indexOpt.traverse(index =>
+        txLogReader.loadTxLogEntry(index.eventId, index.domainId, index.acsContractId)
+      )
+    } yield entry.map {
+      case entry: UserWalletTxLogParser.TxLogEntry.TransferOffer => entry
+      case _ => throw txLogIsOfWrongType()
     }
   }
 }

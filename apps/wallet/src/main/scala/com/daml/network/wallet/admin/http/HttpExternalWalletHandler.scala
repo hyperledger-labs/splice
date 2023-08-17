@@ -87,7 +87,21 @@ class HttpExternalWalletHandler(
       respond: r0.GetTransferOfferStatusResponse.type
   )(
       trackingId: String
-  )(extracted: String): Future[r0.GetTransferOfferStatusResponse] = ???
+  )(user: String): Future[r0.GetTransferOfferStatusResponse] = withNewTrace(workflowId) {
+    implicit traceContext => _ =>
+      for {
+        userStore <- getUserStore(user)
+        txLogEntry <- userStore.getLatestTransferOfferEventByTrackingId(trackingId)
+      } yield {
+        txLogEntry
+          .map(_.status)
+          .fold[r0.GetTransferOfferStatusResponse](
+            r0.GetTransferOfferStatusResponseNotFound(
+              d0.ErrorResponse(s"Couldn't find transfer offer with tracking id $trackingId")
+            )
+          )(status => r0.GetTransferOfferStatusResponseOK(status.toStatusResponse))
+      }
+  }
 
   override def createBuyTrafficRequest(respond: r0.CreateBuyTrafficRequestResponse.type)(
       body: d0.RequestBuyTrafficRequest

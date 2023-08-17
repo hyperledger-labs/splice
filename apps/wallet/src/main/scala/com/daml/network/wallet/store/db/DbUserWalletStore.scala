@@ -1,5 +1,6 @@
 package com.daml.network.wallet.store.db
 
+import cats.data.OptionT
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
@@ -11,6 +12,7 @@ import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.TxLogIndexRecord
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.WalletTables.{
   UserWalletAcsStoreRowData,
@@ -106,12 +108,14 @@ class DbUserWalletStore(
             domainId,
             acsContractId,
             txLogId,
+            optTrackingId,
           ) =>
         val safeEventId = lengthLimited(eventId)
         val safeOffset = optOffset.map(lengthLimited)
+        val safeTrackingId = optTrackingId.map(lengthLimited)
         sqlu"""
-              insert into user_wallet_txlog_store(store_id, event_id, "offset", domain_id, acs_contract_id, tx_log_id)
-              values ($storeId, $safeEventId, $safeOffset, $domainId, $acsContractId, $txLogId)
+              insert into user_wallet_txlog_store(store_id, event_id, "offset", domain_id, acs_contract_id, tx_log_id, transfer_offer_tracking_id)
+              values ($storeId, $safeEventId, $safeOffset, $domainId, $acsContractId, $txLogId, $safeTrackingId)
               on conflict do nothing
             """
     }
@@ -232,6 +236,27 @@ class DbUserWalletStore(
     }
   }
 
+  override def getLatestTransferOfferEventByTrackingId(trackingId: String)(implicit
+      tc: TraceContext
+  ): Future[Option[TxLogEntry.TransferOffer]] = waitUntilAcsIngested {
+    (for {
+      (eventId, domainId, acsContractId) <- storage.querySingle(
+        sql"""
+          select event_id, domain_id, acs_contract_id
+          from #${DbUserWalletStore.txLogTableName}
+          where store_id = $storeId
+            and transfer_offer_tracking_id = ${lengthLimited(trackingId)}
+          order by entry_number desc
+          limit 1
+           """.as[(String, DomainId, Option[ContractId[Any]])].headOption,
+        "getLatestTransferOfferEventByTrackingId",
+      )
+      entry <- OptionT.liftF(txLogReader.loadTxLogEntry(eventId, domainId, acsContractId))
+    } yield entry match {
+      case entry: UserWalletTxLogParser.TxLogEntry.TransferOffer => entry
+      case _ => throw txLogIsOfWrongType()
+    }).value
+  }
 }
 
 object DbUserWalletStore {

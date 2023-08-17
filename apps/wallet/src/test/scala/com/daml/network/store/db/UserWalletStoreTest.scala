@@ -24,6 +24,7 @@ import com.daml.network.store.StoreTest
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.{AppPaymentRequest, SubscriptionRequest}
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransferOfferStatus
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
@@ -36,6 +37,7 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 import com.google.protobuf
 import org.scalatest.{Assertion, Succeeded}
 
+import java.time.Instant
 import java.util.UUID
 import scala.concurrent.Future
 
@@ -152,6 +154,59 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             )
           }
         }
+      }
+
+    }
+
+    "getLatestTransferOfferEventByTrackingId" should {
+
+      "return None when missing" in {
+        for {
+          store <- mkStore(user1)
+          result <- store.getLatestTransferOfferEventByTrackingId("nope")
+        } yield result should be(None)
+      }
+
+      "return the latest entry" in {
+        val treeSource = TransactionTreeSource.ForTesting()
+        val goodTransferOfferCid = nextCid()
+        val goodAcceptedTransferOfferCid = nextCid()
+        val badTransferOfferCid = nextCid()
+
+        def mkTransferOffer(trackingId: String, cid: String)(offset: String) = {
+          val result = mkTransferOfferTx(offset, trackingId, user1, user2, cid)
+          treeSource.addTree(result)
+          result
+        }
+        def mkAcceptTransfer(trackingId: String, cid: String)(offset: String) = {
+          val result =
+            mkAcceptTransferTx(offset, trackingId, user1, user2, cid)
+          treeSource.addTree(result)
+          result
+        }
+
+        for {
+          store <- mkStore(user1, treeSource)
+          _ <- dummyDomain.ingest(mkTransferOffer("good", goodTransferOfferCid))(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.ingest(mkTransferOffer("bad", badTransferOfferCid))(
+            store.multiDomainAcsStore
+          )
+          tree <- dummyDomain.ingest(mkAcceptTransfer("good", goodAcceptedTransferOfferCid))(
+            store.multiDomainAcsStore
+          )
+          result <- store.getLatestTransferOfferEventByTrackingId("good")
+        } yield result.map(_.status) should be(
+          Some(
+            TransferOfferStatus.Accepted(
+              new transferOffersCodegen.AcceptedTransferOffer.ContractId(
+                goodAcceptedTransferOfferCid
+              ),
+              tree.getTransactionId,
+            )
+          )
+        )
       }
 
     }
@@ -775,6 +830,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       currency: paymentCodegen.Currency,
       expiresAt: CantonTimestamp,
       trackingId: String = UUID.randomUUID().toString,
+      cid: String = nextCid(),
   ) = {
     val templateId = transferOffersCodegen.AcceptedTransferOffer.TEMPLATE_ID
     val template = new transferOffersCodegen.AcceptedTransferOffer(
@@ -787,7 +843,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
     Contract(
       identifier = templateId,
-      contractId = new transferOffersCodegen.AcceptedTransferOffer.ContractId(nextCid()),
+      contractId = new transferOffersCodegen.AcceptedTransferOffer.ContractId(cid),
       payload = template,
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
@@ -1070,6 +1126,85 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           .toValue(_.toValue),
       ),
       Seq(toCreatedEvent(coinContract, Seq(receiver))),
+    )
+  }
+
+  private def mkTransferOfferTx(
+      offset: String,
+      trackingId: String,
+      sender: PartyId,
+      receiver: PartyId,
+      transferOfferCid: String,
+  ) = {
+    val walletAppInstallCid = nextCid()
+
+    mkExerciseTx(
+      offset,
+      exercisedEvent(
+        walletAppInstallCid,
+        installCodegen.WalletAppInstall.TEMPLATE_ID,
+        None,
+        installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_CreateTransferOffer.name,
+        consuming = false,
+        new installCodegen.WalletAppInstall_CreateTransferOffer(
+          "receiver",
+          new paymentCodegen.PaymentAmount(BigDecimal(1.0).bigDecimal, paymentCodegen.Currency.CC),
+          "desc",
+          Instant.now().plusSeconds(60),
+          trackingId,
+        ).toValue,
+        new transferOffersCodegen.TransferOffer.ContractId(transferOfferCid).toValue,
+      ),
+      Seq(
+        toCreatedEvent(
+          transferOffer(
+            sender,
+            receiver,
+            1.0,
+            paymentCodegen.Currency.CC,
+            CantonTimestamp.now().plusSeconds(60),
+            trackingId,
+          ),
+          Seq(sender, receiver),
+        )
+      ),
+    )
+  }
+
+  private def mkAcceptTransferTx(
+      offset: String,
+      trackingId: String,
+      sender: PartyId,
+      receiver: PartyId,
+      acceptedTransferOfferCid: String,
+  ) = {
+    val walletAppInstallCid = nextCid()
+
+    mkExerciseTx(
+      offset,
+      exercisedEvent(
+        walletAppInstallCid,
+        transferOffersCodegen.TransferOffer.TEMPLATE_ID,
+        None,
+        transferOffersCodegen.TransferOffer.CHOICE_TransferOffer_Accept.name,
+        consuming = false,
+        new transferOffersCodegen.TransferOffer_Accept().toValue,
+        new transferOffersCodegen.AcceptedTransferOffer.ContractId(acceptedTransferOfferCid).toValue,
+      ),
+      Seq(
+        toCreatedEvent(
+          acceptedTransferOffer(
+            sender,
+            receiver,
+            1.0,
+            paymentCodegen.Currency.CC,
+            CantonTimestamp.now().plusSeconds(60),
+            trackingId,
+            acceptedTransferOfferCid,
+          ),
+          Seq(sender, receiver),
+        )
+      ),
     )
   }
 

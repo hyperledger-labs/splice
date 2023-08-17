@@ -609,6 +609,27 @@ object HttpWalletAppClient {
     }
   }
 
+  case class GetTransferOfferStatus(trackingId: String)
+      extends ExternalBaseCommand[
+        externalHttp.GetTransferOfferStatusResponse,
+        definitions.GetTransferOfferStatusResponse,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], externalHttp.GetTransferOfferStatusResponse] =
+      client.getTransferOfferStatus(trackingId = trackingId, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case externalHttp.GetTransferOfferStatusResponse.OK(ok) =>
+      Right(ok)
+    }
+  }
+
   case object ListTransferOffers
       extends ExternalBaseCommand[
         externalHttp.ListTransferOffersResponse,

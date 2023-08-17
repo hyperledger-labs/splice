@@ -103,7 +103,10 @@ create table user_wallet_txlog_store(
     -- index columns
     ----------------
     -- which txlog this entry belongs to TODO (#7153): this might be separate tables, so this column would be unnecessary
-    tx_log_id text not null
+    tx_log_id text not null,
+
+    -- the tracking_id in all transfer offer tx log entries
+    transfer_offer_tracking_id text
 );
 
 -- Directory store

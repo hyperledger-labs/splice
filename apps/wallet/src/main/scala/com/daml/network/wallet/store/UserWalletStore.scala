@@ -94,6 +94,10 @@ trait UserWalletStore
     _.expiresAt
   )
 
+  def getLatestTransferOfferEventByTrackingId(
+      trackingId: String
+  )(implicit tc: TraceContext): Future[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]
+
   def listAppPaymentRequests(implicit tc: TraceContext): Future[Seq[AppPaymentRequest]] = {
     for {
       domainId <- defaultAcsDomainIdF

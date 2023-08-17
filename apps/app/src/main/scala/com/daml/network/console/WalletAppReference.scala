@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOfferCodegen,
 }
 import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
 import com.daml.network.util.Contract
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
@@ -236,6 +237,16 @@ abstract class WalletAppReference(
           .CreateTransferOffer(receiver, amount, description, expiresAt, trackingId)
       )
     }
+
+  @Help.Summary("Get transfer offer status")
+  @Help.Description("Returns the status of a transfer offer.")
+  def getTransferOfferStatus(trackingId: String): GetTransferOfferStatusResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.GetTransferOfferStatus(trackingId)
+      )
+    }
+  }
 
   @Help.Summary("List active transfer offers")
   @Help.Description(

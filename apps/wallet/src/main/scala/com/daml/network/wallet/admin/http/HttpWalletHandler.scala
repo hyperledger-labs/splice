@@ -303,7 +303,7 @@ class HttpWalletHandler(
               requestCid,
               // This is used for withdrawn_reason in the status response.
               // In the future, it could come from the request payload.
-              "Withdrawn requested",
+              "Withdrawn by sender",
             )
             .map(_ => r0.WithdrawTransferOfferResponseOK)
         )

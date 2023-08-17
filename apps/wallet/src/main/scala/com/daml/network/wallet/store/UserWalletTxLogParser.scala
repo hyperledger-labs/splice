@@ -27,6 +27,7 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
 }
+import com.daml.network.codegen.java.cc.api.v1.coin as coinv1
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferCodegen
 import com.daml.network.history.{
   CoinArchive,
@@ -57,6 +58,7 @@ import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
+import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
 
@@ -832,24 +834,66 @@ object UserWalletTxLogParser {
       val TransactionType = "unknown"
     }
 
-    sealed trait TransferOfferStatus
+    sealed trait TransferOfferStatus {
+      def toStatusResponse: httpDef.GetTransferOfferStatusResponse
+    }
     object TransferOfferStatus {
       case class Created(
           contractId: transferCodegen.TransferOffer.ContractId,
           transactionId: String,
-      ) extends TransferOfferStatus
+      ) extends TransferOfferStatus {
+        override def toStatusResponse: GetTransferOfferStatusResponse =
+          httpDef.GetTransferOfferStatusResponse(
+            status = httpDef.GetTransferOfferStatusResponse.Status.Created,
+            transactionId = Some(transactionId),
+            contractId = Some(contractId.contractId),
+          )
+      }
       case class Accepted(
-          contractId: transferCodegen.TransferOffer.ContractId,
+          contractId: transferCodegen.AcceptedTransferOffer.ContractId,
           transactionId: String,
-      ) extends TransferOfferStatus
+      ) extends TransferOfferStatus {
+        override def toStatusResponse: GetTransferOfferStatusResponse =
+          httpDef.GetTransferOfferStatusResponse(
+            status = httpDef.GetTransferOfferStatusResponse.Status.Accepted,
+            transactionId = Some(transactionId),
+            contractId = Some(contractId.contractId),
+          )
+      }
       case class Completed(
-          contractId: transferCodegen.TransferOffer.ContractId,
+          contractId: Option[coinv1.Coin.ContractId],
           transactionId: String,
-      ) extends TransferOfferStatus
+      ) extends TransferOfferStatus {
+        override def toStatusResponse: GetTransferOfferStatusResponse =
+          httpDef.GetTransferOfferStatusResponse(
+            status = httpDef.GetTransferOfferStatusResponse.Status.Completed,
+            transactionId = Some(transactionId),
+            contractId = contractId.map(_.contractId),
+          )
+      }
       sealed trait Failed extends TransferOfferStatus
-      case object Rejected extends Failed
-      case class Withdrawn(reason: String) extends Failed
-      case object Expired extends Failed
+      case object Rejected extends Failed {
+        override def toStatusResponse: GetTransferOfferStatusResponse =
+          httpDef.GetTransferOfferStatusResponse(
+            status = httpDef.GetTransferOfferStatusResponse.Status.Failed,
+            failureKind = Some(httpDef.GetTransferOfferStatusResponse.FailureKind.Rejected),
+          )
+      }
+      case class Withdrawn(reason: String) extends Failed {
+        override def toStatusResponse: GetTransferOfferStatusResponse =
+          httpDef.GetTransferOfferStatusResponse(
+            status = httpDef.GetTransferOfferStatusResponse.Status.Failed,
+            failureKind = Some(httpDef.GetTransferOfferStatusResponse.FailureKind.Withdrawn),
+            withdrawnReason = Some(reason),
+          )
+      }
+      case object Expired extends Failed {
+        override def toStatusResponse: GetTransferOfferStatusResponse =
+          httpDef.GetTransferOfferStatusResponse(
+            status = httpDef.GetTransferOfferStatusResponse.Status.Failed,
+            failureKind = Some(httpDef.GetTransferOfferStatusResponse.FailureKind.Expired),
+          )
+      }
 
     }
     final case class TransferOffer(
@@ -1330,9 +1374,11 @@ object UserWalletTxLogParser {
         event: ExercisedEvent,
         domainId: DomainId,
     ): State = {
-      val transferOffer = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
+      val (offerCid, transferOffer) = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
         case event: CreatedEvent =>
-          transferCodegen.TransferOffer.valueDecoder().decode(event.getArguments)
+          event.getContractId -> transferCodegen.TransferOffer
+            .valueDecoder()
+            .decode(event.getArguments)
         case x =>
           throw new RuntimeException(
             s"Expected first child to be the CreatedEvent of a TransferOffer, but was $x"
@@ -1344,7 +1390,7 @@ object UserWalletTxLogParser {
         domainId,
         transferOffer.trackingId,
         TxLogEntry.TransferOfferStatus.Created(
-          new transferCodegen.TransferOffer.ContractId(event.getContractId),
+          new transferCodegen.TransferOffer.ContractId(offerCid),
           tx.getTransactionId,
         ),
         transferOffer.sender,
@@ -1357,21 +1403,24 @@ object UserWalletTxLogParser {
         event: ExercisedEvent,
         domainId: DomainId,
     ): State = {
-      val acceptedTransferOffer = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
-        case event: CreatedEvent =>
-          transferCodegen.AcceptedTransferOffer.valueDecoder().decode(event.getArguments)
-        case x =>
-          throw new RuntimeException(
-            s"Expected first child to be the CreatedEvent of a AcceptedTransferOffer, but was $x"
-          )
-      }
+      val (acceptedCid, acceptedTransferOffer) =
+        tx.getEventsById.get(event.getChildEventIds.get(0)) match {
+          case event: CreatedEvent =>
+            event.getContractId -> transferCodegen.AcceptedTransferOffer
+              .valueDecoder()
+              .decode(event.getArguments)
+          case x =>
+            throw new RuntimeException(
+              s"Expected first child to be the CreatedEvent of a AcceptedTransferOffer, but was $x"
+            )
+        }
       fromTransferOfferOperation(
         tx,
         event,
         domainId,
         acceptedTransferOffer.trackingId,
         TxLogEntry.TransferOfferStatus.Accepted(
-          new transferCodegen.TransferOffer.ContractId(event.getContractId),
+          new transferCodegen.AcceptedTransferOffer.ContractId(acceptedCid),
           tx.getTransactionId,
         ),
         acceptedTransferOffer.sender,
@@ -1404,6 +1453,7 @@ object UserWalletTxLogParser {
         domainId: DomainId,
         node: ExerciseNode[?, AcceptedTransferOffer_Complete.Res],
     ): State = {
+      import scala.jdk.OptionConverters.*
       val trackingInfo = node.result.value._1._2
       fromTransferOfferOperation(
         tx,
@@ -1411,7 +1461,7 @@ object UserWalletTxLogParser {
         domainId,
         trackingInfo.trackingId,
         TxLogEntry.TransferOfferStatus.Completed(
-          new transferCodegen.TransferOffer.ContractId(event.getContractId),
+          node.result.value._2.toScala,
           tx.getTransactionId,
         ),
         trackingInfo.sender,
