@@ -33,7 +33,7 @@ Requirements
    including Auth0 setup. Dedicated instructions can be found in the :ref:`Self-Hosted Validator section <self_hosted_validator>`
 
 5) Your cluster either needs to be connected to the GCP DA Canton
-   DevNet VPN or you need a static egress IP. In the latter case,
+   `DevNet` VPN or you need a static egress IP. In the latter case,
    please provide that IP address to your contact at Digital Asset to
    add it to the firewall rules.
 
@@ -80,7 +80,7 @@ Store both keys in a safe location.
 You will be using them every time you want to deploy a new SV node, i.e., also when deploying an SV node to a different deployment of the Canton Network and for redeploying an SV node after a (test-)network reset.
 
 The `public-key` and your desired *SV name* need to be approved by a threshold of currently active SVs in order for you to be able to join the network as an SV.
-For DevNet and the current early version of TestNet, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
+For `DevNet` and the current early version of `TestNet`, send the `public-key` and your desired SV name to your point of contact at Digital Asset (DA) and wait for confirmation that your SV identity has been approved and configured at existing SV nodes.
 
 .. _identity-token:
 
@@ -473,8 +473,8 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 
 Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVC members. The bundled artifacts consist of the lists of recommended values as follows:
 
-- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-test.yaml`` - the list of currently SVC-approved identities for TestNet
-- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-dev.yaml`` - the list of partners currently experimenting with onboarding SV nodes on DevNet. Note that this is a less strict list at the moment, and includes identities for e.g. Digital-Asset support employees.
+- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-test.yaml`` - the list of currently SVC-approved identities for `TestNet`
+- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-dev.yaml`` - the list of partners currently experimenting with onboarding SV nodes on `DevNet`. Note that this is a less strict list at the moment, and includes identities for e.g. Digital-Asset support employees.
 
 Please identify the file out of the above corresponding to the network to which you are connecting, and after reviewing the file, set its path in an environment variable ``SV-IDENTITIES-FILE`` to be used below.
 
@@ -502,6 +502,10 @@ Lastly, you need to configure the SV app to bootstrap the participant from the c
 .. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
     :start-after: PARTICIPANT_BOOTSTRAP_START
     :end-before: PARTICIPANT_BOOTSTRAP_END
+
+Note that restoring from a participant identities backup will only result in a functional participant if no participant with the same identity has ever been connected to the network (more specifically: to the global CN domain) since the network was last reset.
+This implies that you can only restore from the same participant identities backup once per network deployment.
+Also note that restoring from a participant identities backup is only possible if the participant is fresh and uninitialized, i.e., its database is completely empty.
 
 Installing the Helm Charts
 ++++++++++++++++++++++++++
@@ -736,9 +740,14 @@ Transitioning Across Network Resets
 -----------------------------------
 
 Please consult the :ref:`relevant section of the validator runbook <validator_continuity>` on how to backup the identity of your participant,
-to ensure that coin balances associated with your SV's validator node (which likely includes rewards earned by your SV nodes) are preserved across a network reset.
+to ensure that coin balances associated with your SV's validator node (which likely includes rewards earned by your SV nodes) are preserved across a `TestNet` reset.
 Please consult the :ref:`relevant section above <sv-participant-identities-restore>` on how to restore from an existing participant identities backup.
 
+Note that coin balances are currently not persisted across `DevNet` resets.
+Participant identities can still be restored across `DevNet` resets, using the steps referenced above,
+but doing so will yield no benefit in terms of recovered coin balances.
+It can still be useful for testing, of course.
+One way to verify that your participant identities were restored correctly is to observe that the ``svPartyId`` shown in your SV UI is identical to your ``svPartyId`` at the time of your identities backup.
 
 .. _helm-rename-sv:
 

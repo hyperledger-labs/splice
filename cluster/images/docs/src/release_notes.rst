@@ -3,15 +3,16 @@
 Release Notes
 =============
 
-2023-08-21
+2023-08-28
 ----------
 
-* Deployment updates:a
+* Deployment updates:
 
     * Introduced a new value, ``isDevNet``, for the CometBFT Helm charts,
       which should be set to ``true`` only for the ``devnet`` deployment.
       This value is required to generate the proper CometBFT genesis file.
       The value has been added to the ``cometbft-values.yaml`` file, default to false.
+    * The ``foundingSvApiUrl`` has been removed from ``sv-values.yaml`` and ``validator-values.yaml``.
 
 * Jfrog Artifact API Keys will be deprecated during the second half of 2023. You will need to to update the passwords of both the helm repository
   and the k8s secret from an API key to an Identity Token.
@@ -25,9 +26,10 @@ Release Notes
       The governance actions to add/remove/modify individual scheduled coin config changes should be used instead.
     * Added the current CometBFT validator set to the CometBFT debug tab in the SV app
 
-* Deployment:
+* Documentation:
 
-  * The ``foundingSvApiUrl`` has been removed from ``sv-values.yaml`` and ``validator-values.yaml``.
+    * Clarified under which conditions it is possible to recover from a participant identities backup,
+      and that coin balances are only preserved across TestNet resets.
 
 2023-08-14
 ----------

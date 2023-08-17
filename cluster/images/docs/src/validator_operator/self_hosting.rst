@@ -497,3 +497,7 @@ Assuming you saved the file in the current directory, the commands look as follo
 
     DOMAIN_URL=http://|cn_cluster|.network.canton.global:5008 ../|canton_subdir|/bin/canton --config examples/validator/validator-participant.conf --config examples/validator/validator-participant-bootstrapping.conf
     PARTICIPANT_IDENTITIES_DUMP=participant-identities-dump.json NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc --config examples/validator/validator-bootstrapping.conf
+
+Note that restoring from a participant identities backup will only result in a functional participant if no participant with the same identity has ever been connected to the network (more specifically: to the global CN domain) since the network was last reset.
+This implies that you can only restore from the same participant identities backup once per network deployment.
+Also note that restoring from a participant identities backup is only possible if the participant is fresh and uninitialized, i.e., its database is completely empty.
