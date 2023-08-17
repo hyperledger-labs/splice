@@ -2,6 +2,11 @@ package com.daml.network.sv.setup
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
+import cats.implicits.{
+  catsSyntaxTuple2Semigroupal,
+  catsSyntaxTuple3Semigroupal,
+  catsSyntaxTuple5Semigroupal,
+}
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
@@ -205,104 +210,116 @@ class FoundingNodeInitializer(
 
   private def bootstrapDomain(domainNode: LocalDomainNode): Future[Namespace] = {
     logger.info("Bootstrapping the domain as the founding node")
-    for {
-      participantId <- participantAdminConnection.getParticipantId()
-      mediatorId <- domainNode.mediatorAdminConnection.getMediatorId
-      sequencerId <- domainNode.sequencerAdminConnection.getSequencerId
-      namespace = UnionspaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
-      domainId <- retryProvider.ensureThatO(
-        "sequencer is initialized",
-        domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
-        for {
-          identityTransactions <- List(
-            participantAdminConnection,
-            domainNode.mediatorAdminConnection,
-            domainNode.sequencerAdminConnection,
-          ).traverse { con =>
-            con.getId().flatMap(con.getIdentityTransactions(_, domainId = None))
-          }.map(_.flatten)
-          // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
-          // been proposed.
-          unionspace <- participantAdminConnection.proposeInitialUnionspaceDefinition(
-            namespace,
-            NonEmpty.mk(Set, participantId.uid.namespace),
-            threshold = PositiveInt.one,
-            signedBy = participantId.uid.namespace.fingerprint,
-          )
-          domainId = DomainId(
-            UniqueIdentifier(
-              Identifier.tryCreate("global-domain"),
-              namespace,
-            )
-          )
-          initialValues = DynamicDomainParameters.initialXValues(clock, ProtocolVersion.dev)
-          values = initialValues.copy(
-            // TODO(#6055) Consider increasing topology change delay again
-            topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
-            // TODO(#7147) Enable ACS committments again once Canton stops exploding.
-            reconciliationInterval = PositiveSeconds.tryOfDays(365),
-          )(initialValues.representativeProtocolVersion)
-          domainParametersState <- participantAdminConnection.proposeInitialDomainParameters(
-            domainId,
-            values,
-            signedBy = participantId.uid.namespace.fingerprint,
-          )
-          sequencerState <- TopologyAdminConnection.proposeCollectively(
-            NonEmpty.mk(List, participantAdminConnection, domainNode.sequencerAdminConnection)
-          ) { case (con, id) =>
-            con.proposeInitialSequencerDomainState(
-              domainId,
-              active = Seq(sequencerId),
-              observers = Seq.empty,
-              signedBy = id.namespace.fingerprint,
-            )
-          }
-          mediatorState <- TopologyAdminConnection.proposeCollectively(
-            NonEmpty.mk(List, participantAdminConnection, domainNode.mediatorAdminConnection)
-          ) { case (con, id) =>
-            con.proposeInitialMediatorDomainState(
-              domainId,
-              group = NonNegativeInt.zero,
-              active = Seq(mediatorId),
-              observers = Seq.empty,
-              signedBy = id.namespace.fingerprint,
-            )
-          }
-          bootstrapTransactions =
-            (Seq(
+
+    (
+      participantAdminConnection.getParticipantId(),
+      domainNode.mediatorAdminConnection.getMediatorId,
+      domainNode.sequencerAdminConnection.getSequencerId,
+    ).flatMapN { case (participantId, mediatorId, sequencerId) =>
+      val namespace = UnionspaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
+      val domainId = DomainId(
+        UniqueIdentifier(
+          Identifier.tryCreate("global-domain"),
+          namespace,
+        )
+      )
+      val initialValues = DynamicDomainParameters.initialXValues(clock, ProtocolVersion.dev)
+      val values = initialValues.copy(
+        // TODO(#6055) Consider increasing topology change delay again
+        topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
+        // TODO(#7147) Enable ACS committments again once Canton stops exploding.
+        reconciliationInterval = PositiveSeconds.tryOfDays(365),
+      )(initialValues.representativeProtocolVersion)
+      for {
+        domainId <- retryProvider.ensureThatO(
+          "sequencer is initialized",
+          domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
+          for {
+            (
+              identityTransactions,
               unionspace,
               domainParametersState,
               sequencerState,
               mediatorState,
-            ) ++ identityTransactions)
-              .mapFilter(_.selectOp[TopologyChangeOpX.Replace])
-              .map(signed =>
-                StoredTopologyTransactionX(
-                  SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
-                  EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
-                  None,
-                  signed,
+            ) <- (
+              List(
+                participantAdminConnection,
+                domainNode.mediatorAdminConnection,
+                domainNode.sequencerAdminConnection,
+              ).traverse { con =>
+                con.getId().flatMap(con.getIdentityTransactions(_, domainId = None))
+              }.map(_.flatten),
+              // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
+              // been proposed.
+              participantAdminConnection.proposeInitialUnionspaceDefinition(
+                namespace,
+                NonEmpty.mk(Set, participantId.uid.namespace),
+                threshold = PositiveInt.one,
+                signedBy = participantId.uid.namespace.fingerprint,
+              ),
+              participantAdminConnection.proposeInitialDomainParameters(
+                domainId,
+                values,
+                signedBy = participantId.uid.namespace.fingerprint,
+              ),
+              TopologyAdminConnection.proposeCollectively(
+                NonEmpty.mk(List, participantAdminConnection, domainNode.sequencerAdminConnection)
+              ) { case (con, id) =>
+                con.proposeInitialSequencerDomainState(
+                  domainId,
+                  active = Seq(sequencerId),
+                  observers = Seq.empty,
+                  signedBy = id.namespace.fingerprint,
                 )
-              )
-          _ <- domainNode.sequencerAdminConnection.initialize(
-            StoredTopologyTransactionsX(bootstrapTransactions),
+              },
+              TopologyAdminConnection.proposeCollectively(
+                NonEmpty.mk(List, participantAdminConnection, domainNode.mediatorAdminConnection)
+              ) { case (con, id) =>
+                con.proposeInitialMediatorDomainState(
+                  domainId,
+                  group = NonNegativeInt.zero,
+                  active = Seq(mediatorId),
+                  observers = Seq.empty,
+                  signedBy = id.namespace.fingerprint,
+                )
+              },
+            ).tupled
+            bootstrapTransactions =
+              (Seq(
+                unionspace,
+                domainParametersState,
+                sequencerState,
+                mediatorState,
+              ) ++ identityTransactions)
+                .mapFilter(_.selectOp[TopologyChangeOpX.Replace])
+                .map(signed =>
+                  StoredTopologyTransactionX(
+                    SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
+                    EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
+                    None,
+                    signed,
+                  )
+                )
+            _ <- domainNode.sequencerAdminConnection.initialize(
+              StoredTopologyTransactionsX(bootstrapTransactions),
+              domainNode.staticDomainParameters,
+              None,
+            )
+          } yield (),
+          logger,
+        )
+        _ <- retryProvider.ensureThatB(
+          "mediator is initialized",
+          domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
+          domainNode.mediatorAdminConnection.initialize(
+            domainId,
             domainNode.staticDomainParameters,
-            None,
-          )
-        } yield (),
-        logger,
-      )
-      _ <- retryProvider.ensureThatB(
-        "mediator is initialized",
-        domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
-        domainNode.mediatorAdminConnection.initialize(
-          domainId,
-          domainNode.staticDomainParameters,
-          domainNode.sequencerConnection,
-        ),
-        logger,
-      )
-    } yield namespace
+            domainNode.sequencerConnection,
+          ),
+          logger,
+        )
+      } yield namespace
+    }
   }
 
   /** A private class to share the svcStoreWithIngestion and the global domain-id
@@ -418,33 +435,37 @@ class FoundingNodeInitializer(
 
     // Import AcsSnapshot and Create SvcRules and CoinRules and open the first mining round
     private def bootstrapSvc(): Future[Unit] = {
+      val svcRulesConfig = SvUtil.defaultSvcRulesConfig()
       for {
-        participantId <- participantAdminConnection.getParticipantId()
-        svcRulesConfig = SvUtil.defaultSvcRulesConfig()
-        trafficStateForAllMembers <- localDomainNode.sequencerAdminConnection
-          .getSequencerTrafficStatus()
-          .map(_.members)
+        (participantId, mediatorId, trafficStateForAllMembers, coinRules, svcRules) <- (
+          participantAdminConnection.getParticipantId(),
+          localDomainNode.mediatorAdminConnection.getMediatorId,
+          localDomainNode.sequencerAdminConnection
+            .getSequencerTrafficStatus()
+            .map(_.members),
+          svcStore.lookupCoinRules(),
+          svcStore.lookupSvcRulesWithOffset(),
+        ).tupled
         participantTrafficState = trafficStateForAllMembers
           .find(_.member == participantId)
           .map(_.trafficState)
-        _ <- participantAdminConnection.ensureTrafficControlState(
-          domainId,
-          participantId,
-          participantTrafficState.fold(0L)(
-            _.extraTrafficConsumed.value
-          ) + svcRulesConfig.initialTrafficGrant,
-          participantId.uid.namespace.fingerprint,
-        )
-        // TODO(#6256): Remove this and make SvApp pay for mediator traffic as well
-        mediatorId <- localDomainNode.mediatorAdminConnection.getMediatorId
-        _ <- participantAdminConnection.ensureTrafficControlState(
-          domainId,
-          mediatorId,
-          Long.MaxValue,
-          participantId.uid.namespace.fingerprint,
-        )
-        coinRules <- svcStore.lookupCoinRules()
-        svcRules <- svcStore.lookupSvcRulesWithOffset()
+        _ <- (
+          participantAdminConnection.ensureTrafficControlState(
+            domainId,
+            participantId,
+            participantTrafficState.fold(0L)(
+              _.extraTrafficConsumed.value
+            ) + svcRulesConfig.initialTrafficGrant,
+            participantId.uid.namespace.fingerprint,
+          ),
+          // TODO(#6256): Remove this and make SvApp pay for mediator traffic as well
+          participantAdminConnection.ensureTrafficControlState(
+            domainId,
+            mediatorId,
+            Long.MaxValue,
+            participantId.uid.namespace.fingerprint,
+          ),
+        ).tupled
         _ <- svcRules match {
           case QueryResult(offset, None) => {
             coinRules match {

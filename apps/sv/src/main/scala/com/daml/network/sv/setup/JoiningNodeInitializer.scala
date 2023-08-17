@@ -2,6 +2,7 @@ package com.daml.network.sv.setup
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
+import cats.implicits.{catsSyntaxTuple3Semigroupal, catsSyntaxTuple4Semigroupal}
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.NetworkAppClientConfig
@@ -71,44 +72,46 @@ class JoiningNodeInitializer(
     )
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+    // We need to connect to the domain here because otherwise we create a circular dependency
+    // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
+    // before establishing a domain connection, but allocating the SV party requires a domain connection.
+    val domainConfig = DomainConnectionConfig(
+      config.domains.global.alias,
+      SequencerConnections.single(
+        GrpcSequencerConnection.tryCreate(config.domains.global.url)
+      ),
+    )
     for {
-      svcPartyId <- getSvcPartyId(initConnection)
-      // We need to connect to the domain here because otherwise we create a circular dependency
-      // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
-      // before establishing a domain connection, but allocating the SV party requires a domain connection.
-      domainConfig = DomainConnectionConfig(
-        config.domains.global.alias,
-        SequencerConnections.single(
-          GrpcSequencerConnection.tryCreate(config.domains.global.url)
+      (svcPartyId, _, svParty) <- (
+        getSvcPartyId(initConnection),
+        // TODO(#5803) Consider removing this once Canton stops falling apart.
+        // Wait for the sponsoring SV which also ensures the domain is initialized.
+        joiningConfig.traverse_ { conf =>
+          retryProvider.waitUntil(
+            "Sponsoring SV is active",
+            withSvConnection(conf.svClient.adminApi)(_.checkActive()),
+            logger,
+          )
+        },
+        withSvConnection(config.foundingSvClient.adminApi)(
+          _.withGlobalLock(
+            "Domain connection of SV and allocation of SV party",
+            exclusive = false,
+            () => {
+              for {
+                _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
+                // We lock through the outer lock here so we don't lock within this.
+                svParty <- SetupUtil.setupSvParty(
+                  initConnection,
+                  config,
+                  participantAdminConnection,
+                  { case (_, _, f) => f() },
+                )
+              } yield svParty
+            },
+          )
         ),
-      )
-      // TODO(#5803) Consider removing this once Canton stops falling apart.
-      // Wait for the sponsoring SV which also ensures the domain is initialized.
-      _ <- joiningConfig.traverse_ { conf =>
-        retryProvider.waitUntil(
-          "Sponsoring SV is active",
-          withSvConnection(conf.svClient.adminApi)(_.checkActive()),
-          logger,
-        )
-      }
-      svParty <- withSvConnection(config.foundingSvClient.adminApi)(
-        _.withGlobalLock(
-          "Domain connection of SV and allocation of SV party",
-          exclusive = false,
-          () => {
-            for {
-              _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
-              // We lock through the outer lock here so we don't lock within this.
-              svParty <- SetupUtil.setupSvParty(
-                initConnection,
-                config,
-                participantAdminConnection,
-                { case (_, _, f) => f() },
-              )
-            } yield svParty
-          },
-        )
-      )
+      ).tupled
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -276,12 +279,14 @@ class JoiningNodeInitializer(
           _ <- retryProvider.retryForAutomation(
             "add member to Svc",
             for {
-              svcRules <- svcStore.getSvcRules()
-              coinRules <- svcStore.getCoinRules()
-              openMiningRounds <- svcStore.getOpenMiningRoundTriple()
-              svOnboardingConfirmedOpt <- svcStore.lookupSvOnboardingConfirmedByParty(
-                svcStore.key.svParty
-              )
+              (svcRules, coinRules, openMiningRounds, svOnboardingConfirmedOpt) <- (
+                svcStore.getSvcRules(),
+                svcStore.getCoinRules(),
+                svcStore.getOpenMiningRoundTriple(),
+                svcStore.lookupSvOnboardingConfirmedByParty(
+                  svcStore.key.svParty
+                ),
+              ).tupled
               svIsSvcMember = svcRules.payload.members.asScala
                 .contains(svcStore.key.svParty.toProtoPrimitive)
               _ <- svOnboardingConfirmedOpt match {
