@@ -6,7 +6,6 @@ scanAddress: "https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/
 validatorWalletUser: "SV_WALLET_USER_ID"
 clusterUrl: "TARGET_CLUSTER.network.canton.global"
 globalDomainUrl: "http://TARGET_CLUSTER.network.canton.global:5008"
-foundingSvApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
 auth:
   # If you want to configure a custom audience for Validator app backend, uncomment this line and replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
   # The default value of audience is ``https://canton.network.global``.

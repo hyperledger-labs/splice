@@ -535,13 +535,12 @@ class CNLedgerConnection(
       userId: String,
       hint: String,
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PartyId] =
     retryProvider.ensureThatO(
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
-        party <- ensurePartyAllocated(hint, None, participantAdminConnection, lock)
+        party <- ensurePartyAllocated(hint, None, participantAdminConnection)
         _ <- setUserPrimaryParty(userId, party)
         _ <- grantUserRights(userId, actAsParties = Seq(party), readAsParties = Seq.empty)
       } yield (),
@@ -552,7 +551,6 @@ class CNLedgerConnection(
       hint: String,
       namespaceO: Option[Namespace],
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext) =
     for {
       participantId <- participantAdminConnection.getParticipantId()
@@ -563,28 +561,21 @@ class CNLedgerConnection(
           namespace,
         )
       )
-      _ <- lock(
-        s"Ensure that party $partyId is allocated",
-        false,
-        () =>
-          for {
-            _ <- participantAdminConnection
-              .ensureInitialPartyToParticipant(
-                partyId,
-                participantId,
-                participantId.uid.namespace.fingerprint,
-              )
-            _ <- retryProvider.waitUntil(
-              s"Ledger API observers party $partyId",
-              client.getParties(Seq(partyId)).map { parties =>
-                if (parties.isEmpty)
-                  throw Status.NOT_FOUND
-                    .withDescription(s"Party allocation of $partyId not observed on ledger API")
-                    .asRuntimeException()
-              },
-              logger,
-            )
-          } yield (),
+      _ <- participantAdminConnection
+        .ensureInitialPartyToParticipant(
+          partyId,
+          participantId,
+          participantId.uid.namespace.fingerprint,
+        )
+      _ <- retryProvider.waitUntil(
+        s"Ledger API observers party $partyId",
+        client.getParties(Seq(partyId)).map { parties =>
+          if (parties.isEmpty)
+            throw Status.NOT_FOUND
+              .withDescription(s"Party allocation of $partyId not observed on ledger API")
+              .asRuntimeException()
+        },
+        logger,
       )
     } yield partyId
 
@@ -623,14 +614,12 @@ class CNLedgerConnection(
       user: String,
       userRights: Seq[User.Right],
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PartyId] =
     for {
       party <- ensurePartyAllocated(
         sanitizeUserIdToPartyString(user),
         None,
         participantAdminConnection,
-        lock,
       )
       _ <- createUserWithPrimaryParty(user, party, userRights)
     } yield party
@@ -749,7 +738,6 @@ class CNLedgerConnection(
       username: String,
       userRights: Seq[User.Right] = Seq.empty,
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PartyId] = {
     for {
       existingPartyId <- getOptionalPrimaryParty(username).recover {
@@ -757,7 +745,7 @@ class CNLedgerConnection(
           None
       }
       partyId <- existingPartyId.fold[Future[PartyId]](
-        createPartyAndUser(username, userRights, participantAdminConnection, lock)
+        createPartyAndUser(username, userRights, participantAdminConnection)
       )(
         Future.successful
       )

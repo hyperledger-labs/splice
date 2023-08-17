@@ -10,7 +10,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.util.UUID
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 final class SvConnection private (
@@ -106,43 +105,6 @@ final class SvConnection private (
       config.url,
       HttpSvAppClient.GetSvcInfo,
     )
-
-  def acquireGlobalLock(reason: String, traceId: String, exclusive: Boolean): Future[Unit] =
-    runHttpCmd(
-      config.url,
-      HttpSvAppClient.AcquireGlobalLock(reason, traceId, exclusive),
-    )
-
-  def releaseGlobalLock(reason: String, traceId: String, exclusive: Boolean): Future[Unit] =
-    runHttpCmd(
-      config.url,
-      HttpSvAppClient.ReleaseGlobalLock(reason, traceId, exclusive),
-    )
-
-  def withGlobalLock[T](reason: String, exclusive: Boolean, f: () => Future[T]): Future[T] = {
-    val traceId = UUID.randomUUID.toString
-    logger.debug(s"Trying to perform operation under lock: $reason ($traceId)")
-    retryProvider
-      .retryForAutomation(
-        "Acquire global lock",
-        acquireGlobalLock(reason, traceId, exclusive),
-        logger,
-      )
-      .flatMap(_ =>
-        f().transformWith(result =>
-          retryProvider
-            .retryForAutomation(
-              "Release global lock",
-              releaseGlobalLock(reason, traceId, exclusive),
-              logger,
-            )
-            .transform {
-              _.flatMap(_ => result)
-            }
-        )
-      )
-      .andThen(_ => logger.debug(s"Completed locked operation ($traceId)"))
-  }
 }
 
 object SvConnection {

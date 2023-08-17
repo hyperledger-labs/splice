@@ -1390,7 +1390,6 @@
           }
         ],
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingSecretFrom": {
@@ -2141,7 +2140,6 @@
           }
         ],
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "isDevNet": true,
@@ -2223,7 +2221,6 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
@@ -2868,7 +2865,6 @@
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "isDevNet": true,
@@ -2953,7 +2949,6 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
@@ -3525,7 +3520,6 @@
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "isDevNet": true,
@@ -3610,7 +3604,6 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
@@ -4182,7 +4175,6 @@
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "isDevNet": true,
@@ -4267,7 +4259,6 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
@@ -4594,7 +4585,6 @@
           }
         ],
         "fixedTokens": false,
-        "foundingSvApiUrl": "http://sv-app.sv-1:5014",
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingSecretFrom": {

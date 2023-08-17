@@ -44,7 +44,6 @@ class HttpAppManagerAdminHandler(
     ledgerConnection: CNLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
     store: AppManagerStore,
-    lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -139,8 +138,7 @@ class HttpAppManagerAdminHandler(
       releaseManifest <- Future { readAppRelease(release) }
       dars <- Future { readDars(new FileInputStream(release)) }
       _ <- participantAdminConnection.uploadDarFiles(
-        dars.map(_._1),
-        lock,
+        dars.map(_._1)
       )
       _ <- store.storeAppRelease(
         AppManagerStore.AppRelease(
@@ -293,8 +291,7 @@ class HttpAppManagerAdminHandler(
           )
           ._1
         _ <- participantAdminConnection.uploadDarFiles(
-          Seq(dar),
-          lock,
+          Seq(dar)
         )
       } yield (),
       logger,

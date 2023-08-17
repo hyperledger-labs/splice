@@ -97,7 +97,6 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
       globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
       extraDomains: config.extraDomains,
       validatorWalletUser: config.validatorWalletUser,
-      foundingSvApiUrl: 'http://sv-app.sv-1:5014',
       svSponsorAddress: config.svSponsorAddress,
       onboardingSecretFrom: config.onboarding
         ? {

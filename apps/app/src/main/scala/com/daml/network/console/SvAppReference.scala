@@ -81,16 +81,6 @@ abstract class SvAppReference(
       )
     }
 
-  def acquireGlobalLock(reason: String, traceId: String, exclusive: Boolean) =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.AcquireGlobalLock(reason, traceId, exclusive))
-    }
-
-  def releaseGlobalLock(reason: String, traceId: String, exclusive: Boolean) =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.ReleaseGlobalLock(reason, traceId, exclusive))
-    }
-
   @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
   def triggerAcsDump(): definitions.TriggerAcsDumpResponse =
     consoleEnvironment.run {

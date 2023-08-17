@@ -300,9 +300,8 @@ class RetryProvider(
 
   private val retryForAutomationConfig =
     RetryConfig(
-      // TODO(#5855) Reset this back to 35 once
-      // we got rid of locking.
-      maxRetries = 150,
+      // TODO(#7244) Reduce this and only bump it for initialization.
+      maxRetries = 60,
       initialDelay = 200.millis,
       maxDelay = 5.seconds,
       resetRetriesAfter = None,

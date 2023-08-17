@@ -13,7 +13,6 @@ private[setup] object SetupUtil {
       connection: CNLedgerConnection,
       config: SvAppBackendConfig,
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
   )(implicit traceContext: TraceContext): Future[PartyId] = {
     val partyHint = config.svPartyHint.getOrElse(
       config.onboarding
@@ -26,7 +25,6 @@ private[setup] object SetupUtil {
       config.ledgerApiUser,
       partyHint,
       participantAdminConnection,
-      lock,
     )
   }
 

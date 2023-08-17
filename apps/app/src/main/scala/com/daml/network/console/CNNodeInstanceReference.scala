@@ -146,16 +146,6 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
       httpClientConfig,
     )
 
-  protected[console] def longRunningHttpCommand[Result](
-      httpCommand: HttpCommand[_, Result]
-  ): ConsoleCommandResult[Result] =
-    cnNodeConsoleEnvironment.longRunningHttpCommandRunner.runCommand(
-      name,
-      httpCommand,
-      headers,
-      httpClientConfig,
-    )
-
   @Help.Summary("Health and diagnostic related commands (HTTP)")
   @Help.Group("HTTP Health")
   def httpHealth: NodeStatus[CNNodeStatus] = {

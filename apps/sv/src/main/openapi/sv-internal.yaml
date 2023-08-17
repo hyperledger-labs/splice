@@ -447,36 +447,6 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /global-topology-lock/lock:
-    post:
-      tags: [sv]
-      x-jvm-package: sv
-      operationId: "acquireGlobalLock"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/AcquireGlobalLockRequest"
-      responses:
-        "200":
-          description: ok
-        "503":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
-  /global-topology-lock/unlock:
-    post:
-      tags: [sv]
-      x-jvm-package: sv
-      operationId: "releaseGlobalLock"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/ReleaseGlobalLockRequest"
-      responses:
-        "200":
-          description: ok
   /devnet/onboard/validator/prepare:
     post:
       tags: [sv]
@@ -856,34 +826,6 @@ components:
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-
-    AcquireGlobalLockRequest:
-      type: object
-      required:
-        - reason
-        - trace_id
-        - exclusive
-      properties:
-        reason:
-          type: string
-        trace_id:
-          type: string
-        exclusive:
-          type: boolean
-
-    ReleaseGlobalLockRequest:
-      type: object
-      required:
-        - reason
-        - trace_id
-        - exclusive
-      properties:
-        reason:
-          type: string
-        trace_id:
-          type: string
-        exclusive:
-          type: boolean
 
     TriggerAcsDumpResponse:
       type: object

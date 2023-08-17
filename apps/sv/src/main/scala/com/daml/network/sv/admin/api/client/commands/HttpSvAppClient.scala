@@ -336,38 +336,6 @@ object HttpSvAppClient {
     ) = _ => Right(())
   }
 
-  case class AcquireGlobalLock(reason: String, traceId: String, exclusive: Boolean)
-      extends BaseCommand[http.AcquireGlobalLockResponse, Unit] {
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.AcquireGlobalLockResponse] =
-      client.acquireGlobalLock(
-        definitions.AcquireGlobalLockRequest(reason, traceId, exclusive),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.AcquireGlobalLockResponse.OK => Right(())
-    }
-  }
-
-  case class ReleaseGlobalLock(reason: String, traceId: String, exclusive: Boolean)
-      extends BaseCommand[http.ReleaseGlobalLockResponse, Unit] {
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ReleaseGlobalLockResponse] =
-      client.releaseGlobalLock(
-        definitions.ReleaseGlobalLockRequest(reason, traceId, exclusive),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.ReleaseGlobalLockResponse.OK => Right(())
-    }
-  }
-
   case class GetCometBftNodeStatus()
       extends BaseCommand[
         http.GetCometBftNodeStatusResponse,

@@ -8,7 +8,6 @@ import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
-import scala.concurrent.duration.*
 import scala.collection.mutable
 
 /** Preflight test running against validator1.
@@ -343,8 +342,7 @@ class Validator1PreflightIntegrationTest
       if (onboardUserToWallet)
         click on "onboard-button"
 
-      // TODO(#5855) consider using the default timeUntilSuccess once user onboarding doesn't require acquiring a global lock
-      eventually(timeUntilSuccess = 80.seconds) {
+      eventually() {
         findAll(className("party-id")) should have size 1
       }
       copyPartyId()

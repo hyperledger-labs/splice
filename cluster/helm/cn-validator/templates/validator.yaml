@@ -96,8 +96,6 @@ spec:
               url = {{ $domain.url | quote }}
             }
         {{- end }}
-        - name: ADDITIONAL_CONFIG_FOUNDING_SV
-          value: canton.validator-apps.validator_backend.founding-sv-client.admin-api.url = "{{ .Values.foundingSvApiUrl }}"
         {{- if (.Values.topup).enabled }}
         - name: ADDITIONAL_CONFIG_TOPUPS
           value: |

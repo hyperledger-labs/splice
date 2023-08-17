@@ -25,6 +25,10 @@ Release Notes
       The governance actions to add/remove/modify individual scheduled coin config changes should be used instead.
     * Added the current CometBFT validator set to the CometBFT debug tab in the SV app
 
+* Deployment:
+
+  * The ``foundingSvApiUrl`` has been removed from ``sv-values.yaml`` and ``validator-values.yaml``.
+
 2023-08-14
 ----------
 

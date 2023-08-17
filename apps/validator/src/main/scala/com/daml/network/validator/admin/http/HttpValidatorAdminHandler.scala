@@ -20,7 +20,6 @@ class HttpValidatorAdminHandler(
     validatorWalletUserName: Option[String],
     domainId: DomainId,
     participantAdminConnection: ParticipantAdminConnection,
-    lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -88,7 +87,6 @@ class HttpValidatorAdminHandler(
         validatorUserName,
         domainId,
         participantAdminConnection,
-        lock,
         retryProvider,
         logger,
       )

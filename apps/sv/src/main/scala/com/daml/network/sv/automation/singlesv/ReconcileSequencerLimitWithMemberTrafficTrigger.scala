@@ -10,7 +10,6 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.util.ExpiringLock
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +22,6 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     participantAdminConnection: ParticipantAdminConnection,
-    globalLock: ExpiringLock,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -69,18 +67,12 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
           participantAdminConnection
             .getParticipantId()
             .flatMap(svParticipantId =>
-              globalLock
-                .withGlobalLock(
-                  s"Updating traffic limit for member ${memberId}",
-                  exclusive = false,
-                )(
-                  participantAdminConnection
-                    .ensureTrafficControlState(
-                      domainId,
-                      memberId,
-                      newExtraTrafficLimit,
-                      svParticipantId.uid.namespace.fingerprint,
-                    )
+              participantAdminConnection
+                .ensureTrafficControlState(
+                  domainId,
+                  memberId,
+                  newExtraTrafficLimit,
+                  svParticipantId.uid.namespace.fingerprint,
                 )
                 .map(_ =>
                   TaskSuccess(

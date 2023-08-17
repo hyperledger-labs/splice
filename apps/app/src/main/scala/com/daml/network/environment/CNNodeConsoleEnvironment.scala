@@ -8,7 +8,6 @@ import com.daml.network.validator.config.{AppManagerAppClientConfig, ValidatorAp
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
   CommunityCantonHealthAdministration,
@@ -27,8 +26,6 @@ import com.digitalasset.canton.console.{
   NodeReferences,
   StandardConsoleOutput,
 }
-
-import scala.concurrent.duration.*
 
 class CNNodeConsoleEnvironment(
     val environment: CNNodeEnvironmentImpl,
@@ -55,14 +52,6 @@ class CNNodeConsoleEnvironment(
     environment,
     environment.config.parameters.timeouts.processing,
     environment.config.parameters.timeouts.console,
-  )(this.tracer, templateDecoder)
-
-  // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
-  lazy val longRunningHttpCommandRunner: ConsoleHttpCommandRunner = new ConsoleHttpCommandRunner(
-    environment,
-    environment.config.parameters.timeouts.processing,
-    environment.config.parameters.timeouts.console
-      .copy(requestTimeout = NonNegativeDuration.tryFromDuration(1.minute)),
   )(this.tracer, templateDecoder)
 
   override type Env = CNNodeEnvironmentImpl

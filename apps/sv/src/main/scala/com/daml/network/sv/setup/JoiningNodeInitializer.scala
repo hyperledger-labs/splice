@@ -14,7 +14,7 @@ import com.daml.network.sv.automation.SvSvAutomationService
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.concurrent.Threading
@@ -68,7 +68,6 @@ class JoiningNodeInitializer(
         SvSvcStore,
         SvSvcAutomationService,
         SvcRulesLock,
-        Option[ExpiringLock],
     )
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
@@ -93,24 +92,14 @@ class JoiningNodeInitializer(
             logger,
           )
         },
-        withSvConnection(config.foundingSvClient.adminApi)(
-          _.withGlobalLock(
-            "Domain connection of SV and allocation of SV party",
-            exclusive = false,
-            () => {
-              for {
-                _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
-                // We lock through the outer lock here so we don't lock within this.
-                svParty <- SetupUtil.setupSvParty(
-                  initConnection,
-                  config,
-                  participantAdminConnection,
-                  { case (_, _, f) => f() },
-                )
-              } yield svParty
-            },
+        for {
+          _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
+          svParty <- SetupUtil.setupSvParty(
+            initConnection,
+            config,
+            participantAdminConnection,
           )
-        ),
+        } yield svParty,
       ).tupled
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey)
@@ -167,35 +156,21 @@ class JoiningNodeInitializer(
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
-          _ <- svConnection.withGlobalLock(
-            "Onboarding of sequencer",
-            exclusive = false,
-            () =>
-              // TODO(#7048) this lock is a band-aid to reduce flakiness while waiting for the upstream fix; remove me
-              // We always call withAcquiredGlobalLock(...) and svcRulesLock.lock() in that order, to prevent deadlocks.
-              svcRulesLock.withLock("sequencer onboarding") {
-                // TODO(#7048) wait to ensure no currently in-flight transaction reaches the sequencer; remove me
-                Threading.sleep(5000)
-                localDomainNode.onboardLocalSequencerIfRequired(
-                  config.domains.global.alias,
-                  globalDomain,
-                  participantAdminConnection,
-                  svConnection,
-                )
-              },
-          )
-          _ <- svConnection.withGlobalLock(
-            "Onboarding of mediator",
-            // Mediator onboarding is the only (known) operation that requires locking at the moment.
-            exclusive = true,
-            () =>
-              for {
-                _ <- localDomainNode.onboardLocalMediatorIfRequired(
-                  globalDomain,
-                  participantAdminConnection,
-                  svConnection,
-                )
-              } yield (),
+          // TODO(#7048) this lock is a band-aid to reduce flakiness while waiting for the upstream fix; remove me
+          _ <- svcRulesLock.withLock("sequencer onboarding") {
+            // TODO(#7048) wait to ensure no currently in-flight transaction reaches the sequencer; remove me
+            Threading.sleep(5000)
+            localDomainNode.onboardLocalSequencerIfRequired(
+              config.domains.global.alias,
+              globalDomain,
+              participantAdminConnection,
+              svConnection,
+            )
+          }
+          _ <- localDomainNode.onboardLocalMediatorIfRequired(
+            globalDomain,
+            participantAdminConnection,
+            svConnection,
           )
         } yield ()
       }
@@ -207,7 +182,6 @@ class JoiningNodeInitializer(
       svcStore,
       svcAutomation,
       svcRulesLock,
-      None,
     )
   }
 
@@ -341,11 +315,8 @@ class JoiningNodeInitializer(
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
               for {
-                _ <- withSvConnection(svClient.adminApi)(connection =>
-                  participantAdminConnection.uploadDarFiles(
-                    requiredDars,
-                    connection.withGlobalLock(_, _, _),
-                  )
+                _ <- participantAdminConnection.uploadDarFiles(
+                  requiredDars
                 )
                 _ <- requestOnboarding(
                   svClient.adminApi,
@@ -449,7 +420,6 @@ class JoiningNodeInitializer(
         participantAdminConnection,
         retryProvider,
         cometBftNode,
-        None,
         loggerFactory,
       )
   }
@@ -498,7 +468,6 @@ class JoiningNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      None,
       loggerFactory,
     )
 

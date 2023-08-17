@@ -18,7 +18,6 @@ class HttpValidatorHandler(
     validatorUserName: String,
     domainId: DomainId,
     participantAdminConnection: ParticipantAdminConnection,
-    lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -46,7 +45,6 @@ class HttpValidatorHandler(
         validatorUserName,
         domainId,
         participantAdminConnection,
-        lock,
         retryProvider,
         logger,
       )

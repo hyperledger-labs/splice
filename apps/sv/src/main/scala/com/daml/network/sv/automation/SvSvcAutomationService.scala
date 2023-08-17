@@ -17,7 +17,6 @@ import com.daml.network.sv.automation.singlesv.*
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.ExpiringLock
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -33,7 +32,6 @@ class SvSvcAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
-    globalLockO: Option[ExpiringLock],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -81,26 +79,23 @@ class SvSvcAutomationService(
     }
   }
 
-  globalLockO.foreach(lock =>
-    if (config.automation.useMemberTrafficInsteadOfValidatorTraffic)
-      registerTrigger(
-        new ReconcileSequencerLimitWithMemberTrafficTrigger(
-          triggerContext,
-          svcStore,
-          participantAdminConnection,
-          lock,
-        )
+  if (config.automation.useMemberTrafficInsteadOfValidatorTraffic)
+    registerTrigger(
+      new ReconcileSequencerLimitWithMemberTrafficTrigger(
+        triggerContext,
+        svcStore,
+        participantAdminConnection,
       )
-    else
-      registerTrigger(
-        new ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
-          triggerContext,
-          svcStore,
-          participantAdminConnection,
-          lock,
-        )
+    )
+  else
+    registerTrigger(
+      new ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
+        triggerContext,
+        svcStore,
+        participantAdminConnection,
       )
-  )
+    )
+
   if (config.automation.enableLeaderReplacement) {
     registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
   }

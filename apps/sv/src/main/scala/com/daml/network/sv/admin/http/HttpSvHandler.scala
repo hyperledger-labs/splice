@@ -29,7 +29,7 @@ import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.setup.SvcPartyHosting
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.{generateRandomOnboardingSecret, requiredNumVotes}
-import com.daml.network.sv.util.{ExpiringLock, SvOnboardingToken, SvUtil, SvcRulesLock}
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.LfTimestamp
@@ -59,7 +59,6 @@ class HttpSvHandler(
     localDomainNode: Option[LocalDomainNode],
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
-    globalLockO: Option[ExpiringLock],
     cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -73,58 +72,6 @@ class HttpSvHandler(
   private val svcStore = svcStoreWithIngestion.store
   private val svParty = svcStore.key.svParty
   private val svcParty = svcStore.key.svcParty
-
-  private def withGlobalLock[T](f: ExpiringLock => Future[T]): Future[T] =
-    globalLockO match {
-      case Some(globalLock) => f(globalLock)
-      case None =>
-        Future.failed(
-          HttpErrorHandler.notFound("Global lock is only available on founding SV")
-        )
-    }
-
-  private def withAcquiredGlobalLock[T](
-      reason: String,
-      exclusive: Boolean,
-      f: => Future[T],
-  ): Future[T] = {
-    val traceId = UUID.randomUUID
-    acquireGlobalLock(v0.SvResource.AcquireGlobalLockResponse)(
-      definitions.AcquireGlobalLockRequest(reason, traceId.toString, exclusive)
-    )(()).flatMap { _ =>
-      f.andThen(_ =>
-        releaseGlobalLock(v0.SvResource.ReleaseGlobalLockResponse)(
-          definitions.ReleaseGlobalLockRequest(reason, traceId.toString, exclusive)
-        )(())
-      )
-    }
-  }
-
-  override def acquireGlobalLock(
-      respond: v0.SvResource.AcquireGlobalLockResponse.type
-  )(
-      body: definitions.AcquireGlobalLockRequest
-  )(fake: Unit): Future[v0.SvResource.AcquireGlobalLockResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      withGlobalLock { globalLock =>
-        globalLock
-          .tryAcquire(body.reason, body.traceId, body.exclusive)
-          .map(_ => v0.SvResource.AcquireGlobalLockResponseOK)
-      }
-    }
-
-  override def releaseGlobalLock(
-      respond: v0.SvResource.ReleaseGlobalLockResponse.type
-  )(
-      body: definitions.ReleaseGlobalLockRequest
-  )(fake: Unit): Future[v0.SvResource.ReleaseGlobalLockResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
-      withGlobalLock { globalLock =>
-        globalLock
-          .release(body.reason, body.traceId, body.exclusive)
-          .map(_ => v0.SvResource.ReleaseGlobalLockResponseOK)
-      }
-    }
 
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
@@ -463,82 +410,76 @@ class HttpSvHandler(
     for {
       // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-      // We need both locks here to prevent topology transactions and Daml transactions.
-      // We always call withAcquiredGlobalLock(...) and svcRulesLock.lock() in that order, to prevent deadlocks.
-      acsBytes <- withAcquiredGlobalLock(
-        s"Authorizing SVC party to participant $participantId",
-        exclusive = false,
-        svcRulesLock.withLock(s"authorizing SVC party to participant $participantId")(
-          for {
-            // this will wait until the PartyToParticipant state change completed
-            authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
-              globalDomain,
-              participantId,
+      acsBytes <- svcRulesLock.withLock(s"authorizing SVC party to participant $participantId")(
+        for {
+          // this will wait until the PartyToParticipant state change completed
+          authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
+            globalDomain,
+            participantId,
+          )
+          // Acquiring the ACS snapshot is tricky due to two issues:
+          // 1. The snapshot can only be acquired at a "clean" timestamp which means there are no outstanding ACS commitments.
+          //    To ensure that the timestamp will eventually be clean we need to submit a transaction visible to the participant (submitDummyTransaction) and
+          //    retry the download afterwards. Note that due to the second issue, this transaction must not change contracts with SVC as the stakeholder.
+          // 2. Concurrent ACS pruning in Canton can prune the data for that timestamp. In that case, we need to fetch the data at a later timestamp.
+          //    Of course this is only safe if there have not been any relevant changes in between. We ensure this using the SvcRules lock.
+          //    In that case, we again need to submit a dummy transaction to ensure that the updated timestamp is clean.
+          _ <- submitDummyTransaction()
+          acsBytes <- {
+            var acsOffset = authorizedAt
+            retryProvider.retryForAutomation(
+              show"Download ACS snapshot for SVC at $authorizedAt",
+              participantAdminConnection
+                .downloadAcsSnapshot(
+                  Set(svcParty),
+                  filterDomainId = globalDomain.toProtoPrimitive,
+                  timestamp = Some(acsOffset),
+                )
+                .recoverWith { case ex: StatusRuntimeException =>
+                  val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
+                  for {
+                    _ <- errorDetails.traverse_ {
+                      case ErrorDetails.ErrorInfoDetail("UNAVAILABLE_ACS_SNAPSHOT", metadata) =>
+                        metadata.get("prunedTimestamp") match {
+                          case None =>
+                            logger.warn(
+                              s"UNAVAILABLE_ACS_SNAPSHOT has no prunedTimestamp field: $metadata"
+                            )
+                            Future.unit
+                          case Some(timestamp) =>
+                            LfTimestamp.fromString(timestamp) match {
+                              case Left(err) =>
+                                logger.warn(
+                                  s"Failed to convert pruned timestamp from error details into an LfTimestamp: $err"
+                                )
+                                Future.unit
+                              case Right(timestamp) =>
+                                // The pruned timestamp is the latest timestamp that has been pruned
+                                // so we need to increase it by one
+                                acsOffset = timestamp.addMicros(1).toInstant
+                                submitDummyTransaction()
+                            }
+                        }
+                      case _ => Future.unit
+                    }
+                  } yield throw ex
+                },
+              logger,
             )
-            // Acquiring the ACS snapshot is tricky due to two issues:
-            // 1. The snapshot can only be acquired at a "clean" timestamp which means there are no outstanding ACS commitments.
-            //    To ensure that the timestamp will eventually be clean we need to submit a transaction visible to the participant (submitDummyTransaction) and
-            //    retry the download afterwards. Note that due to the second issue, this transaction must not change contracts with SVC as the stakeholder.
-            // 2. Concurrent ACS pruning in Canton can prune the data for that timestamp. In that case, we need to fetch the data at a later timestamp.
-            //    Of course this is only safe if there have not been any relevant changes in between. We ensure this using the SvcRules lock.
-            //    In that case, we again need to submit a dummy transaction to ensure that the updated timestamp is clean.
-            _ <- submitDummyTransaction()
-            acsBytes <- {
-              var acsOffset = authorizedAt
-              retryProvider.retryForAutomation(
-                show"Download ACS snapshot for SVC at $authorizedAt",
-                participantAdminConnection
-                  .downloadAcsSnapshot(
-                    Set(svcParty),
-                    filterDomainId = globalDomain.toProtoPrimitive,
-                    timestamp = Some(acsOffset),
-                  )
-                  .recoverWith { case ex: StatusRuntimeException =>
-                    val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
-                    for {
-                      _ <- errorDetails.traverse_ {
-                        case ErrorDetails.ErrorInfoDetail("UNAVAILABLE_ACS_SNAPSHOT", metadata) =>
-                          metadata.get("prunedTimestamp") match {
-                            case None =>
-                              logger.warn(
-                                s"UNAVAILABLE_ACS_SNAPSHOT has no prunedTimestamp field: $metadata"
-                              )
-                              Future.unit
-                            case Some(timestamp) =>
-                              LfTimestamp.fromString(timestamp) match {
-                                case Left(err) =>
-                                  logger.warn(
-                                    s"Failed to convert pruned timestamp from error details into an LfTimestamp: $err"
-                                  )
-                                  Future.unit
-                                case Right(timestamp) =>
-                                  // The pruned timestamp is the latest timestamp that has been pruned
-                                  // so we need to increase it by one
-                                  acsOffset = timestamp.addMicros(1).toInstant
-                                  submitDummyTransaction()
-                              }
-                          }
-                        case _ => Future.unit
-                      }
-                    } yield throw ex
-                  },
-                logger,
-              )
-            }
-            _ = logger
-              .info(
-                s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
-              )
-            ourParticipant <- participantAdminConnection.getParticipantId()
-            _ = logger.info("Adding candidate SV to unionspace")
-            _ <- participantAdminConnection.ensureUnionspaceDefinition(
-              globalDomain,
-              svcParty.uid.namespace,
-              participantId.uid.namespace,
-              ourParticipant.uid.namespace.fingerprint,
+          }
+          _ = logger
+            .info(
+              s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
             )
-          } yield acsBytes
-        ),
+          ourParticipant <- participantAdminConnection.getParticipantId()
+          _ = logger.info("Adding candidate SV to unionspace")
+          _ <- participantAdminConnection.ensureUnionspaceDefinition(
+            globalDomain,
+            svcParty.uid.namespace,
+            participantId.uid.namespace,
+            ourParticipant.uid.namespace.fingerprint,
+          )
+        } yield acsBytes
       )
       // TODO(M3-57) consider if a more space-efficient encoding is necessary
       encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
@@ -588,9 +529,6 @@ class HttpSvHandler(
         dummyHint,
         None,
         participantAdminConnection,
-        { case (_, _, f) =>
-          f()
-        }, // Don't lock here, the candidate SV locks around the whole sequencer onboarding.
       )
       msg = "Wait for sequencer to observe party allocation"
       _ = logger.info(msg)

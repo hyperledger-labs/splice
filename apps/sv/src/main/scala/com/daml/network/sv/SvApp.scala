@@ -194,7 +194,6 @@ class SvApp(
           svcStore,
           svcAutomation,
           svcRulesLock,
-          globalLockO,
         ),
         foundingConfig,
       ) <-
@@ -320,7 +319,6 @@ class SvApp(
         localDomainNode,
         retryProvider,
         svcPartyHosting,
-        globalLockO,
         cometBftClient,
         loggerFactory,
       )

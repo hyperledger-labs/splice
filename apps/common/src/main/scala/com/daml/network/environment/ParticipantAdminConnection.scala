@@ -208,48 +208,32 @@ class ParticipantAdminConnection(
     } yield ()
 
   def uploadDarFiles(
-      pkgs: Seq[UploadablePackage],
-      withLock: (String, Boolean, () => Future[Unit]) => Future[Unit],
+      pkgs: Seq[UploadablePackage]
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-    withLock(
-      "DAR upload",
-      false,
-      () =>
-        pkgs.foldLeft(Future.unit)((previous, dar) =>
-          previous.flatMap(_ => uploadDarFile(dar, f => f()))
-        ),
+    pkgs.foldLeft(Future.unit)((previous, dar) => previous.flatMap(_ => uploadDarFile(dar)))
+
+  def uploadDarFile(
+      pkg: UploadablePackage
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    uploadDarFileInternal(
+      pkg.packageId,
+      pkg.resourcePath,
+      ByteString.readFrom(pkg.inputStream()),
     )
 
   def uploadDarFile(
-      pkg: UploadablePackage,
-      withLock: (() => Future[Unit]) => Future[Unit],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    withLock(() =>
-      uploadDarFileInternal(
-        pkg.packageId,
-        pkg.resourcePath,
-        ByteString.readFrom(pkg.inputStream()),
-      )
-    )
-  }
-
-  def uploadDarFile(
-      path: Path,
-      withLock: (() => Future[Unit]) => Future[Unit],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    withLock(() =>
-      for {
-        darFile <- Future {
-          ByteString.readFrom(Files.newInputStream(path))
-        }
-        hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
-        _ <- uploadDarFileInternal(hash, path.toString, darFile)
-      } yield ()
-    )
-  }
+      path: Path
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    for {
+      darFile <- Future {
+        ByteString.readFrom(Files.newInputStream(path))
+      }
+      hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
+      _ <- uploadDarFileInternal(hash, path.toString, darFile)
+    } yield ()
 
   def lookupDar(hash: Hash)(implicit traceContext: TraceContext): Future[Option[ByteString]] =
     runCmd(

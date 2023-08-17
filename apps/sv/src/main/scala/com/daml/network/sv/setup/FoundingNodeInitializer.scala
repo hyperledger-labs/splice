@@ -22,7 +22,7 @@ import com.daml.network.sv.automation.SvSvAutomationService
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{ExpiringLock, SvUtil, SvcRulesLock}
+import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
 import com.daml.network.util.CNNodeUtil.{
   defaultCnsConfig,
   defaultCoinConfig,
@@ -40,7 +40,7 @@ import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.time.{NonNegativeFiniteDuration, PositiveSeconds}
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
@@ -54,7 +54,6 @@ import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -84,9 +83,6 @@ class FoundingNodeInitializer(
     tracer: Tracer,
 ) extends NamedLogging {
 
-  @nowarn("cat=unused")
-  private def noLock[T](reason: String, exclusive: Boolean, f: () => Future[T]): Future[T] = f()
-
   def bootstrapCollective(): Future[
     (
         DomainId,
@@ -96,20 +92,10 @@ class FoundingNodeInitializer(
         SvSvcStore,
         SvSvcAutomationService,
         SvcRulesLock,
-        Option[ExpiringLock],
     )
   ] = {
     val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
 
-    // TODO(#5855) Remove this lock
-    // For now, we lock around all operations that somehow affect topology state.
-    // Specifically, we lock around mediator/sequencer onboarding,
-    // participant onboarding (i.e. domain connections),
-    // party allocations and package uploads.
-    // This avoids a bunch of issues where Canton
-    // does not handle concurrency for those operations
-    // correctly.
-    val globalLock = new ExpiringLock(foundingConfig.globalLockTimeout, logger)
     for {
       namespace <- bootstrapDomain(localDomainNode)
       _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
@@ -126,7 +112,7 @@ class FoundingNodeInitializer(
       _ = logger.info("Participant connected to domain")
       svcParty <- setupSvcParty(initConnection, namespace)
       // founder does not need to lock here
-      svParty <- SetupUtil.setupSvParty(initConnection, config, participantAdminConnection, noLock)
+      svParty <- SetupUtil.setupSvParty(initConnection, config, participantAdminConnection)
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
       svAutomation = newSvSvAutomationService(
@@ -168,7 +154,6 @@ class FoundingNodeInitializer(
         svcStore,
         ledgerClient,
         cometBftNode,
-        globalLock,
       )
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- retryProvider.ensureThatB(
@@ -187,7 +172,6 @@ class FoundingNodeInitializer(
       svcStore,
       svcAutomation,
       svcRulesLock,
-      Some(globalLock),
     )
   }
 
@@ -197,8 +181,6 @@ class FoundingNodeInitializer(
         foundingConfig.svcPartyHint,
         Some(namespace),
         participantAdminConnection,
-        // founder does not need to lock here.
-        noLock,
       )
       // this is idempotent
       _ <- connection.grantUserRights(
@@ -226,9 +208,7 @@ class FoundingNodeInitializer(
       val initialValues = DynamicDomainParameters.initialXValues(clock, ProtocolVersion.dev)
       val values = initialValues.copy(
         // TODO(#6055) Consider increasing topology change delay again
-        topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
-        // TODO(#7147) Enable ACS committments again once Canton stops exploding.
-        reconciliationInterval = PositiveSeconds.tryOfDays(365),
+        topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0)
       )(initialValues.representativeProtocolVersion)
       for {
         domainId <- retryProvider.ensureThatO(
@@ -339,8 +319,7 @@ class FoundingNodeInitializer(
       for {
         // Founder does not need to lock
         _ <- participantAdminConnection.uploadDarFiles(
-          requiredDars,
-          noLock,
+          requiredDars
         )
         _ <- retryProvider.retryForAutomation(
           "bootstrapping SVC",
@@ -620,7 +599,6 @@ class FoundingNodeInitializer(
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
       cometBftNode: Option[CometBftNode],
-      globalLock: ExpiringLock,
   ) =
     new SvSvcAutomationService(
       clock,
@@ -631,7 +609,6 @@ class FoundingNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      Some(globalLock),
       loggerFactory,
     )
 

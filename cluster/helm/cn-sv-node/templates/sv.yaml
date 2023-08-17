@@ -30,9 +30,6 @@ spec:
             {{- if eq .Values.onboardingType "found-collective" }}
             - name: CN_APP_SV_IS_DEV_NET
               value: {{ .Values.isDevNet | quote }}
-            - name: ADDITIONAL_CONFIG_GLOBAL_LOCK_TIMEOUT
-              value: |
-                canton.sv-apps.sv.onboarding.global-lock-timeout=240s
             {{- with .Values.acsBootstrappingDump }}
             - name: ADDITIONAL_CONFIG_BOOTSTRAPPING_DUMP
               value: |
@@ -129,8 +126,6 @@ spec:
             - name: CN_APP_SV_COMETBFT_CONNECTION_URI
               value: {{ (.Values.cometBFT).connectionUri }}
             {{- end }}
-            - name: ADDITIONAL_CONFIG_FOUNDING_SV
-              value: canton.sv-apps.sv.founding-sv-client.admin-api.url = "{{ .Values.foundingSvApiUrl }}"
             {{- range $ii, $onboarding := .Values.expectedValidatorOnboardings }}
             - name: ADDITIONAL_CONFIG_VALIDATOR_ONBOARDING_{{ $ii }}
               value: |

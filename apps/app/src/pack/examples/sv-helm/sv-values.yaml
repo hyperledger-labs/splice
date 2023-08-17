@@ -3,7 +3,6 @@ joinWithKeyOnboarding:
 # Replace YOUR_SV_NAME with the name you provided for your SV identity
 onboardingName: YOUR_SV_NAME
 globalDomainUrl: "http://TARGET_CLUSTER.network.canton.global:5008"
-foundingSvApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
 auth:
   # The default value of audience is ``https://canton.network.global``.
   # If you want to configure a custom audience for SV app backend, uncomment this line and replace OIDC_AUTHORITY_SV_AUDIENCE with the audience of your choice.

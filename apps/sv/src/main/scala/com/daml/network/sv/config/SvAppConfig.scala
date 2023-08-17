@@ -64,8 +64,6 @@ object SvOnboardingConfig {
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,
-      // TODO(#5855) remove this again
-      globalLockTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(120),
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
   ) extends SvOnboardingConfig
@@ -134,8 +132,6 @@ case class SvAppBackendConfig(
     enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,
     localDomainNode: Option[SvDomainNodeConfig],
-    // TODO(#5855) so we can lock; remove this again
-    foundingSvClient: SvAppClientConfig,
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     acsStoreDump: Option[BackupDumpConfig] = None,
 ) extends CNNodeBackendConfig {

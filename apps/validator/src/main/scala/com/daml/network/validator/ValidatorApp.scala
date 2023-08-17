@@ -71,8 +71,6 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import scala.annotation.nowarn
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Class representing a Validator app instance. */
@@ -102,16 +100,6 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  @nowarn("cat=unused")
-  private def noLock[T](reason: String, exclusive: Boolean, f: () => Future[T]): Future[T] = f()
-
-  private def noLock_(f: () => Future[Unit]): Future[Unit] = f()
-
-  def withGlobalLock[A, B](f: ((String, Boolean, () => Future[A]) => Future[A]) => Future[B]) =
-    withSvConnection(
-      config.foundingSvClient.adminApi
-    )(svConnection => f(svConnection.withGlobalLock(_, _, _)))
-
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
     _ <- ensureVersionMatch(config.scanClient)
@@ -135,32 +123,22 @@ class ValidatorApp(
         )
       }
       _ <-
-        // TODO(#5855) Remove the lock
-        withGlobalLock[Unit, Unit](lock =>
-          lock(
-            "Domain connection and primary party allocation of validator",
-            false,
-            () =>
-              withParticipantAdminConnection { participantAdminConnection =>
-                for {
-                  _ <- ensureGlobalDomainRegistered(participantAdminConnection)
-                  _ <- ensureExtraDomainsRegistered(participantAdminConnection)
-                  // Note that for the validator of an SV app, the user will be created by the SV app with a
-                  // primary party set to the SV app already so this is a noop.
-                  _ <- connection.ensureUserPrimaryPartyIsAllocated(
-                    config.ledgerApiUser,
-                    config.validatorPartyHint
-                      .getOrElse(
-                        CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                      ),
-                    participantAdminConnection,
-                    // We have an outer lock around both here so we don't need to lock here.
-                    noLock,
-                  ) whenA config.allocateLedgerApiUserParty
-                } yield ()
-              },
-          )
-        )
+        withParticipantAdminConnection { participantAdminConnection =>
+          for {
+            _ <- ensureGlobalDomainRegistered(participantAdminConnection)
+            _ <- ensureExtraDomainsRegistered(participantAdminConnection)
+            // Note that for the validator of an SV app, the user will be created by the SV app with a
+            // primary party set to the SV app already so this is a noop.
+            _ <- connection.ensureUserPrimaryPartyIsAllocated(
+              config.ledgerApiUser,
+              config.validatorPartyHint
+                .getOrElse(
+                  CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                ),
+              participantAdminConnection,
+            ) whenA config.allocateLedgerApiUserParty
+          } yield ()
+        }
     } yield ()
 
   private def setupWalletDars(
@@ -188,9 +166,7 @@ class ValidatorApp(
       lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
     }).filter(_ => config.enableCoinRulesUpgrade)
     for {
-      _ <- withGlobalLock[Unit, Unit](
-        participantAdminConnection.uploadDarFiles(darFiles, _)
-      )
+      _ <- participantAdminConnection.uploadDarFiles(darFiles)
     } yield {
       logger.info(
         s"Finished wallet setup"
@@ -208,41 +184,27 @@ class ValidatorApp(
   ): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
     for {
-      party <- withGlobalLock[PartyId, PartyId](lock =>
-        lock(
-          s"Allocate party for user ${instance.serviceUser}",
-          false,
-          () =>
-            for {
-              _ <- instance.dars.traverse_(dar =>
-                participantAdminConnection.uploadDarFile(
-                  dar,
-                  noLock_,
-                )
-              )
-              party <- storeWithIngestion.connection.getOrAllocateParty(
-                instance.serviceUser,
-                Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
-                participantAdminConnection,
-                // We rely on the outer lock so we don't need to lock here.
-                noLock,
-              )
-              _ <- ValidatorUtil
-                .onboard(
-                  instance.walletUser.getOrElse(instance.serviceUser),
-                  Some(party),
-                  storeWithIngestion,
-                  validatorUserName = config.ledgerApiUser,
-                  domainId,
-                  participantAdminConnection,
-                  // We rely on the outer lock so we don't need to lock here.
-                  noLock,
-                  retryProvider,
-                  logger,
-                )
-            } yield party,
+      _ <- instance.dars.traverse_(dar =>
+        participantAdminConnection.uploadDarFile(
+          dar
         )
       )
+      party <- storeWithIngestion.connection.getOrAllocateParty(
+        instance.serviceUser,
+        Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
+        participantAdminConnection,
+      )
+      _ <- ValidatorUtil
+        .onboard(
+          instance.walletUser.getOrElse(instance.serviceUser),
+          Some(party),
+          storeWithIngestion,
+          validatorUserName = config.ledgerApiUser,
+          domainId,
+          participantAdminConnection,
+          retryProvider,
+          logger,
+        )
     } yield {
       logger.info(
         s"Setup app $name with service user ${instance.serviceUser}, wallet user ${instance.walletUser}  primary party $party, and uploaded ${instance.dars}."
@@ -485,18 +447,15 @@ class ValidatorApp(
         retryProvider,
         logger,
       )
-      _ <- withGlobalLock[Unit, PartyId](
-        ValidatorUtil.onboard(
-          endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
-          knownParty = Some(validatorParty),
-          automation,
-          validatorUserName = config.ledgerApiUser,
-          domainId,
-          participantAdminConnection,
-          _,
-          retryProvider,
-          logger,
-        )
+      _ <- ValidatorUtil.onboard(
+        endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
+        knownParty = Some(validatorParty),
+        automation,
+        validatorUserName = config.ledgerApiUser,
+        domainId,
+        participantAdminConnection,
+        retryProvider,
+        logger,
       )
       _ <- ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
 
@@ -512,35 +471,27 @@ class ValidatorApp(
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
-      handler <- withGlobalLock[Unit, HttpValidatorHandler](lock =>
-        Future.successful(
-          new HttpValidatorHandler(
-            automation,
-            validatorUserName = config.ledgerApiUser,
-            domainId = domainId,
-            participantAdminConnection,
-            lock,
-            retryProvider,
-            loggerFactory,
-          )
+      handler =
+        new HttpValidatorHandler(
+          automation,
+          validatorUserName = config.ledgerApiUser,
+          domainId = domainId,
+          participantAdminConnection,
+          retryProvider,
+          loggerFactory,
         )
-      )
 
-      adminHandler <- withGlobalLock[Unit, HttpValidatorAdminHandler](lock =>
-        Future.successful(
-          new HttpValidatorAdminHandler(
-            automation,
-            participantIdentitiesStore,
-            validatorUserName = config.ledgerApiUser,
-            validatorWalletUserName = config.validatorWalletUser,
-            domainId = domainId,
-            participantAdminConnection,
-            lock,
-            retryProvider = retryProvider,
-            loggerFactory,
-          )
+      adminHandler =
+        new HttpValidatorAdminHandler(
+          automation,
+          participantIdentitiesStore,
+          validatorUserName = config.ledgerApiUser,
+          validatorWalletUserName = config.validatorWalletUser,
+          domainId = domainId,
+          participantAdminConnection,
+          retryProvider = retryProvider,
+          loggerFactory,
         )
-      )
 
       commonAdminHandler = new HttpAdminHandler(
         status
@@ -564,23 +515,20 @@ class ValidatorApp(
         loggerFactory,
       )
 
-      appManagerHandlersO <- withGlobalLock[Unit, Option[
-        (HttpAppManagerAdminHandler, HttpAppManagerHandler, HttpAppManagerPublicHandler)
-      ]](lock =>
+      appManagerHandlersO <-
         config.appManager.traverse { config =>
           val dar = new UploadablePackage {
             lazy val packageId: String = appManagerCodegen.RegisteredApp.TEMPLATE_ID.getPackageId
             lazy val resourcePath: String = "dar/app-manager-0.1.0.dar"
           }
           for {
-            _ <- participantAdminConnection.uploadDarFiles(Seq(dar), lock)
+            _ <- participantAdminConnection.uploadDarFiles(Seq(dar))
           } yield {
             val oauth2Manager = new OAuth2Manager(config, loggerFactory)
             val appManagerAdminHandler = new HttpAppManagerAdminHandler(
               automation.connection,
               participantAdminConnection,
               automation.appManagerStore,
-              lock,
               retryProvider,
               loggerFactory,
             )
@@ -601,7 +549,6 @@ class ValidatorApp(
             (appManagerAdminHandler, appManagerHandler, appManagerPublicHandler)
           }
         }
-      )
 
       routes = cors(
         CorsSettings(ac).withAllowedMethods(
@@ -621,16 +568,7 @@ class ValidatorApp(
                 (Seq(
                   ValidatorResource.routes(
                     handler,
-                    operationId =>
-                      (operationId match {
-                        // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
-                        case "register" => withRequestTimeout(60.seconds)
-                        case _ => pass
-                      }).tflatMap(_ =>
-                        AuthExtractor(verifier, loggerFactory, "canton network validator realm")(
-                          operationId
-                        )
-                      ),
+                    AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
                   ),
                   InternalWalletResource.routes(
                     walletInternalHandler,
@@ -643,23 +581,17 @@ class ValidatorApp(
                   ValidatorAdminResource.routes(
                     adminHandler,
                     operationId =>
-                      (operationId match {
-                        // TODO(#5855) consider removing this once user onboarding doesn't require acquiring a global lock
-                        case "onboardUser" => withRequestTimeout(60.seconds)
-                        case _ => pass
-                      }).tflatMap(_ =>
-                        if (config.enableAdminAuth) {
-                          AdminAuthExtractor(
-                            verifier,
-                            validatorParty,
-                            automation.connection,
-                            loggerFactory,
-                            "canton network validator operator realm",
-                          )(operationId).tflatMap(_ => provide(()))
-                        } else {
-                          provide(())
-                        }
-                      ),
+                      if (config.enableAdminAuth) {
+                        AdminAuthExtractor(
+                          verifier,
+                          validatorParty,
+                          automation.connection,
+                          loggerFactory,
+                          "canton network validator operator realm",
+                        )(operationId).tflatMap(_ => provide(()))
+                      } else {
+                        provide(())
+                      },
                   ),
                   ValidatorPublicResource.routes(
                     publicHandler,

@@ -73,7 +73,6 @@ private[validator] object ValidatorUtil {
       validatorUserName: String,
       domainId: DomainId,
       participantAdminConnection: ParticipantAdminConnection,
-      lock: (String, Boolean, () => Future[Unit]) => Future[Unit],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
@@ -91,7 +90,6 @@ private[validator] object ValidatorUtil {
             endUserName,
             Seq(),
             participantAdminConnection,
-            lock,
           )
       }
       _ <- storeWithIngestion.connection.grantUserRights(
