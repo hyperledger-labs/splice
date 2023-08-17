@@ -6,5 +6,5 @@
 
 {{- define "cliArgs" }}
 --home /cometbft \
---log_level="*:debug" \
+--log_level="pex:debug,CantonNetworkApplication:debug,*:info" \
 {{- end }}
