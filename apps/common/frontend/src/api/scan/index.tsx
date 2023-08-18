@@ -6,6 +6,7 @@ import useGetSvcPartyId from './useGetSvcPartyId';
 import useGetTopValidatorsByPurchasedTraffic from './useGetTopValidatorsByPurchasedTraffic';
 import useGetTopValidatorsByValidatorRewards from './useGetTopValidatorsByValidatorRewards';
 import useLookupFeaturedAppRight from './useLookupFeaturedAppRight';
+import useRecentActivity from './useRecentActivity';
 import useTopAppProviders from './useTopAppProviders';
 import useTotalCoinBalance from './useTotalCoinBalance';
 
@@ -18,6 +19,7 @@ export {
   useGetTopValidatorsByValidatorRewards,
   useGetTopValidatorsByPurchasedTraffic,
   useLookupFeaturedAppRight,
+  useRecentActivity,
   useTopAppProviders,
   useTotalCoinBalance,
 };
