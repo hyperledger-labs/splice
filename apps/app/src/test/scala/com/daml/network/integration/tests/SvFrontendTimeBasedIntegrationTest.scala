@@ -6,7 +6,9 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import org.openqa.selenium.WebDriver
+import org.slf4j.event.Level
 
 import java.time.Duration as JavaDuration
 
@@ -79,8 +81,19 @@ class SvFrontendTimeBasedIntegrationTest
           .plus(automationConfig.pollingInterval.asJava)
           .plus(JavaDuration.ofSeconds(5))
         sv1Backend.stop()
-        advanceTime(tickDurationWithBuffer)
-        advanceTime(effectiveTimeoutPlusBuffer)
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+          {
+            advanceTime(tickDurationWithBuffer)
+            advanceTime(effectiveTimeoutPlusBuffer)
+          },
+          entries => {
+            forExactly(3, entries) { line =>
+              line.message should include(
+                "Noticed an SvcRules epoch change"
+              )
+            }
+          },
+        )
       }
 
       withFrontEnd("sv2") { implicit webDriver =>

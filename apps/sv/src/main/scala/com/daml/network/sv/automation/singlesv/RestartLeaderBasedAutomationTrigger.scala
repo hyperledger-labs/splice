@@ -85,6 +85,10 @@ class RestartLeaderBasedAutomationTrigger(
             restartAutomation(currentEpoch, svcRules)
           case Some(state) =>
             if (state.epoch != currentEpoch) {
+              logger.warn(
+                s"Noticed an SvcRules epoch change (from ${state.epoch} to $currentEpoch)."
+                  + " This typically means that the leader was replaced."
+              )
               logger.debug(
                 s"Restarting automation, as the epoch changed from ${state.epoch} to $currentEpoch"
               )

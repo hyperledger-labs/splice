@@ -96,16 +96,23 @@ class SvcElectionTimeBasedIntegrationTest
 
         val bufferDuration = JavaDuration.ofSeconds(5)
 
-        advanceTime(effectiveTimeout.plus(bufferDuration))
-        eventually() {
-          val svcRulesAfterElection =
-            sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
-              .head
-              .data
-          svcRulesAfterElection.epoch shouldBe svcRulesBeforeElection.epoch + 1
-          svcRulesAfterElection.leader should not be svcRulesBeforeElection.leader
-        }
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+          advanceTime(effectiveTimeout.plus(bufferDuration)),
+          entries => {
+            forExactly(3, entries) { line =>
+              line.message should include(
+                "Noticed an SvcRules epoch change"
+              )
+            }
+          },
+        )
+        val svcRulesAfterElection =
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+            .head
+            .data
+        svcRulesAfterElection.epoch shouldBe svcRulesBeforeElection.epoch + 1
+        svcRulesAfterElection.leader should not be svcRulesBeforeElection.leader
 
         eventually() {
           val newRounds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
