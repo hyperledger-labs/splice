@@ -78,10 +78,15 @@ export const DropdownSchedules: React.FC<{
             </option>
           ))}
       </NativeSelect>
-      {onChange && dropdownOptions.filter(e => e.label === selectedOption)[0].value !== null && (
-        <PrettyJsonPrint data={dropdownOptions.filter(e => e.label === selectedOption)[0].value!} />
-      )}
+      {onChange &&
+        dropdownOptions.filter(e => e.label === selectedOption).length > 0 &&
+        dropdownOptions.filter(e => e.label === selectedOption)[0].value !== null && (
+          <PrettyJsonPrint
+            data={dropdownOptions.filter(e => e.label === selectedOption)[0].value!}
+          />
+        )}
       {onChangeEditor &&
+        dropdownOptions.filter(e => e.label === selectedOption).length > 0 &&
         dropdownOptions.filter(e => e.label === selectedOption)[0].value !== null && (
           <JsonEditor
             data={dropdownOptions.filter(e => e.label === selectedOption)[0].value!}

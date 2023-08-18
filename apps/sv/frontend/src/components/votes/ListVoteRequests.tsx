@@ -182,7 +182,7 @@ const ListVoteRequests: React.FC = () => {
       {voteRequestsStaled.length > 0 && (
         <Stack>
           <Typography mt={6} variant="h5">
-            Rejected due to coin configuration schedule conflict
+            Rejected due to system conflict
           </Typography>
           <ListVoteRequestsTable
             voteRequests={voteRequestsStaled}

@@ -1,4 +1,4 @@
-import { getUTCWithOffset, JSONValue, JsonEditor, Loading } from 'common-frontend';
+import { getUTCWithOffset, JsonEditor, JSONValue, Loading } from 'common-frontend';
 import { Dayjs } from 'dayjs';
 import React, { useState } from 'react';
 
@@ -31,7 +31,7 @@ const AddFutureCoinConfigSchedule: React.FC<{
   }
 
   if (!svcInfosQuery.data) {
-    return <p>no VoteRequest contractId is specified</p>;
+    return <p>undefined query data</p>;
   }
 
   async function addFutureCoinConfigScheduleAction(config: Record<string, JSONValue>) {

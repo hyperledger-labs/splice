@@ -26,16 +26,17 @@ const RemoveFutureCoinConfigSchedule: React.FC<{
   }
 
   if (!svcInfosQuery.data) {
-    return <p>no VoteRequest contractId is specified</p>;
+    return <p>undefined query data</p>;
   }
 
   async function RemoveFutureCoinConfigScheduleAction(time: string) {
+    const utcTime = dayjs.utc(dayjs(time)).format('YYYY-MM-DDTHH:mm:00[Z]');
     chooseAction({
       tag: 'ARC_CoinRules',
       value: {
         coinRulesAction: {
           tag: 'CRARC_RemoveFutureCoinConfigSchedule',
-          value: { scheduleTime: dayjs.utc(dayjs(time)).format('YYYY-MM-DDTHH:mm:00[Z]') },
+          value: { scheduleTime: utcTime },
         },
       },
     });

@@ -28,7 +28,7 @@ const UpdateFutureCoinConfigSchedule: React.FC<{
   }
 
   if (!svcInfosQuery.data) {
-    return <p>no VoteRequest contractId is specified</p>;
+    return <p>undefined query data</p>;
   }
 
   async function UpdateFutureCoinConfigScheduleAction(
@@ -36,10 +36,9 @@ const UpdateFutureCoinConfigSchedule: React.FC<{
     config: Record<string, JSONValue>
   ) {
     const item: Tuple2<string, CoinConfig<'USD'>> = {
-      _1: dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]'),
+      _1: dayjs.utc(dayjs(date)).format('YYYY-MM-DDTHH:mm:00[Z]'),
       _2: CoinConfig(USD).decoder.runWithException(config),
     };
-
     chooseAction({
       tag: 'ARC_CoinRules',
       value: {

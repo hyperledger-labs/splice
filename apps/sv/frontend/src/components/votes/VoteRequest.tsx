@@ -18,7 +18,10 @@ import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcR
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { useSvcInfos } from '../../contexts/SvContext';
+import { useListSvcRulesVoteRequests } from '../../hooks/useListVoteRequests';
 import { config } from '../../utils';
+import { Alerting, AlertState } from '../../utils/Alerting';
+import { isScheduleDateTimeValid, ScheduleValidity } from '../../utils/validations';
 import ListVoteRequests from './ListVoteRequests';
 import AddFutureCoinConfigSchedule from './actions/AddFutureCoinConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
@@ -29,11 +32,18 @@ import SetCoinRulesEnabledChoices from './actions/SetCoinRulesEnabledChoices';
 import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 import UpdateFutureCoinConfigSchedule from './actions/UpdateFutureCoinConfigSchedule';
 
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+dayjs.extend(utc);
+
 const VoteRequest: React.FC = () => {
   const [actionName, setActionName] = useState('SRARC_RemoveMember');
   const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
+
+  const [alertMessage, setAlertMessage] = useState<AlertState>({});
   const svcInfosQuery = useSvcInfos();
+  const listVoteRequestsQuery = useListSvcRulesVoteRequests();
 
   const actionNameOptions = [
     { name: 'Remove Member', value: 'SRARC_RemoveMember' },
@@ -51,11 +61,48 @@ const VoteRequest: React.FC = () => {
     setAction(action);
   };
 
+  function validateAction(action: ActionRequiringConfirmation) {
+    // check that for FutureCoinConfigSchedule operations, the date is yet not in progress in another request
+    if (action?.tag === 'ARC_CoinRules') {
+      switch (action.value.coinRulesAction.tag) {
+        case 'CRARC_AddFutureCoinConfigSchedule': {
+          const validity: ScheduleValidity = isScheduleDateTimeValid(
+            listVoteRequestsQuery.data!,
+            action.value.coinRulesAction.value.newScheduleItem._1
+          );
+          setAlertMessage(validity.alertMessage);
+          return validity.isValid;
+        }
+        case 'CRARC_UpdateFutureCoinConfigSchedule': {
+          const validity: ScheduleValidity = isScheduleDateTimeValid(
+            listVoteRequestsQuery.data!,
+            action.value.coinRulesAction.value.scheduleItem._1
+          );
+          setAlertMessage(validity.alertMessage);
+          return validity.isValid;
+        }
+        case 'CRARC_RemoveFutureCoinConfigSchedule': {
+          const validity: ScheduleValidity = isScheduleDateTimeValid(
+            listVoteRequestsQuery.data!,
+            action.value.coinRulesAction.value.scheduleTime
+          );
+          setAlertMessage(validity.alertMessage);
+          return validity.isValid;
+        }
+        default:
+          return true;
+      }
+    } else {
+      return true;
+    }
+  }
+
   const { createVoteRequest } = useSvAdminClient();
   const createVoteRequestMutation = useMutation({
     mutationFn: async () => {
       const requester = svcInfosQuery.data?.svPartyId!;
-      if (actionNameOptions.map(e => e.value).includes(actionName)) {
+
+      if (actionNameOptions.map(e => e.value).includes(actionName) && validateAction(action!)) {
         return await createVoteRequest(requester, action!, url, summary)
           .then(() => setUrl(''))
           .then(() => setSummary(''))
@@ -142,7 +189,7 @@ const VoteRequest: React.FC = () => {
               </Button>
             </Box>
           </Stack>
-
+          <Alerting alertState={alertMessage} />
           <Button
             id="create-voterequest-submit-button"
             fullWidth
