@@ -2,13 +2,14 @@ package com.daml.network.sv.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
+  AssignTrigger,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
-  AssignTrigger,
 }
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.automation.confirmation.{
   ArchiveClosedMiningRoundsTrigger,
+  CnsSubscriptionInitialPaymentTrigger,
   ElectionRequestTrigger,
   SummarizingMiningRoundTrigger,
   SvOnboardingRequestTrigger,
@@ -144,5 +145,7 @@ class SvSvcAutomationService(
           ),
     )
   )
-
+  registerTrigger(
+    new CnsSubscriptionInitialPaymentTrigger(triggerContext, svcStore, connection)
+  )
 }

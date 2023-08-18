@@ -10,9 +10,11 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, SummarizingMiningRound}
 import com.daml.network.codegen.java.cn.svcrules.Confirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
+  ARC_CnsEntryContext,
   ARC_CoinRules,
   ARC_SvcRules,
 }
+import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
   CRARC_MiningRound_Archive,
   CRARC_MiningRound_StartIssuing,
@@ -158,6 +160,21 @@ class ExecuteConfirmedActionTrigger(
           case action =>
             throw new UnsupportedOperationException(
               show"svc rules $action is not yet supported"
+            )
+        }
+      case arcCnsEntryContext: ARC_CnsEntryContext =>
+        arcCnsEntryContext.cnsEntryContextAction match {
+          case _: CNSRARC_CollectInitialEntryPayment =>
+            store.lookupCnsEntryContext(arcCnsEntryContext.cnsEntryContextCid).flatMap {
+              case Some(context) =>
+                store.lookupCnsEntryByName(context.payload.name).map(_.isDefined)
+              case None =>
+                // The cns context no longer exists, it doesn't make sense to retry collecting the payment.
+                Future.successful(true)
+            }
+          case action =>
+            throw new UnsupportedOperationException(
+              show"cns entry context $action is not yet supported"
             )
         }
       case _ =>

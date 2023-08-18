@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
+import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext, CnsRules}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.store.{AcsStoreDump, Limit, MultiDomainAcsStore}
@@ -122,6 +123,10 @@ class DbSvSvcStore(
     Option[AssignedContract[CoinRules.ContractId, CoinRules]]
   ]] = ???
 
+  override protected def lookupCnsRulesWithOffset(): Future[MultiDomainAcsStore.QueryResult[Option[
+    AssignedContract[CnsRules.ContractId, CnsRules]
+  ]]] = ???
+
   override def lookupSvOnboardingConfirmedByPartyOnDomain(svParty: PartyId, domainId: DomainId)(
       implicit tc: TraceContext
   ): Future[MultiDomainAcsStore.QueryResult[
@@ -170,6 +175,17 @@ class DbSvSvcStore(
       action: ActionRequiringConfirmation,
   )(implicit tc: TraceContext): Future[
     MultiDomainAcsStore.QueryResult[Option[Contract[Confirmation.ContractId, Confirmation]]]
+  ] = ???
+
+  override def lookupCnsInitialPaymentConfirmationByCnsNameWithOffset(
+      confirmer: PartyId,
+      name: String,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    MultiDomainAcsStore.QueryResult[Option[
+      Contract[Confirmation.ContractId, Confirmation]
+    ]]
   ] = ???
 
   override def lookupSvOnboardingRequestByTokenWithOffset(
@@ -294,6 +310,27 @@ class DbSvSvcStore(
   override def listCoinRulesTransferFollowers()(implicit
       tc: TraceContext
   ): Future[Seq[FollowTask[CoinRules.ContractId, CoinRules, ?, ?]]] = ???
+
+  override protected def lookupCnsEntryByNameWithOffset(name: String): Future[
+    MultiDomainAcsStore.QueryResult[Option[AssignedContract[CnsEntry.ContractId, CnsEntry]]]
+  ] = ???
+
+  override protected def listCnsEntryContextByCnsName(
+      name: String
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[CnsEntryContext.ContractId, CnsEntryContext]]
+  ] = ???
+
+  override def listCnsInitialPaymentConfirmationByCnsName(
+      confirmer: PartyId,
+      name: String,
+  )(implicit tc: TraceContext): Future[Seq[Contract[Confirmation.ContractId, Confirmation]]] = ???
+
+  override def lookupFeaturedAppRightWithOffset(
+      providerPartyId: PartyId
+  )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[
+    Option[AssignedContract[FeaturedAppRight.ContractId, FeaturedAppRight]]
+  ]] = ???
 }
 
 object DbSvSvcStore {

@@ -4,6 +4,7 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.{
+  cns as cnsCongen,
   directory as directoryCodegen,
   splitwell as splitwellCodegen,
 }
@@ -554,6 +555,13 @@ object UserWalletStore {
               )
             ),
             InterfaceImplementation(testSubsCodegen.TestSubscriptionContext.COMPANION)(ctx =>
+              new subsCodegen.SubscriptionContextView(
+                ctx.svc,
+                ctx.user,
+                ctx.description,
+              )
+            ),
+            InterfaceImplementation(cnsCongen.CnsEntryContext.COMPANION)(ctx =>
               new subsCodegen.SubscriptionContextView(
                 ctx.svc,
                 ctx.user,

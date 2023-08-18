@@ -11,10 +11,15 @@ import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cc.{v1test as v1testcc, validatorlicense as vl}
+import com.daml.network.codegen.java.cn.cns.*
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
+  ARC_CnsEntryContext,
+  ARC_CoinRules,
+}
+import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
@@ -79,6 +84,13 @@ class InMemorySvSvcStore(
           (_: Any) => true,
         )
     )
+
+  override protected def lookupCnsRulesWithOffset(): Future[MultiDomainAcsStore.QueryResult[Option[
+    AssignedContract[CnsRules.ContractId, CnsRules]
+  ]]] = for {
+    result <- multiDomainAcsStore
+      .findContractWithOffset(cn.cns.CnsRules.COMPANION)((_: Any) => true)
+  } yield result map (_ flatMap (_.toAssignedContract))
 
   override protected def listExpiredRoundBased[Id <: ContractId[T], T <: Template](
       companion: TemplateCompanion[Id, T]
@@ -284,6 +296,33 @@ class InMemorySvSvcStore(
           co.payload.confirmer == confirmer.toProtoPrimitive && co.payload.action.toValue == action.toValue,
       )
     )
+
+  override def lookupCnsInitialPaymentConfirmationByCnsNameWithOffset(
+      confirmer: PartyId,
+      name: String,
+  )(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[Contract[Confirmation.ContractId, Confirmation]]]] = for {
+    domain <- defaultAcsDomainIdF
+    cnsContextCids <- listCnsEntryContextByCnsName(name).map(_.map(_.contractId).toSet)
+    result <- multiDomainAcsStore.findContractOnDomainWithOffset(
+      cn.svcrules.Confirmation.COMPANION
+    )(
+      domain,
+      (co: Contract[Confirmation.ContractId, Confirmation]) =>
+        co.payload.confirmer == confirmer.toProtoPrimitive
+          && (co.payload.action match {
+            case arcCnsEntryContext: ARC_CnsEntryContext =>
+              arcCnsEntryContext.cnsEntryContextAction match {
+                case _: CNSRARC_CollectInitialEntryPayment =>
+                  cnsContextCids.contains(arcCnsEntryContext.cnsEntryContextCid)
+                case _ =>
+                  false
+              }
+            case _ => false
+          }),
+    )
+  } yield result
 
   override def lookupSvOnboardingRequestByTokenWithOffset(token: String)(implicit
       tc: TraceContext
@@ -624,4 +663,69 @@ class InMemorySvSvcStore(
         cc.validatorlicense.ValidatorLicense.COMPANION,
       ).map(_.map(FollowTask(coinRules, _)).toSeq)
     }.getOrElse(Future successful Seq.empty))
+
+  override protected def lookupCnsEntryByNameWithOffset(name: String): Future[
+    QueryResult[Option[AssignedContract[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]]
+  ] = multiDomainAcsStore
+    .findContractWithOffset(cn.cns.CnsEntry.COMPANION)(
+      (c: Contract[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]) => c.payload.name == name
+    )
+    .map(_.map(_.flatMap(_.toAssignedContract)))
+
+  override protected def listCnsEntryContextByCnsName(
+      name: String
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]]
+  ] = for {
+    domain <- defaultAcsDomainIdF
+    contexts <- multiDomainAcsStore.filterContractsOnDomain(
+      cn.cns.CnsEntryContext.COMPANION,
+      domain,
+      { co: Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext] =>
+        co.payload.name == name
+      },
+    )
+  } yield contexts
+
+  override def listCnsInitialPaymentConfirmationByCnsName(
+      confirmer: PartyId,
+      name: String,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]
+  ] = {
+    for {
+      domain <- defaultAcsDomainIdF
+      cnsContextCids <- listCnsEntryContextByCnsName(name).map(_.map(_.contractId).toSet)
+      result <- multiDomainAcsStore.filterContractsOnDomain(
+        cn.svcrules.Confirmation.COMPANION,
+        domain,
+        (co: Contract[Confirmation.ContractId, Confirmation]) =>
+          co.payload.confirmer == confirmer.toProtoPrimitive
+            && (co.payload.action match {
+              case arcCnsEntryContext: ARC_CnsEntryContext =>
+                arcCnsEntryContext.cnsEntryContextAction match {
+                  case _: CNSRARC_CollectInitialEntryPayment =>
+                    cnsContextCids.contains(arcCnsEntryContext.cnsEntryContextCid)
+                  case _ =>
+                    false
+                }
+              case _ => false
+            }),
+      )
+    } yield result
+  }
+
+  override def lookupFeaturedAppRightWithOffset(
+      providerPartyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[
+      Option[AssignedContract[FeaturedAppRight.ContractId, FeaturedAppRight]]
+    ]
+  ] = for {
+    result <- multiDomainAcsStore
+      .findContractWithOffset(FeaturedAppRight.COMPANION)(
+        (co: Contract[FeaturedAppRight.ContractId, FeaturedAppRight]) =>
+          co.payload.provider == providerPartyId.toProtoPrimitive
+      )
+  } yield result map (_ flatMap (_.toAssignedContract))
 }

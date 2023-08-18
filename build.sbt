@@ -706,6 +706,7 @@ lazy val `apps-wallet` =
       `directory-daml`,
       `splitwell-daml`,
       `svc-governance-daml`,
+      `canton-name-service-daml`,
     )
     .settings(
       BuildCommon.sharedAppSettings,

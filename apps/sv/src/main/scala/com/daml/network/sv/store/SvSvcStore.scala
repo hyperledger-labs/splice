@@ -15,6 +15,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
   SvcRules_ConfirmSvOnboarding,
   VoteRequest,
 }
+import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.directory.store.DirectoryStore
@@ -37,6 +38,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
 trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
@@ -102,6 +104,22 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       _.map(_.contract).getOrElse(
         throw new StatusRuntimeException(
           Status.NOT_FOUND.withDescription("No active CoinRules contract")
+        )
+      )
+    )
+
+  protected def lookupCnsRulesWithOffset()
+      : Future[QueryResult[Option[AssignedContract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]]
+
+  def lookupCnsRules()
+      : Future[Option[AssignedContract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]] =
+    lookupCnsRulesWithOffset().map(_.value)
+
+  def getCnsRules(): Future[Contract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]] =
+    lookupCnsRules().map(
+      _.map(_.contract).getOrElse(
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription("No active CnsRules contract")
         )
       )
     )
@@ -238,6 +256,15 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
     QueryResult[Option[
       Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]
     ]]
+  ]
+
+  def lookupCnsInitialPaymentConfirmationByCnsNameWithOffset(
+      confirmer: PartyId,
+      name: String,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    QueryResult[Option[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]]
   ]
 
   def lookupSvOnboardingRequestByTokenWithOffset(
@@ -516,6 +543,73 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   def listCoinRulesTransferFollowers()(implicit
       tc: TraceContext
   ): Future[Seq[FollowTask[cc.coin.CoinRules.ContractId, cc.coin.CoinRules, ?, ?]]]
+
+  protected def lookupCnsEntryByNameWithOffset(name: String): Future[
+    QueryResult[Option[AssignedContract[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]]
+  ]
+
+  def lookupCnsEntryByName(
+      name: String
+  ): Future[Option[AssignedContract[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]] =
+    lookupCnsEntryByNameWithOffset(name).map(_.value)
+
+  def lookupCnsEntryContext(contractId: cn.cns.CnsEntryContext.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]]] =
+    defaultAcsDomainIdF.flatMap(
+      multiDomainAcsStore
+        .lookupContractByIdOnDomain(cn.cns.CnsEntryContext.COMPANION)(_, contractId)
+    )
+
+  protected def listCnsEntryContextByCnsName(name: String)(implicit tc: TraceContext): Future[
+    Seq[Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]]
+  ]
+
+  def listCnsInitialPaymentConfirmationByCnsName(
+      confirmer: PartyId,
+      name: String,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]
+  ]
+
+  def lookupFeaturedAppRightWithOffset(
+      providerPartyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    QueryResult[
+      Option[AssignedContract[cc.coin.FeaturedAppRight.ContractId, cc.coin.FeaturedAppRight]]
+    ]
+  ]
+
+  def lookupFeaturedAppRight(
+      providerPartyId: PartyId
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Option[AssignedContract[cc.coin.FeaturedAppRight.ContractId, cc.coin.FeaturedAppRight]]
+  ] =
+    lookupFeaturedAppRightWithOffset(providerPartyId).map(_.value)
+
+  def getSvcTransferContextForRound(round: cc.api.v1.round.Round)(implicit
+      tc: TraceContext
+  ): Future[Option[cc.api.v1.coin.AppTransferContext]] = {
+    for {
+      triple <- getOpenMiningRoundTriple()
+      openRounds = triple.toSeq
+      featured <- lookupFeaturedAppRight(key.svcParty)
+      coinRules <- getCoinRules()
+    } yield {
+      openRounds.find(_.payload.round == round) map { openMiningRound =>
+        new cc.api.v1.coin.AppTransferContext(
+          coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
+          openMiningRound.contractId
+            .toInterface(cc.api.v1.round.OpenMiningRound.INTERFACE),
+          featured
+            .map(_.contractId.toInterface(cc.api.v1.coin.FeaturedAppRight.INTERFACE))
+            .toJava,
+        )
+      }
+    }
+  }
 }
 
 object SvSvcStore {
@@ -598,6 +692,12 @@ object SvSvcStore {
         mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc),
         mkFilter(cc.globaldomain.ValidatorTraffic.COMPANION)(vt => vt.payload.svc == svc),
         mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc),
+        mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.cns.CnsEntryContext.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(sub.SubscriptionInitialPayment.COMPANION)(co =>
+          co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
+        ),
       ) ++
         (if (enableCoinRulesUpgrade)
            Map(mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))

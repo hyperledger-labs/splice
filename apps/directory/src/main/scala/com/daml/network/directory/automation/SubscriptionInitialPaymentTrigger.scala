@@ -66,7 +66,7 @@ class SubscriptionInitialPaymentTrigger(
         )
         .map(_ => TaskSuccess(s"rejected initial subscription payment: $reason"))
     }
-    def collectPayment(
+    def collectPaymentAndCreateEntry(
         entryName: String,
         deduplicationOffset: String,
         transferContext: v1.coin.AppTransferContext,
@@ -93,78 +93,76 @@ class SubscriptionInitialPaymentTrigger(
       } yield TaskSuccess("created directory entry.")
     }
 
-    for {
-      context <- store.multiDomainAcsStore
-        .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
-          domainId,
-          contextId,
-        )
-        .map(
-          _.getOrElse(
-            throw new IllegalStateException(
-              s"Invariant violation: subscription context $contextId not known"
-            )
-          )
-        )
-      transferContextE <- scanConnection.getAppTransferContextForRound(
-        store.svcParty,
-        payment.payload.round,
+    store.multiDomainAcsStore
+      .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
+        domainId,
+        contextId,
       )
-      result <- transferContextE match {
-        case Right((transferContext, disclosedContracts)) =>
-          // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
-          val entryName = context.payload.name
-          val entryUrl = context.payload.url
-          val entryDescription = context.payload.description
+      .flatMap {
+        case Some(context) =>
+          for {
+            transferContextE <- scanConnection.getAppTransferContextForRound(
+              store.svcParty,
+              payment.payload.round,
+            )
+            result <- transferContextE match {
+              case Right((transferContext, disclosedContracts)) =>
+                // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
+                val entryName = context.payload.name
+                val entryUrl = context.payload.url
+                val entryDescription = context.payload.description
 
-          if (!DirectoryUtil.isValidEntryName(entryName)) {
-            rejectPayment(
-              s"entry name ($entryName) is not valid",
-              transferContext,
-              disclosedContracts,
-            )
-          } else if (!DirectoryUtil.isValidEntryUrl(entryUrl)) {
-            rejectPayment(
-              s"entry url ($entryUrl) is not valid",
-              transferContext,
-              disclosedContracts,
-            )
-          } else if (!DirectoryUtil.isValidEntryDescription(entryDescription)) {
-            rejectPayment(
-              s"entry description ($entryDescription) is not valid",
-              transferContext,
-              disclosedContracts,
-            )
-          } else {
-            // check whether the entry already exists
-            store.lookupEntryByNameWithOffset(entryName).flatMap {
-              case QueryResult(_, Some(entry)) =>
-                rejectPayment(
-                  s"entry already exists and owned by ${entry.payload.user}.",
-                  transferContext,
-                  disclosedContracts,
-                )
-              case QueryResult(offset, None) =>
-                // collect the payment and create the entry
-                collectPayment(
-                  entryName,
-                  offset,
-                  transferContext,
-                  disclosedContracts,
-                )
+                if (!DirectoryUtil.isValidEntryName(entryName)) {
+                  rejectPayment(
+                    s"entry name ($entryName) is not valid",
+                    transferContext,
+                    disclosedContracts,
+                  )
+                } else if (!DirectoryUtil.isValidEntryUrl(entryUrl)) {
+                  rejectPayment(
+                    s"entry url ($entryUrl) is not valid",
+                    transferContext,
+                    disclosedContracts,
+                  )
+                } else if (!DirectoryUtil.isValidEntryDescription(entryDescription)) {
+                  rejectPayment(
+                    s"entry description ($entryDescription) is not valid",
+                    transferContext,
+                    disclosedContracts,
+                  )
+                } else {
+                  // check whether the entry already exists
+                  store.lookupEntryByNameWithOffset(entryName).flatMap {
+                    case QueryResult(_, Some(entry)) =>
+                      rejectPayment(
+                        s"entry already exists and owned by ${entry.payload.user}.",
+                        transferContext,
+                        disclosedContracts,
+                      )
+                    case QueryResult(offset, None) =>
+                      collectPaymentAndCreateEntry(
+                        entryName,
+                        offset,
+                        transferContext,
+                        disclosedContracts,
+                      )
+                  }
+                }
+              case Left(err) =>
+                scanConnection
+                  .getAppTransferContext(store.svcParty)
+                  .flatMap { case (transferContext, disclosedContracts) =>
+                    rejectPayment(
+                      s"Round ${payment.payload.round} is no longer active: $err",
+                      transferContext,
+                      disclosedContracts,
+                    )
+                  }
             }
-          }
-        case Left(err) =>
-          scanConnection
-            .getAppTransferContext(store.svcParty)
-            .flatMap { case (transferContext, disclosedContracts) =>
-              rejectPayment(
-                s"Round ${payment.payload.round} is no longer active: $err",
-                transferContext,
-                disclosedContracts,
-              )
-            }
+          } yield result
+        case None =>
+          Future.successful(TaskSuccess(s"skipping as subscription context $contextId not known."))
       }
-    } yield result
+
   }
 }
