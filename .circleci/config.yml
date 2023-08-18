@@ -44,6 +44,11 @@ parameters:
   bootstrapping-config:
     type: string
     default: ""
+  # Disable the CometBFT driver for the global domain sequencer
+  # TODO(#7344) remove once the driver is stable
+  disable-cometbft-driver:
+    type: boolean
+    default: false
 
 notify-fail: &notify-fail
   context: slack-context
@@ -1423,6 +1428,10 @@ jobs:
                 echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
                 exit 1
               fi
+            fi
+            # TODO(#7344) remove once the driver is stable
+            if [[ << pipeline.parameters.disable-cometbft-driver >> == true ]]; then
+              export DISABLE_COMETBFT_DRIVER=true
             fi
             cncluster activate
             cncluster ci_apply

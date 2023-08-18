@@ -248,6 +248,10 @@ jobs:
                 exit 1
               fi
             fi
+            # TODO(#7344) remove once the driver is stable
+            if [[ << pipeline.parameters.disable-cometbft-driver >> == true ]]; then
+              export DISABLE_COMETBFT_DRIVER=true
+            fi
             cncluster activate
             cncluster ci_apply
       - notify-cluster-fail:

@@ -47,7 +47,9 @@ if (withDomainFees && !doubleSv) {
   exit(1);
 }
 
-const globalDomainSequencerDriver = isDevNet ? 'cometbft' : 'postgres';
+// TODO(#7344) remove once the driver is stable
+const disableCometBftDriver = process.env.DISABLE_COMETBFT_DRIVER === 'true';
+const globalDomainSequencerDriver = isDevNet && !disableCometBftDriver ? 'cometbft' : 'postgres';
 
 pulumi.log.error(`Initializing with global domain with ${globalDomainSequencerDriver}`);
 
