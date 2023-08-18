@@ -94,16 +94,7 @@ object TxLogStore {
             logger.error(s"Failed to handle parsing error: ${e.getMessage}", e)
             Seq.empty
           },
-          entries => {
-            // TODO (#7154): uncomment and ensure that the invariant holds in all parsers
-//            val byEventId = entries.groupBy(_.indexRecord.eventId)
-//            val notUnique = byEventId.collect { case (k, vs) if vs.size > 1 => (k, vs) }
-//            assert(
-//              notUnique.isEmpty,
-//              s"TxLogParser returned more than one entry for the same eventId: $notUnique",
-//            )
-            entries
-          },
+          identity,
         )
   }
 
@@ -206,16 +197,23 @@ object TxLogStore {
       val entries = txLogStore.txLogParser.parse(tx, domainId, logger)
 
       // Find original TxLog entry
-      entries
-        .find(_.indexRecord.eventId == eventId)
-        .getOrElse(
-          sys.error(
-            s"Parser did not return any entry for event ${eventId}. "
+      entries.filter(_.indexRecord.eventId == eventId) match {
+        case entry +: Seq() =>
+          entry
+        case Seq() =>
+          throw new IllegalStateException(
+            s"Parser did not return any entry for event $eventId. "
               + "The parser did return an entry for the same event previously. "
               + "Either the parser doesn't always return the same entry for a given input tree event, "
               + "or the transaction tree was loaded using different reader parties than those used during ingestion."
           )
-        )
+        case x =>
+          throw new IllegalStateException(
+            s"Parser returned ${x.size} entries for event $eventId. "
+              + "This means that the parser does not guarantee a single entry for an event id, "
+              + "therefore, `loadTxLogEntryFromTree` cannot be used for entries from that parser."
+          )
+      }
     }
 
     private def loadTxLogEntryFromAcs(
