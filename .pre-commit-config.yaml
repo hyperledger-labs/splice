@@ -49,3 +49,8 @@ repos:
         entry: "make cluster/pulumi/sv-runbook/test"
         files: '^cluster/pulumi/sv-runbook/.*[.]ts$'
         pass_filenames: false
+      - id: circleci_config
+        name: check circleci config is updated
+        language: system
+        entry: ".circleci/build-config.sh --check"
+        files: '^.circleci/config/.*[.]yml$'
