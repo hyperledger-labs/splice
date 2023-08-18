@@ -861,14 +861,14 @@ object UserWalletTxLogParser {
           )
       }
       case class Completed(
-          contractId: Option[coinv1.Coin.ContractId],
+          contractId: coinv1.Coin.ContractId,
           transactionId: String,
       ) extends TransferOfferStatus {
         override def toStatusResponse: GetTransferOfferStatusResponse =
           httpDef.GetTransferOfferStatusResponse(
             status = httpDef.GetTransferOfferStatusResponse.Status.Completed,
             transactionId = Some(transactionId),
-            contractId = contractId.map(_.contractId),
+            contractId = Some(contractId.contractId),
           )
       }
       sealed trait Failed extends TransferOfferStatus
@@ -1453,15 +1453,22 @@ object UserWalletTxLogParser {
         domainId: DomainId,
         node: ExerciseNode[?, AcceptedTransferOffer_Complete.Res],
     ): State = {
-      import scala.jdk.OptionConverters.*
       val trackingInfo = node.result.value._1._2
+      val receiverCoinContractId = node.result.value._1._1.createdCoins.asScala.toList match {
+        case (coin: coinv1.createdcoin.TransferResultCoin) :: Nil =>
+          coin.contractIdValue
+        case x =>
+          throw new RuntimeException(
+            s"Expected createdCoins to contain a single TransferResultCoin, but was $x"
+          )
+      }
       fromTransferOfferOperation(
         tx,
         event,
         domainId,
         trackingInfo.trackingId,
         TxLogEntry.TransferOfferStatus.Completed(
-          node.result.value._2.toScala,
+          receiverCoinContractId,
           tx.getTransactionId,
         ),
         trackingInfo.sender,

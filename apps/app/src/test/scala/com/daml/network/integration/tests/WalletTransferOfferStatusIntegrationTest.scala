@@ -1,16 +1,18 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.api.v1.event.CreatedEvent.toJavaProto
 import com.daml.ledger.api.v1.transaction.{TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.history.CoinCreate
+import com.daml.network.http.v0.definitions as d0
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
-import com.daml.network.http.v0.definitions as d0
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
-import com.daml.network.codegen.java.cc.api.v1.coin as coinv1
 
 import java.time.Duration
 
@@ -29,6 +31,7 @@ class WalletTransferOfferStatusIntegrationTest
   "A wallet transfer offer status" should {
 
     val trackingId = "mytracking"
+    val transferOfferAmount = BigDecimal(10.0)
 
     def createTransferOffer(senderParty: PartyId, receiverParty: PartyId)(implicit
         env: CNNodeTests.CNNodeTestConsoleEnvironment
@@ -37,7 +40,7 @@ class WalletTransferOfferStatusIntegrationTest
         "Alice creates transfer offer",
         aliceWalletClient.createTransferOffer(
           receiverParty,
-          10.0,
+          transferOfferAmount,
           "created->accepted->completed",
           CantonTimestamp.now().plus(Duration.ofMinutes(1)),
           trackingId,
@@ -141,11 +144,21 @@ class WalletTransferOfferStatusIntegrationTest
               )
               batchExercise.getExercised.choice should be("WalletAppInstall_ExecuteBatch")
               tree.eventsById
-                .exists(
+                .find(
                   _._2.getExercised.choice == "AcceptedTransferOffer_Complete"
-                ) should be(true)
-              tree.eventsById.exists { case (_, evt) =>
-                evt.getCreated.contractId == contractId && evt.getCreated.getTemplateId.entityName == coinv1.Coin.TEMPLATE_ID.getEntityName
+                )
+                .valueOrFail("Did not find complete tx")
+              val coins = tree.eventsById.view
+                .filter(_._2.getCreated.contractId.nonEmpty)
+                .mapValues(evt => CreatedEvent.fromProto(toJavaProto(evt.getCreated)))
+                .collect { case (_, CoinCreate(coin)) =>
+                  coin
+                }
+              coins.exists { coin =>
+                coin.payload.owner == bobUserParty.toProtoPrimitive &&
+                coin.payload.amount.initialAmount
+                  .doubleValue() == transferOfferAmount.doubleValue &&
+                coin.contractId.contractId == contractId
               } should be(true)
           }
         },

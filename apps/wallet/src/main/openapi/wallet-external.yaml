@@ -221,7 +221,8 @@ components:
               contract_id points to the contract id of the accepted offer and transaction_id to the transaction that accepted it
             completed:
               The transfer has been completed and the CC amount has been transferred to the receiver.
-              contract_id points to the contract id of the created coin and transaction_id to the transaction of the transfer.
+              contract_id points to the contract id of the created coin for the receiver and
+              transaction_id to the transaction of the transfer.
             failed:
               The transfer has failed permanently and no CC has been transferred. Refer to
               failure_reason for details. A new transfer offer can be created with a different tracking_id.
