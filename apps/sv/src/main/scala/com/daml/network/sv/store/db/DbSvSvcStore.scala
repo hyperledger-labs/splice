@@ -87,6 +87,9 @@ class DbSvSvcStore(
             requester,
             electionRequestEpoch,
             importCrateReceiver,
+            memberTrafficMember,
+            cnsEntryName,
+            actionCnsEntryContextCid,
           ) =>
         val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
         val templateId = contract.identifier
@@ -97,19 +100,20 @@ class DbSvSvcStore(
         val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
         val safeSvOnboardingToken = svOnboardingToken.map(lengthLimited)
         val safeSvCandidateName = svCandidateName.map(lengthLimited)
+        val safeCnsEntryName = cnsEntryName.map(lengthLimited)
         sqlu"""
               insert into svc_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                         coin_round_of_expiry, reward_round, reward_party, mining_round, action_requiring_confirmation,
                                         confirmer, sv_onboarding_token, sv_candidate_party, sv_candidate_name, validator,
                                         total_traffic_purchased, voter, vote_request_cid, requester, election_request_epoch,
-                                        import_crate_receiver)
+                                        import_crate_receiver, member_traffic_member, cns_entry_name, action_cns_entry_context_cid)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       $coinRoundOfExpiry, $rewardRound, $rewardParty, $miningRound, $actionRequiringConfirmation,
                       $confirmer, $safeSvOnboardingToken, $svCandidateParty, $safeSvCandidateName, $validator,
                       $totalTrafficPurchased, $voter, $voteRequestCid, $requester, $electionRequestEpoch,
-                      $importCrateReceiver)
+                      $importCrateReceiver, $memberTrafficMember, $safeCnsEntryName, $actionCnsEntryContextCid)
               on conflict do nothing
             """
     }

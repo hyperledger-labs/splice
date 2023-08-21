@@ -341,7 +341,18 @@ create table svc_acs_store
     election_request_epoch        bigint,
 
     -- the receiver in an ImportCrate
-    import_crate_receiver         text
+    import_crate_receiver         text,
+
+    -- the member id in a MemberTraffic
+    member_traffic_member         text,
+
+    -- The entry name in CnsEntry and CnsEntryContext
+    cns_entry_name                text,
+
+    -- the cnsEntryContextCid of a Confirmation contract:
+    -- - if the action is of type ARC_CnsEntryContext
+    -- - if the above's cnsEntryContextAction is of type CNSRARC_CollectInitialEntryPayment
+    action_cns_entry_context_cid  text
 );
 
 -- ordered mining rounds
@@ -408,4 +419,16 @@ create index svc_acs_store_sid_tid_ere_r
 create index svc_acs_store_sid_tid_icr
     on svc_acs_store (store_id, template_id, import_crate_receiver)
     where import_crate_receiver is not null;
+
+create index svc_acs_store_sid_tid_mtm
+    on svc_acs_store (store_id, template_id, member_traffic_member)
+    where member_traffic_member is not null;
+
+create index svc_acs_store_sid_tid_cen
+    on svc_acs_store (store_id, template_id, cns_entry_name)
+    where cns_entry_name is not null;
+
+create index svc_acs_store_sid_tid_acecc
+    on svc_acs_store (store_id, template_id, action_cns_entry_context_cid)
+    where action_cns_entry_context_cid is not null;
 

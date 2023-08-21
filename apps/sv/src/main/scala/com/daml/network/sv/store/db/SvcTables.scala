@@ -5,6 +5,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -34,6 +35,9 @@ object SvcTables extends AcsTables with NamedLogging {
       requester: Option[PartyId] = None,
       electionRequestEpoch: Option[Long] = None,
       importCrateReceiver: Option[PartyId] = None,
+      memberTrafficMember: Option[PartyId] = None,
+      cnsEntryName: Option[String] = None,
+      actionCnsEntryContextCid: Option[cn.cns.CnsEntryContext.ContractId] = None,
   )
 
   object SvcAcsStoreRowData {
@@ -56,6 +60,16 @@ object SvcTables extends AcsTables with NamedLogging {
               actionRequiringConfirmation =
                 Some(payloadJsonFromValue(contract.payload.action.toValue)),
               confirmer = Some(PartyId.tryFromProtoPrimitive(contract.payload.confirmer)),
+              actionCnsEntryContextCid = contract.payload.action match {
+                case arcCnsEntryContext: cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext =>
+                  arcCnsEntryContext.cnsEntryContextAction match {
+                    case _: cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment =>
+                      Some(arcCnsEntryContext.cnsEntryContextCid)
+                    case _ =>
+                      None
+                  }
+                case _ => None
+              },
             )
           }
         case cn.svcrules.ElectionRequest.TEMPLATE_ID =>
@@ -195,6 +209,35 @@ object SvcTables extends AcsTables with NamedLogging {
               validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
               totalTrafficPurchased = Some(contract.payload.totalPurchased),
             )
+          }
+        case cc.globaldomain.MemberTraffic.TEMPLATE_ID =>
+          tryToDecode(cc.globaldomain.MemberTraffic.COMPANION, createdEvent) { contract =>
+            SvcAcsStoreRowData(
+              contract,
+              memberTrafficMember = Some(PartyId.tryFromProtoPrimitive(contract.payload.memberId)),
+            )
+          }
+        case cn.cns.CnsRules.TEMPLATE_ID =>
+          tryToDecode(cn.cns.CnsRules.COMPANION, createdEvent) { contract =>
+            SvcAcsStoreRowData(contract)
+          }
+        case cn.cns.CnsEntry.TEMPLATE_ID =>
+          tryToDecode(cn.cns.CnsEntry.COMPANION, createdEvent) { contract =>
+            SvcAcsStoreRowData(
+              contract,
+              cnsEntryName = Some(contract.payload.name),
+            )
+          }
+        case cn.cns.CnsEntryContext.TEMPLATE_ID =>
+          tryToDecode(cn.cns.CnsEntryContext.COMPANION, createdEvent) { contract =>
+            SvcAcsStoreRowData(
+              contract,
+              cnsEntryName = Some(contract.payload.name),
+            )
+          }
+        case sub.SubscriptionInitialPayment.TEMPLATE_ID =>
+          tryToDecode(sub.SubscriptionInitialPayment.COMPANION, createdEvent) { contract =>
+            SvcAcsStoreRowData(contract)
           }
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the SVC store.")
