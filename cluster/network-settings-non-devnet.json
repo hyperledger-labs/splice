@@ -20,28 +20,6 @@
   "postgresMemoryMib": 8192,
   "ledgerDatabaseGib": 40,
   "numberOfSvNodes": 4,
-  "externalIPRanges": [
-    "35.194.81.56/32",
-    "35.198.147.95/32",
-    "35.189.40.124/32",
-    "34.132.91.75/32",
-    "18.210.210.130/32",
-
-    // DA Clusters
-    // testnet
-    "34.70.176.204/32",
-
-    // IEU
-    "54.228.250.8/32",
-
-    // SBI
-    "3.114.35.109/32",
-    
-    // Cumberland
-    "3.132.125.148/32",
-    "3.133.232.151/32",
-    "3.20.42.135/32"
-  ],
   "tls": {
     "issuerName": "letsencrypt-production",
     "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"

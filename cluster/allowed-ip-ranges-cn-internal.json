@@ -1,0 +1,12 @@
+{
+  "devnet": {
+    "Canton-Foundation Engineering Internal": {
+      "scratchneta": ["34.28.102.64/32"],
+      "scratchnetb": ["34.71.129.232/32"],
+      "scratchnetc": ["35.224.32.176/32"],
+      "staging": ["34.171.136.234/32"],
+      "stagingb": ["34.173.176.161/32"]
+    }
+  },
+  "testnet": {}
+}

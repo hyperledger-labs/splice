@@ -91,13 +91,46 @@ export function fixedTokens(): boolean {
   return config.require('FIXED_TOKENS') !== '0';
 }
 
+type IpRangesDict = { [key: string]: IpRangesDict } | string[];
+
+function extractIpRanges(x: IpRangesDict): string[] {
+  return Array.isArray(x)
+    ? x
+    : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
+}
+
+export function loadIPRanges(): string[] {
+  const externalIPRangesJson = loadJsonFromFile(
+    process.env.REPO_ROOT + '/cluster/allowed-ip-ranges-external.json'
+  );
+  const internalIPRangesJson = loadJsonFromFile(
+    process.env.REPO_ROOT + '/cluster/allowed-ip-ranges-cn-internal.json'
+  );
+
+  if (isDevNet) {
+    return extractIpRanges(externalIPRangesJson.devnet).concat(
+      extractIpRanges(internalIPRangesJson.devnet)
+    );
+  } else {
+    return extractIpRanges(externalIPRangesJson.testnet).concat(
+      extractIpRanges(internalIPRangesJson.testnet)
+    );
+  }
+}
+
 export function cnChartValues(chartPath: string, overrideValues: ChartValues = {}): ChartValues {
-  const networkSettings = loadJsonFromFile(
+  const externalIPRanges = loadIPRanges();
+  const networkSettingsJson = loadJsonFromFile(
     process.env.REPO_ROOT +
       (isDevNet
         ? '/cluster/network-settings-devnet.json'
         : '/cluster/network-settings-non-devnet.json')
   );
+
+  const networkSettings = {
+    ...networkSettingsJson,
+    externalIPRanges,
+  };
 
   const chartDefaultValues = loadYamlFromFile(
     process.env.REPO_ROOT + '/cluster/helm/' + chartPath + '/values.yaml'

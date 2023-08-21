@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { loadJsonFromFile } from 'cn-pulumi-common';
 
+import { loadIPRanges } from '../../common';
 import { clusterBasename } from './config';
 
 function configureIstioBase(ns: k8s.core.v1.Namespace): k8s.helm.v3.Release {
@@ -70,14 +70,7 @@ function configureGatewayService(
   ingressIp: pulumi.Output<string>,
   istiod: k8s.helm.v3.Release
 ) {
-  const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
-  const networkSettings = loadJsonFromFile(
-    process.env.REPO_ROOT +
-      (isDevNet
-        ? '/cluster/network-settings-devnet.json'
-        : '/cluster/network-settings-non-devnet.json')
-  );
-  const externalIPRanges = networkSettings.externalIPRanges;
+  const externalIPRanges = loadIPRanges();
   return new k8s.helm.v3.Release(
     'istio-ingress',
     {
