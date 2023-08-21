@@ -63,7 +63,7 @@ spec:
               name: cs-adm-api
               protocol: TCP
         {{- with .Values.resources }}
-          resources: {{- toYaml . | nindent 10 }}
+          resources: {{- toYaml . | nindent 12 }}
         {{- end }}
           readinessProbe:
             failureThreshold: 3
