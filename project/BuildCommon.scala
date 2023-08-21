@@ -1121,8 +1121,14 @@ object BuildCommon {
         sharedSettings,
         scalacOptions --= removeCompileFlagsForDaml
           // needed for foo.bar.{this as that} imports
-          .filterNot(_ == "-Xsource:3"),
-        scalacOptions += "-Wconf:src=src_managed/.*:silent",
+          .filterNot(_ == "-Xsource:3")
+          :+ "-Wnonunit-statement",
+        scalacOptions += "-Wconf:src=src_managed/.*:silent" ++ Seq(
+          "lint-byname-implicit",
+          "other-match-analysis",
+        )
+          .map(cat => s"cat=$cat:silent")
+          .mkString(",", ",", ""),
         libraryDependencies ++= Seq(
           akka_http,
           akka_http_core,
