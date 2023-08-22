@@ -41,6 +41,22 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
 
     "lookupInstallByUserWithOffset" should {
 
+      "return nothing if no install exists" in {
+        for {
+          store <- mkStore()
+          unwantedContract = directoryInstall(1)
+          _ <- dummyDomain.create(unwantedContract, createdEventSignatories = Seq(provider))(
+            store.multiDomainAcsStore
+          )
+        } yield {
+          eventually() {
+            store.lookupInstallByUserWithOffset(userParty(2)).futureValue.value should be(
+              None
+            )
+          }
+        }
+      }
+
       "return the install of the user" in {
         for {
           store <- mkStore()

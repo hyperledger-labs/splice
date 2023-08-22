@@ -241,34 +241,34 @@ class DbUserWalletStore(
     waitUntilAcsIngested {
       import cats.implicits.*
       for {
-        (offset, eventIdOpt, domainIdOpt, acsContractId) <- storage
+        resultWithOffset <- storage
           .querySingle(
-            sql"""
-                select last_ingested_offset, event_id, domain_id, acs_contract_id
-                from  store_descriptors sd left join #${DbUserWalletStore.txLogTableName} tx on sd.id = tx.store_id
-                where sd.id = $storeId
-                  and (tx.transfer_offer_tracking_id = ${lengthLimited(trackingId)}
-                    or tx.transfer_offer_tracking_id is null)
-                order by entry_number desc
-                limit 1
-                 """
-              .as[(String, Option[String], Option[DomainId], Option[ContractId[Any]])]
+            selectFromTxLogTableWithOffset(
+              DbUserWalletStore.txLogTableName,
+              storeId,
+              sql"transfer_offer_tracking_id = ${lengthLimited(trackingId)}",
+              sql"order by entry_number desc limit 1",
+            )
+              .as[TxLogStoreRowTemplateWithOffset]
               .headOption,
             "getLatestTransferOfferEventByTrackingId",
           )
           .getOrElse(throw offsetExpectedError())
-        entry <- (eventIdOpt, domainIdOpt).tupled.traverse { case (eventId, domainId) =>
-          txLogReader.loadTxLogEntry(eventId, domainId, acsContractId)
-        }
+        entry <- resultWithOffset.row.traverse(row =>
+          txLogReader.loadTxLogEntry(row.eventId, row.domainId, row.acsContractId)
+        )
         result <- entry match {
           case None =>
             Future.successful(
-              QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]](offset, None)
+              QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]](
+                resultWithOffset.offset,
+                None,
+              )
             )
           case Some(entry: UserWalletTxLogParser.TxLogEntry.TransferOffer) =>
             Future.successful(
               QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]](
-                offset,
+                resultWithOffset.offset,
                 Some(entry),
               )
             )

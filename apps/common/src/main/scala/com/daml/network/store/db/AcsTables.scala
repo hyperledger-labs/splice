@@ -69,6 +69,30 @@ object AcsTables extends AcsTables {
     }
   }
 
+  case class TxLogStoreRowTemplate(
+      storeId: Int,
+      entryNumber: Long,
+      eventId: String,
+      domainId: DomainId,
+      acsContractId: Option[ContractId[Any]],
+  )
+
+  object TxLogStoreRowTemplate {
+    implicit val GetResultTxLogStoreTemplateRow: GetResult[TxLogStoreRowTemplate] = GetResult {
+      prs =>
+        import prs.*
+        (TxLogStoreRowTemplate.apply _).tupled(
+          (
+            <<[Int],
+            <<[Long],
+            <<[String],
+            <<[DomainId],
+            <<[Option[ContractId[Any]]],
+          )
+        )
+    }
+  }
+
   import profile.api.*
 
   abstract class AcsStoreTemplate[Row](_tableTag: Tag, tableName: String)

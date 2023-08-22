@@ -170,6 +170,22 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
+      "return None after ingesting unrelated entries only" in {
+        val treeSource = TransactionTreeSource.ForTesting()
+        def mkUnrelatedEntry()(offset: String) = {
+          val result = mintTransaction(user1, 11.0, 1L, 1.0)(offset)
+          treeSource.addTree(result)
+          result
+        }
+        for {
+          store <- mkStore(user1, treeSource)
+          _ <- dummyDomain.ingest(mkUnrelatedEntry())(store.multiDomainAcsStore)
+          result <- store.getLatestTransferOfferEventByTrackingId("nope")
+        } yield {
+          result.value should be(None)
+        }
+      }
+
       "return the latest entry" in {
         val treeSource = TransactionTreeSource.ForTesting()
         val goodTransferOfferCid = nextCid()

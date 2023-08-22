@@ -181,6 +181,11 @@ create table user_wallet_txlog_store(
     transfer_offer_tracking_id text
 );
 
+create index user_wallet_txlog_store_sid_totid
+    on user_wallet_txlog_store (store_id, transfer_offer_tracking_id)
+    where transfer_offer_tracking_id is not null;
+
+
 -- Directory store
 ------------------
 

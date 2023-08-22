@@ -2,7 +2,7 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
-import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
+import com.daml.network.store.db.AcsTables.{AcsStoreRowTemplate, TxLogStoreRowTemplate}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -50,9 +50,11 @@ trait AcsQueries extends AcsJdbcTypes {
          contract_metadata_contract_key_hash,
          contract_metadata_driver_internal,
          contract_expires_at
-       from store_descriptors sd left join #$tableName on sd.id = store_id
-       where sd.id = $storeId and (event_number is null OR (
-       """ ++ where ++ sql")) " ++ orderLimit).toActionBuilder // handle the case where we have an offset, but no matching row for `where`
+       from store_descriptors sd
+           left join #$tableName
+               on sd.id = store_id
+               and """ ++ where ++ sql"""
+       where sd.id = $storeId""" ++ orderLimit).toActionBuilder
 
   case class AcsStoreRowTemplateWithOffset(
       offset: String,
@@ -72,6 +74,52 @@ trait AcsQueries extends AcsJdbcTypes {
             pp.<<,
             pp.<<,
             pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+          )
+        },
+      )
+    }
+  }
+
+  /** Same as [[selectFromAcsTableWithOffset]], but for tx log tables.
+    */
+  protected def selectFromTxLogTableWithOffset(
+      tableName: String,
+      storeId: Int,
+      where: SQLActionBuilder,
+      orderLimit: SQLActionBuilder = sql"",
+  ): SQLActionBuilder =
+    (sql"""
+       select
+         store_id,
+         last_ingested_offset,
+         entry_number,
+         event_id,
+         domain_id,
+         acs_contract_id
+       from store_descriptors sd
+           left join #$tableName
+               on sd.id = store_id
+               and """ ++ where ++ sql"""
+       where sd.id = $storeId""" ++ orderLimit).toActionBuilder
+
+  case class TxLogStoreRowTemplateWithOffset(
+      offset: String,
+      row: Option[TxLogStoreRowTemplate],
+  )
+
+  object TxLogStoreRowTemplateWithOffset {
+    implicit val GetResultTxLogStoreRowTemplateWithOffset
+        : GetResult[TxLogStoreRowTemplateWithOffset] = { (pp: PositionedResult) =>
+      val storeIdFromTxLogRow = pp.<<[Option[Int]]
+      TxLogStoreRowTemplateWithOffset(
+        pp.<<,
+        storeIdFromTxLogRow.map { storeId =>
+          TxLogStoreRowTemplate(
+            storeId,
             pp.<<,
             pp.<<,
             pp.<<,
