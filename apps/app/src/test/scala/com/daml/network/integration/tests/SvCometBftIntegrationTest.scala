@@ -79,6 +79,7 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
       action,
       "url",
       "description",
+      sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
     )
     Seq(sv2Backend, sv3Backend).foreach { sv =>
       eventually() {

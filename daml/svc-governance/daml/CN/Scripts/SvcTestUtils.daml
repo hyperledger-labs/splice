@@ -285,6 +285,7 @@ initateAndAcceptVote app (initiator::others) action = do
     requester = initiator
     action
     reason = Reason with url = ""; body = "let's get it done"
+    voteRequestTimeout = None
 
   forA_ others $ \sv ->
     submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with

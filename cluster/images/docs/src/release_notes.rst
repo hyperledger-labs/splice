@@ -6,6 +6,12 @@ Release Notes
 2023-08-28
 ----------
 
+* Frontend updates:
+
+    * The expiration of a vote request (VoteRequestTimeout) can be specified on the request level fulfilling the condition that
+      the effective date of the coin configuration schedule change must be after the expiration.
+    * Better vote requests concurrency management by preventing SVs to define coin configuration schedule effective at the same time.
+
 * Deployment updates:
 
     * Introduced a new value, ``isDevNet``, for the CometBFT Helm charts,

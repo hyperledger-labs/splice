@@ -3,11 +3,17 @@ import BigNumber from 'bignumber.js';
 import { BaseApiMiddleware, OpenAPILoggingMiddleware, useUserState } from 'common-frontend';
 import React, { useContext, useMemo } from 'react';
 import {
+  BatchListVotesByVoteRequestsRequest,
+  CastVoteRequest,
   createConfiguration,
+  CreateVoteRequest,
   ListCoinPriceVotesResponse,
   ListOngoingValidatorOnboardingsResponse,
   ListOpenMiningRoundsResponse,
+  ListSvcRulesVoteRequestsResponse,
   ListValidatorLicensesResponse,
+  ListVotesResponse,
+  LookupSvcRulesVoteRequestResponse,
   Middleware,
   PrepareValidatorOnboardingRequest,
   PrepareValidatorOnboardingResponse,
@@ -15,15 +21,10 @@ import {
   ResponseContext,
   ServerConfiguration,
   UpdateCoinPriceVoteRequest,
-  CreateVoteRequest,
-  ListVotesResponse,
-  ListSvcRulesVoteRequestsResponse,
-  LookupSvcRulesVoteRequestResponse,
-  CastVoteRequest,
   UpdateVoteRequest,
-  BatchListVotesByVoteRequestsRequest,
 } from 'sv-openapi';
 
+import { RelTime } from '@daml.js/733e38d36a2759688a4b2c4cec69d48e7b55ecc8dedc8067b815926c917a182a/lib/DA/Time/Types';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);
@@ -38,7 +39,8 @@ export interface SvAdminClient {
     requester: string,
     action: ActionRequiringConfirmation,
     url: string,
-    description: string
+    description: string,
+    expiration: RelTime
   ) => Promise<void>;
   listSvcRulesVoteRequests: () => Promise<ListSvcRulesVoteRequestsResponse>;
   lookupSvcRulesVoteRequest: (
@@ -93,13 +95,15 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         requester,
         action: ActionRequiringConfirmation,
         url,
-        description
+        description,
+        expiration
       ): Promise<void> => {
         const request: CreateVoteRequest = {
           requester,
           action: ActionRequiringConfirmation.encode(action),
           url,
           description,
+          expiration: RelTime.encode(expiration),
         };
         return await svAdminClient.createVoteRequest(request);
       },

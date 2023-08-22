@@ -132,6 +132,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           ),
           "url",
           "description",
+          sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
         ),
       )(
         "VoteRequest and Vote should be there",

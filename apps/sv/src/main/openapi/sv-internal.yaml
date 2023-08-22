@@ -596,6 +596,7 @@ components:
         - action
         - url
         - description
+        - expiration
       properties:
         requester:
           type: string
@@ -605,6 +606,8 @@ components:
           type: string
         description:
           type: string
+        expiration:
+          type: object
 
     ListVotesResponse:
       type: object

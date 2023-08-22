@@ -11,9 +11,10 @@ import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, Vote, VoteRequest}
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.CNNodeStatus
-import com.daml.network.http.v0.definitions.{CometBftNodeDumpResponse}
-import com.daml.network.http.v0.svAdmin.{GetCometBftNodeDebugDumpResponse}
+import com.daml.network.http.v0.definitions.CometBftNodeDumpResponse
+import com.daml.network.http.v0.svAdmin.GetCometBftNodeDebugDumpResponse
 import com.daml.network.http.v0.{definitions, svAdmin as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.health.admin.data.NodeStatus
@@ -170,6 +171,7 @@ object HttpSvAdminAppClient {
       action: ActionRequiringConfirmation,
       reasonUrl: String,
       reasonDescription: String,
+      expiration: RelTime,
   )(implicit elc: ErrorLoggingContext)
       extends BaseCommand[http.CreateVoteRequestResponse, Unit] {
 
@@ -189,6 +191,13 @@ object HttpSvAdminAppClient {
             .valueOr(error => throw new IllegalArgumentException(error)),
           reasonUrl,
           reasonDescription,
+          io.circe.parser
+            .parse(
+              ApiCodecCompressed
+                .apiValueToJsValue(Contract.javaValueToLfValue(expiration.toValue))
+                .compactPrint
+            )
+            .valueOr(error => throw new IllegalArgumentException(error)),
         ),
         headers = headers,
       )

@@ -520,13 +520,18 @@ template SvcRules with
         requester : Party
         action : ActionRequiringConfirmation
         reason : Reason
+        voteRequestTimeout : Optional RelTime
       controller requester
       do
         requireUnlocked lock
         require "Initiator is a collective member" (requester `Map.member` members)
         requireWellformedReason config reason
         now <- getTime
-        let expiresAt = now `addRelTime` config.voteRequestTimeout
+        let expiresAt = case voteRequestTimeout of
+              Some value ->
+                now `addRelTime` value
+              None ->
+                now `addRelTime` config.voteRequestTimeout
         requestCid <- create VoteRequest with
           svc
           requester

@@ -172,6 +172,7 @@ class SvTimeBasedOnboardingIntegrationTest
               action,
               "url",
               "description",
+              sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
             )
           },
         )(

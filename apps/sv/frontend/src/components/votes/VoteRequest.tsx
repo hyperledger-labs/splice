@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
-import { SvClientProvider } from 'common-frontend';
-import React, { useState } from 'react';
+import { getUTCWithOffset, SvClientProvider } from 'common-frontend';
+import { Dayjs } from 'dayjs';
+import React, { useEffect, useState } from 'react';
 
 import {
   Box,
@@ -13,7 +14,9 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
+import { RelTime } from '@daml.js/733e38d36a2759688a4b2c4cec69d48e7b55ecc8dedc8067b815926c917a182a/lib/DA/Time/Types';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
@@ -21,7 +24,11 @@ import { useSvcInfos } from '../../contexts/SvContext';
 import { useListSvcRulesVoteRequests } from '../../hooks/useListVoteRequests';
 import { config } from '../../utils';
 import { Alerting, AlertState } from '../../utils/Alerting';
-import { isScheduleDateTimeValid, ScheduleValidity } from '../../utils/validations';
+import {
+  isExpirationBeforeEffectiveDate,
+  isScheduleDateTimeValid,
+  VoteRequestValidity,
+} from '../../utils/validations';
 import ListVoteRequests from './ListVoteRequests';
 import AddFutureCoinConfigSchedule from './actions/AddFutureCoinConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
@@ -37,13 +44,39 @@ const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
 const VoteRequest: React.FC = () => {
+  // States related to vote requests
   const [actionName, setActionName] = useState('SRARC_RemoveMember');
   const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
+  const [expiration, setExpiration] = useState<Dayjs | null>(null);
 
+  // States related to constraints from vote requests
+  const [maxDateTimeIfAddFutureCoinConfigSchedule, setMaxDateTimeIfAddFutureCoinConfigSchedule] =
+    useState<Dayjs | undefined>(undefined);
   const [alertMessage, setAlertMessage] = useState<AlertState>({});
+
   const svcInfosQuery = useSvcInfos();
   const listVoteRequestsQuery = useListSvcRulesVoteRequests();
+
+  const defaultExpiration: Dayjs = dayjs().add(
+    Math.floor(
+      parseInt(svcInfosQuery.data?.svcRules.payload.config.voteRequestTimeout.microseconds!) / 1000
+    ),
+    'milliseconds'
+  );
+
+  useEffect(() => {
+    setExpiration(defaultExpiration);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [svcInfosQuery.isSuccess]);
+
+  useEffect(() => {
+    setExpiration(defaultExpiration);
+    setMaxDateTimeIfAddFutureCoinConfigSchedule(undefined);
+    setUrl('');
+    setSummary('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionName, setActionName]); // same than above
 
   const actionNameOptions = [
     { name: 'Remove Member', value: 'SRARC_RemoveMember' },
@@ -57,44 +90,75 @@ const VoteRequest: React.FC = () => {
   ];
 
   const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
+
+  function max(time1: Dayjs, time2: Dayjs): Dayjs {
+    return time1 > time2 ? time1 : time2;
+  }
+
   const chooseAction = (action: ActionRequiringConfirmation) => {
     setAction(action);
+    if (action.tag === 'ARC_CoinRules') {
+      switch (action.value.coinRulesAction.tag) {
+        case 'CRARC_AddFutureCoinConfigSchedule': {
+          setMaxDateTimeIfAddFutureCoinConfigSchedule(
+            max(dayjs(), dayjs(action.value.coinRulesAction.value.newScheduleItem._1))
+          );
+          return;
+        }
+        case 'CRARC_UpdateFutureCoinConfigSchedule': {
+          setMaxDateTimeIfAddFutureCoinConfigSchedule(
+            max(dayjs(), dayjs(action.value.coinRulesAction.value.scheduleItem._1))
+          );
+          return;
+        }
+        case 'CRARC_RemoveFutureCoinConfigSchedule': {
+          setMaxDateTimeIfAddFutureCoinConfigSchedule(
+            max(dayjs(), dayjs(action.value.coinRulesAction.value.scheduleTime))
+          );
+          return;
+        }
+      }
+    }
   };
 
   function validateAction(action: ActionRequiringConfirmation) {
-    // check that for FutureCoinConfigSchedule operations, the date is yet not in progress in another request
-    if (action?.tag === 'ARC_CoinRules') {
-      switch (action.value.coinRulesAction.tag) {
-        case 'CRARC_AddFutureCoinConfigSchedule': {
-          const validity: ScheduleValidity = isScheduleDateTimeValid(
-            listVoteRequestsQuery.data!,
-            action.value.coinRulesAction.value.newScheduleItem._1
-          );
-          setAlertMessage(validity.alertMessage);
-          return validity.isValid;
-        }
-        case 'CRARC_UpdateFutureCoinConfigSchedule': {
-          const validity: ScheduleValidity = isScheduleDateTimeValid(
-            listVoteRequestsQuery.data!,
-            action.value.coinRulesAction.value.scheduleItem._1
-          );
-          setAlertMessage(validity.alertMessage);
-          return validity.isValid;
-        }
-        case 'CRARC_RemoveFutureCoinConfigSchedule': {
-          const validity: ScheduleValidity = isScheduleDateTimeValid(
-            listVoteRequestsQuery.data!,
-            action.value.coinRulesAction.value.scheduleTime
-          );
-          setAlertMessage(validity.alertMessage);
-          return validity.isValid;
-        }
-        default:
-          return true;
-      }
-    } else {
+    if (action?.tag !== 'ARC_CoinRules') {
+      setAlertMessage({});
       return true;
     }
+
+    const coinRulesAction = action.value.coinRulesAction;
+    let effectiveDate: string;
+
+    switch (coinRulesAction.tag) {
+      case 'CRARC_AddFutureCoinConfigSchedule':
+        effectiveDate = coinRulesAction.value.newScheduleItem._1;
+        break;
+      case 'CRARC_UpdateFutureCoinConfigSchedule':
+        effectiveDate = coinRulesAction.value.scheduleItem._1;
+        break;
+      case 'CRARC_RemoveFutureCoinConfigSchedule':
+        effectiveDate = coinRulesAction.value.scheduleTime;
+        break;
+      default:
+        setAlertMessage({});
+        return true;
+    }
+
+    const scheduleValidity: VoteRequestValidity = isScheduleDateTimeValid(
+      listVoteRequestsQuery.data!,
+      effectiveDate
+    );
+    if (!scheduleValidity.isValid) {
+      setAlertMessage(scheduleValidity.alertMessage);
+    }
+
+    const dateValidity = isExpirationBeforeEffectiveDate(dayjs(effectiveDate), expiration);
+    if (!dateValidity.isValid) {
+      setAlertMessage(dateValidity.alertMessage);
+    }
+
+    return scheduleValidity.isValid && dateValidity.isValid;
   }
 
   const { createVoteRequest } = useSvAdminClient();
@@ -102,12 +166,19 @@ const VoteRequest: React.FC = () => {
     mutationFn: async () => {
       const requester = svcInfosQuery.data?.svPartyId!;
 
+      const duration: RelTime = {
+        microseconds: BigInt(expiration!.diff(dayjs(), 'milliseconds') * 1000).toString(),
+      };
+
       if (actionNameOptions.map(e => e.value).includes(actionName) && validateAction(action!)) {
-        return await createVoteRequest(requester, action!, url, summary)
+        return await createVoteRequest(requester, action!, url, summary, duration)
           .then(() => setUrl(''))
           .then(() => setSummary(''))
           .then(() => setActionName('SRARC_RemoveMember'))
-          .then(() => setAction(undefined));
+          .then(() => setAction(undefined))
+          .then(() => setExpiration(defaultExpiration))
+          .then(() => setMaxDateTimeIfAddFutureCoinConfigSchedule(undefined))
+          .then(() => setAlertMessage({}));
       }
     },
 
@@ -188,6 +259,23 @@ const VoteRequest: React.FC = () => {
                 Open
               </Button>
             </Box>
+          </Stack>
+          <Stack direction="column" mb={4} spacing={1}>
+            <Typography variant="h5">Expires At</Typography>
+            <DesktopDateTimePicker
+              label={`Enter time in local timezone (${getUTCWithOffset()})`}
+              value={expiration}
+              minDateTime={dayjs()}
+              maxDateTime={maxDateTimeIfAddFutureCoinConfigSchedule}
+              readOnly={false}
+              onChange={(newValue: Dayjs | null) => setExpiration(newValue)}
+              slotProps={{
+                textField: {
+                  id: 'datetime-picker-vote-request-expiration',
+                },
+              }}
+              closeOnSelect
+            />
           </Stack>
           <Alerting alertState={alertMessage} />
           <Button

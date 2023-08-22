@@ -31,9 +31,9 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import io.grpc.Status
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpSvAdminHandler(
@@ -206,6 +206,7 @@ class HttpSvAdminHandler(
           body.action,
           body.url,
           body.description,
+          body.expiration,
           svcStoreWithIngestion,
           globalDomain,
         )

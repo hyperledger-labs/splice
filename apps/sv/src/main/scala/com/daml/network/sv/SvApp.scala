@@ -17,6 +17,7 @@ import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svcrules.*
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
@@ -25,12 +26,11 @@ import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.svAdmin.SvAdminResource
 import com.daml.network.setup.ParticipantInitializer
-import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
-import com.daml.network.sv.automation.SvSvcAutomationService
-import com.daml.network.sv.automation.SvSvAutomationService
+import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
@@ -757,6 +757,7 @@ object SvApp {
       action: Json,
       reasonUrl: String,
       reasonDescription: String,
+      expiration: Json,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       globalDomain: DomainId,
   )(implicit
@@ -764,6 +765,12 @@ object SvApp {
       traceContext: TraceContext,
       templateJsonDecoder: TemplateJsonDecoder,
   ): Future[Either[String, Unit]] = {
+    val decodedExpiration = templateJsonDecoder.decodeValue(
+      RelTime.valueDecoder(),
+      RelTime._packageId,
+      "DA.Time.Types",
+      "RelTime",
+    )(expiration)
     val decodedAction = templateJsonDecoder.decodeValue(
       ActionRequiringConfirmation.valueDecoder(),
       ActionRequiringConfirmation._packageId,
@@ -781,7 +788,12 @@ object SvApp {
           for {
             svcRules <- svcStoreWithIngestion.store.getSvcRules()
             reason = new Reason(reasonUrl, reasonDescription)
-            request = new SvcRules_RequestVote(requester, decodedAction, reason)
+            request = new SvcRules_RequestVote(
+              requester,
+              decodedAction,
+              reason,
+              java.util.Optional.of(decodedExpiration),
+            )
             cmd = svcRules.contractId.exerciseSvcRules_RequestVote(request)
             _ <- svcStoreWithIngestion.connection.submitCommands(
               actAs = Seq(svcStoreWithIngestion.store.key.svParty),

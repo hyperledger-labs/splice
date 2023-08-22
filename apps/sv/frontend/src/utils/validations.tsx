@@ -1,4 +1,5 @@
 import { Contract } from 'common-frontend';
+import { Dayjs } from 'dayjs';
 
 import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
@@ -6,7 +7,7 @@ const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
-export interface ScheduleValidity {
+export interface VoteRequestValidity {
   isValid: boolean;
   alertMessage: object;
 }
@@ -43,7 +44,7 @@ function validateScheduleDateTime(
 export function isScheduleDateTimeValid(
   data: Contract<VoteRequest>[],
   time: string
-): ScheduleValidity {
+): VoteRequestValidity {
   if (validateScheduleDateTime(data, time)) {
     return { isValid: true, alertMessage: {} };
   } else {
@@ -52,6 +53,36 @@ export function isScheduleDateTimeValid(
       alertMessage: {
         severity: 'warning',
         message: `Another vote request for a schedule adjustment at ${time} is already on record. Please change the scheduled time to continue.`,
+      },
+    };
+  }
+}
+
+export function isExpirationBeforeEffectiveDate(
+  effectiveTime: Dayjs,
+  expiration: Dayjs | null
+): VoteRequestValidity {
+  if (expiration === null) {
+    return {
+      isValid: true,
+      alertMessage: {},
+    };
+  } else if (
+    effectiveTime.isAfter(expiration) &&
+    expiration.isAfter(dayjs()) &&
+    effectiveTime.isAfter(dayjs())
+  ) {
+    return {
+      isValid: true,
+      alertMessage: {},
+    };
+  } else {
+    return {
+      isValid: false,
+      alertMessage: {
+        severity: 'warning',
+        message:
+          'The expiration date must be before the effective date of the configuration schedule and both dates must be in the future.',
       },
     };
   }

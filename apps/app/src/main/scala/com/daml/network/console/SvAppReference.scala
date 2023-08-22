@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cc.round as cr
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, Vote, VoteRequest}
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
@@ -186,10 +187,17 @@ class SvAppBackendReference(
       action: ActionRequiringConfirmation,
       reasonUrl: String,
       reasonDescription: String,
+      expiration: RelTime,
   ): Unit = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.CreateVoteRequest(requester, action, reasonUrl, reasonDescription)
+        HttpSvAdminAppClient.CreateVoteRequest(
+          requester,
+          action,
+          reasonUrl,
+          reasonDescription,
+          expiration,
+        )
       )
     }
   }

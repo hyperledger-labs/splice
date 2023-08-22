@@ -185,6 +185,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           action,
           "url",
           "description",
+          sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
         )
       },
     )(
@@ -292,6 +293,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           action,
           "url",
           "description",
+          sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
         )
       },
     )(

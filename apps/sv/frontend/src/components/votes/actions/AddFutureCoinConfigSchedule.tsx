@@ -1,6 +1,6 @@
 import { getUTCWithOffset, JsonEditor, JSONValue, Loading } from 'common-frontend';
 import { Dayjs } from 'dayjs';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
@@ -21,6 +21,25 @@ const AddFutureCoinConfigSchedule: React.FC<{
   const svcInfosQuery = useSvcInfos();
 
   const [date, setDate] = useState<Dayjs | null>(dayjs());
+  const [configuration, setConfiguration] = useState<Record<string, JSONValue>>();
+
+  useEffect(() => {
+    if (date != null && configuration != null) {
+      const newItem: Tuple2<string, CoinConfig<'USD'>> = {
+        _1: dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]'),
+        _2: CoinConfig(USD).decoder.runWithException(configuration),
+      };
+      chooseAction({
+        tag: 'ARC_CoinRules',
+        value: {
+          coinRulesAction: {
+            tag: 'CRARC_AddFutureCoinConfigSchedule',
+            value: { newScheduleItem: newItem },
+          },
+        },
+      });
+    }
+  }, [date, configuration, chooseAction]);
 
   if (svcInfosQuery.isLoading) {
     return <Loading />;
@@ -34,20 +53,8 @@ const AddFutureCoinConfigSchedule: React.FC<{
     return <p>undefined query data</p>;
   }
 
-  async function addFutureCoinConfigScheduleAction(config: Record<string, JSONValue>) {
-    const newItem: Tuple2<string, CoinConfig<'USD'>> = {
-      _1: dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]'),
-      _2: CoinConfig(USD).decoder.runWithException(config),
-    };
-    chooseAction({
-      tag: 'ARC_CoinRules',
-      value: {
-        coinRulesAction: {
-          tag: 'CRARC_AddFutureCoinConfigSchedule',
-          value: { newScheduleItem: newItem },
-        },
-      },
-    });
+  function addFutureCoinConfigScheduleAction(config: Record<string, JSONValue>) {
+    setConfiguration(config);
   }
 
   return (

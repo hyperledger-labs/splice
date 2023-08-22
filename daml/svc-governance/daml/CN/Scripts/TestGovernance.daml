@@ -38,6 +38,7 @@ testVoteRequest = do
       svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
         provider
     reason = Reason with url = ""; body = "they are great!"
+    voteRequestTimeout = None
 
   -- sv2 rejects initially
   voteCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
@@ -89,6 +90,7 @@ testVoteRequest = do
       svcAction = SRARC_RevokeFeaturedAppRight SvcRules_RevokeFeaturedAppRight with
         rightCid
     reason = Reason with url = ""; body = "they are no longer great!"
+    voteRequestTimeout = None
 
   submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
       voter = sv2
@@ -189,6 +191,7 @@ testVoteRequestExpire = do
       svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
         provider
     reason = Reason with url = ""; body = "they are great!"
+    voteRequestTimeout = None
 
   submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_VoteRequest_Expire with
     cid=requestCid
