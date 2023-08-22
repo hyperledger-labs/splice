@@ -185,33 +185,21 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         )
         for {
           store <- mkStore(user1)
-          _ <- Future.traverse(appRewards.zipWithIndex) { case (amount, round) =>
-            dummyDomain.exercise(
-              coinRules(),
-              Some(ccApiCodegen.coin.CoinRules.TEMPLATE_ID),
-              Transfer.choice.name,
-              mkCoinRulesTransfer(user1, amount),
-              mkTransferResult(
-                round.toLong,
-                amount,
-                holdingFee,
-                inputAppRewardAmount = amount,
-              ),
-            )(store.multiDomainAcsStore)
-          }
-          _ <- Future.traverse(validatorRewards.zipWithIndex) { case (amount, round) =>
-            dummyDomain.exercise(
-              coinRules(),
-              Some(ccApiCodegen.coin.CoinRules.TEMPLATE_ID),
-              Transfer.choice.name,
-              mkCoinRulesTransfer(user1, amount),
-              mkTransferResult(
-                round.toLong,
-                amount,
-                holdingFee,
-                inputValidatorRewardAmount = amount,
-              ),
-            )(store.multiDomainAcsStore)
+          _ <- Future.traverse(appRewards.zip(validatorRewards).zipWithIndex) {
+            case ((appAmount, validatorAmount), round) =>
+              dummyDomain.exercise(
+                coinRules(),
+                Some(ccApiCodegen.coin.CoinRules.TEMPLATE_ID),
+                Transfer.choice.name,
+                mkCoinRulesTransfer(user1, 1.0),
+                mkTransferResult(
+                  round.toLong,
+                  1.0,
+                  holdingFee,
+                  inputAppRewardAmount = appAmount,
+                  inputValidatorRewardAmount = validatorAmount,
+                ),
+              )(store.multiDomainAcsStore)
           }
         } yield {
           eventually() {
