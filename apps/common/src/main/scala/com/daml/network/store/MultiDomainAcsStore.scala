@@ -277,7 +277,7 @@ object MultiDomainAcsStore {
       if (!isStakeholderOf(ev)) {
         // We decided to crash the store when we see an CreatedEvent that store party is not a stakeholder of it. Discussion in #6527
         throw new IllegalStateException(
-          s"Cannot ingest an CreatedEvent the the store party is not the stakeholder of the store party. Crashing... : $ev"
+          s"Cannot ingest the CreatedEvent as the store party is not a stakeholder of the contract. Crashing... : $ev"
         )
       }
     }

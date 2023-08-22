@@ -118,7 +118,7 @@ class HttpAppManagerPublicHandler(
       provider: String,
       version: String,
   )(extracted: Unit): Future[v0.AppManagerPublicResource.GetAppReleaseResponse] =
-    withNewTrace(workflowId) { _ => _ =>
+    withNewTrace(workflowId) { implicit tc => _ =>
       store.getAppRelease(PartyId.tryFromProtoPrimitive(provider), version).map(_.toJson)
     }
 

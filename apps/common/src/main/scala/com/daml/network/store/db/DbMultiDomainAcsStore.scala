@@ -2,6 +2,7 @@ package com.daml.network.store.db
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -83,29 +84,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     finishedAcsIngestion.future.flatMap(_ => f)
   def waitUntilAcsIngested(): Future[Unit] =
     finishedAcsIngestion.future
-
-  def lastIngestedOffset(
-      storage: DbStorage
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-      closeContext: CloseContext,
-  ): Future[String] = waitUntilAcsIngested {
-    storage
-      .querySingle(
-        sql"""
-              select last_ingested_offset from store_descriptors
-              where id = ${storeId}
-           """.as[String].headOption,
-        "minimumLastOffset",
-      )
-      .value
-      .map(
-        _.getOrElse(
-          throw new IllegalStateException("Offset must be defined, as the ACS was ingested")
-        )
-      )
-  }
 
   override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
       implicit
@@ -640,6 +618,20 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       val contract = contractFromRow(companion)(row)
       ContractWithState(contract, state)
     }
+  }
+
+  def contractWithStateFromOptRow[C, TCid <: ContractId[_], T](companion: C)(
+      row: Option[AcsStoreRowTemplate]
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Option[ContractWithState[TCid, T]]] = {
+    OptionT
+      .fromOption[Future](row)
+      .semiflatMap(
+        contractWithStateFromRow(companion)(_)
+      )
+      .value
   }
 
   @annotation.nowarn(

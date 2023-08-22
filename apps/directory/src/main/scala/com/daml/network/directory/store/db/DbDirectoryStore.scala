@@ -55,9 +55,9 @@ class DbDirectoryStore(
     with NamedLogging {
 
   import storage.DbStorageConverters.setParameterByteArray
-  import multiDomainAcsStore.{waitUntilAcsIngested, lastIngestedOffset}
+  import multiDomainAcsStore.waitUntilAcsIngested
 
-  def storeId: Int = multiDomainAcsStore.storeId
+  private def storeId: Int = multiDomainAcsStore.storeId
 
   override def ingestionAcsInsert(
       createdEvent: CreatedEvent
@@ -100,22 +100,23 @@ class DbDirectoryStore(
     MultiDomainAcsStore.QueryResult[Option[Contract[DirectoryInstall.ContractId, DirectoryInstall]]]
   ] = waitUntilAcsIngested {
     for {
-      offset <- lastIngestedOffset(storage)
-      row <- storage
+      resultWithOffset <- storage
         .querySingle(
-          (selectFromAcsTable(DbDirectoryStore.tableName) ++
+          selectFromAcsTableWithOffset(
+            DbDirectoryStore.tableName,
+            storeId,
             sql"""
-              where store_id = $storeId
-                and template_id = ${directoryCodegen.DirectoryInstall.COMPANION.TEMPLATE_ID}
+              template_id = ${directoryCodegen.DirectoryInstall.COMPANION.TEMPLATE_ID}
                 and directory_install_user = $user
-              limit 1
-          """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            """,
+            sql"limit 1",
+          ).as[AcsStoreRowTemplateWithOffset].headOption,
           "lookupInstallByUserWithOffset",
         )
-        .value
+        .getOrElse(throw offsetExpectedError())
     } yield MultiDomainAcsStore.QueryResult(
-      offset,
-      row.map(contractFromRow(directoryCodegen.DirectoryInstall.COMPANION)(_)),
+      resultWithOffset.offset,
+      resultWithOffset.row.map(contractFromRow(directoryCodegen.DirectoryInstall.COMPANION)(_)),
     )
   }
 
@@ -123,22 +124,23 @@ class DbDirectoryStore(
     MultiDomainAcsStore.QueryResult[Option[Contract[DirectoryEntry.ContractId, DirectoryEntry]]]
   ] = waitUntilAcsIngested {
     for {
-      offset <- lastIngestedOffset(storage)
-      row <- storage
+      resultWithOffset <- storage
         .querySingle(
-          (selectFromAcsTable(DbDirectoryStore.tableName) ++
+          (selectFromAcsTableWithOffset(
+            DbDirectoryStore.tableName,
+            storeId,
             sql"""
-            where store_id = $storeId
-              and template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
+            template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
               and directory_entry_name = ${lengthLimited(name)}
-            limit 1
-        """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            """,
+            sql"limit 1",
+          )).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
           "lookupEntryByNameWithOffset",
         )
-        .value
+        .getOrElse(throw offsetExpectedError())
     } yield MultiDomainAcsStore.QueryResult(
-      offset,
-      row.map(contractFromRow(directoryCodegen.DirectoryEntry.COMPANION)(_)),
+      resultWithOffset.offset,
+      resultWithOffset.row.map(contractFromRow(directoryCodegen.DirectoryEntry.COMPANION)(_)),
     )
   }
 

@@ -36,6 +36,7 @@ trait AcsQueries extends AcsJdbcTypes {
       tableName: String,
       storeId: Int,
       where: SQLActionBuilder,
+      orderLimit: SQLActionBuilder = sql"",
   ): SQLActionBuilder =
     (sql"""
        select
@@ -51,7 +52,7 @@ trait AcsQueries extends AcsJdbcTypes {
          contract_expires_at
        from store_descriptors sd left join #$tableName on sd.id = store_id
        where sd.id = $storeId and (event_number is null OR (
-       """ ++ where ++ sql"))").toActionBuilder // handle the case where we have an offset, but no matching row for `where`
+       """ ++ where ++ sql")) " ++ orderLimit).toActionBuilder // handle the case where we have an offset, but no matching row for `where`
 
   case class AcsStoreRowTemplateWithOffset(
       offset: String,

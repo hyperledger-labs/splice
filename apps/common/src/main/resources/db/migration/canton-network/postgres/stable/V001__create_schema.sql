@@ -81,6 +81,76 @@ create table txlog_store_template(
     acs_contract_id text
 );
 
+
+-- Validator/wallet store
+------------------
+
+create table validator_acs_store(
+    like acs_store_template including all,
+
+    -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
+    foreign key (store_id) references store_descriptors(id),
+
+    -- index columns
+    ----------------
+
+    -- party id of the end user associated with this contract
+    user_party text,
+
+    -- name of the end user associated with this contract
+    user_name text,
+
+    -- party id of the provider associated with this contract
+    provider_party text,
+
+    -- party id of the validator associated with this contract
+    validator_party text,
+
+    -- target domain for the domain traffic contract
+    traffic_domain_id text,
+
+    -- AppConfiguration.version
+    app_configuration_version bigint,
+
+    -- AppRelease.version
+    app_release_version text,
+
+    -- ApprovedReleaseConfiguration.jsonHash
+    json_hash text
+);
+
+create index validator_acs_store_sid_tid_up
+    on validator_acs_store (store_id, template_id, user_party)
+    where user_party is not null;
+
+create index validator_acs_store_sid_tid_un
+    on validator_acs_store (store_id, template_id, user_name)
+    where user_name is not null;
+
+create index validator_acs_store_sid_tid_pp
+    on validator_acs_store (store_id, template_id, provider_party)
+    where provider_party is not null;
+
+create index validator_acs_store_sid_tid_vp
+    on validator_acs_store (store_id, template_id, validator_party)
+    where validator_party is not null;
+
+create index validator_acs_store_sid_tid_tdi
+    on validator_acs_store (store_id, template_id, traffic_domain_id)
+    where traffic_domain_id is not null;
+
+create index validator_acs_store_sid_tid_acv
+    on validator_acs_store (store_id, template_id, app_configuration_version)
+    where app_configuration_version is not null;
+
+create index validator_acs_store_sid_tid_arv
+    on validator_acs_store (store_id, template_id, app_release_version)
+    where app_release_version is not null;
+
+create index validator_acs_store_sid_tid_jh
+    on validator_acs_store (store_id, template_id, json_hash)
+    where json_hash is not null;
+
 -- User Wallet Store
 --------------------
 

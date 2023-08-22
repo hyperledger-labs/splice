@@ -5,20 +5,12 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.globaldomain.{
-  ValidatorTraffic,
-  ValidatorTrafficCreationIntent,
-}
+import com.daml.network.codegen.java.cc.globaldomain as domainCodegen
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.codegen.java.cn.wallet.topupstate.ValidatorTopUpState
+import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{
-  CNNodeAppStoreWithoutHistory,
-  InMemoryMultiDomainAcsStore,
-  MultiDomainAcsStore,
-  TxLogStore,
-}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{Contract, ContractWithState}
 import com.daml.network.validator.config.ValidatorDomainConfig
@@ -42,85 +34,52 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
 
   override final def defaultAcsDomain = domainConfig.global.alias
 
-  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
-    TxLogStore.IndexRecord,
-    TxLogStore.Entry[TxLogStore.IndexRecord],
-  ]
-
   def lookupWalletInstallByNameWithOffset(
       endUserName: String
   )(implicit tc: TraceContext): Future[QueryResult[
     Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
-  ]] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(walletCodegen.WalletAppInstall.COMPANION)(
-        _,
-        co => co.payload.endUserName == endUserName,
-      )
-    )
+  ]]
 
   def lookupValidatorLicenseWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[
       validatorLicenseCodegen.ValidatorLicense.ContractId,
       validatorLicenseCodegen.ValidatorLicense,
     ]]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(
-        validatorLicenseCodegen.ValidatorLicense.COMPANION
-      )(_, vl => vl.payload.validator == key.validatorParty.toProtoPrimitive)
-    )
+  ]
 
   def lookupValidatorRightByPartyWithOffset(
       party: PartyId
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(coinCodegen.ValidatorRight.COMPANION)(
-        _,
-        co => co.payload.user == party.toProtoPrimitive,
-      )
-    )
+  ]
 
   /** Lookup the validator-traffic contract for the given domain. */
   def lookupValidatorTrafficWithOffset(domainId: DomainId)(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]]
-  ] =
-    defaultAcsDomainIdF.flatMap(defaultDomainId =>
-      // TODO(#4913): read from all domains in the global domain
-      multiDomainAcsStore.findContractOnDomainWithOffset(ValidatorTraffic.COMPANION)(
-        defaultDomainId,
-        traffic => traffic.payload.domainId == domainId.toProtoPrimitive,
-      )
-    )
+    QueryResult[
+      Option[Contract[domainCodegen.ValidatorTraffic.ContractId, domainCodegen.ValidatorTraffic]]
+    ]
+  ]
 
   def lookupValidatorTrafficCreationIntentWithOffset(
       domainId: DomainId
   )(implicit tc: TraceContext): Future[
     QueryResult[
-      Option[Contract[ValidatorTrafficCreationIntent.ContractId, ValidatorTrafficCreationIntent]]
+      Option[Contract[
+        domainCodegen.ValidatorTrafficCreationIntent.ContractId,
+        domainCodegen.ValidatorTrafficCreationIntent,
+      ]]
     ]
-  ] =
-    defaultAcsDomainIdF.flatMap(defaultDomainId =>
-      // TODO(#4913): read from all domains in the global domain
-      multiDomainAcsStore.findContractOnDomainWithOffset(ValidatorTrafficCreationIntent.COMPANION)(
-        defaultDomainId,
-        intent => intent.payload.domainId == domainId.toProtoPrimitive,
-      )
-    )
+  ]
 
   def lookupValidatorTopUpStateWithOffset(
       domainId: DomainId
-  ): Future[
+  )(implicit traceContext: TraceContext): Future[
     QueryResult[
-      Option[Contract[ValidatorTopUpState.ContractId, ValidatorTopUpState]]
+      Option[
+        Contract[topUpCodegen.ValidatorTopUpState.ContractId, topUpCodegen.ValidatorTopUpState]
+      ]
     ]
-  ] =
-    multiDomainAcsStore.findContractOnDomainWithOffset(ValidatorTopUpState.COMPANION)(
-      domainId,
-      intent => intent.payload.domainId == domainId.toProtoPrimitive,
-    )
+  ]
 
   def listUsers()(implicit tc: TraceContext): Future[Seq[String]] = {
     for {
@@ -137,71 +96,38 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   )(implicit tc: TraceContext): Future[Option[ContractWithState[
     appManagerCodegen.AppConfiguration.ContractId,
     appManagerCodegen.AppConfiguration,
-  ]]] =
-    multiDomainAcsStore
-      .filterContracts(
-        appManagerCodegen.AppConfiguration.COMPANION,
-        (c: Contract[_, appManagerCodegen.AppConfiguration]) =>
-          c.payload.provider == provider.toProtoPrimitive,
-      )
-      .map {
-        _.maxByOption(c => c.contract.payload.version)
-      }
+  ]]]
 
   def lookupAppConfiguration(
       provider: PartyId,
       version: Long,
-  ): Future[QueryResult[Option[ContractWithState[
+  )(implicit tc: TraceContext): Future[QueryResult[Option[ContractWithState[
     appManagerCodegen.AppConfiguration.ContractId,
     appManagerCodegen.AppConfiguration,
-  ]]]] =
-    multiDomainAcsStore
-      .findContractWithOffset(appManagerCodegen.AppConfiguration.COMPANION)(
-        (c: Contract[
-          appManagerCodegen.AppConfiguration.ContractId,
-          appManagerCodegen.AppConfiguration,
-        ]) => c.payload.provider == provider.toProtoPrimitive && c.payload.version == version
-      )
+  ]]]]
 
   def lookupAppRelease(
       provider: PartyId,
       version: String,
-  ): Future[QueryResult[
+  )(implicit tc: TraceContext): Future[QueryResult[
     Option[ContractWithState[appManagerCodegen.AppRelease.ContractId, appManagerCodegen.AppRelease]]
-  ]] =
-    multiDomainAcsStore
-      .findContractWithOffset(appManagerCodegen.AppRelease.COMPANION)(
-        (c: Contract[appManagerCodegen.AppRelease.ContractId, appManagerCodegen.AppRelease]) =>
-          c.payload.provider == provider.toProtoPrimitive && c.payload.version == version
-      )
+  ]]
 
   def lookupRegisteredApp(
       provider: PartyId
-  ): Future[QueryResult[
+  )(implicit tc: TraceContext): Future[QueryResult[
     Option[
       ContractWithState[appManagerCodegen.RegisteredApp.ContractId, appManagerCodegen.RegisteredApp]
     ]
-  ]] =
-    multiDomainAcsStore
-      .findContractWithOffset(appManagerCodegen.RegisteredApp.COMPANION)(
-        (c: Contract[
-          appManagerCodegen.RegisteredApp.ContractId,
-          appManagerCodegen.RegisteredApp,
-        ]) => c.payload.provider == provider.toProtoPrimitive
-      )
+  ]]
 
   def lookupInstalledApp(
       provider: PartyId
-  ): Future[QueryResult[
+  )(implicit tc: TraceContext): Future[QueryResult[
     Option[
       ContractWithState[appManagerCodegen.InstalledApp.ContractId, appManagerCodegen.InstalledApp]
     ]
-  ]] =
-    multiDomainAcsStore
-      .findContractWithOffset(appManagerCodegen.InstalledApp.COMPANION)(
-        (c: Contract[appManagerCodegen.InstalledApp.ContractId, appManagerCodegen.InstalledApp]) =>
-          c.payload.provider == provider.toProtoPrimitive
-      )
+  ]]
 
   def listRegisteredApps()(implicit
       traceContext: TraceContext
@@ -242,37 +168,22 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
         )
       })
 
-  private def listApprovedReleaseConfigurations(provider: PartyId)(implicit
+  protected def listApprovedReleaseConfigurations(provider: PartyId)(implicit
       traceContext: TraceContext
   ): Future[Seq[
     ContractWithState[
       appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
       appManagerCodegen.ApprovedReleaseConfiguration,
     ]
-  ]] =
-    multiDomainAcsStore.filterContracts(
-      appManagerCodegen.ApprovedReleaseConfiguration.COMPANION,
-      (c: Contract[_, appManagerCodegen.ApprovedReleaseConfiguration]) =>
-        c.payload.provider == provider.toProtoPrimitive,
-    )
+  ]]
 
   def lookupApprovedReleaseConfiguration(
       provider: PartyId,
       releaseConfigurationHash: Hash,
-  ): Future[QueryResult[Option[ContractWithState[
+  )(implicit traceContext: TraceContext): Future[QueryResult[Option[ContractWithState[
     appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
     appManagerCodegen.ApprovedReleaseConfiguration,
-  ]]]] =
-    multiDomainAcsStore.findContractWithOffset(
-      appManagerCodegen.ApprovedReleaseConfiguration.COMPANION
-    )(
-      (c: Contract[
-        appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
-        appManagerCodegen.ApprovedReleaseConfiguration,
-      ]) =>
-        c.payload.provider == provider.toProtoPrimitive &&
-          c.payload.jsonHash == releaseConfigurationHash.toHexString
-    )
+  ]]]]
 }
 
 object ValidatorStore {
@@ -351,12 +262,16 @@ object ValidatorStore {
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == validator
         ),
-        mkFilter(ValidatorTraffic.COMPANION)(co =>
+        mkFilter(domainCodegen.ValidatorTraffic.COMPANION)(co =>
           co.payload.validator == validator &&
             co.payload.svc == svc
         ),
-        mkFilter(ValidatorTrafficCreationIntent.COMPANION)(co => co.payload.validator == validator),
-        mkFilter(ValidatorTopUpState.COMPANION)(co => co.payload.validator == validator),
+        mkFilter(domainCodegen.ValidatorTrafficCreationIntent.COMPANION)(co =>
+          co.payload.validator == validator
+        ),
+        mkFilter(topUpCodegen.ValidatorTopUpState.COMPANION)(co =>
+          co.payload.validator == validator
+        ),
         mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == validator

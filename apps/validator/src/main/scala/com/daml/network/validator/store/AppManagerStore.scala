@@ -192,7 +192,7 @@ final class AppManagerStore(
   def lookupAppConfiguration(
       provider: PartyId,
       version: Long,
-  ): Future[Option[AppConfiguration]] =
+  )(implicit tc: TraceContext): Future[Option[AppConfiguration]] =
     store
       .lookupAppConfiguration(provider, version)
       .map(
@@ -204,7 +204,9 @@ final class AppManagerStore(
         )
       )
 
-  def getAppConfiguration(provider: PartyId, version: Long): Future[AppConfiguration] =
+  def getAppConfiguration(provider: PartyId, version: Long)(implicit
+      tc: TraceContext
+  ): Future[AppConfiguration] =
     lookupAppConfiguration(provider, version).map(
       _.getOrElse(
         throw Status.NOT_FOUND
@@ -213,7 +215,9 @@ final class AppManagerStore(
       )
     )
 
-  def lookupAppRelease(provider: PartyId, version: String): Future[Option[AppRelease]] =
+  def lookupAppRelease(provider: PartyId, version: String)(implicit
+      tc: TraceContext
+  ): Future[Option[AppRelease]] =
     store
       .lookupAppRelease(provider, version)
       .map(
@@ -222,7 +226,9 @@ final class AppManagerStore(
         )
       )
 
-  def getAppRelease(provider: PartyId, version: String): Future[AppRelease] =
+  def getAppRelease(provider: PartyId, version: String)(implicit
+      tc: TraceContext
+  ): Future[AppRelease] =
     lookupAppRelease(provider, version).map(
       _.getOrElse(
         throw Status.NOT_FOUND
@@ -241,12 +247,14 @@ final class AppManagerStore(
       ),
     )
 
-  def lookupInstalledAppUrl(provider: PartyId): Future[Option[AppUrl]] =
+  def lookupInstalledAppUrl(provider: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[AppUrl]] =
     store
       .lookupInstalledApp(provider)
       .map(_.value.map(c => AppUrl(c.contract.payload.appUrl)))
 
-  def getInstalledAppUrl(provider: PartyId): Future[AppUrl] =
+  def getInstalledAppUrl(provider: PartyId)(implicit tc: TraceContext): Future[AppUrl] =
     lookupInstalledAppUrl(provider).map(
       _.getOrElse(
         throw Status.NOT_FOUND.withDescription(show"App $provider not found").asRuntimeException()

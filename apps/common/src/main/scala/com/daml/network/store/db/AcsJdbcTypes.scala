@@ -7,6 +7,7 @@ import com.daml.lf.data.Ref.*
 import com.daml.lf.data.Time.Timestamp
 import com.daml.lf.value.Value as LfValue
 import com.daml.lf.value.json.ApiCodecCompressed
+import com.daml.network.store.MultiDomainAcsStore.ContractFilter
 import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
 import com.digitalasset.canton.admin.api.client.data.TemplateId
@@ -236,6 +237,21 @@ trait AcsJdbcTypes {
       .map(toData)
       .toRight(
         s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
+      )
+  }
+
+  protected def tryToDecode[I, TCid <: ContractId[I], View <: DamlRecord[?], D](
+      companion: Companion.Interface[TCid, I, View],
+      createdEvent: CreatedEvent,
+      contractFilter: ContractFilter,
+  )(
+      toData: Contract[TCid, View] => D
+  ): Either[String, D] = {
+    contractFilter
+      .decodeInterface(companion)(createdEvent)
+      .map(toData)
+      .toRight(
+        s"Failed to decode interface ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
       )
   }
 

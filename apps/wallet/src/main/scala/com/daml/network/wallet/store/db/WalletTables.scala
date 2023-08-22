@@ -1,7 +1,7 @@
 package com.daml.network.wallet.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -14,7 +14,6 @@ import com.daml.network.store.MultiDomainAcsStore.ContractFilter
 import com.daml.network.store.db.AcsTables
 import com.daml.network.store.db.AcsTables.{AcsStoreTemplate, TxLogStoreTemplate}
 import com.daml.network.util.Contract
-import com.daml.network.util.Contract.Companion
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -152,35 +151,6 @@ object WalletTables extends AcsTables {
               Left(s"Template $t cannot be decoded as an entry for the user wallet store.")
             )
       }
-    }
-
-    private def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?]](
-        companion: Companion.Template[TCid, T],
-        createdEvent: CreatedEvent,
-    )(
-        toData: Contract[TCid, T] => UserWalletAcsStoreRowData
-    ): Either[String, UserWalletAcsStoreRowData] = {
-      Contract
-        .fromCreatedEvent(companion)(createdEvent)
-        .map(toData)
-        .toRight(
-          s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
-        )
-    }
-
-    def tryToDecode[I, TCid <: ContractId[I], View <: DamlRecord[?]](
-        companion: Companion.Interface[TCid, I, View],
-        createdEvent: CreatedEvent,
-        contractFilter: ContractFilter,
-    )(
-        toData: Contract[TCid, View] => UserWalletAcsStoreRowData
-    ): Either[String, UserWalletAcsStoreRowData] = {
-      contractFilter
-        .decodeInterface(companion)(createdEvent)
-        .map(toData)
-        .toRight(
-          s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
-        )
     }
   }
 
