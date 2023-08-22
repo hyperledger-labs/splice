@@ -687,7 +687,7 @@ class InMemorySvSvcStore(
     )
   } yield contexts
 
-  override def listCnsInitialPaymentConfirmationByCnsName(
+  override def listInitialPaymentConfirmationByCnsName(
       confirmer: PartyId,
       name: String,
   )(implicit tc: TraceContext): Future[

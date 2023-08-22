@@ -1,5 +1,6 @@
 package com.daml.network.sv.store
 
+import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -565,7 +566,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
     Seq[Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]]
   ]
 
-  def listCnsInitialPaymentConfirmationByCnsName(
+  def listInitialPaymentConfirmationByCnsName(
       confirmer: PartyId,
       name: String,
   )(implicit tc: TraceContext): Future[
@@ -591,23 +592,31 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
 
   def getSvcTransferContextForRound(round: cc.api.v1.round.Round)(implicit
       tc: TraceContext
-  ): Future[Option[cc.api.v1.coin.AppTransferContext]] = {
+  ): Future[Option[cc.api.v1.coin.AppTransferContext]] =
+    getOpenMiningRoundTriple().map(_.toSeq).flatMap { openRounds =>
+      openRounds.find(_.payload.round == round).traverse(getTransferContext)
+    }
+
+  def getSvcTransferContext()(implicit
+      tc: TraceContext
+  ): Future[cc.api.v1.coin.AppTransferContext] =
+    getLatestActiveOpenMiningRound().flatMap(getTransferContext)
+
+  private def getTransferContext(
+      openMiningRound: SvSvcStore.OpenMiningRoundContract
+  )(implicit tc: TraceContext): Future[cc.api.v1.coin.AppTransferContext] = {
     for {
-      triple <- getOpenMiningRoundTriple()
-      openRounds = triple.toSeq
       featured <- lookupFeaturedAppRight(key.svcParty)
       coinRules <- getCoinRules()
     } yield {
-      openRounds.find(_.payload.round == round) map { openMiningRound =>
-        new cc.api.v1.coin.AppTransferContext(
-          coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
-          openMiningRound.contractId
-            .toInterface(cc.api.v1.round.OpenMiningRound.INTERFACE),
-          featured
-            .map(_.contractId.toInterface(cc.api.v1.coin.FeaturedAppRight.INTERFACE))
-            .toJava,
-        )
-      }
+      new cc.api.v1.coin.AppTransferContext(
+        coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
+        openMiningRound.contractId
+          .toInterface(cc.api.v1.round.OpenMiningRound.INTERFACE),
+        featured
+          .map(_.contractId.toInterface(cc.api.v1.coin.FeaturedAppRight.INTERFACE))
+          .toJava,
+      )
     }
   }
 }

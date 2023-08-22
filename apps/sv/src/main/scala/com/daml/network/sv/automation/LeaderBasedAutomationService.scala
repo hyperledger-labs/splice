@@ -54,4 +54,5 @@ class LeaderBasedAutomationService(
   }
 
   registerTrigger(new ExpireElectionRequestsTrigger(triggerContext, svTaskContext))
+  registerTrigger(new CnsRejectSubscriptionInitialPaymentTrigger(triggerContext, svTaskContext))
 }

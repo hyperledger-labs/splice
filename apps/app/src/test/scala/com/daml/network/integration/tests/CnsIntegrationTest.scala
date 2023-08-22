@@ -94,6 +94,62 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         entry.data.expiresAt,
       )
     }
+
+    "reject invalid entry names" in { implicit env =>
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+
+      clue("invalid entries(bad names) are rejected") {
+        val invalidNames =
+          Seq("alice.company.unverified.cns", "alice$company.unverified.cns", "alice.cns")
+        invalidNames.foreach { name =>
+          loggerFactory.assertLogs(
+            {
+              requestAndPayForEntry(aliceRefs, name)
+            },
+            _.warningMessage should include(s"entry name ($name) is not valid"),
+          )
+        }
+      }
+    }
+
+    "reject invalid entry urls" in { implicit env =>
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+
+      clue("invalid entries(bad urls) are rejected") {
+        val invalidUrls =
+          Seq("s3://alice.arn.cns", "http://asdklfjh%skldjfgh", s"https://${"alice-" * 50}.cns.com")
+        invalidUrls.foreach { url =>
+          loggerFactory.assertLogs(
+            {
+              requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryUrl = url)
+            },
+            _.warningMessage should include(s"entry url ($url) is not valid"),
+          )
+        }
+      }
+    }
+
+    "reject invalid entry descriptions" in { implicit env =>
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+
+      clue("invalid entries(bad descriptions) are rejected") {
+        val invalidDescriptions = Seq("Sample CNS Directory Entry Description -" * 50)
+        invalidDescriptions.foreach { desc =>
+          loggerFactory.assertLogs(
+            {
+              requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryDescription = desc)
+            },
+            _.warningMessage should include(s"entry description ($desc) is not valid"),
+          )
+        }
+      }
+    }
   }
 
   private def requestAndPayForEntry(

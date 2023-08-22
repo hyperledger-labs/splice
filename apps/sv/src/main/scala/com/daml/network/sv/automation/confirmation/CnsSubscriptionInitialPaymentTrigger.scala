@@ -15,13 +15,13 @@ import com.daml.network.codegen.java.cn.cns.{
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext
 import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
-import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, Confirmation}
+import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.CnsUtil
-import com.daml.network.util.{AssignedContract, Contract}
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -62,10 +62,11 @@ class CnsSubscriptionInitialPaymentTrigger(
       case Some(cnsContext) =>
         if (CnsUtil.isValidCnsContent(cnsContext)) {
           for {
-            transferContextE <- svcStore.getSvcTransferContextForRound(payment.payload.round)
-            result <- transferContextE match {
+            transferContextOpt <- svcStore.getSvcTransferContextForRound(payment.payload.round)
+            result <- transferContextOpt match {
               case Some(transferContext) =>
-                initialPaymentConfirmations(cnsContext.payload.name)
+                svcStore
+                  .listInitialPaymentConfirmationByCnsName(svParty, cnsContext.payload.name)
                   .flatMap { confirmations =>
                     if (confirmations.isEmpty)
                       svcStore.lookupCnsEntryByName(cnsContext.payload.name).flatMap {
@@ -179,11 +180,4 @@ class CnsSubscriptionInitialPaymentTrigger(
 
     }
   } yield taskOutcome
-
-  private def initialPaymentConfirmations(
-      name: String
-  )(implicit tc: TraceContext): Future[Seq[Contract[
-    Confirmation.ContractId,
-    Confirmation,
-  ]]] = svcStore.listCnsInitialPaymentConfirmationByCnsName(svParty, name)
 }
