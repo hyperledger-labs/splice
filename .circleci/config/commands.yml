@@ -1016,25 +1016,22 @@ commands:
             query="timestamp>=\"$before\" AND timestamp<=\"$now_formatted\""
             apps=(
               "sv-1 sv-app"
+              "sv-1 directory-app"
+              "sv-1 participant"
+              "sv-1 scan-app"
               "sv-2 sv-app"
               "sv-3 sv-app"
               "sv-4 sv-app"
-              "svc directory-app"
-              "svc global-domain"
-              "svc participant"
-              "svc scan-app"
               "validator1 participant"
               "validator1 validator-app"
-              "validator1 wallet-app"
               "splitwell domain"
               "splitwell participant"
               "splitwell splitwell-app"
               "splitwell validator-app"
-              "splitwell wallet-app"
             )
             for app in "${apps[@]}"
             do
-              echo "Use the following command to download logs for $app '$query':"
+              echo "# --- Use the following command to download logs for $app '$query':"
               echo "cncluster gcloud_logs $app '$query'"
             done
 
