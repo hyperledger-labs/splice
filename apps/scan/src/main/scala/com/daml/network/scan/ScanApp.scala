@@ -63,6 +63,8 @@ class ScanApp(
       nodeMetrics,
     ) {
 
+  override def packages = super.packages ++ Seq("dar/canton-name-service-0.1.0.dar")
+
   override def initialize(
       ledgerClient: CNLedgerClient,
       // we don't care about the primary party in scan as that points to the SV party while we need the svc party

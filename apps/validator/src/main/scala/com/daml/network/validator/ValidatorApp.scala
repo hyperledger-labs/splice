@@ -100,6 +100,8 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
+  override def packages = super.packages ++ Seq("dar/wallet-0.1.0.dar")
+
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
     _ <- ensureVersionMatch(config.scanClient)

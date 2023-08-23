@@ -4,10 +4,11 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
+import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cn
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.daml.network.codegen.java.cc
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanTxLogParser
 import com.daml.network.scan.store.ScanTxLogParser.TxLogIndexRecord
@@ -34,6 +35,18 @@ object ScanTables extends AcsTables {
       createdEvent.getTemplateId match {
         case cc.coin.CoinRules.TEMPLATE_ID =>
           tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent) { contract =>
+            ScanAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              round = None,
+              validator = None,
+              amount = None,
+              importCrateReceiver = None,
+              featuredAppRightProvider = None,
+            )
+          }
+        case cn.cns.CnsRules.TEMPLATE_ID =>
+          tryToDecode(cn.cns.CnsRules.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
               contractExpiresAt = None,

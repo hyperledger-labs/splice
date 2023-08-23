@@ -16,6 +16,7 @@ import com.daml.network.codegen.java.cc.{
   round as roundCodegen,
   schedule as scheduleCodegen,
 }
+import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types as daTypes
 import com.daml.network.config.DomainConfig
@@ -568,6 +569,23 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
     }
 
+    "lookupCnsRules" should {
+      "find the latest CNS rules" in {
+        val cr = cnsRules()
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(cr)(store.multiDomainAcsStore)
+        } yield {
+          eventually() {
+            store
+              .lookupCnsRules()
+              .futureValue
+              .map(_.contract) should be(Some(cr))
+          }
+        }
+      }
+    }
+
     "lookupCoinRulesV1Test" should {
 
       "find the coin rules" in {
@@ -688,6 +706,26 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     Contract(
       identifier = templateId,
       contractId = new coinCodegen.CoinRules.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  private def cnsRules() = {
+    val templateId = cnsCodegen.CnsRules.TEMPLATE_ID
+
+    val template = new cnsCodegen.CnsRules(
+      svcParty.toProtoPrimitive,
+      new cnsCodegen.CnsRulesConfig(
+        new RelTime(1_000_000),
+        new RelTime(1_000_000),
+        new java.math.BigDecimal(1.0).setScale(10),
+      ),
+    )
+    Contract(
+      identifier = templateId,
+      contractId = new cnsCodegen.CnsRules.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
@@ -1088,7 +1126,8 @@ class DbScanStoreTest
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         Seq(
-          "dar/canton-coin-0.1.1.dar"
+          "dar/canton-coin-0.1.1.dar",
+          "dar/canton-name-service-0.1.0.dar",
         )
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =

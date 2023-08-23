@@ -276,10 +276,6 @@ object ValidatorStore {
           co.payload.svc == svc &&
             co.payload.owner == validator
         ),
-        mkFilter(coinCodegen.Coin.COMPANION)(co =>
-          co.payload.svc == svc &&
-            co.payload.owner == validator
-        ),
         mkFilter(appManagerCodegen.AppConfiguration.COMPANION)(co =>
           co.payload.validatorOperator == validator
         ),

@@ -80,6 +80,8 @@ object ValidatorTables extends AcsTables {
           )
         case coinCodegen.CoinRules.TEMPLATE_ID =>
           tryToDecode(coinCodegen.CoinRules.COMPANION, createdEvent)(noIndex)
+        case coinCodegen.Coin.COMPANION.TEMPLATE_ID =>
+          tryToDecode(coinCodegen.Coin.COMPANION, createdEvent)(noIndex)
         case validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID =>
           tryToDecode(validatorLicenseCodegen.ValidatorLicense.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
