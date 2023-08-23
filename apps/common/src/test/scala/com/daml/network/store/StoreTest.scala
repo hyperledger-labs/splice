@@ -418,6 +418,22 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         .map(_ => tx)
     }
 
+    def ingestMulti(
+        makeTx: String => TransactionTree
+    )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
+      val tx = makeTx(nextOffset)
+      val txUpdate = TransactionTreeUpdate(tx)
+      // Note: runs the futures sequentially in order to get deterministic tests
+      stores
+        .foldLeft(Future.unit) { (acc, store) =>
+          for {
+            _ <- acc
+            _ <- store.ingestionSink.ingestUpdate(domain, txUpdate)
+          } yield ()
+        }
+        .map(_ => tx)
+    }
+
     def unassign[TCid <: ContractId[T], T](
         contractAndDomain: (Contract[TCid, T], DomainId),
         reassignmentId: String,

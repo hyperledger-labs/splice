@@ -170,7 +170,7 @@ create table user_wallet_txlog_store(
     -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
     foreign key (store_id) references store_descriptors (id),
 
-    unique (event_id),
+    unique (store_id, tx_log_id, event_id),
 
     -- index columns
     ----------------
@@ -298,7 +298,7 @@ create table scan_txlog_store
     -- parent traits (e.g. RewardIndexRecord) are *not* present in the DB, only their subclasses
     index_record_type                                        text not null,
 
-    unique (event_id, index_record_type),
+    unique (store_id, event_id, index_record_type),
 
     -- the round of a OpenMiningRound/ClosedMiningRound/Reward/ExtraTrafficPurchase IndexRecord
     round                                                    bigint,

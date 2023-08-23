@@ -186,6 +186,28 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
+      "return entry stored by multiple stores" in {
+        val treeSource = TransactionTreeSource.ForTesting()
+
+        def mkSharedTx()(offset: String) = {
+          val result = mkTransferOfferTx(offset, "trackingId", user1, user2, nextCid())
+          treeSource.addTree(result)
+          result
+        }
+
+        for {
+          store1 <- mkStore(user1, treeSource)
+          store2 <- mkStore(user2, treeSource)
+          allStores = List(store1.multiDomainAcsStore, store2.multiDomainAcsStore)
+          tx <- dummyDomain.ingestMulti(mkSharedTx())(allStores)
+          result1 <- store1.getLatestTransferOfferEventByTrackingId("trackingId")
+          result2 <- store2.getLatestTransferOfferEventByTrackingId("trackingId")
+        } yield {
+          result1.value.value.indexRecord.eventId should be(tx.getRootEventIds.loneElement)
+          result2.value.value.indexRecord.eventId should be(tx.getRootEventIds.loneElement)
+        }
+      }
+
       "return the latest entry" in {
         val treeSource = TransactionTreeSource.ForTesting()
         val goodTransferOfferCid = nextCid()
@@ -748,35 +770,33 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.ingest(mkMint(4.0))(store.multiDomainAcsStore)
           _ <- dummyDomain.ingest(mkMint(5.0))(store.multiDomainAcsStore)
         } yield {
-          eventually() {
-            checkTxHistory(
-              store,
-              // Note: transactions are returned in reverse chronological order
-              Seq(
-                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
-                  logEntry.amount shouldBe 5.0
-                },
-                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
-                  logEntry.amount shouldBe 4.0
-                },
-                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
-                  logEntry.amount shouldBe 3.0
-                },
-                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
-                  logEntry.amount shouldBe 2.0
-                },
-                { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
-                  logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
-                  logEntry.amount shouldBe 1.0
-                },
-              ),
-            )
-            Succeeded
-          }
+          checkTxHistory(
+            store,
+            // Note: transactions are returned in reverse chronological order
+            Seq(
+              { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                logEntry.amount shouldBe 5.0
+              },
+              { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                logEntry.amount shouldBe 4.0
+              },
+              { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                logEntry.amount shouldBe 3.0
+              },
+              { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                logEntry.amount shouldBe 2.0
+              },
+              { case logEntry: UserWalletTxLogParser.TxLogEntry.BalanceChange =>
+                logEntry.transactionSubtype shouldBe UserWalletTxLogParser.TxLogEntry.BalanceChange.Mint
+                logEntry.amount shouldBe 1.0
+              },
+            ),
+          )
+          Succeeded
         }
       }
     }
