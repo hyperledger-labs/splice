@@ -79,7 +79,7 @@ class DbUserWalletStore(
             ) =>
           val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
           val templateId = contract.identifier
-          val createArguments = contract.toJson.payload
+          val createArguments = contract.toHttp.payload
           val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
           val contractMetadataContractKeyHash =
             lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)

@@ -68,7 +68,7 @@ class HttpSvAdminHandler(
         validatorOnboardings <- svStore.listValidatorOnboardings()
       } yield {
         definitions.ListOngoingValidatorOnboardingsResponse(
-          validatorOnboardings.map(_.toJson).toVector
+          validatorOnboardings.map(_.toHttp).toVector
         )
       }
     }
@@ -82,7 +82,7 @@ class HttpSvAdminHandler(
         validatorLicenses <- svcStore.listValidatorLicenses()
       } yield {
         definitions.ListValidatorLicensesResponse(
-          validatorLicenses.map(_.toJson).toVector
+          validatorLicenses.map(_.toHttp).toVector
         )
       }
     }
@@ -144,7 +144,7 @@ class HttpSvAdminHandler(
         coinPriceVotes <- svcStore.listCoinPriceVotes()
       } yield {
         definitions.ListCoinPriceVotesResponse(
-          coinPriceVotes.map(_.toJson).toVector
+          coinPriceVotes.map(_.toHttp).toVector
         )
       }
     }
@@ -161,7 +161,7 @@ class HttpSvAdminHandler(
           (openMiningRoundTriple match {
             case Some(triple) => triple.toSeq
             case _ => Seq.empty
-          }).map(_.toJson).toVector
+          }).map(_.toHttp).toVector
         )
       }
     }
@@ -224,7 +224,7 @@ class HttpSvAdminHandler(
         svcRulesVoteRequests <- svcStore.listVoteRequests()
       } yield {
         definitions.ListSvcRulesVoteRequestsResponse(
-          svcRulesVoteRequests.map(_.toJson).toVector
+          svcRulesVoteRequests.map(_.toHttp).toVector
         )
       }
     }
@@ -242,7 +242,7 @@ class HttpSvAdminHandler(
             Future.successful(
               v0.SvAdminResource.LookupSvcRulesVoteRequestResponse.OK(
                 definitions.LookupSvcRulesVoteRequestResponse(
-                  voteRequest.toJson
+                  voteRequest.toHttp
                 )
               )
             )
@@ -309,7 +309,7 @@ class HttpSvAdminHandler(
         )
       } yield {
         definitions.ListVotesResponse(
-          svcRulesVotes.map(_.toJson).toVector
+          svcRulesVotes.map(_.toHttp).toVector
         )
       }
     }
@@ -376,7 +376,7 @@ class HttpSvAdminHandler(
           SvAdminResource.GetAcsStoreDumpResponse.OK(
             definitions.GetAcsStoreDumpResponse(
               offset = snapshot.offset,
-              contracts = snapshot.contracts.map(_.toJson).toVector,
+              contracts = snapshot.contracts.map(_.toHttp).toVector,
             )
           )
         )

@@ -227,7 +227,7 @@ object SvUtil {
 
           val httpSnapshot = http.GetAcsStoreDumpResponse(
             offset = snapshot.offset,
-            contracts = snapshot.contracts.map(_.toJson).toVector,
+            contracts = snapshot.contracts.map(_.toHttp).toVector,
             version = Some(BuildInfo.compiledVersion),
           )
           val fileDesc =

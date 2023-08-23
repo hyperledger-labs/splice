@@ -103,8 +103,8 @@ class HttpWalletHandler(
         appPaymentRequest <- userStore.getAppPaymentRequest(requestCid)
       } yield r0.GetAppPaymentRequestResponseOK(
         d0.AppPaymentRequest(
-          appPaymentRequest.appPaymentRequest.toJson,
-          appPaymentRequest.deliveryOffer.toJson,
+          appPaymentRequest.appPaymentRequest.toHttp,
+          appPaymentRequest.deliveryOffer.toHttp,
         )
       )
     }
@@ -119,8 +119,8 @@ class HttpWalletHandler(
         appPaymentRequests <- userStore.listAppPaymentRequests
       } yield d0.ListAppPaymentRequestsResponse(appPaymentRequests.map { appPaymentRequest =>
         d0.AppPaymentRequest(
-          appPaymentRequest.appPaymentRequest.toJson,
-          appPaymentRequest.deliveryOffer.toJson,
+          appPaymentRequest.appPaymentRequest.toHttp,
+          appPaymentRequest.deliveryOffer.toHttp,
         )
       }.toVector)
     }
@@ -155,8 +155,8 @@ class HttpWalletHandler(
       } yield {
         d0.ListSubscriptionRequestsResponse(subRequests.map { subRequest =>
           d0.SubscriptionRequest(
-            subRequest.subscription.toJson,
-            subRequest.context.toJson,
+            subRequest.subscription.toHttp,
+            subRequest.context.toHttp,
           )
         }.toVector)
       }
@@ -174,14 +174,14 @@ class HttpWalletHandler(
           d0.ListSubscriptionsResponse(
             subscriptions.map { subscription =>
               d0.Subscription(
-                subscription.subscription.toJson,
+                subscription.subscription.toHttp,
                 subscription.state match {
                   case UserWalletStore.SubscriptionIdleState(contract) =>
-                    d0.SubscriptionState(idle = Some(contract.toJson))
+                    d0.SubscriptionState(idle = Some(contract.toHttp))
                   case UserWalletStore.SubscriptionPaymentState(contract) =>
-                    d0.SubscriptionState(payment = Some(contract.toJson))
+                    d0.SubscriptionState(payment = Some(contract.toHttp))
                 },
-                subscription.context.toJson,
+                subscription.context.toHttp,
               )
             }.toVector
           )
@@ -202,7 +202,7 @@ class HttpWalletHandler(
           None,
         )
       } yield d0.ListValidatorRewardCouponsResponse(
-        validatorRewardCoupons.map(_.toJson).toVector
+        validatorRewardCoupons.map(_.toHttp).toVector
       )
     }
 
@@ -362,8 +362,8 @@ class HttpWalletHandler(
         subscriptionRequest <- userStore.getSubscriptionRequest(requestCid)
       } yield r0.GetSubscriptionRequestResponseOK(
         d0.SubscriptionRequest(
-          subscriptionRequest.subscription.toJson,
-          subscriptionRequest.context.toJson,
+          subscriptionRequest.subscription.toHttp,
+          subscriptionRequest.context.toHttp,
         )
       )
     }
@@ -540,7 +540,7 @@ class HttpWalletHandler(
       round: Long,
   )(implicit errorLoggingContext: ErrorLoggingContext): d0.CoinPosition = {
     d0.CoinPosition(
-      coin.toJson,
+      coin.toHttp,
       round,
       Codec.encode(CNNodeUtil.holdingFee(coin.payload, round)),
       Codec.encode(CNNodeUtil.currentAmount(coin.payload, round)),
@@ -552,7 +552,7 @@ class HttpWalletHandler(
       round: Long,
   )(implicit errorLoggingContext: ErrorLoggingContext): d0.CoinPosition =
     d0.CoinPosition(
-      lockedCoin.toJson,
+      lockedCoin.toHttp,
       round,
       Codec.encode(CNNodeUtil.holdingFee(lockedCoin.payload.coin, round)),
       Codec.encode(CNNodeUtil.currentAmount(lockedCoin.payload.coin, round)),

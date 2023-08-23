@@ -143,7 +143,7 @@ class HttpScanHandler(
               show"Not sending ${PrettyContractId(round)}, as it is cached by the client."
             )
             None
-          } else Some(round.toJson),
+          } else Some(round.toHttp),
           constDomain,
         ),
       )
@@ -171,7 +171,7 @@ class HttpScanHandler(
               None
             case Some(_) // else: coin rules are cached but outdated.
                 | None =>
-              Some(coinRules.contract.toJson)
+              Some(coinRules.contract.toHttp)
           },
           domainId = coinRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
         )
@@ -209,7 +209,7 @@ class HttpScanHandler(
               None
             case Some(_) // else: coin rules are cached but outdated.
                 | None =>
-              Some(coinRules.contract.toJson)
+              Some(coinRules.contract.toHttp)
           },
           domainId = coinRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
         )
@@ -239,7 +239,7 @@ class HttpScanHandler(
               )
               None
             case Some(_) | None =>
-              Some(cnsRules.contract.toJson)
+              Some(cnsRules.contract.toHttp)
           },
           domainId = cnsRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
         )
@@ -261,7 +261,7 @@ class HttpScanHandler(
         )
       } yield {
         val filteredRounds = rounds.sortBy(_.payload.round.number)
-        definitions.GetClosedRoundsResponse(filteredRounds.toVector.map(r => r.toJson))
+        definitions.GetClosedRoundsResponse(filteredRounds.toVector.map(r => r.toHttp))
       }
     }
 
@@ -276,7 +276,7 @@ class HttpScanHandler(
           domainId,
         )
       } yield {
-        definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.toJson))
+        definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.toHttp))
       }
     }
 
@@ -293,7 +293,7 @@ class HttpScanHandler(
           PartyId.tryFromProtoPrimitive(providerPartyId),
         )
       } yield {
-        definitions.LookupFeaturedAppRightResponse(right.map(r => r.toJson))
+        definitions.LookupFeaturedAppRightResponse(right.map(r => r.toHttp))
       }
     }
 
@@ -524,7 +524,7 @@ class HttpScanHandler(
           crates
             .map(crate =>
               MaybeCachedContractWithState(
-                Some(crate.contract.toJson),
+                Some(crate.contract.toHttp),
                 crate.state match {
                   case ContractState.InFlight => None
                   case ContractState.Assigned(domainId) => Some(domainId.toProtoPrimitive)

@@ -51,7 +51,7 @@ final case class Contract[TCid, T](
 ) extends PrettyPrinting
     with Contract.Has[TCid, T] {
 
-  def toJson(implicit elc: ErrorLoggingContext): http.Contract = {
+  def toHttp(implicit elc: ErrorLoggingContext): http.Contract = {
     http.Contract(
       templateId =
         s"${identifier.getPackageId}:${identifier.getModuleName}:${identifier.getEntityName}",

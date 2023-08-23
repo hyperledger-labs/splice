@@ -68,7 +68,7 @@ class HttpSplitwellHandler(
         acceptedGroupInvites <- store.listAcceptedGroupInvites(userParty, groupId)
       } yield {
         definitions.ListAcceptedGroupInvitesResponse(
-          acceptedGroupInvites.map(_.contract.toJson).toVector
+          acceptedGroupInvites.map(_.contract.toHttp).toVector
         )
       }
     }
@@ -85,7 +85,7 @@ class HttpSplitwellHandler(
       } yield {
         definitions.ListBalanceUpdatesResponse(
           balanceUpdates
-            .map(_.contract.toJson)
+            .map(_.contract.toHttp)
             .toVector
         )
       }
@@ -230,7 +230,7 @@ object HttpSplitwellHandler {
   )(implicit elc: ErrorLoggingContext): definitions.ContractWithState = {
     import ContractState.*
     definitions.ContractWithState(
-      cws.contract.toJson,
+      cws.contract.toHttp,
       cws.state match {
         case Assigned(domain) => Some(domain.toProtoPrimitive)
         case InFlight => None

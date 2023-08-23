@@ -37,7 +37,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
         contracts <- userStore.multiDomainAcsStore.listContracts(
           templateCompanion
         )
-      } yield mkResponse(contracts.map(_.contract.toJson).toVector)
+      } yield mkResponse(contracts.map(_.contract.toHttp).toVector)
     }
 
   protected def getUserStore(user: String): Future[UserWalletStore] =
