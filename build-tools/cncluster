@@ -422,23 +422,36 @@ function subcmd_gcloud_logs() {
 
     _cluster_must_exist
 
+    local postgres glr_format
+    postgres="$(if [ "$app" = postgres ]; then echo 1; else echo 0; fi)"
+    if [ "$postgres" -ne 0 ]; then
+        glr_format='text(textPayload)'
+    else
+        glr_format='json(jsonPayload)'
+    fi
+
     LOGFILE=$(mktemp "$namespace"-"$app"-XXXX.clog)
     _info "Writing log to $LOGFILE"
 
     function gcloud_read() {
-        gcloud logging read --order asc --format 'json(jsonPayload)' "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter"
+        gcloud logging read --order asc --format "$glr_format" \
+          "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter"
     }
-    function jq_parse() {
-        jq --stream -cn 'fromstream(1 | truncate_stream(inputs) | select(.[0][0] == "jsonPayload")) | .jsonPayload'
+    function parse_gcloud_format() {
+        if [ "$postgres" -eq 0 ]; then
+            jq --stream -cn 'fromstream(1 | truncate_stream(inputs) | select(.[0][0] == "jsonPayload")) | .jsonPayload'
+        else
+            awk '/^---$|^: None$/ {next} {sub("^text_payload: ", ""); print}'
+        fi
     }
 
 
     if [ -z "${download_only-}" ]
     then
-        gcloud_read | jq_parse > "$LOGFILE" &
+        gcloud_read | parse_gcloud_format > "$LOGFILE" &
         lnav "$LOGFILE"
     else
-        gcloud_read | jq_parse > "$LOGFILE"
+        gcloud_read | parse_gcloud_format > "$LOGFILE"
     fi
 }
 
