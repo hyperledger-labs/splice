@@ -11,6 +11,7 @@
     },
     "svs": {
       "Canton-Foundation": ["104.198.172.213/32"],
+      "Liberty-City-Ventures": ["54.228.250.8/32"],
       "Digital-Asset": [
         "34.31.226.101/32",
         "34.27.176.33/32",
