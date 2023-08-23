@@ -4,6 +4,7 @@ jobs:
   static_tests:
     docker:
       - image: cimg/base:2021.04
+    resource_class: "xlarge"
     environment:
       <<: *env
     steps:
