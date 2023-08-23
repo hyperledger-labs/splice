@@ -30,7 +30,7 @@ import com.daml.network.history.{
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanDomainConfig}
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.scan.store.ScanTxLogParser.TxLogIndexRecord
+import com.daml.network.scan.store.ScanTxLogParser.{TxLogIndexRecord, TxLogEntry}
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{StoreErrors, StoreTest, TxLogStore}
@@ -44,7 +44,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.google.protobuf
-
 import java.time.{Duration, Instant}
 import java.util.Optional
 import scala.concurrent.Future
@@ -665,9 +664,80 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           }
         }
       }
-
     }
 
+    "listRecentActivity" should {
+      "return the most recent activities" in {
+        val limit = 10
+        val nrActivities = 11
+        val activities = (1 to nrActivities).map { i =>
+          TxLogEntry.RecentActivityLogEntry(
+            TxLogIndexRecord
+              .RecentActivityIndexRecord(
+                s"$i",
+                s"$i",
+                domainId = dummyDomain,
+              ),
+            provider = user1.toProtoPrimitive,
+            sender = user1.toProtoPrimitive,
+            receiver = user1.toProtoPrimitive,
+            amount = BigDecimal(i),
+            coinPrice = BigDecimal(1.0),
+          )
+        }.toList
+        def stripEventId(activity: TxLogEntry.RecentActivityLogEntry) =
+          activity.copy(indexRecord = activity.indexRecord.copy(eventId = ""))
+        // recent activity returns most recent 10 activities
+        val expectedActivities = activities.reverse.take(limit).toList
+
+        def transferFromActivity(
+            store: ScanStore,
+            coinRulesContract: Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
+            activity: TxLogEntry.RecentActivityLogEntry,
+            offset: String,
+        ) = {
+          dummyDomain
+            .exercise(
+              coinRulesContract,
+              interfaceId = Some(ccApiCodegen.coin.CoinRules.TEMPLATE_ID),
+              Transfer.choice.name,
+              mkCoinRulesTransfer(user1, activity.amount.toDouble),
+              mkTransferResult(
+                round = 2,
+                changeToInitialAmountAsOfRoundZero = 0,
+                changeToHoldingFeesRate = holdingFee,
+                inputCoinAmount = activity.amount.toDouble,
+                coinPrice = activity.coinPrice.toDouble,
+              ),
+              offset,
+            )(
+              store.multiDomainAcsStore
+            )
+            .map { result =>
+              transactionTreeSource.addTree(result)
+              ()
+            }
+        }
+
+        for {
+          store <- mkStore()
+          coinRulesContract = coinRules()
+          _ <- activities.foldLeft(Future.successful(())) { (f, activity) =>
+            f.flatMap { _ =>
+              transferFromActivity(store, coinRulesContract, activity, activity.indexRecord.offset)
+            }
+          }
+        } yield {
+          eventually() {
+            store
+              .listRecentActivity(limit)
+              .futureValue
+              .map(stripEventId)
+              .toList should be(expectedActivities.map(stripEventId))
+          }
+        }
+      }
+    }
   }
 
   protected def mkStore(endUserParty: PartyId = svcParty): Future[ScanStore]
@@ -816,15 +886,17 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       changeToHoldingFeesRate: Double,
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
+      inputCoinAmount: Double,
+      coinPrice: Double,
   ) = new ccApiCodegen.coin.TransferSummary(
     new java.math.BigDecimal(inputAppRewardAmount),
     new java.math.BigDecimal(inputValidatorRewardAmount),
-    new java.math.BigDecimal(0.0),
+    new java.math.BigDecimal(inputCoinAmount),
     new java.math.BigDecimal(0.0),
     java.util.List.of(new java.math.BigDecimal(0.0)),
     new java.math.BigDecimal(0.0),
     new java.math.BigDecimal(0.0),
-    new java.math.BigDecimal(0.0),
+    new java.math.BigDecimal(coinPrice),
     new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
     new java.math.BigDecimal(changeToHoldingFeesRate),
   )
@@ -835,6 +907,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       changeToHoldingFeesRate: Double,
       inputAppRewardAmount: Double = 0.0,
       inputValidatorRewardAmount: Double = 0.0,
+      inputCoinAmount: Double = 0.0,
+      coinPrice: Double = 0.0,
   ) =
     new ccApiCodegen.coin.TransferResult(
       new ccApiCodegen.round.Round(round),
@@ -843,6 +917,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         changeToHoldingFeesRate,
         inputAppRewardAmount,
         inputValidatorRewardAmount,
+        inputCoinAmount,
+        coinPrice,
       ),
       java.util.List.of(),
       Optional.empty(),

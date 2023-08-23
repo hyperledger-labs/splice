@@ -173,6 +173,7 @@ object TxLogStore {
         eventId: String,
         domainId: DomainId,
         acsContractId: Option[ContractId[?]],
+        filterUnique: (Seq[TXE], String) => TXE = defaultFilterUnique,
     )(implicit
         ec: ExecutionContext,
         tc: TraceContext,
@@ -186,34 +187,37 @@ object TxLogStore {
             case Some(contractId) =>
               loadTxLogEntryFromAcs(contractId, tx, domainId)
             case None =>
-              loadTxLogEntryFromTree(eventId, tx, domainId)
+              loadTxLogEntryFromTree(eventId, tx, domainId, filterUnique)
           }
         )
 
-    private def loadTxLogEntryFromTree(eventId: String, tx: TransactionTree, domainId: DomainId)(
-        implicit tc: TraceContext
-    ): TXE = {
-      // Extract application-specific data from the tree
-      val entries = txLogStore.txLogParser.parse(tx, domainId, logger)
-
-      // Find original TxLog entry
+    private def defaultFilterUnique(entries: Seq[TXE], eventId: String): TXE =
       entries.filter(_.indexRecord.eventId == eventId) match {
         case entry +: Seq() =>
           entry
         case Seq() =>
           throw new IllegalStateException(
-            s"Parser did not return any entry for event $eventId. "
-              + "The parser did return an entry for the same event previously. "
-              + "Either the parser doesn't always return the same entry for a given input tree event, "
-              + "or the transaction tree was loaded using different reader parties than those used during ingestion."
+            s"defaultFilterUnique did not return any entry for event $eventId. "
           )
         case x =>
           throw new IllegalStateException(
-            s"Parser returned ${x.size} entries for event $eventId. "
-              + "This means that the parser does not guarantee a single entry for an event id, "
-              + "therefore, `loadTxLogEntryFromTree` cannot be used for entries from that parser."
+            s"defaultFilterUnique returned ${x.size} entries for event $eventId. "
           )
       }
+
+    private def loadTxLogEntryFromTree(
+        eventId: String,
+        tx: TransactionTree,
+        domainId: DomainId,
+        filterUnique: (Seq[TXE], String) => TXE,
+    )(implicit
+        tc: TraceContext
+    ): TXE = {
+      // Extract application-specific data from the tree
+      val entries = txLogStore.txLogParser.parse(tx, domainId, logger)
+
+      // Find original TxLog entry
+      filterUnique(entries, eventId)
     }
 
     private def loadTxLogEntryFromAcs(

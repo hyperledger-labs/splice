@@ -540,15 +540,10 @@ class HttpScanHandler(
       respond: v0.ScanResource.ListRecentActivityResponse.type
   )()(extracted: Unit): Future[v0.ScanResource.ListRecentActivityResponse] =
     withNewTrace(workflowId) { implicit traceContext => _ =>
-      val _ = traceContext
-      def mkItem(amount: Int) = definitions.ListRecentActivityResponseItem(
-        provider = "SVS.cns",
-        sender = "Bank.cns",
-        receiver = "Repo.cns",
-        amount = s"${amount}",
-        price = (amount.toDouble / 10).toString,
+      for {
+        recentActivities <- store.listRecentActivity(10)
+      } yield definitions.ListRecentActivityResponse(
+        recentActivities.map(_.toResponseItem).toVector
       )
-      val items = (1 to 10).map(mkItem)
-      Future.successful(definitions.ListRecentActivityResponse(items.toVector))
     }
 }

@@ -37,9 +37,15 @@ export const RecentActivityTable: React.FC = () => {
 export default RecentActivityTable;
 
 const ActivityRow: React.FC<{
-  activity: { provider: string; sender: string; receiver: string; amount: string; price: string };
+  activity: {
+    provider: string;
+    sender: string;
+    receiver: string;
+    amount: string;
+    coinPrice: string;
+  };
 }> = ({ activity }) => {
-  const { amount, provider, receiver, sender, price } = activity;
+  const { amount, provider, receiver, sender, coinPrice } = activity;
   return (
     <TableRow>
       <TableCell>{provider}</TableCell>
@@ -53,7 +59,7 @@ const ActivityRow: React.FC<{
           amount={amount}
           currency="CC"
           convert="CCtoUSD"
-          coinPrice={new BigNumber(price)}
+          coinPrice={new BigNumber(coinPrice)}
         />
       </TableCell>
     </TableRow>

@@ -14,13 +14,13 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
-
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.environment.ledger.api.ActiveContract
 import com.daml.network.environment.ledger.api.IncompleteReassignmentEvent
+import com.daml.network.http.v0.definitions as httpDef
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
 
@@ -300,6 +300,21 @@ object ScanTxLogParser {
       override val shortType: String = "bac"
     }
 
+    final case class RecentActivityIndexRecord(
+        offset: String,
+        eventId: String,
+        domainId: DomainId,
+    ) extends TxLogIndexRecord {
+      override def optOffset = Some(offset)
+
+      override def acsContractId: Option[codegen.ContractId[_]] = None
+
+      override val companion: TxLogIndexRecordCompanion = RecentActivityIndexRecord
+    }
+
+    object RecentActivityIndexRecord extends TxLogIndexRecordCompanion {
+      override val shortType: String = "rar"
+    }
   }
 
   sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}
@@ -324,6 +339,22 @@ object ScanTxLogParser {
       val transaction_type = "open_mining_round"
     }
 
+    final case class RecentActivityLogEntry(
+        indexRecord: TxLogIndexRecord.RecentActivityIndexRecord,
+        provider: String,
+        sender: String,
+        receiver: String,
+        amount: BigDecimal,
+        coinPrice: BigDecimal,
+    ) extends TxLogEntry {
+      def toResponseItem = httpDef.ListRecentActivityResponseItem(
+        provider = provider,
+        sender = sender,
+        receiver = receiver,
+        amount = Codec.encode(amount),
+        coinPrice = Codec.encode(coinPrice),
+      )
+    }
   }
 
   case class State(
@@ -469,10 +500,29 @@ object ScanTxLogParser {
         )
       )
 
+      val recentActivityEntry = State(
+        immutable.Queue(
+          TxLogEntry.RecentActivityLogEntry(
+            indexRecord = TxLogIndexRecord.RecentActivityIndexRecord(
+              offset = tx.getOffset(),
+              eventId = rootEventId.getOrElse(event.getEventId()),
+              domainId = domainId,
+            ),
+            provider = node.argument.value.transfer.provider,
+            sender = node.argument.value.transfer.sender,
+            receiver = node.argument.value.transfer.outputs.asScala.headOption
+              .map(_.receiver)
+              .getOrElse(""),
+            amount = node.result.value.summary.inputCoinAmount,
+            coinPrice = node.result.value.summary.coinPrice,
+          )
+        )
+      )
       State.empty
         .appended(appRewardEntry)
         .appended(validatorRewardEntry)
         .appended(balanceChangeEntry)
+        .appended(recentActivityEntry)
     }
 
     def fromCoinExpireSummary(

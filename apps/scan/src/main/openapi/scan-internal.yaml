@@ -605,7 +605,7 @@ components:
         - sender
         - receiver
         - amount
-        - price
+        - coin_price
       properties:
         provider:
           type: string
@@ -615,5 +615,5 @@ components:
           type: string
         amount:
           type: string
-        price:
+        coin_price:
           type: string

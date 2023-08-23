@@ -1,5 +1,6 @@
 package com.daml.network.scan.store
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
@@ -12,11 +13,13 @@ import com.daml.network.store.{
   CNNodeAppStoreWithHistory,
   ConfiguredDefaultDomain,
   MultiDomainAcsStore,
+  TxLogStore,
 }
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{CoinConfigSchedule, Contract, ContractWithState, TemplateJsonDecoder}
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -147,6 +150,42 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
+  def listRecentActivity(limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]]
+
+  protected def loadTxLogEntry(
+      txLogReader: TxLogStore.Reader[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry],
+      eventId: String,
+      domainId: DomainId,
+      acsContractId: Option[ContractId[?]],
+      dbType: String3,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ScanTxLogParser.TxLogEntry] =
+    txLogReader.loadTxLogEntry(eventId, domainId, acsContractId, filterUnique(dbType))
+
+  protected def filterUnique(dbType: String3)(
+      entries: Seq[ScanTxLogParser.TxLogEntry],
+      eventId: String,
+  ): ScanTxLogParser.TxLogEntry = {
+    val res = entries.filter(e =>
+      e.indexRecord.eventId == eventId && e.indexRecord.companion.dbType == dbType
+    )
+    res match {
+      case entry +: Seq() =>
+        entry
+      case Seq() =>
+        throw new IllegalStateException(
+          s"ScanStore.filterUnique did not return any entry for event $eventId and dbType $dbType. "
+        )
+      case x =>
+        throw new IllegalStateException(
+          s"ScanStore.filterUnique returned ${x.size} entries for event $eventId and dbType $dbType."
+        )
+    }
+  }
 }
 
 object ScanStore {

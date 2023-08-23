@@ -92,10 +92,12 @@ class InMemoryScanStore(
           roundConfig.round == round
         case _ => false
       }
-      roundConfig <- txLogReader.loadTxLogEntry(
+      roundConfig <- loadTxLogEntry(
+        txLogReader,
         indexRecord.eventId,
         indexRecord.domainId,
         indexRecord.acsContractId,
+        ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType,
       )
     } yield {
       roundConfig match {
@@ -224,6 +226,30 @@ class InMemoryScanStore(
         case _ => false
       }),
     )
+
+  override def listRecentActivity(limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]] = {
+    for {
+      indexes <- txLog
+        .collectTxLogIndicesType[ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord]
+      records <- indexes
+        .traverse { index =>
+          loadTxLogEntry(
+            txLogReader,
+            index.eventId,
+            index.domainId,
+            index.acsContractId,
+            index.companion.dbType,
+          )
+        }
+        .map {
+          _.collect { case entry: ScanTxLogParser.TxLogEntry.RecentActivityLogEntry =>
+            entry
+          }.take(limit)
+        }
+    } yield records
+  }
 
   private def trafficPurchasesByValidatorInRound(
       round: Long

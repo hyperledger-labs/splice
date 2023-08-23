@@ -258,6 +258,34 @@ class DbScanStore(
       } yield result.getOrElse(0)
     }
 
+  override def listRecentActivity(limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]] =
+    waitUntilAcsIngested {
+      val dbType = ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord.dbType
+      for {
+        rows <- storage.query(
+          sql"""
+                select event_id, domain_id 
+                from scan_txlog_store
+                where store_id = $storeId
+                  and index_record_type = ${dbType}
+                order by entry_number desc
+                limit $limit;
+          """.as[(String, String)],
+          "listRecentActivity",
+        )
+        entries <- rows.traverse { case (eventId, domainId) =>
+          loadTxLogEntry(txLogReader, eventId, DomainId.tryFromString(domainId), None, dbType)
+        }: Future[Seq[ScanTxLogParser.TxLogEntry]]
+        recentActivityEntries = entries.collect {
+          case e: ScanTxLogParser.TxLogEntry.RecentActivityLogEntry =>
+            e
+        }
+      } yield recentActivityEntries
+
+    }
+
   override def getRewardsCollectedInRound(round: Long)(implicit
       tc: TraceContext
   ): Future[BigDecimal] = waitUntilAcsIngested {
@@ -297,7 +325,13 @@ class DbScanStore(
         )
         .value
       entry <- row.traverse { case (eventId, domainId, acsContractId) =>
-        txLogReader.loadTxLogEntry(eventId, domainId, acsContractId)
+        loadTxLogEntry(
+          txLogReader,
+          eventId,
+          domainId,
+          acsContractId,
+          ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType,
+        )
       }
       result <- entry match {
         case Some(omr: ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry) =>
@@ -342,10 +376,12 @@ class DbScanStore(
                 Some((closedEventId, closedAcsContractId, closedDomainId, closedRound)),
                 Some(openRound),
               ) if openRound <= closedRound =>
-            txLogReader.loadTxLogEntry(
+            loadTxLogEntry(
+              txLogReader,
               closedEventId,
               closedDomainId,
               closedAcsContractId,
+              ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord.dbType,
             )
           case _ =>
             Future.failed(txLogNotFound())

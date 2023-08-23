@@ -360,6 +360,26 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
+        case rar @ ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord(
+              offset,
+              eventId,
+              domainId,
+            ) =>
+          ScanTxLogRowData(
+            eventId = eventId,
+            indexRecordType = rar.companion.dbType,
+            offset = Some(offset),
+            domainId = domainId,
+            acsContractId = None,
+            round = None,
+            rewardAmount = None,
+            rewardedParty = None,
+            balanceChangeToInitialAmountAsOfRoundZero = None,
+            balanceChangeChangeToHoldingFeesRate = None,
+            extraTrafficValidator = None,
+            extraTrafficPurchaseTrafficPurchase = None,
+            extraTrafficPurchaseCcSpent = None,
+          )
       }
     }
 

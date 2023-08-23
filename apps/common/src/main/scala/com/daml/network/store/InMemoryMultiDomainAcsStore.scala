@@ -24,6 +24,7 @@ import io.grpc.Status
 import java.time.Instant
 import scala.collection.immutable.{Queue, SortedMap}
 import scala.concurrent.*
+import scala.reflect.ClassTag
 
 class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     override protected val loggerFactory: NamedLoggerFactory,
@@ -490,6 +491,12 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   def getTxLogIndicesByFilter(filter: TXI => Boolean): Future[Seq[TXI]] =
     Future.successful(stateVar.txLog.view.filter(filter).toSeq)
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def collectTxLogIndicesType[T](implicit tag: ClassTag[T]): Future[Seq[T]] =
+    Future.successful(stateVar.txLog.view.collect {
+      case c if tag.runtimeClass.isInstance(c) => c.asInstanceOf[T]
+    }.toSeq)
 
   private def offsetAndStateAfterIngestingAcs()
       : Future[(String, InMemoryMultiDomainAcsStore.State[TXI, TXE])] =

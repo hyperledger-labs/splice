@@ -322,7 +322,22 @@ create table scan_txlog_store
     extra_traffic_purchase_traffic_purchased                 bigint,
 
     -- cc_spent in ExtraTrafficPurchaseIndexRecord
-    extra_traffic_purchase_cc_spent                          numeric
+    extra_traffic_purchase_cc_spent                          numeric,
+
+    -- provider of RecentActivityIndexRecord
+    recent_activity_provider                                 text, 
+
+    -- sender of RecentActivityIndexRecord
+    recent_activity_sender                                   text, 
+
+    -- receiver of RecentActivityIndexRecord
+    recent_activity_receiver                                 text, 
+
+    -- amount of RecentActivityIndexRecord
+    recent_activity_amount                                   numeric, 
+
+    -- coin_price of RecentActivityIndexRecord
+    recent_activity_coin_price                               numeric
 );
 
 create index scan_txlog_store_sid_irt_r_en
