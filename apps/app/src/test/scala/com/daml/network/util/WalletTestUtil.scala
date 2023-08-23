@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.cc.api.v1 as coinApiCodegen
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
+import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
@@ -813,6 +814,39 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         readAs = Seq.empty,
         update = state.create,
         domainId = domainId,
+      )
+    }
+  }
+
+  protected def requestCnsEntry(
+      participantClientWithAdminToken: CNParticipantClientReference,
+      entryName: String,
+      userId: String,
+      userParty: PartyId,
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val entryUrl = "https://cns-dir-url.com"
+    val entryDescription = "Sample CNS Entry Description"
+    val cnsRules = sv1ScanBackend.getCnsRules()
+    val update = cnsRules.contractId.exerciseCnsRules_RequestEntry(
+      entryName,
+      entryUrl,
+      entryDescription,
+      userParty.toProtoPrimitive,
+    )
+    val disclosure = DisclosedContracts(cnsRules)
+
+    clue("request a cns entry from cnsRules contract") {
+      val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = userId,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = update,
+        domainId = Some(disclosure.assignedDomain),
+        disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
+      )
+      (
+        cnsCodegen.CnsEntryContext.COMPANION.toContractId(result.exerciseResult._1),
+        subsCodegen.SubscriptionRequest.COMPANION.toContractId(result.exerciseResult._2),
       )
     }
   }

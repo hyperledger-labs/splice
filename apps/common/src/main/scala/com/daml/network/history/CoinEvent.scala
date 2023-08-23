@@ -6,8 +6,10 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinimport
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.globaldomain.{ValidatorTraffic, MemberTraffic}
+import com.daml.network.codegen.java.cc.globaldomain.{MemberTraffic, ValidatorTraffic}
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -216,6 +218,25 @@ object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {
     trafficCid => trafficCid.toValue,
     optionalCoin => DamlOptional.of(optionalCoin.map(_.toValue): Optional[Value]),
   )
+}
+
+object CnsRules_CollectInitialEntryPayment extends ExerciseNodeCompanion {
+  override type Tpl = cnsCodegen.CnsRules
+  override type Arg = cnsCodegen.CnsRules_CollectInitialEntryPayment
+  override type Res =
+    Tuple2[cnsCodegen.CnsEntry.ContractId, SubscriptionIdleState.ContractId]
+  override val choice = cnsCodegen.CnsRules.CHOICE_CnsRules_CollectInitialEntryPayment
+  override val templateOrInterface = Left(cnsCodegen.CnsRules.COMPANION)
+  override val argDecoder = cnsCodegen.CnsRules_CollectInitialEntryPayment.valueDecoder()
+
+  override def argToValue(arg: Arg): Value = arg.toValue
+
+  override val resDecoder = Tuple2.valueDecoder(
+    cid => new cnsCodegen.CnsEntry.ContractId(cid.asContractId().get().getValue),
+    cid => new SubscriptionIdleState.ContractId(cid.asContractId().get().getValue),
+  )
+
+  override def resToValue(res: Res): Value = res.toValue(_.toValue, _.toValue)
 }
 
 object CoinArchive {

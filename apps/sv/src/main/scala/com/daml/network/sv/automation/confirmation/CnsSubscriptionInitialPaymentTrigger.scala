@@ -79,17 +79,15 @@ class CnsSubscriptionInitialPaymentTrigger(
                             transferContext,
                           )
                         case Some(entry) =>
-                          val msg =
+                          TaskSuccess(
                             s"skipping as entry already exists and owned by ${entry.payload.user}."
-                          logger.warn(msg)
-                          TaskSuccess(msg).pure[Future]
+                          ).pure[Future]
                       }
                     else {
-                      val msg =
+                      TaskSuccess(
                         s"skipping as initial payment collection has been confirmed for this cns name: ${confirmations
                             .map(_.contractId)}"
-                      logger.warn(msg)
-                      TaskSuccess(msg).pure[Future]
+                      ).pure[Future]
                     }
                   }
               case None =>

@@ -35,6 +35,7 @@ import com.daml.network.history.{
   CoinExpire,
   CoinRules_BuyExtraTraffic,
   CoinRules_BuyMemberTraffic,
+  CnsRules_CollectInitialEntryPayment,
   ImportCrate_ReceiveCoin,
   LockedCoinExpireCoin,
   LockedCoinOwnerExpireLock,
@@ -679,6 +680,31 @@ class UserWalletTxLogParser(
             now(State.fromBuyMemberTraffic(tree, exercised, domainId))
 
           // ------------------------------------------------------------------
+          // Canton name service subscription payment collection
+          // ------------------------------------------------------------------
+
+          case CnsRules_CollectInitialEntryPayment(_) =>
+            // first child event is the initial subscription payment collected by SVC
+            val paymentCollectionEvent =
+              tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
+                case e: ExercisedEvent => e
+                case e =>
+                  throw new RuntimeException(
+                    s"Unable to parse event ${e.getEventId} as ExercisedEvent"
+                  )
+              }
+            defer(
+              parseTree(tree, paymentCollectionEvent, domainId).map { stateFromPaymentCollection =>
+                State.fromCollectInitialEntryPayment(
+                  tree,
+                  exercised,
+                  domainId,
+                  stateFromPaymentCollection,
+                )
+              }
+            )
+
+          // ------------------------------------------------------------------
           // Other
           // ------------------------------------------------------------------
 
@@ -958,6 +984,7 @@ object UserWalletTxLogParser {
           SubscriptionPaymentCollected,
           WalletAutomation,
           ExtraTrafficPurchase,
+          InitialEntryPaymentCollection,
           Transfer,
         ).map(txSubtype => txSubtype.choice.name -> txSubtype).toMap
 
@@ -978,6 +1005,8 @@ object UserWalletTxLogParser {
           extends TransferTransactionSubtype(SubscriptionPayment_Collect)
       case object WalletAutomation extends TransferTransactionSubtype(WalletAppInstall_ExecuteBatch)
       case object ExtraTrafficPurchase extends TransferTransactionSubtype(CoinRules_BuyExtraTraffic)
+      case object InitialEntryPaymentCollection
+          extends TransferTransactionSubtype(CnsRules_CollectInitialEntryPayment)
       case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
     }
 
@@ -1558,43 +1587,30 @@ object UserWalletTxLogParser {
       // third child event is burning of transferred coin by SVC
       val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(2))
       // Adjust tx log entries for SVC since the coin it receives is immediately burnt
-      val burntCoin = tx.getEventsById.asScala
-        .collectFirst {
-          case (_, c: CreatedEvent) if c.getContractId == coinArchiveEvent.getContractId =>
-            CoinCreate.unapply(c).map(_.payload)
-        }
-        .flatten
-        .getOrElse(
-          throw new RuntimeException(
-            s"The coin contract ${coinArchiveEvent.getContractId} " +
-              s"referenced by the coin archive event ${coinArchiveEvent.getEventId} " +
-              s"was not found in transaction ${tx.getTransactionId}"
-          )
-        )
-      val stateFromBurntCoin = State(entries =
-        immutable.Queue(
-          TxLogEntry.BalanceChange(
-            indexRecord = TransactionHistoryTxLogIndexRecord(
-              optOffset = Some(tx.getOffset),
-              eventId = transferEvent.getEventId,
-              domainId = domainId,
-              acsContractId = None,
-            ),
-            transactionSubtype =
-              TxLogEntry.BalanceChange.Tap, // This doesn't matter - it'll be removed by mergeBalanceChangesIntoTransfer
-            date = tx.getEffectiveAt,
-            receiver = burntCoin.owner,
-            amount = -burntCoin.amount.initialAmount,
-            coinPrice = transferNode.result.value.summary.coinPrice,
-          )
-        )
-      )
-
+      val burntCoin = getCoinCreateEvent(tx, coinArchiveEvent.getContractId)
+      val stateFromBurntCoin = State.fromBurntCoin(burntCoin, domainId)
       stateFromTransfer
         .appended(stateFromBurntCoin)
         .mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.ExtraTrafficPurchase)
         .setEventId(event.getEventId)
+    }
 
+    def fromCollectInitialEntryPayment(
+        tx: TransactionTree,
+        event: ExercisedEvent,
+        domainId: DomainId,
+        stateFromPaymentCollection: State,
+    ): State = {
+      // second child event is burning of transferred coin by SVC
+      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      // Adjust tx log entries for SVC since the coin it receives is immediately burnt
+      val burntCoin = getCoinCreateEvent(tx, coinArchiveEvent.getContractId)
+      val stateFromBurntCoin = State.fromBurntCoin(burntCoin, domainId)
+
+      stateFromPaymentCollection
+        .appended(stateFromBurntCoin)
+        .mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.InitialEntryPaymentCollection)
+        .setEventId(event.getEventId)
     }
 
     /** State from a choice that returns a `MintSummary`.
@@ -1612,17 +1628,7 @@ object UserWalletTxLogParser {
       // Instead of including the coin price and owner in CoinCreateSummary,
       // we locate the corresponding coin create event in the transaction tree.
       val coinCid = ccsum.coin.contractId
-      val coin = tx.getEventsById.asScala
-        .collectFirst {
-          case (_, c: CreatedEvent) if c.getContractId == coinCid =>
-            CoinCreate.unapply(c).map(_.payload)
-        }
-        .flatten
-        .getOrElse(
-          throw new RuntimeException(
-            s"The coin contract $coinCid referenced by CoinCreateSummary was not found in transaction ${tx.getTransactionId}"
-          )
-        )
+      val coin = getCoinCreateEvent(tx, coinCid)
       val newEntry = TxLogEntry.BalanceChange(
         indexRecord = TransactionHistoryTxLogIndexRecord(
           optOffset = Some(tx.getOffset),
@@ -1688,6 +1694,40 @@ object UserWalletTxLogParser {
         ),
       )
     }
+
+    private def fromBurntCoin(
+        burntCoin: CoinCreate.T,
+        domainId: DomainId,
+    ) = State(entries =
+      immutable.Queue(
+        TxLogEntry.BalanceChange(
+          receiver = burntCoin.owner,
+          amount = -burntCoin.amount.initialAmount,
+          // all fields below doesn't matter - it'll be removed by mergeBalanceChangesIntoTransfer
+          indexRecord = TransactionHistoryTxLogIndexRecord(
+            optOffset = None,
+            eventId = "",
+            domainId = domainId,
+            acsContractId = None,
+          ),
+          transactionSubtype = TxLogEntry.BalanceChange.Tap,
+          date = Instant.now(),
+          coinPrice = BigDecimal(0),
+        )
+      )
+    )
+
+    private def getCoinCreateEvent(tx: TransactionTree, cid: String) = {
+      tx.getEventsById.asScala
+        .collectFirst {
+          case (_, c: CreatedEvent) if c.getContractId == cid =>
+            CoinCreate.unapply(c).map(_.payload)
+        }
+    }.flatten.getOrElse(
+      throw new RuntimeException(
+        s"The coin contract $cid was not found in transaction ${tx.getTransactionId}"
+      )
+    )
   }
 
   private def parseSender(

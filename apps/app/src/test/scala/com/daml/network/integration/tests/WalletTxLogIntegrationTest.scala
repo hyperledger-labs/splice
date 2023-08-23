@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
@@ -27,6 +28,7 @@ class WalletTxLogIntegrationTest
     with WalletTxLogTestUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val cnsDarPath = "daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar"
 
   private val coinPrice = BigDecimal(0.75).setScale(10)
 
@@ -45,6 +47,8 @@ class WalletTxLogIntegrationTest
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
       })
   }
 
@@ -980,6 +984,86 @@ class WalletTxLogIntegrationTest
           checkSubscriptionPaymentTransfer(
             walletLogEntry.Transfer.SubscriptionInitialPaymentCollected
           )
+        ),
+      )
+    }
+
+    "handle collected cns subscription payments" in { implicit env =>
+      val aliceUserId = aliceWalletClient.config.ledgerApiUser
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val subscriptionPrice = 1.0
+
+      clue("Alice taps some coins") {
+        aliceWalletClient.tap(100.0)
+      }
+
+      val ((entryContextCid, _), request) = actAndCheck(
+        "Request cns entry",
+        requestCnsEntry(
+          aliceValidatorBackend.participantClientWithAdminToken,
+          "alice.unverified.cns",
+          aliceUserId,
+          aliceUserParty,
+        ),
+      )(
+        "Request appears in Alice's wallet",
+        _ => aliceWalletClient.listSubscriptionRequests().headOption.value,
+      )
+
+      actAndCheck(
+        "Alice accepts the request",
+        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+      )(
+        "Request disappears from Alice's list",
+        _ => {
+          aliceWalletClient.listSubscriptionRequests() shouldBe empty
+          aliceWalletClient
+            .listSubscriptions()
+            .find(
+              _.context.contractId == entryContextCid.toInterface(
+                subsCodegen.SubscriptionContext.INTERFACE
+              )
+            )
+            .value
+        },
+      )
+
+      checkTxHistory(
+        aliceWalletClient,
+        Seq[CheckTxHistoryFn](
+          { case logEntry: walletLogEntry.Transfer =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.InitialEntryPaymentCollection
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount shouldBe BigDecimal(0)
+            }
+
+            inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+              receiver shouldBe svcParty.toProtoPrimitive
+              // coin received by svc is burnt
+              amount shouldBe BigDecimal(0)
+            }
+
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
+            logEntry.coinPrice shouldBe coinPrice
+          },
+          { case logEntry: walletLogEntry.Transfer =>
+            // Accepting the self-payment request created a 42CC locked coin,
+            // leading to a net loss of slightly over 42CC because of transfer fees.
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.SubscriptionInitialPaymentAccepted
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
+            logEntry.coinPrice shouldBe coinPrice
+          },
+          { case logEntry: walletLogEntry.BalanceChange =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
+            logEntry.amount shouldBe 100.0
+            logEntry.coinPrice shouldBe coinPrice
+          },
         ),
       )
     }

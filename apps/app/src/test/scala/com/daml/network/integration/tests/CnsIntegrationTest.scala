@@ -11,9 +11,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.util.{DisclosedContracts, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
-import org.slf4j.event.Level.INFO
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
@@ -56,32 +54,16 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
       val bobRefs = setupUser(bobStaticRefs)
 
       // Concurrently, request an entry as alice and bob
-      val entry = loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(INFO))(
-        {
-          Seq(
-            aliceRefs,
-            bobRefs,
-          ).parTraverse { ref =>
-            Future { requestAndPayForEntry(ref, testEntryName) }
-          }.futureValue
+      Seq(
+        aliceRefs,
+        bobRefs,
+      ).parTraverse { ref =>
+        Future { requestAndPayForEntry(ref, testEntryName) }
+      }.futureValue
 
-          eventually() {
-            lookupEntryByName(testEntryName).value
-          }
-        },
-        logEntries => {
-          forAtLeast(1, logEntries)(logEntry => {
-            logEntry.message should (
-              include("initial payment collection has been confirmed")
-                or include("entry already exists and owned")
-                or include("is already created for such entry name")
-            )
-          })
-          forAtLeast(2, logEntries)(logEntry => {
-            logEntry.message should include("Completed processing with outcome")
-          })
-        },
-      )
+      val entry = eventually() {
+        lookupEntryByName(testEntryName).value
+      }
 
       val winnerUserParty = PartyId.tryFromProtoPrimitive(entry.data.user)
 
@@ -158,8 +140,6 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
       entryUrl: String = "https://cns-dir-url.com",
       entryDescription: String = "Sample CNS Entry Description",
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val svcInfo = sv1Backend.getSvcInfo()
-    val svc = svcInfo.svcParty
     val cnsRules = sv1ScanBackend.getCnsRules()
 
     // for paying the cns entry initial payment.
@@ -177,7 +157,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         .submitWithResult(
           userId = refs.validator.config.ledgerApiUser,
           actAs = Seq(refs.userParty),
-          readAs = Seq(svc),
+          readAs = Seq.empty,
           update = cmd,
           disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
         )
