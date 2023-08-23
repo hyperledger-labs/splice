@@ -24,6 +24,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ $fullRpcHostName }}
+  namespace: {{ $.Release.Namespace }}
   labels:
     name: {{ $fullRpcHostName }}
 spec:
