@@ -11,10 +11,10 @@ import com.daml.network.store.MultiDomainAcsStore.ContractFilter
 import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
 import com.digitalasset.canton.admin.api.client.data.TemplateId
-import com.digitalasset.canton.config.CantonRequireTypes.String2066
+import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import io.circe.Json
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, SetParameter}
@@ -129,6 +129,10 @@ trait AcsJdbcTypes {
     (partyId: Option[PartyId], pp: PositionedParameters) =>
       implicitly[SetParameter[Option[String2066]]]
         .apply(partyId.map(party => lengthLimited(party.toProtoPrimitive)), pp)
+
+  protected implicit lazy val memberIdSetParameterOption: SetParameter[Option[Member]] =
+    (memberIdO: Option[Member], pp: PositionedParameters) =>
+      implicitly[SetParameter[Option[String300]]].apply(memberIdO.map(_.toLengthLimitedString), pp)
 
   protected implicit lazy val jsonJdbcType: JdbcType[Json] = new profile.DriverJdbcType[Json]() {
     override def sqlType: Int = java.sql.Types.OTHER

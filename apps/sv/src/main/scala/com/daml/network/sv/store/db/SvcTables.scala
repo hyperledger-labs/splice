@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.{CNNodeUtil, Contract}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{Member, PartyId}
 import spray.json.JsValue
 
 object SvcTables extends AcsTables with NamedLogging {
@@ -35,7 +35,7 @@ object SvcTables extends AcsTables with NamedLogging {
       requester: Option[PartyId] = None,
       electionRequestEpoch: Option[Long] = None,
       importCrateReceiver: Option[PartyId] = None,
-      memberTrafficMember: Option[PartyId] = None,
+      memberTrafficMember: Option[Member] = None,
       cnsEntryName: Option[String] = None,
       actionCnsEntryContextCid: Option[cn.cns.CnsEntryContext.ContractId] = None,
   )
@@ -214,7 +214,15 @@ object SvcTables extends AcsTables with NamedLogging {
           tryToDecode(cc.globaldomain.MemberTraffic.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
-              memberTrafficMember = Some(PartyId.tryFromProtoPrimitive(contract.payload.memberId)),
+              memberTrafficMember = Some(
+                // TODO(#7424): Refactor this into a Member.tryFromProtoPrimitive method
+                Member
+                  .fromProtoPrimitive(contract.payload.memberId, "")
+                  .fold(
+                    err => throw new IllegalArgumentException(err.message),
+                    identity,
+                  )
+              ),
             )
           }
         case cn.cns.CnsRules.TEMPLATE_ID =>
