@@ -910,6 +910,7 @@ import sbtassembly.AssemblyPlugin.autoImport.assembly
 /** Generate a release bundle. Simplified versions of Canton's release bundling (see Canton's code base / issue #147) */
 lazy val bundleTask = {
   bundle := {
+    val license = Seq("-c", "LICENSE.txt")
     val log = streams.value.log
     val assemblyJar = assembly.value
     val examples = Seq("-c", "apps/app/src/pack")
@@ -928,7 +929,7 @@ lazy val bundleTask = {
         (`splitwell-daml` / Compile / damlBuild).value,
         (`directory-daml` / Compile / damlBuild).value,
       )
-    val args: Seq[String] = examples ++ webUis.flatMap({ case ((source, _), name) =>
+    val args: Seq[String] = license ++ examples ++ webUis.flatMap({ case ((source, _), name) =>
       Seq[String]("-r", source.toString, s"web-uis/$name")
     }) ++ dars.flatten.flatMap({ case dar =>
       Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
