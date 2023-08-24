@@ -5,6 +5,7 @@
     "module": "esnext",
     "declaration": true,
     "sourceMap": true,
+    "declarationMap": true,
     "strict": true,
     "moduleResolution": "node16",
     "isolatedModules": true,
