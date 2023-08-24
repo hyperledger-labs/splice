@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.{CNStorageFactory, SharedCNNodeAppParameters}
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
@@ -106,7 +106,7 @@ object ScanAppBootstrap {
           testingConfigInternal,
           clock,
           scanMetrics,
-          new CommunityStorageFactory(scanConfig.storage),
+          new CNStorageFactory(scanConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

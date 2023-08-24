@@ -116,7 +116,7 @@ case class ValidatorDomainConfig(
 
 case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
+    override val storage: CNDbConfig,
     ledgerApiUser: String,
     allocateLedgerApiUserParty: Boolean = true,
     // If not set the ledgerApiUser name is used.

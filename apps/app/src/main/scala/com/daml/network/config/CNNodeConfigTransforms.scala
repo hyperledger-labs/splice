@@ -512,6 +512,32 @@ object CNNodeConfigTransforms {
       }
     )
 
+  def modifyAllCNStorageConfigs(
+      storageConfigModifier: (
+          String,
+          CNDbConfig,
+      ) => CNDbConfig
+  ): CNNodeConfigTransform = { config =>
+    val transforms: Seq[CNNodeConfigTransform] = Seq(
+      updateDirectoryAppConfig { config =>
+        config
+          .focus(_.storage)
+          .modify(storage => storageConfigModifier("directory_app", storage))
+      },
+      updateAllValidatorConfigs((name, config) =>
+        config
+          .focus(_.storage)
+          .modify(storage => storageConfigModifier(name, storage))
+      ),
+      updateAllScanAppConfigs((name, config) =>
+        config
+          .focus(_.storage)
+          .modify(storage => storageConfigModifier(name, storage))
+      ),
+    )
+    transforms.foldLeft(config)((c, tf) => tf(c))
+  }
+
   /** Canton has a built in authorizer that accepts "canton admin tokens",
     * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]
     * These are 128 character random strings (not JWTs), generated independently for each local participant node at canton startup.

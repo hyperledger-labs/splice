@@ -12,11 +12,13 @@ import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.{Contract, ContractWithState}
+import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.config.ValidatorDomainConfig
+import com.daml.network.validator.store.db.DbValidatorStore
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -220,11 +222,16 @@ object ValidatorStore {
       domains: ValidatorDomainConfig,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
-  )(implicit ec: ExecutionContext): ValidatorStore =
+  )(implicit
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      closeContext: CloseContext,
+  ): ValidatorStore =
     storage match {
       case _: MemoryStorage =>
         new InMemoryValidatorStore(key, domains, loggerFactory, retryProvider)
-      case _: DbStorage => throw new RuntimeException("Not implemented")
+      case storage: DbStorage =>
+        new DbValidatorStore(key, domains, storage, loggerFactory, retryProvider)
     }
 
   case class Key(

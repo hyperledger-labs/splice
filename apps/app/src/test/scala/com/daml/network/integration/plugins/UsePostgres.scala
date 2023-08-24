@@ -134,20 +134,26 @@ class UsePostgres(
   override def beforeEnvironmentCreated(config: CNNodeConfig): CNNodeConfig = {
     implicit val ec: ExecutionContext = dbSetupExecutionContext
 
-    val storageChange = CNNodeConfigTransforms.updateDirectoryAppConfig { config =>
-      config
-        .focus(_.storage)
-        .modify(storage => generateDbConfig("directory_app", storage.parameters))
+    // Note: CNNodeConfigTransforms performs transformations sequentially
+    val nodesWithPersistence = scala.collection.mutable.ListBuffer.empty[String]
+    val storageChange = CNNodeConfigTransforms.modifyAllCNStorageConfigs { (name, config) =>
+      assert(
+        !nodesWithPersistence.contains(name),
+        "Node names must be unique, otherwise two app backends would write to the same database",
+      )
+      nodesWithPersistence.addOne(name)
+      generateDbConfig(name, config.parameters)
     }
+    val configWithPersistence = storageChange(config)
 
+    val allDbNames = nodesWithPersistence.toSeq.map(getOrGenerateDbName)
+    logger.debug(s"Databases for config ${config.name}: ${allDbNames.mkString(", ")} ")
     Await.result(
-      Seq("directory_app")
-        .map(getOrGenerateDbName)
-        .parTraverse_(dbName => recreateDatabase(dbName)),
+      allDbNames.parTraverse_(dbName => recreateDatabase(dbName)),
       config.parameters.timeouts.processing.io.duration,
     )
 
-    storageChange(config)
+    configWithPersistence
   }
 
   override def afterEnvironmentDestroyed(config: CNNodeConfig): Unit = {

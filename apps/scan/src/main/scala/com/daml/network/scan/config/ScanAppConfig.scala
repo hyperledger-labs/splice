@@ -2,9 +2,10 @@ package com.daml.network.scan.config
 
 import com.daml.network.config.{
   AutomationConfig,
+  CNDbConfig,
   CNNodeBackendConfig,
-  HttpCNNodeClientConfig,
   CNParticipantClientConfig,
+  HttpCNNodeClientConfig,
   NetworkAppClientConfig,
 }
 import com.digitalasset.canton.config.*
@@ -13,7 +14,7 @@ trait BaseScanAppConfig {}
 
 case class ScanAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
+    override val storage: CNDbConfig,
     svUser: String,
     override val participantClient: CNParticipantClientConfig,
     domains: ScanDomainConfig,

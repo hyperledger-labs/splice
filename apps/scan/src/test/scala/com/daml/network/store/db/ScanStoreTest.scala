@@ -19,7 +19,7 @@ import com.daml.network.codegen.java.cc.{
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types as daTypes
-import com.daml.network.config.DomainConfig
+import com.daml.network.config.{CNDbConfig, DomainConfig}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.history.{
   CoinExpire,
@@ -1171,6 +1171,7 @@ class InMemoryScanStoreTest extends ScanStoreTest {
     val store = new InMemoryScanStore(
       endUserParty,
       ScanAppBackendConfig(
+        storage = CNDbConfig.Memory(),
         svUser = endUserParty.toProtoPrimitive,
         enableCoinRulesUpgrade = true,
         participantClient = null,
@@ -1213,6 +1214,7 @@ class DbScanStoreTest
       endUserParty,
       storage,
       ScanAppBackendConfig(
+        storage = CNDbConfig.Memory(), // Note: this field is not used by the store
         svUser = endUserParty.toProtoPrimitive,
         enableCoinRulesUpgrade = true,
         participantClient = null,

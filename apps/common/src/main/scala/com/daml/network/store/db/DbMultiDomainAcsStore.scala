@@ -272,7 +272,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .mapConcat(identity)
   }
 
-  override def streamReadyForAssign(): Source[ReassignmentEvent.Unassign, NotUsed] = ???
+  // TODO(#5314): Implement domain reassignments
+  override def streamReadyForAssign(): Source[ReassignmentEvent.Unassign, NotUsed] = Source.never
 
   override def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId): Future[Boolean] =
     ???
