@@ -56,4 +56,7 @@ Invalid Status code=405 text=Method Not Allowed","logger_name":"o.o.s.remote.htt
 # TODO(#7048) remove once we can make sequencer onboarding faster again so that locks are released more quickly
 onboard/sv/party-migration/authorize resulted in a timeout
 
+# Ignoring console.warn
+.*Auth0 login error.*
+
 # Make sure to have a trailing newline
