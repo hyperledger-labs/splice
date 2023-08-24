@@ -6,12 +6,13 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.sv.config.InitialCnsConfig
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransactionSubtype
 import com.digitalasset.canton.HasExecutionContext
-import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.config.{DbConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
@@ -43,10 +44,23 @@ class WalletTxLogIntegrationTest
       )
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
+      .addConfigTransform((_, config) =>
+        // setting the initialCnsEntryLifetime to be the same as initialCnsRenewalDuration
+        CNNodeConfigTransforms
+          .updateAllSvAppFoundCollectiveConfigs_(
+            _.copy(
+              initialCnsConfig = InitialCnsConfig(
+                renewalDuration = NonNegativeFiniteDuration.ofDays(30),
+                entryLifetime = NonNegativeFiniteDuration.ofDays(30),
+              )
+            )
+          )(config)
+      )
       // Some tests use the splitwell app to generate multi-party payments
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        // TODO(#7353): we will not upload the cns dars here after we have switch to upload dars in validator.
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
       })
@@ -1028,9 +1042,52 @@ class WalletTxLogIntegrationTest
         },
       )
 
+      // Note: because paymentInterval == paymentDuration, the second payment can be made immediately
+      clue("Alice's automation triggers the second payment") {
+        eventually() {
+          inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
+            sub.subscription.payload should equal(
+              request.subscriptionRequest.payload.subscriptionData
+            )
+
+            inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
+              state.payload.subscription shouldBe sub.subscription.contractId
+              state.payload.payData should equal(request.subscriptionRequest.payload.payData)
+              state
+            }
+          }
+        }
+      }
+
       checkTxHistory(
         aliceWalletClient,
         Seq[CheckTxHistoryFn](
+          { case logEntry: walletLogEntry.Transfer =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.EntryRenewalPaymentCollection
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount shouldBe BigDecimal(0)
+            }
+
+            inside(logEntry.receivers) { case Seq((receiver, amount)) =>
+              receiver shouldBe svcParty.toProtoPrimitive
+              // coin received by svc is burnt
+              amount shouldBe BigDecimal(0)
+            }
+
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
+            logEntry.coinPrice shouldBe coinPrice
+          },
+          { case logEntry: walletLogEntry.Transfer =>
+            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.SubscriptionPaymentAccepted
+            inside(logEntry.sender) { case (sender, amount) =>
+              sender shouldBe aliceUserParty.toProtoPrimitive
+              amount should beWithin(-subscriptionPrice - smallAmount, -subscriptionPrice)
+            }
+            logEntry.receivers shouldBe empty
+            logEntry.senderHoldingFees should beWithin(0, smallAmount)
+            logEntry.coinPrice shouldBe coinPrice
+          },
           { case logEntry: walletLogEntry.Transfer =>
             logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.InitialEntryPaymentCollection
             inside(logEntry.sender) { case (sender, amount) =>
@@ -1048,8 +1105,6 @@ class WalletTxLogIntegrationTest
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: walletLogEntry.Transfer =>
-            // Accepting the self-payment request created a 42CC locked coin,
-            // leading to a net loss of slightly over 42CC because of transfer fees.
             logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.SubscriptionInitialPaymentAccepted
             inside(logEntry.sender) { case (sender, amount) =>
               sender shouldBe aliceUserParty.toProtoPrimitive

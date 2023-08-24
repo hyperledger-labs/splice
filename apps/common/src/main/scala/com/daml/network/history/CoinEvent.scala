@@ -239,6 +239,25 @@ object CnsRules_CollectInitialEntryPayment extends ExerciseNodeCompanion {
   override def resToValue(res: Res): Value = res.toValue(_.toValue, _.toValue)
 }
 
+object CnsRules_CollectEntryRenewalPayment extends ExerciseNodeCompanion {
+  override type Tpl = cnsCodegen.CnsRules
+  override type Arg = cnsCodegen.CnsRules_CollectEntryRenewalPayment
+  override type Res =
+    Tuple2[cnsCodegen.CnsEntry.ContractId, SubscriptionIdleState.ContractId]
+  override val choice = cnsCodegen.CnsRules.CHOICE_CnsRules_CollectEntryRenewalPayment
+  override val templateOrInterface = Left(cnsCodegen.CnsRules.COMPANION)
+  override val argDecoder = cnsCodegen.CnsRules_CollectEntryRenewalPayment.valueDecoder()
+
+  override def argToValue(arg: Arg): Value = arg.toValue
+
+  override val resDecoder = Tuple2.valueDecoder(
+    cid => new cnsCodegen.CnsEntry.ContractId(cid.asContractId().get().getValue),
+    cid => new SubscriptionIdleState.ContractId(cid.asContractId().get().getValue),
+  )
+
+  override def resToValue(res: Res): Value = res.toValue(_.toValue, _.toValue)
+}
+
 object CoinArchive {
   // Matches on any consuming exercise on a coin
   def unapply(event: ExercisedEvent): Option[ExercisedEvent] =

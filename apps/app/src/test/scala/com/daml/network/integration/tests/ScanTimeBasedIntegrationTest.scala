@@ -303,6 +303,6 @@ class ScanTimeBasedIntegrationTest
 
   "return CnsRules contract and config" in { implicit env =>
     val cnsRules = sv1ScanBackend.getCnsRules()
-    cnsRules.payload.config shouldBe defaultCnsConfig
+    cnsRules.payload.config shouldBe defaultCnsConfig()
   }
 }

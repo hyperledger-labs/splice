@@ -432,6 +432,8 @@ object CNNodeConfig {
     implicit val svBootstrapDumpConfigReader: ConfigReader[SvBootstrapDumpConfig] =
       deriveReader[SvBootstrapDumpConfig]
     implicit val svOnboardingConfigHint = new FieldCoproductHint[SvOnboardingConfig]("type")
+    implicit val initialCnsConfigReader: ConfigReader[InitialCnsConfig] =
+      deriveReader[InitialCnsConfig]
     implicit val svOnboardingFoundCollectiveReader
         : ConfigReader[SvOnboardingConfig.FoundCollective] =
       deriveReader[SvOnboardingConfig.FoundCollective]
@@ -634,6 +636,8 @@ object CNNodeConfig {
       deriveWriter[SvBootstrapDumpConfig]
     implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
       new FieldCoproductHint[SvOnboardingConfig]("type")
+    implicit val initialCnsConfigWriter: ConfigWriter[InitialCnsConfig] =
+      deriveWriter[InitialCnsConfig]
     implicit val svOnboardingFoundCollectiveWriter
         : ConfigWriter[SvOnboardingConfig.FoundCollective] =
       deriveWriter[SvOnboardingConfig.FoundCollective]

@@ -58,24 +58,9 @@ class ScanTxLogParser(
           case LockedCoinUnlock(_) =>
             State.empty
           case CnsRules_CollectInitialEntryPayment(_) =>
-            // first child event is the initial subscription payment collected by SVC
-            val paymentCollectionEvent =
-              tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
-                case e: ExercisedEvent => e
-                case e =>
-                  throw new RuntimeException(
-                    s"Unable to parse event ${e.getEventId} as ExercisedEvent"
-                  )
-              }
-
-            val stateFromPaymentCollection = parseTree(tree, domainId, paymentCollectionEvent)
-            State.fromCollectInitialEntryPayment(
-              tree,
-              exercised,
-              domainId,
-              stateFromPaymentCollection,
-            )
-
+            fromCnsEntryPaymentCollection(tree, exercised, domainId)
+          case CnsRules_CollectEntryRenewalPayment(_) =>
+            fromCnsEntryPaymentCollection(tree, exercised, domainId)
           case CoinArchive(_) =>
             throw new RuntimeException(
               s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
@@ -153,6 +138,29 @@ class ScanTxLogParser(
       )
     )
 
+  private def fromCnsEntryPaymentCollection(
+      tree: TransactionTree,
+      exercised: ExercisedEvent,
+      domainId: DomainId,
+  )(implicit tc: TraceContext) = {
+    // first child event is the initial subscription payment collected by SVC
+    val paymentCollectionEvent =
+      tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
+        case e: ExercisedEvent => e
+        case e =>
+          throw new RuntimeException(
+            s"Unable to parse event ${e.getEventId} as ExercisedEvent"
+          )
+      }
+
+    val stateFromPaymentCollection = parseTree(tree, domainId, paymentCollectionEvent)
+    State.fromCollectEntryPayment(
+      tree,
+      exercised,
+      domainId,
+      stateFromPaymentCollection,
+    )
+  }
 }
 
 object ScanTxLogParser {
@@ -658,7 +666,7 @@ object ScanTxLogParser {
 
     }
 
-    def fromCollectInitialEntryPayment(
+    def fromCollectEntryPayment(
         tx: TransactionTree,
         event: ExercisedEvent,
         domainId: DomainId,

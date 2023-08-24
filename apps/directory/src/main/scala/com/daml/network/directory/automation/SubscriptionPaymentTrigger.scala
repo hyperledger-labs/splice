@@ -98,65 +98,63 @@ class SubscriptionPaymentTrigger(
           )
       } yield TaskSuccess("renewed directory entry.")
     }
-    for {
-      directoryEntryContext <- store.multiDomainAcsStore
-        .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
-          domainId,
-          contextId,
-        )
-        .map(
-          _.getOrElse(
-            throw new IllegalStateException(
-              s"Invariant violation: subscription context $contextId not known"
-            )
-          )
-        )
-      transferContextE <- scanConnection.getAppTransferContextForRound(
-        store.svcParty,
-        payment.payload.round,
+    store.multiDomainAcsStore
+      .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
+        domainId,
+        contextId,
       )
-      result <- transferContextE match {
-        case Right((transferContext, disclosedContracts)) =>
-          // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
-          val entryName = directoryEntryContext.payload.name
-          // check whether the entry exists
-          store.lookupEntryByNameWithOffset(entryName).flatMap {
-            case QueryResult(offset, Some(entry)) =>
-              // collect the payment and renew the entry
-              collectPayment(
-                entry,
-                offset,
-                transferContext,
-                disclosedContracts,
-              )
-            case QueryResult(_, None) => {
-              if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
-                rejectPayment("entry doesn't exist.", transferContext, disclosedContracts)
-              } else {
-                // If the entry doesn't exist, and the payment is now past due, then
-                // probably the ExpiredDirectoryEntryTrigger cleaned it up before this trigger
-                // had a chance to renew it. We reject the payment but only log this at an INFO level
-                // rather than a warning.
-                rejectPayment(
-                  "entry has already been expired",
-                  transferContext,
-                  disclosedContracts,
-                  logger.info(_),
-                )
-              }
+      .flatMap {
+        case Some(directoryEntryContext) =>
+          for {
+            transferContextE <- scanConnection.getAppTransferContextForRound(
+              store.svcParty,
+              payment.payload.round,
+            )
+            result <- transferContextE match {
+              case Right((transferContext, disclosedContracts)) =>
+                // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
+                val entryName = directoryEntryContext.payload.name
+                // check whether the entry exists
+                store.lookupEntryByNameWithOffset(entryName).flatMap {
+                  case QueryResult(offset, Some(entry)) =>
+                    // collect the payment and renew the entry
+                    collectPayment(
+                      entry,
+                      offset,
+                      transferContext,
+                      disclosedContracts,
+                    )
+                  case QueryResult(_, None) => {
+                    if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
+                      rejectPayment("entry doesn't exist.", transferContext, disclosedContracts)
+                    } else {
+                      // If the entry doesn't exist, and the payment is now past due, then
+                      // probably the ExpiredDirectoryEntryTrigger cleaned it up before this trigger
+                      // had a chance to renew it. We reject the payment but only log this at an INFO level
+                      // rather than a warning.
+                      rejectPayment(
+                        "entry has already been expired",
+                        transferContext,
+                        disclosedContracts,
+                        logger.info(_),
+                      )
+                    }
+                  }
+                }
+              case Left(err) =>
+                scanConnection
+                  .getAppTransferContext(store.svcParty)
+                  .flatMap { case (transferContext, disclosedContracts) =>
+                    rejectPayment(
+                      s"Round ${payment.payload.round} is no longer active: $err",
+                      transferContext,
+                      disclosedContracts,
+                    )
+                  }
             }
-          }
-        case Left(err) =>
-          scanConnection
-            .getAppTransferContext(store.svcParty)
-            .flatMap { case (transferContext, disclosedContracts) =>
-              rejectPayment(
-                s"Round ${payment.payload.round} is no longer active: $err",
-                transferContext,
-                disclosedContracts,
-              )
-            }
+          } yield result
+        case None =>
+          Future.successful(TaskSuccess(s"skipping as subscription context $contextId not known."))
       }
-    } yield result
   }
 }

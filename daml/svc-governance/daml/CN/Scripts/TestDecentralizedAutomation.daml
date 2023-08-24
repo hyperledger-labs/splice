@@ -382,9 +382,6 @@ testDecentralizedCns = do
       coinRulesCid = None
       confirmationCids
 
-  confirmations <- query @Confirmation svc
-  length confirmations === 0
-
   [(entryCid, entry)] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
   [(subscriptionStateCid, subscriptionState)] <- queryFilter @SubscriptionIdleState app.svc (\state -> state.subscriptionData.sender == alice.primaryParty)
 
@@ -402,28 +399,14 @@ testDecentralizedCns = do
     context = paymentContext
     walletProvider = app.svc
 
-  -- SVs create confirmations for SVC to collect renewal payment of the requested cns entry.
-  let collectRenewalPaymentAction = ARC_CnsEntryContext with
-        cnsEntryContextCid = entryContext
-        cnsEntryContextAction = CNSRARC_CollectRenewalEntryPayment $ CnsEntryContext_CollectEntryRenewalPayment with
-          paymentCid
-          entryCid
-          transferContext = appContext
-          cnsRulesCid
-
-  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
-    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
-      confirmer = svParty
-      action = collectRenewalPaymentAction
-
-  confirmations <- query @Confirmation svc
-  length confirmations === 4
-
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
-    SvcRules_ExecuteConfirmedAction with
-      action = collectRenewalPaymentAction
-      coinRulesCid = None
-      confirmationCids
+    SvcRules_CollectEntryRenewalPayment with
+      cnsEntryContextCid = entryContext
+      choiceArg = CnsEntryContext_CollectEntryRenewalPayment with
+        paymentCid
+        entryCid
+        transferContext = appContext
+        cnsRulesCid
 
   [(_, renewedEntry)] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
   [(_, renewedSubscriptionState)] <- queryFilter @SubscriptionIdleState app.svc (\state -> state.subscriptionData.sender == alice.primaryParty)

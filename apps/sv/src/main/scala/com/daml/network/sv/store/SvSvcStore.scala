@@ -707,6 +707,9 @@ object SvSvcStore {
         mkFilter(sub.SubscriptionInitialPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
         ),
+        mkFilter(sub.SubscriptionPayment.COMPANION)(co =>
+          co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
+        ),
       ) ++
         (if (enableCoinRulesUpgrade)
            Map(mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))

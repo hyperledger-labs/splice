@@ -36,6 +36,7 @@ import com.daml.network.history.{
   CoinRules_BuyExtraTraffic,
   CoinRules_BuyMemberTraffic,
   CnsRules_CollectInitialEntryPayment,
+  CnsRules_CollectEntryRenewalPayment,
   ImportCrate_ReceiveCoin,
   LockedCoinExpireCoin,
   LockedCoinOwnerExpireLock,
@@ -684,24 +685,19 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case CnsRules_CollectInitialEntryPayment(_) =>
-            // first child event is the initial subscription payment collected by SVC
-            val paymentCollectionEvent =
-              tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
-                case e: ExercisedEvent => e
-                case e =>
-                  throw new RuntimeException(
-                    s"Unable to parse event ${e.getEventId} as ExercisedEvent"
-                  )
-              }
-            defer(
-              parseTree(tree, paymentCollectionEvent, domainId).map { stateFromPaymentCollection =>
-                State.fromCollectInitialEntryPayment(
-                  tree,
-                  exercised,
-                  domainId,
-                  stateFromPaymentCollection,
-                )
-              }
+            fromCnsEntryPaymentCollection(
+              tree,
+              exercised,
+              domainId,
+              TxLogEntry.Transfer.InitialEntryPaymentCollection,
+            )
+
+          case CnsRules_CollectEntryRenewalPayment(_) =>
+            fromCnsEntryPaymentCollection(
+              tree,
+              exercised,
+              domainId,
+              TxLogEntry.Transfer.EntryRenewalPaymentCollection,
             )
 
           // ------------------------------------------------------------------
@@ -769,6 +765,35 @@ class UserWalletTxLogParser(
         TransactionHistoryTxLogIndexRecord(Some(offset), eventId, domainId, None)
       )
     )
+
+  private def fromCnsEntryPaymentCollection(
+      tree: TransactionTree,
+      exercised: ExercisedEvent,
+      domainId: DomainId,
+      transactionSubtype: TransferTransactionSubtype,
+  )(implicit tc: TraceContext): Eval[State] = {
+    import Eval.defer
+    // first child event is the subscription payment collected by SVC
+    val paymentCollectionEvent =
+      tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
+        case e: ExercisedEvent => e
+        case e =>
+          throw new RuntimeException(
+            s"Unable to parse event ${e.getEventId} as ExercisedEvent"
+          )
+      }
+    defer(
+      parseTree(tree, paymentCollectionEvent, domainId).map { stateFromPaymentCollection =>
+        State.fromCollectEntryPayment(
+          tree,
+          exercised,
+          domainId,
+          stateFromPaymentCollection,
+          transactionSubtype,
+        )
+      }
+    )
+  }
 }
 
 object UserWalletTxLogParser {
@@ -985,6 +1010,7 @@ object UserWalletTxLogParser {
           WalletAutomation,
           ExtraTrafficPurchase,
           InitialEntryPaymentCollection,
+          EntryRenewalPaymentCollection,
           Transfer,
         ).map(txSubtype => txSubtype.choice.name -> txSubtype).toMap
 
@@ -1007,6 +1033,8 @@ object UserWalletTxLogParser {
       case object ExtraTrafficPurchase extends TransferTransactionSubtype(CoinRules_BuyExtraTraffic)
       case object InitialEntryPaymentCollection
           extends TransferTransactionSubtype(CnsRules_CollectInitialEntryPayment)
+      case object EntryRenewalPaymentCollection
+          extends TransferTransactionSubtype(CnsRules_CollectEntryRenewalPayment)
       case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
     }
 
@@ -1595,11 +1623,12 @@ object UserWalletTxLogParser {
         .setEventId(event.getEventId)
     }
 
-    def fromCollectInitialEntryPayment(
+    def fromCollectEntryPayment(
         tx: TransactionTree,
         event: ExercisedEvent,
         domainId: DomainId,
         stateFromPaymentCollection: State,
+        transactionSubtype: TransferTransactionSubtype,
     ): State = {
       // second child event is burning of transferred coin by SVC
       val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
@@ -1609,7 +1638,7 @@ object UserWalletTxLogParser {
 
       stateFromPaymentCollection
         .appended(stateFromBurntCoin)
-        .mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.InitialEntryPaymentCollection)
+        .mergeBalanceChangesIntoTransfer(transactionSubtype)
         .setEventId(event.getEventId)
     }
 

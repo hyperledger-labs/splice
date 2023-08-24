@@ -475,7 +475,11 @@ class FoundingNodeInitializer(
                           domainId,
                         ),
                         foundingConfig.initialCoinPrice.bigDecimal,
-                        defaultCnsConfig,
+                        defaultCnsConfig(
+                          foundingConfig.initialCnsConfig.renewalDuration,
+                          foundingConfig.initialCnsConfig.entryLifetime,
+                          foundingConfig.initialCnsConfig.entryFee,
+                        ),
                         svcRulesConfig,
                         optOpenMiningRounds.map(_.asJava).toJava,
                         trafficStateForAllMembers

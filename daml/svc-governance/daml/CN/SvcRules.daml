@@ -16,6 +16,7 @@ import CC.Util
 import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
+import CN.Wallet.Subscriptions
 import CC.GlobalDomain (initialValidatorTraffic, ValidatorTraffic, initialMemberTraffic)
 
 import qualified CN.CometBft as CometBft
@@ -101,8 +102,6 @@ data SvcRules_ActionRequiringConfirmation
 data CnsEntryContext_ActionRequiringConfirmation
   = CNSRARC_CollectInitialEntryPayment CnsEntryContext_CollectInitialEntryPayment
     -- ^ Automated action to collect initial payment of an cns entry.
-  | CNSRARC_CollectRenewalEntryPayment CnsEntryContext_CollectEntryRenewalPayment
-    -- ^ Automated action to collect renewal payment of an cns entry.
   deriving (Eq, Show)
 
 -- | Information about members relevant to collective governance.
@@ -755,8 +754,6 @@ template SvcRules with
         archive rightCid
 
 
-
-
     -- Validator onboarding
     -----------------------
 
@@ -881,6 +878,19 @@ template SvcRules with
         requireUnlocked lock
         coinPrice <- fetchMedianCoinPrice svc (Map.keys members) coinPriceVoteCids
         exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
+
+
+    -- CNS payment collection driven directly by the leader
+    -----------------------------------------------
+
+    nonconsuming choice SvcRules_CollectEntryRenewalPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
+      with
+        cnsEntryContextCid : ContractId CnsEntryContext
+        choiceArg : CnsEntryContext_CollectEntryRenewalPayment
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cnsEntryContextCid choiceArg
 
 
     -- Reward management driven directly by the leader
@@ -1076,7 +1086,6 @@ executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
   ARC_CnsEntryContext with .. ->
     case cnsEntryContextAction of
       CNSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
-      CNSRARC_CollectRenewalEntryPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
 
 -- Functions implementing instant-runoff voting
 -----------------------------------------------

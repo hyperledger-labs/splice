@@ -247,6 +247,10 @@ object SvcTables extends AcsTables with NamedLogging {
           tryToDecode(sub.SubscriptionInitialPayment.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(contract)
           }
+        case sub.SubscriptionPayment.TEMPLATE_ID =>
+          tryToDecode(sub.SubscriptionPayment.COMPANION, createdEvent) { contract =>
+            SvcAcsStoreRowData(contract)
+          }
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the SVC store.")
       }

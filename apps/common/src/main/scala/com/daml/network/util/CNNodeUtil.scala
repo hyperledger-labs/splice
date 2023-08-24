@@ -210,19 +210,23 @@ object CNNodeUtil {
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
   )
 
-  def defaultCnsConfig: cn.cns.CnsRulesConfig = new cn.cns.CnsRulesConfig(
+  def defaultCnsConfig(
+      renewalDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
+      entryLifetime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(90),
+      entryFee: Double = 1.0,
+  ): cn.cns.CnsRulesConfig = new cn.cns.CnsRulesConfig(
     // renewalDuration
     new RelTime(
-      TimeUnit.NANOSECONDS.toMicros(NonNegativeFiniteDuration.ofDays(30).duration.toNanos)
+      TimeUnit.NANOSECONDS.toMicros(renewalDuration.duration.toNanos)
     ),
 
     // entryLifetime
     new RelTime(
-      TimeUnit.NANOSECONDS.toMicros(NonNegativeFiniteDuration.ofDays(90).duration.toNanos)
+      TimeUnit.NANOSECONDS.toMicros(entryLifetime.duration.toNanos)
     ),
 
     // entryFee
-    damlDecimal(1.0),
+    damlDecimal(entryFee),
   )
 
   private def defaultGlobalDomainConfig(

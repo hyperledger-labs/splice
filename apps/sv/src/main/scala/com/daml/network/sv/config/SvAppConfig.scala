@@ -64,6 +64,7 @@ object SvOnboardingConfig {
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,
+      initialCnsConfig: InitialCnsConfig = InitialCnsConfig(),
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
   ) extends SvOnboardingConfig
@@ -86,6 +87,12 @@ object SvOnboardingConfig {
     }
   }
 }
+
+final case class InitialCnsConfig(
+    renewalDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
+    entryLifetime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(90),
+    entryFee: Double = 1.0,
+)
 
 final case class SvGlobalDomainConfig(
     alias: DomainAlias,
