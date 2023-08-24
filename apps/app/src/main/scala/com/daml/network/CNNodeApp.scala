@@ -22,4 +22,7 @@ object CNNodeApp extends CantonAppDriver[CNNodeEnvironmentImpl] {
 
   override protected def withManualStart(config: CNNodeConfig): CNNodeConfig =
     config.copy(parameters = config.parameters.copy(manualStart = true))
+
+  override protected def logAppVersion(): Unit =
+    logger.info(s"Starting Canton Network version ${BuildInfo.compiledVersion}")
 }

@@ -15,7 +15,6 @@ import com.digitalasset.canton.config.{CantonConfig, ConfigErrors, Generate}
 import com.digitalasset.canton.environment.{Environment, EnvironmentFactory}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.version.ReleaseVersion
 import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.LoggerFactory
 
@@ -43,6 +42,8 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
       Console.out.println(s"$name: $version")
     }
   }
+
+  protected def logAppVersion(): Unit = logger.info(s"Starting Canton version ${BuildInfo.version}")
 
   // BE CAREFUL: Set the environment variables before you touch anything related to
   // logback as otherwise, the logback configuration will be read without these
@@ -80,7 +81,8 @@ abstract class CantonAppDriver[E <: Environment] extends App with NamedLogging w
       case (None, _) =>
     }
 
-  logger.info(s"Starting Canton version ${ReleaseVersion.current}")
+  logAppVersion()
+
   if (cliOptions.logTruncate) {
     cliOptions.logFileAppender match {
       case LogFileAppender.Rolling =>
