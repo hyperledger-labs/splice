@@ -1009,13 +1009,14 @@ To build the required artifacts from your current local repo:
    Note that this does an incremental build. If things break, you can force a full rebuild by first running `make clean`.
 1. Run `make cluster/helm/build` to build the Helm charts. You will need to rerun this every time you modify the helm charts.
 
-The Pulumi script depends on the following env variables to be defined (e.g. by exporting them from your .envrc.private):
+The Pulumi script depends on the following env variables to be defined
+(e.g. by exporting them from your `.envrc.private`):
 
-- AUTH0_DOMAIN: please use our sv-test domain: canton-network-sv-test.us.auth0.com
-- AUTH0_CLIENT_ID: management client id of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
-- AUTH0_CLIENT_SECRET: management secret of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
-- ARTIFACTORY_USER: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
-- ARTIFACTORY_PASSWORD: Your identity token at digitalasset.jfrog.io (can be obtained by generating an identity token in your user profile)
+- `AUTH0_DOMAIN`: please use our sv-test domain: `canton-network-sv-test.us.auth0.com`
+- `AUTH0_CLIENT_ID`: management client id of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
+- `AUTH0_CLIENT_SECRET`: management secret of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
+- `ARTIFACTORY_USER`: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
+- `ARTIFACTORY_PASSWORD`: Your identity token at digitalasset.jfrog.io (can be obtained by generating an identity token in your user profile)
 
 
 To deploy the SV node following the runbook, cd to the scratchnet directory you wish to use, lock it, and run:

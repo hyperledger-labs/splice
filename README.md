@@ -1,6 +1,7 @@
 # Table of Contents
 
 1. [Setting up Your Development Environment](#setting-up-your-development-environment)
+    1. [Private Environment Variables](#private-environment-variables)
     1. [Directory Layout](#directory-layout)
     1. [IntelliJ Setup](#intellij-setup)
     1. [VS Code Setup](#vs-code-setup)
@@ -146,6 +147,37 @@ clusters.)
 
 9. On MacOS, please install the following globally:
    1. Firefox, by following the process here: <https://www.firefox.com>
+
+### Private Environment Variables
+
+There are a number of environment variables managed with `direnv` that
+are used to contain private information. This includes credentials to
+a range of external services, including Auth0 and Artifactory. To keep
+this private information private, they are stored in a specific file
+in the root of the project repository: `.envrc.private`. This file is
+listed in `.gitignore` to prevent accidental commit to the repository.
+
+Due to requirement to manually create and populate this file, there is
+also checking to verify that the environment definitions expected to
+be present in `.envrc.private` are in fact present. Missing
+definitions will cause a warning to be reported when `.envrc` is
+executed.
+
+A list of expected environment definitions is as follows:
+
+* `AUTH0_MANAGEMENT_API_TOKEN` - Management API Token generated from
+  the [Auth0 console](https://manage.auth0.com/dashboard/us/canton-network-dev/apis/management/explorer)
+* Auth0 Management API credentials (taken from the *API Explorer* application defined within each Auth0 tenant)
+   * `AUTH0_CN_MANAGEMENT_API_CLIENT_ID`/`AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET` - Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-dev/applications/ECfosW3sLHUfHatCRLEGUQ9YG9XMs9aq/settings) settings page. (Note `canton-network-dev` tenant.)
+   * `AUTH0_SV_MANAGEMENT_API_CLIENT_ID`/`AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET` - Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-sv-test/applications/OjD90OemoxGYTLqzmbSTDJlmCi6nbUnu/settings) settings apge. (Note `canton-network-sv-test` tenant.)
+   * `AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID`/`AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET` Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-test/applications/DnmjyCAmMHWVD0yS0jZLgBv8pKL7dVMM/settings) settings page. (Note `canton-network-test` tenant.)
+* Artifactory credentials
+   * `ARTIFACTORY_USER`: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
+   * `ARTIFACTORY_PASSWORD`: Your identity token at digitalasset.jfrog.io (can be obtained by generating an identity token in your user profile)
+
+Be aware: The Auth0 tokens allow the requester to perform any
+administrative action against the Auth0 tenant! Use caution and keep
+production values secure.
 
 ### Directory Layout
 
@@ -769,15 +801,26 @@ this doesn't give you a debugger.
 
 ### Testing Auth0 Auth Flows Locally
 
-If you want to run one of the integration tests with a `LocalAuth0Test` tag, you likely need to pass Auth0 management API credentials for our `canton-network-test` tenant to `sbt`.
-You can set them in your `.envrc.private` file via:
+If you want to run one of the integration tests with a
+`LocalAuth0Test` tag, you will need to pass Auth0 management API
+credentials for our `canton-network-test` tenant to `sbt`. This is
+done using environment variables that are most easily maintained in
+`.envrc.private`. Instructions on how to populate that file are
+[here](#private-environment-variables).
+
 ```
 export AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID=…
 export AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET=…
 ```
-Note that [Running The Preflight Check](#running-the-preflight-check) also requires you to obtain Auth0 management API credentials, but for a different tenant.
-To switch tenants, run `sbt -DAUTH0_TENANT=dev`. The tests will then read the environment variables without the `_TESTS` suffix. `cncluster preflight` sets this automatically
-so in most cases you should not have to do this manually.
+
+Note that [Running The Preflight Check](#running-the-preflight-check)
+also requires Auth0 management API credentials, but for a different
+tenant. Following the linked instructions above will provide
+definitions in `.envrc.private`. To switch tenants, run `sbt
+-DAUTH0_TENANT=dev`. The tests will then read the environment
+variables without the `_TESTS` suffix. `cncluster preflight` sets this
+automatically so in most cases you should not have to do this
+manually.
 
 ```
 export AUTH0_CN_MANAGEMENT_API_CLIENT_ID=…
@@ -816,22 +859,15 @@ After the test, you have to manually stop the frontends using the typical `stop-
 
 #### Configure Auth0 Environment
 
-The preflight check also requires access to auth0's management API (`canton-network-dev` tenant). To enable that, please go
-to the Auth0 [API Explorer Application](https://manage.auth0.com/dashboard/us/canton-network-dev/applications/ECfosW3sLHUfHatCRLEGUQ9YG9XMs9aq/settings).
+The preflight check also requires access to Auth0's management
+API. This access is granted via credentials to the API Explorer
+Application defined within of the Auth0 tenant, which are stored in
+`.envrc.private` and populated as described
+[here](#private-environment-variables).
 
-Copy the Client ID and Client Secret into the following environment variables, respectively:
-
-- `AUTH0_CN_MANAGEMENT_API_CLIENT_ID`
-- `AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET`
-
-Similarly, the SV preflight tests require similar secrets for the canton-network-sv-test tenant, from [here](https://manage.auth0.com/dashboard/us/canton-network-sv-test/applications/OjD90OemoxGYTLqzmbSTDJlmCi6nbUnu/settings), in these environment variables:
-
-- `AUTH0_SV_MANAGEMENT_API_CLIENT_ID`
-- `AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET`
-
-For convenience, you can `export` these from your `.envrc.private` which is ignored by git, to always be available for subsequent runs.
-
-Be aware: these tokens allow the requester to perform any administrative action against the Auth0 tenant! Use caution and keep production values secure.
+Be aware: these tokens allow the requester to perform any
+administrative action against the Auth0 tenant! Use caution and keep
+production values secure.
 
 #### Configure SV Web UI Password
 
@@ -1010,11 +1046,13 @@ We have:
 - `AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID` and `_SECRET` which are used for integration tests and currently correspond to the `API Explorer Application` configured in our `canton-test-dev` auth0 tenant
 - `AUTH0_SV_MANAGEMENT_API_CLIENT_ID` and `_SECRET` which are used for tests against an SV deployment in our clusters and currently correspond to the `API Explorer Application` configured in our `canton-network-sv-test` auth0 tenant
 
-For all three, you can get the ID and the secret from the settings page of the respective auth0 application,
-where you can also rotate the secret (bottom of the page).
+For all three, you can get the ID and the secret from the settings
+page of the respective auth0 application, where you can also rotate
+the secret (bottom of the page).
 
-An important note on security:
-If one of above credentials was compromised, then you should treat all auth0 based authentication as compromised.
+An important note on security: If one of above credentials was
+compromised, then you should treat all auth0 based authentication as
+compromised.
 
 This is because the auth0 management API that can be accessed with these credentials can be used by an attacker to [obtain client secrets](https://auth0.com/docs/api/management/v2#!/Clients/get_clients_by_id), which can then be exchanged for long-living access tokens.
 
