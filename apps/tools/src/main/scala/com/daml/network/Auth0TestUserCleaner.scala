@@ -87,11 +87,7 @@ object Auth0TestUserCleaner {
     }
   }
 
-  def run() = {
-    val domain = "https://canton-network-dev.us.auth0.com"
-    val clientId = Tools.readMandatoryEnvVar("AUTH0_MANAGEMENT_API_CLIENT_ID");
-    val clientSecret = Tools.readMandatoryEnvVar("AUTH0_MANAGEMENT_API_CLIENT_SECRET");
-
+  def run(domain: String, clientId: String, clientSecret: String) = {
     val auth0Util = retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret))
 
     println(s"Deleting auth0 test users older than $maxUserAge day(s)...")

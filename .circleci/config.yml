@@ -1782,7 +1782,12 @@ jobs:
       - restore_sbt_cache
       - execute_sbt_command:
           cmd: "\"tools/run\""
-          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD"
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD"
       - save_sbt_cache
       - save_compiled_classes
 
@@ -2538,6 +2543,9 @@ workflows:
     jobs:
       - auth0_user_cleanup:
           <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
 
   cluster_lock_reaper:
     when:

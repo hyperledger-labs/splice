@@ -572,6 +572,9 @@ workflows:
     jobs:
       - auth0_user_cleanup:
           <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
 
   cluster_lock_reaper:
     when:
