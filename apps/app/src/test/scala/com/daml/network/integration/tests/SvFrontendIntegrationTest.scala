@@ -7,9 +7,13 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, SvTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.{By, Keys}
+import org.slf4j.event.Level
+
+import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -1121,6 +1125,54 @@ class SvFrontendIntegrationTest
           )
         }
       }
+
+    "can request SVC leader election" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        actAndCheck(
+          "sv1 operator can login and browse to the leader election tab", {
+            go to s"http://localhost:$sv1UIPort/leader"
+            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+          },
+        )(
+          "We see a button for requesting a leader election",
+          _ => {
+            find(id("submit-ranking-leader-election")) should not be empty
+          },
+        )
+
+        val members: Vector[String] =
+          sv3Backend.getSvcInfo().svcRules.payload.members.keySet().asScala.toVector
+
+        val newLeader = members.head
+
+        sv2Backend.createElectionRequest(sv2Backend.getSvcInfo().svParty.toProtoPrimitive, members)
+        sv3Backend.createElectionRequest(sv3Backend.getSvcInfo().svParty.toProtoPrimitive, members)
+
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+          actAndCheck(
+            "sv1 operator makes his own ranking for his leader preference", {
+              click on "submit-ranking-leader-election"
+            },
+          )(
+            "The epoch advances by one and the leader name is changed.",
+            _ => {
+              find(id("leader-election-epoch")).value.text should include(
+                sv1Backend.getSvcInfo().svcRules.payload.epoch.toString
+              )
+              find(id("leader-election-current-leader")).value.text should include(newLeader)
+            },
+          ),
+          entries => {
+            forExactly(4, entries) { line =>
+              line.message should include(
+                "Noticed an SvcRules epoch change"
+              )
+            }
+          },
+        )
+
+      }
+    }
 
     "if two AddFutureCoinConfigSchedule actions scheduled at the same time are created concurrently, then one is marked as staled" in {
       implicit env =>

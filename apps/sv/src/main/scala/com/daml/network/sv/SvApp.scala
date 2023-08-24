@@ -752,6 +752,78 @@ object SvApp {
     }
   }
 
+  def getElectionRequest(
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore]
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[Boolean] = {
+    val store = svcStoreWithIngestion.store
+    for {
+      svcRules <- store.getSvcRules()
+      queryResult <- store
+        .lookupElectionRequestByRequesterWithOffset(
+          store.key.svParty,
+          svcRules.payload.epoch,
+        )
+    } yield queryResult.value.isDefined;;
+  }
+
+  def createElectionRequest(
+      requester: String,
+      ranking: Seq[String],
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      globalDomain: DomainId,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[Either[String, Unit]] = {
+    val store = svcStoreWithIngestion.store
+    for {
+      svcRules <- store.getSvcRules()
+      queryResult <- store
+        .lookupElectionRequestByRequesterWithOffset(
+          PartyId.tryFromProtoPrimitive(requester),
+          svcRules.payload.epoch,
+        )
+      result <- queryResult match {
+        case QueryResult(_, Some(_)) =>
+          Future.successful(
+            Left(
+              s"already voted in an election for epoch ${svcRules.payload.epoch} to replace inactive leader ${svcRules.payload.leader}"
+            )
+          )
+        case QueryResult(offset, None) =>
+          val self = requester
+          val cmd = svcRules.contractId.exerciseSvcRules_RequestElection(
+            self,
+            new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
+              com.daml.ledger.javaapi.data.Unit.getInstance()
+            ),
+            ranking.asJava,
+          )
+          for {
+            _ <- svcStoreWithIngestion.connection
+              .submitCommands(
+                actAs = Seq(store.key.svParty),
+                readAs = Seq(store.key.svcParty),
+                commands = cmd.commands.asScala.toSeq,
+                commandId = CNLedgerConnection.CommandId(
+                  "com.daml.network.sv.requestElection",
+                  Seq(
+                    store.key.svParty,
+                    store.key.svcParty,
+                  ),
+                  svcRules.payload.epoch.toString,
+                ),
+                deduplicationOffset = offset,
+                domainId = globalDomain,
+              )
+          } yield Right(())
+      }
+    } yield result
+  }
+
   def createVoteRequest(
       requester: String,
       action: Json,

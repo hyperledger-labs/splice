@@ -13,6 +13,7 @@ import com.daml.network.http.v0.definitions.{
   BatchListVotesByVoteRequestsRequest,
   CastVoteRequest,
   CometBftNodeDumpResponse,
+  CreateElectionRequest,
   CreateVoteRequest,
   ErrorResponse,
   UpdateVoteRequest,
@@ -195,6 +196,37 @@ class HttpSvAdminHandler(
     withNewTrace(workflowId) { _ => _ =>
       Future.successful(v0.SvAdminResource.IsAuthorizedResponseOK)
     }
+
+  def createElectionRequest(respond: SvAdminResource.CreateElectionRequestResponse.type)(
+      body: CreateElectionRequest
+  )(user: String): Future[SvAdminResource.CreateElectionRequestResponse] =
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      SvApp
+        .createElectionRequest(
+          body.requester,
+          body.ranking,
+          svcStoreWithIngestion,
+          globalDomain,
+        )
+        .flatMap {
+          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
+          case Right(()) => Future.successful(v0.SvAdminResource.CreateElectionRequestResponseOK)
+        }
+    }
+
+  def getElectionRequest(
+      respond: SvAdminResource.GetElectionRequestResponse.type
+  )()(extracted: String): Future[SvAdminResource.GetElectionRequestResponse] = {
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      for {
+        electionRequestExists <- SvApp.getElectionRequest(svcStoreWithIngestion)
+      } yield {
+        definitions.GetElectionRequestResponse(
+          electionRequestExists
+        )
+      }
+    }
+  }
 
   def createVoteRequest(respond: SvAdminResource.CreateVoteRequestResponse.type)(
       body: CreateVoteRequest
@@ -428,4 +460,5 @@ class HttpSvAdminHandler(
       notFound(ErrorResponse("Mediator is not configured."))
         .pure[Future]
     } { call }
+
 }

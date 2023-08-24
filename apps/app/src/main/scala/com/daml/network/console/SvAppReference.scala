@@ -181,6 +181,18 @@ class SvAppBackendReference(
     }
   }
 
+  @Help.Summary("Create an election request (via admin API)")
+  def createElectionRequest(
+      requester: String,
+      ranking: Vector[String],
+  ): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.CreateElectionRequest(requester, ranking)
+      )
+    }
+  }
+
   @Help.Summary("Create a vote request (via admin API)")
   def createVoteRequest(
       requester: String,

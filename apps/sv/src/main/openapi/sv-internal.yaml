@@ -182,6 +182,36 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/LookupSvcRulesVoteRequestResponse"
+  /admin/sv/electionrequests/create:
+    post:
+      tags: [sv]
+      x-jvm-package: svAdmin
+      operationId: "createElectionRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateElectionRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+  /admin/sv/electionrequests/get:
+    get:
+      tags: [ sv ]
+      x-jvm-package: svAdmin
+      operationId: "getElectionRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetElectionRequestResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /admin/sv/votes:
     post:
       tags: [sv]
@@ -589,6 +619,19 @@ components:
         candidateKey:
           type: string
 
+    CreateElectionRequest:
+      type: object
+      required:
+        - requester
+        - ranking
+      properties:
+        requester:
+          type: string
+        ranking:
+          type: array
+          items:
+            type: string
+
     CreateVoteRequest:
       type: object
       required:
@@ -858,3 +901,12 @@ components:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         version:
           type: string
+
+    GetElectionRequestResponse:
+      type: object
+      required:
+        - exists
+      properties:
+        exists:
+          type: boolean
+          description: "Whether the election already exists for that epoch."

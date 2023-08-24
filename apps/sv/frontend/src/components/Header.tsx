@@ -12,6 +12,7 @@ const Header: React.FC = () => {
     { name: 'Validator Onboarding', path: 'validator-onboarding' },
     { name: 'Canton Coin Price', path: 'cc-price' },
     { name: 'Governance', path: 'votes' },
+    // TODO(#7134) add something like { name: 'Leader Election', path: 'leader' },
   ];
 
   const applyNavStyle = (isActive: boolean) => {
