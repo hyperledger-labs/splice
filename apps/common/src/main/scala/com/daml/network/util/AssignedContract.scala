@@ -1,5 +1,8 @@
 package com.daml.network.util
 
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
+import com.daml.network.http.v0.definitions as http
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.DomainId
 
@@ -17,4 +20,26 @@ final case class AssignedContract[TCid, T](
     param("contract", _.contract),
     param("domain", _.domain),
   )
+
+  def toHttp(implicit elc: ErrorLoggingContext): http.AssignedContract =
+    http.AssignedContract(
+      contract.toHttp,
+      Codec.encode(domain),
+    )
+}
+
+object AssignedContract {
+
+  def fromHttp[TCid <: ContractId[T], T <: DamlRecord[?]](
+      companion: Contract.Companion.Template[TCid, T]
+  )(contract: http.AssignedContract)(implicit
+      decoder: TemplateJsonDecoder
+  ): Either[String, AssignedContract[TCid, T]] =
+    for {
+      decodedContract <- Contract.fromHttp(companion)(contract.contract).left.map(_.toString)
+      domainId <- Codec.decode(Codec.DomainId)(contract.domainId)
+    } yield AssignedContract(
+      decodedContract,
+      domainId,
+    )
 }

@@ -1,4 +1,5 @@
 import {
+  AssignedContract as OpenAPIAssignedContract,
   Contract as OpenAPIContract,
   ContractWithState as OpenAPIContractWithState,
 } from 'splitwell-openapi';
@@ -60,5 +61,15 @@ export const AssignedContract = {
     const c = cws.contract;
     const domainId = cws.domainId;
     return c && domainId ? { contract: Contract.decodeOpenAPI(c, tmpl), domainId } : undefined;
+  },
+
+  decodeAssignedContract<T extends object, K>(
+    contract: OpenAPIAssignedContract,
+    tmpl: Template<T, K>
+  ): AssignedContract<T> {
+    return {
+      contract: Contract.decodeOpenAPI(contract.contract, tmpl),
+      domainId: contract.domainId,
+    };
   },
 };

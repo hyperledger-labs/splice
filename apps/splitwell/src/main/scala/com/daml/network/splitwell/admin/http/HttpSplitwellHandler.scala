@@ -176,6 +176,19 @@ class HttpSplitwellHandler(
       }
     }
 
+  def listSplitwellRules(
+      respond: v0.SplitwellResource.ListSplitwellRulesResponse.type
+  )()(extracted: Unit): Future[v0.SplitwellResource.ListSplitwellRulesResponse] =
+    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+      for {
+        rules <- store.listSplitwellRules()
+      } yield {
+        definitions.ListSplitwellRulesResponse(
+          rules.map(_.toHttp).toVector
+        )
+      }
+    }
+
   override def getProviderPartyId(
       respond: v0.SplitwellResource.GetProviderPartyIdResponse.type
   )()(fake: Unit): Future[v0.SplitwellResource.GetProviderPartyIdResponse] =

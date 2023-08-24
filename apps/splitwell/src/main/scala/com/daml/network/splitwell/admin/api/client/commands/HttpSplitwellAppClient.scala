@@ -8,7 +8,13 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.splitwell as http
 import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{Contract, ContractWithState, Codec, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  Contract,
+  ContractWithState,
+  Codec,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -225,6 +231,27 @@ object HttpSplitwellAppClient {
             } yield domain -> cid
           )
         } yield installs.toMap
+    }
+  }
+
+  case object ListSplitwellRules
+      extends BaseCommand[
+        http.ListSplitwellRulesResponse,
+        Seq[AssignedContract[
+          splitwellCodegen.SplitwellRules.ContractId,
+          splitwellCodegen.SplitwellRules,
+        ]],
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.listSplitwellRules(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListSplitwellRulesResponse.OK(response) =>
+        response.rules.traverse(
+          AssignedContract.fromHttp(splitwellCodegen.SplitwellRules.COMPANION)
+        )
     }
   }
 

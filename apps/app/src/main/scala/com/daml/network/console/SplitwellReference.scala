@@ -93,20 +93,22 @@ final class SplitwellAppClientReference(
   lazy val userParty = getUserPrimaryParty()
 
   // return the install on the leftmost configured domain (e.g. preferred first)
-  private def getFavoredSplitwellInstall()
-      : (DomainId, splitwellCodegen.SplitwellInstall.ContractId) = {
-    val installs = listSplitwellInstalls()
-    installs.toList match {
-      case Seq((domain, install)) => (domain, install)
+  private def getFavoredSplitwellRules(): (
+      DomainId,
+      Contract[splitwellCodegen.SplitwellRules.ContractId, splitwellCodegen.SplitwellRules],
+  ) = {
+    val rules = listSplitwellRules()
+    val connectedDomains = getConnectedDomains(userParty)
+    val filteredRules = rules.filter(c => connectedDomains.contains(c._1))
+    filteredRules.toList match {
+      case Seq((domain, rules)) => (domain, rules)
       case Seq() =>
-        val userParty = getUserPrimaryParty()
         throw new IllegalStateException(
-          s"Expected exactly one SplitwellInstall contract for user $userParty but got $installs"
+          s"Expected exactly one SplitwellRules contract for user $userParty but got $rules"
         )
-      case multipleInstalls =>
+      case multipleRules =>
         val domains = getSplitwellDomainIds()
-        // by listSplitwellInstalls's sig, each DomainId is unique
-        multipleInstalls.minByOption { case (domain, _) =>
+        multipleRules.minByOption { case (domain, _) =>
           if (domain == domains.preferred) 0
           else {
             val ix = domains.others indexOf domain
@@ -116,15 +118,14 @@ final class SplitwellAppClientReference(
     }
   }
 
-  private def getSplitwellInstall(
+  private def getSplitwellRules(
       domain: DomainId
-  ): splitwellCodegen.SplitwellInstall.ContractId = {
-    val installs = listSplitwellInstalls()
-    installs.getOrElse(
+  ): Contract[splitwellCodegen.SplitwellRules.ContractId, splitwellCodegen.SplitwellRules] = {
+    val rules = listSplitwellRules()
+    rules.getOrElse(
       domain, {
-        val userParty = getUserPrimaryParty()
         throw new IllegalStateException(
-          s"Expected a SplitwellInstall contract for user $userParty, domain $domain but got $installs"
+          s"Expected a SplitwellRules contract for domain $domain but got $rules"
         )
       },
     )
@@ -189,7 +190,6 @@ final class SplitwellAppClientReference(
   def createInstallRequests(
   ): Map[DomainId, splitwellCodegen.SplitwellInstallRequest.ContractId] = {
     val party = getUserPrimaryParty()
-    val provider = getProviderPartyId()
     val splitwellDomains = getSplitwellDomainIds()
     val connectedDomains = getConnectedDomains(party)
     val connectedSplitwellDomains =
@@ -197,17 +197,18 @@ final class SplitwellAppClientReference(
     // We unconditionally create install contracts on all domains and rely on the provider's backend to reject them
     // for duplicates or if a domain is no longer supported.
     connectedSplitwellDomains.map { domainId =>
-      val created = submitWithResult(
+      val rules = getSplitwellRules(domainId)
+      val exercised = submitWithResult(
         actAs = Seq(party),
         readAs = Seq.empty,
-        new splitwellCodegen.SplitwellInstallRequest(
-          provider.toProtoPrimitive,
-          party.toProtoPrimitive,
-        ).create,
+        rules.contractId.exerciseSplitwellRules_RequestInstall(
+          party.toProtoPrimitive
+        ),
         domainId = Some(domainId),
+        disclosedContracts = Seq(rules.toDisclosedContract),
       )
       domainId -> splitwellCodegen.SplitwellInstallRequest.COMPANION.toContractId(
-        created.contractId
+        exercised.exerciseResult
       )
     }.toMap
   }
@@ -219,11 +220,11 @@ final class SplitwellAppClientReference(
     val party = getUserPrimaryParty()
     val provider = getProviderPartyId()
     val svc = scanClient.getSvcPartyId()
-    val (domain, install) = getFavoredSplitwellInstall()
+    val (domain, rules) = getFavoredSplitwellRules()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      install.exerciseSplitwellInstall_RequestGroup(
+      rules.contractId.exerciseSplitwellRules_RequestGroup(
         new splitwellCodegen.Group(
           party.toProtoPrimitive,
           svc.toProtoPrimitive,
@@ -231,9 +232,11 @@ final class SplitwellAppClientReference(
           new splitwellCodegen.GroupId(id),
           provider.toProtoPrimitive,
           acceptDuration,
-        )
+        ),
+        party.toProtoPrimitive,
       ),
       domainId = Some(domain),
+      disclosedContracts = Seq(rules.toDisclosedContract),
     ).exerciseResult
   }
 
@@ -245,7 +248,7 @@ final class SplitwellAppClientReference(
   ): AssignedContract[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite] = {
     val party = getUserPrimaryParty()
     val (domain, group) = getGroup(HttpSplitwellAppClient.GroupKey(id, party))
-    val install = getSplitwellInstall(domain)
+    val rules = getSplitwellRules(domain)
     AssignedContract(
       ledgerApi.ledger_api_extensions.commands.submitWithCreate(
         splitwellCodegen.GroupInvite.COMPANION
@@ -253,8 +256,9 @@ final class SplitwellAppClientReference(
         userId,
         Seq(party),
         Seq.empty,
-        install.exerciseSplitwellInstall_CreateInvite(group),
+        rules.contractId.exerciseSplitwellRules_CreateInvite(group, party.toProtoPrimitive),
         domainId = Some(domain),
+        disclosedContracts = Seq(rules.toDisclosedContract),
       ),
       domain,
     )
@@ -271,15 +275,17 @@ final class SplitwellAppClientReference(
         (c: splitwellCodegen.AcceptedGroupInvite.Contract) => c.id == acceptedGroupInvite,
       )
     val (domain, group) = getGroup(acceptedInvite.data.groupKey)
-    val install = getSplitwellInstall(domain)
+    val rules = getSplitwellRules(domain)
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      install.exerciseSplitwellInstall_Join(
+      rules.contractId.exerciseSplitwellRules_Join(
         group,
         acceptedGroupInvite,
+        party.toProtoPrimitive,
       ),
       domainId = Some(domain),
+      disclosedContracts = Seq(rules.toDisclosedContract),
     ).exerciseResult
   }
 
@@ -294,14 +300,15 @@ final class SplitwellAppClientReference(
   ): splitwellCodegen.AcceptedGroupInvite.ContractId = {
     val party = getUserPrimaryParty()
     val domain = groupInvite.domain
-    val install = getSplitwellInstall(domain)
+    val rules = getSplitwellRules(domain)
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      install.exerciseSplitwellInstall_AcceptInvite(
-        groupInvite.contractId
+      rules.contractId.exerciseSplitwellRules_AcceptInvite(
+        groupInvite.contractId,
+        party.toProtoPrimitive,
       ),
-      disclosedContracts = Seq(groupInvite.contract.toDisclosedContract),
+      disclosedContracts = Seq(rules.toDisclosedContract, groupInvite.contract.toDisclosedContract),
       domainId = Some(domain),
     ).exerciseResult
   }
@@ -318,15 +325,17 @@ final class SplitwellAppClientReference(
   ): splitwellCodegen.BalanceUpdate.ContractId = {
     val party = getUserPrimaryParty()
     val (domain, group) = getGroup(key)
-    val install = getSplitwellInstall(domain)
+    val rules = getSplitwellRules(domain)
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      install.exerciseSplitwellInstall_EnterPayment(
+      rules.contractId.exerciseSplitwellRules_EnterPayment(
         group,
         amount.bigDecimal,
         description,
+        party.toProtoPrimitive,
       ),
+      disclosedContracts = Seq(rules.toDisclosedContract),
       domainId = Some(domain),
     ).exerciseResult
   }
@@ -338,15 +347,17 @@ final class SplitwellAppClientReference(
   ): walletCodegen.AppPaymentRequest.ContractId = {
     val party = getUserPrimaryParty()
     val (domain, group) = getGroup(key)
-    val install = getSplitwellInstall(domain)
+    val rules = getSplitwellRules(domain)
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      install.exerciseSplitwellInstall_InitiateTransfer(
+      rules.contractId.exerciseSplitwellRules_InitiateTransfer(
         group,
         receiverAmounts.asJava,
+        party.toProtoPrimitive,
       ),
       domainId = Some(domain),
+      disclosedContracts = Seq(rules.toDisclosedContract),
     ).exerciseResult
   }
 
@@ -372,15 +383,17 @@ final class SplitwellAppClientReference(
         ]).asJava
       }.asJava
     val (domain, group) = getGroup(key)
-    val install = getSplitwellInstall(domain)
+    val rules = getSplitwellRules(domain)
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      install.exerciseSplitwellInstall_Net(
+      rules.contractId.exerciseSplitwellRules_Net(
         group,
         balanceChangesPrim,
+        party.toProtoPrimitive,
       ),
       domainId = Some(domain),
+      disclosedContracts = Seq(rules.toDisclosedContract),
     ).exerciseResult
   }
 
@@ -431,6 +444,17 @@ final class SplitwellAppClientReference(
     consoleEnvironment.run {
       httpCommand(HttpSplitwellAppClient.ListSplitwellInstalls(userParty))
     }
+
+  def listSplitwellRules(): Map[DomainId, Contract[
+    splitwellCodegen.SplitwellRules.ContractId,
+    splitwellCodegen.SplitwellRules,
+  ]] =
+    consoleEnvironment
+      .run {
+        httpCommand(HttpSplitwellAppClient.ListSplitwellRules)
+      }
+      .map(c => c.domain -> c.contract)
+      .toMap
 
   override val scanClientConfig = config.scanClient
 }

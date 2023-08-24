@@ -14,6 +14,16 @@ components:
           type: string
       required:
         [ "contract" ]
+    AssignedContract:
+      type: object
+      properties:
+        contract:
+          $ref: "./common-external.yaml#/components/schemas/Contract"
+        domain_id:
+          type: string
+      required:
+        - contract
+        - domain_id
     # Represents a contract that is maybe already cached by the client. If the client sends along a contract-id that
     # matches the contract the server would respond with, the server responds with an empty contract property to indicate
     # that the client's cache is correct.

@@ -32,14 +32,11 @@ template SplitwellInstallRequest
     provider : Party
     user : Party
   where
-    signatory user
-    -- Workaround for lack of explicit disclosure.
-    observer provider
+    signatory provider, user
 
     choice SplitwellInstallRequest_Accept : ContractId SplitwellInstall
       controller provider
       do create SplitwellInstall with ..
-
 
     choice SplitwellInstallRequest_Reject : ()
       controller provider
@@ -53,64 +50,86 @@ assertOwner group p = do
   Group {..} <- fetch group
   owner === p
 
+-- TODO(#7411) Remove this once the domain migration automation
+-- no longer relies on it.
 template SplitwellInstall
   with
-    provider : Party -- in non-provider centric model: provider = user
+    provider : Party
     user : Party
   where
-    signatory user, provider
+    signatory provider, user
 
-    nonconsuming choice SplitwellInstall_RequestGroup : ContractId GroupRequest
-      with group : Group
+template SplitwellRules
+  with
+    provider : Party
+  where
+    signatory provider
+
+    nonconsuming choice SplitwellRules_RequestInstall : ContractId SplitwellInstallRequest
+      with
+        user : Party
+      controller user
+      do create SplitwellInstallRequest with ..
+
+    nonconsuming choice SplitwellRules_RequestGroup : ContractId GroupRequest
+      with
+        group : Group
+        user : Party
       controller user
       do group.provider === provider
          group.owner === user
          create (GroupRequest group)
 
-    nonconsuming choice SplitwellInstall_CreateInvite : ContractId GroupInvite
+    nonconsuming choice SplitwellRules_CreateInvite : ContractId GroupInvite
       with
         group : ContractId Group
+        user : Party
       controller user
       do assertOwner group user
          exercise group Group_CreateInvite
 
-    nonconsuming choice SplitwellInstall_AcceptInvite : ContractId AcceptedGroupInvite
+    nonconsuming choice SplitwellRules_AcceptInvite : ContractId AcceptedGroupInvite
       with
         cid : ContractId GroupInvite
+        user : Party
       controller user
       do exercise cid (GroupInvite_Accept user)
 
-    nonconsuming choice SplitwellInstall_Join : ContractId Group
+    nonconsuming choice SplitwellRules_Join : ContractId Group
       with
         group : ContractId Group
         cid : ContractId AcceptedGroupInvite
+        user : Party
       controller user
       do assertOwner group user
          exercise cid (AcceptedGroupInvite_Join group)
 
-    nonconsuming choice SplitwellInstall_EnterPayment : ContractId BalanceUpdate
+    nonconsuming choice SplitwellRules_EnterPayment : ContractId BalanceUpdate
       with
         group : ContractId Group
         amount : Decimal
         description : Text
+        user : Party
       controller user
       do exercise group Group_EnterPayment with
            payer = user
            ..
 
-    nonconsuming choice SplitwellInstall_InitiateTransfer : ContractId AppPaymentRequest
+    nonconsuming choice SplitwellRules_InitiateTransfer : ContractId AppPaymentRequest
       with
         group : ContractId Group
         receiverAmounts : [ReceiverCCAmount]
+        user : Party
       controller user
       do exercise group Group_InitiateTransfer with
            sender = user
            ..
 
-    nonconsuming choice SplitwellInstall_Net : ContractId BalanceUpdate
+    nonconsuming choice SplitwellRules_Net : ContractId BalanceUpdate
       with
         group : ContractId Group
         balanceChanges : Map Party (Map Party Decimal)
+        user : Party
       controller user
       do assertOwner group user
          exercise group Group_Net with

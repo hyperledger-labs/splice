@@ -1,6 +1,7 @@
 import { UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Contract } from 'common-frontend';
 
-import { GroupId, SplitwellInstall } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { GroupId, SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
 import {
   AppPaymentRequest,
   ReceiverCCAmount,
@@ -14,7 +15,7 @@ export const useInitiateTransfer = (
   party: string,
   provider: string,
   domainId: string,
-  install: ContractId<SplitwellInstall>
+  rules: Contract<SplitwellRules>
 ): UseMutationResult<
   ContractId<AppPaymentRequest>,
   unknown,
@@ -34,7 +35,7 @@ export const useInitiateTransfer = (
         groups,
         amounts,
         domainId,
-        install
+        rules
       );
     },
   });

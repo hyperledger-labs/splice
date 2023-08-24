@@ -4,7 +4,7 @@ daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar eabe943f794e559ba6e33215739572
 daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar d25a92b0952e3029ac9647ef0bc68687ec9df256cc1a80f7eaabd1d92f063e56
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar 8de3effc944378fabae1a5a4a33a8d8383bd80187c22855d77870b6349516641
 daml/directory-service/.daml/dist/directory-service-0.1.0.dar dd1e9c52904921d445987273ed4b3e7c1e8daaa5ee814834febed0ec7b6a00e5
-daml/splitwell/.daml/dist/splitwell-0.1.0.dar 1068e803f5c99e76f490ce74d7fa12d3098660d0fa82bed036a6d30b09399199
+daml/splitwell/.daml/dist/splitwell-0.1.0.dar a5f7b3c876fba8183d15e3250a642821f2e90c22856be5a6b9c548574e530c5c
 daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 23f40aea80a4496cf2acdb61c71ad4b83c6e80d22ad5e60f1877eced9c3da0e5
 daml/upgrade-tests/cc-upgrade-test/.daml/dist/canton-coin-0.1.1.dar 7f0c7792d600d39026b3a3ebf8c10c598c1bedb26c378dc4c105bd9c10e31fcc
 daml/upgrade-tests/coin-upgrade-test/.daml/dist/canton-coin-0.1.2.dar 2f44a2e19b6371bada6f2d74f6ec7a353b034eb54b63bfe67c7b78cf77b320cf

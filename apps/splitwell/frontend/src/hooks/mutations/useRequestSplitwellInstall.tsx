@@ -1,15 +1,15 @@
 import { useMutation, UseMutationResult, useQueryClient } from '@tanstack/react-query';
-import { LedgerApiClient } from 'common-frontend';
+import { Contract } from 'common-frontend';
 
-import { SplitwellInstallRequest } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
 
+import { useSplitwellLedgerApiClient } from '../../contexts/SplitwellLedgerApiContext';
 import { QuerySplitwellInstallOperationName } from '../queries/useSplitwellInstall';
 
 interface RequestSplitwellInstallArgs {
-  ledgerApiClient: LedgerApiClient;
   primaryPartyId: string;
-  providerPartyId: string;
   domainId: string;
+  rules: Contract<SplitwellRules>;
 }
 export const useRequestSplitwellInstall = (): UseMutationResult<
   void,
@@ -17,18 +17,11 @@ export const useRequestSplitwellInstall = (): UseMutationResult<
   RequestSplitwellInstallArgs
 > => {
   const queryClient = useQueryClient();
+  const ledgerApiClient = useSplitwellLedgerApiClient();
   return useMutation({
-    mutationFn: async ({ primaryPartyId, providerPartyId, domainId, ledgerApiClient }) => {
+    mutationFn: async ({ primaryPartyId, domainId, rules }) => {
       console.debug('SplitwellInstall not found, creating SplitwellInstallRequest');
-      await ledgerApiClient.create(
-        [primaryPartyId],
-        SplitwellInstallRequest,
-        {
-          user: primaryPartyId,
-          provider: providerPartyId,
-        },
-        domainId
-      );
+      await ledgerApiClient.requestSplitwellInstall(primaryPartyId, domainId, rules);
       console.debug('Created SplitwellInstallRequest');
     },
     onError: (error: unknown) => {

@@ -4,9 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Container, Stack, Typography } from '@mui/material';
 
-import { SplitwellInstall } from '@daml.js/splitwell/lib/CN/Splitwell';
-import { ContractId } from '@daml/types';
-
 import GroupSetup from '../components/GroupSetup';
 import Groups from '../components/Groups';
 import { useSplitwellLedgerApiClient } from '../contexts/SplitwellLedgerApiContext';
@@ -17,6 +14,7 @@ import {
   useSplitwellDomains,
   useSplitwellInstalls,
 } from '../hooks';
+import { useSplitwellRules } from '../hooks/queries/useSplitwellRules';
 
 function collectFirst<A, B>(xs: A[], f: (elt: A) => B | undefined): B | undefined {
   for (const x of xs) {
@@ -43,6 +41,7 @@ const Home: React.FC = () => {
 
   const installs = useSplitwellInstalls();
   const requestInstall = useRequestSplitwellInstall();
+  const rules = useSplitwellRules();
 
   const [requestedInstalls, setRequestedInstalls] = useState<string[]>([]);
 
@@ -53,14 +52,16 @@ const Home: React.FC = () => {
         !connectedDomainIds.data ||
         !provider.data ||
         !installs.data ||
-        !splitwellDomainIds.data
+        !splitwellDomainIds.data ||
+        !rules.data
       ) {
         return;
       } else {
-        const connectedSplitwellDomainIds = connectedDomainIds.data.filter(
-          d => splitwellDomainIds.data.preferred === d || splitwellDomainIds.data.others.includes(d)
+        const connectedSplitwellRules = rules.data.filter(rules =>
+          connectedDomainIds.data?.includes(rules.domainId)
         );
-        for (const domainId of connectedSplitwellDomainIds) {
+        for (const rules of connectedSplitwellRules) {
+          const domainId = rules.domainId;
           if (
             !requestedInstalls.find(requested => requested === domainId) &&
             !installs.data.find(install => install.domainId === domainId)
@@ -72,8 +73,7 @@ const Home: React.FC = () => {
             await requestInstall.mutateAsync({
               domainId,
               primaryPartyId,
-              providerPartyId: provider.data,
-              ledgerApiClient,
+              rules: rules.contract,
             });
           }
         }
@@ -89,38 +89,33 @@ const Home: React.FC = () => {
     installs,
     requestInstall,
     requestedInstalls,
+    rules,
   ]);
 
-  const installsMap = useMemo(
-    () =>
-      new Map(
-        (installs.data || []).map(install => [
-          install.domainId,
-          install.contractId as ContractId<SplitwellInstall>,
-        ])
-      ),
-    [installs]
+  const rulesMap = useMemo(
+    () => new Map((rules.data || []).map(rules => [rules.domainId, rules.contract])),
+    [rules]
   );
 
-  const pickPreferredInstallDomain = useCallback(() => {
+  const pickPreferredRulesDomain = useCallback(() => {
     if (!splitwellDomainIds.data) {
       return [undefined, undefined] as const;
     }
     const result = collectFirst(
       [splitwellDomainIds.data.preferred, ...splitwellDomainIds.data.others],
       id => {
-        const install = installsMap.get(id);
-        if (install) {
-          return [id, install] as const;
+        const rules = rulesMap.get(id);
+        if (rules && connectedDomainIds.data?.includes(id)) {
+          return [id, rules] as const;
         }
       }
     );
     return result ? result : ([undefined, undefined] as const);
-  }, [installsMap, splitwellDomainIds]);
+  }, [rulesMap, splitwellDomainIds, connectedDomainIds]);
 
-  const [preferredDomainId, preferredInstallDomain] = pickPreferredInstallDomain();
+  const [preferredDomainId, preferredRulesDomain] = pickPreferredRulesDomain();
 
-  if (provider.data && primaryPartyId && svc && splitwellDomainIds && preferredInstallDomain) {
+  if (provider.data && primaryPartyId && svc && splitwellDomainIds && preferredRulesDomain) {
     return (
       <Container>
         <Stack spacing={3}>
@@ -129,10 +124,10 @@ const Home: React.FC = () => {
             provider={provider.data}
             svc={svc}
             domainId={preferredDomainId}
-            newGroupInstall={preferredInstallDomain}
-            installs={installsMap}
+            newGroupRules={preferredRulesDomain}
+            rulesMap={rulesMap}
           />
-          <Groups party={primaryPartyId} provider={provider.data} installs={installsMap} />
+          <Groups party={primaryPartyId} provider={provider.data} rulesMap={rulesMap} />
         </Stack>
       </Container>
     );

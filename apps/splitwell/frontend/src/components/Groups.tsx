@@ -29,10 +29,9 @@ import {
 import {
   BalanceUpdate,
   Group as CodegenGroup,
-  SplitwellInstall,
+  SplitwellRules,
 } from '@daml.js/splitwell/lib/CN/Splitwell';
 import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
-import { ContractId } from '@daml/types';
 
 import {
   useAcceptedInvites,
@@ -45,21 +44,21 @@ import {
   useInitiateTransfer,
 } from '../hooks';
 import { useConfig } from '../utils/config';
-import { SplitwellInstalls } from '../utils/installs';
+import { SplitwellRulesMap } from '../utils/installs';
 
 interface BalancesProps {
   group: Contract<CodegenGroup>;
   party: string;
   provider: string;
   domainId: string;
-  install: ContractId<SplitwellInstall>;
+  rules: Contract<SplitwellRules>;
 }
 
-const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, install }) => {
+const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, rules }) => {
   const config = useConfig();
   const balances = useBalances(group, party);
 
-  const initiateTransfer = useInitiateTransfer(party, provider, domainId, install);
+  const initiateTransfer = useInitiateTransfer(party, provider, domainId, rules);
 
   const groupId = group.payload.id;
 
@@ -123,7 +122,7 @@ interface MembershipRequestsProps {
   provider: string;
   party: string;
   domainId: string;
-  install: ContractId<SplitwellInstall>;
+  rules: Contract<SplitwellRules>;
 }
 
 const MembershipRequests: React.FC<MembershipRequestsProps> = ({
@@ -131,11 +130,11 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   party,
   provider,
   domainId,
-  install,
+  rules,
 }) => {
   const acceptedInvites = useAcceptedInvites(group, party);
 
-  const addMember = useAddMember(party, provider, domainId, install);
+  const addMember = useAddMember(party, provider, domainId, rules);
 
   if (acceptedInvites.isLoading) {
     return <Loading />;
@@ -174,17 +173,17 @@ interface EntryProps {
   provider: string;
   party: string;
   domainId: string;
-  install: ContractId<SplitwellInstall>;
+  rules: Contract<SplitwellRules>;
 }
 
-const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId, install }) => {
+const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId, rules }) => {
   const config = useConfig();
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentDescription, setPaymentDescription] = useState<string>('');
-  const enterPayment = useEnterPayment(party, provider, domainId, install);
+  const enterPayment = useEnterPayment(party, provider, domainId, rules);
   const [transferAmount, setTransferAmount] = useState<string>('');
   const [transferReceiver, setTransferReceiver] = useState<string | undefined>();
-  const initiateTransfer = useInitiateTransfer(party, provider, domainId, install);
+  const initiateTransfer = useInitiateTransfer(party, provider, domainId, rules);
   const groupId = group.payload.id;
 
   const transfer = async () => {
@@ -314,12 +313,12 @@ interface GroupProps {
   party: string;
   provider: string;
   domainId: string;
-  install: ContractId<SplitwellInstall>;
+  rules: Contract<SplitwellRules>;
 }
 
-const Group: React.FC<GroupProps> = ({ group, party, provider, domainId, install }) => {
+const Group: React.FC<GroupProps> = ({ group, party, provider, domainId, rules }) => {
   const isOwner = party === group.payload.owner;
-  const createInvite = useCreateInvite(party, provider, domainId, install);
+  const createInvite = useCreateInvite(party, provider, domainId, rules);
 
   return (
     <Paper elevation={3} sx={{ width: 600 }}>
@@ -355,24 +354,12 @@ const Group: React.FC<GroupProps> = ({ group, party, provider, domainId, install
           party={party}
           provider={provider}
           domainId={domainId}
-          install={install}
+          rules={rules}
         />
       )}
-      <Entry
-        group={group}
-        party={party}
-        provider={provider}
-        domainId={domainId}
-        install={install}
-      />
+      <Entry group={group} party={party} provider={provider} domainId={domainId} rules={rules} />
       <Divider />
-      <Balances
-        group={group}
-        party={party}
-        provider={provider}
-        domainId={domainId}
-        install={install}
-      />
+      <Balances group={group} party={party} provider={provider} domainId={domainId} rules={rules} />
       <Divider />
       <BalanceUpdates group={group} party={party} />
       <Divider />
@@ -383,10 +370,10 @@ const Group: React.FC<GroupProps> = ({ group, party, provider, domainId, install
 interface GroupsProps {
   party: string;
   provider: string;
-  installs: SplitwellInstalls;
+  rulesMap: SplitwellRulesMap;
 }
 
-const Groups: React.FC<GroupsProps> = ({ party, provider, installs }) => {
+const Groups: React.FC<GroupsProps> = ({ party, provider, rulesMap }) => {
   const groups = useGroups(party);
 
   if (groups.isLoading) {
@@ -400,8 +387,8 @@ const Groups: React.FC<GroupsProps> = ({ party, provider, installs }) => {
   return (
     <Stack spacing={2}>
       {groups.data.flatMap(({ contract: group, domainId }) => {
-        const install = installs.get(domainId);
-        return install
+        const rules = rulesMap.get(domainId);
+        return rules
           ? [
               <Group
                 key={`${group.payload.owner}:${group.payload.id.unpack}`}
@@ -409,7 +396,7 @@ const Groups: React.FC<GroupsProps> = ({ party, provider, installs }) => {
                 party={party}
                 provider={provider}
                 domainId={domainId}
-                install={install}
+                rules={rules}
               />,
             ]
           : [];

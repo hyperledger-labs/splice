@@ -3,6 +3,7 @@ package com.daml.network.splitwell
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
+import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -12,6 +13,7 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{
   CNLedgerClient,
+  CNLedgerConnection,
   CNNode,
   CNNodeStatus,
   ParticipantAdminConnection,
@@ -25,6 +27,7 @@ import com.daml.network.splitwell.automation.SplitwellAutomationService
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.daml.network.splitwell.store.SplitwellStore
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -34,7 +37,7 @@ import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
@@ -107,6 +110,11 @@ class SplitwellApp(
       .map(_.alias)
       .toList
       .traverse(store.domains.waitForDomainConnection(_))
+
+    splitwellDomains = SplitwellDomains(preferred, others)
+
+    _ <- createSplitwellRules(splitwellDomains, automation)
+
     handler = new HttpSplitwellHandler(
       participantAdminConnection,
       SplitwellDomains(preferred, others),
@@ -153,6 +161,39 @@ class SplitwellApp(
       timeouts,
     )
   }
+
+  private def createSplitwellRules(
+      domains: SplitwellDomains,
+      automation: SplitwellAutomationService,
+  ): Future[Unit] =
+    (domains.preferred +: domains.others).toList.traverse_(createSplitwellRules(_, automation))
+
+  private def createSplitwellRules(
+      domain: DomainId,
+      automation: SplitwellAutomationService,
+  ): Future[Unit] =
+    automation.store.lookupSplitwellRules(domain).flatMap {
+      case QueryResult(offset, None) =>
+        automation.connection
+          .submit(
+            Seq(automation.store.providerParty),
+            Seq.empty,
+            new splitwellCodegen.SplitwellRules(
+              automation.store.providerParty.toProtoPrimitive
+            ).create,
+          )
+          .withDomainId(domain)
+          .withDedup(
+            CNLedgerConnection.CommandId(
+              "com.daml.network.splitwell.createSplitwellRules",
+              Seq(automation.store.providerParty),
+              domain.toProtoPrimitive,
+            ),
+            offset,
+          )
+          .yieldUnit()
+      case QueryResult(_, Some(_)) => Future.unit
+    }
 
   override lazy val requiredTemplates = Set(splitwellCodegen.SplitwellInstall.TEMPLATE_ID)
 }

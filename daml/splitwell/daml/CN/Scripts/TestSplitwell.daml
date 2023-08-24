@@ -15,36 +15,37 @@ import CC.Scripts.Util
 import CN.Wallet.Payment
 
 
-createInstall : CCUser -> CCUser -> Script (ContractId SplitwellInstall)
-createInstall user provider = do
-  request <- submit user.primaryParty $ createCmd SplitwellInstallRequest with user = user.primaryParty, provider = provider.primaryParty, ..
-  submit provider.primaryParty $ exerciseCmd request SplitwellInstallRequest_Accept
+createSplitwellRules : CCUser -> Script (ContractId SplitwellRules)
+createSplitwellRules provider = do
+  submit provider.primaryParty $ createCmd SplitwellRules with provider = provider.primaryParty, ..
 
 requestGroup : CCApp -> CCUser -> CCUser -> Text -> Script (ContractId GroupRequest)
 requestGroup app p provider id =
-  exerciseSplitwellInstall p provider $ SplitwellInstall_RequestGroup Group with
-    owner = p.primaryParty
-    provider = provider.primaryParty
-    members = []
-    id = GroupId id
-    svc = app.svc
-    acceptDuration = minutes 5
+  exerciseSplitwellRules p provider $ SplitwellRules_RequestGroup with
+    group =Group with
+      owner = p.primaryParty
+      provider = provider.primaryParty
+      members = []
+      id = GroupId id
+      svc = app.svc
+      acceptDuration = minutes 5
+    user = p.primaryParty
 
-getSplitwellInstall : CCUser -> CCUser -> Script (ContractId SplitwellInstall)
-getSplitwellInstall user provider = do
-  installs <- queryFilter @SplitwellInstall user.primaryParty (\install -> install.user == user.primaryParty && install.provider == provider.primaryParty)
-  case installs of
-    [(install, _)] -> pure install
-    _ -> abort $ "Expected exactly one SplitwellInstall but got " <> show installs
+getSplitwellRules : CCUser -> Script (ContractId SplitwellRules)
+getSplitwellRules provider = do
+  rules <- queryFilter @SplitwellRules provider.primaryParty (\rule -> rule.provider == provider.primaryParty)
+  case rules of
+    [(rule, _)] -> pure rule
+    _ -> abort $ "Expected exactly one SplitwellRules but got " <> show rules
 
-exerciseSplitwellInstall : Choice SplitwellInstall c r => CCUser -> CCUser -> c -> Script r
-exerciseSplitwellInstall user provider arg = exerciseSplitwellInstall' user provider [] arg
+exerciseSplitwellRules : Choice SplitwellRules c r => CCUser -> CCUser -> c -> Script r
+exerciseSplitwellRules user provider arg = exerciseSplitwellRules' user provider [] arg
 
 
-exerciseSplitwellInstall' : Choice SplitwellInstall c r => CCUser -> CCUser -> [Party] -> c -> Script r
-exerciseSplitwellInstall' user provider readAs arg = do
-  install <- getSplitwellInstall user provider
-  submitMulti [user.primaryParty] readAs $ exerciseCmd install arg
+exerciseSplitwellRules' : Choice SplitwellRules c r => CCUser -> CCUser -> [Party] -> c -> Script r
+exerciseSplitwellRules' user provider readAs arg = do
+  rule <- getSplitwellRules provider
+  submitMulti [user.primaryParty] (provider.primaryParty :: readAs) $ exerciseCmd rule arg
 
 getGroup : CCUser -> GroupKey -> Script (ContractId Group)
 getGroup user k = do
@@ -56,24 +57,31 @@ getGroup user k = do
 createInvite : CCUser -> CCUser -> GroupKey -> Script (ContractId GroupInvite)
 createInvite owner provider groupKey = do
   group <- getGroup owner groupKey
-  exerciseSplitwellInstall owner provider SplitwellInstall_CreateInvite with ..
+  exerciseSplitwellRules owner provider SplitwellRules_CreateInvite with user = owner.primaryParty, ..
 
 acceptInvite : CCUser -> CCUser -> Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
 acceptInvite invitee provider groupOwner inviteCid = do
   -- No explicit disclosure support in Daml script so we do readAs as the group owner.
-  exerciseSplitwellInstall' invitee provider [groupOwner] (SplitwellInstall_AcceptInvite inviteCid)
+  exerciseSplitwellRules' invitee provider [groupOwner] $ SplitwellRules_AcceptInvite with
+    cid = inviteCid
+    user = invitee.primaryParty
 
 joinAllInvites : CCUser -> CCUser -> Script ()
 joinAllInvites owner provider = do
   acceptedInvites <- queryFilter @AcceptedGroupInvite owner.primaryParty (\c -> c.groupKey.owner == owner.primaryParty)
   forA_ acceptedInvites $ \(cid, invite) -> do
     group <- getGroup owner (groupKey invite)
-    exerciseSplitwellInstall owner provider (SplitwellInstall_Join group cid)
+    exerciseSplitwellRules owner provider $ SplitwellRules_Join with
+      group
+      cid
+      user = owner.primaryParty
 
 net : CCUser -> CCUser -> GroupKey -> Map Party (Map Party Decimal) -> Script (ContractId BalanceUpdate)
 net owner provider groupKey balanceChanges = do
   group <- getGroup owner groupKey
-  exerciseSplitwellInstall owner provider SplitwellInstall_Net with ..
+  exerciseSplitwellRules owner provider SplitwellRules_Net with
+    user = owner.primaryParty
+    ..
 
 
 -- | Query all balances for the current party in the given group.
@@ -104,12 +112,12 @@ queryBalances p k = do
 enterPayment : CCUser -> CCUser -> GroupKey -> Decimal -> Text -> Script ()
 enterPayment payer provider groupKey amount description = do
   group <- getGroup payer groupKey
-  void $ exerciseSplitwellInstall payer provider SplitwellInstall_EnterPayment with ..
+  void $ exerciseSplitwellRules payer provider $ SplitwellRules_EnterPayment with user = payer.primaryParty, ..
 
 initiateTransfer : CCUser -> CCUser -> GroupKey -> [ReceiverCCAmount] -> Script (ContractId AppPaymentRequest)
 initiateTransfer sender provider groupKey receiverAmounts = do
   group <- getGroup sender groupKey
-  exerciseSplitwellInstall sender provider SplitwellInstall_InitiateTransfer with ..
+  exerciseSplitwellRules sender provider SplitwellRules_InitiateTransfer with user = sender.primaryParty, ..
 
 completeTransfer : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
 completeTransfer app provider acceptedPaymentCid = do
@@ -117,8 +125,8 @@ completeTransfer app provider acceptedPaymentCid = do
   Some AcceptedAppPayment{deliveryOffer} <- queryContractId provider.primaryParty acceptedPaymentCid
   void $ submitUser provider.userId $ exerciseCmd (fromInterfaceContractId @TransferInProgress deliveryOffer) TransferInProgress_CompleteTransfer with ..
 
-testProviderHosted : Script ()
-testProviderHosted = script do
+test : Script ()
+test = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runNextIssuance app
   runCoinDepositBots app
@@ -126,39 +134,33 @@ testProviderHosted = script do
   featureApp app provider1
 
   testCase app Parties with
-    getProvider = const provider1
+    provider = provider1
     getValidator = const provider1Validator.primaryParty
     ..
 
 -- | Parties used in the test.
--- You can run this in a setting where the provider hosts the app UI.
--- In that case, the provider party points to the party hosting the app UI.
--- However, you can also self-host the UI. In that case the provider party points
--- to the user.
 data Parties = Parties
   with
     alice : CCUser
     bob : CCUser
     charlie : CCUser
-    getProvider : CCUser -> CCUser
+    provider : CCUser
     getValidator : CCUser -> Party
 
 testCase : CCApp -> Parties -> Script ()
 testCase app Parties{..} = do
-  createInstall alice (getProvider alice)
-  createInstall bob (getProvider bob)
-  createInstall charlie (getProvider charlie)
+  createSplitwellRules provider
 
-  groupRequestCid <- requestGroup app alice (getProvider alice) "group0"
-  submit (getProvider alice).primaryParty $ exerciseCmd groupRequestCid GroupRequest_Accept
-  let groupKey = GroupKey alice.primaryParty (getProvider alice).primaryParty (GroupId "group0")
-  groupInviteCid <- createInvite alice (getProvider alice) groupKey
+  groupRequestCid <- requestGroup app alice provider "group0"
+  submit provider.primaryParty $ exerciseCmd groupRequestCid GroupRequest_Accept
+  let groupKey = GroupKey alice.primaryParty provider.primaryParty (GroupId "group0")
+  groupInviteCid <- createInvite alice provider groupKey
 
-  acceptInvite bob (getProvider bob) alice.primaryParty groupInviteCid
-  joinAllInvites alice (getProvider alice)
+  acceptInvite bob provider alice.primaryParty groupInviteCid
+  joinAllInvites alice provider
 
-  acceptInvite charlie (getProvider charlie) alice.primaryParty groupInviteCid
-  joinAllInvites alice (getProvider alice)
+  acceptInvite charlie provider alice.primaryParty groupInviteCid
+  joinAllInvites alice provider
 
   Some group <- queryContractId alice.primaryParty =<< getGroup alice groupKey
   sort group.members === [bob.primaryParty, charlie.primaryParty]
@@ -170,7 +172,7 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (getGroupKey group)
   balance === M.empty
 
-  enterPayment alice (getProvider alice) (getGroupKey group) 63.0 "foo"
+  enterPayment alice provider (getGroupKey group) 63.0 "foo"
 
   balance <- queryBalances alice (getGroupKey group)
   balance === M.fromList [(bob.primaryParty, 21.0), (charlie.primaryParty, 21.0)]
@@ -179,7 +181,7 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (getGroupKey group)
   balance === M.fromList [(alice.primaryParty, -21.0)]
 
-  enterPayment bob (getProvider bob) (getGroupKey group) 33.0 "foo"
+  enterPayment bob provider (getGroupKey group) 33.0 "foo"
   balance <- queryBalances alice (getGroupKey group)
   balance === M.fromList [(bob.primaryParty, 10.0), (charlie.primaryParty, 21.0)]
   balance <- queryBalances bob (getGroupKey group)
@@ -187,11 +189,11 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (getGroupKey group)
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
-  request <- initiateTransfer alice (getProvider alice) (getGroupKey group) [ReceiverCCAmount bob.primaryParty 8.0]
+  request <- initiateTransfer alice provider (getGroupKey group) [ReceiverCCAmount bob.primaryParty 8.0]
   coin <- tap app alice 63.0
   receipt <- acceptPaymentRequest app alice (getValidator alice) None request coin
 
-  completeTransfer app (getProvider alice) receipt
+  completeTransfer app provider receipt
 
   balance <- queryBalances alice (getGroupKey group)
   balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, 21.0)]
@@ -200,13 +202,13 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (getGroupKey group)
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
-  request <- initiateTransfer charlie (getProvider charlie) (getGroupKey group) [
+  request <- initiateTransfer charlie provider (getGroupKey group) [
       ReceiverCCAmount alice.primaryParty 39.0,
       ReceiverCCAmount bob.primaryParty 11.0
     ]
   coin <- tap app charlie 55.0
   receipt <- acceptPaymentRequest app charlie (getValidator charlie) None request coin
-  completeTransfer app (getProvider charlie) receipt
+  completeTransfer app provider receipt
 
   balance <- queryBalances alice (getGroupKey group)
   balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, -18.0)]
@@ -215,7 +217,7 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (getGroupKey group)
   balance === M.fromList [(alice.primaryParty, 18.0)]
 
-  net alice (getProvider alice) (getGroupKey group) $ M.fromList
+  net alice provider (getGroupKey group) $ M.fromList
     [ (alice.primaryParty, M.fromList [(bob.primaryParty, -18.0), (charlie.primaryParty, 18.0)])
     , (bob.primaryParty, M.fromList [(alice.primaryParty, 18.0), (charlie.primaryParty, -18.0)])
     , (charlie.primaryParty, M.fromList [(alice.primaryParty, -18.0), (bob.primaryParty, 18.0)])

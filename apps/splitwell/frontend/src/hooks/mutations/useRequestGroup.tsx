@@ -1,7 +1,7 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
+import { Contract } from 'common-frontend';
 
-import { SplitwellInstall } from '@daml.js/splitwell/lib/CN/Splitwell';
-import { ContractId } from '@daml/types';
+import { SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
 
 import { useSplitwellLedgerApiClient } from '../../contexts/SplitwellLedgerApiContext';
 
@@ -10,12 +10,12 @@ export const useRequestGroup = (
   provider: string,
   svc: string,
   domainId: string,
-  install: ContractId<SplitwellInstall>
+  rules: Contract<SplitwellRules>
 ): UseMutationResult<void, unknown, string> => {
   const ledgerApiClient = useSplitwellLedgerApiClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      await ledgerApiClient.requestGroup(party, provider, svc, id, domainId, install);
+      await ledgerApiClient.requestGroup(party, provider, svc, id, domainId, rules);
     },
   });
 };

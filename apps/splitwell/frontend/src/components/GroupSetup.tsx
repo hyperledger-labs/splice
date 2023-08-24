@@ -3,26 +3,25 @@ import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
 
-import { GroupInvite, SplitwellInstall } from '@daml.js/splitwell/lib/CN/Splitwell';
-import { ContractId } from '@daml/types';
+import { GroupInvite, SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
 
 import { useGroupInvites, useJoinGroup, useRequestGroup } from '../hooks';
-import { SplitwellInstalls } from '../utils/installs';
+import { SplitwellRulesMap } from '../utils/installs';
 
 interface GroupSetupProps {
   svc: string;
   provider: string;
   party: string;
   domainId: string;
-  newGroupInstall: ContractId<SplitwellInstall>;
-  installs: SplitwellInstalls;
+  newGroupRules: Contract<SplitwellRules>;
+  rulesMap: SplitwellRulesMap;
 }
 
 type GroupInviteInput = { originalText: string } & (
   | {
       type: 'good';
       inviteContract: AssignedContract<GroupInvite>;
-      install: ContractId<SplitwellInstall>;
+      rules: Contract<SplitwellRules>;
     }
   | { type: 'noparse'; failure: string }
   | { type: 'noinstall'; domainId: string }
@@ -33,8 +32,8 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
   provider,
   svc,
   domainId,
-  newGroupInstall,
-  installs,
+  newGroupRules,
+  rulesMap,
 }) => {
   const [groupId, setGroupId] = useState<string>('');
   const [groupInvite, setGroupInvite] = useState<GroupInviteInput>({
@@ -42,7 +41,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     failure: 'empty invite text field',
     originalText: '',
   });
-  const requestGroup = useRequestGroup(party, provider, svc, domainId, newGroupInstall);
+  const requestGroup = useRequestGroup(party, provider, svc, domainId, newGroupRules);
   const onCreateGroup = async () => {
     await requestGroup.mutate(groupId);
   };
@@ -55,14 +54,14 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
         const decodedInvite = JSON.parse(rawValue);
         const inviteContract = Contract.decodeOpenAPI(decodedInvite, GroupInvite);
         const inviteDomainId = (decodedInvite as { domainId: string }).domainId;
-        const inviteInstall = installs.get(inviteDomainId);
+        const inviteRules = rulesMap.get(inviteDomainId);
         setGroupInvite({
           originalText: rawValue,
-          ...(inviteInstall
+          ...(inviteRules
             ? {
                 type: 'good',
                 inviteContract: { contract: inviteContract, domainId: inviteDomainId },
-                install: inviteInstall,
+                rules: inviteRules,
               }
             : { type: 'noinstall', domainId: inviteDomainId }),
         });
@@ -74,7 +73,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
         }
       }
     },
-    [installs, setGroupInvite]
+    [rulesMap, setGroupInvite]
   );
 
   const joinGroup = useJoinGroup();
@@ -84,13 +83,13 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     if (groupInvite.type === 'good') {
       const {
         inviteContract: { contract: inviteContract, domainId: inviteDomainId },
-        install: inviteInstall,
+        rules: inviteRules,
       } = groupInvite;
       joinGroup.mutate({
         party,
         provider,
         inviteContract,
-        installContractId: inviteInstall,
+        rules: inviteRules,
         inviteDomainId,
       });
     }

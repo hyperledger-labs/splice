@@ -125,6 +125,28 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
       c => c.payload.user == user.toProtoPrimitive,
     )
 
+  def listSplitwellRules()(implicit traceContext: TraceContext): Future[Seq[
+    AssignedContract[
+      splitwellCodegen.SplitwellRules.ContractId,
+      splitwellCodegen.SplitwellRules,
+    ]
+  ]] =
+    multiDomainAcsStore.filterAssignedContracts(
+      splitwellCodegen.SplitwellRules.COMPANION,
+      _ => true,
+    )
+
+  def lookupSplitwellRules(domainId: DomainId): Future[QueryResult[Option[
+    Contract[
+      splitwellCodegen.SplitwellRules.ContractId,
+      splitwellCodegen.SplitwellRules,
+    ]
+  ]]] =
+    multiDomainAcsStore.findContractOnDomainWithOffset(splitwellCodegen.SplitwellRules.COMPANION)(
+      domainId,
+      (_: Any) => true,
+    )
+
   /** List balance updates that are lagging behind the corresponding group contract meaning the
     * have not yet transferred to the same domain.
     */
@@ -207,6 +229,7 @@ object SplitwellStore {
     MultiDomainAcsStore.SimpleContractFilter(
       providerPartyId,
       Map(
+        mkFilter(splitwellCodegen.SplitwellRules.COMPANION)(co => co.payload.provider == provider),
         mkFilter(splitwellCodegen.SplitwellInstallRequest.COMPANION)(co =>
           co.payload.provider == provider
         ),
