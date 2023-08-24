@@ -78,4 +78,7 @@ protoc-jar: caught exception, retrying: java\.io\.IOException: Cannot run progra
 # daml test output at debug level
 stderr: Finishing shakeRun .*exception: AsyncCancelled
 
+# compiling daml-errors can be safely ignored
+.*compiling.*daml-errors.*
+
 # Make sure to have a trailing newline
