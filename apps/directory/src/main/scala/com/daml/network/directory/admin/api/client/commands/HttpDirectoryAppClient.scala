@@ -44,7 +44,7 @@ object HttpDirectoryAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListEntriesResponse.OK(response) =>
       response.entries
-        .traverse(entry => Contract.fromJson(codegen.DirectoryEntry.COMPANION)(entry))
+        .traverse(entry => Contract.fromHttp(codegen.DirectoryEntry.COMPANION)(entry))
         .leftMap(_.toString)
     }
   }
@@ -66,7 +66,7 @@ object HttpDirectoryAppClient {
     ) = { case http.LookupEntryByPartyResponse.OK(response) =>
       for {
         entry <- Contract
-          .fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
+          .fromHttp(codegen.DirectoryEntry.COMPANION)(response.entry)
           .leftMap(_.toString)
       } yield entry
     }
@@ -89,7 +89,7 @@ object HttpDirectoryAppClient {
     ) = { case http.LookupEntryByNameResponse.OK(response) =>
       for {
         entry <- Contract
-          .fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
+          .fromHttp(codegen.DirectoryEntry.COMPANION)(response.entry)
           .leftMap(_.toString)
       } yield entry
     }

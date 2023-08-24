@@ -154,7 +154,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
       ConsoleCommandResult.fromEither(
         Right(
           httpCommand(
-            HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromJsonV0)
+            HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromHttp)
           ).toEither.fold(err => NodeStatus.Failure(err), success => success)
         )
       )

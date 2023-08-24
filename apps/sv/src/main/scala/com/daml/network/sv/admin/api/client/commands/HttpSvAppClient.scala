@@ -209,11 +209,11 @@ object HttpSvAppClient {
           svPartyId <- Codec.decode(Codec.Party)(svPartyId)
           svcPartyId <- Codec.decode(Codec.Party)(svcPartyId)
           latestMiningRound <- Contract
-            .fromJson(OpenMiningRound.COMPANION)(latestMiningRound)
+            .fromHttp(OpenMiningRound.COMPANION)(latestMiningRound)
             .left
             .map(_.toString)
-          coinRules <- Contract.fromJson(CoinRules.COMPANION)(coinRules).left.map(_.toString)
-          svcRules <- Contract.fromJson(SvcRules.COMPANION)(svcRules).left.map(_.toString)
+          coinRules <- Contract.fromHttp(CoinRules.COMPANION)(coinRules).left.map(_.toString)
+          svcRules <- Contract.fromHttp(SvcRules.COMPANION)(svcRules).left.map(_.toString)
         } yield SvcInfo(
           svUser,
           svPartyId,

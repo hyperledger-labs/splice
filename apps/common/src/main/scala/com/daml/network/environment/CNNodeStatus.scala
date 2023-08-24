@@ -55,7 +55,7 @@ case class CNNodeStatus(
       components.map(_.toProtoV0),
     )
 
-  def toJsonV0: jsonV0.Status =
+  def toHttp: jsonV0.Status =
     jsonV0.Status(
       uid.toProtoPrimitive,
       uptime.toString,
@@ -73,10 +73,10 @@ object CNNodeStatus {
       status.ports,
       status.active,
     )
-  def toJsonNodeStatus[S <: NodeStatus.Status](status: NodeStatus[S]): jsonV0.NodeStatus =
+  def toHttpNodeStatus[S <: NodeStatus.Status](status: NodeStatus[S]): jsonV0.NodeStatus =
     status match {
       case NodeStatus.Success(status) =>
-        jsonV0.NodeStatus(success = Some(CNNodeStatus.fromStatus(status).toJsonV0))
+        jsonV0.NodeStatus(success = Some(CNNodeStatus.fromStatus(status).toHttp))
       case NodeStatus.NotInitialized(active) =>
         jsonV0.NodeStatus(
           notInitialized = Some(jsonV0.NotInitialized(active))
@@ -85,7 +85,7 @@ object CNNodeStatus {
         jsonV0.NodeStatus(None, None)
     }
 
-  def fromJsonNodeStatus[S <: NodeStatus.Status](
+  def fromHttpNodeStatus[S <: NodeStatus.Status](
       deserialize: jsonV0.Status => Either[String, S]
   )(status: jsonV0.NodeStatus): Either[String, NodeStatus[S]] =
     status match {
@@ -98,7 +98,7 @@ object CNNodeStatus {
       case _ => Left("Unsuccessful status response")
     }
 
-  def fromJsonV0(json: jsonV0.Status): Either[String, CNNodeStatus] = {
+  def fromHttp(json: jsonV0.Status): Either[String, CNNodeStatus] = {
     for {
       uid <- UniqueIdentifier
         .fromProtoPrimitive(json.id, "Status.id")

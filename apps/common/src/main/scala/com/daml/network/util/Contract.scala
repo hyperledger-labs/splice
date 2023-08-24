@@ -63,7 +63,7 @@ final case class Contract[TCid, T](
             .compactPrint
         )
         .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
-      metadata = ContractMetadataUtil.toJson(metadata),
+      metadata = ContractMetadataUtil.toHttp(metadata),
       createArgumentsBlob = Hex.encodeHexString(createArgumentsBlob.toByteArray),
     )
   }
@@ -121,22 +121,22 @@ object Contract {
       .validateValue(scalaValue.Value.fromJavaProto(v.toProto))
       .valueOr(err => ErrorUtil.internalError(err))
 
-  def fromJson[TCid <: ContractId[T], T <: DamlRecord[?]](
+  def fromHttp[TCid <: ContractId[T], T <: DamlRecord[?]](
       companion: Companion.Template[TCid, T]
   )(contract: http.Contract)(implicit
       decoder: TemplateJsonDecoder
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     val contractId = companion.toContractId(new ContractId[T](contract.contractId))
-    fromJson(companion.TEMPLATE_ID, contractId, decoder.decodeTemplate(companion), contract)
+    fromHttp(companion.TEMPLATE_ID, contractId, decoder.decodeTemplate(companion), contract)
   }
 
-  def fromJson[ICid <: ContractId[Marker], Marker, View <: DamlRecord[?]](
+  def fromHttp[ICid <: ContractId[Marker], Marker, View <: DamlRecord[?]](
       interfaceCompanion: Companion.Interface[ICid, Marker, View]
   )(contract: http.Contract)(implicit
       decoder: TemplateJsonDecoder
   ): Either[ProtoDeserializationError, Contract[ICid, View]] = {
     val contractId = interfaceCompanion.toContractId(new ContractId[Marker](contract.contractId))
-    fromJson(
+    fromHttp(
       interfaceCompanion.TEMPLATE_ID,
       contractId,
       decoder.decodeInterface(interfaceCompanion),
@@ -144,13 +144,13 @@ object Contract {
     )
   }
 
-  private def fromJson[TCid <: ContractId[?], T <: DamlRecord[?]](
+  private def fromHttp[TCid <: ContractId[?], T <: DamlRecord[?]](
       companionTemplateId: Identifier,
       contractId: TCid,
       decodePayload: Json => T,
       contract: http.Contract,
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
-    val metadata = ContractMetadataUtil.fromJson(contract.metadata)
+    val metadata = ContractMetadataUtil.fromHttp(contract.metadata)
     val createArgumentsBlob = protobuf.Any.parseFrom(Hex.decodeHex(contract.createArgumentsBlob))
     for {
       templateId <- LfIdentifier
@@ -162,7 +162,7 @@ object Contract {
         templateId.qualifiedName.module.dottedName,
         templateId.qualifiedName.name.dottedName,
       )
-      result <- fromJson(companionTemplateId, contractId, decodePayload)(
+      result <- fromHttp(companionTemplateId, contractId, decodePayload)(
         javaTemplateId,
         contract.payload,
         metadata,
@@ -171,7 +171,7 @@ object Contract {
     } yield result
   }
 
-  def fromJson[TCid <: ContractId[?], T <: DamlRecord[?]](
+  def fromHttp[TCid <: ContractId[?], T <: DamlRecord[?]](
       companionTemplateId: Identifier,
       contractId: TCid,
       decodePayload: Json => T,
@@ -215,7 +215,7 @@ object Contract {
             "The server indicated that we have cached a certain contract, but we don't have it cached. "
           )
         case Some(contract) =>
-          Contract.fromJson(companion)(contract).leftMap(_.toString)
+          Contract.fromHttp(companion)(contract).leftMap(_.toString)
       }
     } yield res
   }

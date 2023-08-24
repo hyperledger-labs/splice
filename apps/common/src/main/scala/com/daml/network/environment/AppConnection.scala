@@ -132,7 +132,7 @@ abstract class HttpAppConnection(
   def getStatus(): Future[NodeStatus[CNNodeStatus]] =
     runHttpCmd(
       config.url,
-      HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromJsonV0),
+      HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromHttp),
     )
 
   // Fails the future if the node is not active for easy use in waitUntil

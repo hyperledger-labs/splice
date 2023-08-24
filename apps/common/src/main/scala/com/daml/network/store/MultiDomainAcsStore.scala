@@ -516,7 +516,7 @@ object MultiDomainAcsStore {
       )(implicit
           decoder: TemplateJsonDecoder
       ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
-        Contract.fromJson(typeId(companion), cId, decoder.decodeTemplate(companion))(
+        Contract.fromHttp(typeId(companion), cId, decoder.decodeTemplate(companion))(
           templateId,
           payload,
           metadata,
@@ -554,7 +554,7 @@ object MultiDomainAcsStore {
       )(implicit
           decoder: TemplateJsonDecoder
       ): Either[ProtoDeserializationError, Contract[Id, View]] = {
-        Contract.fromJson(typeId(companion), cId, decoder.decodeInterface(companion))(
+        Contract.fromHttp(typeId(companion), cId, decoder.decodeInterface(companion))(
           templateId,
           payload,
           metadata,

@@ -42,7 +42,7 @@ object HttpAdminAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case externalHttp.GetHealthStatusResponse.OK(response) =>
-      CNNodeStatus.fromJsonNodeStatus(deserialize)(response)
+      CNNodeStatus.fromHttpNodeStatus(deserialize)(response)
     }
   }
 

@@ -42,7 +42,7 @@ object AcsStoreDump {
       templateId.qualifiedName,
     )
     val fixedContract = contract.copy(templateId = fixedTemplateId.toString())
-    Contract.fromJson(companion)(fixedContract)
+    Contract.fromHttp(companion)(fixedContract)
   }
 
   def extractOpenMiningRounds(

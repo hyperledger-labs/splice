@@ -180,7 +180,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
       }
 
       val coinContracts = contracts.collect(
-        Function.unlift(ev => Contract.fromJson(cc.coin.Coin.COMPANION)(ev).toOption)
+        Function.unlift(ev => Contract.fromHttp(cc.coin.Coin.COMPANION)(ev).toOption)
       )
       clue("check that the coins we tapped are present in the dump") {
         coinContracts.filter(co =>
@@ -196,7 +196,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
           companion: Companion.Template[TCid, T]
       ) = {
         val extractedContracts = contracts.collect(
-          Function.unlift(ev => Contract.fromJson(companion)(ev).toOption)
+          Function.unlift(ev => Contract.fromHttp(companion)(ev).toOption)
         )
         clue(s"check that at least one ${companion.TEMPLATE_ID} contract is present")(
           extractedContracts should not be empty
@@ -227,7 +227,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
 
       clue("check that the open rounds are present") {
         val openRounds = dump.contracts.collect(
-          Function.unlift(ev => Contract.fromJson(cc.round.OpenMiningRound.COMPANION)(ev).toOption)
+          Function.unlift(ev => Contract.fromHttp(cc.round.OpenMiningRound.COMPANION)(ev).toOption)
         )
         inside(openRounds) { _ =>
           openRounds.map(_.payload.round.number).sorted.toSeq shouldBe Seq(1, 2, 3)

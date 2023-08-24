@@ -44,7 +44,7 @@ object HttpSplitwellAppClient {
       case http.ListGroupsResponse.OK(response) =>
         response.groups
           .traverse {
-            contractWithStateFromJson(Contract.fromJson(splitwellCodegen.Group.COMPANION))
+            contractWithStateFromJson(Contract.fromHttp(splitwellCodegen.Group.COMPANION))
           }
           .leftMap(_.toString)
     }
@@ -80,7 +80,7 @@ object HttpSplitwellAppClient {
       case http.ListGroupInvitesResponse.OK(response) =>
         response.groupInvites
           .traverse(
-            contractWithStateFromJson(Contract.fromJson(splitwellCodegen.GroupInvite.COMPANION))
+            contractWithStateFromJson(Contract.fromHttp(splitwellCodegen.GroupInvite.COMPANION))
           )
           .leftMap(_.toString)
     }
@@ -105,7 +105,7 @@ object HttpSplitwellAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListAcceptedGroupInvitesResponse.OK(response) =>
         response.acceptedGroupInvites
-          .traverse(Contract.fromJson(splitwellCodegen.AcceptedGroupInvite.COMPANION)(_))
+          .traverse(Contract.fromHttp(splitwellCodegen.AcceptedGroupInvite.COMPANION)(_))
           .leftMap(_.toString)
     }
   }
@@ -125,7 +125,7 @@ object HttpSplitwellAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListBalanceUpdatesResponse.OK(response) =>
         response.balanceUpdates
-          .traverse(Contract.fromJson(splitwellCodegen.BalanceUpdate.COMPANION)(_))
+          .traverse(Contract.fromHttp(splitwellCodegen.BalanceUpdate.COMPANION)(_))
           .leftMap(_.toString)
     }
   }

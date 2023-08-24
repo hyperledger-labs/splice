@@ -113,7 +113,7 @@ class HttpAppManagerHandler(
     withNewTrace(workflowId) { implicit tc => _ =>
       store
         .listInstalledApps()
-        .map(apps => definitions.ListInstalledAppsResponse(apps.map(_.toJson).toVector))
+        .map(apps => definitions.ListInstalledAppsResponse(apps.map(_.toHttp).toVector))
     }
 
   def listRegisteredApps(
@@ -126,7 +126,7 @@ class HttpAppManagerHandler(
         .listRegisteredApps()
         .map(apps =>
           definitions.ListRegisteredAppsResponse(
-            apps.map(_.toJson(config.appManagerApiUrl)).toVector
+            apps.map(_.toHttp(config.appManagerApiUrl)).toVector
           )
         )
     }

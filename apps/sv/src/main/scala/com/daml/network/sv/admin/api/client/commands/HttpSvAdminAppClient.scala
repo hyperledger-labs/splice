@@ -57,7 +57,7 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListOngoingValidatorOnboardingsResponse.OK(response) =>
       response.ongoingValidatorOnboardings
-        .traverse(req => Contract.fromJson(ValidatorOnboarding.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(ValidatorOnboarding.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -120,7 +120,7 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListCoinPriceVotesResponse.OK(response) =>
       response.coinPriceVotes
-        .traverse(req => Contract.fromJson(CoinPriceVote.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(CoinPriceVote.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -161,7 +161,7 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListOpenMiningRoundsResponse.OK(response) =>
       response.openMiningRounds
-        .traverse(req => Contract.fromJson(OpenMiningRound.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(OpenMiningRound.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -226,7 +226,7 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListSvcRulesVoteRequestsResponse.OK(response) =>
       response.svcRulesVoteRequests
-        .traverse(req => Contract.fromJson(VoteRequest.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(VoteRequest.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -298,7 +298,7 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.BatchListVotesByVoteRequestsResponse.OK(response) =>
       response.svcRulesVotes
-        .traverse(req => Contract.fromJson(Vote.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(Vote.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -347,7 +347,7 @@ object HttpSvAdminAppClient {
       http.GetSequencerNodeStatusResponse,
       Either[String, NodeStatus[CNNodeStatus]],
     ] = { case http.GetSequencerNodeStatusResponse.OK(response) =>
-      CNNodeStatus.fromJsonNodeStatus(CNNodeStatus.fromJsonV0)(response)
+      CNNodeStatus.fromHttpNodeStatus(CNNodeStatus.fromHttp)(response)
     }
   }
 
@@ -371,7 +371,7 @@ object HttpSvAdminAppClient {
       http.GetMediatorNodeStatusResponse,
       Either[String, NodeStatus[CNNodeStatus]],
     ] = { case http.GetMediatorNodeStatusResponse.OK(response) =>
-      CNNodeStatus.fromJsonNodeStatus(CNNodeStatus.fromJsonV0)(response)
+      CNNodeStatus.fromHttpNodeStatus(CNNodeStatus.fromHttp)(response)
     }
   }
 

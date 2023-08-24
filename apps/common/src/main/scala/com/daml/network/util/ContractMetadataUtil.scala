@@ -17,7 +17,7 @@ object ContractMetadataUtil {
   def instantToMicros(i: Instant) =
     TimeUnit.SECONDS.toMicros(i.getEpochSecond) + TimeUnit.NANOSECONDS.toMicros(i.getNano.toLong)
 
-  def toJson(contractMetadata: ContractMetadata): http.ContractMetadata = {
+  def toHttp(contractMetadata: ContractMetadata): http.ContractMetadata = {
 
     val res = http.ContractMetadata(
       createdAt = Timestamp.assertFromInstant(contractMetadata.createdAt).toString,
@@ -28,7 +28,7 @@ object ContractMetadataUtil {
     res
   }
 
-  def fromJson(metadata: http.ContractMetadata): ContractMetadata = {
+  def fromHttp(metadata: http.ContractMetadata): ContractMetadata = {
     // For backwards compatibility (required for ACS dumps) we also support an
     // older format where createdAt stores the micros since unix epoch and
     // driverMetadata is base16 encoded.

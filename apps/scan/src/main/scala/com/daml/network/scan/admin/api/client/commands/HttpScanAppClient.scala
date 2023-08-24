@@ -259,7 +259,7 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.GetClosedRoundsResponse.OK(response) =>
       response.rounds
-        .traverse(round => Contract.fromJson(roundCodegen.ClosedMiningRound.COMPANION)(round))
+        .traverse(round => Contract.fromHttp(roundCodegen.ClosedMiningRound.COMPANION)(round))
         .leftMap(_.toString)
     }
   }
@@ -280,7 +280,7 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListFeaturedAppRightsResponse.OK(response) =>
       response.featuredApps
-        .traverse(co => Contract.fromJson(FeaturedAppRight.COMPANION)(co))
+        .traverse(co => Contract.fromHttp(FeaturedAppRight.COMPANION)(co))
         .leftMap(_.toString)
     }
   }
@@ -301,7 +301,7 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.LookupFeaturedAppRightResponse.OK(response) =>
       response.featuredAppRight
-        .traverse(co => Contract.fromJson(FeaturedAppRight.COMPANION)(co))
+        .traverse(co => Contract.fromHttp(FeaturedAppRight.COMPANION)(co))
         .leftMap(_.toString)
     }
   }

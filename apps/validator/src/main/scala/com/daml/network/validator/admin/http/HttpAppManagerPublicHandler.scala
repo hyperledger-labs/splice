@@ -111,7 +111,7 @@ class HttpAppManagerPublicHandler(
       extracted: Unit
   ): Future[v0.AppManagerPublicResource.GetLatestAppConfigurationResponse] =
     withNewTrace(workflowId) { implicit tc => _ =>
-      store.getLatestAppConfiguration(PartyId.tryFromProtoPrimitive(provider)).map(_.toJson)
+      store.getLatestAppConfiguration(PartyId.tryFromProtoPrimitive(provider)).map(_.toHttp)
     }
 
   def getAppRelease(respond: v0.AppManagerPublicResource.GetAppReleaseResponse.type)(
@@ -119,7 +119,7 @@ class HttpAppManagerPublicHandler(
       version: String,
   )(extracted: Unit): Future[v0.AppManagerPublicResource.GetAppReleaseResponse] =
     withNewTrace(workflowId) { implicit tc => _ =>
-      store.getAppRelease(PartyId.tryFromProtoPrimitive(provider), version).map(_.toJson)
+      store.getAppRelease(PartyId.tryFromProtoPrimitive(provider), version).map(_.toHttp)
     }
 
   // Reverse proxy for JSON API to add CORS headers.

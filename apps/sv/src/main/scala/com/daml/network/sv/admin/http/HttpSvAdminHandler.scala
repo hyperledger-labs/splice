@@ -389,7 +389,7 @@ class HttpSvAdminHandler(
     SvAdminResource.GetSequencerNodeStatusResponse
   ] = withNewTrace(workflowId) { implicit tc => _ =>
     withSequencerConnectionOrNotFound(respond.NotFound)(
-      _.getStatus.map(CNNodeStatus.toJsonNodeStatus(_))
+      _.getStatus.map(CNNodeStatus.toHttpNodeStatus(_))
     )
   }
 
@@ -399,7 +399,7 @@ class HttpSvAdminHandler(
     SvAdminResource.GetMediatorNodeStatusResponse
   ] = withNewTrace(workflowId) { implicit tc => _ =>
     withMediatorConnectionOrNotFound(respond.NotFound)(
-      _.getStatus.map(CNNodeStatus.toJsonNodeStatus(_))
+      _.getStatus.map(CNNodeStatus.toHttpNodeStatus(_))
     )
   }
 

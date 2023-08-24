@@ -104,10 +104,10 @@ object HttpWalletAppClient {
         subscriptionRequest: definitions.SubscriptionRequest
     )(implicit decoder: TemplateJsonDecoder): Either[String, SubscriptionRequest] = {
       (for {
-        main <- Contract.fromJson(subsCodegen.SubscriptionRequest.COMPANION)(
+        main <- Contract.fromHttp(subsCodegen.SubscriptionRequest.COMPANION)(
           subscriptionRequest.subscriptionRequest
         )
-        context <- Contract.fromJson(subsCodegen.SubscriptionContext.INTERFACE)(
+        context <- Contract.fromHttp(subsCodegen.SubscriptionContext.INTERFACE)(
           subscriptionRequest.context
         )
       } yield SubscriptionRequest(main, context)).leftMap(_.toString)
@@ -131,10 +131,10 @@ object HttpWalletAppClient {
     )(implicit decoder: TemplateJsonDecoder): Either[String, AppPaymentRequest] = {
       (for {
         appPaymentRequest <- Contract
-          .fromJson(walletCodegen.AppPaymentRequest.COMPANION)(
+          .fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(
             response.appPaymentRequest
           )
-        deliveryOffer <- Contract.fromJson(walletCodegen.DeliveryOffer.INTERFACE)(
+        deliveryOffer <- Contract.fromHttp(walletCodegen.DeliveryOffer.INTERFACE)(
           response.deliveryOffer
         )
       } yield AppPaymentRequest(appPaymentRequest, deliveryOffer)).leftMap(_.toString)
@@ -203,7 +203,7 @@ object HttpWalletAppClient {
       def decodePositions(position: definitions.CoinPosition) =
         for {
           contract <- Contract
-            .fromJson(coinCodegen.Coin.COMPANION)(position.contract)
+            .fromHttp(coinCodegen.Coin.COMPANION)(position.contract)
             .leftMap(_.toString)
 
           accruedHoldingFee <- Codec.decode(Codec.BigDecimal)(position.accruedHoldingFee)
@@ -220,7 +220,7 @@ object HttpWalletAppClient {
       def decodeLockedPositions(lockedPosition: definitions.CoinPosition) =
         for {
           contract <- Contract
-            .fromJson(coinCodegen.LockedCoin.COMPANION)(lockedPosition.contract)
+            .fromHttp(coinCodegen.LockedCoin.COMPANION)(lockedPosition.contract)
             .leftMap(_.toString)
 
           accruedHoldingFee <- Codec.decode(Codec.BigDecimal)(lockedPosition.accruedHoldingFee)
@@ -398,7 +398,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListAcceptedAppPaymentsResponse.OK(response) =>
       response.acceptedAppPayments
-        .traverse(req => Contract.fromJson(walletCodegen.AcceptedAppPayment.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(walletCodegen.AcceptedAppPayment.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -444,7 +444,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListSubscriptionInitialPaymentsResponse.OK(response) =>
       response.initialPayments
-        .traverse(req => Contract.fromJson(subsCodegen.SubscriptionInitialPayment.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(subsCodegen.SubscriptionInitialPayment.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -467,19 +467,19 @@ object HttpWalletAppClient {
         .traverse(sub =>
           for {
             main <- Contract
-              .fromJson(subsCodegen.Subscription.COMPANION)(sub.subscription)
+              .fromHttp(subsCodegen.Subscription.COMPANION)(sub.subscription)
               .leftMap(_.toString)
             context <- Contract
-              .fromJson(subsCodegen.SubscriptionContext.INTERFACE)(sub.context)
+              .fromHttp(subsCodegen.SubscriptionContext.INTERFACE)(sub.context)
               .leftMap(_.toString)
             state <- (sub.state match {
               case SubscriptionStateContract(SubscriptionStateIdleContract(contract)) =>
                 Contract
-                  .fromJson(subsCodegen.SubscriptionIdleState.COMPANION)(contract)
+                  .fromHttp(subsCodegen.SubscriptionIdleState.COMPANION)(contract)
                   .map(SubscriptionIdleState)
               case SubscriptionStateContract(SubscriptionStatePaymentContract(contract)) =>
                 Contract
-                  .fromJson(subsCodegen.SubscriptionPayment.COMPANION)(contract)
+                  .fromHttp(subsCodegen.SubscriptionPayment.COMPANION)(contract)
                   .map(SubscriptionPayment)
               case other =>
                 Left(
@@ -648,7 +648,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case externalHttp.ListTransferOffersResponse.OK(response) =>
       response.offers
-        .traverse(req => Contract.fromJson(transferOfferCodegen.TransferOffer.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(transferOfferCodegen.TransferOffer.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -693,7 +693,7 @@ object HttpWalletAppClient {
     ) = { case http.ListAcceptedTransferOffersResponse.OK(response) =>
       response.acceptedOffers
         .traverse(req =>
-          Contract.fromJson(transferOfferCodegen.AcceptedTransferOffer.COMPANION)(req)
+          Contract.fromHttp(transferOfferCodegen.AcceptedTransferOffer.COMPANION)(req)
         )
         .leftMap(_.toString)
     }
@@ -754,7 +754,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListAppRewardCouponsResponse.OK(response) =>
       response.appRewardCoupons
-        .traverse(req => Contract.fromJson(coinCodegen.AppRewardCoupon.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(coinCodegen.AppRewardCoupon.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -776,7 +776,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListValidatorRewardCouponsResponse.OK(response) =>
       response.validatorRewardCoupons
-        .traverse(req => Contract.fromJson(coinCodegen.ValidatorRewardCoupon.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(coinCodegen.ValidatorRewardCoupon.COMPANION)(req))
         .leftMap(_.toString)
     }
   }

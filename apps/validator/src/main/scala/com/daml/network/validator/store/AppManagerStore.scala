@@ -297,21 +297,21 @@ object AppManagerStore {
     PrettyUtil.adHocPrettyInstance
 
   final case class AppRelease(provider: PartyId, release: definitions.AppRelease) {
-    def toJson: definitions.AppRelease = release
+    def toHttp: definitions.AppRelease = release
   }
 
   final case class AppConfiguration(
       provider: PartyId,
       configuration: definitions.AppConfiguration,
   ) {
-    def toJson: definitions.AppConfiguration = configuration
+    def toHttp: definitions.AppConfiguration = configuration
   }
 
   final case class RegisteredApp(
       provider: PartyId,
       configuration: definitions.AppConfiguration,
   ) {
-    def toJson(appManagerApiUrl: Uri): definitions.RegisteredApp =
+    def toHttp(appManagerApiUrl: Uri): definitions.RegisteredApp =
       definitions.RegisteredApp(
         provider.toProtoPrimitive,
         appManagerApiUrl
@@ -329,7 +329,7 @@ object AppManagerStore {
       latestConfiguration: definitions.AppConfiguration,
       approvedReleaseConfigurations: Seq[definitions.ReleaseConfiguration],
   ) extends PrettyPrinting {
-    def toJson: definitions.InstalledApp = definitions.InstalledApp(
+    def toHttp: definitions.InstalledApp = definitions.InstalledApp(
       provider = provider.toProtoPrimitive,
       latestConfiguration = latestConfiguration,
       approvedReleaseConfigurations = approvedReleaseConfigurations.toVector,
