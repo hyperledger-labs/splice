@@ -599,7 +599,7 @@ testBuyMemberTraffic = script do
   -- test that buying less extra traffic than the configured min topup amount fails
   let minTopupAmount = globalDomainConfig.fees.minTopupAmount
   outcome <- executeCoinOperation app aliceValidator $
-    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId domainId aliceValidator.primaryParty (minutes 1) (Some topupStateCid)
+    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId domainId (minutes 1) (Some topupStateCid)
   let errorMsg = "The requirement 'trafficAmount " <> show (minTopupAmount-1) <> " is at least as much as the configured minTopupAmount " <> show minTopupAmount <> "' was not met."
   outcome === COO_Error (ITR_Other errorMsg)
 
@@ -608,13 +608,13 @@ testBuyMemberTraffic = script do
   invalidTopupStateCid <- submit aliceValidator.primaryParty $
     createCmd (initialValidatorTopUpState aliceValidator.primaryParty testParticipantId invalidDomainId)
   outcome <- executeCoinOperation app aliceValidator $
-    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidDomainId aliceValidator.primaryParty (minutes 1) (Some invalidTopupStateCid)
+    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidDomainId (minutes 1) (Some invalidTopupStateCid)
   outcome === COO_Error (ITR_Other ("The requirement 'Known domain-id' was not met."))
   submit aliceValidator.primaryParty $ archiveCmd invalidTopupStateCid
 
   -- test that creating the initial traffic contract works
   COO_BuyMemberTraffic trafficCid1 <- executeCoinOperation app aliceValidator $
-    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId aliceValidator.primaryParty (minutes 1) (Some topupStateCid)
+    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId (minutes 1) (Some topupStateCid)
 
   -- validate the state of the member traffic contract
   Some traffic1 <- queryContractId @MemberTraffic app.svc trafficCid1
@@ -631,27 +631,27 @@ testBuyMemberTraffic = script do
   topupStateCid2 =/= topupStateCid
   topupState2.lastPurchasedAt === now
 
-  -- check that the app reward coupons were issued to the SVC
+  -- check that the app reward coupons were issued to aliceValidator
   [(coupon1Cid, coupon1)] <- query @AppRewardCoupon app.svc
-  coupon1.provider === app.svc
+  coupon1.provider === aliceValidator.primaryParty
   coupon1.round === openRound.round
 
   -- topping up too soon fails
   outcome <- executeCoinOperation app aliceValidator $
-    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId aliceValidator.primaryParty (minutes 1) (Some topupStateCid2)
+    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId (minutes 1) (Some topupStateCid2)
   outcome === COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met."))
 
   -- once a minute has passed, the same topup succeeds
   passTime (minutes 1)
   COO_BuyMemberTraffic trafficCid2 <- executeCoinOperation app aliceValidator $
-    (CO_BuyMemberTraffic minTopupAmount testParticipantId domainId aliceValidator.primaryParty (minutes 1)) (Some topupStateCid2)
+    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId (minutes 1) (Some topupStateCid2)
   Some traffic2 <- queryContractId @MemberTraffic app.svc trafficCid2
 
   -- check the app reward coupons once more
   [(coupon2Cid, coupon2), (coupon1Cid_, coupon1_)] <- query @AppRewardCoupon app.svc
   (coupon1Cid_, coupon1_) === (coupon1Cid, coupon1_)
   coupon2Cid =/= coupon1Cid
-  coupon2.provider === app.svc
+  coupon2.provider === aliceValidator.primaryParty
   coupon2.round === openRound.round
 
   -- Test that third-party top-ups work
@@ -669,9 +669,9 @@ testBuyMemberTraffic = script do
     validatorParty = provider1Validator.primaryParty
   _ <- tap app provider1Validator 10.0
   
-  -- provider1 purchases extra traffic for the same participant on behalf of alice
+  -- provider1 purchases extra traffic for the same participant
   COO_BuyMemberTraffic providerTrafficCid <- executeCoinOperation app provider1Validator $
-    CO_BuyMemberTraffic (minTopupAmount + 1) testParticipantId domainId alice.primaryParty (minutes 1) None
+    CO_BuyMemberTraffic (minTopupAmount + 1) testParticipantId domainId (minutes 1) None
 
   -- validate the state of the member traffic contract
   Some providerTraffic <- queryContractId @MemberTraffic app.svc providerTrafficCid
@@ -683,7 +683,7 @@ testBuyMemberTraffic = script do
   providerTraffic.ccSpent === ccSpent
   providerTraffic.usdSpent === usdSpent
 
-  -- test that the app reward coupons were issued to the provider and not to the SVC
+  -- check that the app reward coupons were issued to the provider
   [(providerCouponCid, providerCoupon)] <- query @AppRewardCoupon provider1Validator.primaryParty
   providerCouponCid =/= coupon1Cid
   providerCouponCid =/= coupon2Cid

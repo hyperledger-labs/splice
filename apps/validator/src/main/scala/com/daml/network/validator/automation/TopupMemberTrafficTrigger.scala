@@ -124,7 +124,6 @@ class TopupMemberTrafficTrigger(
       topupParameters.topupAmount,
       topupState.payload.memberId,
       topupState.payload.domainId,
-      validator.toProtoPrimitive,
       new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
       Optional.of(topupState.contractId),
     )

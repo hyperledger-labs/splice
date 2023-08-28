@@ -226,7 +226,6 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   )(implicit env: CNNodeTestConsoleEnvironment): CoinOperationOutcome = {
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
-    val buyerParty = validatorParty // for the case of a self top-up
     val domainId =
       DomainId.tryFromString(sv1ScanBackend.getCoinConfigAsOf(ts).globalDomain.activeDomain)
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
@@ -260,7 +259,6 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
           trafficAmount,
           memberId.toProtoPrimitive,
           domainId.toProtoPrimitive,
-          buyerParty.toProtoPrimitive,
           new RelTime(1),
           Optional.of(topupStateCid),
         )

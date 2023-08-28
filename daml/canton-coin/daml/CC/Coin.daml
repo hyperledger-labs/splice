@@ -365,7 +365,6 @@ template CoinRules
       with
         inputs : [API.TransferInput]
         context : API.PaymentTransferContext
-        buyer : Party
         provider : Party
         memberId : Text
         domainId : Text
@@ -383,8 +382,7 @@ template CoinRules
         (trafficCostCc, trafficCostUsd) <- computeDomainFees provider trafficAmount this context
         let transfer = API.Transfer with
               sender = provider
-              -- rewards go to SVC for self top-ups and to the provider for third-party top-ups
-              provider = if (buyer == provider) then svc else provider
+              provider
               inputs
               outputs = [ API.TransferOutput with
                             receiver = svc

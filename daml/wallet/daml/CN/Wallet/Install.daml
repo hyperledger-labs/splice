@@ -46,8 +46,8 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     CO_BuyExtraTraffic extraTraffic trafficCid minTopupInterval -> do
       resultE <- catchAll $ handleBuyExtraTraffic extraTraffic trafficCid minTopupInterval
       handleResult COO_BuyExtraTraffic resultE
-    CO_BuyMemberTraffic trafficAmount memberId domainId buyer minTopupInterval topupStateCid -> do
-      resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId domainId buyer minTopupInterval topupStateCid
+    CO_BuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCid -> do
+      resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCid
       handleResult COO_BuyMemberTraffic resultE
     CO_MergeTransferInputs -> do
         let transfer = mkMergeCoinAndRewardsTransfer endUserP inputs
@@ -120,8 +120,8 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
       exercise coinRulesCid
         (CoinRules_BuyExtraTraffic newInputs context validatorP intentOrTrafficCid extraTraffic)
 
-    handleBuyMemberTraffic: Int -> Text -> Text -> Party -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId API.Coin))
-    handleBuyMemberTraffic trafficAmount memberId domainId buyer minTopupInterval topupStateCidO = do
+    handleBuyMemberTraffic: Int -> Text -> Text -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId API.Coin))
+    handleBuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCidO = do
       now <- getTime
       -- fetch and validate topupState if provided
       topupStateO <- forA topupStateCidO $ \topupStateCid -> do
@@ -158,7 +158,7 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
             pure inputs
       -- purchase extra traffic for given member
       (trafficCid, changeCoin) <- exercise coinRulesCid
-        (CoinRules_BuyMemberTraffic newInputs context buyer validatorP memberId domainId trafficAmount)
+        (CoinRules_BuyMemberTraffic newInputs context validatorP memberId domainId trafficAmount)
       -- update topupState if provided
       forA_ topupStateO $ \(topupStateCid, topupState) -> do
         archive topupStateCid
@@ -201,7 +201,6 @@ data CoinOperation
       trafficAmount : Int
       memberId : Text
       domainId : Text
-      buyer : Party
       minTopupInterval: RelTime
       topupStateCid : Optional (ContractId ValidatorTopUpState)
   | CO_Tap with
