@@ -1098,7 +1098,6 @@ printTests := {
     name.contains("PreflightIntegrationTest") && isNonDevNetTest(name)
   def isPreflightSvIntegrationTest(name: String): Boolean =
     name.contains("PreflightSvIntegrationTest")
-  def isDomainFeesTest(name: String): Boolean = name.contains(".DF")
   def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
 
@@ -1133,16 +1132,6 @@ printTests := {
       "Preflight SV tests",
       "test-full-class-names-preflight-sv.log",
       (t: String) => isPreflightSvIntegrationTest(t),
-    ),
-    (
-      "domain fees enabled tests with wall clock time",
-      "test-full-class-names-domain-fees.log",
-      (t: String) => !isTimeBasedTest(t) && isDomainFeesTest(t),
-    ),
-    (
-      "domain fees enabled tests with sim time",
-      "test-full-class-names-domain-fees-sim-time.log",
-      (t: String) => isTimeBasedTest(t) && isDomainFeesTest(t),
     ),
     (
       "global domain upgrade test",

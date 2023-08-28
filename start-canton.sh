@@ -11,7 +11,6 @@ function usage() {
   echo "  -w               only start canton instance with wall clock time"
   echo "  -s               only start canton instance with simulated time"
   echo "  -f               start canton using the CometBFT driver for the global sequencers"
-  echo "  -t               start canton with traffic control enabled"
   echo "  -g               start extra global upgrade domain"
   echo "  -m               collect metrics and send them to our CI prometheus instance"
   echo "  -c <canton>      start a custom canton binary instead of the one on the PATH"
@@ -23,7 +22,6 @@ wallclocktime=1
 simtime=1
 POSTGRES_MODE=docker
 CANTON=canton
-trafficQoS=0
 globalUpgradeDomain=0
 bootstrapScriptPath=bootstrap-canton.sc
 global_cometbft=0
@@ -59,10 +57,6 @@ while getopts "hdap:c:wsbtfgm" arg; do
     f)
       global_cometbft=1
       echo "start canton with the cometbft driver"
-      ;;
-    t)
-      trafficQoS=1
-      echo "start canton with traffic control enabled"
       ;;
     g)
       globalUpgradeDomain=1
@@ -176,9 +170,11 @@ JAVA_TOOL_OPTIONS="-Xms6g -Xmx6g -Dlogback.configurationFile=./scripts/canton-lo
 
 config_overrides=""
 config_overrides_simtime=""
-if [ $trafficQoS -eq 1 ]; then
-  config_overrides="$config_overrides -c ./apps/app/src/test/resources/domain-fees-overrides.conf"
-fi
+
+# Enable traffic QoS
+config_overrides="$config_overrides -c ./apps/app/src/test/resources/domain-fees-overrides.conf"
+config_overrides_simtime="$config_overrides -c ./apps/app/src/test/resources/domain-fees-overrides.conf"
+
 if [[ $global_cometbft -eq 1 ]]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/cometbft-sequencer-global-domain-overrides.conf"
 fi;

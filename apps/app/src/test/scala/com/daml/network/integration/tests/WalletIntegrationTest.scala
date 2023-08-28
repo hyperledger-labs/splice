@@ -25,7 +25,7 @@ import org.slf4j.event.Level
 import scala.concurrent.Future
 import scala.util.Try
 
-class DFWalletIntegrationTest
+class WalletIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil {

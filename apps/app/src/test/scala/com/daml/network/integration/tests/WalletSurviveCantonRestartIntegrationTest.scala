@@ -15,7 +15,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.concurrent.duration.*
 import scala.util.Using
 
-class DFWalletSurviveCantonRestartIntegrationTest
+class WalletSurviveCantonRestartIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
     with WalletTestUtil {

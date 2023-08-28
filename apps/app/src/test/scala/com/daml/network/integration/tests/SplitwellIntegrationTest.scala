@@ -16,7 +16,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 
-class DFSplitwellIntegrationTest
+class SplitwellIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with SplitwellTestUtil
     with WalletTestUtil {

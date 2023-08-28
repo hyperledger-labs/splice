@@ -21,7 +21,7 @@ import scala.util.Random
 import scala.util.control.NonFatal
 import scala.jdk.CollectionConverters.*
 
-class DFTrafficReservationTimeBasedIntegrationTest
+class TrafficReservationTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
