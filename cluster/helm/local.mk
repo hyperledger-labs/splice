@@ -48,12 +48,15 @@ define DEFINE_PHONY_CHART_RULES =
 prefix := cluster/helm/$(1)
 
 .PHONY: $$(prefix)/helm-build
-$$(prefix)/helm-build: $$(prefix)/values.yaml $$(prefix)/Chart.yaml
+$$(prefix)/helm-build: $$(prefix)/values.yaml $$(prefix)/Chart.yaml $$(prefix)/LICENSE
 	helm package $$(@D) --dependency-update --destination cluster/helm/target
 
 .PHONY: $$(prefix)/helm-clean
 $$(prefix)/helm-clean:
-	rm -vf $$(@D)/values.yaml $$(@D)/Chart.yaml
+	rm -vf $$(@D)/values.yaml $$(@D)/Chart.yaml $$(@D)/LICENSE
+
+$$(prefix)/LICENSE: LICENSE.txt
+	cp LICENSE.txt $$(@D)/LICENSE
 
 endef # end DEFINE_PHONY_CHART_RULES
 
