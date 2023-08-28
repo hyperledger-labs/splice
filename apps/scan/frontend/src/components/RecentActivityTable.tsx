@@ -1,6 +1,7 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
 import { AmountDisplay, TitledTable, Loading, ErrorDisplay } from 'common-frontend';
+import { PartyId } from 'common-frontend';
 import { useRecentActivity } from 'common-frontend/scan-api';
 
 import { TableBody, TableCell, TableHead, TableRow } from '@mui/material';
@@ -48,9 +49,15 @@ const ActivityRow: React.FC<{
   const { amount, provider, receiver, sender, coinPrice } = activity;
   return (
     <TableRow>
-      <TableCell>{provider}</TableCell>
-      <TableCell>{sender}</TableCell>
-      <TableCell>{receiver}</TableCell>
+      <TableCell>
+        <PartyId partyId={provider} />
+      </TableCell>
+      <TableCell>
+        <PartyId partyId={sender} />
+      </TableCell>
+      <TableCell>
+        <PartyId partyId={receiver} />
+      </TableCell>
       <TableCell align="right">
         <AmountDisplay amount={amount} currency="CC" />
       </TableCell>
