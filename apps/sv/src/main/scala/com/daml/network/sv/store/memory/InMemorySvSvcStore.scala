@@ -354,13 +354,25 @@ class InMemorySvSvcStore(
       tc: TraceContext
   ): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] = for {
     domain <- defaultAcsDomainIdF
-    svOnboardings <- multiDomainAcsStore.filterContractsOnDomain(
+    unclaimedRewards <- multiDomainAcsStore.filterContractsOnDomain(
       cc.coin.UnclaimedReward.COMPANION,
       domain,
       (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
       limit = PageLimit(limit),
     )
-  } yield svOnboardings
+  } yield unclaimedRewards
+
+  override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(
+      implicit tc: TraceContext
+  ): Future[Seq[Contract[MemberTraffic.ContractId, MemberTraffic]]] = for {
+    memberTraffics <- multiDomainAcsStore.filterContractsOnDomain(
+      cc.globaldomain.MemberTraffic.COMPANION,
+      domainId,
+      (co: Contract[cc.globaldomain.MemberTraffic.ContractId, cc.globaldomain.MemberTraffic]) =>
+        co.payload.memberId == memberId.toProtoPrimitive && co.payload.domainId == domainId.toProtoPrimitive,
+      PageLimit(limit),
+    )
+  } yield memberTraffics
 
   override def listAllCoinPriceVotes()(implicit
       tc: TraceContext
@@ -421,7 +433,7 @@ class InMemorySvSvcStore(
       )
   }
 
-  // TODO(#7146): Remove once we have completely switched over to MemberTraffic contracts
+  // TODO(#7081): Remove once we have completely switched over to MemberTraffic contracts
   override def listDuplicateValidatorTrafficContracts(
       validator: PartyId,
       domainId: DomainId,

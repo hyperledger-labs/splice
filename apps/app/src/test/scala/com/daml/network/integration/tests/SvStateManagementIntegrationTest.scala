@@ -166,6 +166,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "SV1 create a vote request for a new SvcRules Configuration", {
         val newConfig = new SvcRulesConfig(
           newNumUnclaimedRewardsThreshold,
+          sv1Backend.getSvcInfo().svcRules.payload.config.numMemberTrafficContractsThreshold,
           sv1Backend.getSvcInfo().svcRules.payload.config.actionConfirmationTimeout,
           sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingRequestTimeout,
           sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingConfirmedTimeout,

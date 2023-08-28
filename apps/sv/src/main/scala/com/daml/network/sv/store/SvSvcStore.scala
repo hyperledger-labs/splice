@@ -352,6 +352,12 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       tc: TraceContext
   ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]]
 
+  def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[Contract[cc.globaldomain.MemberTraffic.ContractId, cc.globaldomain.MemberTraffic]]
+  ]
+
   /** List issuing mining rounds past their targetClosesAt */
   def listExpiredIssuingMiningRounds
       : ListExpiredContracts[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound] =
@@ -403,7 +409,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       tc: TraceContext
   ): Future[Long]
 
-  // TODO(#7146): Remove once we have completely switched over to MemberTraffic contracts
+  // TODO(#7081): Remove once we have completely switched over to MemberTraffic contracts
   def listDuplicateValidatorTrafficContracts(
       validator: PartyId,
       domainId: DomainId,

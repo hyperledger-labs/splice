@@ -49,6 +49,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Compute the minimum poll interval used in `eventually` to 10% of the `maxPollInterval`
 * Added `suppressFailedClues` to `BaseTest` trait.
 * Added `logAppVersion()` to `CantonAppDriver` abstract class and replaced canton version log with `logAppVersion()`.
+* Added `tryFromProtoPrimitive` to `Member` trait.
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

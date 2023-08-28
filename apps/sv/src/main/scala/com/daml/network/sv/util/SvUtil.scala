@@ -104,6 +104,7 @@ object SvUtil {
 
   def defaultSvcRulesConfig(): SvcRulesConfig = new SvcRulesConfig(
     10, // numUnclaimedRewardsThreshold
+    5, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
     new RelTime(TimeUnit.MINUTES.toMicros(5)), // actionConfirmationTimeout
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingRequestTimeout
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingConfirmedTimeout

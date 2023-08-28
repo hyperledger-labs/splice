@@ -6,7 +6,7 @@ import Prelude hiding (forA)
 import DA.Action (void, foldlA)
 import DA.Exception
 import DA.Foldable (forA_)
-import DA.List (dedupSort, dedup)
+import DA.List (dedupSort)
 import DA.Map (Map)
 import qualified DA.Map as Map
 import DA.Set (Set)
@@ -413,7 +413,7 @@ template CoinRules
         requireUnlocked lock
 
         -- fetch, validate and archive all given contracts
-        let firstCid::remainingCids = (dedup trafficCids)
+        let firstCid::remainingCids = trafficCids
         first <- fetch firstCid
         archive firstCid
         require "SVC matches" (first.svc == svc)

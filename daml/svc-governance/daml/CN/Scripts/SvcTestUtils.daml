@@ -55,6 +55,7 @@ initCollective initialOpenRounds isDevNet = do
 
   let config = SvcRulesConfig with
         numUnclaimedRewardsThreshold = 5
+        numMemberTrafficContractsThreshold = 5
         actionConfirmationTimeout = minutes 5
         svOnboardingRequestTimeout = hours 1
         svOnboardingConfirmedTimeout = hours 1

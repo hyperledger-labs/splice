@@ -17,7 +17,7 @@ import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
 import CN.Wallet.Subscriptions
-import CC.GlobalDomain (initialValidatorTraffic, ValidatorTraffic, initialMemberTraffic)
+import CC.GlobalDomain (initialValidatorTraffic, ValidatorTraffic, initialMemberTraffic, MemberTraffic)
 
 import qualified CN.CometBft as CometBft
 import CN.Cns
@@ -242,6 +242,7 @@ data VoteResult = VoteResult with
 
 data SvcRulesConfig = SvcRulesConfig with
     numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
+    numMemberTrafficContractsThreshold : Int -- ^ The minimum number of member traffic contracts required for merging
     actionConfirmationTimeout : RelTime -- ^ The TTL for contracts representing a confirmation
     svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
     svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing a SV confirmation
@@ -990,6 +991,7 @@ template SvcRules with
         archive staleConfirmationCid
 
 
+    -- TODO(#7081) - Remove this choice once we've switched over entirely to MemberTraffic contracts
     -- Cleaning up duplicate validator traffic contracts
     ----------------------------------------------------
 
@@ -1003,6 +1005,18 @@ template SvcRules with
         requireUnlocked lock
         exercise coinRulesCid CoinRules_ArchiveDuplicateValidatorTrafficContracts with ..
 
+    -- Batch merge of member traffic contracts
+    -------------------------------------------
+    nonconsuming choice SvcRules_MergeMemberTrafficContracts
+      : ContractId MemberTraffic
+      with
+        coinRulesCid : ContractId CoinRules
+        trafficCids : [ContractId MemberTraffic]
+      controller leader
+      do
+        requireUnlocked lock
+        require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
+        exercise coinRulesCid CoinRules_MergeMemberTrafficContracts with ..
 
     -- Lock or Unlock Choices that could be observed by SVC
     -------------------------------------------------------

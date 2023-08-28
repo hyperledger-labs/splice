@@ -153,6 +153,7 @@ class SvTimeBasedOnboardingIntegrationTest
           "sv1 creates a new vote request", {
             val newConfig = new SvcRulesConfig(
               sv1Backend.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold,
+              sv1Backend.getSvcInfo().svcRules.payload.config.numMemberTrafficContractsThreshold,
               sv1Backend.getSvcInfo().svcRules.payload.config.actionConfirmationTimeout,
               sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingRequestTimeout,
               sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingConfirmedTimeout,

@@ -7,6 +7,7 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.automation.TransferFollowTrigger
 import TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cc.coin.*
+import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
@@ -211,6 +212,10 @@ class DbSvSvcStore(
       tc: TraceContext
   ): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] = ???
 
+  override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(
+      implicit tc: TraceContext
+  ): Future[Seq[Contract[MemberTraffic.ContractId, MemberTraffic]]] = ???
+
   override def listAllCoinPriceVotes()(implicit
       tc: TraceContext
   ): Future[Seq[Contract[CoinPriceVote.ContractId, CoinPriceVote]]] = ???
@@ -235,7 +240,7 @@ class DbSvSvcStore(
       tc: TraceContext
   ): Future[Long] = ???
 
-  // TODO(#7146): Remove once we have completely switched over to MemberTraffic contracts
+  // TODO(#7081): Remove once we have completely switched over to MemberTraffic contracts
   override def listDuplicateValidatorTrafficContracts(
       validator: PartyId,
       domainId: DomainId,

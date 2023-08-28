@@ -157,6 +157,12 @@ object Member {
         )
     }
 
+  def tryFromProtoPrimitive(str: String): Member =
+    fromProtoPrimitive(str, "").fold(
+      err => throw new IllegalArgumentException(err.message),
+      identity,
+    )
+
   // Use the same ordering as for what we use in the database
   implicit val memberOrdering: Ordering[Member] = Ordering.by(_.toLengthLimitedString.unwrap)
 
